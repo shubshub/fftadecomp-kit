@@ -201,6 +201,21 @@ assets beyond that boundary, and instructions may not straddle it. Literal
 data can still be read elsewhere in the ROM. Generated function spans remain
 provisional; this boundary does not prove that every function has been found.
 
+During Thumb traversal, the analyzer also recognizes an adjacent immediate
+`cmp` / `bls` guard leading to the five-instruction word-table dispatch
+`lsls #2; ldr [pc]; adds; ldr; mov pc`. Registers must agree throughout,
+the table must immediately follow its pointer literal, and all entries must
+be aligned code-region addresses outside the guard/dispatch/table bytes.
+The compare bounds the table to at most 256 entries. Recognized targets seed
+provisional discovery; table bytes are not decoded as fallthrough instructions.
+`recognized_switch_tables` records the count in layout statistics.
+
+This structural recognition is not a proof that the guard dominates every
+runtime path, that a default call never returns, or that each case is a
+separate function. It does not relax the matching harness's indirect-control-
+flow restrictions or certify complete-function extents. Other switch layouts
+remain unresolved; the generated inventory remains explicitly incomplete.
+
 ## The matching harness
 
 `match.py` exists because "close" is not good enough in a matching decomp: it

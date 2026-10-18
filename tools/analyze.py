@@ -29,7 +29,7 @@ try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_LR,
-                                    ARM_REG_PC)
+                                    ARM_REG_PC, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
 except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
@@ -165,6 +165,7 @@ class Analyzer:
         self.entry_targets = set() # where the entry point transfers to
         self.in_entry = False
         self.indirect = 0            # indirect transfers seen
+        self.switch_tables = 0
         self.max_func_instr = 4000
 
     # -- helpers
@@ -200,6 +201,66 @@ class Analyzer:
         if 0 <= a and a + 4 <= self.n:
             return struct.unpack_from("<I", self.rom, a)[0]
         return None
+
+    def thumb_switch_targets(self, offset):
+        """Recognize the bounded cmp/bls/word-table pattern as discovery evidence."""
+        def instruction(position):
+            if position % 2 or not self.in_code(position, 2):
+                return None
+            decoded = next(self.dec.thumb.disasm(self.rom[position:position + 4],
+                                                ROM_BASE + position, count=1), None)
+            return decoded if decoded is not None and decoded.size == 2 else None
+
+        comparison = instruction(offset - 2)
+        guard = instruction(offset)
+        if comparison is None or guard is None or comparison.mnemonic != "cmp" or \
+                guard.mnemonic != "bls" or len(comparison.operands) != 2 or \
+                comparison.operands[0].type != ARM_OP_REG or \
+                comparison.operands[1].type != ARM_OP_IMM or \
+                not 0 <= comparison.operands[1].imm <= 255 or \
+                len(guard.operands) != 1 or guard.operands[0].type != ARM_OP_IMM:
+            return ()
+        dispatch = guard.operands[0].imm - ROM_BASE
+        if dispatch <= offset:
+            return ()
+        sequence = [instruction(dispatch + distance) for distance in range(0, 10, 2)]
+        if any(item is None or item.cc not in (ARM_CC_AL, ARM_CC_INVALID)
+               for item in sequence) or \
+                tuple(item.mnemonic for item in sequence) != ("lsls", "ldr", "adds", "ldr", "mov"):
+            return ()
+        shift, literal, addition, load, transfer = (item.operands for item in sequence)
+        if len(shift) != 3 or shift[0].type != ARM_OP_REG or \
+                shift[1].type != ARM_OP_REG or shift[1].reg != comparison.operands[0].reg or \
+                shift[2].type != ARM_OP_IMM or shift[2].imm != 2:
+            return ()
+        accumulator = shift[0].reg
+        if len(literal) != 2 or literal[0].type != ARM_OP_REG or \
+                literal[0].reg == accumulator or literal[1].type != ARM_OP_MEM or \
+                literal[1].mem.base != ARM_REG_PC or literal[1].mem.index or \
+                literal[1].mem.disp < 0 or literal[1].mem.disp % 4:
+            return ()
+        if len(addition) != 3 or any(operand.type != ARM_OP_REG for operand in addition) or \
+                tuple(operand.reg for operand in addition) != (accumulator, accumulator, literal[0].reg):
+            return ()
+        if len(load) != 2 or load[0].type != ARM_OP_REG or load[0].reg != accumulator or \
+                load[1].type != ARM_OP_MEM or load[1].mem.base != accumulator or \
+                load[1].mem.index or load[1].mem.disp:
+            return ()
+        if len(transfer) != 2 or any(operand.type != ARM_OP_REG for operand in transfer) or \
+                tuple(operand.reg for operand in transfer) != (ARM_REG_PC, accumulator):
+            return ()
+        pool = ((dispatch + 6) & ~3) + literal[1].mem.disp
+        table = pool + 4
+        count = comparison.operands[1].imm + 1
+        if pool < dispatch + 10 or not self.in_code(pool, 4 + count * 4) or \
+                struct.unpack_from("<I", self.rom, pool)[0] != ROM_BASE + table:
+            return ()
+        targets = tuple(value - ROM_BASE for value in
+                        struct.unpack_from(f"<{count}I", self.rom, table))
+        if any(target % 2 or target < HEADER_LEN or not self.in_code(target, 2) or
+               offset - 2 <= target < table + count * 4 for target in targets):
+            return ()
+        return targets
 
     def traverse(self, start, thumb=False, seed_known=None):
         """Walk from `start` following branches; mode switches on BX/BLX/bit0.
@@ -245,6 +306,12 @@ class Analyzer:
                     val = self.literal(off, thumb, disp)
                     if val is not None:
                         known[reg] = val
+
+                if thumb and info["mn"] == "bls":
+                    switch_targets = self.thumb_switch_targets(off)
+                    if switch_targets:
+                        self.switch_tables += 1
+                        stack.extend((target, True, {}) for target in sorted(set(switch_targets)))
 
                 tgt = info["tgt"]
                 if tgt is None and info["opreg"] is not None:
@@ -617,6 +684,7 @@ def main():
             "thumb_halfwords_covered": int(sum(an.thumb_seen)),
             "code_bytes": sum(1 for v in an.covered if v),
             "cached_arm_instructions": len(dec.arm_cache),
+            "recognized_switch_tables": an.switch_tables,
             "inventory_complete": False,
         },
         "segments": out_segs,
