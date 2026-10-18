@@ -319,7 +319,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                     raise ValueError("call helper must be an undefined symbol")
                 target = helper
                 if not thunk_is_call_via(rom_image, target,
-                                         int(target_symbol["name"][-1])):
+                                         int(target_symbol["name"][len("_call_via_r"):])):
                     raise ValueError("call helper does not match its thunk in the ROM")
                 candidates = []
                 if not ROM_BASE <= target < ROM_BASE + len(rom_image):
