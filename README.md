@@ -39,9 +39,8 @@ or set `FFTA_ROOT=/path/to/decomp-repo` and call them with no path.
 ## Reserving an address before you work on it
 
 Several agents can work on the decomp at once, so **every address has to be
-claimed first**, and the claim lives as an issue in *this* repository — one
-issue per address, labelled `reservation`, with a machine-readable marker block
-so the tool can read the ledger.
+claimed first**, and the claim lives in this repository's single **address
+ledger** issue. Each address has its own row in the machine-readable table.
 
 ```sh
 python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 3 unmatchable
@@ -49,7 +48,7 @@ python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
 python tools/reserve.py list                      # who holds what
 python tools/reserve.py ping 0x08011040           # still on it, bumps the lease
 python tools/reserve.py release 0x08011040 --reason "done, moved to src/"
-python tools/reserve.py sweep --days 3            # close anything quiet
+python tools/reserve.py sweep --days 3            # release anything quiet
 ```
 
 ### The rules
@@ -60,17 +59,23 @@ python tools/reserve.py sweep --days 3            # close anything quiet
 2. **A reservation is a lease, not a land grab.** Ping it while you work.
    Release it as soon as you stop, including when you conclude the function
    **cannot** be matched — that is exactly when somebody else should be allowed
-   to try. `sweep` runs every 6 hours via the `reservations` workflow and closes
-   anything quiet for 3 days, so a stalled agent cannot hold an address.
+   to try. `sweep` runs every 6 hours via the `reservations` workflow and removes
+   rows quiet for 3 days, so a stalled agent cannot hold an address.
 3. **Release unmatchable addresses, don't hoard them.** `release
-   --unmatchable --reason "..." --tried "<flags>"` closes the reservation *and*
+   --unmatchable --reason "..." --tried "<flags>"` releases the reservation *and*
    records the address in `known-unmatchable.json`, with the reason and the
    flags already tried. Later agents get told to skip it instead of repeating
    the same dead end.
 
 `claim` fills in the function's name and size from the decomp repo's analysis
-(`config/functions.json`), so the issue says which function it is without
-anyone having to look it up.
+(`config/functions.json`), so the ledger records its size. Commands pull the
+kit first; investigate update warnings rather than trusting a stale client.
+`--no-pull` skips this update when the checkout has already been synchronized.
+The current table-writing commands require permission to edit the ledger issue;
+an update failure does not create a reservation.
+
+Rebase contribution branches onto current `origin/main` before opening a PR;
+do not merge main into the contribution branch. See `AGENTS.md` for the rules.
 
 ## Layout it expects
 
@@ -95,9 +100,13 @@ The comparison covers the named ELF function's entire symbol size, including
 literal pools, but excludes assembler alignment padding outside that symbol.
 The ELF instruction mode and alignment must agree with the ROM address.
 Unresolved relocations are rejected rather than compared as placeholder bytes.
-For now the verifier supports closed, straight-line leaf functions with
-canonical balanced push/pop returns; calls, branches, interrupts, local stack
-allocation and untracked transfers fail closed pending linked CFG verification.
+The verifier supports local leaf control flow, including immediate conditional
+branches and loops. Every reachable instruction is checked; return-address
+provenance and balanced saved-stack depth must agree at joins. Branches cannot
+leave the symbol or enter instruction interiors or literal pools, and each
+reachable region must have a path to a verified return. This does not prove
+termination of arbitrary loops. Calls, interrupts, local stack allocation and
+untracked transfers remain unsupported and fail closed.
 
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with

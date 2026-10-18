@@ -5,7 +5,7 @@ from pathlib import Path
 import re
 
 
-SCHEMA = "elf-symbol-leaf-v1"
+SCHEMA = "elf-symbol-cfg-leaf-v2"
 
 
 def source_paths(root, address):

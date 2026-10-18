@@ -33,7 +33,8 @@ from match_evidence import SCHEMA, source_fingerprint, source_paths, verify_depe
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT)
-    from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_OP_MEM,
+    from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_INS_ADR, ARM_INS_B,
+                                    ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
                                     ARM_OP_REG, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP)
 except ImportError:
     sys.exit("match.py needs capstone:  python -m pip install capstone")
@@ -164,32 +165,61 @@ def function_bytes(object_data, text_data, name, address, thumb):
     return matches[0]
 
 
-def verify_leaf(data, address, thumb):
-    """Certify a closed straight-line body and its PC-relative literal reads."""
+def verify_leaf_instructions(data, address, thumb):
+    """Certify a local leaf CFG and return its reachable instructions in order."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
-    return_registers = {ARM_REG_LR}
-    stack = []
-    literals = []
-    for instruction in decoder.disasm(data, address):
+    end = address + len(data)
+    alignment = 2 if thumb else 4
+    states = {address: (frozenset({ARM_REG_LR}), ())}
+    pending = [address]
+    instructions = {}
+    owners = {}
+    edges = {}
+    returns = set()
+    literals = set()
+    while pending:
+        current = pending.pop()
+        if current % alignment or not address <= current < end:
+            raise ValueError("function has no verified return: non-leaf control flow leaves the symbol")
+        if current not in instructions:
+            instruction = next(decoder.disasm(data[current - address:current - address + 4],
+                                             current, count=1), None)
+            if instruction is None or current + instruction.size > end:
+                raise ValueError("invalid or truncated reachable instruction")
+            for position in range(current, current + instruction.size):
+                if position in owners:
+                    raise ValueError("control flow enters the middle of an instruction")
+                owners[position] = current
+            instructions[current] = instruction
+        instruction = instructions[current]
+        return_registers = set(states[current][0])
+        stack = list(states[current][1])
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
-        if instruction.mnemonic in ("push", "pop"):
+        stack_operation = instruction.mnemonic in ("push", "pop")
+        if any(group in instruction.groups for group in (CS_GRP_CALL, CS_GRP_INT)):
+            raise ValueError("non-leaf calls and interrupts require linked CFG verification")
+        if instruction.id == ARM_INS_IT:
+            raise ValueError("unsupported conditional instruction block")
+        if instruction.id == ARM_INS_ADR:
+            raise ValueError("unsupported program-counter materialization")
+        if stack_operation:
             if not unconditional or ARM_REG_SP in registers:
                 raise ValueError("unsupported conditional or irregular stack operation")
             if instruction.mnemonic == "push":
+                if ARM_REG_PC in registers:
+                    raise ValueError("unsupported program-counter materialization")
                 stack[:0] = [register in return_registers for register in registers]
-                continue
-            if len(registers) > len(stack):
-                raise ValueError("pop reads outside the saved stack frame")
-            for register, saved_return in zip(registers, stack):
-                return_registers.discard(register)
-                if saved_return:
-                    return_registers.add(register)
-            del stack[:len(registers)]
-            if ARM_REG_PC not in registers:
-                continue
+            else:
+                if len(registers) > len(stack):
+                    raise ValueError("pop reads outside the saved stack frame")
+                for register, saved_return in zip(registers, stack):
+                    return_registers.discard(register)
+                    if saved_return:
+                        return_registers.add(register)
+                del stack[:len(registers)]
         returning = unconditional and (
             (instruction.mnemonic == "bx" and len(registers) == 1 and
              registers[0] in return_registers) or
@@ -199,32 +229,87 @@ def verify_leaf(data, address, thumb):
         if returning:
             if stack:
                 raise ValueError("return does not balance the saved stack frame")
-            code_end = instruction.address + instruction.size
-            if any(literal < code_end or literal + 4 > address + len(data)
-                   for literal in literals):
-                raise ValueError("literal read is outside the function's trailing pool")
-            return code_end - address
-        if any(group in instruction.groups for group in (CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT)):
-            raise ValueError("non-leaf control flow requires linked CFG verification")
-        written = instruction.regs_access()[1]
-        if ARM_REG_PC in written:
-            raise ValueError("unresolved program-counter write")
-        if ARM_REG_SP in written:
-            raise ValueError("unsupported stack-pointer adjustment")
-        if ARM_REG_SP in registers:
-            raise ValueError("unsupported stack-address materialization")
-        for operand in operands:
-            if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC:
-                if instruction.mnemonic != "ldr" or operand.mem.index:
-                    raise ValueError("unsupported PC-relative memory access")
-                program_counter = ((instruction.address + 4) & ~3
-                                   if thumb else instruction.address + 8)
-                literals.append(program_counter + operand.mem.disp)
-            if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP:
-                if not instruction.mnemonic.startswith("ldr"):
-                    raise ValueError("unsupported stack-frame write")
-        return_registers.difference_update(written)
-    raise ValueError("function has no verified return")
+            returns.add(current)
+            successors = ()
+        elif instruction.id == ARM_INS_B:
+            if len(operands) != 1 or operands[0].type != ARM_OP_IMM:
+                raise ValueError("unsupported non-leaf branch operand")
+            successors = (operands[0].imm,)
+            if not unconditional:
+                successors += (current + instruction.size,)
+        else:
+            if CS_GRP_JUMP in instruction.groups:
+                raise ValueError("non-leaf indirect control flow requires linked CFG verification")
+            if not stack_operation:
+                written = instruction.regs_access()[1]
+                if ARM_REG_PC in written:
+                    raise ValueError("unresolved program-counter write")
+                if ARM_REG_SP in written:
+                    raise ValueError("unsupported stack-pointer adjustment")
+                if ARM_REG_SP in registers:
+                    raise ValueError("unsupported stack-address materialization")
+                if ARM_REG_PC in registers:
+                    raise ValueError("unsupported program-counter materialization")
+                for operand in operands:
+                    if operand.type != ARM_OP_MEM:
+                        continue
+                    if operand.mem.index == ARM_REG_SP:
+                        raise ValueError("unsupported stack-address materialization")
+                    if operand.mem.index == ARM_REG_PC:
+                        raise ValueError("unsupported program-counter materialization")
+                    if operand.mem.base == ARM_REG_PC:
+                        if instruction.mnemonic != "ldr" or operand.mem.index:
+                            raise ValueError("unsupported PC-relative memory access")
+                        program_counter = ((current + 4) & ~3 if thumb else current + 8)
+                        literals.add(program_counter + operand.mem.disp)
+                    if operand.mem.base == ARM_REG_SP:
+                        if not instruction.mnemonic.startswith("ldr"):
+                            raise ValueError("unsupported stack-frame write")
+                return_registers.difference_update(written)
+            elif ARM_REG_PC in registers:
+                raise ValueError("unproven program-counter stack return")
+            successors = (current + instruction.size,)
+        edges[current] = successors
+        outgoing = (frozenset(return_registers), tuple(stack))
+        for successor in successors:
+            previous = states.get(successor)
+            if previous is None:
+                merged = outgoing
+            else:
+                if len(previous[1]) != len(stack):
+                    raise ValueError("inconsistent saved stack depth at control-flow join")
+                merged = (previous[0] & outgoing[0],
+                          tuple(saved and incoming for saved, incoming
+                                in zip(previous[1], stack)))
+            if previous != merged:
+                states[successor] = merged
+                pending.append(successor)
+    if not returns:
+        raise ValueError("function has no verified return")
+    predecessors = {current: set() for current in instructions}
+    for current, successors in edges.items():
+        for successor in successors:
+            predecessors[successor].add(current)
+    reaching_return = set(returns)
+    pending = list(returns)
+    while pending:
+        for predecessor in predecessors[pending.pop()]:
+            if predecessor not in reaching_return:
+                reaching_return.add(predecessor)
+                pending.append(predecessor)
+    if reaching_return != instructions.keys():
+        raise ValueError("reachable control-flow region has no path to a verified return")
+    code_end = max(instruction.address + instruction.size
+                   for instruction in instructions.values())
+    if any(literal % 4 or literal < code_end or literal + 4 > end for literal in literals):
+        raise ValueError("literal read is outside the function's trailing pool")
+    return [instructions[current] for current in sorted(instructions)]
+
+
+def verify_leaf(data, address, thumb):
+    """Return the code extent of a verified local leaf CFG."""
+    instructions = verify_leaf_instructions(data, address, thumb)
+    return max(instruction.address + instruction.size for instruction in instructions) - address
 
 
 def lcs_align(a, b):
@@ -338,14 +423,14 @@ def main():
             got = function_bytes(runner.read_binary(f"{workspace}/f.o"),
                                  runner.read_binary(f"{workspace}/f.bin"),
                                  f"func_{addr:08X}", addr, thumb)
-            code_size = verify_leaf(got, addr, thumb)
+            verified_instructions = verify_leaf_instructions(got, addr, thumb)
     except Exception as e:                       # noqa: BLE001
         sys.exit(f"compile failed:\n{e}")
 
     if len(got) < span:
         sys.exit(f"compiled symbol is shorter than the indexed span: {len(got)} < {span}")
     span = len(got)
-    print(f"extent    {span} bytes (complete ELF symbol; closed leaf; no relocations)")
+    print(f"extent    {span} bytes (complete ELF symbol; closed leaf CFG; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
     identical = got_body == want
@@ -388,8 +473,11 @@ def main():
         for line in findings:
             print(f"  {line}")
 
-    ga = disasm(got[:code_size], addr, thumb)
-    wa = disasm(want[:code_size], addr, thumb)
+    ga = [(instruction.address, instruction.size,
+           f"{instruction.mnemonic} {instruction.op_str}".strip())
+          for instruction in verified_instructions]
+    wa = [row for address, size, _ in ga
+          for row in disasm(want[address - addr:address - addr + size], address, thumb)]
     gbytes = [t for _, _, t in ga]
     wbytes = [t for _, _, t in wa]
     past_end = {i for i, (a, _, _) in enumerate(ga) if a >= addr + span}
