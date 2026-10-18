@@ -20,22 +20,28 @@ instruction the compiler decided differently.
 """
 
 import argparse
+import json
 import os
 import platform
+import re
 import shlex
 import shutil
 import struct
 import subprocess
 import sys
 from contextlib import contextmanager
-from match_evidence import SCHEMA, source_fingerprint, source_paths, verify_dependencies
+from match_evidence import (CALL_SUMMARY, LINKED_SCHEMA, SCHEMA, mapping_fingerprint,
+                            mapping_snapshot, source_fingerprint, source_paths,
+                            verify_dependencies)
 
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_INS_ADR, ARM_INS_B,
-                                    ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
-                                    ARM_OP_REG, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP)
+                                    ARM_INS_BL, ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
+                                    ARM_OP_REG, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP,
+                                    ARM_REG_R0, ARM_REG_R1, ARM_REG_R2, ARM_REG_R3,
+                                    ARM_REG_R12)
 except ImportError:
     sys.exit("match.py needs capstone:  python -m pip install capstone")
 
@@ -55,6 +61,7 @@ DEFAULT_CC = "$HOME/agbcc/gcc/agbcc"
 DEFAULT_CPP = "cpp"
 DEFAULT_AS = "arm-none-eabi-as"
 DEFAULT_OBJCOPY = "arm-none-eabi-objcopy"
+DEFAULT_LD = "arm-none-eabi-ld"
 DEFAULT_FLAGS = "-mthumb-interwork -O2"
 DEFAULT_WSL_PATH = "$HOME/armtc/root/usr/bin"
 
@@ -89,6 +96,9 @@ class Runner:
         with open(path, "rb") as f:
             return f.read()
 
+    def write_text(self, path, text):
+        self.sh(f"printf %s {shlex.quote(text)} > {shlex.quote(path)}")
+
     @contextmanager
     def workspace(self):
         path = self.sh('mkdir -p build && mktemp -d "$PWD/build/ffta_match_XXXXXXXX"').strip()
@@ -98,25 +108,28 @@ class Runner:
             yield path
         finally:
             outputs = " ".join(shlex.quote(f"{path}/f.{suffix}")
-                               for suffix in ("i", "s", "o", "bin"))
+                               for suffix in ("i", "s", "o", "bin", "known.s", "known.o",
+                                              "ld", "elf", "linked.bin"))
             self.sh(f"rm -f -- {outputs} && rmdir -- {shlex.quote(path)}")
 
 
-def function_bytes(object_data, text_data, name, address, thumb):
-    """Read the complete named function, including its pool, from ARM ELF32."""
+def elf_image(object_data):
+    """Read ARM ELF32 sections, symbols, and relocation-section metadata."""
     if object_data[:7] != b"\x7fELF\x01\x01\x01":
         raise ValueError("expected a little-endian ELF32 object")
     header = struct.unpack_from("<HHIIIIIHHHHHH", object_data, 16)
     object_type, machine = header[:2]
     section_offset, section_size, section_count, names_index = (
         header[5], header[10], header[11], header[12])
-    if object_type != 1 or machine != 40 or section_size != 40:
-        raise ValueError("expected an ARM relocatable ELF32 object")
+    if object_type not in (1, 2) or machine != 40 or section_size != 40:
+        raise ValueError("expected an ARM relocatable or executable ELF32 object")
     sections = [struct.unpack_from("<IIIIIIIIII", object_data,
                                   section_offset + index * section_size)
                 for index in range(section_count)]
 
     def section_data(section):
+        if section[1] == 8:
+            return b""
         start, size = section[4:6]
         result = object_data[start:start + size]
         if len(result) != size:
@@ -124,6 +137,8 @@ def function_bytes(object_data, text_data, name, address, thumb):
         return result
 
     def string_at(strings, offset):
+        if not 0 <= offset < len(strings):
+            raise ValueError("invalid ELF string offset")
         return strings[offset:strings.index(b"\0", offset)].decode("ascii")
 
     section_names = section_data(sections[names_index])
@@ -132,41 +147,207 @@ def function_bytes(object_data, text_data, name, address, thumb):
     if len(text_sections) != 1:
         raise ValueError("expected exactly one .text section")
     text_index = text_sections[0]
-    if section_data(sections[text_index]) != text_data:
-        raise ValueError("objcopy output does not equal ELF .text")
-    if any(section[1] in (4, 9) and section[5] for section in sections):
-        raise ValueError("unresolved relocations: link the object before comparing ROM bytes")
-
-    matches = []
-    for section in sections:
+    symbol_tables = {}
+    for table_index, section in enumerate(sections):
         if section[1] != 2:
             continue
         if section[9] != 16 or section[5] % 16:
             raise ValueError("invalid ELF symbol table")
         strings = section_data(sections[section[6]])
-        symbols = section_data(section)
-        for offset in range(0, len(symbols), 16):
+        symbol_data = section_data(section)
+        symbols = []
+        for offset in range(0, len(symbol_data), 16):
             symbol_name, value, size, info, visibility, section_index = (
-                struct.unpack_from("<IIIBBH", symbols, offset))
-            if string_at(strings, symbol_name) != name:
-                continue
-            if info & 15 != 2 or section_index != text_index or not size:
-                raise ValueError(f"{name} is not a sized .text function")
-            start = value & ~1
-            if bool(value & 1) != thumb:
-                raise ValueError(f"{name} ELF instruction mode does not match requested mode")
-            if start % 4 != address % 4 or address % (2 if thumb else 4):
-                raise ValueError(f"{name} ELF and ROM alignment differ")
-            if start + size > len(text_data):
-                raise ValueError(f"{name} extends beyond .text")
-            matches.append(text_data[start:start + size])
+                struct.unpack_from("<IIIBBH", symbol_data, offset))
+            symbols.append({"name": string_at(strings, symbol_name), "value": value,
+                            "size": size, "type": info & 15, "bind": info >> 4,
+                            "section": section_index})
+        symbol_tables[table_index] = symbols
+    return {"type": object_type, "sections": sections,
+            "section_data": [section_data(section) for section in sections],
+            "text_index": text_index, "text": section_data(sections[text_index]),
+            "symbol_tables": symbol_tables,
+            "symbols": [symbol for symbols in symbol_tables.values() for symbol in symbols],
+            "relocations": [index for index, section in enumerate(sections)
+                            if section[1] in (4, 9) and section[5]]}
+
+
+def function_record(image, name, address, thumb):
+    matches = [symbol for symbol in image["symbols"] if symbol["name"] == name]
     if len(matches) != 1:
         raise ValueError(f"expected exactly one ELF function named {name}")
-    return matches[0]
+    symbol = matches[0]
+    if symbol["type"] != 2 or symbol["section"] != image["text_index"] or not symbol["size"]:
+        raise ValueError(f"{name} is not a sized .text function")
+    start = symbol["value"] & ~1
+    if bool(symbol["value"] & 1) != thumb:
+        raise ValueError(f"{name} ELF instruction mode does not match requested mode")
+    if start % 4 != address % 4 or address % (2 if thumb else 4):
+        raise ValueError(f"{name} ELF and ROM alignment differ")
+    base = image["sections"][image["text_index"]][3] if image["type"] == 2 else 0
+    offset = start - base
+    if offset < 0 or offset + symbol["size"] > len(image["text"]):
+        raise ValueError(f"{name} extends beyond .text")
+    return symbol, offset
 
 
-def verify_leaf_instructions(data, address, thumb):
-    """Certify a local leaf CFG and return its reachable instructions in order."""
+def function_bytes(object_data, text_data, name, address, thumb):
+    """Read the complete named function, including its pool, from ARM ELF32."""
+    image = elf_image(object_data)
+    if image["type"] != 1:
+        raise ValueError("expected an ARM relocatable ELF32 object")
+    if image["text"] != text_data:
+        raise ValueError("objcopy output does not equal ELF .text")
+    if image["relocations"]:
+        raise ValueError("unresolved relocations: link the object before comparing ROM bytes")
+    symbol, offset = function_record(image, name, address, thumb)
+    return text_data[offset:offset + symbol["size"]]
+
+
+def allocated_text_only(image):
+    for index, section in enumerate(image["sections"]):
+        if section[2] & 2 and section[5] and index != image["text_index"]:
+            raise ValueError("unexpected nonempty allocated section")
+    text_section = image["sections"][image["text_index"]]
+    if text_section[1] != 1 or text_section[2] & 7 != 6:
+        raise ValueError("expected read-only executable .text")
+
+
+def call_bindings(image, name, address, mapping, rom_size):
+    """Allow only external Thumb calls to unambiguous addressed ROM functions."""
+    if image["type"] != 1 or mapping is None:
+        raise ValueError("linked calls require a relocatable object and config/functions.json")
+    allocated_text_only(image)
+    symbol, offset = function_record(image, name, address, True)
+    functions = [item for item in image["symbols"] if item["type"] == 2 and item["section"]]
+    padding = image["text"][symbol["size"]:]
+    thumb_padding = symbol["size"] % 4 == 2 and padding == b"\xc0\x46"
+    if functions != [symbol] or offset or len(image["text"]) - symbol["size"] > 3 or \
+            any(padding) and not thumb_padding:
+        raise ValueError("linked calls require one complete function without helpers or extra text")
+    entries = json.loads(mapping)
+    if not isinstance(entries, list):
+        raise ValueError("function mapping must be a list")
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    decoder.detail = True
+    calls = {}
+    targets = {}
+    occupied = set()
+    for section_index in image["relocations"]:
+        section = image["sections"][section_index]
+        if section[1] != 9 or section[7] != image["text_index"] or \
+                section[9] != 8 or section[5] % 8:
+            raise ValueError("unsupported linked relocation section")
+        symbols = image["symbol_tables"].get(section[6])
+        if symbols is None:
+            raise ValueError("relocation has no symbol table")
+        for position in range(0, section[5], 8):
+            relocation, info = struct.unpack_from("<II", image["section_data"][section_index], position)
+            if info & 255 != 10 or info >> 8 >= len(symbols):
+                raise ValueError("only R_ARM_THM_CALL relocations are supported")
+            target_symbol = symbols[info >> 8]
+            match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
+            if not match or target_symbol["section"] or target_symbol["bind"] != 1 or \
+                    target_symbol["type"] not in (0, 2):
+                raise ValueError("call target must be an undefined addressed function")
+            target = int(match[1], 16)
+            candidates = []
+            for entry in entries:
+                try:
+                    entry_address = int(entry["rom"], 16)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if entry_address & ~1 == target & ~1:
+                    candidates.append(entry)
+            if target % 2 or len(candidates) != 1 or \
+                    candidates[0].get("mode") != "thumb" or \
+                    int(candidates[0]["rom"], 16) != target or \
+                    not ROM_BASE <= target < ROM_BASE + min(rom_size, 0x150000):
+                raise ValueError("call target is unknown, ambiguous, misaligned, or not Thumb ROM code")
+            if address <= target < address + symbol["size"]:
+                raise ValueError("recursive or intra-function calls are unsupported")
+            instruction = next(decoder.disasm(image["text"][relocation:relocation + 4],
+                                             address + relocation, count=1), None)
+            if relocation % 2 or relocation + 4 > symbol["size"] or instruction is None or \
+                    instruction.id != ARM_INS_BL or instruction.size != 4:
+                raise ValueError("call relocation does not cover a Thumb BL instruction")
+            positions = set(range(relocation, relocation + 4))
+            if positions & occupied:
+                raise ValueError("overlapping call relocations")
+            occupied.update(positions)
+            calls[address + relocation] = target
+            targets[target_symbol["name"]] = target
+    if not calls or any(item["name"] and not item["section"] and item["name"] not in targets
+                        for item in image["symbols"]):
+        raise ValueError("unresolved symbols outside the permitted call bindings")
+    return calls, targets
+
+
+def linked_function_bytes(original, linked, name, address, calls, targets):
+    """Validate exact placement and the linker's complete modification surface."""
+    if linked["type"] != 2 or linked["relocations"]:
+        raise ValueError("expected an executable ELF without remaining relocations")
+    allocated_text_only(linked)
+    before, _ = function_record(original, name, address, True)
+    after, offset = function_record(linked, name, address, True)
+    if after["value"] != address | 1 or offset or after["size"] != before["size"] or \
+            linked["sections"][linked["text_index"]][3] != address:
+        raise ValueError("linked function address, mode, or size changed")
+    if len(linked["text"]) != len(original["text"]):
+        raise ValueError("linker added text or veneers")
+    expected_functions = {name, *targets}
+    actual_functions = [item["name"] for item in linked["symbols"] if item["type"] == 2]
+    if len(actual_functions) != len(expected_functions) or set(actual_functions) != expected_functions:
+        raise ValueError("unexpected linked function or veneer symbol")
+    for target_name, target in targets.items():
+        definitions = [item for item in linked["symbols"] if item["name"] == target_name]
+        if len(definitions) != 1 or definitions[0]["type"] != 2 or \
+                definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != target | 1:
+            raise ValueError("linked target lost its absolute Thumb function type")
+    if any(item["name"] and not item["section"] for item in linked["symbols"]):
+        raise ValueError("linked ELF retains undefined symbols")
+    if any(re.fullmatch(r"\$a(?:\..*)?", item["name"]) for item in linked["symbols"]):
+        raise ValueError("linked text contains an ARM mode mapping")
+    patched = {position for call in calls for position in range(call - address, call - address + 4)}
+    if any(before_byte != after_byte and position not in patched
+           for position, (before_byte, after_byte)
+           in enumerate(zip(original["text"], linked["text"]))):
+        raise ValueError("linker changed bytes outside call relocations")
+    return linked["text"][:after["size"]]
+
+
+def link_calls(runner, workspace, args, original, address, mapping, rom_size):
+    name = f"func_{address:08X}"
+    calls, targets = call_bindings(original, name, address, mapping, rom_size)
+    definitions = [".syntax unified", ".thumb"]
+    for target_name, target in sorted(targets.items()):
+        definitions.extend((f".global {target_name}", f".type {target_name}, %function",
+                            f".thumb_set {target_name}, 0x{target | 1:08X}"))
+    runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
+    script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
+              ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
+              ".ARM.attributes 0 : { *(.ARM.attributes) } "
+              ".unexpected 0 : { *(.vfp11_veneer) *(.v4_bx) *(.iplt) *(.igot.plt) } "
+              ".rel.iplt 0 : { *(.rel.iplt) } "
+              "ASSERT(SIZEOF(.unexpected) == 0, \"unexpected linker stubs\") "
+              "ASSERT(SIZEOF(.rel.iplt) == 0, \"unexpected dynamic relocations\") "
+              "/DISCARD/ : { *(.comment) *(.note.GNU-stack) } }")
+    runner.write_text(f"{workspace}/f.ld", script)
+    quoted = shlex.quote(workspace)
+    runner.sh(f"export TMPDIR={quoted}; {args.assembler} -mthumb-interwork "
+              f"{quoted}/f.known.s -o {quoted}/f.known.o")
+    runner.sh(f"export TMPDIR={quoted}; {args.linker} --fatal-warnings --no-undefined "
+              f"--no-relax --orphan-handling=error -T {quoted}/f.ld -e {name} "
+              f"{quoted}/f.o {quoted}/f.known.o -o {quoted}/f.elf")
+    runner.sh(f"{args.objcopy} -O binary --only-section=.text {quoted}/f.elf {quoted}/f.linked.bin")
+    linked = elf_image(runner.read_binary(f"{workspace}/f.elf"))
+    if runner.read_binary(f"{workspace}/f.linked.bin") != linked["text"]:
+        raise ValueError("objcopy output does not equal linked ELF .text")
+    return linked_function_bytes(original, linked, name, address, calls, targets), calls
+
+
+def verify_leaf_instructions(data, address, thumb, validated_calls=None):
+    """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     end = address + len(data)
@@ -178,6 +359,8 @@ def verify_leaf_instructions(data, address, thumb):
     edges = {}
     returns = set()
     literals = set()
+    calls = validated_calls or {}
+    seen_calls = set()
     while pending:
         current = pending.pop()
         if current % alignment or not address <= current < end:
@@ -199,8 +382,15 @@ def verify_leaf_instructions(data, address, thumb):
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
-        if any(group in instruction.groups for group in (CS_GRP_CALL, CS_GRP_INT)):
+        calling = CS_GRP_CALL in instruction.groups
+        if CS_GRP_INT in instruction.groups or calling and not calls:
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
+        if calling:
+            if not thumb or not unconditional or instruction.id != ARM_INS_BL or \
+                    instruction.size != 4 or len(operands) != 1 or operands[0].type != ARM_OP_IMM or \
+                    calls.get(current) != operands[0].imm or address <= operands[0].imm < end:
+                raise ValueError("call is not a validated external direct Thumb BL")
+            seen_calls.add(current)
         if instruction.id == ARM_INS_IT:
             raise ValueError("unsupported conditional instruction block")
         if instruction.id == ARM_INS_ADR:
@@ -231,6 +421,10 @@ def verify_leaf_instructions(data, address, thumb):
                 raise ValueError("return does not balance the saved stack frame")
             returns.add(current)
             successors = ()
+        elif calling:
+            return_registers.difference_update((ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
+                                               ARM_REG_R3, ARM_REG_R12, ARM_REG_LR))
+            successors = (current + instruction.size,)
         elif instruction.id == ARM_INS_B:
             if len(operands) != 1 or operands[0].type != ARM_OP_IMM:
                 raise ValueError("unsupported non-leaf branch operand")
@@ -284,6 +478,8 @@ def verify_leaf_instructions(data, address, thumb):
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
+    if seen_calls != calls.keys():
+        raise ValueError("call relocations are not all reachable verified instructions")
     if not returns:
         raise ValueError("function has no verified return")
     predecessors = {current: set() for current in instructions}
@@ -364,6 +560,7 @@ def main():
     ap.add_argument("--cpp", default=DEFAULT_CPP)
     ap.add_argument("--assembler", dest="assembler", default=DEFAULT_AS)
     ap.add_argument("--objcopy", default=DEFAULT_OBJCOPY)
+    ap.add_argument("--linker", default=DEFAULT_LD)
     ap.add_argument("--flags", default=DEFAULT_FLAGS)
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
     ap.add_argument("--wsl", default="Ubuntu")
@@ -384,6 +581,8 @@ def main():
     if not os.path.exists(src_abs):
         sys.exit(f"no source at {src_abs}")
     fingerprint = source_fingerprint(ROOT, addr)
+    mapping = mapping_snapshot(ROOT)
+    linked_profile = False
     emit = None
     if args.emit:
         emit = os.path.realpath(os.path.join(ROOT, args.emit))
@@ -420,17 +619,28 @@ def main():
             runner.sh(f"{environment}{args.assembler} {assembler_flags} {tmp}/f.s -o {tmp}/f.o")
             runner.sh(f"{args.objcopy} -O binary --only-section=.text "
                       f"{tmp}/f.o {tmp}/f.bin")
-            got = function_bytes(runner.read_binary(f"{workspace}/f.o"),
-                                 runner.read_binary(f"{workspace}/f.bin"),
-                                 f"func_{addr:08X}", addr, thumb)
-            verified_instructions = verify_leaf_instructions(got, addr, thumb)
+            object_data = runner.read_binary(f"{workspace}/f.o")
+            original = elf_image(object_data)
+            text_data = runner.read_binary(f"{workspace}/f.bin")
+            if original["text"] != text_data:
+                raise ValueError("objcopy output does not equal ELF .text")
+            calls = {}
+            if original["relocations"]:
+                if not thumb:
+                    raise ValueError("linked profile supports only Thumb callers")
+                got, calls = link_calls(runner, workspace, args, original, addr, mapping, len(rom))
+                linked_profile = True
+            else:
+                got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
+            verified_instructions = verify_leaf_instructions(got, addr, thumb, calls)
     except Exception as e:                       # noqa: BLE001
         sys.exit(f"compile failed:\n{e}")
 
     if len(got) < span:
         sys.exit(f"compiled symbol is shorter than the indexed span: {len(got)} < {span}")
     span = len(got)
-    print(f"extent    {span} bytes (complete ELF symbol; closed leaf CFG; no relocations)")
+    control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
+    print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
     identical = got_body == want
@@ -453,6 +663,8 @@ def main():
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
+    if linked_profile and mapping_snapshot(ROOT) != mapping:
+        sys.exit("function mapping changed during verification; re-run match.py")
     with open(rom_path, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -516,8 +728,11 @@ def main():
             f.write(f"# match report - 0x{addr:08X}"
                     f"{' (' + args.label + ')' if args.label else ''}\n\n")
             f.write(f"* source: `{src_rel}`\n")
-            f.write(f"* verification: `{SCHEMA}`\n")
+            f.write(f"* verification: `{LINKED_SCHEMA if linked_profile else SCHEMA}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
+            if linked_profile:
+                f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
+                f.write(f"* control flow: {CALL_SUMMARY}\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")
