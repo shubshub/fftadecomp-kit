@@ -4,6 +4,7 @@ push.py - the only sanctioned way to get work onto the decomp repository.
 
     python tools/push.py                 # verify, then push
     python tools/push.py --check-only    # verify only, push nothing
+    python tools/push.py --force          # only for an intentional rewrite
     python tools/push.py --repo ../fftadecomp
 
 Agents do not run `git push`.  They run this, and it refuses to push anything
@@ -13,7 +14,8 @@ somebody has to remember under pressure.
 The gate, all of which must pass:
 
   1. the branch contains the remote's tip of its base branch, and has no merge
-     commits  - a rebased, linear history, reviewable as a diff
+     commits  - a rebased, linear history, reviewable as a diff.
+     (--force skips only the "contains the tip" half, for rewriting history)
   2. nothing ROM-derived is tracked: no baserom.bin, no .gba, no asm/,
      no files/ - the disassembly and the raw runs are generated from the
      user's own ROM by 'make init' and must never be committed
@@ -65,7 +67,7 @@ def git(*args, **kw):
     return run(["git", *args], cwd=repo, **kw)
 
 
-def check_history(repo, remote, branch):
+def check_history(repo, remote, branch, force=False):
     log("[1/5] history: rebased and linear")
     code, _ = git("fetch", remote, branch, repo=repo)
     if code != 0:
@@ -79,17 +81,32 @@ def check_history(repo, remote, branch):
     code, out = git("merge-base", "--is-ancestor", f"{remote}/{branch}", "HEAD",
                     repo=repo)
     if code != 0:
-        log(f"    FAIL  the branch is behind {remote}/{branch}.")
-        log("          git fetch && git rebase " + f"{remote}/{branch}")
-        return False
-    code, out = git("log", "--merges", "--oneline", f"{remote}/{branch}..HEAD",
-                    repo=repo)
-    merges = [ln for ln in out.strip().splitlines() if ln.strip()]
-    if merges:
-        log(f"    FAIL  {len(merges)} merge commit(s) in the range; rebase instead")
-        for m in merges[:5]:
-            log(f"          {m}")
-        return False
+        if force:
+            log("    --force: history rewrite in progress, so the branch cannot "
+                "contain the old tip.")
+            log("    ok: continuing; the push will rewrite "
+                f"{remote}/{branch}")
+        else:
+            log(f"    FAIL  the branch is behind {remote}/{branch}.")
+            log("          git fetch && git rebase " + f"{remote}/{branch}")
+            log("          (or --force, if you are deliberately rewriting "
+                "history)")
+            return False
+    if force:
+        # the range now spans the whole existing trunk, whose merge commits
+        # from other people's pull requests are legitimate history
+        log("    --force: skipping the merge-commit scan; the range spans the "
+            "existing trunk")
+    else:
+        code, out = git("log", "--merges", "--oneline",
+                        f"{remote}/{branch}..HEAD", repo=repo)
+        merges = [ln for ln in out.strip().splitlines() if ln.strip()]
+        if merges:
+            log(f"    FAIL  {len(merges)} merge commit(s) in the range; rebase "
+                f"instead of merging {remote}/{branch} into your branch")
+            for m in merges[:5]:
+                log(f"          {m}")
+            return False
     code, out = git("rev-list", "--count", f"{remote}/{branch}..HEAD", repo=repo)
     log(f"    ok: {out.strip()} commit(s) ahead of {remote}/{branch}, linear")
     return True
@@ -183,12 +200,14 @@ def check_reports(repo):
     return True
 
 
-def do_push(repo, remote, branch):
+def do_push(repo, remote, branch, force=False):
     if os.environ.get("FFTA_PUSH_DRY"):
         log("\nFFTA_PUSH_DRY set - not pushing")
         return True
-    log(f"\npushing to {remote}/{branch} ...")
-    code, out = git("push", remote, branch, repo=repo)
+    verb = "force-pushing" if force else "pushing"
+    log(f"\n{verb} to {remote}/{branch} ...")
+    code, out = git("push", *(["--force"] if force else []), remote, branch,
+                    repo=repo)
     if code != 0:
         log("    FAIL  the push was rejected")
         for line in out.strip().splitlines()[-10:]:
@@ -206,6 +225,11 @@ def main():
     ap.add_argument("--branch", default=DEFAULT_BRANCH)
     ap.add_argument("--check-only", action="store_true",
                     help="run every check but push nothing")
+    ap.add_argument("--force", action="store_true",
+                    help="for an intentional history rewrite: drops the "
+                         "'branch contains the remote tip' requirement and "
+                         "force-pushes.  Every other check still runs.  Never "
+                         "use this for ordinary work - rebase instead.")
     args = ap.parse_args()
 
     repo = os.path.abspath(args.repo)
@@ -214,7 +238,7 @@ def main():
 
     log(f"push gate for {repo} -> {args.remote}/{args.branch}\n")
     checks = (
-        check_history(repo, args.remote, args.branch),
+        check_history(repo, args.remote, args.branch, force=args.force),
         check_no_rom_data(repo),
         check_matches(repo),
         check_plausible(repo),
@@ -227,7 +251,8 @@ def main():
     if args.check_only:
         log("--check-only: stopping before the push")
         return 0
-    return 0 if do_push(repo, args.remote, args.branch) else 1
+    return 0 if do_push(repo, args.remote, args.branch,
+                         force=args.force) else 1
 
 
 if __name__ == "__main__":
