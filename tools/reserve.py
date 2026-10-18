@@ -32,7 +32,33 @@ import time
 
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
-LEDGER_NUMBER = os.environ.get("FFTA_LEDGER_ISSUE", "64")
+LEDGER_TITLE = "address ledger"
+
+
+def _resolve_ledger_number():
+    """Find the open 'address ledger' issue instead of trusting a pinned number.
+
+    The ledger gets rotated (old one closed, new one opened) and a hard-coded
+    number goes stale every time it happens - which has bitten twice.  An env
+    override still wins, for pinning and tests.
+    """
+    override = os.environ.get("FFTA_LEDGER_ISSUE")
+    if override and override.isdigit() and int(override) > 0:
+        return int(override)
+    r = subprocess.run(
+        ["gh", "issue", "list", "--repo", KIT_REPO, "--state", "open",
+         "--limit", "50", "--json", "number,title"],
+        capture_output=True, text=True)
+    try:
+        for issue in json.loads(r.stdout or "[]"):
+            if str(issue.get("title", "")).strip().lower() == LEDGER_TITLE.lower():
+                return int(issue["number"])
+    except (ValueError, KeyError, TypeError):
+        pass
+    return 0            # no ledger yet: the first claim will create one
+
+
+LEDGER_NUMBER = _resolve_ledger_number()
 START = "<!-- ffta-ledger:start -->"
 END = "<!-- ffta-ledger:end -->"
 STATE_START = "<!-- ffta-ledger-state\n"
