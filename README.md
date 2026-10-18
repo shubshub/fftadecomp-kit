@@ -290,7 +290,12 @@ and headers. `status.py` rejects legacy or stale reports; regenerate them with
 `match.py`. Shared preprocessing inputs must live under `include/` or be `.h`
 files under `src/`; dependencies outside the fingerprinted set are rejected.
 `status.py --verify` recompiles against the local ROM and exits nonzero if any
-function fails. Offline report checks are cached evidence, not fresh ROM checks.
+function fails. `status.py --write --verify` also regenerates the match reports
+and validates their fingerprints before counting a successful compilation. This
+keeps the written status and subsequent offline checks consistent after shared
+header or mapping changes. `--verify` alone and `--check` never rewrite reports;
+`--check` takes precedence if combined with `--write`. Offline report checks are
+cached evidence, not fresh ROM checks.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
 Linked-profile reports also bind the exact `config/functions.json` mapping
