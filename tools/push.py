@@ -14,7 +14,9 @@ The gate, all of which must pass:
 
   1. the branch contains the remote's tip of its base branch, and has no merge
      commits  - a rebased, linear history, reviewable as a diff
-  2. no base ROM, no .gba and no extracted game data is tracked
+  2. nothing ROM-derived is tracked: no baserom.bin, no .gba, no asm/,
+     no files/ - the disassembly and the raw runs are generated from the
+     user's own ROM by 'make init' and must never be committed
   3. every function in src/ recompiles to the ROM bytes exactly, and the README
      progress block agrees with the result
   4. every source in src/ and include/ is plausible: no inline asm, no steering
@@ -41,7 +43,7 @@ DEFAULT_REPO = os.environ.get("FFTA_REPO") or (
     _SIBLING if os.path.isdir(_SIBLING) else os.getcwd())
 DEFAULT_REMOTE = os.environ.get("FFTA_REMOTE", "origin")
 DEFAULT_BRANCH = os.environ.get("FFTA_BRANCH", "main")
-FORBIDDEN_TRACKED = ("baserom.bin", ".gba", "files/")
+FORBIDDEN_TRACKED = ("baserom.bin", ".gba", "files/", "asm/")
 
 
 def log(*a):
