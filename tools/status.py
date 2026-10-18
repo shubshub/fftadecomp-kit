@@ -183,6 +183,10 @@ def main():
         old = current[current.index(START):current.index(END) + len(END)]
         if old.strip() != block.strip():
             sys.exit("README status is stale - run: python tools/status.py --write")
+        status_path = os.path.join(root, "docs", "status.md")
+        if os.path.exists(status_path):
+            if open(status_path, encoding="utf-8").read().strip() != block.strip():
+                sys.exit("docs/status.md is stale - run: python tools/status.py --write")
         print("README status is up to date")
         return 0
 
@@ -191,12 +195,19 @@ def main():
             sys.exit(f"{readme} has no {START} / {END} markers")
         new = re.sub(re.escape(START) + r".*?" + re.escape(END), block,
                      current, flags=re.S)
+        # also keep the block standalone, so CI can check the README against it
+        # without needing this tool
+        status_path = os.path.join(root, "docs", "status.md")
+        os.makedirs(os.path.dirname(status_path), exist_ok=True)
+        with open(status_path, "w", encoding="utf-8", newline="\n") as f:
+            f.write(block + "\n")
         if new != current:
             with open(readme, "w", encoding="utf-8", newline="\n") as f:
                 f.write(new)
             print(f"updated {os.path.relpath(readme, root)}")
         else:
             print("README status already up to date")
+        print(f"wrote {os.path.relpath(status_path, root)}")
     else:
         print(block)
 
