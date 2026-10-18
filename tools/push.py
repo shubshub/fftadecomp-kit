@@ -67,6 +67,110 @@ def git(*args, **kw):
     return run(["git", *args], cwd=repo, **kw)
 
 
+def committed_tree(repo, remote, branch):
+    """A clean copy of what HEAD would actually push.
+
+    The gate has to verify the *commit*, not the working tree: with other agents
+    working in the same checkout there is almost always an in-flight file in
+    src/, and refusing every push because of someone else's scratch file would
+    make the gate useless rather than strict.  The ROM is not committed, so it
+    is copied in - it is an input to verification, not part of the repository.
+    """
+    import shutil
+    import tempfile
+    dst = tempfile.mkdtemp(prefix="ffta_push_")
+    archive = subprocess.run(["git", "-C", repo, "archive", "HEAD"],
+                            capture_output=True)
+    if archive.returncode != 0:
+        shutil.rmtree(dst, ignore_errors=True)
+        return None
+    tar = subprocess.run(["tar", "-x", "-C", dst], input=archive.stdout,
+                         capture_output=True)
+    if tar.returncode != 0:
+        shutil.rmtree(dst, ignore_errors=True)
+        return None
+    for name in ("baserom.bin",):
+        srcf = os.path.join(repo, name)
+        if os.path.exists(srcf):
+            shutil.copy2(srcf, os.path.join(dst, name))
+    return dst
+
+
+def badge_base(repo):
+    """raw.githubusercontent.com base for the repo's badges branch"""
+    r = subprocess.run(["git", "-C", repo, "remote", "get-url", "origin"],
+                       capture_output=True, text=True)
+    m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$",
+                  r.stdout.strip() if r.returncode == 0 else "")
+    if not m:
+        return ""
+    return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/badges"
+
+
+def check_matches(root, badge=""):
+    log("[3/5] every function in src/ really matches, and the block agrees")
+    cmd = [sys.executable, os.path.join(KIT, "status.py"),
+           "--root", root, "--check", "--verify"]
+    if badge:
+        cmd += ["--badge-base", badge]
+    code, out = run(cmd, cwd=root)
+    if code != 0:
+        log("    FAIL  the progress block is stale or a source does not match.")
+        for line in out.strip().splitlines()[-12:]:
+            log(f"    {line}")
+        log("    Fix the sources, then run: python "
+            "../fftadecomp-kit/tools/status.py --write --verify")
+        return False
+    counts = [ln for ln in out.splitlines() if "identical" in ln or "up to date" in ln]
+    log(f"    ok: {counts[-1].strip() if counts else 'verified'}")
+    return True
+
+
+def check_plausible(root):
+    log("[4/5] sources are plausible")
+    for target in ("src", "include"):
+        if not os.path.isdir(os.path.join(root, target)):
+            continue
+        code, out = run([sys.executable, os.path.join(KIT, "plausible.py"),
+                         os.path.join(root, target)], cwd=root)
+        if code != 0:
+            log(f"    FAIL  {target}/ contains implausible source")
+            for line in out.strip().splitlines()[-10:]:
+                log(f"    {line}")
+            return False
+    log("    ok: no inline asm, no steering pragmas, no inert control flow")
+    return True
+
+
+def check_reports(root):
+    log("[5/5] every function in src/ has a MATCH report")
+    src = os.path.join(root, "src")
+    reports = os.path.join(root, "docs", "match")
+    if not os.path.isdir(src):
+        log("    ok: no src/ directory")
+        return True
+    problems = []
+    names = sorted(f for f in os.listdir(src) if f.endswith(".c"))
+    for name in names:
+        addr = name[:-2]
+        path = os.path.join(reports, f"{addr}.md")
+        if not os.path.exists(path):
+            problems.append(f"{addr}: no report in docs/match/")
+            continue
+        text = open(path, encoding="utf-8").read()
+        if "IMPLAUSIBLE" in text or "HAND-ASM" in text:
+            problems.append(f"{addr}: report is not a clean MATCH")
+        elif "MATCH - byte identical" not in text:
+            problems.append(f"{addr}: report does not say MATCH")
+    if problems:
+        log(f"    FAIL  {len(problems)} report problem(s):")
+        for p in problems[:8]:
+            log(f"          {p}")
+        return False
+    log(f"    ok: {len(names)} function(s), all with a MATCH report")
+    return True
+
+
 def check_history(repo, remote, branch, force=False):
     log("[1/5] history: rebased and linear")
     code, _ = git("fetch", remote, branch, repo=repo)
@@ -133,7 +237,7 @@ def check_no_rom_data(repo):
     return True
 
 
-def check_matches(repo):
+def check_matches_old_unused(repo):
     log("[3/5] every function in src/ really matches, and the block agrees")
     code, out = run([sys.executable, os.path.join(KIT, "status.py"),
                      "--root", repo, "--check", "--verify"], cwd=repo)
@@ -150,7 +254,7 @@ def check_matches(repo):
     return True
 
 
-def check_plausible(repo):
+def check_plausible_old_unused(repo):
     log("[4/5] sources are plausible")
     for target in ("src", "include"):
         if not os.path.isdir(os.path.join(repo, target)):
@@ -166,7 +270,7 @@ def check_plausible(repo):
     return True
 
 
-def check_reports(repo):
+def check_reports_old_unused(repo):
     log("[5/5] every function in src/ has a MATCH report")
     src = os.path.join(repo, "src")
     reports = os.path.join(repo, "docs", "match")
@@ -225,6 +329,9 @@ def main():
     ap.add_argument("--branch", default=DEFAULT_BRANCH)
     ap.add_argument("--check-only", action="store_true",
                     help="run every check but push nothing")
+    ap.add_argument("--working-tree", action="store_true",
+                    help="verify the working tree instead of the commit "
+                         "(normally wrong with other agents in flight)")
     ap.add_argument("--force", action="store_true",
                     help="for an intentional history rewrite: drops the "
                          "'branch contains the remote tip' requirement and "
@@ -237,13 +344,25 @@ def main():
         sys.exit(f"{repo} is not a git repository")
 
     log(f"push gate for {repo} -> {args.remote}/{args.branch}\n")
-    checks = (
-        check_history(repo, args.remote, args.branch, force=args.force),
-        check_no_rom_data(repo),
-        check_matches(repo),
-        check_plausible(repo),
-        check_reports(repo),
-    )
+    tree = repo if args.working_tree else committed_tree(repo, args.remote,
+                                                        args.branch)
+    if tree and tree != repo:
+        log(f"verifying the committed tree ({os.path.relpath(tree, repo)}), "
+            f"not the working tree: other agents may have files in flight")
+    else:
+        tree = repo
+    try:
+        checks = (
+            check_history(repo, args.remote, args.branch, force=args.force),
+            check_no_rom_data(repo),
+            check_matches(tree, badge_base(repo)),
+            check_plausible(tree),
+            check_reports(tree),
+        )
+    finally:
+        if tree != repo:
+            import shutil
+            shutil.rmtree(tree, ignore_errors=True)
     if not all(checks):
         log("\nNOTHING PUSHED - a check above failed.")
         return 1
