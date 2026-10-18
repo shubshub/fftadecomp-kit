@@ -6,6 +6,19 @@ import re
 
 
 SCHEMA = "elf-symbol-cfg-leaf-v2"
+LINKED_SCHEMA = "elf-symbol-thumb-calls-v1"
+CALL_SUMMARY = "direct Thumb BL with ordinary ARM ABI call summaries"
+
+
+def mapping_snapshot(root):
+    try:
+        return (Path(root) / "config" / "functions.json").read_bytes()
+    except FileNotFoundError:
+        return None
+
+
+def mapping_fingerprint(snapshot):
+    return hashlib.sha256(snapshot).hexdigest() if snapshot is not None else None
 
 
 def source_paths(root, address):
@@ -47,9 +60,16 @@ def verify_dependencies(preprocessed, root, address):
 
 def report_matches(report, root, address):
     lines = report.splitlines()
+    profiles = [line for line in lines if line.startswith("* verification:")]
+    profile_valid = profiles == [f"* verification: `{SCHEMA}`"]
+    if profiles == [f"* verification: `{LINKED_SCHEMA}`"]:
+        snapshot = mapping_snapshot(root)
+        profile_valid = (snapshot is not None and
+                         f"* mapping SHA-256: `{mapping_fingerprint(snapshot)}`" in lines and
+                         f"* control flow: {CALL_SUMMARY}" in lines)
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
-    return (f"* verification: `{SCHEMA}`" in lines and
+    return (profile_valid and
             f"* source SHA-256: `{source_fingerprint(root, address)}`" in lines and
             "* source plausibility: plausible" in lines and
             "* relocations: none" in lines and verdict is not None and

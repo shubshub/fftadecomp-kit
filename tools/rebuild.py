@@ -23,7 +23,7 @@ import subprocess
 import sys
 import tempfile
 
-from match_evidence import source_fingerprint
+from match_evidence import mapping_snapshot, source_fingerprint
 
 ROM_BASE = 0x08000000
 
@@ -90,6 +90,7 @@ def compiled_rebuild(root, requested_output=None):
     baseline = root / "baserom.bin"
     baseline_state = file_state(baseline)
     inventory = source_inventory(root)
+    mapping = mapping_snapshot(root)
     matcher = Path(__file__).with_name("match.py")
     build = root / "build"
     build.mkdir(exist_ok=True)
@@ -121,8 +122,9 @@ def compiled_rebuild(root, requested_output=None):
             previous_end = address + size
             emitted.unlink()
             print(f"verified  0x{address:08X}: {size} compiled bytes", flush=True)
-    if source_inventory(root) != inventory or file_state(baseline) != baseline_state:
-        raise ValueError("source inventory, dependencies, or base ROM changed during compilation")
+    if source_inventory(root) != inventory or file_state(baseline) != baseline_state or \
+            mapping_snapshot(root) != mapping:
+        raise ValueError("source inventory, dependencies, mapping, or base ROM changed during compilation")
 
     stream = None
     output_created = False
@@ -174,8 +176,9 @@ def compiled_rebuild(root, requested_output=None):
             stream = None
             if file_state(output) != rebuilt_state:
                 raise ValueError("written mixed rebuild failed its read-back check")
-        if source_inventory(root) != inventory or file_state(baseline) != baseline_state:
-            raise ValueError("source inventory, dependencies, or base ROM changed during rebuild")
+        if source_inventory(root) != inventory or file_state(baseline) != baseline_state or \
+                mapping_snapshot(root) != mapping:
+            raise ValueError("source inventory, dependencies, mapping, or base ROM changed during rebuild")
         compiled_bytes = sum(len(payload) for _, payload in payloads)
         print(f"\nrebuilt  : {position:,} bytes (partial mixed C/ROM build)\n"
               f"  compiled functions : {len(payloads):,}\n"
