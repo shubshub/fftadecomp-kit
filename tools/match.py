@@ -614,7 +614,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                 raise ValueError("non-leaf indirect control flow requires linked CFG verification")
             if not stack_operation and adjustment is None:
                 read, written = instruction.regs_access()
-                loaded_return = None
+                assigned_return = None
                 if ARM_REG_PC in written:
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
@@ -655,7 +655,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                             stack[slot] = (width == 4 and registers[0] in return_registers,
                                            stack[slot][1])
                         elif width == 4 and stack[slot][0]:
-                            loaded_return = registers[0]
+                            assigned_return = registers[0]
                     if operand.mem.base == ARM_REG_PC:
                         if instruction.mnemonic != "ldr" or operand.mem.index:
                             raise ValueError("unsupported PC-relative memory access")
@@ -675,7 +675,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                                     raise ValueError("stack-frame write is outside the tracked frame")
                                 stack[slot] = (registers[0] in return_registers, stack[slot][1])
                             elif slot < len(stack) and stack[slot][0]:
-                                loaded_return = registers[0]
+                                assigned_return = registers[0]
                         elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
                 if (set(read) & aliases.keys()) - allowed_aliases:
@@ -688,6 +688,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                         constant = operands[1].imm
                     elif operands[1].type == ARM_OP_REG:
                         constant = constants.get(operands[1].reg)
+                        if operands[1].reg in return_registers:
+                            assigned_return = operands[0].reg
                 return_registers.difference_update(written)
                 for register in written:
                     aliases.pop(register, None)
@@ -696,8 +698,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                     constants[operands[0].reg] = constant
                 if assignment is not None:
                     aliases[assignment[0]] = assignment[1]
-                if loaded_return is not None:
-                    return_registers.add(loaded_return)
+                if assigned_return is not None:
+                    return_registers.add(assigned_return)
             elif ARM_REG_PC in registers:
                 raise ValueError("unproven program-counter stack return")
             successors = (current + instruction.size,)

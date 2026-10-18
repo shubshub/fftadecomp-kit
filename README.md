@@ -200,6 +200,12 @@ reachable region must have a path to a verified return. This does not prove
 termination of arbitrary loops. Interrupts, dynamic stack adjustments and
 untracked transfers remain unsupported and fail closed.
 
+Unconditional 16-bit Thumb register moves preserve a proven original return
+address, including copies restored to LR. Overwrites discard that fact, joins
+retain it only when all incoming paths agree, and calls still invalidate
+caller-clobbered registers. Arithmetic, unknown inputs and wider or conditional
+moves do not establish return-address provenance.
+
 ### Fixed Thumb stack frames
 
 The framed profiles additionally support 16-bit `sub sp, #N` / `add sp, #N`
