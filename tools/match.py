@@ -468,9 +468,37 @@ def thumb_stack_adjustment(instruction):
 
 def uses_stack_frame(instructions):
     return any(thumb_stack_adjustment(instruction) is not None or
-               any(operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP
+               any((operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP) or
+                   (operand.type == ARM_OP_REG and operand.reg == ARM_REG_SP)
                    for operand in instruction.operands)
                for instruction in instructions)
+
+
+def stack_alias_assignment(instruction, aliases, depth):
+    operands = instruction.operands
+    if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            not operands or operands[0].type != ARM_OP_REG:
+        return None
+    source = None
+    displacement = 0
+    if instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+            operands[1].type == ARM_OP_REG:
+        source = operands[1].reg
+    elif instruction.mnemonic in ("add", "adds", "sub", "subs") and \
+            len(operands) in (2, 3) and operands[-1].type == ARM_OP_IMM:
+        if len(operands) == 2:
+            source = operands[0].reg
+        elif operands[1].type == ARM_OP_REG:
+            source = operands[1].reg
+        displacement = operands[-1].imm
+        if instruction.mnemonic.startswith("sub"):
+            displacement = -displacement
+    if source != ARM_REG_SP and source not in aliases:
+        return None
+    offset = (-4 * depth if source == ARM_REG_SP else aliases[source]) + displacement
+    if not -4 * depth <= offset <= 0:
+        raise ValueError("stack alias arithmetic leaves the tracked frame")
+    return operands[0].reg, offset, source
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None):
@@ -479,7 +507,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
     decoder.detail = True
     end = address + len(data)
     alignment = 2 if thumb else 4
-    states = {address: (frozenset({ARM_REG_LR}), ())}
+    states = {address: (frozenset({ARM_REG_LR}), (), ())}
     pending = [address]
     instructions = {}
     owners = {}
@@ -505,6 +533,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         instruction = instructions[current]
         return_registers = set(states[current][0])
         stack = list(states[current][1])
+        aliases = dict(states[current][2])
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
@@ -529,11 +558,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             if instruction.mnemonic == "push":
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
+                if any(register in aliases for register in registers):
+                    raise ValueError("stack aliases cannot be pushed or spilled")
                 stack[:0] = [(register in return_registers, True) for register in registers]
             else:
                 if len(registers) > len(stack):
                     raise ValueError("pop reads outside the saved stack frame")
                 for register, saved_slot in zip(registers, stack):
+                    aliases.pop(register, None)
                     return_registers.discard(register)
                     if saved_slot[0]:
                         return_registers.add(register)
@@ -559,6 +591,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             returns.add(current)
             successors = ()
         elif calling:
+            if any(register in aliases for register in
+                   (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2, ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)):
+                raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
             return_registers.difference_update((ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
                                                ARM_REG_R3, ARM_REG_R12, ARM_REG_LR))
             stack = [(saved_return and saved_slot, saved_slot)
@@ -574,16 +609,18 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             if CS_GRP_JUMP in instruction.groups:
                 raise ValueError("non-leaf indirect control flow requires linked CFG verification")
             if not stack_operation and adjustment is None:
-                written = instruction.regs_access()[1]
+                read, written = instruction.regs_access()
                 loaded_return = None
                 if ARM_REG_PC in written:
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
                     raise ValueError("unsupported stack-pointer adjustment")
-                if ARM_REG_SP in registers:
+                assignment = stack_alias_assignment(instruction, aliases, len(stack)) if thumb else None
+                if ARM_REG_SP in registers and assignment is None:
                     raise ValueError("unsupported stack-address materialization")
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
+                allowed_aliases = {assignment[2]} if assignment is not None else set()
                 for operand in operands:
                     if operand.type != ARM_OP_MEM:
                         continue
@@ -591,6 +628,26 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                         raise ValueError("unsupported stack-address materialization")
                     if operand.mem.index == ARM_REG_PC:
                         raise ValueError("unsupported program-counter materialization")
+                    if operand.mem.base in aliases:
+                        widths = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2,
+                                  "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}
+                        width = widths.get(instruction.mnemonic)
+                        if not thumb or not unconditional or instruction.size != 2 or \
+                                width is None or len(operands) != 2 or len(registers) != 1 or \
+                                operands[0].type != ARM_OP_REG or operand.mem.index:
+                            raise ValueError("unsupported stack-alias memory access")
+                        offset = aliases[operand.mem.base] + operand.mem.disp
+                        if offset % width or not -4 * len(stack) <= offset or offset + width > 0:
+                            raise ValueError("stack-alias access is unaligned or outside the tracked frame")
+                        allowed_aliases.add(operand.mem.base)
+                        slot = (offset + 4 * len(stack)) // 4
+                        if instruction.mnemonic.startswith("str"):
+                            if registers[0] in aliases:
+                                raise ValueError("stack aliases cannot be stored or spilled")
+                            stack[slot] = (width == 4 and registers[0] in return_registers,
+                                           stack[slot][1])
+                        elif width == 4 and stack[slot][0]:
+                            loaded_return = registers[0]
                     if operand.mem.base == ARM_REG_PC:
                         if instruction.mnemonic != "ldr" or operand.mem.index:
                             raise ValueError("unsupported PC-relative memory access")
@@ -613,14 +670,20 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                                 loaded_return = registers[0]
                         elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
+                if (set(read) & aliases.keys()) - allowed_aliases:
+                    raise ValueError("unsupported stack-alias use or escape")
                 return_registers.difference_update(written)
+                for register in written:
+                    aliases.pop(register, None)
+                if assignment is not None:
+                    aliases[assignment[0]] = assignment[1]
                 if loaded_return is not None:
                     return_registers.add(loaded_return)
             elif ARM_REG_PC in registers:
                 raise ValueError("unproven program-counter stack return")
             successors = (current + instruction.size,)
         edges[current] = successors
-        outgoing = (frozenset(return_registers), tuple(stack))
+        outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())))
         for successor in successors:
             previous = states.get(successor)
             if previous is None:
@@ -628,10 +691,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             else:
                 if len(previous[1]) != len(stack):
                     raise ValueError("inconsistent saved stack depth at control-flow join")
+                if previous[2] != outgoing[2]:
+                    raise ValueError("inconsistent stack aliases at control-flow join")
                 merged = (previous[0] & outgoing[0],
                           tuple((saved[0] and incoming[0], saved[1] and incoming[1])
                                 for saved, incoming
-                                in zip(previous[1], stack)))
+                                in zip(previous[1], stack)), outgoing[2])
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)

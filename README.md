@@ -211,9 +211,19 @@ argument never establishes a return address. Stores outside the tracked frame
 are rejected. Calls invalidate return-address facts in allocated local/outgoing
 words, retaining pushed-save facts only under the existing ABI call assumption.
 
-Register-controlled SP writes, stack-address materialization, indirect stack
-aliases and unsupported access widths remain rejected. This is a bounded CFG
-profile, not a general proof of memory safety or callee behavior.
+Local-array addresses formed by 16-bit register moves and constant additions
+or subtractions are tracked relative to entry SP. Aligned byte, halfword and
+word accesses through these aliases must stay inside the allocated/pushed
+frame. Partial stores invalidate the affected word's return-address fact.
+Alias facts must agree exactly at control-flow joins. Pushing or storing these
+pointers, unsupported pointer arithmetic, indexed accesses, and carrying an
+alias across a call in a caller-clobbered register are rejected. Callee-saved
+aliases survive only under the existing ABI assumption and are cleared when
+their registers are restored by a pop.
+
+Register-controlled SP writes and untracked stack-pointer transformations
+remain rejected. This is a bounded CFG profile, not a general proof of memory
+safety, pointer lifetime, or callee behavior.
 
 Framed reports use `elf-symbol-thumb-frame-v1` or
 `elf-symbol-thumb-frame-calls-v1` and require an explicit stack-summary line.

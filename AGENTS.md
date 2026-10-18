@@ -218,7 +218,9 @@ call summary, not a proof that the callee returns or preserves its contract.
 It rejects veneers, cross-mode and indirect calls, unmapped data relocations, local
 helpers, self/intra-function calls, tail calls and unsupported stack operations.
 Fixed Thumb SP allocations and direct aligned word accesses have a separate
-framed profile. Stack aliases, dynamic adjustments, out-of-frame stores and
+framed profile. Bounded constant-offset stack aliases support local-array
+accesses, including aligned byte and halfword operations. Alias escapes,
+inconsistent alias joins, dynamic adjustments, out-of-frame stores and
 unbalanced returns still fail; do not steer source around these checks.
 Known external data symbols can be listed in `config/data_symbols.json` for
 typed absolute linking. Only reachable trailing `R_ARM_ABS32` literal words

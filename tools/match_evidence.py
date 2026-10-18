@@ -10,7 +10,7 @@ LINKED_SCHEMA = "elf-symbol-thumb-calls-v1"
 CALL_SUMMARY = "direct Thumb BL with ordinary ARM ABI call summaries"
 FRAMED_SCHEMA = "elf-symbol-thumb-frame-v1"
 FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
-STACK_SUMMARY = "fixed Thumb SP adjustments and direct word accesses with return provenance"
+STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return provenance"
 DATA_SCHEMA = "elf-symbol-thumb-data-v1"
 FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
 
