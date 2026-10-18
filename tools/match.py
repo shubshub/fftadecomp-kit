@@ -57,6 +57,22 @@ def repo_root(arg=None):
 ROOT = repo_root()
 ROM_BASE = 0x08000000
 
+# agbcc's indirect-call helpers are a table of 'bx rN' thunks at 0x08142250,
+# not addressed functions, so call_bindings cannot find them in the index.
+# They are real code with a checkable shape, so recognise them by name and
+# verify the thunk against the ROM rather than trusting the name.
+RUNTIME_HELPERS = {f"_call_via_r{n}": 0x08142244 + n * 4
+                   for n in range(0, 15)}
+
+
+def thunk_is_call_via(rom, address, register):
+    """the thunk must really be 'bx r<register>' followed by 'mov r8,r8'"""
+    off = address - ROM_BASE
+    if off < 0 or off + 4 > len(rom):
+        return False
+    hw0, hw1 = struct.unpack_from("<HH", rom, off)
+    return hw0 == 0x4700 + (register << 3) and hw1 == 0x46C0
+
 DEFAULT_CC = "$HOME/agbcc/gcc/agbcc"
 DEFAULT_CPP = "cpp"
 DEFAULT_AS = "arm-none-eabi-as"
@@ -213,7 +229,8 @@ def allocated_text_only(image):
         raise ValueError("expected read-only executable .text")
 
 
-def call_bindings(image, name, address, mapping, rom_size):
+def call_bindings(image, name, address, mapping, rom_size,
+                   rom_image=b''):
     """Allow only external Thumb calls to unambiguous addressed ROM functions."""
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
@@ -247,11 +264,25 @@ def call_bindings(image, name, address, mapping, rom_size):
                 raise ValueError("only R_ARM_THM_CALL relocations are supported")
             target_symbol = symbols[info >> 8]
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
-            if not match or target_symbol["section"] or target_symbol["bind"] != 1 or \
-                    target_symbol["type"] not in (0, 2):
-                raise ValueError("call target must be an undefined addressed function")
-            target = int(match[1], 16)
-            candidates = []
+            helper = RUNTIME_HELPERS.get(target_symbol["name"])
+            if helper is not None:
+                # agbcc's _call_via_rN: a real call, through a thunk we verify
+                if target_symbol["section"] or target_symbol["bind"] != 1:
+                    raise ValueError("call helper must be an undefined symbol")
+                target = helper
+                if not thunk_is_call_via(rom_image, target,
+                                         int(target_symbol["name"][-1])):
+                    raise ValueError("call helper does not match its thunk in the ROM")
+                candidates = []
+                if not ROM_BASE <= target < ROM_BASE + len(rom_image):
+                    raise ValueError("call target is outside the ROM")
+            else:
+                if not match or target_symbol["section"] or \
+                        target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2):
+                    raise ValueError("call target must be an undefined addressed function")
+                target = int(match[1], 16)
+                candidates = []
             for entry in entries:
                 try:
                     entry_address = int(entry["rom"], 16)
@@ -259,10 +290,15 @@ def call_bindings(image, name, address, mapping, rom_size):
                     continue
                 if entry_address & ~1 == target & ~1:
                     candidates.append(entry)
-            if target % 2 or len(candidates) != 1 or \
+            if helper is None and (target % 2 or len(candidates) != 1 or \
                     candidates[0].get("mode") != "thumb" or \
                     int(candidates[0]["rom"], 16) != target or \
-                    not ROM_BASE <= target < ROM_BASE + min(rom_size, 0x150000):
+                    not ROM_BASE <= target < ROM_BASE + rom_size):
+                # No arbitrary region cap: config/functions.json already reaches
+                # well past 0x08150000 (0x080D2E24 is indexed), so the old
+                # min(rom_size, 0x150000) rejected legitimate call targets.
+                # Uniqueness, exact address, Thumb mode and ROM bounds are the
+                # real checks.
                 raise ValueError("call target is unknown, ambiguous, misaligned, or not Thumb ROM code")
             if address <= target < address + symbol["size"]:
                 raise ValueError("recursive or intra-function calls are unsupported")
@@ -316,9 +352,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets):
     return linked["text"][:after["size"]]
 
 
-def link_calls(runner, workspace, args, original, address, mapping, rom_size):
+def link_calls(runner, workspace, args, original, address, mapping, rom_size,
+               rom_image=b''):
     name = f"func_{address:08X}"
-    calls, targets = call_bindings(original, name, address, mapping, rom_size)
+    calls, targets = call_bindings(original, name, address, mapping,
+                                     rom_size, rom_image)
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
         definitions.extend((f".global {target_name}", f".type {target_name}, %function",
@@ -628,7 +666,8 @@ def main():
             if original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
-                got, calls = link_calls(runner, workspace, args, original, addr, mapping, len(rom))
+                got, calls = link_calls(runner, workspace, args, original,
+                                        addr, mapping, len(rom), rom)
                 linked_profile = True
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
