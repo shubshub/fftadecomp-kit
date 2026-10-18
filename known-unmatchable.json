@@ -14,6 +14,13 @@
     "tried": "literal base: 28 B, base lands in r0, no frame; symbol form: exact 30 B but unverifiable without a linked build"
   },
   {
+    "address": "0x0801CA10",
+    "reason": "exhausted: 13 source shapes probed with probe.py, all land at 52 bytes / 19 of 34 slots. The ROM keeps &scaled[0..2] in three registers; agbcc folds each into one sp base plus an immediate, and every shape that forces the addresses into registers pays in spill traffic (5 regs -> 8 slots).",
+    "released_at": "2026-10-18T09:54:44Z",
+    "who": "opencode",
+    "tried": "s32 vs s16 temporaries; address locals; addresses taken once; struct vs array; declaration order; register hints; forwarding; interleaving; destination aliasing; -O0..-Os"
+  },
+  {
     "address": "0x08135D38",
     "reason": "two independent blockers. (1) Three dead computations survive only if their loads are branch conditions that outlive reload, which in C means identical if/else arms - rejected by plausible.py as inert control flow. (2) 0x02000000 + 0x2FC2 must stay unfolded, which needs a named symbol and leaves an R_ARM_ABS32 relocation match.py refuses. Same dead-load mechanism as 0x0814862C/0x0814860C; see Parked/08135D38/README.md.",
     "released_at": "2026-10-18T09:03:23Z",

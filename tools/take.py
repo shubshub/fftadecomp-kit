@@ -390,6 +390,29 @@ def cmd_sweep(args):
     return EXIT_OK
 
 
+def cmd_note_unmatchable(args):
+    """record a dead end without a live lease (after release, or from a park note)"""
+    addr = normalise(args.addr)
+    number, state = fetch_ledger()
+    if held_by(state, addr):
+        sys.exit(f"{addr} is still reserved - release it with --unmatchable so "
+                 f"the reason lands on the reservation")
+    path, db = unmatchable_db()
+    rec = {"address": addr, "reason": args.reason or "no reason given",
+           "released_at": now(), "who": args.who}
+    if args.tried:
+        rec["tried"] = args.tried
+    db = [d for d in db if d.get("address", "").upper() != addr.upper()] + [rec]
+    with open(path, "w", encoding="utf-8", newline="\n") as f:
+        json.dump(sorted(db, key=lambda d: d["address"]), f, indent=2)
+        f.write("\n")
+    comment(number,
+            f"**recorded {addr} as unmatchable** (no lease needed): "
+            f"{rec['reason']}")
+    print(f"recorded {addr} in known-unmatchable.json")
+    return 0
+
+
 def cmd_doctor(args):
     try:
         number, state = fetch_ledger()
@@ -462,6 +485,14 @@ def main():
     p = sub.add_parser("sweep", help="drop rows nobody has touched")
     p.add_argument("--days", type=int, default=STALE_DAYS)
     p.set_defaults(fn=cmd_sweep)
+
+    p = sub.add_parser("note-unmatchable",
+                       help="record a dead end for an address that is not reserved")
+    p.add_argument("addr")
+    p.add_argument("--reason", default="")
+    p.add_argument("--tried", default="")
+    p.add_argument("--who", default=os.environ.get("FFTA_WHO", "agent"))
+    p.set_defaults(fn=cmd_note_unmatchable)
 
     p = sub.add_parser("doctor", help="is the ledger healthy?")
     p.set_defaults(fn=cmd_doctor)
