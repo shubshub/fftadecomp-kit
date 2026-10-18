@@ -18,9 +18,9 @@ Work is parallel, and the ledger is **one issue in this repository** — the
 "address ledger" — with a row per claimed address.
 
 ```sh
-python tools/reserve.py list                    # read the board first
-python tools/reserve.py check 0x08011040        # then check the address
-python tools/reserve.py claim 0x08011040 --who <you> --note "what you are doing"
+python tools/take.py list                    # read the board first
+python tools/take.py check 0x08011040        # then check the address
+python tools/take.py claim 0x08011040 --who <you> --note "what you are doing"
 ```
 
 **Never reserve an address already reserved, matched, or in review.** `check`
@@ -57,10 +57,22 @@ reserved, and do not work around a refusal.
 
 ### 2. Release it the moment you stop — especially if you cannot match it
 
-```sh
-python tools/reserve.py ping    0x08011040 --who <you>
-python tools/reserve.py release 0x08011040 --who <you> --reason "moved to src/"
-python tools/reserve.py release 0x08011040 --who <you> --unmatchable --reason "no flags reproduce this" --tried="-O1..-O3"
+```
+**`tools/take.py` is the official way to reserve an address.**  `reserve.py` is a *broker client*: it posts a request comment that the
+reservations workflow is meant to accept, which is asynchronous - a claim
+can sit "submitted, not yet accepted" indefinitely, so an agent can believe
+it holds an address when it does not.  `take.py` writes the ledger itself,
+in the same schema the broker reads, and re-reads afterwards to confirm the
+lease actually took.  It refuses before writing anything: already reserved
+(1), recorded unmatchable (3), already matched in `src/` (4), matched in an
+open PR (5), broker requests still pending (7) - and it re-reads after
+writing, exiting 8 if it lost the race rather than pretending to hold the
+lease.  `take.py doctor` reports whether the ledger is healthy;
+`take.py purge-requests` clears requests the broker never answered.
+sh
+python tools/take.py ping    0x08011040 --who <you>
+python tools/take.py release 0x08011040 --who <you> --reason "moved to src/"
+python tools/take.py release 0x08011040 --who <you> --unmatchable --reason "no flags reproduce this" --tried="-O1..-O3"
 ```
 
 A reservation is a **lease, not a land grab**. Anything quiet for 3 days is

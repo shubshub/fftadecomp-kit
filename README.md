@@ -16,6 +16,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/rebuild.py` | concatenates the split and checks it reproduces the base ROM byte for byte (also drives armips) |
 | `tools/match.py` | compiles a decompiled function and diffs it against the ROM, instruction by instruction |
 | `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
+| `tools/take.py` | **the official way to reserve an address** - claims it in this repo's ledger, refusing anything already reserved, already matched or in review |
 | `tools/reserve.py` | submits address requests to the single ledger issue and waits for authenticated broker confirmation |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
@@ -43,11 +44,11 @@ claimed first**, and the claim lives in this repository's single **address
 ledger** issue. Each address has its own row in the machine-readable table.
 
 ```sh
-python tools/reserve.py list                    # read the board first
-python tools/reserve.py check 0x08011040        # then check the address
-python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
-python tools/reserve.py ping 0x08011040 --who me
-python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src/"
+python tools/take.py list                    # read the board first
+python tools/take.py check 0x08011040        # then check the address
+python tools/take.py claim 0x08011040 --who me --note "four strh pairs"
+python tools/take.py ping 0x08011040 --who me
+python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
 ```
 
 ### The rules
