@@ -197,8 +197,28 @@ branches and loops. Every reachable instruction is checked; return-address
 provenance and balanced saved-stack depth must agree at joins. Branches cannot
 leave the symbol or enter instruction interiors or literal pools, and each
 reachable region must have a path to a verified return. This does not prove
-termination of arbitrary loops. Interrupts, local stack allocation and
+termination of arbitrary loops. Interrupts, dynamic stack adjustments and
 untracked transfers remain unsupported and fail closed.
+
+### Fixed Thumb stack frames
+
+The framed profiles additionally support 16-bit `sub sp, #N` / `add sp, #N`
+and direct aligned word `ldr` / `str` accesses through SP. Allocations are
+tracked alongside pushed registers. Deallocation cannot cross entry SP, all
+returns must restore entry depth, and control-flow joins require equal depths.
+Stores update the affected word's return-address provenance; loading an incoming
+argument never establishes a return address. Stores outside the tracked frame
+are rejected. Calls invalidate return-address facts in allocated local/outgoing
+words, retaining pushed-save facts only under the existing ABI call assumption.
+
+Register-controlled SP writes, stack-address materialization, indirect stack
+aliases and unsupported access widths remain rejected. This is a bounded CFG
+profile, not a general proof of memory safety or callee behavior.
+
+Framed reports use `elf-symbol-thumb-frame-v1` or
+`elf-symbol-thumb-frame-calls-v1` and require an explicit stack-summary line.
+The linked variant also requires the usual mapping fingerprint and call
+summary. Existing unframed schemas remain accepted without report churn.
 
 ### Direct Thumb calls
 

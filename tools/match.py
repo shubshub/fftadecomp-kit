@@ -30,7 +30,8 @@ import struct
 import subprocess
 import sys
 from contextlib import contextmanager
-from match_evidence import (CALL_SUMMARY, LINKED_SCHEMA, SCHEMA, mapping_fingerprint,
+from match_evidence import (CALL_SUMMARY, FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA,
+                            LINKED_SCHEMA, SCHEMA, STACK_SUMMARY, mapping_fingerprint,
                             mapping_snapshot, source_fingerprint, source_paths,
                             verify_dependencies)
 
@@ -384,6 +385,20 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
     return linked_function_bytes(original, linked, name, address, calls, targets), calls
 
 
+def thumb_stack_adjustment(instruction):
+    if instruction.size != 2 or instruction.bytes[1] != 0xB0:
+        return None
+    words = instruction.bytes[0] & 0x7F
+    return -words if instruction.bytes[0] & 0x80 else words
+
+
+def uses_stack_frame(instructions):
+    return any(thumb_stack_adjustment(instruction) is not None or
+               any(operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP
+                   for operand in instruction.operands)
+               for instruction in instructions)
+
+
 def verify_leaf_instructions(data, address, thumb, validated_calls=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
@@ -420,6 +435,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
+        adjustment = thumb_stack_adjustment(instruction) if thumb else None
         calling = CS_GRP_CALL in instruction.groups
         if CS_GRP_INT in instruction.groups or calling and not calls:
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
@@ -439,15 +455,24 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             if instruction.mnemonic == "push":
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
-                stack[:0] = [register in return_registers for register in registers]
+                stack[:0] = [(register in return_registers, True) for register in registers]
             else:
                 if len(registers) > len(stack):
                     raise ValueError("pop reads outside the saved stack frame")
-                for register, saved_return in zip(registers, stack):
+                for register, saved_slot in zip(registers, stack):
                     return_registers.discard(register)
-                    if saved_return:
+                    if saved_slot[0]:
                         return_registers.add(register)
                 del stack[:len(registers)]
+        elif adjustment is not None:
+            if not unconditional:
+                raise ValueError("unsupported conditional stack-pointer adjustment")
+            if adjustment < 0:
+                stack[:0] = [(False, False)] * -adjustment
+            elif adjustment > len(stack):
+                raise ValueError("stack-pointer adjustment leaves the tracked frame")
+            else:
+                del stack[:adjustment]
         returning = unconditional and (
             (instruction.mnemonic == "bx" and len(registers) == 1 and
              registers[0] in return_registers) or
@@ -462,6 +487,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         elif calling:
             return_registers.difference_update((ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
                                                ARM_REG_R3, ARM_REG_R12, ARM_REG_LR))
+            stack = [(saved_return and saved_slot, saved_slot)
+                     for saved_return, saved_slot in stack]
             successors = (current + instruction.size,)
         elif instruction.id == ARM_INS_B:
             if len(operands) != 1 or operands[0].type != ARM_OP_IMM:
@@ -472,8 +499,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         else:
             if CS_GRP_JUMP in instruction.groups:
                 raise ValueError("non-leaf indirect control flow requires linked CFG verification")
-            if not stack_operation:
+            if not stack_operation and adjustment is None:
                 written = instruction.regs_access()[1]
+                loaded_return = None
                 if ARM_REG_PC in written:
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
@@ -495,9 +523,25 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                         program_counter = ((current + 4) & ~3 if thumb else current + 8)
                         literals.add(program_counter + operand.mem.disp)
                     if operand.mem.base == ARM_REG_SP:
-                        if not instruction.mnemonic.startswith("ldr"):
+                        if thumb:
+                            if not unconditional or instruction.size != 2 or \
+                                    instruction.mnemonic not in ("ldr", "str") or \
+                                    len(operands) != 2 or len(registers) != 1 or \
+                                    operands[0].type != ARM_OP_REG or operand.mem.index or \
+                                    operand.mem.disp < 0 or operand.mem.disp % 4:
+                                raise ValueError("unsupported direct stack-frame access")
+                            slot = operand.mem.disp // 4
+                            if instruction.mnemonic == "str":
+                                if slot >= len(stack):
+                                    raise ValueError("stack-frame write is outside the tracked frame")
+                                stack[slot] = (registers[0] in return_registers, stack[slot][1])
+                            elif slot < len(stack) and stack[slot][0]:
+                                loaded_return = registers[0]
+                        elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
                 return_registers.difference_update(written)
+                if loaded_return is not None:
+                    return_registers.add(loaded_return)
             elif ARM_REG_PC in registers:
                 raise ValueError("unproven program-counter stack return")
             successors = (current + instruction.size,)
@@ -511,7 +555,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                 if len(previous[1]) != len(stack):
                     raise ValueError("inconsistent saved stack depth at control-flow join")
                 merged = (previous[0] & outgoing[0],
-                          tuple(saved and incoming for saved, incoming
+                          tuple((saved[0] and incoming[0], saved[1] and incoming[1])
+                                for saved, incoming
                                 in zip(previous[1], stack)))
             if previous != merged:
                 states[successor] = merged
@@ -715,6 +760,10 @@ def main():
     if len(got) < span:
         sys.exit(f"compiled symbol is shorter than the indexed span: {len(got)} < {span}")
     span = len(got)
+    framed_profile = thumb and uses_stack_frame(verified_instructions)
+    schema = LINKED_SCHEMA if linked_profile else SCHEMA
+    if framed_profile:
+        schema = FRAMED_LINKED_SCHEMA if linked_profile else FRAMED_SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
@@ -823,8 +872,10 @@ def main():
             f.write(f"# match report - 0x{addr:08X}"
                     f"{' (' + args.label + ')' if args.label else ''}\n\n")
             f.write(f"* source: `{src_rel}`\n")
-            f.write(f"* verification: `{LINKED_SCHEMA if linked_profile else SCHEMA}`\n")
+            f.write(f"* verification: `{schema}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
+            if framed_profile:
+                f.write(f"* stack frame: {STACK_SUMMARY}\n")
             if linked_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {CALL_SUMMARY}\n")

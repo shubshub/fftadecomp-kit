@@ -8,6 +8,9 @@ import re
 SCHEMA = "elf-symbol-cfg-leaf-v2"
 LINKED_SCHEMA = "elf-symbol-thumb-calls-v1"
 CALL_SUMMARY = "direct Thumb BL with ordinary ARM ABI call summaries"
+FRAMED_SCHEMA = "elf-symbol-thumb-frame-v1"
+FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
+STACK_SUMMARY = "fixed Thumb SP adjustments and direct word accesses with return provenance"
 
 
 def mapping_snapshot(root):
@@ -61,12 +64,17 @@ def verify_dependencies(preprocessed, root, address):
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
-    profile_valid = profiles == [f"* verification: `{SCHEMA}`"]
-    if profiles == [f"* verification: `{LINKED_SCHEMA}`"]:
+    profile_valid = profiles in ([f"* verification: `{SCHEMA}`"],
+                                 [f"* verification: `{FRAMED_SCHEMA}`"])
+    if profiles in ([f"* verification: `{LINKED_SCHEMA}`"],
+                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"]):
         snapshot = mapping_snapshot(root)
         profile_valid = (snapshot is not None and
                          f"* mapping SHA-256: `{mapping_fingerprint(snapshot)}`" in lines and
                          f"* control flow: {CALL_SUMMARY}" in lines)
+    if profiles in ([f"* verification: `{FRAMED_SCHEMA}`"],
+                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"]):
+        profile_valid = profile_valid and f"* stack frame: {STACK_SUMMARY}" in lines
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
     return (profile_valid and
