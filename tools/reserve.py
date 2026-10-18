@@ -32,7 +32,7 @@ import time
 
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
-LEDGER_NUMBER = os.environ.get("FFTA_LEDGER_ISSUE", "50")
+LEDGER_NUMBER = os.environ.get("FFTA_LEDGER_ISSUE", "64")
 START = "<!-- ffta-ledger:start -->"
 END = "<!-- ffta-ledger:end -->"
 STATE_START = "<!-- ffta-ledger-state\n"
