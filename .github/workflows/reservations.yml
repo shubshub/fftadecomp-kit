@@ -1,10 +1,8 @@
 name: reservations
 
-# Keeps the address ledger honest: a reservation is a lease, so anything that
-# has been quiet for a few days gets closed automatically and becomes available
-# again.  Without this, one stalled agent can hold an address forever.
-
 on:
+  issue_comment:
+    types: [created]
   schedule:
     - cron: "23 */6 * * *"
   workflow_dispatch:
@@ -17,27 +15,33 @@ on:
 permissions:
   issues: write
   contents: read
+  pull-requests: read
 
 jobs:
-  sweep:
-    name: release stale reservations
+  broker:
+    name: process reservation requests
+    if: >-
+      github.repository == 'shubshub/fftadecomp-kit' &&
+      (github.event_name != 'issue_comment' ||
+       (github.event.issue.number == 50 && !github.event.issue.pull_request &&
+        startsWith(github.event.comment.body, '<!-- ffta-reservation-request:v1 -->')))
+    concurrency:
+      group: ffta-address-ledger-50
+      cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      GH_TOKEN: ${{ github.token }}
+      FFTA_KIT_REPO: shubshub/fftadecomp-kit
+      FFTA_REPO: shubshub/fftadecomp
+      FFTA_LEDGER_ISSUE: '50'
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: open reservations before
-        run: |
-          gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --label reservation --limit 100 \
-            --json number,title,updatedAt --jq '.[] | "  #\(.number) \(.title) (updated \(.updatedAt))"'
-      - name: close the quiet ones
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: python tools/reserve.py sweep --days "${{ github.event.inputs.days || 3 }}"
-      - name: open reservations after
-        run: |
-          gh issue list --repo "$GITHUB_REPOSITORY" --state open \
-            --label reservation --limit 100 \
-            --json number,title --jq '.[] | "  #\(.number) \(.title)"'
+      - name: drain all pending requests and expire stale leases
+        run: python tools/reserve.py --no-pull broker
