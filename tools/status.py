@@ -19,7 +19,7 @@ report, which is what CI should do.
 
 --badges writes functions.json and bytes.json in the shields.io *endpoint*
 format, to be published on a `badges` branch and rendered with
-img.shields.io/endpoint?url=... (the same pattern dqix-decomp uses).
+img.shields.io/endpoint?url=... .
 """
 
 import argparse
@@ -41,7 +41,7 @@ START = "<!-- ffta-status:start -->"
 END = "<!-- ffta-status:end -->"
 CODE_END = 0x08150000          # end of the code region (from the analysis)
 
-# same thresholds as the dqix-decomp badges
+# colour thresholds for a percentage badge
 COLOR_THRESHOLDS = [(20, "red"), (40, "orange"), (60, "yellow"),
                     (80, "yellowgreen"), (100, "green")]
 
