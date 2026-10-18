@@ -81,7 +81,41 @@ gates in CI are evaluated against a stale base — the `matches` workflow fails
 any PR that does not contain the current `origin/main` tip, and flags one that
 merged main instead of rebasing.
 
-### 4. Only byte-exact matches, from plausible source, go in `src/`
+### 4. Hand matching is done by sub-agents, never by the session that orchestrates
+
+This is a hard rule, not a preference. One session claims a batch of addresses
+and spawns **one sub-agent per address**; the session itself does not write the
+C, does not iterate on a compiler diff, and does not hold a single function
+open in its own context.
+
+Why: matching is a long, narrow, iterative loop — compile, read a diff, adjust
+one thing, compile again. Done serially it consumes the orchestrator's context
+and starves everything else it is supposed to be doing (reservations, status,
+commits, CI). Fan-out keeps each attempt isolated and lets several addresses be
+in flight at once.
+
+**How to run a batch**
+
+1. `reserve.py list` / `check` / `claim` the addresses yourself — the ledger is
+   the orchestrator's job, not the sub-agent's.
+2. Spawn one sub-agent per address, in the background, with a prompt that
+   contains:
+   * the address, the full ROM disassembly of the function (dump it yourself),
+   * the exact command to check the match,
+   * the previous attempt's state if there is one (`Parked/<addr>/README.md`),
+   * the ground rules: no git, do not edit `include/ffta.h` (declare types in
+     the function's own file so parallel agents cannot collide), do not touch
+     another address's files, no asm/pragmas/`volatile`/dead code,
+   * "report the verdict, the C if it matched, or the exact remaining
+     difference and what you ruled out".
+3. Collect the reports. Commit the exact matches, park the rest with the
+   diagnosis, release each reservation with its reason.
+4. Only the orchestrator runs git, `status.py`, or the plausibility sweep.
+
+Give every sub-agent a **disjoint file set** — one `src/<addr>.c` each, no
+shared header edits — or they will collide.
+
+### 5. Only byte-exact matches, from plausible source, go in `src/`
 
 Both gates, checked by `tools/match.py`:
 
