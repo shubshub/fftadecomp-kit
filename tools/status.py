@@ -59,6 +59,20 @@ def badge(label, percent, detail=""):
             "color": color_for(percent)}
 
 
+def static_badge(label, percent):
+    """A shields.io *static* badge URL.
+
+    Static (rather than /endpoint?url=...) because shields.io fetches endpoint
+    URLs itself and cannot read a private repository - it renders "resource not
+    found".  These render for any repo, and the URL is regenerated from the
+    numbers whenever the block is rewritten, so they stay current.
+    """
+    from urllib.parse import quote
+    msg = quote(f"{percent:.2f}%", safe="")
+    return (f"https://img.shields.io/badge/{quote(label, safe='')}-{msg}-"
+            f"{color_for(percent)}")
+
+
 def repo_root(arg=None):
     return os.path.abspath(arg or os.environ.get("FFTA_ROOT") or os.getcwd())
 
@@ -115,13 +129,17 @@ def collect(root, verify, quiet=False):
     return total_fns, matched_f, total_bytes, matched_b, problems
 
 
-def render(total_f, matched_f, total_b, matched_b, problems):
+def render(total_f, matched_f, total_b, matched_b, problems, prefix=""):
     pf = matched_f / total_f if total_f else 0.0
     pb = matched_b / total_b if total_b else 0.0
+    label = f"{prefix} " if prefix else ""
     lines = [
         START,
         "",
         "### Decompilation status",
+        "",
+        f"![{label}functions]({static_badge(f'{label}functions', pf * 100)}) "
+        f"![{label}bytes]({static_badge(f'{label}bytes', pb * 100)})",
         "",
         "| Metric | Count | Percent | |",
         "|---|---|---|---|",
@@ -159,14 +177,14 @@ def main():
 
     root = repo_root(args.root)
     tf, mf, tb, mb, problems = collect(root, args.verify)
-    block, pf, pb = render(tf, mf, tb, mb, problems)
+    block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix)
 
     if args.badges:
         out = os.path.abspath(args.badges)
         os.makedirs(out, exist_ok=True)
-        prefix = f"{args.label_prefix} " if args.label_prefix else ""
         for name, pct in (("functions", pf), ("bytes", pb)):
-            data = badge(f"{prefix}{name}", pct * 100)
+            lbl = f"{args.label_prefix} {name}" if args.label_prefix else name
+            data = badge(lbl, pct * 100)
             with open(os.path.join(out, f"{name}.json"), "w",
                       encoding="utf-8", newline="\n") as f:
                 json.dump(data, f)
