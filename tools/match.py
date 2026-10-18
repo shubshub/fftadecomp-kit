@@ -184,13 +184,43 @@ def main():
         sys.exit(f"compile failed:\n{e}")
 
     got_body = got[:span]
-    exact = got_body == want
+    identical = got_body == want
+
+    # a byte-identical compile is only a match if the source is something a
+    # developer could plausibly have written
+    here = os.path.dirname(os.path.abspath(__file__))
+    plaus_path = os.path.join(here, "plausible.py")
+    findings = []
+    if os.path.exists(plaus_path):
+        lint_targets = [src_abs]
+        inc = os.path.join(ROOT, "include")
+        if os.path.isdir(inc):
+            lint_targets += [os.path.join(inc, f)
+                             for f in sorted(os.listdir(inc))
+                             if f.endswith(".h")]
+        r = subprocess.run([sys.executable, plaus_path, "--quiet"] + lint_targets,
+                           capture_output=True, text=True)
+        findings = [ln for ln in r.stdout.splitlines() if ln.strip()]
+        if r.returncode and not findings:
+            findings = [ln for ln in r.stderr.splitlines() if ln.strip()]
+
+    plausible = not findings
+    exact = identical and plausible
     byte_rows = lcs_align(got_body, want)
 
     print(f"\ntarget  {want.hex()}")
     print(f"got     {got_body.hex()}"
           + ("" if len(got) == span else f"   ({len(got)} bytes compiled)"))
-    print(f"verdict {'MATCH - byte identical' if exact else 'differs'}\n")
+    print(f"bytes   {'identical' if identical else 'DIFFER'}")
+    print(f"source  {'plausible' if plausible else 'IMPLAUSIBLE'}")
+    print(f"verdict {'MATCH - byte identical' if exact else
+                 ('IMPLAUSIBLE - bytes match but the source is not code a '
+                  'developer would have written' if identical else
+                  'NOT MATCHING - bytes differ')}\n")
+    if findings:
+        print("plausibility findings:")
+        for line in findings:
+            print(f"  {line}")
 
     ga, wa = disasm(got, addr, thumb), disasm(want, addr, thumb)
     gbytes = [t for _, _, t in ga]
@@ -233,9 +263,19 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* ROM bytes: `{want.hex()}` ({span} bytes)\n")
-            f.write(f"* compiled : `{got_body.hex()}`\n\n")
-            f.write(f"**{'MATCH - byte identical' if exact else 'NOT matching'}**"
-                    f" - {same_bytes}/{len(want)} bytes\n\n```\n")
+            f.write(f"* compiled : `{got_body.hex()}`\n")
+            f.write(f"* source plausibility: "
+                    f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n\n")
+            verdict = ("MATCH - byte identical" if exact else
+                       "IMPLAUSIBLE - bytes match but the source is not code a "
+                       "developer would have written" if identical else
+                       "NOT MATCHING - bytes differ")
+            f.write(f"**{verdict}** - {same_bytes}/{len(want)} bytes\n")
+            if findings:
+                f.write("\nplausibility findings:\n\n")
+                for line in findings:
+                    f.write(f"- {line.strip()}\n")
+            f.write("\n```\n")
             f.write(f"{'compiled':<{width}}{'rom':<{width}}\n")
             for line in lines:
                 f.write(line + "\n")
