@@ -23,6 +23,18 @@ python tools/take.py check 0x08011040        # then check the address
 python tools/take.py claim 0x08011040 --who <you> --note "what you are doing"
 ```
 
+`take.py` is the direct-writing path and requires permission to edit the
+ledger issue. Read-only contributors must use the authenticated broker client:
+
+```sh
+python tools/reserve.py list
+python tools/reserve.py check 0x08011040
+python tools/reserve.py claim 0x08011040 --who <you> --note "what you are doing"
+```
+
+An issue-edit permission failure is not a lease. The broker path still needs
+an explicit accepted response; it cannot override a taken or rejected claim.
+
 **Never reserve an address already reserved, matched, or in review.** `check`
 and `claim` check the decomp repository's default branch and open pull requests
 as well as the ledger. The broker repeats these checks before accepting a
@@ -52,6 +64,23 @@ It refuses unless all of these hold:
 5. every function in `src/` has a report saying `MATCH - byte identical`, and no
    report says `IMPLAUSIBLE` or an unsanctioned `HAND-ASM`
 
+For toolkit contributions, run `python tools/push.py --kit --repo .` from
+this checkout, with `--remote` and `--branch` set to the intended destination.
+Toolkit mode keeps history and game-data checks, and checks tracked Python
+tool syntax instead of requiring a nonexistent game tree. It is restricted to
+the executing toolkit checkout and cannot disable the decompilation gates.
+Run relevant behavioral checks separately before publishing toolkit changes.
+Toolkit publication requires a clean working tree and index. Decompilation
+mode verifies an archive of the captured commit and permits unrelated working
+edits. Archive failure stops publication; it never falls back to working files.
+The gate checks that the branch and commit remain unchanged and pushes that
+exact commit. `--working-tree --check-only` validates uncommitted game edits;
+publishing with `--working-tree` requires a clean checkout too.
+An intentional history rewrite uses `--force`, which pins the destination tip
+before verification and refuses to overwrite a concurrent remote change.
+
+The following exit codes apply to `reserve.py`:
+
 | exit | state |
 |---|---|
 | 0 | `FREE` from `check`, or confirmed acceptance from a request command |
@@ -62,13 +91,13 @@ It refuses unless all of these hold:
 | 5 | `IN PR` — address already covered by an open decomp PR |
 | 6 | `UNCONFIRMED` — submission or acknowledgement is uncertain |
 
-**The tool attempts to pull this repository before every command.** If it
+**`reserve.py` attempts to pull this repository before every command.** If it
 cannot update (dirty checkout, offline), it says so and continues — resolve
 the warning before trusting the local rules. `--no-pull` skips the update.
 Explicitly pull and restart clients when the reservation protocol changes;
 updating files does not replace code already loaded by an old process.
 
-Claims are JSON request comments on the single ledger issue. The trusted
+Broker claims are JSON request comments on the single ledger issue. The trusted
 workflow, not the contributor, edits its table. **Wait for `ACCEPTED` and exit
 0 before starting work.** A posted request, a free `check`, or `UNCONFIRMED`
 (exit 6) is not a lease. The workflow must be deployed on the default branch
@@ -81,47 +110,47 @@ reserved, and do not work around a refusal.
 
 ### 2. Release it the moment you stop — especially if you cannot match it
 
+Use the same reservation mechanism that accepted the claim. For direct
+`take.py` reservations, the operator needs issue-edit permission:
+
+```sh
+python tools/take.py ping    0x08011040
+python tools/take.py release 0x08011040 --reason "moved to src/"
 ```
-**`tools/take.py` is the official way to reserve an address.**  `reserve.py` is a *broker client*: it posts a request comment that the
-reservations workflow is meant to accept, which is asynchronous - a claim
-can sit "submitted, not yet accepted" indefinitely, so an agent can believe
-it holds an address when it does not.  `take.py` writes the ledger itself,
-in the same schema the broker reads, and re-reads afterwards to confirm the
-lease actually took.  It refuses before writing anything: already reserved
-(1), recorded unmatchable (3), already matched in `src/` (4), matched in an
-open PR (5), broker requests still pending (7) - and it re-reads after
-writing, exiting 8 if it lost the race rather than pretending to hold the
-lease.  `take.py doctor` reports whether the ledger is healthy;
-`take.py purge-requests` clears requests the broker never answered.
-sh
-python tools/take.py ping    0x08011040 --who <you>
-python tools/take.py release 0x08011040 --who <you> --reason "moved to src/"
-python tools/take.py release 0x08011040 --who <you> --unmatchable --reason "no flags reproduce this" --tried="-O1..-O3"
+
+For authenticated broker reservations:
+
+```sh
+python tools/reserve.py ping    0x08011040 --who <you>
+python tools/reserve.py release 0x08011040 --who <you> --reason "moved to src/"
+python tools/reserve.py release 0x08011040 --who <you> --unmatchable --reason "no flags reproduce this" --tried="-O1..-O3"
 ```
 
 A reservation is a **lease, not a land grab**. Anything quiet for 3 days is
 auto-released by the `reservations` workflow, but you should not wait for that.
-When you conclude a function cannot be matched, request release with
+When a broker-reserved function cannot be matched, request release with
 `--unmatchable`: the comment preserves the reason and flags for maintainer
 review. It does not modify `known-unmatchable.json` automatically.
 
-Ownership is authenticated by numeric GitHub account ID and original claim
-request ID. A `--who` label alone cannot authorize a release. Give parallel
+Broker ownership is authenticated by numeric GitHub account ID and original
+claim request ID. A `--who` label alone cannot authorize a release. Give parallel
 agents distinct labels; `--claim-id <id>` pins a ping or release to a specific
 claim generation. Legacy rows remain reserved but cannot be adopted by label;
 they need normal expiry or maintainer reconciliation. After an unconfirmed
 request, inspect the ledger before retrying. Do not work around the result.
 
-Only the serialized broker writes the ledger. Retire legacy direct-writing
-clients and pause all writers for manual maintenance. Deployment, bounded
-receipt retention, capacity limits, and exit codes are detailed in `README.md`.
+Broker requests are written only by the serialized workflow. Direct writes,
+including `take.py` maintenance, must not overlap broker activity: issue edits
+are not compare-and-swap operations. Direct rows have no authenticated broker
+owner and cannot be adopted by label. Deployment, bounded receipt retention,
+capacity limits, and exit codes are detailed in `README.md`.
 
 ### 3. Rebase before you open a PR
 
 ```sh
 git -C ../fftadecomp fetch origin
 git -C ../fftadecomp rebase origin/main      # not merge
-git -C ../fftadecomp push --force-with-lease
+python tools/push.py --repo ../fftadecomp --remote <remote> --branch <branch>
 ```
 
 Matches land as small, linear commits on top of current `main`. A PR branch
@@ -186,8 +215,18 @@ Byte-identical output from implausible source is **IMPLAUSIBLE**, not a match.
 Direct Thumb calls require typed linking to unique, aligned function-index
 targets and exact comparison of the relocated bytes. That profile uses an ABI
 call summary, not a proof that the callee returns or preserves its contract.
-It rejects veneers, cross-mode and indirect calls, data relocations, local
+It rejects veneers, cross-mode and indirect calls, unmapped data relocations, local
 helpers, self/intra-function calls, tail calls and unsupported stack operations.
+Fixed Thumb SP allocations and direct aligned word accesses have a separate
+framed profile. Bounded constant-offset stack aliases support local-array
+accesses, including aligned byte and halfword operations. Register indices must
+be proven constants; unknown or arithmetic-derived indices still fail. Alias
+escapes, inconsistent alias joins, dynamic adjustments, out-of-frame stores and
+unbalanced returns still fail; do not steer source around these checks.
+Known external data symbols can be listed in `config/data_symbols.json` for
+typed absolute linking. Only reachable trailing `R_ARM_ABS32` literal words
+qualify; all relocated bytes are compared. Do not invent addresses to make a
+match. Data reports bind both mappings, and stale mappings invalidate evidence.
 See `README.md` for the precise boundary; do not work around a rejected relocation.
 Do not try to reach a match by trickery — a tricked match is worth nothing and
 is rejected by CI. When you cannot match honestly, park it:
@@ -219,15 +258,20 @@ gitignored and generated by `make split`).
   straight off `sp` with no frame pointer (286 functions in the ROM do this);
   functions return via the interworking `pop {r0}; bx r0`; an address constant
   has to live in a *variable* or every access folds into its own literal pool.
-- **The ROM header is damaged** (logo scrambled, checksum 0x85 vs stored 0x89)
-  and the payload beyond `0x08150000` is packed assets, not code. The code
+- **The baseline ROM header is valid:** its logo matches the standard GBA logo
+  and its computed and stored header complement are both `0x89`. Earlier
+  damaged-header warnings came from an incorrect logo constant and checksum
+  formula in the analyzer, not the ROM. The payload beyond `0x08150000` is
+  packed assets, not code. The code
   region is `0x08000000`-`0x08150000`.
 - **Where the numbers come from:** `status.py` counts functions and bytes over
   the functions in the code region from `config/functions.json`, and a function
   counts only if its report has current verification metadata and a matching
   source/header fingerprint. Use `--verify` for fresh ROM comparisons; failures
-  exit nonzero. The index contains provisional, possibly overlapping or truncated
-  spans, not a proof of exhaustive coverage. `docs/status.md` must match the
+  exit nonzero. `--write --verify` also regenerates and validates the reports;
+  `--verify` alone and `--check` leave them untouched. The index contains
+  provisional, possibly overlapping or truncated spans, not a proof of
+  exhaustive coverage. `docs/status.md` must match the
   README block or CI fails.
 - **Linked reports:** direct-call verification binds the exact
   `config/functions.json` mapping as well as source and headers. Mapping changes

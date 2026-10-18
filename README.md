@@ -18,6 +18,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
 | `tools/take.py` | **the official way to reserve an address** - claims it in this repo's ledger, refusing anything already reserved, already matched or in review |
 | `tools/reserve.py` | submits address requests to the single ledger issue and waits for authenticated broker confirmation |
+| `tools/push.py` | validates decompilation or toolkit changes before pushing |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
 Requires Python 3 and capstone. Nothing else is needed for analysis and
@@ -47,8 +48,19 @@ ledger** issue. Each address has its own row in the machine-readable table.
 python tools/take.py list                    # read the board first
 python tools/take.py check 0x08011040        # then check the address
 python tools/take.py claim 0x08011040 --who me --note "four strh pairs"
-python tools/take.py ping 0x08011040 --who me
-python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
+python tools/take.py ping 0x08011040
+python tools/take.py release 0x08011040 --reason "done, moved to src/"
+```
+
+The direct `take.py` path requires issue-edit permission. Read-only contributors
+use `reserve.py` for authenticated broker requests instead:
+
+```sh
+python tools/reserve.py list
+python tools/reserve.py check 0x08011040
+python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
+python tools/reserve.py ping 0x08011040 --who me
+python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src/"
 ```
 
 ### The rules
@@ -57,7 +69,7 @@ python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
    address already reserved, matched on the decomp default branch, or covered
    by an open decomp PR. Both the client and broker check these conditions;
    coordinate with an existing PR's author rather than duplicating work.
-   Start only after `claim` prints
+   For broker claims, start only after `claim` prints
    `ACCEPTED` and exits zero. A free `check`, a posted request, or a timeout is
    not a reservation. If another agent holds it, pick another address. Multiple
    addresses can be claimed separately in the same issue; each needs acceptance.
@@ -66,13 +78,13 @@ python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
    **cannot** be matched — that is exactly when somebody else should be allowed
    to try. The `reservations` workflow drains requests and expires rows quiet
    for 3 days; a scheduled run also does this every 6 hours.
-3. **Release unmatchable addresses, don't hoard them.** `release
+3. **Release unmatchable addresses, don't hoard them.** Broker `release
    --unmatchable --reason "..." --tried="-O1..-O3"` requests release and leaves
    the evidence in its comment for maintainer review. It does not write
    `known-unmatchable.json`; an accepted database change still needs review.
 
-Clients require authenticated `gh` access to post comments, not permission to
-edit another person's issue. The trusted workflow is the only ledger writer.
+Broker clients require authenticated `gh` access to post comments, not permission
+to edit another person's issue. The trusted workflow writes accepted requests.
 It binds ownership to the comment author's numeric GitHub ID and the original
 claim request ID, not the display label. Use distinct `--who` labels for agents
 sharing an account, and pass `--claim-id <id>` to `ping` or `release` when the
@@ -86,7 +98,7 @@ matched source, 5 for an open PR, or 6 for an **UNCONFIRMED** submission or
 acknowledgement. On exit 6, inspect the ledger
 before retrying; the request may still be processed. Do not start matching.
 
-Commands attempt a fast-forward pull first; investigate update warnings rather
+Broker commands attempt a fast-forward pull first; investigate update warnings rather
 than trusting a stale client. `--no-pull` skips this update when the checkout has
 already been synchronized. When changing reservation protocols, explicitly pull
 and restart all clients: an already loaded old process still contains old code.
@@ -96,11 +108,22 @@ and restart all clients: an already loaded old process still contains old code.
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
 `issues: write`, `contents: read`, and `pull-requests: read`, checks out the trusted default branch,
-and handles request comments on issue #50, scheduled expiry, and manual runs
-through one concurrency group. Each run drains the durable comment backlog,
-so replacement of a pending workflow run does not discard its requests.
+and handles request comments on the unique open owner-authored `address ledger`
+issue, scheduled expiry, and manual runs through one concurrency group. Ledger
+rotation does not require editing a workflow issue number. The legacy
+`ffta-address-ledger-50` concurrency key stays constant so old and new jobs
+serialize together; it does not select the ledger. Each run drains the durable
+comment backlog, so replacement of a pending workflow run does not discard its
+requests.
 
-Retire old direct-writing clients before deployment. Legacy rows keep their
+Discovery rejects missing, ambiguous or inaccessible ledgers. An explicit
+`FFTA_LEDGER_ISSUE` pin must agree with the discovered canonical ledger; a stale
+pin fails before posting a request. No client creates a replacement issue.
+The canonical ledger author must be the kit repository owner. Organization-
+owned repositories need an explicitly reviewed authority policy before use.
+
+Direct writers, including `take.py`, must not run concurrently with the broker.
+Legacy and direct-written rows keep their
 visible labels and timestamps, but have no authenticated owner: they cannot
 be adopted by matching a label. They remain reserved until normal expiry or
 maintainer reconciliation. Manual ledger maintenance must pause all writers;
@@ -116,6 +139,36 @@ write access or create separate reservation issues.
 Rebase contribution branches onto current `origin/main` before opening a PR;
 do not merge main into the contribution branch. See `AGENTS.md` for the rules.
 
+## Publishing through the gate
+
+Use `tools/push.py`, not a separate `git push`. Decompilation mode verifies
+history, tracked-file restrictions, fresh ROM matches, plausibility and reports.
+Use `--check-only` to run the gate without publishing.
+
+For changes to this toolkit checkout:
+
+```sh
+python tools/push.py --kit --repo . --remote fork --branch main --check-only
+python tools/push.py --kit --repo . --remote fork --branch main
+```
+
+Toolkit mode checks history, forbidden game data and tracked Python tool syntax.
+It only accepts the executing toolkit checkout; it cannot be used to skip game
+verification in a decompilation repository. Run the affected behavioral checks
+as well: syntax validation alone does not establish tool correctness.
+
+Toolkit publication requires a clean working tree and index, including no
+nonignored untracked files. Decompilation mode verifies an archive of the
+captured commit under the checkout's `build/` directory, so unrelated work can
+remain in progress. Archive failure stops the gate rather than falling back to
+working files. The gate checks that the branch and commit remain unchanged and
+pushes that exact commit. `--working-tree --check-only` validates uncommitted
+game edits; publication with `--working-tree` requires a clean checkout too.
+
+Use `--force` only for an intentional history rewrite. The gate captures the
+remote tip before validation and uses an explicit force-with-lease, so a remote
+change during verification rejects the push rather than being overwritten.
+
 ## Layout it expects
 
 ```
@@ -127,6 +180,41 @@ do not merge main into the contribution branch. See `AGENTS.md` for the rules.
   src/  include/       decompiled C
   docs/match/          per-function match reports
 ```
+
+## Cartridge header validation
+
+`analyze.py` checks the 156-byte logo field by SHA-256 without embedding logo
+data. The reference digest and complement formula agree with
+[devkitPro's `gbafix`](https://github.com/devkitPro/gba-tools/blob/master/src/gbafix.c).
+The header complement is the negated sum of bytes `0xA0` through `0xBC`, minus
+`0x19`, reduced to one byte. Headers shorter than `0xC0` bytes are rejected.
+
+The baseline FFTA USA header passes both checks: its computed and stored
+complement are `0x89`. Earlier reports of a scrambled logo and a computed
+`0x85` were analyzer defects, not evidence of ROM damage. Header reports retain
+`nintendo_logo_ok` and now include `nintendo_logo_sha256` instead of the invalid
+byte-difference count. These checks do not alter the ROM or certify its payload.
+
+Code discovery is bounded to FFTA's documented code region below
+`0x08150000`. Branch/call traversal and prologue scans do not decode packed
+assets beyond that boundary, and instructions may not straddle it. Literal
+data can still be read elsewhere in the ROM. Generated function spans remain
+provisional; this boundary does not prove that every function has been found.
+
+During Thumb traversal, the analyzer also recognizes an adjacent immediate
+`cmp` / `bls` guard leading to the five-instruction word-table dispatch
+`lsls #2; ldr [pc]; adds; ldr; mov pc`. Registers must agree throughout,
+the table must immediately follow its pointer literal, and all entries must
+be aligned code-region addresses outside the guard/dispatch/table bytes.
+The compare bounds the table to at most 256 entries. Recognized targets seed
+provisional discovery; table bytes are not decoded as fallthrough instructions.
+`recognized_switch_tables` records the count in layout statistics.
+
+This structural recognition is not a proof that the guard dominates every
+runtime path, that a default call never returns, or that each case is a
+separate function. It does not relax the matching harness's indirect-control-
+flow restrictions or certify complete-function extents. Other switch layouts
+remain unresolved; the generated inventory remains explicitly incomplete.
 
 ## The matching harness
 
@@ -144,8 +232,49 @@ branches and loops. Every reachable instruction is checked; return-address
 provenance and balanced saved-stack depth must agree at joins. Branches cannot
 leave the symbol or enter instruction interiors or literal pools, and each
 reachable region must have a path to a verified return. This does not prove
-termination of arbitrary loops. Interrupts, local stack allocation and
+termination of arbitrary loops. Interrupts, dynamic stack adjustments and
 untracked transfers remain unsupported and fail closed.
+
+Unconditional 16-bit Thumb register moves preserve a proven original return
+address, including copies restored to LR. Overwrites discard that fact, joins
+retain it only when all incoming paths agree, and calls still invalidate
+caller-clobbered registers. Arithmetic, unknown inputs and wider or conditional
+moves do not establish return-address provenance.
+
+### Fixed Thumb stack frames
+
+The framed profiles additionally support 16-bit `sub sp, #N` / `add sp, #N`
+and direct aligned word `ldr` / `str` accesses through SP. Allocations are
+tracked alongside pushed registers. Deallocation cannot cross entry SP, all
+returns must restore entry depth, and control-flow joins require equal depths.
+Stores update the affected word's return-address provenance; loading an incoming
+argument never establishes a return address. Stores outside the tracked frame
+are rejected. Calls invalidate return-address facts in allocated local/outgoing
+words, retaining pushed-save facts only under the existing ABI call assumption.
+
+Local-array addresses formed by 16-bit register moves and constant additions
+or subtractions are tracked relative to entry SP. Aligned byte, halfword and
+word accesses through these aliases must stay inside the allocated/pushed
+frame. Partial stores invalidate the affected word's return-address fact.
+Register-indexed accesses, including signed byte/halfword loads, additionally
+require an exact constant established by a 16-bit immediate move or register
+copy. Writes and restoring pops discard constant facts; calls discard them for
+caller-clobbered registers, and joins retain only identical constants present
+on every incoming path. Unknown or arithmetic-derived indices are rejected.
+Alias facts must agree exactly at control-flow joins. Pushing or storing these
+pointers, unsupported pointer arithmetic, and carrying an
+alias across a call in a caller-clobbered register are rejected. Callee-saved
+aliases survive only under the existing ABI assumption and are cleared when
+their registers are restored by a pop.
+
+Register-controlled SP writes and untracked stack-pointer transformations
+remain rejected. This is a bounded CFG profile, not a general proof of memory
+safety, pointer lifetime, or callee behavior.
+
+Framed reports use `elf-symbol-thumb-frame-v1` or
+`elf-symbol-thumb-frame-calls-v1` and require an explicit stack-summary line.
+The linked variant also requires the usual mapping fingerprint and call
+summary. Existing unframed schemas remain accepted without report churn.
 
 ### Direct Thumb calls
 
@@ -168,18 +297,51 @@ provenance in `r0`–`r3`, `r12` and `lr` is invalidated at each call. The verif
 checks the caller's fallthrough paths, joins, saved-stack balance and return
 provenance; it does not certify the callee's behavior or whole-program return.
 
-External data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
+Unmapped data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
 helper functions, self/intra-function calls, tail calls, linker veneers and
 extra allocated sections remain unsupported. These cases fail closed rather
 than receiving a partial match. Existing relocation-free leaf functions retain
 their original verification profile.
+
+### Named data literals
+
+For a known external object address, add an explicit mapping to the decomp
+checkout's `config/data_symbols.json`, for example:
+
+```json
+{"g_tbl": "0x02009000"}
+```
+
+Names must be ordinary C identifiers, not function or call-helper names;
+addresses must be eight-digit hexadecimal strings. Duplicate keys and malformed
+mappings are rejected. The map supplies reviewed addresses, not guessed ones.
+Only undefined external object/notype symbols with `R_ARM_ABS32` relocations
+qualify. Each relocation must occupy a complete aligned word in the function's
+trailing literal pool and be loaded by a reachable PC-relative instruction.
+Signed addends are supported without address wrapping; self-function references,
+overlapping relocations and unconsumed literal words are rejected.
+
+The linker defines typed absolute objects without allocating their contents.
+Each relocated word must equal its address plus addend; no other bytes may
+change, and the entire linked function must still equal the ROM. This works
+with the existing call and fixed-frame profiles. Data reports use
+`elf-symbol-thumb-data-v1` or `elf-symbol-thumb-frame-data-v1` and bind both
+function and data mappings, source, headers and the applicable control-flow
+summary. Mapping changes invalidate cached evidence and interrupt mixed rebuilds.
+These checks establish relocation fidelity, not the safety of dereferencing a
+mapped address. No game data should be copied into the symbol map.
 
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with
 `match.py`. Shared preprocessing inputs must live under `include/` or be `.h`
 files under `src/`; dependencies outside the fingerprinted set are rejected.
 `status.py --verify` recompiles against the local ROM and exits nonzero if any
-function fails. Offline report checks are cached evidence, not fresh ROM checks.
+function fails. `status.py --write --verify` also regenerates the match reports
+and validates their fingerprints before counting a successful compilation. This
+keeps the written status and subsequent offline checks consistent after shared
+header or mapping changes. `--verify` alone and `--check` never rewrite reports;
+`--check` takes precedence if combined with `--write`. Offline report checks are
+cached evidence, not fresh ROM checks.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
 Linked-profile reports also bind the exact `config/functions.json` mapping

@@ -30,7 +30,9 @@ import struct
 import subprocess
 import sys
 from contextlib import contextmanager
-from match_evidence import (CALL_SUMMARY, LINKED_SCHEMA, SCHEMA, mapping_fingerprint,
+from match_evidence import (CALL_SUMMARY, DATA_SCHEMA, FRAMED_DATA_SCHEMA,
+                            FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA, LINKED_SCHEMA,
+                            SCHEMA, STACK_SUMMARY, data_snapshot, mapping_fingerprint,
                             mapping_snapshot, source_fingerprint, source_paths,
                             verify_dependencies)
 
@@ -229,9 +231,34 @@ def allocated_text_only(image):
         raise ValueError("expected read-only executable .text")
 
 
+def parse_data_symbols(snapshot):
+    if snapshot is None:
+        return {}
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate data symbol name")
+            result[name] = value
+        return result
+
+    document = json.loads(snapshot, object_pairs_hook=unique_members)
+    if not isinstance(document, dict):
+        raise ValueError("data symbol mapping must be an object")
+    symbols = {}
+    for name, value in document.items():
+        if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
+                name.startswith(("func_", "_call_via_")) or \
+                not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
+            raise ValueError("invalid data symbol name or absolute address")
+        symbols[name] = int(value, 16)
+    return symbols
+
+
 def call_bindings(image, name, address, mapping, rom_size,
-                   rom_image=b''):
-    """Allow only external Thumb calls to unambiguous addressed ROM functions."""
+                   rom_image=b'', data_mapping=None):
+    """Bind external Thumb calls and explicitly mapped absolute data words."""
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     allocated_text_only(image)
@@ -249,6 +276,8 @@ def call_bindings(image, name, address, mapping, rom_size,
     decoder.detail = True
     calls = {}
     targets = {}
+    data_relocations = {}
+    data_symbols = parse_data_symbols(data_mapping)
     occupied = set()
     for section_index in image["relocations"]:
         section = image["sections"][section_index]
@@ -260,9 +289,28 @@ def call_bindings(image, name, address, mapping, rom_size,
             raise ValueError("relocation has no symbol table")
         for position in range(0, section[5], 8):
             relocation, info = struct.unpack_from("<II", image["section_data"][section_index], position)
-            if info & 255 != 10 or info >> 8 >= len(symbols):
-                raise ValueError("only R_ARM_THM_CALL relocations are supported")
+            if info & 255 not in (2, 10) or info >> 8 >= len(symbols):
+                raise ValueError("only R_ARM_THM_CALL and mapped R_ARM_ABS32 relocations are supported")
             target_symbol = symbols[info >> 8]
+            if info & 255 == 2:
+                target_name = target_symbol["name"]
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 1) or target_name not in data_symbols:
+                    raise ValueError("data target must be an undefined mapped object")
+                if (address + relocation) % 4 or relocation + 4 > symbol["size"]:
+                    raise ValueError("data relocation must cover an aligned complete literal word")
+                target = data_symbols[target_name]
+                addend = struct.unpack_from("<i", image["text"], relocation)[0]
+                value = target + addend
+                if not 0 <= value <= 0xFFFFFFFF or address <= value < address + symbol["size"]:
+                    raise ValueError("data relocation overflows or references its own function")
+                positions = set(range(relocation, relocation + 4))
+                if positions & occupied:
+                    raise ValueError("overlapping data or call relocations")
+                occupied.update(positions)
+                data_relocations[relocation] = (target_name, value)
+                targets[target_name] = target
+                continue
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
             helper = RUNTIME_HELPERS.get(target_symbol["name"])
             if helper is not None:
@@ -271,7 +319,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                     raise ValueError("call helper must be an undefined symbol")
                 target = helper
                 if not thunk_is_call_via(rom_image, target,
-                                         int(target_symbol["name"][-1])):
+                                         int(target_symbol["name"][len("_call_via_r"):])):
                     raise ValueError("call helper does not match its thunk in the ROM")
                 candidates = []
                 if not ROM_BASE <= target < ROM_BASE + len(rom_image):
@@ -313,13 +361,14 @@ def call_bindings(image, name, address, mapping, rom_size,
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
-    if not calls or any(item["name"] and not item["section"] and item["name"] not in targets
-                        for item in image["symbols"]):
-        raise ValueError("unresolved symbols outside the permitted call bindings")
-    return calls, targets
+    if not (calls or data_relocations) or \
+            any(item["name"] and not item["section"] and item["name"] not in targets
+                for item in image["symbols"]):
+        raise ValueError("unresolved symbols outside the permitted bindings")
+    return calls, targets, data_relocations
 
 
-def linked_function_bytes(original, linked, name, address, calls, targets):
+def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None):
     """Validate exact placement and the linker's complete modification surface."""
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
@@ -331,36 +380,52 @@ def linked_function_bytes(original, linked, name, address, calls, targets):
         raise ValueError("linked function address, mode, or size changed")
     if len(linked["text"]) != len(original["text"]):
         raise ValueError("linker added text or veneers")
-    expected_functions = {name, *targets}
+    data_relocations = data_relocations or {}
+    data_names = {binding[0] for binding in data_relocations.values()}
+    expected_functions = {name} | (set(targets) - data_names)
     actual_functions = [item["name"] for item in linked["symbols"] if item["type"] == 2]
     if len(actual_functions) != len(expected_functions) or set(actual_functions) != expected_functions:
         raise ValueError("unexpected linked function or veneer symbol")
+    actual_objects = [item["name"] for item in linked["symbols"] if item["type"] == 1]
+    if len(actual_objects) != len(data_names) or set(actual_objects) != data_names:
+        raise ValueError("unexpected linked object symbol")
     for target_name, target in targets.items():
         definitions = [item for item in linked["symbols"] if item["name"] == target_name]
-        if len(definitions) != 1 or definitions[0]["type"] != 2 or \
-                definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != target | 1:
-            raise ValueError("linked target lost its absolute Thumb function type")
+        expected_type = 1 if target_name in data_names else 2
+        expected_value = target if target_name in data_names else target | 1
+        if len(definitions) != 1 or definitions[0]["type"] != expected_type or \
+                definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value:
+            raise ValueError("linked target lost its absolute symbol type or address")
     if any(item["name"] and not item["section"] for item in linked["symbols"]):
         raise ValueError("linked ELF retains undefined symbols")
     if any(re.fullmatch(r"\$a(?:\..*)?", item["name"]) for item in linked["symbols"]):
         raise ValueError("linked text contains an ARM mode mapping")
     patched = {position for call in calls for position in range(call - address, call - address + 4)}
+    for relocation, (_, value) in data_relocations.items():
+        if struct.unpack_from("<I", linked["text"], relocation)[0] != value:
+            raise ValueError("linked data word does not equal its mapped address and addend")
+        patched.update(range(relocation, relocation + 4))
     if any(before_byte != after_byte and position not in patched
            for position, (before_byte, after_byte)
            in enumerate(zip(original["text"], linked["text"]))):
-        raise ValueError("linker changed bytes outside call relocations")
+        raise ValueError("linker changed bytes outside permitted relocations")
     return linked["text"][:after["size"]]
 
 
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
-               rom_image=b''):
+               rom_image=b'', data_mapping=None):
     name = f"func_{address:08X}"
-    calls, targets = call_bindings(original, name, address, mapping,
-                                     rom_size, rom_image)
+    calls, targets, data_relocations = call_bindings(original, name, address, mapping,
+                                                    rom_size, rom_image, data_mapping)
+    data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
-        definitions.extend((f".global {target_name}", f".type {target_name}, %function",
-                            f".thumb_set {target_name}, 0x{target | 1:08X}"))
+        if target_name in data_names:
+            definitions.extend((f".global {target_name}", f".type {target_name}, %object",
+                                f".set {target_name}, 0x{target:08X}"))
+        else:
+            definitions.extend((f".global {target_name}", f".type {target_name}, %function",
+                                f".thumb_set {target_name}, 0x{target | 1:08X}"))
     runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
     script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
               ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
@@ -381,7 +446,59 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
     linked = elf_image(runner.read_binary(f"{workspace}/f.elf"))
     if runner.read_binary(f"{workspace}/f.linked.bin") != linked["text"]:
         raise ValueError("objcopy output does not equal linked ELF .text")
-    return linked_function_bytes(original, linked, name, address, calls, targets), calls
+    return (linked_function_bytes(original, linked, name, address, calls, targets, data_relocations),
+            calls, data_relocations)
+
+
+def verify_data_literals(instructions, address, data_relocations):
+    literals = {((instruction.address + 4) & ~3) + operand.mem.disp
+                for instruction in instructions for operand in instruction.operands
+                if instruction.mnemonic == "ldr" and operand.type == ARM_OP_MEM and
+                operand.mem.base == ARM_REG_PC and not operand.mem.index}
+    if any(address + relocation not in literals for relocation in data_relocations):
+        raise ValueError("data relocation is not a reachable trailing literal-pool load")
+
+
+def thumb_stack_adjustment(instruction):
+    if instruction.size != 2 or instruction.bytes[1] != 0xB0:
+        return None
+    words = instruction.bytes[0] & 0x7F
+    return -words if instruction.bytes[0] & 0x80 else words
+
+
+def uses_stack_frame(instructions):
+    return any(thumb_stack_adjustment(instruction) is not None or
+               any((operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP) or
+                   (operand.type == ARM_OP_REG and operand.reg == ARM_REG_SP)
+                   for operand in instruction.operands)
+               for instruction in instructions)
+
+
+def stack_alias_assignment(instruction, aliases, depth):
+    operands = instruction.operands
+    if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            not operands or operands[0].type != ARM_OP_REG:
+        return None
+    source = None
+    displacement = 0
+    if instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+            operands[1].type == ARM_OP_REG:
+        source = operands[1].reg
+    elif instruction.mnemonic in ("add", "adds", "sub", "subs") and \
+            len(operands) in (2, 3) and operands[-1].type == ARM_OP_IMM:
+        if len(operands) == 2:
+            source = operands[0].reg
+        elif operands[1].type == ARM_OP_REG:
+            source = operands[1].reg
+        displacement = operands[-1].imm
+        if instruction.mnemonic.startswith("sub"):
+            displacement = -displacement
+    if source != ARM_REG_SP and source not in aliases:
+        return None
+    offset = (-4 * depth if source == ARM_REG_SP else aliases[source]) + displacement
+    if not -4 * depth <= offset <= 0:
+        raise ValueError("stack alias arithmetic leaves the tracked frame")
+    return operands[0].reg, offset, source
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None):
@@ -390,7 +507,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
     decoder.detail = True
     end = address + len(data)
     alignment = 2 if thumb else 4
-    states = {address: (frozenset({ARM_REG_LR}), ())}
+    states = {address: (frozenset({ARM_REG_LR}), (), (), ())}
+    caller_clobbered = (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
+                        ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
     pending = [address]
     instructions = {}
     owners = {}
@@ -416,10 +535,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         instruction = instructions[current]
         return_registers = set(states[current][0])
         stack = list(states[current][1])
+        aliases = dict(states[current][2])
+        constants = dict(states[current][3])
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
+        adjustment = thumb_stack_adjustment(instruction) if thumb else None
         calling = CS_GRP_CALL in instruction.groups
         if CS_GRP_INT in instruction.groups or calling and not calls:
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
@@ -439,15 +561,28 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             if instruction.mnemonic == "push":
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
-                stack[:0] = [register in return_registers for register in registers]
+                if any(register in aliases for register in registers):
+                    raise ValueError("stack aliases cannot be pushed or spilled")
+                stack[:0] = [(register in return_registers, True) for register in registers]
             else:
                 if len(registers) > len(stack):
                     raise ValueError("pop reads outside the saved stack frame")
-                for register, saved_return in zip(registers, stack):
+                for register, saved_slot in zip(registers, stack):
+                    aliases.pop(register, None)
+                    constants.pop(register, None)
                     return_registers.discard(register)
-                    if saved_return:
+                    if saved_slot[0]:
                         return_registers.add(register)
                 del stack[:len(registers)]
+        elif adjustment is not None:
+            if not unconditional:
+                raise ValueError("unsupported conditional stack-pointer adjustment")
+            if adjustment < 0:
+                stack[:0] = [(False, False)] * -adjustment
+            elif adjustment > len(stack):
+                raise ValueError("stack-pointer adjustment leaves the tracked frame")
+            else:
+                del stack[:adjustment]
         returning = unconditional and (
             (instruction.mnemonic == "bx" and len(registers) == 1 and
              registers[0] in return_registers) or
@@ -460,8 +595,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             returns.add(current)
             successors = ()
         elif calling:
-            return_registers.difference_update((ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
-                                               ARM_REG_R3, ARM_REG_R12, ARM_REG_LR))
+            if any(register in aliases for register in caller_clobbered):
+                raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
+            return_registers.difference_update(caller_clobbered)
+            for register in caller_clobbered:
+                constants.pop(register, None)
+            stack = [(saved_return and saved_slot, saved_slot)
+                     for saved_return, saved_slot in stack]
             successors = (current + instruction.size,)
         elif instruction.id == ARM_INS_B:
             if len(operands) != 1 or operands[0].type != ARM_OP_IMM:
@@ -472,16 +612,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         else:
             if CS_GRP_JUMP in instruction.groups:
                 raise ValueError("non-leaf indirect control flow requires linked CFG verification")
-            if not stack_operation:
-                written = instruction.regs_access()[1]
+            if not stack_operation and adjustment is None:
+                read, written = instruction.regs_access()
+                assigned_return = None
                 if ARM_REG_PC in written:
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
                     raise ValueError("unsupported stack-pointer adjustment")
-                if ARM_REG_SP in registers:
+                assignment = stack_alias_assignment(instruction, aliases, len(stack)) if thumb else None
+                if ARM_REG_SP in registers and assignment is None:
                     raise ValueError("unsupported stack-address materialization")
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
+                allowed_aliases = {assignment[2]} if assignment is not None else set()
                 for operand in operands:
                     if operand.type != ARM_OP_MEM:
                         continue
@@ -489,20 +632,80 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                         raise ValueError("unsupported stack-address materialization")
                     if operand.mem.index == ARM_REG_PC:
                         raise ValueError("unsupported program-counter materialization")
+                    if operand.mem.base in aliases:
+                        widths = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2,
+                                  "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}
+                        width = widths.get(instruction.mnemonic)
+                        if not thumb or not unconditional or instruction.size != 2 or \
+                                width is None or len(operands) != 2 or len(registers) != 1 or \
+                                operands[0].type != ARM_OP_REG:
+                            raise ValueError("unsupported stack-alias memory access")
+                        offset = aliases[operand.mem.base] + operand.mem.disp
+                        if operand.mem.index:
+                            if operand.mem.index not in constants:
+                                raise ValueError("stack-alias index is not a known constant")
+                            offset += constants[operand.mem.index]
+                        if offset % width or not -4 * len(stack) <= offset or offset + width > 0:
+                            raise ValueError("stack-alias access is unaligned or outside the tracked frame")
+                        allowed_aliases.add(operand.mem.base)
+                        slot = (offset + 4 * len(stack)) // 4
+                        if instruction.mnemonic.startswith("str"):
+                            if registers[0] in aliases:
+                                raise ValueError("stack aliases cannot be stored or spilled")
+                            stack[slot] = (width == 4 and registers[0] in return_registers,
+                                           stack[slot][1])
+                        elif width == 4 and stack[slot][0]:
+                            assigned_return = registers[0]
                     if operand.mem.base == ARM_REG_PC:
                         if instruction.mnemonic != "ldr" or operand.mem.index:
                             raise ValueError("unsupported PC-relative memory access")
                         program_counter = ((current + 4) & ~3 if thumb else current + 8)
                         literals.add(program_counter + operand.mem.disp)
                     if operand.mem.base == ARM_REG_SP:
-                        if not instruction.mnemonic.startswith("ldr"):
+                        if thumb:
+                            if not unconditional or instruction.size != 2 or \
+                                    instruction.mnemonic not in ("ldr", "str") or \
+                                    len(operands) != 2 or len(registers) != 1 or \
+                                    operands[0].type != ARM_OP_REG or operand.mem.index or \
+                                    operand.mem.disp < 0 or operand.mem.disp % 4:
+                                raise ValueError("unsupported direct stack-frame access")
+                            slot = operand.mem.disp // 4
+                            if instruction.mnemonic == "str":
+                                if slot >= len(stack):
+                                    raise ValueError("stack-frame write is outside the tracked frame")
+                                stack[slot] = (registers[0] in return_registers, stack[slot][1])
+                            elif slot < len(stack) and stack[slot][0]:
+                                assigned_return = registers[0]
+                        elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
+                if (set(read) & aliases.keys()) - allowed_aliases:
+                    raise ValueError("unsupported stack-alias use or escape")
+                constant = None
+                if thumb and unconditional and instruction.size == 2 and \
+                        instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+                        operands[0].type == ARM_OP_REG:
+                    if operands[1].type == ARM_OP_IMM:
+                        constant = operands[1].imm
+                    elif operands[1].type == ARM_OP_REG:
+                        constant = constants.get(operands[1].reg)
+                        if operands[1].reg in return_registers:
+                            assigned_return = operands[0].reg
                 return_registers.difference_update(written)
+                for register in written:
+                    aliases.pop(register, None)
+                    constants.pop(register, None)
+                if constant is not None:
+                    constants[operands[0].reg] = constant
+                if assignment is not None:
+                    aliases[assignment[0]] = assignment[1]
+                if assigned_return is not None:
+                    return_registers.add(assigned_return)
             elif ARM_REG_PC in registers:
                 raise ValueError("unproven program-counter stack return")
             successors = (current + instruction.size,)
         edges[current] = successors
-        outgoing = (frozenset(return_registers), tuple(stack))
+        outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())),
+                    tuple(sorted(constants.items())))
         for successor in successors:
             previous = states.get(successor)
             if previous is None:
@@ -510,9 +713,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             else:
                 if len(previous[1]) != len(stack):
                     raise ValueError("inconsistent saved stack depth at control-flow join")
+                if previous[2] != outgoing[2]:
+                    raise ValueError("inconsistent stack aliases at control-flow join")
                 merged = (previous[0] & outgoing[0],
-                          tuple(saved and incoming for saved, incoming
-                                in zip(previous[1], stack)))
+                          tuple((saved[0] and incoming[0], saved[1] and incoming[1])
+                                for saved, incoming
+                                in zip(previous[1], stack)), outgoing[2],
+                          tuple((register, value) for register, value in previous[3]
+                                if constants.get(register) == value))
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
@@ -591,6 +799,43 @@ def function_span(addr, symbols_file):
     return None
 
 
+def plausibility_result(result, address):
+    document = json.loads(result.stdout)
+    required = {"findings", "total", "addr", "hand_asm_allowed", "allow_entry"}
+    if not isinstance(document, dict) or not required <= document.keys():
+        raise ValueError("missing plausibility JSON fields")
+    records = document["findings"]
+    if not isinstance(records, list) or type(document["total"]) is not int or \
+            document["total"] != len(records) or document["addr"] != f"0x{address:08X}" or \
+            type(document["hand_asm_allowed"]) is not bool:
+        raise ValueError("invalid plausibility JSON fields")
+    findings = []
+    for record in records:
+        if not isinstance(record, dict) or \
+                any(not isinstance(record.get(field), str) or not record[field]
+                    for field in ("file", "rule", "severity", "message")) or \
+                type(record.get("line")) is not int or record["line"] < 0 or \
+                record["severity"] not in ("error", "suspect"):
+            raise ValueError("invalid plausibility finding")
+        findings.append(f"{os.path.basename(record['file'])}:{record['line']}: "
+                        f"{record['severity'].upper()}: {record['rule']}")
+    allowed = document["allow_entry"]
+    if allowed is not None and (not isinstance(allowed, dict) or
+            not isinstance(allowed.get("address"), str) or
+            allowed["address"].upper() != f"0x{address:08X}".upper() or
+            not isinstance(allowed.get("reason", "no reason recorded"), str)):
+        raise ValueError("invalid hand-asm allow entry")
+    if document["hand_asm_allowed"] != (allowed is not None) or \
+            allowed is not None and not findings:
+        raise ValueError("inconsistent hand-asm allow entry")
+    expected_exit = 1 if findings else 0
+    if result.returncode != expected_exit:
+        findings.append(f"plausibility checker failed with exit {result.returncode}; "
+                        f"expected {expected_exit}")
+        allowed = None
+    return findings, allowed
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("addr")
@@ -620,6 +865,7 @@ def main():
         sys.exit(f"no source at {src_abs}")
     fingerprint = source_fingerprint(ROOT, addr)
     mapping = mapping_snapshot(ROOT)
+    data_mapping = data_snapshot(ROOT)
     linked_profile = False
     emit = None
     if args.emit:
@@ -663,21 +909,30 @@ def main():
             if original["text"] != text_data:
                 raise ValueError("objcopy output does not equal ELF .text")
             calls = {}
+            data_relocations = {}
             if original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
-                got, calls = link_calls(runner, workspace, args, original,
-                                        addr, mapping, len(rom), rom)
-                linked_profile = True
+                got, calls, data_relocations = link_calls(runner, workspace, args, original,
+                                                          addr, mapping, len(rom), rom, data_mapping)
+                linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             verified_instructions = verify_leaf_instructions(got, addr, thumb, calls)
+            verify_data_literals(verified_instructions, addr, data_relocations)
     except Exception as e:                       # noqa: BLE001
         sys.exit(f"compile failed:\n{e}")
 
     if len(got) < span:
         sys.exit(f"compiled symbol is shorter than the indexed span: {len(got)} < {span}")
     span = len(got)
+    framed_profile = thumb and uses_stack_frame(verified_instructions)
+    data_profile = bool(data_relocations)
+    schema = LINKED_SCHEMA if linked_profile else SCHEMA
+    if data_profile:
+        schema = FRAMED_DATA_SCHEMA if framed_profile else DATA_SCHEMA
+    elif framed_profile:
+        schema = FRAMED_LINKED_SCHEMA if linked_profile else FRAMED_SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
@@ -692,28 +947,22 @@ def main():
     hand_asm_allowed = None
     if os.path.exists(plaus_path):
         lint_targets = [str(path) for path in source_paths(ROOT, addr)]
-        r = subprocess.run(
-            [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
-             "--json"] + lint_targets,
-            capture_output=True, text=True)
         try:
-            doc = json.loads(r.stdout)
-            findings = [f"{os.path.basename(f['file'])}:{f['line']}: "
-                        f"{f['severity'].upper()}: {f['rule']}"
-                        for f in doc.get("findings", [])]
-            hand_asm_allowed = doc.get("allow_entry")
-        except ValueError:
-            findings = [ln for ln in r.stdout.splitlines() if ln.strip()]
-            if r.returncode and not findings:
-                findings = [ln for ln in r.stderr.splitlines() if ln.strip()]
-                if not findings:
-                    findings = [f"plausibility checker failed with exit {r.returncode}"]
+            checker_result = subprocess.run(
+                [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
+                 "--json"] + lint_targets,
+                capture_output=True, text=True)
+            findings, hand_asm_allowed = plausibility_result(checker_result, addr)
+        except (OSError, ValueError, TypeError, RecursionError) as error:
+            findings = [f"plausibility checker failed: {error}"]
 
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
-    if linked_profile and mapping_snapshot(ROOT) != mapping:
+    if (linked_profile or data_profile) and mapping_snapshot(ROOT) != mapping:
         sys.exit("function mapping changed during verification; re-run match.py")
+    if data_profile and data_snapshot(ROOT) != data_mapping:
+        sys.exit("data symbol mapping changed during verification; re-run match.py")
     with open(rom_path, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -794,11 +1043,15 @@ def main():
             f.write(f"# match report - 0x{addr:08X}"
                     f"{' (' + args.label + ')' if args.label else ''}\n\n")
             f.write(f"* source: `{src_rel}`\n")
-            f.write(f"* verification: `{LINKED_SCHEMA if linked_profile else SCHEMA}`\n")
+            f.write(f"* verification: `{schema}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
-            if linked_profile:
+            if framed_profile:
+                f.write(f"* stack frame: {STACK_SUMMARY}\n")
+            if linked_profile or data_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
-                f.write(f"* control flow: {CALL_SUMMARY}\n")
+                f.write(f"* control flow: {control_flow}\n")
+            if data_profile:
+                f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")

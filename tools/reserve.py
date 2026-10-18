@@ -33,32 +33,7 @@ import time
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
 LEDGER_TITLE = "address ledger"
-
-
-def _resolve_ledger_number():
-    """Find the open 'address ledger' issue instead of trusting a pinned number.
-
-    The ledger gets rotated (old one closed, new one opened) and a hard-coded
-    number goes stale every time it happens - which has bitten twice.  An env
-    override still wins, for pinning and tests.
-    """
-    override = os.environ.get("FFTA_LEDGER_ISSUE")
-    if override and override.isdigit() and int(override) > 0:
-        return int(override)
-    r = subprocess.run(
-        ["gh", "issue", "list", "--repo", KIT_REPO, "--state", "open",
-         "--limit", "50", "--json", "number,title"],
-        capture_output=True, text=True)
-    try:
-        for issue in json.loads(r.stdout or "[]"):
-            if str(issue.get("title", "")).strip().lower() == LEDGER_TITLE.lower():
-                return int(issue["number"])
-    except (ValueError, KeyError, TypeError):
-        pass
-    return 0            # no ledger yet: the first claim will create one
-
-
-LEDGER_NUMBER = _resolve_ledger_number()
+LEDGER_NUMBER = None
 START = "<!-- ffta-ledger:start -->"
 END = "<!-- ffta-ledger:end -->"
 STATE_START = "<!-- ffta-ledger-state\n"
@@ -167,11 +142,56 @@ def api(method, endpoint, payload=None):
 
 
 def endpoint(suffix=""):
+    global LEDGER_NUMBER
     if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", KIT_REPO):
         raise LedgerError("invalid configured repository")
-    if not str(LEDGER_NUMBER).isdigit() or int(LEDGER_NUMBER) <= 0:
+    if LEDGER_NUMBER is None:
+        LEDGER_NUMBER = _resolve_ledger_number()
+    if not positive_id(LEDGER_NUMBER):
         raise LedgerError("invalid configured ledger issue")
-    return f"repos/{KIT_REPO}/issues/{int(LEDGER_NUMBER)}{suffix}"
+    return f"repos/{KIT_REPO}/issues/{LEDGER_NUMBER}{suffix}"
+
+
+def _resolve_ledger_number():
+    """Discover one owner-authored open ledger; an explicit pin must agree."""
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", KIT_REPO):
+        raise LedgerError("invalid configured repository")
+    override = os.environ.get("FFTA_LEDGER_ISSUE")
+    if override is not None and not re.fullmatch(r"[1-9][0-9]*", override):
+        raise LedgerError("FFTA_LEDGER_ISSUE must be a positive issue number")
+    owner = KIT_REPO.split("/")[0].casefold()
+    candidates = []
+    seen = set()
+    for page in range(1, 101):
+        issues = api("GET", f"repos/{KIT_REPO}/issues?state=open&per_page=100&page={page}")
+        if not isinstance(issues, list) or len(issues) > 100:
+            raise LedgerError("invalid ledger discovery response")
+        for issue in issues:
+            if not isinstance(issue, dict) or not positive_id(issue.get("number")) or \
+                    issue["number"] in seen:
+                raise LedgerError("invalid or repeated issue in ledger discovery")
+            seen.add(issue["number"])
+            if issue.get("state") != "open" or "pull_request" in issue:
+                continue
+            title = issue.get("title")
+            author = issue.get("user")
+            if not isinstance(title, str) or title.strip().casefold() != LEDGER_TITLE or \
+                    not isinstance(author, dict) or not isinstance(author.get("login"), str) or \
+                    author["login"].casefold() != owner:
+                continue
+            if issue.get("repository_url") != f"https://api.github.com/repos/{KIT_REPO}":
+                raise LedgerError("ledger discovery returned an unexpected repository")
+            candidates.append(issue["number"])
+        if len(issues) < 100:
+            break
+    else:
+        raise LedgerError("ledger discovery exceeded its pagination limit")
+    if len(candidates) != 1:
+        raise LedgerError("expected exactly one owner-authored open address ledger")
+    number = candidates[0]
+    if override is not None and int(override) != number:
+        raise LedgerError("FFTA_LEDGER_ISSUE does not match the authoritative open ledger")
+    return number
 
 
 def self_update():
@@ -661,7 +681,7 @@ def drain(days=STALE_DAYS):
 
 
 def trusted_event():
-    endpoint()
+    global LEDGER_NUMBER
     if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REPOSITORY") != KIT_REPO:
         raise LedgerError("broker runs only in the trusted repository workflow")
     try:
@@ -677,10 +697,14 @@ def trusted_event():
         raise LedgerError("unexpected workflow repository")
     if os.environ.get("GITHUB_REF") != "refs/heads/" + branch:
         raise LedgerError("broker must run from the default branch")
+    LEDGER_NUMBER = _resolve_ledger_number()
     event_name = os.environ.get("GITHUB_EVENT_NAME")
     if event_name == "issue_comment":
         issue = event.get("issue", {})
-        if not isinstance(issue, dict) or event.get("action") != "created" or issue.get("number") != int(LEDGER_NUMBER) or "pull_request" in issue:
+        if not isinstance(issue, dict) or event.get("action") != "created" or \
+                not positive_id(issue.get("number")) or issue["number"] != LEDGER_NUMBER or \
+                issue.get("state") != "open" or \
+                "pull_request" in issue:
             raise LedgerError("unexpected ledger comment event")
     elif event_name not in ("schedule", "workflow_dispatch"):
         raise LedgerError("unsupported broker event")

@@ -17,6 +17,7 @@ Usage:  python tools/analyze.py [rom] [repo-root]
        be run from a decomp repo that vendors it (see fftadecomp-kit).
 """
 
+import hashlib
 import json
 import math
 import os
@@ -28,11 +29,12 @@ try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_LR,
-                                    ARM_REG_PC)
+                                    ARM_REG_PC, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
 except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
 ROM_BASE = 0x08000000
+CODE_END = 0x08150000
 HEADER_LEN = 0xC0          # GBA header (logo, title, code, pointer fields)
 BLK = 0x400                # 4 KiB granularity for the coverage map
 
@@ -53,20 +55,7 @@ def say(*a):
     print(line, flush=True)
     _LOG.append(line)
 
-NINTENDO_LOGO = bytes.fromhex(
-    "24ffae51699aa2213a8341789646332860"
-    "47f70908e45ab08d701e7b729f743b9e9c17"
-    "6f1f0db1d3e82b9b6c8e01f41d7708e5b613ec"
-    "a74c12d28f63d331ec8b306b9786e0ff1c6f"
-    "381b6ebcd72a3d95a28f76847268f27ab4a2"
-    "63da6910421a54f5097418180772305d74b9"
-    "91a9a0216d968c615da542f5330ff1587f07"
-    "6f88c0a813c037f2f36d8c5e457c741786a2"
-    "cb5d3c390418d43c58b78f871f61136f8fb0"
-    "f7088ab7259defe13d4cf39526b521c1004c"
-    "653b10450084ff9d2426016f463a00788d31"
-    "249cb8e8e8891212000002c4000003840000"
-    "0100000000")
+NINTENDO_LOGO_SHA256 = "08a0153cfd6b0ea54b938f7d209933fa849da0d56f5a34c481060c9ff2fad818"
 
 
 # --------------------------------------------------------------------------
@@ -164,6 +153,7 @@ class Analyzer:
         self.rom = rom
         self.dec = dec
         self.n = len(rom)
+        self.code_limit = min(self.n, CODE_END - ROM_BASE)
         # coverage: one byte per 4-byte word (size) or 2-byte halfword (thumb)
         self.arm_seen = bytearray((self.n + 3) // 4)
         self.thumb_seen = bytearray((self.n + 1) // 2)
@@ -175,20 +165,24 @@ class Analyzer:
         self.entry_targets = set() # where the entry point transfers to
         self.in_entry = False
         self.indirect = 0            # indirect transfers seen
+        self.switch_tables = 0
         self.max_func_instr = 4000
 
     # -- helpers
     def in_rom(self, off, size):
         return 0 <= off and off + size <= self.n
 
+    def in_code(self, off, size):
+        return 0 <= off and off + size <= self.code_limit
+
     def prologue_ish(self, off, thumb=False):
         """cheap ARM/Thumb prologue test used to seed candidate functions"""
         if thumb:
-            if off & 1 or not self.in_rom(off, 2):
+            if off & 1 or not self.in_code(off, 2):
                 return False
             w = struct.unpack_from("<H", self.rom, off)[0]
             return (w >> 8) in (0xB4, 0xB5)      # push {rlist[,lr]}
-        if off & 3 or not self.in_rom(off, 4):
+        if off & 3 or not self.in_code(off, 4):
             return False
         w = struct.unpack_from("<I", self.rom, off)[0]
         if (w & 0x0FFF0000) == 0x092D0000:      # stmdb sp!, {regs...}  (ARM push)
@@ -208,6 +202,66 @@ class Analyzer:
             return struct.unpack_from("<I", self.rom, a)[0]
         return None
 
+    def thumb_switch_targets(self, offset):
+        """Recognize the bounded cmp/bls/word-table pattern as discovery evidence."""
+        def instruction(position):
+            if position % 2 or not self.in_code(position, 2):
+                return None
+            decoded = next(self.dec.thumb.disasm(self.rom[position:position + 4],
+                                                ROM_BASE + position, count=1), None)
+            return decoded if decoded is not None and decoded.size == 2 else None
+
+        comparison = instruction(offset - 2)
+        guard = instruction(offset)
+        if comparison is None or guard is None or comparison.mnemonic != "cmp" or \
+                guard.mnemonic != "bls" or len(comparison.operands) != 2 or \
+                comparison.operands[0].type != ARM_OP_REG or \
+                comparison.operands[1].type != ARM_OP_IMM or \
+                not 0 <= comparison.operands[1].imm <= 255 or \
+                len(guard.operands) != 1 or guard.operands[0].type != ARM_OP_IMM:
+            return ()
+        dispatch = guard.operands[0].imm - ROM_BASE
+        if dispatch <= offset:
+            return ()
+        sequence = [instruction(dispatch + distance) for distance in range(0, 10, 2)]
+        if any(item is None or item.cc not in (ARM_CC_AL, ARM_CC_INVALID)
+               for item in sequence) or \
+                tuple(item.mnemonic for item in sequence) != ("lsls", "ldr", "adds", "ldr", "mov"):
+            return ()
+        shift, literal, addition, load, transfer = (item.operands for item in sequence)
+        if len(shift) != 3 or shift[0].type != ARM_OP_REG or \
+                shift[1].type != ARM_OP_REG or shift[1].reg != comparison.operands[0].reg or \
+                shift[2].type != ARM_OP_IMM or shift[2].imm != 2:
+            return ()
+        accumulator = shift[0].reg
+        if len(literal) != 2 or literal[0].type != ARM_OP_REG or \
+                literal[0].reg == accumulator or literal[1].type != ARM_OP_MEM or \
+                literal[1].mem.base != ARM_REG_PC or literal[1].mem.index or \
+                literal[1].mem.disp < 0 or literal[1].mem.disp % 4:
+            return ()
+        if len(addition) != 3 or any(operand.type != ARM_OP_REG for operand in addition) or \
+                tuple(operand.reg for operand in addition) != (accumulator, accumulator, literal[0].reg):
+            return ()
+        if len(load) != 2 or load[0].type != ARM_OP_REG or load[0].reg != accumulator or \
+                load[1].type != ARM_OP_MEM or load[1].mem.base != accumulator or \
+                load[1].mem.index or load[1].mem.disp:
+            return ()
+        if len(transfer) != 2 or any(operand.type != ARM_OP_REG for operand in transfer) or \
+                tuple(operand.reg for operand in transfer) != (ARM_REG_PC, accumulator):
+            return ()
+        pool = ((dispatch + 6) & ~3) + literal[1].mem.disp
+        table = pool + 4
+        count = comparison.operands[1].imm + 1
+        if pool < dispatch + 10 or not self.in_code(pool, 4 + count * 4) or \
+                struct.unpack_from("<I", self.rom, pool)[0] != ROM_BASE + table:
+            return ()
+        targets = tuple(value - ROM_BASE for value in
+                        struct.unpack_from(f"<{count}I", self.rom, table))
+        if any(target % 2 or target < HEADER_LEN or not self.in_code(target, 2) or
+               offset - 2 <= target < table + count * 4 for target in targets):
+            return ()
+        return targets
+
     def traverse(self, start, thumb=False, seed_known=None):
         """Walk from `start` following branches; mode switches on BX/BLX/bit0.
 
@@ -225,7 +279,7 @@ class Analyzer:
             off, thumb, known = stack.pop()
             unit = 2 if thumb else 4
             seen = self.thumb_seen if thumb else self.arm_seen
-            while self.in_rom(off, unit):
+            while self.in_code(off, unit):
                 idx = off // unit
                 if seen[idx]:
                     break
@@ -234,6 +288,9 @@ class Analyzer:
                     ended = "badinsn"
                     break
                 size = info["sz"]
+                if not self.in_code(off, size):
+                    ended = "code-boundary"
+                    break
                 for position in range(off, off + size, unit):
                     seen[position // unit] = 1
                 count += 1
@@ -250,6 +307,12 @@ class Analyzer:
                     if val is not None:
                         known[reg] = val
 
+                if thumb and info["mn"] == "bls":
+                    switch_targets = self.thumb_switch_targets(off)
+                    if switch_targets:
+                        self.switch_tables += 1
+                        stack.extend((target, True, {}) for target in sorted(set(switch_targets)))
+
                 tgt = info["tgt"]
                 if tgt is None and info["opreg"] is not None:
                     val = known.get(info["opreg"])
@@ -265,7 +328,7 @@ class Analyzer:
                     else:
                         tthumb = thumb           # b/bl stay in the current mode
                     toff = tgt & ~1
-                    if self.in_rom(toff, 2 if tthumb else 4) and not (not tthumb and toff & 3):
+                    if self.in_code(toff, 2 if tthumb else 4) and not (not tthumb and toff & 3):
                         target = ROM_BASE + toff + int(tthumb)
                         if info["call"]:
                             self.calls[target] += 1
@@ -317,10 +380,13 @@ class Analyzer:
         count = 0
         previous_pop = ()
         ended = "fallthrough"
-        while count < limit and self.in_rom(position, unit):
+        while count < limit and self.in_code(position, unit):
             info = self.dec.thumb_ins(position) if thumb else self.dec.arm_ins(position)
             if info is None:
                 ended = "badinsn"
+                break
+            if not self.in_code(position, info["sz"]):
+                ended = "code-boundary"
                 break
             count += 1
             position += info["sz"]
@@ -362,7 +428,7 @@ class Analyzer:
         added = 0
         for addr in sorted(set(self.calls) | self.entry_targets):
             off = (addr & ~1) - ROM_BASE
-            if off < 0 or off >= self.n or off in self.functions:
+            if not self.in_code(off, 2 if addr & 1 else 4) or off in self.functions:
                 continue
             tthumb = bool(addr & 1)
             n, stop, endby = self.linear_body(off, tthumb)
@@ -385,8 +451,8 @@ class Analyzer:
 
     def scan_candidates(self):
         """Every 4-aligned address that begins with an ARM push prologue."""
-        return [off for off in range(0, self.n - 4, 4)
-                if off >= HEADER_LEN and self.prologue_ish(off, thumb=False)]
+        return [off for off in range(HEADER_LEN, self.code_limit - 3, 4)
+                if self.prologue_ish(off, thumb=False)]
 
     def verify_thumb(self, off, limit=128):
         """Linear-verify a Thumb candidate: push {...lr} ... pop {..,pc}/bx lr.
@@ -398,7 +464,7 @@ class Analyzer:
         flag it as a return, so it is recognised here, otherwise every
         function using that epilogue swallows the next one.
         """
-        if off & 1 or not self.in_rom(off, 2):
+        if off & 1 or not self.in_code(off, 2):
             return None
         h = struct.unpack_from("<H", self.rom, off)[0]
         if (h >> 8) != 0xB5:                # must be `push {rlist, lr}`
@@ -409,9 +475,9 @@ class Analyzer:
         return None
 
     def scan_thumb_functions(self):
-        """Find verified Thumb functions across the whole ROM."""
+        """Find provisional Thumb functions within the FFTA code region."""
         found = 0
-        for off in range(HEADER_LEN, self.n - 2, 2):
+        for off in range(HEADER_LEN, self.code_limit - 1, 2):
             if self.thumb_seen[off // 2]:
                 continue
             r = self.verify_thumb(off)
@@ -440,7 +506,7 @@ class Analyzer:
 
     def scan_arm_functions(self):
         found = 0
-        for off in range(HEADER_LEN, self.n - 4, 4):
+        for off in range(HEADER_LEN, self.code_limit - 3, 4):
             if self.arm_seen[off // 4]:
                 continue
             r = self.verify_arm(off)
@@ -463,6 +529,8 @@ class Analyzer:
 # --------------------------------------------------------------------------
 
 def header_report(rom):
+    if len(rom) < HEADER_LEN:
+        raise ValueError(f"ROM is shorter than the {HEADER_LEN}-byte cartridge header")
     rep = {}
     title = rom[0xA0:0xAC]
     rep["title"] = title.rstrip(b"\x00").decode("latin-1")
@@ -475,16 +543,12 @@ def header_report(rom):
         rep["entry"] = f"0x{ROM_BASE + off:08X}"
     else:
         rep["entry"] = None
-    logo_ok = rom[0x04:0xA0] == NINTENDO_LOGO
-    rep["nintendo_logo_ok"] = logo_ok
-    if not logo_ok:
-        diff = sum(1 for a, b in zip(rom[0x04:0xA0], NINTENDO_LOGO) if a != b)
-        rep["nintendo_logo_diff_bytes"] = diff
-    chk = 0
-    for b in rom[0xA0:0xBD]:
-        chk = (chk - b - 1) & 0xFF
-    rep["header_checksum"] = {"computed": f"{chk:02X}", "stored": f"{rom[0xBD]:02X}",
-                              "ok": chk == rom[0xBD]}
+    logo_digest = hashlib.sha256(rom[0x04:0xA0]).hexdigest()
+    rep["nintendo_logo_ok"] = logo_digest == NINTENDO_LOGO_SHA256
+    rep["nintendo_logo_sha256"] = logo_digest
+    checksum = (-sum(rom[0xA0:0xBD]) - 0x19) & 0xFF
+    rep["header_checksum"] = {"computed": f"{checksum:02X}", "stored": f"{rom[0xBD]:02X}",
+                              "ok": checksum == rom[0xBD]}
     return rep
 
 
@@ -620,6 +684,7 @@ def main():
             "thumb_halfwords_covered": int(sum(an.thumb_seen)),
             "code_bytes": sum(1 for v in an.covered if v),
             "cached_arm_instructions": len(dec.arm_cache),
+            "recognized_switch_tables": an.switch_tables,
             "inventory_complete": False,
         },
         "segments": out_segs,

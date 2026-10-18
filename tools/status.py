@@ -16,6 +16,8 @@ Counts two things over the functions in the code region:
 A function counts as matched when src/<addr>.c exists *and* its match report
 says the bytes are identical.  --verify recompiles instead of trusting the
 report, which is what CI should do.
+--write --verify also regenerates the reports so offline checks stay current.
+--verify alone and --check never rewrite match reports.
 
 --badges writes functions.json and bytes.json in the shields.io *endpoint*
 format, to be published on a `badges` branch and rendered with
@@ -114,7 +116,7 @@ def bar(frac, width=28):
     return "█" * filled + "░" * (width - filled)
 
 
-def collect(root, verify, quiet=False):
+def collect(root, verify, quiet=False, write_reports=False):
     cfg = os.path.join(root, "config", "functions.json")
     if not os.path.exists(cfg):
         sys.exit(f"no {cfg} - run analyze first")
@@ -139,17 +141,18 @@ def collect(root, verify, quiet=False):
         ok = False
         if verify:
             here = os.path.dirname(os.path.abspath(__file__))
-            r = subprocess.run(
-                [sys.executable, os.path.join(here, "match.py"),
-                 "--root", root, addr, "--no-write"],
-                capture_output=True, text=True)
-            ok = r.returncode == 0 and "verdict MATCH - byte identical" in r.stdout.splitlines()
-        else:
+            command = [sys.executable, os.path.join(here, "match.py"), "--root", root, addr]
+            if not write_reports:
+                command.append("--no-write")
+            result = subprocess.run(command, capture_output=True, text=True)
+            ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
+        if not verify or write_reports and ok:
             rep = os.path.join(root, "docs", "match", f"{addr}.md")
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     ok = report_matches(report_file.read(), root, int(addr, 16))
             else:
+                ok = False
                 problems.append(f"{addr}: no match report in docs/match/")
         if ok:
             matched_f += 1
@@ -211,7 +214,8 @@ def main():
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"))
     ap.add_argument("--verify", action="store_true",
                     help="recompile every src/*.c instead of trusting the reports")
-    ap.add_argument("--write", action="store_true")
+    ap.add_argument("--write", action="store_true",
+                    help="update status files; with --verify, regenerate match reports too")
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--badges", metavar="DIR",
                     help="write shields.io endpoint JSON (functions/bytes) here")
@@ -226,7 +230,8 @@ def main():
     args = ap.parse_args()
 
     root = repo_root(args.root)
-    tf, mf, tb, mb, problems = collect(root, args.verify)
+    tf, mf, tb, mb, problems = collect(root, args.verify,
+                                      write_reports=args.verify and args.write and not args.check)
     badge_base = None if args.static_badges else (
         args.badge_base or os.environ.get("FFTA_BADGE_BASE")
         or badge_base_from_remote(root))
