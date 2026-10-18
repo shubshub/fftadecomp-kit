@@ -181,6 +181,20 @@ change during verification rejects the push rather than being overwritten.
   docs/match/          per-function match reports
 ```
 
+## Cartridge header validation
+
+`analyze.py` checks the 156-byte logo field by SHA-256 without embedding logo
+data. The reference digest and complement formula agree with
+[devkitPro's `gbafix`](https://github.com/devkitPro/gba-tools/blob/master/src/gbafix.c).
+The header complement is the negated sum of bytes `0xA0` through `0xBC`, minus
+`0x19`, reduced to one byte. Headers shorter than `0xC0` bytes are rejected.
+
+The baseline FFTA USA header passes both checks: its computed and stored
+complement are `0x89`. Earlier reports of a scrambled logo and a computed
+`0x85` were analyzer defects, not evidence of ROM damage. Header reports retain
+`nintendo_logo_ok` and now include `nintendo_logo_sha256` instead of the invalid
+byte-difference count. These checks do not alter the ROM or certify its payload.
+
 ## The matching harness
 
 `match.py` exists because "close" is not good enough in a matching decomp: it

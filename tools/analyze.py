@@ -17,6 +17,7 @@ Usage:  python tools/analyze.py [rom] [repo-root]
        be run from a decomp repo that vendors it (see fftadecomp-kit).
 """
 
+import hashlib
 import json
 import math
 import os
@@ -53,20 +54,7 @@ def say(*a):
     print(line, flush=True)
     _LOG.append(line)
 
-NINTENDO_LOGO = bytes.fromhex(
-    "24ffae51699aa2213a8341789646332860"
-    "47f70908e45ab08d701e7b729f743b9e9c17"
-    "6f1f0db1d3e82b9b6c8e01f41d7708e5b613ec"
-    "a74c12d28f63d331ec8b306b9786e0ff1c6f"
-    "381b6ebcd72a3d95a28f76847268f27ab4a2"
-    "63da6910421a54f5097418180772305d74b9"
-    "91a9a0216d968c615da542f5330ff1587f07"
-    "6f88c0a813c037f2f36d8c5e457c741786a2"
-    "cb5d3c390418d43c58b78f871f61136f8fb0"
-    "f7088ab7259defe13d4cf39526b521c1004c"
-    "653b10450084ff9d2426016f463a00788d31"
-    "249cb8e8e8891212000002c4000003840000"
-    "0100000000")
+NINTENDO_LOGO_SHA256 = "08a0153cfd6b0ea54b938f7d209933fa849da0d56f5a34c481060c9ff2fad818"
 
 
 # --------------------------------------------------------------------------
@@ -463,6 +451,8 @@ class Analyzer:
 # --------------------------------------------------------------------------
 
 def header_report(rom):
+    if len(rom) < HEADER_LEN:
+        raise ValueError(f"ROM is shorter than the {HEADER_LEN}-byte cartridge header")
     rep = {}
     title = rom[0xA0:0xAC]
     rep["title"] = title.rstrip(b"\x00").decode("latin-1")
@@ -475,16 +465,12 @@ def header_report(rom):
         rep["entry"] = f"0x{ROM_BASE + off:08X}"
     else:
         rep["entry"] = None
-    logo_ok = rom[0x04:0xA0] == NINTENDO_LOGO
-    rep["nintendo_logo_ok"] = logo_ok
-    if not logo_ok:
-        diff = sum(1 for a, b in zip(rom[0x04:0xA0], NINTENDO_LOGO) if a != b)
-        rep["nintendo_logo_diff_bytes"] = diff
-    chk = 0
-    for b in rom[0xA0:0xBD]:
-        chk = (chk - b - 1) & 0xFF
-    rep["header_checksum"] = {"computed": f"{chk:02X}", "stored": f"{rom[0xBD]:02X}",
-                              "ok": chk == rom[0xBD]}
+    logo_digest = hashlib.sha256(rom[0x04:0xA0]).hexdigest()
+    rep["nintendo_logo_ok"] = logo_digest == NINTENDO_LOGO_SHA256
+    rep["nintendo_logo_sha256"] = logo_digest
+    checksum = (-sum(rom[0xA0:0xBD]) - 0x19) & 0xFF
+    rep["header_checksum"] = {"computed": f"{checksum:02X}", "stored": f"{rom[0xBD]:02X}",
+                              "ok": checksum == rom[0xBD]}
     return rep
 
 
