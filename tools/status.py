@@ -91,6 +91,24 @@ def repo_root(arg=None):
     return os.path.abspath(arg or os.environ.get("FFTA_ROOT") or os.getcwd())
 
 
+def badge_base_from_remote(root):
+    """derive the raw badges URL from the repo's origin remote.
+
+    Without this, --write and --check disagree unless both remember
+    FFTA_BADGE_BASE, and a stale block slips in whenever one of them runs
+    without it.
+    """
+    import subprocess
+    r = subprocess.run(["git", "-C", root, "remote", "get-url", "origin"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        return ""
+    m = re.search(r"github\.com[:/]([^/]+)/([^/\s]+?)(?:\.git)?$", r.stdout.strip())
+    if not m:
+        return ""
+    return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/badges"
+
+
 def bar(frac, width=28):
     filled = int(round(frac * width))
     return "█" * filled + "░" * (width - filled)
@@ -209,7 +227,9 @@ def main():
 
     root = repo_root(args.root)
     tf, mf, tb, mb, problems = collect(root, args.verify)
-    badge_base = None if args.static_badges else (args.badge_base or os.environ.get("FFTA_BADGE_BASE"))
+    badge_base = None if args.static_badges else (
+        args.badge_base or os.environ.get("FFTA_BADGE_BASE")
+        or badge_base_from_remote(root))
     block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix, badge_base)
 
     if args.badges:
