@@ -69,7 +69,8 @@ class Runner:
             cmd = f"{self.prefix}cd {here} && {cmd}"
             r = subprocess.run(self.wsl + [cmd], capture_output=True, text=True)
         else:
-            r = subprocess.run(cmd, shell=True, capture_output=True, text=True)
+            r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
+                               cwd=ROOT)
         if r.returncode != 0:
             raise RuntimeError((r.stderr or r.stdout or "command failed").strip())
         return r.stdout
