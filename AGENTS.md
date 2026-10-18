@@ -28,6 +28,30 @@ and `claim` check the decomp repository's default branch and open pull requests
 as well as the ledger. The broker repeats these checks before accepting a
 claim. Coordinate with an existing PR's author rather than duplicating work.
 
+## Before you push
+
+**Do not run `git push`.** Run the gate, which verifies and then pushes — and
+pushes nothing if any check fails:
+
+```sh
+python ../fftadecomp-kit/tools/push.py                  # verify, then push
+python ../fftadecomp-kit/tools/push.py --check-only     # verify only
+```
+
+It refuses unless all of these hold:
+
+1. the branch contains the remote tip and has no merge commits (rebase, linear)
+2. nothing ROM-derived is tracked — no `baserom.bin`, no `*.gba`, no `asm/`,
+   no `files/`. The disassembly and raw runs are generated from the user's own
+   ROM by `make init` and **have been purged from this repository's history** —
+   do not add them back
+3. every function in `src/` recompiles to the ROM bytes exactly, and the README
+   progress block agrees with the result
+4. no source in `src/` or `include/` is implausible (no inline asm, no steering
+   pragmas, no inert control flow)
+5. every function in `src/` has a report saying `MATCH - byte identical`, and no
+   report says `IMPLAUSIBLE` or an unsanctioned `HAND-ASM`
+
 | exit | state |
 |---|---|
 | 0 | `FREE` from `check`, or confirmed acceptance from a request command |
