@@ -73,6 +73,19 @@ def static_badge(label, percent):
             f"{color_for(percent)}")
 
 
+def endpoint_badge(label, percent, badge_base):
+    """A shields.io *endpoint* badge: self-updating, but only for a public repo.
+
+    shields.io fetches the JSON itself, so this only works when the repository
+    holding badge_base is public - and the numbers then come straight from the
+    JSON on the badges branch without anyone rewriting the README.
+    """
+    from urllib.parse import quote
+    url = f"{badge_base.rstrip('/')}/{label.split()[-1]}.json"
+    return (f"https://img.shields.io/endpoint?"
+            f"url={quote(url, safe='')}")
+
+
 def repo_root(arg=None):
     return os.path.abspath(arg or os.environ.get("FFTA_ROOT") or os.getcwd())
 
@@ -129,7 +142,16 @@ def collect(root, verify, quiet=False):
     return total_fns, matched_f, total_bytes, matched_b, problems
 
 
-def render(total_f, matched_f, total_b, matched_b, problems, prefix=""):
+def badge_url(label, percent, badge_base):
+    """endpoint badges when the repo is public and a badges branch exists,
+    otherwise static ones (which render everywhere, but need a rewrite to
+    update)"""
+    if badge_base:
+        return endpoint_badge(label, percent, badge_base)
+    return static_badge(label, percent)
+
+
+def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_base=None):
     pf = matched_f / total_f if total_f else 0.0
     pb = matched_b / total_b if total_b else 0.0
     label = f"{prefix} " if prefix else ""
@@ -138,8 +160,8 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix=""):
         "",
         "### Decompilation status",
         "",
-        f"![{label}functions]({static_badge(f'{label}functions', pf * 100)}) "
-        f"![{label}bytes]({static_badge(f'{label}bytes', pb * 100)})",
+        f"![{label}functions]({badge_url(f'{label}functions', pf * 100, badge_base)}) "
+        f"![{label}bytes]({badge_url(f'{label}bytes', pb * 100, badge_base)})",
         "",
         "| Metric | Count | Percent | |",
         "|---|---|---|---|",
@@ -173,11 +195,18 @@ def main():
                     help="write shields.io endpoint JSON (functions/bytes) here")
     ap.add_argument("--label-prefix", default="",
                     help="prefix each badge label, e.g. USA")
+    ap.add_argument("--badge-base", default="",
+                    help="raw base URL of the badges branch, e.g. "
+                         "https://raw.githubusercontent.com/owner/repo/badges ; "
+                         "enables self-updating endpoint badges (public repo only)")
+    ap.add_argument("--static-badges", action="store_true",
+                    help="always use static badge URLs, even with --badge-base")
     args = ap.parse_args()
 
     root = repo_root(args.root)
     tf, mf, tb, mb, problems = collect(root, args.verify)
-    block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix)
+    badge_base = None if args.static_badges else (args.badge_base or os.environ.get("FFTA_BADGE_BASE"))
+    block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix, badge_base)
 
     if args.badges:
         out = os.path.abspath(args.badges)

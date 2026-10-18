@@ -15,6 +15,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/split.py` | writes the splat-style tree: labelled `asm/`, raw runs in `files/`, `symbols/` |
 | `tools/rebuild.py` | concatenates the split and checks it reproduces the base ROM byte for byte (also drives armips) |
 | `tools/match.py` | compiles a decompiled function and diffs it against the ROM, instruction by instruction |
+| `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
 Requires Python 3 and capstone. Nothing else is needed for analysis and
@@ -51,7 +52,12 @@ or set `FFTA_ROOT=/path/to/decomp-repo` and call them with no path.
 `match.py` exists because "close" is not good enough in a matching decomp: it
 compiles `src/<addr>.c`, assembles, strips, and compares against the ROM bytes,
 then prints an aligned diff so you can see *which* instruction the compiler
-decided differently. Exit status is 0 only on an exact match.
+decided differently.
+
+It also gates on \plausible.py\: byte-identical output from source that looks
+like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
+steering padding) is reported **IMPLAUSIBLE**, not a match. Exit status is 0
+only when the bytes match *and* the source is plausible.
 
 It handles the compiler stage as `cc -> .s`, so it works with a classic cc1
 (GCC 2.9 / agbcc), with modern gcc and with clang:
