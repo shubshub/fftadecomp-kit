@@ -5,7 +5,7 @@ analyze.py - FFTA (AFXE / GBA) ROM analysis and layout extractor.
 This is a from-scratch analysis pass over the base ROM:
   * validates the cartridge header (logo / checksum) and reports anomalies
   * performs recursive-descent disassembly (ARM + Thumb) from the entry point
-    and from prologue candidates, producing function boundaries
+    and from prologue candidates, producing provisional linear code extents
   * classifies the ROM into code / data / asset regions by coverage + entropy
   * writes config/rom_layout.json, symbols/functions.txt, logs/analysis.txt
 
@@ -22,12 +22,13 @@ import math
 import os
 import struct
 import sys
-from collections import Counter, defaultdict
+from collections import Counter, OrderedDict
 
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET)
-    from capstone.arm_const import ARM_REG_PC
+    from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_LR,
+                                    ARM_REG_PC)
 except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
@@ -73,7 +74,9 @@ NINTENDO_LOGO = bytes.fromhex(
 # --------------------------------------------------------------------------
 
 class Decoder:
-    """Word -> decoded instruction, cached (ARM and Thumb share the cache)."""
+    """Address-aware instruction decoding with bounded per-mode caches."""
+
+    CACHE_LIMIT = 4096
 
     def __init__(self, rom):
         self.rom = rom
@@ -82,44 +85,38 @@ class Decoder:
         for c in (self.arm, self.thumb):
             c.detail = True
             c.skipdata = False
-        self.arm_cache = {}
-        self.thumb_cache = {}
+        self.arm_cache = OrderedDict()
+        self.thumb_cache = OrderedDict()
 
     def arm_ins(self, off):
         """Decode one ARM word. Returns dict or None if undecodable."""
-        w = struct.unpack_from("<I", self.rom, off)[0]
-        if w in self.arm_cache:
-            return self.arm_cache[w]
-        ins = None
-        for i in self.arm.disasm(self.rom[off:off + 4], ROM_BASE + off, count=1):
-            ins = i
-            break
-        info = self._describe(ins, w, 4) if ins else None
-        self.arm_cache[w] = info
-        return info
+        return self._decode(off, self.arm, self.arm_cache, 4)
 
     def thumb_ins(self, off):
-        w = struct.unpack_from("<H", self.rom, off)[0]
-        if w in self.thumb_cache:
-            return self.thumb_cache[w]
-        ins = None
-        # four bytes, so 32-bit Thumb-2 encodings decode too
-        for i in self.thumb.disasm(self.rom[off:off + 4], ROM_BASE + off, count=1):
-            ins = i
-            break
-        info = self._describe(ins, w, 2) if ins else None
-        self.thumb_cache[w] = info
+        return self._decode(off, self.thumb, self.thumb_cache, 2)
+
+    def _decode(self, off, engine, cache, alignment):
+        if off < 0 or off % alignment or off + alignment > len(self.rom):
+            return None
+        if off in cache:
+            return cache[off]
+        instruction = next(engine.disasm(self.rom[off:off + 4],
+                                         ROM_BASE + off, count=1), None)
+        info = self._describe(instruction) if instruction is not None else None
+        if len(cache) >= self.CACHE_LIMIT:
+            cache.popitem(last=False)
+        cache[off] = info
         return info
 
     @staticmethod
-    def _describe(ins, word, size):
+    def _describe(ins):
         md = ins.mnemonic
         grp = ins.groups
         d = {
             "mn": md,
             "op": ins.op_str,
-            "sz": size,
-            "cond": ins.cc != 14 and size == 4,   # conditional (ARM only)
+            "sz": ins.size,
+            "cond": ins.cc not in (ARM_CC_AL, ARM_CC_INVALID),
             "jump": CS_GRP_JUMP in grp,
             "call": CS_GRP_CALL in grp,
             "ret": CS_GRP_RET in grp,
@@ -128,6 +125,7 @@ class Decoder:
             "wr": (),       # registers written
             "pcldr": None,  # (dest_reg, displacement) for `ldr rX, [pc, #imm]`
             "opreg": None,  # rX for bx/bl rX style transfers
+            "pop_regs": (),
         }
         ops = ins.operands
         if ops and ops[0].type == 2:  # ARM_OP_IMM
@@ -144,9 +142,16 @@ class Decoder:
             d["pcldr"] = (ops[0].reg, ops[1].mem.disp)
         if md in ("bx", "bl", "blx") and len(ops) == 1 and ops[0].type == 1:
             d["opreg"] = ops[0].reg
-        first_is_pc = bool(ops) and ops[0].type == 1 and ops[0].reg == ARM_REG_PC
         any_pc = any(o.type == 1 and o.reg == ARM_REG_PC for o in ops)
-        d["writes_pc"] = first_is_pc or (md.startswith("pop") and any_pc)
+        if md.startswith("pop"):
+            d["pop_regs"] = tuple(operand.reg for operand in ops
+                                  if operand.type == 1)
+        d["writes_pc"] = ARM_REG_PC in d["wr"] or (bool(d["pop_regs"]) and any_pc)
+        d["ret"] = d["ret"] or (md == "bx" and d["opreg"] == ARM_REG_LR) \
+            or (bool(d["pop_regs"]) and any_pc) \
+            or (md.startswith("mov") and len(ops) == 2
+                and ops[0].type == 1 and ops[0].reg == ARM_REG_PC
+                and ops[1].type == 1 and ops[1].reg == ARM_REG_LR)
         return d
 
 
@@ -160,8 +165,8 @@ class Analyzer:
         self.dec = dec
         self.n = len(rom)
         # coverage: one byte per 4-byte word (size) or 2-byte halfword (thumb)
-        self.arm_seen = bytearray(self.n // 4)
-        self.thumb_seen = bytearray(self.n // 2)
+        self.arm_seen = bytearray((self.n + 3) // 4)
+        self.thumb_seen = bytearray((self.n + 1) // 2)
         self.covered = bytearray(self.n)   # 0 none, 1 arm, 2 thumb (verified)
         self.reached = bytearray(self.n)   # everything the walker stepped on
         self.functions = {}          # off -> dict
@@ -183,7 +188,7 @@ class Analyzer:
                 return False
             w = struct.unpack_from("<H", self.rom, off)[0]
             return (w >> 8) in (0xB4, 0xB5)      # push {rlist[,lr]}
-        if not self.in_rom(off, 4):
+        if off & 3 or not self.in_rom(off, 4):
             return False
         w = struct.unpack_from("<I", self.rom, off)[0]
         if (w & 0x0FFF0000) == 0x092D0000:      # stmdb sp!, {regs...}  (ARM push)
@@ -210,6 +215,8 @@ class Analyzer:
         startup pattern walks into the real code instead of dead-ending.
         returns (instr_count, lo_off, hi_off, ended_by)
         """
+        thumb = thumb or bool(start & 1)
+        start = start & ~1 if thumb else start
         stack = [(start, thumb, seed_known or {})]
         lo = hi = start
         count = 0
@@ -226,11 +233,13 @@ class Analyzer:
                 if info is None:
                     ended = "badinsn"
                     break
-                seen[idx] = 1
+                size = info["sz"]
+                for position in range(off, off + size, unit):
+                    seen[position // unit] = 1
                 count += 1
                 lo = min(lo, off)
-                hi = max(hi, off + unit)
-                for i in range(off, off + unit):
+                hi = max(hi, off + size)
+                for i in range(off, off + size):
                     self.reached[i] = 2 if thumb else 1
 
                 for r in info["wr"]:
@@ -252,40 +261,48 @@ class Analyzer:
                     if mn in ("bx", "blx") and info["opreg"] is not None:
                         tthumb = bool(tgt & 1)   # interworking register branch
                     elif mn == "blx":
-                        tthumb = True            # blx <imm> always switches to Thumb
+                        tthumb = not thumb
                     else:
                         tthumb = thumb           # b/bl stay in the current mode
                     toff = tgt & ~1
-                    if self.in_rom(toff, 2) and not (not tthumb and toff & 3):
+                    if self.in_rom(toff, 2 if tthumb else 4) and not (not tthumb and toff & 3):
+                        target = ROM_BASE + toff + int(tthumb)
                         if info["call"]:
-                            self.calls[ROM_BASE + tgt] += 1
+                            self.calls[target] += 1
                         if self.in_entry:
-                            self.entry_targets.add(ROM_BASE + tgt)
+                            self.entry_targets.add(target)
                         stack.append((toff, tthumb, {}))
-                        if not info["cond"]:
-                            ended = "call" if info["call"] else "branch"
+                        if info["call"]:
+                            known.clear()
+                        elif not info["cond"]:
+                            ended = "branch"
                             break
-                        off += unit
+                        off += size
                         continue
                     if info["call"]:
                         ended = "call-out"
+                        known.clear()
                     else:
                         self.externs[ROM_BASE + toff] += 1
                         ended = "branch-out"
-                    if not info["cond"]:
+                    if not info["cond"] and not info["call"]:
                         break
-                    off += unit
+                    off += size
                     continue
 
-                if info["writes_pc"]:
-                    if info["mn"] in ("bx", "blx", "blxl"):
-                        self.indirect += 1
-                    ended = "indirect"
-                    break
                 if info["ret"]:
                     ended = "return"
-                    break
-                off += unit
+                    if not info["cond"]:
+                        break
+                elif info["call"]:
+                    self.indirect += 1
+                    known.clear()
+                elif info["jump"] or info["writes_pc"]:
+                    self.indirect += 1
+                    ended = "indirect"
+                    if not info["cond"]:
+                        break
+                off += size
         return count, lo, hi, ended
 
     def linear_body(self, off, thumb, limit=0x400):
@@ -296,18 +313,29 @@ class Analyzer:
         sweeping a literal pool in as instructions.
         """
         unit = 2 if thumb else 4
-        o = off
-        n = 0
-        while n < limit and self.in_rom(o, unit):
-            info = self.dec.thumb_ins(o) if thumb else self.dec.arm_ins(o)
+        position = off & ~1 if thumb else off
+        count = 0
+        previous_pop = ()
+        ended = "fallthrough"
+        while count < limit and self.in_rom(position, unit):
+            info = self.dec.thumb_ins(position) if thumb else self.dec.arm_ins(position)
             if info is None:
+                ended = "badinsn"
                 break
-            n += 1
-            o += unit
-            if info["ret"] or (info["jump"] and info["tgt"] is not None) \
-                    or info["writes_pc"]:
+            count += 1
+            position += info["sz"]
+            popped_return = info["mn"] == "bx" and previous_pop == (info["opreg"],)
+            if info["ret"] or popped_return:
+                ended = "conditional-return" if info["cond"] else "return"
                 break
-        return n, o
+            if not info["call"] and (info["jump"] or info["writes_pc"]):
+                ended = "branch" if info["tgt"] is not None else "indirect"
+                break
+            previous_pop = info["pop_regs"]
+        else:
+            if count >= limit:
+                ended = "limit"
+        return count, position, ended
 
     def discover(self):
         """Entry point first, then every in-ROM call target, then ARM prologues.
@@ -319,10 +347,10 @@ class Analyzer:
         self.in_entry = True
         c, lo, hi, end = self.traverse(0xC0)
         self.in_entry = False
-        n, stop = self.linear_body(0xC0, thumb=False)
+        n, stop, endby = self.linear_body(0xC0, thumb=False)
         if c:
             self.functions[0xC0] = {"start": 0xC0, "end": stop, "instrs": n,
-                                    "kind": "entry", "mode": "arm", "endby": "call"}
+                                    "kind": "entry", "mode": "arm", "endby": endby}
             for i in range(0xC0, stop):
                 self.covered[i] = 1
         say(f"  entry 0x080000C0: walk {c} instrs to 0x{hi:X} ({end}); "
@@ -333,16 +361,16 @@ class Analyzer:
         # walk data-as-code and never terminate)
         added = 0
         for addr in sorted(set(self.calls) | self.entry_targets):
-            off = addr - ROM_BASE
+            off = (addr & ~1) - ROM_BASE
             if off < 0 or off >= self.n or off in self.functions:
                 continue
             tthumb = bool(addr & 1)
-            n, stop = self.linear_body(off, tthumb)
+            n, stop, endby = self.linear_body(off, tthumb)
             if n < 2:
                 continue
             self.functions[off] = {"start": off, "end": stop, "instrs": n,
                                    "kind": "call", "mode": "thumb" if tthumb else "arm",
-                                   "endby": "linear"}
+                                   "endby": endby}
             for i in range(off, stop):
                 self.covered[i] = 2 if tthumb else 1
             added += 1
@@ -370,29 +398,14 @@ class Analyzer:
         flag it as a return, so it is recognised here, otherwise every
         function using that epilogue swallows the next one.
         """
+        if off & 1 or not self.in_rom(off, 2):
+            return None
         h = struct.unpack_from("<H", self.rom, off)[0]
         if (h >> 8) != 0xB5:                # must be `push {rlist, lr}`
             return None
-        n = 0
-        o = off
-        prev_pop = False
-        while n < limit and self.in_rom(o, 2):
-            info = self.dec.thumb_ins(o)
-            if info is None:
-                return None
-            n += 1
-            o += 2
-            ending = info["ret"] or (info["jump"] and info["tgt"] is not None)
-            if info["mn"] == "bx" and prev_pop:
-                ending = True
-            if info["mn"].startswith("pop"):
-                prev_pop = True
-            elif info["mn"] != "bx":
-                prev_pop = False
-            if ending:
-                if n >= 5:
-                    return n, o
-                return None
+        count, end, endby = self.linear_body(off, True, limit)
+        if endby == "return" and count >= 5:
+            return count, end
         return None
 
     def scan_thumb_functions(self):
@@ -420,18 +433,9 @@ class Analyzer:
         """Same check for ARM push prologues."""
         if not self.prologue_ish(off, thumb=False):
             return None
-        n = 0
-        o = off
-        while n < limit and self.in_rom(o, 4):
-            info = self.dec.arm_ins(o)
-            if info is None:
-                return None
-            n += 1
-            o += 4
-            if info["ret"] or (info["jump"] and info["tgt"] is not None):
-                if n >= 5:
-                    return n, o
-                return None
+        count, end, endby = self.linear_body(off, False, limit)
+        if endby == "return" and count >= 5:
+            return count, end
         return None
 
     def scan_arm_functions(self):
@@ -574,7 +578,7 @@ def main():
     say("== code discovery ==")
     t0 = os.times()
     accepted = an.discover()
-    say(f"  functions accepted: {accepted}")
+    say(f"  provisional function extents: {accepted} (inventory incomplete)")
     say(f"  ARM words covered: {sum(an.arm_seen)} / {len(an.arm_seen)}")
     say(f"  Thumb halfwords covered: {sum(an.thumb_seen)} / {len(an.thumb_seen)}")
     say(f"  code bytes: {sum(1 for v in an.covered if v):,} of {len(rom):,}")
@@ -599,7 +603,7 @@ def main():
     funcs = sorted(an.functions.values(), key=lambda f: f["start"])
     os.makedirs(os.path.dirname(txt_path), exist_ok=True)
     with open(txt_path, "w", encoding="utf-8", newline="\n") as f:
-        f.write("# FFTA - discovered functions (addr end size instrs)\n")
+        f.write("# FFTA - provisional function extents (addr end size instrs endby)\n")
         for fn in funcs:
             f.write(f"{ROM_BASE + fn['start']:08X} {ROM_BASE + fn['end']:08X} "
                     f"{fn['end'] - fn['start']:6d} {fn['instrs']:5d} {fn['endby']}\n")
@@ -615,7 +619,8 @@ def main():
             "arm_words_covered": int(sum(an.arm_seen)),
             "thumb_halfwords_covered": int(sum(an.thumb_seen)),
             "code_bytes": sum(1 for v in an.covered if v),
-            "unique_arm_words": len(dec.arm_cache),
+            "cached_arm_instructions": len(dec.arm_cache),
+            "inventory_complete": False,
         },
         "segments": out_segs,
     }
@@ -644,6 +649,8 @@ def main():
             "mode": fn.get("mode", "arm"),
             "instrs": fn["instrs"],
             "kind": fn["kind"],
+            "endby": fn["endby"],
+            "complete": False,
         } for fn in funcs], f, indent=1)
     say("  wrote config/coverage.json, config/functions.json")
 

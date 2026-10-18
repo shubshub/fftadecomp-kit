@@ -6,16 +6,24 @@ rebuild.py - prove the split is lossless, and check the assembled ROM.
                                      and compare SHA1 against baserom.bin
   python tools/rebuild.py --armips   assemble asm/*.s with armips first, then
                                      compare that output instead
+  python tools/rebuild.py --compiled [--output build/mixed.gba]
+                                    mix freshly compiled symbols with original gaps
 
 Byte-exactness matters more than speed here: if the concatenation does not
 reproduce the base ROM, the split is wrong and nothing downstream is safe.
 """
 
+import argparse
 import hashlib
 import json
 import os
+from pathlib import Path
+import re
 import subprocess
 import sys
+import tempfile
+
+from match_evidence import source_fingerprint
 
 ROM_BASE = 0x08000000
 
@@ -33,9 +41,178 @@ def sha1(data):
     return hashlib.sha1(data).hexdigest().upper()
 
 
+def file_state(path):
+    digest = hashlib.sha1()
+    size = 0
+    with open(path, "rb") as source:
+        while chunk := source.read(1024 * 1024):
+            digest.update(chunk)
+            size += len(chunk)
+    return size, digest.hexdigest().upper()
+
+
+def source_inventory(root):
+    source_dir = root / "src"
+    inventory = {}
+    for path in sorted(source_dir.rglob("*")):
+        if path.suffix.lower() != ".c":
+            continue
+        if path.parent != source_dir or not path.is_file() or \
+                not re.fullmatch(r"[0-9A-F]{8}\.c", path.name):
+            raise ValueError(f"invalid addressed source: {path.relative_to(root)}")
+        address = int(path.stem, 16)
+        if address in inventory:
+            raise ValueError(f"duplicate source address: 0x{address:08X}")
+        inventory[address] = source_fingerprint(root, address)
+    if not inventory:
+        raise ValueError("compiled rebuild requires at least one addressed source")
+    return inventory
+
+
+def output_path(root, requested):
+    if requested is None:
+        return None
+    candidate = root / requested
+    if candidate.exists() or candidate.is_symlink():
+        raise ValueError("--output refuses to overwrite an existing file")
+    output = candidate.resolve()
+    build = (root / "build").resolve()
+    if build not in output.parents or output == (root / "baserom.bin").resolve():
+        raise ValueError("--output must name a new file under the decomp build/ directory")
+    if output.exists() or output.is_symlink():
+        raise ValueError("--output refuses to overwrite an existing file")
+    return output
+
+
+def compiled_rebuild(root, requested_output=None):
+    root = Path(root)
+    output = output_path(root, requested_output)
+    baseline = root / "baserom.bin"
+    baseline_state = file_state(baseline)
+    inventory = source_inventory(root)
+    matcher = Path(__file__).with_name("match.py")
+    build = root / "build"
+    build.mkdir(exist_ok=True)
+    print(f"base ROM : {baseline.name}\n  size   : {baseline_state[0]:,}\n"
+          f"  sha1   : {baseline_state[1]}")
+    payloads = []
+    previous_end = ROM_BASE
+    with tempfile.TemporaryDirectory(prefix="ffta_rebuild_", dir=build) as directory:
+        for address in inventory:
+            emitted = Path(directory) / f"{address:08X}.bin"
+            result = subprocess.run(
+                [sys.executable, str(matcher), "--root", str(root),
+                 f"{address:08X}", "--no-write", "--emit", str(emitted)],
+                capture_output=True, text=True)
+            if result.returncode:
+                detail = (result.stderr or result.stdout).strip()
+                raise ValueError(f"0x{address:08X}: matching failed\n{detail}")
+            if not emitted.is_file() or emitted.is_symlink():
+                raise ValueError(f"0x{address:08X}: matcher emitted no regular payload")
+            size = emitted.stat().st_size
+            if not size or address < ROM_BASE or address + size > ROM_BASE + baseline_state[0]:
+                raise ValueError(f"0x{address:08X}: compiled extent is empty or outside the ROM")
+            if address < previous_end:
+                raise ValueError(f"0x{address:08X}: compiled extents overlap")
+            payload = emitted.read_bytes()
+            if len(payload) != size:
+                raise ValueError(f"0x{address:08X}: emitted payload changed while reading")
+            payloads.append((address, payload))
+            previous_end = address + size
+            emitted.unlink()
+            print(f"verified  0x{address:08X}: {size} compiled bytes", flush=True)
+    if source_inventory(root) != inventory or file_state(baseline) != baseline_state:
+        raise ValueError("source inventory, dependencies, or base ROM changed during compilation")
+
+    stream = None
+    output_created = False
+    complete = False
+    digest = hashlib.sha1()
+    reference_digest = hashlib.sha1()
+    position = 0
+
+    def emit(data):
+        digest.update(data)
+        if stream is not None:
+            stream.write(data)
+
+    try:
+        if output is not None:
+            output.parent.mkdir(parents=True, exist_ok=True)
+            stream = output.open("xb")
+            output_created = True
+        with baseline.open("rb") as original:
+            for address, payload in payloads:
+                offset = address - ROM_BASE
+                while position < offset:
+                    gap = original.read(min(1024 * 1024, offset - position))
+                    if not gap:
+                        raise ValueError("base ROM ended before a compiled extent")
+                    reference_digest.update(gap)
+                    emit(gap)
+                    position += len(gap)
+                expected = original.read(len(payload))
+                if len(expected) != len(payload):
+                    raise ValueError("base ROM ended inside a compiled extent")
+                if payload != expected:
+                    first = next(index for index, pair in enumerate(zip(payload, expected))
+                                 if pair[0] != pair[1])
+                    raise ValueError(f"compiled byte mismatch at 0x{address + first:08X}")
+                reference_digest.update(expected)
+                emit(payload)
+                position += len(payload)
+            while gap := original.read(1024 * 1024):
+                reference_digest.update(gap)
+                emit(gap)
+                position += len(gap)
+        rebuilt_state = (position, digest.hexdigest().upper())
+        if rebuilt_state != baseline_state or \
+                reference_digest.hexdigest().upper() != baseline_state[1]:
+            raise ValueError("mixed rebuild length or SHA1 differs from the initial base ROM")
+        if stream is not None:
+            stream.close()
+            stream = None
+            if file_state(output) != rebuilt_state:
+                raise ValueError("written mixed rebuild failed its read-back check")
+        if source_inventory(root) != inventory or file_state(baseline) != baseline_state:
+            raise ValueError("source inventory, dependencies, or base ROM changed during rebuild")
+        compiled_bytes = sum(len(payload) for _, payload in payloads)
+        print(f"\nrebuilt  : {position:,} bytes (partial mixed C/ROM build)\n"
+              f"  compiled functions : {len(payloads):,}\n"
+              f"  compiled bytes     : {compiled_bytes:,}\n"
+              f"  original bytes     : {position - compiled_bytes:,}\n"
+              f"  sha1               : {rebuilt_state[1]}")
+        if output is not None:
+            print(f"  output             : {output}")
+        print("\nOK - partial mixed C/ROM rebuild is byte-exact; unmatched bytes remain original")
+        complete = True
+        return 0
+    finally:
+        try:
+            if stream is not None:
+                stream.close()
+        finally:
+            if output_created and not complete:
+                output.unlink(missing_ok=True)
+
+
 def main():
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    here = repo_root(args[0] if args else None)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("root", nargs="?")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--armips", action="store_true")
+    mode.add_argument("--compiled", action="store_true")
+    parser.add_argument("--output", help="new output file under decomp build/ (relative to decomp root)")
+    args = parser.parse_args()
+    if args.output and not args.compiled:
+        parser.error("--output requires --compiled")
+    here = repo_root(args.root)
+    if args.compiled:
+        try:
+            return compiled_rebuild(here, args.output)
+        except (OSError, ValueError) as error:
+            print(f"compiled rebuild failed: {error}", file=sys.stderr)
+            return 1
     rom_path = os.path.join(here, "baserom.bin")
     base = open(rom_path, "rb").read()
     manifest = json.load(open(os.path.join(here, "asm", "manifest.json")))
@@ -44,7 +221,7 @@ def main():
     print(f"  size   : {len(base):,}")
     print(f"  sha1   : {sha1(base)}")
 
-    if "--armips" in sys.argv:
+    if args.armips:
         out = os.path.join(here, "build", "ffta.gba")
         os.makedirs(os.path.dirname(out), exist_ok=True)
         script = os.path.join(here, "asm", "ffta.s")
