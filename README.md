@@ -91,6 +91,43 @@ compiles `src/<addr>.c`, assembles, strips, and compares against the ROM bytes,
 then prints an aligned diff so you can see *which* instruction the compiler
 decided differently.
 
+The comparison covers the named ELF function's entire symbol size, including
+literal pools, but excludes assembler alignment padding outside that symbol.
+The ELF instruction mode and alignment must agree with the ROM address.
+Unresolved relocations are rejected rather than compared as placeholder bytes.
+For now the verifier supports closed, straight-line leaf functions with
+canonical balanced push/pop returns; calls, branches, interrupts, local stack
+allocation and untracked transfers fail closed pending linked CFG verification.
+
+Reports carry a verification schema and a SHA-256 fingerprint of the source
+and headers. `status.py` rejects legacy or stale reports; regenerate them with
+`match.py`. Shared preprocessing inputs must live under `include/` or be `.h`
+files under `src/`; dependencies outside the fingerprinted set are rejected.
+`status.py --verify` recompiles against the local ROM and exits nonzero if any
+function fails. Offline report checks are cached evidence, not fresh ROM checks.
+The existing function index is provisional and includes truncated or overlapping
+spans, so its percentages do not establish whole-function or whole-ROM completion.
+Compilation scratch lives under the decomp repo's ignored `build/` directory
+and is removed after success or failure.
+
+### Integrating matched C into the ROM
+
+```sh
+python tools/rebuild.py ../fftadecomp --compiled
+python tools/rebuild.py ../fftadecomp --compiled --output build/ffta-mixed.gba
+```
+
+This freshly compiles and verifies every addressed source, overlays its complete
+ELF symbol bytes, and streams unchanged baseline bytes only for uncovered gaps.
+It rejects overlapping or out-of-range symbols, failed matches, changed inputs,
+and mismatched final bytes. The optional output must be a new file under the
+decomp repo's `build/` directory; existing files are never overwritten.
+
+The result is explicitly a **partial mixed C/ROM build**, with separate compiled
+and original byte counts. An identical full-ROM SHA-1 proves integration of the
+currently matched code, not that the remaining original code is decompiled.
+Without `--compiled`, the existing manifest-concatenation check is unchanged.
+
 It also gates on \plausible.py\: byte-identical output from source that looks
 like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
 steering padding) is reported **IMPLAUSIBLE**, not a match. Exit status is 0

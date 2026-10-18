@@ -286,6 +286,7 @@ def main():
                                                          DEFAULT_WSL_PATH))
     ap.add_argument("--label", default="")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--emit", help="write verified symbol bytes to a new file under the decomp build/")
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
     args = ap.parse_args()
@@ -298,8 +299,18 @@ def main():
     if not os.path.exists(src_abs):
         sys.exit(f"no source at {src_abs}")
     fingerprint = source_fingerprint(ROOT, addr)
+    emit = None
+    if args.emit:
+        emit = os.path.realpath(os.path.join(ROOT, args.emit))
+        build = os.path.realpath(os.path.join(ROOT, "build"))
+        if os.path.commonpath((emit, build)) != build or emit == build:
+            sys.exit("--emit must name a new file under the decomp build/ directory")
+        if os.path.lexists(emit):
+            sys.exit("--emit refuses to overwrite an existing file")
 
-    rom = open(os.path.join(ROOT, "baserom.bin"), "rb").read()
+    rom_path = os.path.join(ROOT, "baserom.bin")
+    with open(rom_path, "rb") as original:
+        rom = original.read()
     span = function_span(addr, os.path.join(ROOT, "symbols", "functions.txt"))
     if span is None or span <= 0:
         sys.exit(f"no valid indexed span for 0x{addr:08X}")
@@ -357,6 +368,9 @@ def main():
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
+    with open(rom_path, "rb") as original:
+        if original.read() != rom:
+            sys.exit("base ROM changed during verification; re-run match.py")
     exact = identical and plausible
     byte_rows = lcs_align(got_body, want)
 
@@ -438,6 +452,20 @@ def main():
                 f.write(line.rstrip() + "\n")
             f.write("```\n")
         print(f"\nwrote {os.path.relpath(out, ROOT)}")
+    if exact and emit:
+        os.makedirs(os.path.dirname(emit), exist_ok=True)
+        created = False
+        complete = False
+        try:
+            with open(emit, "xb") as output:
+                created = True
+                if output.write(got_body) != len(got_body):
+                    raise OSError("incomplete verified symbol write")
+            complete = True
+        finally:
+            if created and not complete:
+                os.unlink(emit)
+        print(f"emitted {span} verified bytes to {os.path.relpath(emit, ROOT)}")
     return 0 if exact else 1
 
 
