@@ -110,8 +110,35 @@ branches and loops. Every reachable instruction is checked; return-address
 provenance and balanced saved-stack depth must agree at joins. Branches cannot
 leave the symbol or enter instruction interiors or literal pools, and each
 reachable region must have a path to a verified return. This does not prove
-termination of arbitrary loops. Calls, interrupts, local stack allocation and
+termination of arbitrary loops. Interrupts, local stack allocation and
 untracked transfers remain unsupported and fail closed.
+
+### Direct Thumb calls
+
+A separate linked profile supports unconditional Thumb `BL` relocations to
+external `func_XXXXXXXX` symbols. Each target must resolve to one aligned Thumb
+entry in `config/functions.json`, inside the ROM code region and outside the
+caller. The profile is selected automatically for eligible call relocations;
+the linker defaults to `arm-none-eabi-ld` and can be set with `--linker`.
+The matcher creates typed absolute Thumb symbols and links at the
+caller's exact ROM address. It checks the linked ELF's mode, address, size,
+sections and symbols, verifies each patched call target, and rejects changes
+outside the approved relocation fields. The complete linked symbol, including
+call instructions and literal pools, must still match the ROM byte for byte.
+Relocation bytes are never masked or omitted.
+
+This profile uses an **ABI call summary**, not a closed-leaf proof: a call is
+assumed to return normally and preserve the saved stack and callee-saved
+registers under the ordinary ARM procedure-call contract. Return-address
+provenance in `r0`–`r3`, `r12` and `lr` is invalidated at each call. The verifier
+checks the caller's fallthrough paths, joins, saved-stack balance and return
+provenance; it does not certify the callee's behavior or whole-program return.
+
+External data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
+helper functions, self/intra-function calls, tail calls, linker veneers and
+extra allocated sections remain unsupported. These cases fail closed rather
+than receiving a partial match. Existing relocation-free leaf functions retain
+their original verification profile.
 
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with
@@ -121,6 +148,11 @@ files under `src/`; dependencies outside the fingerprinted set are rejected.
 function fails. Offline report checks are cached evidence, not fresh ROM checks.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
+Linked-profile reports also bind the exact `config/functions.json` mapping
+snapshot. A changed mapping invalidates those cached reports, and mapping
+freshness is checked before accepting a match or emitting linked bytes. Leaf
+report fingerprints remain unchanged. The mixed rebuild separately checks for
+mapping changes across compilation and output verification.
 Compilation scratch lives under the decomp repo's ignored `build/` directory
 and is removed after success or failure.
 
