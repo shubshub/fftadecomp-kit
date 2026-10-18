@@ -23,7 +23,7 @@ jobs:
     if: >-
       github.repository == 'shubshub/fftadecomp-kit' &&
       (github.event_name != 'issue_comment' ||
-       (github.event.issue.number == 50 && !github.event.issue.pull_request &&
+       (github.event.issue.state == 'open' && !github.event.issue.pull_request &&
         startsWith(github.event.comment.body, '<!-- ffta-reservation-request:v1 -->')))
     concurrency:
       group: ffta-address-ledger-50
@@ -34,7 +34,6 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       FFTA_KIT_REPO: shubshub/fftadecomp-kit
       FFTA_REPO: shubshub/fftadecomp
-      FFTA_LEDGER_ISSUE: '50'
     steps:
       - uses: actions/checkout@v4
         with:

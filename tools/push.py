@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-push.py - the only sanctioned way to get work onto the decomp repository.
+push.py - verify and push the decompilation or this toolkit checkout.
 
     python tools/push.py                 # verify, then push
     python tools/push.py --check-only    # verify only, push nothing
     python tools/push.py --force          # only for an intentional rewrite
     python tools/push.py --repo ../fftadecomp
+    python tools/push.py --kit           # validate and push this toolkit
 
 Agents do not run `git push`.  They run this, and it refuses to push anything
 that has not been verified - so the gate is mechanical rather than a rule
@@ -26,6 +27,13 @@ The gate, all of which must pass:
   5. every function in src/ has a report that says MATCH - byte identical, and
      no report says IMPLAUSIBLE or an unsanctioned HAND-ASM
 
+Toolkit mode replaces checks 3-5 with syntax validation of tracked Python
+tools. Intentional rewrites pin the remote tip before validation and use an
+explicit force-with-lease, never an unconditional force push.
+Toolkit and working-tree publication require a clean worktree and index.
+Default decompilation verification uses an archive of the captured commit,
+allowing unrelated work in progress without publishing unverified changes.
+
 Exit status is 0 only when every check passed *and* the push succeeded.  On
 failure nothing is pushed and the failing check says what to do about it.
 
@@ -39,7 +47,8 @@ import re
 import subprocess
 import sys
 
-KIT = os.path.dirname(os.path.abspath(__file__))
+KIT = os.path.dirname(os.path.realpath(__file__))
+KIT_ROOT = os.path.realpath(os.path.dirname(KIT))
 _SIBLING = os.path.join(os.path.dirname(os.path.dirname(KIT)), "fftadecomp")
 DEFAULT_REPO = os.environ.get("FFTA_REPO") or (
     _SIBLING if os.path.isdir(_SIBLING) else os.getcwd())
@@ -67,33 +76,32 @@ def git(*args, **kw):
     return run(["git", *args], cwd=repo, **kw)
 
 
-def committed_tree(repo, remote, branch):
-    """A clean copy of what HEAD would actually push.
-
-    The gate has to verify the *commit*, not the working tree: with other agents
-    working in the same checkout there is almost always an in-flight file in
-    src/, and refusing every push because of someone else's scratch file would
-    make the gate useless rather than strict.  The ROM is not committed, so it
-    is copied in - it is an input to verification, not part of the repository.
-    """
+def committed_tree(repo, commit):
+    """Materialize the captured commit under the repository's build directory."""
     import shutil
     import tempfile
-    dst = tempfile.mkdtemp(prefix="ffta_push_")
-    archive = subprocess.run(["git", "-C", repo, "archive", "HEAD"],
-                            capture_output=True)
-    if archive.returncode != 0:
-        shutil.rmtree(dst, ignore_errors=True)
+    destination = None
+    try:
+        build = os.path.join(repo, "build")
+        os.makedirs(build, exist_ok=True)
+        destination = tempfile.mkdtemp(prefix="ffta_push_", dir=build)
+        archive = subprocess.run(["git", "-C", repo, "archive", commit],
+                                 capture_output=True)
+        if archive.returncode != 0:
+            raise ValueError("could not archive the captured commit")
+        extracted = subprocess.run(["tar", "-x", "-C", destination],
+                                   input=archive.stdout, capture_output=True)
+        if extracted.returncode != 0:
+            raise ValueError("could not extract the captured commit")
+        source_rom = os.path.join(repo, "baserom.bin")
+        if os.path.exists(source_rom):
+            shutil.copy2(source_rom, os.path.join(destination, "baserom.bin"))
+        return destination
+    except (OSError, ValueError) as error:
+        if destination is not None:
+            shutil.rmtree(destination, ignore_errors=True)
+        log(f"    FAIL  committed-tree verification: {error}")
         return None
-    tar = subprocess.run(["tar", "-x", "-C", dst], input=archive.stdout,
-                         capture_output=True)
-    if tar.returncode != 0:
-        shutil.rmtree(dst, ignore_errors=True)
-        return None
-    for name in ("baserom.bin",):
-        srcf = os.path.join(repo, name)
-        if os.path.exists(srcf):
-            shutil.copy2(srcf, os.path.join(dst, name))
-    return dst
 
 
 def badge_base(repo):
@@ -178,6 +186,9 @@ def check_history(repo, remote, branch, force=False):
         log("    FAIL  could not fetch the remote")
         return False
     code, out = git("rev-parse", "--abbrev-ref", "HEAD", repo=repo)
+    if code != 0:
+        log("    FAIL  could not determine the current branch")
+        return False
     current = out.strip()
     if current != branch:
         log(f"    FAIL  on branch '{current}', expected '{branch}'")
@@ -185,6 +196,9 @@ def check_history(repo, remote, branch, force=False):
     code, out = git("merge-base", "--is-ancestor", f"{remote}/{branch}", "HEAD",
                     repo=repo)
     if code != 0:
+        if code != 1:
+            log("    FAIL  could not check the remote ancestry")
+            return False
         if force:
             log("    --force: history rewrite in progress, so the branch cannot "
                 "contain the old tip.")
@@ -204,6 +218,9 @@ def check_history(repo, remote, branch, force=False):
     else:
         code, out = git("log", "--merges", "--oneline",
                         f"{remote}/{branch}..HEAD", repo=repo)
+        if code != 0:
+            log("    FAIL  could not scan merge commits")
+            return False
         merges = [ln for ln in out.strip().splitlines() if ln.strip()]
         if merges:
             log(f"    FAIL  {len(merges)} merge commit(s) in the range; rebase "
@@ -212,20 +229,24 @@ def check_history(repo, remote, branch, force=False):
                 log(f"          {m}")
             return False
     code, out = git("rev-list", "--count", f"{remote}/{branch}..HEAD", repo=repo)
+    if code != 0:
+        log("    FAIL  could not count branch commits")
+        return False
     log(f"    ok: {out.strip()} commit(s) ahead of {remote}/{branch}, linear")
     return True
 
 
-def check_no_rom_data(repo):
+def check_no_rom_data(repo, commit=None):
     log("[2/5] no game data tracked")
-    code, out = git("ls-files", repo=repo)
+    arguments = ("ls-tree", "-r", "--name-only", "-z", commit) if commit else ("ls-files", "-z")
+    code, out = git(*arguments, repo=repo)
     if code != 0:
         log("    FAIL  could not list tracked files")
         return False
-    tracked = out.splitlines()
-    bad = [f for f in tracked
-           if f.endswith(FORBIDDEN_TRACKED) or f.endswith(".gba")
-           or f.startswith("files/")]
+    tracked = [path for path in out.split("\0") if path]
+    bad = [path for path in tracked
+           if path.endswith(("baserom.bin", ".gba"))
+           or any(part in ("asm", "files") for part in path.split("/")[:-1])]
     if bad:
         log("    FAIL  game data is tracked in git:")
         for f in bad[:5]:
@@ -234,6 +255,27 @@ def check_no_rom_data(repo):
         return False
     log(f"    ok: none of {', '.join(FORBIDDEN_TRACKED)} tracked "
         f"({len(tracked)} files tracked)")
+    return True
+
+
+def check_kit_tools(repo):
+    log("[3/3] tracked Python tools have valid syntax")
+    code, out = git("ls-files", "-z", "--", "tools", repo=repo)
+    if code != 0:
+        log("    FAIL  could not list tracked tools")
+        return False
+    paths = [path for path in out.split("\0") if path.endswith(".py")]
+    if not paths:
+        log("    FAIL  no tracked Python tools found")
+        return False
+    for path in paths:
+        try:
+            with open(os.path.join(repo, path), "rb") as source:
+                compile(source.read(), path, "exec")
+        except (OSError, SyntaxError, ValueError) as error:
+            log(f"    FAIL  {path}: {error}")
+            return False
+    log(f"    ok: {len(paths)} tracked Python tool(s) compile")
     return True
 
 
@@ -304,14 +346,67 @@ def check_reports_old_unused(repo):
     return True
 
 
-def do_push(repo, remote, branch, force=False):
+def capture_force_lease(repo, remote, branch):
+    code, out = git("remote", "get-url", "--push", "--all", remote, repo=repo)
+    destinations = out.strip().splitlines()
+    if code != 0 or len(destinations) != 1:
+        log("    FAIL  a rewrite requires exactly one push destination")
+        return None
+    destination = destinations[0]
+    reference = f"refs/heads/{branch}"
+    code, out = git("ls-remote", "--exit-code", "--refs", destination, reference,
+                    repo=repo)
+    matches = out.strip().splitlines()
+    if code != 0 or len(matches) != 1:
+        log("    FAIL  could not capture the existing remote branch tip")
+        return None
+    fields = matches[0].split()
+    if len(fields) != 2 or fields[1] != reference or \
+            re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", fields[0]) is None:
+        log("    FAIL  invalid remote branch tip")
+        return None
+    return destination, fields[0]
+
+
+def publish_snapshot(repo, branch, require_clean=True):
+    if require_clean:
+        code, out = git("status", "--porcelain=v1", "-z", "--untracked-files=all",
+                        "--ignore-submodules=none", repo=repo)
+        if code != 0 or out:
+            log("    FAIL  publishing requires a clean tracked/index/untracked state")
+            return None
+    code, out = git("symbolic-ref", "--quiet", "HEAD", repo=repo)
+    reference = out.strip()
+    if code != 0 or reference != f"refs/heads/{branch}":
+        log("    FAIL  publishing requires the expected current branch")
+        return None
+    code, out = git("rev-parse", "--verify", "HEAD", repo=repo)
+    commit = out.strip()
+    if code != 0 or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit) is None:
+        log("    FAIL  could not capture the current commit")
+        return None
+    return reference, commit
+
+
+def do_push(repo, remote, branch, force=False, lease=None, commit=None):
+    if force and lease is None:
+        log("    FAIL  refusing a rewrite without a captured remote tip")
+        return False
     if os.environ.get("FFTA_PUSH_DRY"):
         log("\nFFTA_PUSH_DRY set - not pushing")
         return True
+    if commit is None:
+        log("    FAIL  refusing to push without a verified commit")
+        return False
     verb = "force-pushing" if force else "pushing"
     log(f"\n{verb} to {remote}/{branch} ...")
-    code, out = git("push", *(["--force"] if force else []), remote, branch,
-                    repo=repo)
+    if force:
+        destination, expected = lease
+        command = [f"--force-with-lease=refs/heads/{branch}:{expected}",
+                   destination, f"{commit}:refs/heads/{branch}"]
+    else:
+        command = [remote, f"{commit}:refs/heads/{branch}"]
+    code, out = git("push", *command, repo=repo)
     if code != 0:
         log("    FAIL  the push was rejected")
         for line in out.strip().splitlines()[-10:]:
@@ -324,7 +419,9 @@ def do_push(repo, remote, branch, force=False):
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--repo", default=DEFAULT_REPO)
+    ap.add_argument("--repo", default=None)
+    ap.add_argument("--kit", action="store_true",
+                    help="validate only this toolkit checkout instead of a decompilation")
     ap.add_argument("--remote", default=DEFAULT_REMOTE)
     ap.add_argument("--branch", default=DEFAULT_BRANCH)
     ap.add_argument("--check-only", action="store_true",
@@ -335,32 +432,45 @@ def main():
     ap.add_argument("--force", action="store_true",
                     help="for an intentional history rewrite: drops the "
                          "'branch contains the remote tip' requirement and "
-                         "force-pushes.  Every other check still runs.  Never "
+                         "pushes with an explicit expected-tip lease. Every "
+                         "other check still runs. Never "
                          "use this for ordinary work - rebase instead.")
     args = ap.parse_args()
 
-    repo = os.path.abspath(args.repo)
+    repo = os.path.abspath(args.repo or (KIT_ROOT if args.kit else DEFAULT_REPO))
+    if args.kit and os.path.realpath(repo) != KIT_ROOT:
+        sys.exit("--kit accepts only the toolkit checkout containing this script")
     if not os.path.isdir(os.path.join(repo, ".git")):
         sys.exit(f"{repo} is not a git repository")
 
     log(f"push gate for {repo} -> {args.remote}/{args.branch}\n")
-    tree = repo if args.working_tree else committed_tree(repo, args.remote,
-                                                        args.branch)
-    if tree and tree != repo:
-        log(f"verifying the committed tree ({os.path.relpath(tree, repo)}), "
-            f"not the working tree: other agents may have files in flight")
-    else:
-        tree = repo
+    lease = capture_force_lease(repo, args.remote, args.branch) if args.force else None
+    if args.force and lease is None:
+        log("\nNOTHING PUSHED - could not establish a rewrite lease.")
+        return 1
+    publishing = not args.check_only and not os.environ.get("FFTA_PUSH_DRY")
+    use_committed = not (args.kit or args.working_tree)
+    snapshot = publish_snapshot(repo, args.branch, require_clean=not use_committed) \
+        if publishing or use_committed else None
+    if (publishing or use_committed) and snapshot is None:
+        log("\nNOTHING PUSHED - could not establish a publication snapshot.")
+        return 1
+    checks = (
+        check_history(repo, args.remote, args.branch, force=args.force),
+        check_no_rom_data(repo, commit=snapshot[1] if use_committed else None),
+    )
+    tree = committed_tree(repo, snapshot[1]) if use_committed else repo
+    if tree is None:
+        log("\nNOTHING PUSHED - could not materialize the committed tree.")
+        return 1
     try:
-        checks = (
-            check_history(repo, args.remote, args.branch, force=args.force),
-            check_no_rom_data(repo),
+        checks += (check_kit_tools(repo),) if args.kit else (
             check_matches(tree, badge_base(repo)),
             check_plausible(tree),
             check_reports(tree),
         )
     finally:
-        if tree != repo:
+        if use_committed:
             import shutil
             shutil.rmtree(tree, ignore_errors=True)
     if not all(checks):
@@ -370,8 +480,13 @@ def main():
     if args.check_only:
         log("--check-only: stopping before the push")
         return 0
+    if publishing and publish_snapshot(repo, args.branch,
+                                      require_clean=not use_committed) != snapshot:
+        log("\nNOTHING PUSHED - the publication snapshot changed during validation.")
+        return 1
     return 0 if do_push(repo, args.remote, args.branch,
-                         force=args.force) else 1
+                         force=args.force, lease=lease,
+                         commit=snapshot[1] if snapshot else None) else 1
 
 
 if __name__ == "__main__":

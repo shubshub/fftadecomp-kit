@@ -591,6 +591,43 @@ def function_span(addr, symbols_file):
     return None
 
 
+def plausibility_result(result, address):
+    document = json.loads(result.stdout)
+    required = {"findings", "total", "addr", "hand_asm_allowed", "allow_entry"}
+    if not isinstance(document, dict) or not required <= document.keys():
+        raise ValueError("missing plausibility JSON fields")
+    records = document["findings"]
+    if not isinstance(records, list) or type(document["total"]) is not int or \
+            document["total"] != len(records) or document["addr"] != f"0x{address:08X}" or \
+            type(document["hand_asm_allowed"]) is not bool:
+        raise ValueError("invalid plausibility JSON fields")
+    findings = []
+    for record in records:
+        if not isinstance(record, dict) or \
+                any(not isinstance(record.get(field), str) or not record[field]
+                    for field in ("file", "rule", "severity", "message")) or \
+                type(record.get("line")) is not int or record["line"] < 0 or \
+                record["severity"] not in ("error", "suspect"):
+            raise ValueError("invalid plausibility finding")
+        findings.append(f"{os.path.basename(record['file'])}:{record['line']}: "
+                        f"{record['severity'].upper()}: {record['rule']}")
+    allowed = document["allow_entry"]
+    if allowed is not None and (not isinstance(allowed, dict) or
+            not isinstance(allowed.get("address"), str) or
+            allowed["address"].upper() != f"0x{address:08X}".upper() or
+            not isinstance(allowed.get("reason", "no reason recorded"), str)):
+        raise ValueError("invalid hand-asm allow entry")
+    if document["hand_asm_allowed"] != (allowed is not None) or \
+            allowed is not None and not findings:
+        raise ValueError("inconsistent hand-asm allow entry")
+    expected_exit = 1 if findings else 0
+    if result.returncode != expected_exit:
+        findings.append(f"plausibility checker failed with exit {result.returncode}; "
+                        f"expected {expected_exit}")
+        allowed = None
+    return findings, allowed
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("addr")
@@ -692,22 +729,14 @@ def main():
     hand_asm_allowed = None
     if os.path.exists(plaus_path):
         lint_targets = [str(path) for path in source_paths(ROOT, addr)]
-        r = subprocess.run(
-            [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
-             "--json"] + lint_targets,
-            capture_output=True, text=True)
         try:
-            doc = json.loads(r.stdout)
-            findings = [f"{os.path.basename(f['file'])}:{f['line']}: "
-                        f"{f['severity'].upper()}: {f['rule']}"
-                        for f in doc.get("findings", [])]
-            hand_asm_allowed = doc.get("allow_entry")
-        except ValueError:
-            findings = [ln for ln in r.stdout.splitlines() if ln.strip()]
-            if r.returncode and not findings:
-                findings = [ln for ln in r.stderr.splitlines() if ln.strip()]
-                if not findings:
-                    findings = [f"plausibility checker failed with exit {r.returncode}"]
+            checker_result = subprocess.run(
+                [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
+                 "--json"] + lint_targets,
+                capture_output=True, text=True)
+            findings, hand_asm_allowed = plausibility_result(checker_result, addr)
+        except (OSError, ValueError, TypeError, RecursionError) as error:
+            findings = [f"plausibility checker failed: {error}"]
 
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:

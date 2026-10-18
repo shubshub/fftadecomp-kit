@@ -18,6 +18,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
 | `tools/take.py` | **the official way to reserve an address** - claims it in this repo's ledger, refusing anything already reserved, already matched or in review |
 | `tools/reserve.py` | submits address requests to the single ledger issue and waits for authenticated broker confirmation |
+| `tools/push.py` | validates decompilation or toolkit changes before pushing |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
 Requires Python 3 and capstone. Nothing else is needed for analysis and
@@ -47,8 +48,19 @@ ledger** issue. Each address has its own row in the machine-readable table.
 python tools/take.py list                    # read the board first
 python tools/take.py check 0x08011040        # then check the address
 python tools/take.py claim 0x08011040 --who me --note "four strh pairs"
-python tools/take.py ping 0x08011040 --who me
-python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
+python tools/take.py ping 0x08011040
+python tools/take.py release 0x08011040 --reason "done, moved to src/"
+```
+
+The direct `take.py` path requires issue-edit permission. Read-only contributors
+use `reserve.py` for authenticated broker requests instead:
+
+```sh
+python tools/reserve.py list
+python tools/reserve.py check 0x08011040
+python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
+python tools/reserve.py ping 0x08011040 --who me
+python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src/"
 ```
 
 ### The rules
@@ -57,7 +69,7 @@ python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
    address already reserved, matched on the decomp default branch, or covered
    by an open decomp PR. Both the client and broker check these conditions;
    coordinate with an existing PR's author rather than duplicating work.
-   Start only after `claim` prints
+   For broker claims, start only after `claim` prints
    `ACCEPTED` and exits zero. A free `check`, a posted request, or a timeout is
    not a reservation. If another agent holds it, pick another address. Multiple
    addresses can be claimed separately in the same issue; each needs acceptance.
@@ -66,13 +78,13 @@ python tools/take.py release 0x08011040 --who me --reason "done, moved to src/"
    **cannot** be matched — that is exactly when somebody else should be allowed
    to try. The `reservations` workflow drains requests and expires rows quiet
    for 3 days; a scheduled run also does this every 6 hours.
-3. **Release unmatchable addresses, don't hoard them.** `release
+3. **Release unmatchable addresses, don't hoard them.** Broker `release
    --unmatchable --reason "..." --tried="-O1..-O3"` requests release and leaves
    the evidence in its comment for maintainer review. It does not write
    `known-unmatchable.json`; an accepted database change still needs review.
 
-Clients require authenticated `gh` access to post comments, not permission to
-edit another person's issue. The trusted workflow is the only ledger writer.
+Broker clients require authenticated `gh` access to post comments, not permission
+to edit another person's issue. The trusted workflow writes accepted requests.
 It binds ownership to the comment author's numeric GitHub ID and the original
 claim request ID, not the display label. Use distinct `--who` labels for agents
 sharing an account, and pass `--claim-id <id>` to `ping` or `release` when the
@@ -86,7 +98,7 @@ matched source, 5 for an open PR, or 6 for an **UNCONFIRMED** submission or
 acknowledgement. On exit 6, inspect the ledger
 before retrying; the request may still be processed. Do not start matching.
 
-Commands attempt a fast-forward pull first; investigate update warnings rather
+Broker commands attempt a fast-forward pull first; investigate update warnings rather
 than trusting a stale client. `--no-pull` skips this update when the checkout has
 already been synchronized. When changing reservation protocols, explicitly pull
 and restart all clients: an already loaded old process still contains old code.
@@ -96,11 +108,22 @@ and restart all clients: an already loaded old process still contains old code.
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
 `issues: write`, `contents: read`, and `pull-requests: read`, checks out the trusted default branch,
-and handles request comments on issue #50, scheduled expiry, and manual runs
-through one concurrency group. Each run drains the durable comment backlog,
-so replacement of a pending workflow run does not discard its requests.
+and handles request comments on the unique open owner-authored `address ledger`
+issue, scheduled expiry, and manual runs through one concurrency group. Ledger
+rotation does not require editing a workflow issue number. The legacy
+`ffta-address-ledger-50` concurrency key stays constant so old and new jobs
+serialize together; it does not select the ledger. Each run drains the durable
+comment backlog, so replacement of a pending workflow run does not discard its
+requests.
 
-Retire old direct-writing clients before deployment. Legacy rows keep their
+Discovery rejects missing, ambiguous or inaccessible ledgers. An explicit
+`FFTA_LEDGER_ISSUE` pin must agree with the discovered canonical ledger; a stale
+pin fails before posting a request. No client creates a replacement issue.
+The canonical ledger author must be the kit repository owner. Organization-
+owned repositories need an explicitly reviewed authority policy before use.
+
+Direct writers, including `take.py`, must not run concurrently with the broker.
+Legacy and direct-written rows keep their
 visible labels and timestamps, but have no authenticated owner: they cannot
 be adopted by matching a label. They remain reserved until normal expiry or
 maintainer reconciliation. Manual ledger maintenance must pause all writers;
@@ -115,6 +138,36 @@ write access or create separate reservation issues.
 
 Rebase contribution branches onto current `origin/main` before opening a PR;
 do not merge main into the contribution branch. See `AGENTS.md` for the rules.
+
+## Publishing through the gate
+
+Use `tools/push.py`, not a separate `git push`. Decompilation mode verifies
+history, tracked-file restrictions, fresh ROM matches, plausibility and reports.
+Use `--check-only` to run the gate without publishing.
+
+For changes to this toolkit checkout:
+
+```sh
+python tools/push.py --kit --repo . --remote fork --branch main --check-only
+python tools/push.py --kit --repo . --remote fork --branch main
+```
+
+Toolkit mode checks history, forbidden game data and tracked Python tool syntax.
+It only accepts the executing toolkit checkout; it cannot be used to skip game
+verification in a decompilation repository. Run the affected behavioral checks
+as well: syntax validation alone does not establish tool correctness.
+
+Toolkit publication requires a clean working tree and index, including no
+nonignored untracked files. Decompilation mode verifies an archive of the
+captured commit under the checkout's `build/` directory, so unrelated work can
+remain in progress. Archive failure stops the gate rather than falling back to
+working files. The gate checks that the branch and commit remain unchanged and
+pushes that exact commit. `--working-tree --check-only` validates uncommitted
+game edits; publication with `--working-tree` requires a clean checkout too.
+
+Use `--force` only for an intentional history rewrite. The gate captures the
+remote tip before validation and uses an explicit force-with-lease, so a remote
+change during verification rejects the push rather than being overwritten.
 
 ## Layout it expects
 
