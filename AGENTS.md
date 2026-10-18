@@ -18,54 +18,67 @@ Work is parallel, and the ledger is **one issue in this repository** — the
 "address ledger" — with a row per claimed address.
 
 ```sh
-python tools/reserve.py list                    # 1. read the board first
-python tools/reserve.py check 0x08011040        # 2. is this one free?
+python tools/reserve.py list                    # read the board first
+python tools/reserve.py check 0x08011040        # then check the address
 python tools/reserve.py claim 0x08011040 --who <you> --note "what you are doing"
 ```
 
-**Never reserve an address that is already reserved, already matched, or
-already in review.** Read the ledger before you claim, let `check` tell you the
-state of your specific address, and take a free one. `check` reports four
-states:
+**Never reserve an address already reserved, matched, or in review.** `check`
+and `claim` check the decomp repository's default branch and open pull requests
+as well as the ledger. The broker repeats these checks before accepting a
+claim. Coordinate with an existing PR's author rather than duplicating work.
 
 | exit | state |
 |---|---|
-| 0 | `FREE` — yours to claim |
-| 1 | `TAKEN` — another agent holds it in the ledger |
-| 4 | `MATCHED` — `src/<addr>.c` is already on the decomp repo's default branch |
-| 5 | `IN PR` — an open PR in the decomp repo already matches it |
+| 0 | `FREE` from `check`, or confirmed acceptance from a request command |
+| 1 | `TAKEN` or rejected request |
+| 2 | operational error; no permission to start work |
 | 3 | `SKIP` — recorded unmatchable |
+| 4 | `MATCHED` — source already on the decomp default branch |
+| 5 | `IN PR` — address already covered by an open decomp PR |
+| 6 | `UNCONFIRMED` — submission or acknowledgement is uncertain |
 
-`claim` refuses for all of those, so a duplicate cannot happen even if you
-skip the check: it re-reads the ledger after writing (so two agents claiming at
-the same instant cannot both win), refuses an address already in `src/`, and
-refuses one an open PR already covers. Coordinate with whoever opened that PR
-rather than duplicating work that is in review.
+**The tool attempts to pull this repository before every command.** If it
+cannot update (dirty checkout, offline), it says so and continues — resolve
+the warning before trusting the local rules. `--no-pull` skips the update.
+Explicitly pull and restart clients when the reservation protocol changes;
+updating files does not replace code already loaded by an old process.
 
-**The tool pulls this repository before every command**, so you always decide
-against the current ledger and the current `known-unmatchable.json`. If it
-cannot update (dirty checkout, offline), it says so and continues — check the
-message, and if it warned, `git -C ../fftadecomp-kit pull` yourself before
-trusting the result. `--no-pull` skips it.
+Claims are JSON request comments on the single ledger issue. The trusted
+workflow, not the contributor, edits its table. **Wait for `ACCEPTED` and exit
+0 before starting work.** A posted request, a free `check`, or `UNCONFIRMED`
+(exit 6) is not a lease. The workflow must be deployed on the default branch
+first. Multiple addresses may share this issue; claim each separately and
+wait for each acceptance. Never create a separate reservation issue.
 
-If `claim` refuses, **the address belongs to another agent — pick a different
-one.** Do not start work on a function somebody else has reserved, and do not
-work around a refusal.
+If `claim` refuses because the address is taken, matched, or in review,
+**pick a different one.** Do not start work on a function somebody else has
+reserved, and do not work around a refusal.
 
 ### 2. Release it the moment you stop — especially if you cannot match it
 
 ```sh
-python tools/reserve.py ping    0x08011040          # still on it; bumps the lease
-python tools/reserve.py release 0x08011040 --reason "moved to src/"
-python tools/reserve.py release 0x08011040 --unmatchable --reason "no flags reproduce this" --tried "-O1..-O3"
+python tools/reserve.py ping    0x08011040 --who <you>
+python tools/reserve.py release 0x08011040 --who <you> --reason "moved to src/"
+python tools/reserve.py release 0x08011040 --who <you> --unmatchable --reason "no flags reproduce this" --tried="-O1..-O3"
 ```
 
 A reservation is a **lease, not a land grab**. Anything quiet for 3 days is
 auto-released by the `reservations` workflow, but you should not wait for that.
-When you conclude a function cannot be matched, release it with
-`--unmatchable`: that records the address, the reason and the flags you tried
-in `known-unmatchable.json`, so the next agent skips it instead of repeating
-your dead end.
+When you conclude a function cannot be matched, request release with
+`--unmatchable`: the comment preserves the reason and flags for maintainer
+review. It does not modify `known-unmatchable.json` automatically.
+
+Ownership is authenticated by numeric GitHub account ID and original claim
+request ID. A `--who` label alone cannot authorize a release. Give parallel
+agents distinct labels; `--claim-id <id>` pins a ping or release to a specific
+claim generation. Legacy rows remain reserved but cannot be adopted by label;
+they need normal expiry or maintainer reconciliation. After an unconfirmed
+request, inspect the ledger before retrying. Do not work around the result.
+
+Only the serialized broker writes the ledger. Retire legacy direct-writing
+clients and pause all writers for manual maintenance. Deployment, bounded
+receipt retention, capacity limits, and exit codes are detailed in `README.md`.
 
 ### 3. Rebase before you open a PR
 
@@ -178,7 +191,7 @@ gitignored and generated by `make split`).
 
 | command | what it does |
 |---|---|
-| `tools/reserve.py {claim,check,list,ping,release,sweep}` | the address ledger |
+| `tools/reserve.py {claim,check,list,ping,release}` | authenticated requests to the address ledger; `broker` is workflow-only |
 | `tools/match.py <addr>` | compile, assemble, diff against the ROM; exit 0 only on a true match |
 | `tools/plausible.py <files>` | the implausibility gate on its own |
 | `tools/status.py [--write\|--verify\|--check]` | README progress block |

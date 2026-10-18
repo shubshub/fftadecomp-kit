@@ -1,47 +1,27 @@
 #!/usr/bin/env python3
-"""
-reserve.py - claim a function address before working on it, so parallel agents
-do not collide.
+"""One-issue reservation ledger with an authenticated, single-writer broker.
 
-The kit repository has ONE issue that is the ledger, and every reservation is a
-row in it.  One issue means one place to look, one thing to subscribe to, and
-no issue-list noise as the project grows.
+Clients post JSON requests, never edit the ledger. A request is not a lease
+until the trusted workflow persists an accepted result and the matching row.
+The workflow must be deployed on the default branch before requests can work.
 
-    claim 0x08011040              # reserve it (refuses if somebody holds it)
-    check 0x08011040              # exit 0 free, 1 taken, 3 known unmatchable
-    list                          # the whole ledger
-    ping 0x08011040               # still on it; refreshes the lease
-    release 0x08011040 --reason "..."
-    release 0x08011040 --unmatchable --reason "no flags reproduce this"
-    sweep --days 3                # drop rows nobody has touched
+The broker drains comments after its durable cursor, so replaced pending
+workflow runs and retries cannot lose or repeat accepted operations. All writers,
+including sweep, must use the same workflow concurrency group. Manual ledger
+maintenance requires pausing that writer; GitHub issue edits are not a CAS API.
 
-Working agreement
------------------
-1. Before touching a function, check the ledger and claim it.  Claim refuses
-   an address that is held, already matched in src/, or already matched in an
-   open PR - if it refuses, pick another address.
-2. A reservation is a *lease*: ping it while you work and release it as soon as
-   you stop - including when you conclude the function cannot be matched.
-   `sweep` (and the reservations workflow) drops rows quiet for a few days.
-3. `--unmatchable` also records the address in known-unmatchable.json with the
-   reason and the flags tried, so the next agent does not repeat the dead end.
-
-Every claim and release is also posted as a comment on the ledger, so the audit
-trail survives rows being removed.
-
-The machine-readable part of the ledger is the table between the markers:
-
-    <!-- ffta-ledger:start -->
-    | address | claimed by | claimed at | last seen | note |
-    |---|---|---|---|---|
-    | 0x08011040 | opencode | 2026-10-18T05:43:46Z | 2026-10-18T06:10:00Z | ... |
-    <!-- ffta-ledger:end -->
-
-Requires the gh CLI, authenticated for the kit repository.
+Operational bounds: 64 recent results, 256 rows, 2 KiB requests, and a conservative
+60,000-byte UTF-8 issue body. If even a rejection result cannot fit, neither rows
+nor cursor change. An expired result or timeout is unconfirmed, not
+success. Legacy rows remain ownerless until expiry or maintainer reconciliation.
+Unmatchable evidence stays in the request comment for maintainer review; this
+tool never writes repository contents or creates issues.
 """
 
 import argparse
+import copy
 import datetime
+import html
 import json
 import os
 import re
@@ -49,447 +29,799 @@ import subprocess
 import sys
 import time
 
+
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
-LEDGER_TITLE = os.environ.get("FFTA_LEDGER_TITLE", "address ledger")
+LEDGER_NUMBER = os.environ.get("FFTA_LEDGER_ISSUE", "50")
 START = "<!-- ffta-ledger:start -->"
 END = "<!-- ffta-ledger:end -->"
+STATE_START = "<!-- ffta-ledger-state\n"
+STATE_END = "\nffta-ledger-state -->"
+REQUEST_PREFIX = "<!-- ffta-reservation-request:v1 -->\n"
 STALE_DAYS = 3
-
+MAX_RESULTS = 64
+MAX_ROWS = 256
+MAX_REQUEST_BYTES = 2048
+MAX_BODY_BYTES = 60000
 HERE = os.path.dirname(os.path.abspath(__file__))
 UNMATCHABLE_DB = os.path.join(HERE, "..", "known-unmatchable.json")
+ROW_FIELDS = {"address", "who", "claimed_at", "last_seen", "note",
+              "owner_id", "claim_id"}
+RESULT_FIELDS = {"request_id", "owner_id", "who", "operation", "address",
+                 "claim_id", "status", "code", "message"}
+COMMENTS_QUERY = """query($owner:String!, $name:String!, $issue:Int!, $after:String) {
+  repository(owner:$owner, name:$name) {
+    issue(number:$issue) {
+      comments(first:100, after:$after) {
+        edges {
+          cursor
+          node {
+            fullDatabaseId
+            body
+            author {
+              __typename
+              ... on User { databaseId }
+              ... on Bot { databaseId }
+            }
+          }
+        }
+        pageInfo { hasNextPage endCursor }
+      }
+    }
+  }
+}"""
+CLAIM_QUERY = """query($owner:String!, $name:String!, $after:String) {
+  repository(owner:$owner, name:$name) {
+    defaultBranchRef { name }
+    object(expression:"HEAD:src") { __typename ... on Tree { entries { name type } } }
+    pullRequests(first:20, states:OPEN, after:$after) {
+      nodes {
+        number title body
+        files(first:100) { nodes { path } pageInfo { hasNextPage endCursor } }
+      }
+      pageInfo { hasNextPage endCursor }
+    }
+  }
+}"""
+PR_FILES_QUERY = """query($owner:String!, $name:String!, $number:Int!, $after:String) {
+  repository(owner:$owner, name:$name) {
+    pullRequest(number:$number) {
+      files(first:100, after:$after) { nodes { path } pageInfo { hasNextPage endCursor } }
+    }
+  }
+}"""
 
-for _s in ("stdout", "stderr"):
+
+class LedgerError(Exception):
+    pass
+
+
+class Unconfirmed(LedgerError):
+    pass
+
+
+class GuardUnavailable(LedgerError):
+    pass
+
+
+def positive_id(value):
+    return type(value) is int and value > 0
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise LedgerError("duplicate JSON object key")
+        result[key] = value
+    return result
+
+
+def decode_json(value):
     try:
-        getattr(sys, _s).reconfigure(encoding="utf-8", errors="replace")
-    except (AttributeError, ValueError):
-        pass
+        return json.loads(value, object_pairs_hook=unique_object)
+    except (ValueError, TypeError, RecursionError) as error:
+        raise LedgerError(f"invalid JSON: {error}") from error
 
 
-def sh(*args, check=True):
-    r = subprocess.run(["gh", *args], capture_output=True, text=True)
-    if check and r.returncode != 0:
-        sys.exit(f"gh {' '.join(args)} failed:\n{r.stderr or r.stdout}")
-    return r.stdout.strip()
+def api(method, endpoint, payload=None):
+    command = ["gh", "api", "--method", method, endpoint]
+    data = None
+    if payload is not None:
+        command += ["--input", "-"]
+        data = json.dumps(payload)
+    try:
+        result = subprocess.run(command, input=data, capture_output=True,
+                                text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise LedgerError(f"GitHub request failed: {error}") from error
+    if result.returncode:
+        raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
+    return decode_json(result.stdout)
 
 
-def self_update(quiet=False):
-    """pull the latest kit before touching the ledger.
+def endpoint(suffix=""):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", KIT_REPO):
+        raise LedgerError("invalid configured repository")
+    if not str(LEDGER_NUMBER).isdigit() or int(LEDGER_NUMBER) <= 0:
+        raise LedgerError("invalid configured ledger issue")
+    return f"repos/{KIT_REPO}/issues/{int(LEDGER_NUMBER)}{suffix}"
 
-    The ledger itself lives on GitHub and is always current, but
-    known-unmatchable.json and this script's logic live in the checkout - a
-    stale kit means a stale view of what is known-unmatchable and an old
-    claim/release implementation.  So every command refreshes first.
-    """
-    repo = os.path.dirname(os.path.abspath(HERE))
-    if not os.path.isdir(os.path.join(repo, ".git")):
-        return False
-    r = subprocess.run(["git", "-C", repo, "pull", "--ff-only", "-q"],
-                       capture_output=True, text=True)
-    if r.returncode != 0:
-        if not quiet:
-            print(f"note: could not update {repo} ({r.stderr.strip() or 'not a git checkout'}); "
-                  f"continuing with the local copy", file=sys.stderr)
-        return False
-    if not quiet and r.stdout.strip():
-        print(f"updated kit from origin: {r.stdout.strip()}")
-    return True
+
+def self_update():
+    root = os.path.dirname(HERE)
+    if not os.path.isdir(os.path.join(root, ".git")):
+        return
+    result = subprocess.run(["git", "-C", root, "pull", "--ff-only", "-q"],
+                            capture_output=True, text=True)
+    if result.returncode:
+        print("note: could not update the kit; using the local rules: "
+              + result.stderr.strip(), file=sys.stderr)
 
 
 def now():
     return datetime.datetime.now(datetime.timezone.utc).replace(
-        microsecond=0).isoformat().replace("+00:00", "Z")
+        microsecond=0).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def parse_ts(ts):
+def parse_ts(value):
+    if not isinstance(value, str):
+        raise LedgerError("invalid ledger timestamp")
     try:
-        return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
-    except (ValueError, AttributeError):
-        return None
+        return datetime.datetime.strptime(value, "%Y-%m-%dT%H:%M:%SZ").replace(
+            tzinfo=datetime.timezone.utc)
+    except ValueError as error:
+        raise LedgerError("invalid ledger timestamp") from error
 
 
-def age_days(ts):
-    t = parse_ts(ts)
-    return None if t is None else (
-        datetime.datetime.now(datetime.timezone.utc) - t).days
+def normalise(address):
+    if not isinstance(address, str) or not re.fullmatch(r"0[xX][0-9A-Fa-f]{8}", address):
+        raise LedgerError("address must be 0x followed by eight hex digits")
+    value = int(address, 16)
+    if not 0x08000000 <= value < 0x08150000 or value % 2:
+        raise LedgerError("address must be aligned inside the ROM code region")
+    return f"0x{value:08X}"
 
 
-# ---------------------------------------------------------------- ledger ---
-
-def normalise(addr):
-    return f"0x{int(str(addr), 0):08X}"
-
-
-def ledger(create=False):
-    """the one issue that holds the table"""
-    items = json.loads(sh("issue", "list", "--repo", KIT_REPO, "--state", "open",
-                          "--limit", "100", "--json", "number,title,body,url",
-                          check=False) or "[]")
-    for it in items:
-        if it["title"].strip().lower() == LEDGER_TITLE.lower():
-            return it
-    if not create:
-        return None
-    url = sh("issue", "create", "--repo", KIT_REPO,
-             "--title", LEDGER_TITLE, "--body", render([]))
-    number = int(re.search(r"/issues/(\d+)", url).group(1))
-    pin(number)
-    return {"number": number, "title": LEDGER_TITLE,
-            "body": render([]), "url": url}
+def text_field(value, name, maximum=400, empty=True):
+    if not isinstance(value, str) or len(value) > maximum or (not empty and not value.strip()):
+        raise LedgerError(f"invalid {name}")
+    if value != value.strip():
+        raise LedgerError(f"outer whitespace in {name}")
+    if any(ord(character) < 32 or ord(character) == 127 or 0xD800 <= ord(character) <= 0xDFFF
+           or ord(character) in (0x85, 0x2028, 0x2029) for character in value):
+        raise LedgerError(f"control characters in {name}")
+    return value
 
 
-def pin(number):
-    """best effort: pinned issues are the first thing anybody sees"""
-    r = subprocess.run(
-        ["gh", "api", "graphql", "-f",
-         "query=mutation($id:ID!){addPinToIssue(input:{issueId:$id})"
-         "{clientMutationId}}",
-         "-F", f"id=Issue:{number}"],
-        capture_output=True, text=True)
-    return r.returncode == 0
+def table_rows(body):
+    if not isinstance(body, str) or body.count(START) != 1 or body.count(END) != 1:
+        raise LedgerError("ledger table markers missing or ambiguous")
+    start = body.index(START) + len(START)
+    finish = body.index(END)
+    if start > finish:
+        raise LedgerError("ledger table markers out of order")
+    content = body[start:finish]
+    lines = [line.strip() for line in content.splitlines() if line.strip()]
+    if len(lines) < 2:
+        raise LedgerError("ledger table header missing")
+    cells = lambda line: [html.unescape(cell.strip()) for cell in line.strip("|").split("|")]
+    if cells(lines[0]) != ["address", "claimed by", "claimed at", "last seen", "note"]:
+        raise LedgerError("unexpected ledger table header")
+    if not re.fullmatch(r"\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|\s*-+\s*\|", lines[1]):
+        raise LedgerError("invalid ledger table separator")
+    rows = []
+    for line in lines[2:]:
+        values = cells(line)
+        if not line.startswith("|") or not line.endswith("|") or len(values) != 5:
+            raise LedgerError("malformed ledger row")
+        address, who, claimed_at, last_seen, note = values
+        rows.append({"address": normalise(address), "who": who,
+                     "claimed_at": claimed_at, "last_seen": last_seen,
+                     "note": note, "owner_id": None, "claim_id": None})
+    return rows
 
 
-def rows_of(body):
-    m = re.search(re.escape(START) + r"(.*?)" + re.escape(END), body or "", re.S)
-    if not m:
-        return []
-    out = []
-    for line in m.group(1).splitlines():
-        if not line.strip().startswith("|"):
+def validate_state(state):
+    if not isinstance(state, dict) or set(state) != {"version", "cursor", "rows", "results"}:
+        raise LedgerError("invalid broker state fields")
+    if type(state["version"]) is not int or state["version"] != 1:
+        raise LedgerError("unsupported broker state version")
+    if type(state["cursor"]) is not int or state["cursor"] < 0:
+        raise LedgerError("invalid broker cursor")
+    if not isinstance(state["rows"], list) or len(state["rows"]) > MAX_ROWS:
+        raise LedgerError("ledger row limit exceeded")
+    addresses = set()
+    claims = set()
+    for row in state["rows"]:
+        if not isinstance(row, dict) or set(row) != ROW_FIELDS:
+            raise LedgerError("invalid row fields")
+        if normalise(row["address"]) != row["address"] or row["address"] in addresses:
+            raise LedgerError("duplicate or noncanonical row address")
+        addresses.add(row["address"])
+        text_field(row["who"], "lane", 64, empty=False)
+        text_field(row["note"], "note")
+        if parse_ts(row["last_seen"]) < parse_ts(row["claimed_at"]):
+            raise LedgerError("lease timestamp predates claim")
+        if row["owner_id"] is None and row["claim_id"] is None:
             continue
-        cells = [c.strip() for c in line.strip().strip("|").split("|")]
-        if len(cells) < 5 or not cells[0].lower().startswith("0x"):
-            continue                       # header or separator
-        out.append({"address": normalise(cells[0]), "who": cells[1],
-                    "claimed_at": cells[2], "last_seen": cells[3],
-                    "note": cells[4] if len(cells) > 4 else ""})
-    return out
+        if not positive_id(row["owner_id"]) or not positive_id(row["claim_id"]):
+            raise LedgerError("invalid authenticated row identity")
+        if row["claim_id"] > state["cursor"] or row["claim_id"] in claims:
+            raise LedgerError("invalid or duplicate claim request ID")
+        claims.add(row["claim_id"])
+    if not isinstance(state["results"], list) or len(state["results"]) > MAX_RESULTS:
+        raise LedgerError("invalid recent results")
+    previous = 0
+    for result in state["results"]:
+        if not isinstance(result, dict) or set(result) != RESULT_FIELDS:
+            raise LedgerError("invalid result fields")
+        request_id = result["request_id"]
+        if not positive_id(request_id) or not previous < request_id <= state["cursor"]:
+            raise LedgerError("invalid result sequence")
+        previous = request_id
+        if not positive_id(result["owner_id"]):
+            raise LedgerError("invalid result owner")
+        if result["status"] not in ("accepted", "rejected"):
+            raise LedgerError("invalid result status")
+        if type(result["code"]) is not int or result["code"] not in (0, 1, 3, 4, 5):
+            raise LedgerError("invalid result code")
+        if (result["status"] == "accepted") != (result["code"] == 0):
+            raise LedgerError("result code disagrees with status")
+        text_field(result["message"], "result message")
+        text_field(result["who"], "result lane", 64)
+        if result["operation"] not in ("claim", "ping", "release", "invalid"):
+            raise LedgerError("invalid result operation")
+        if result["address"] is not None:
+            normalise(result["address"])
+        if result["claim_id"] is not None and not positive_id(result["claim_id"]):
+            raise LedgerError("invalid result claim ID")
+        if result["status"] == "accepted" and (result["operation"] == "invalid" or
+                result["address"] is None or result["claim_id"] is None or not result["who"]):
+            raise LedgerError("accepted result is missing its identity")
 
 
-def render(rows):
-    head = [
-        "# Address ledger",
-        "",
-        "Every decomp address somebody is working on, in one place. One row per",
-        "address; a row that goes quiet for 3 days is dropped automatically, so",
-        "an agent that stops working does not keep an address hostage.",
-        "",
-        "```sh",
-        f"python tools/reserve.py check 0x08011040     # 0 free, 1 taken, 3 unmatchable",
-        f"python tools/reserve.py claim 0x08011040 --who <you> --note \"...\"",
-        f"python tools/reserve.py ping 0x08011040      # still on it",
-        f"python tools/reserve.py release 0x08011040 --reason \"...\"",
-        f"python tools/reserve.py release 0x08011040 --unmatchable --reason \"...\" --tried \"...\"",
-        "```",
-        "",
-        "Claim before you touch a function. If a claim is refused, that address",
-        "belongs to another agent - pick a different one.",
-        "",
-        START,
-        "| address | claimed by | claimed at | last seen | note |",
-        "|---|---|---|---|---|",
-    ]
-    body = [f"| {r['address']} | {r['who']} | {r['claimed_at']} | "
-            f"{r['last_seen']} | {r['note']} |" for r in rows]
-    return "\n".join(head + body + [END, ""])
+def parse_ledger(body):
+    visible = table_rows(body)
+    if STATE_START not in body and STATE_END not in body:
+        if "ffta-ledger-state" in body:
+            raise LedgerError("malformed broker state markers")
+        state = {"version": 1, "cursor": 0, "rows": visible, "results": []}
+    else:
+        if body.count(STATE_START) != 1 or body.count(STATE_END) != 1:
+            raise LedgerError("broker state markers missing or ambiguous")
+        content = body.split(STATE_START)[1].split(STATE_END)
+        if len(content) != 2:
+            raise LedgerError("broker state markers out of order")
+        state = decode_json(content[0])
+        validate_state(state)
+        projected = [{**row, "owner_id": None, "claim_id": None} for row in state["rows"]]
+        if projected != visible:
+            raise LedgerError("visible table differs from broker state; maintainer reconciliation required")
+    validate_state(state)
+    return state
 
 
-def write(rows, comment=None):
-    led = ledger(create=True)
-    sh("issue", "edit", str(led["number"]), "--repo", KIT_REPO,
-       "--body", render(rows))
-    if comment:
-        sh("issue", "comment", str(led["number"]), "--repo", KIT_REPO,
-           "--body", comment)
-    return led
+def render(state):
+    validate_state(state)
+    lines = ["# Address ledger", "", "Reservations are accepted only by the trusted broker.",
+             "Legacy rows have no authenticated owner; labels do not establish identity.",
+             "", START, "| address | claimed by | claimed at | last seen | note |",
+             "|---|---|---|---|---|"]
+    for row in state["rows"]:
+        values = [html.escape(str(row[field]), quote=False).replace("|", "&#124;")
+                  for field in ("address", "who", "claimed_at", "last_seen", "note")]
+        lines.append("| " + " | ".join(values) + " |")
+    metadata = json.dumps(state, ensure_ascii=True, separators=(",", ":")).replace("<", "\\u003c").replace(">", "\\u003e")
+    body = "\n".join(lines + [END, "", STATE_START + metadata + STATE_END, ""])
+    if len(body.encode("utf-8")) > MAX_BODY_BYTES:
+        raise LedgerError("ledger body capacity exceeded; maintainer reconciliation required")
+    if parse_ledger(body) != state:
+        raise LedgerError("rendered ledger does not preserve broker state")
+    return body
 
 
-def held_by(rows, addr):
-    addr = normalise(addr).upper()
-    for r in rows:
-        if r["address"].upper() == addr:
-            return r
-    return None
+def ledger():
+    issue = api("GET", endpoint())
+    if not isinstance(issue, dict) or issue.get("number") != int(LEDGER_NUMBER):
+        raise LedgerError("configured ledger issue not found")
+    if issue.get("state") != "open" or "pull_request" in issue:
+        raise LedgerError("configured ledger must be an open issue, not a pull request")
+    return issue, parse_ledger(issue.get("body"))
 
 
-# ------------------------------------------------------------ the commands --
+def held_by(state, address):
+    return next((row for row in state["rows"] if row["address"] == address), None)
 
-def function_meta(root, addr):
-    cfg = os.path.join(root or ".", "config", "functions.json")
-    if not os.path.exists(cfg):
+
+def unmatchable():
+    try:
+        with open(UNMATCHABLE_DB, encoding="utf-8") as source:
+            records = decode_json(source.read())
+    except FileNotFoundError:
+        return set()
+    if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
+        raise LedgerError("invalid known-unmatchable database")
+    return {normalise(record.get("address")) for record in records}
+
+
+def decomp_query(query, **variables):
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", DECOMP_REPO):
+        raise LedgerError("invalid configured decomp repository")
+    owner, name = DECOMP_REPO.split("/")
+    result = api("POST", "graphql", {"query": query,
+                 "variables": dict(variables, owner=owner, name=name)})
+    if not isinstance(result, dict) or result.get("errors"):
+        raise LedgerError("decomp duplicate-check query failed")
+    try:
+        repository = result["data"]["repository"]
+    except (KeyError, TypeError) as error:
+        raise LedgerError("decomp repository is unavailable") from error
+    if not isinstance(repository, dict):
+        raise LedgerError("decomp repository is unavailable")
+    return repository
+
+
+def connection_page(connection):
+    if not isinstance(connection, dict) or not isinstance(connection.get("nodes"), list):
+        raise LedgerError("invalid duplicate-check connection")
+    page = connection.get("pageInfo")
+    if not isinstance(page, dict) or type(page.get("hasNextPage")) is not bool:
+        raise LedgerError("invalid duplicate-check pagination")
+    after = page.get("endCursor") if page["hasNextPage"] else None
+    if page["hasNextPage"] and (not connection["nodes"] or not isinstance(after, str) or not after):
+        raise LedgerError("missing duplicate-check pagination cursor")
+    return connection["nodes"], after
+
+
+def claim_status(address):
+    try:
+        address = normalise(address)
+        filename = address[2:] + ".c"
+        token = re.compile(r"(?<![A-Za-z0-9_])(?:0x|func_)?" + address[2:]
+                           + r"(?![A-Za-z0-9_])", re.IGNORECASE)
+        after = None
+        seen = set()
+        while True:
+            repository = decomp_query(CLAIM_QUERY, after=after)
+            branch = repository.get("defaultBranchRef")
+            tree = repository.get("object")
+            if not isinstance(branch, dict) or not isinstance(branch.get("name"), str):
+                raise LedgerError("decomp default branch is unavailable")
+            if not isinstance(tree, dict) or tree.get("__typename") != "Tree" or not isinstance(tree.get("entries"), list):
+                raise LedgerError("default-branch src tree is unavailable")
+            for entry in tree["entries"]:
+                if not isinstance(entry, dict) or not isinstance(entry.get("name"), str) or not isinstance(entry.get("type"), str):
+                    raise LedgerError("invalid default-branch src entry")
+                if entry["name"] == filename:
+                    return 4, f"MATCHED: src/{filename} is on the default branch"
+            pulls, after = connection_page(repository.get("pullRequests"))
+            for pull in pulls:
+                if not isinstance(pull, dict) or not positive_id(pull.get("number")):
+                    raise LedgerError("invalid open PR identity")
+                title, body = pull.get("title"), pull.get("body")
+                if not isinstance(title, str) or (body is not None and not isinstance(body, str)):
+                    raise LedgerError("invalid open PR text")
+                message = f"IN PR #{pull['number']}: address is already in review"
+                if token.search(title + "\n" + (body or "")):
+                    return 5, message
+                files = pull.get("files")
+                seen_files = set()
+                while True:
+                    paths, file_after = connection_page(files)
+                    for changed in paths:
+                        if not isinstance(changed, dict) or not isinstance(changed.get("path"), str):
+                            raise LedgerError("invalid PR changed-file path")
+                        if changed["path"].lower() == ("src/" + filename).lower():
+                            return 5, message
+                    if file_after is None:
+                        break
+                    if file_after in seen_files:
+                        raise LedgerError("repeated PR file cursor")
+                    seen_files.add(file_after)
+                    current = decomp_query(PR_FILES_QUERY, number=pull["number"], after=file_after).get("pullRequest")
+                    if not isinstance(current, dict):
+                        raise LedgerError("open PR changed during duplicate check")
+                    files = current.get("files")
+            if after is None:
+                return 0, ""
+            if after in seen:
+                raise LedgerError("repeated open PR cursor")
+            seen.add(after)
+    except LedgerError as error:
+        raise GuardUnavailable(f"duplicate guards unavailable; no claim accepted: {error}") from error
+
+
+def parse_request(body):
+    if not isinstance(body, str) or not body.startswith(REQUEST_PREFIX):
         return None
     try:
-        fns = json.load(open(cfg, encoding="utf-8"))
-    except (OSError, ValueError):
-        return None
-    a = int(normalise(addr), 16)
-    for f in fns:
-        if int(f["rom"], 16) == a:
-            return {"name": f"func_{f['rom'][2:]}",
-                    "size": int(f["end"], 16) - a}
-    return None
+        length = len(body.encode("utf-8"))
+    except UnicodeEncodeError as error:
+        raise LedgerError("invalid request text encoding") from error
+    if length > MAX_REQUEST_BYTES:
+        raise LedgerError("request exceeds 2 KiB")
+    request = decode_json(body[len(REQUEST_PREFIX):])
+    if not isinstance(request, dict):
+        raise LedgerError("request must be an object")
+    operation = request.get("operation")
+    common = {"operation", "address", "who"}
+    fields = {"claim": common | {"note"}, "ping": common | {"claim_id"},
+              "release": common | {"claim_id", "reason", "unmatchable", "tried"}}
+    if not isinstance(operation, str) or operation not in fields or set(request) != fields[operation]:
+        raise LedgerError("invalid request operation or fields")
+    request["address"] = normalise(request["address"])
+    text_field(request["who"], "lane", 64, empty=False)
+    if operation == "claim":
+        text_field(request["note"], "note")
+    else:
+        if not positive_id(request["claim_id"]):
+            raise LedgerError("invalid claim request ID")
+    if operation == "release":
+        text_field(request["reason"], "reason")
+        text_field(request["tried"], "tried")
+        if type(request["unmatchable"]) is not bool:
+            raise LedgerError("invalid unmatchable evidence flag")
+    return request
 
 
-def unmatchable_db():
-    path = os.path.abspath(UNMATCHABLE_DB)
-    if not os.path.exists(path):
-        return path, []
+def comment_identity(comment):
+    if not isinstance(comment, dict) or not positive_id(comment.get("id")):
+        raise LedgerError("invalid server comment identity")
+    author = comment.get("user")
+    if not isinstance(author, dict) or not positive_id(author.get("id")):
+        raise LedgerError("invalid authenticated comment author")
+    if author.get("type") not in ("User", "Bot"):
+        raise LedgerError("unsupported authenticated comment author")
+    return comment["id"], author["id"]
+
+
+def apply_comment(state, comment, skipped, timestamp, claim_check=None):
+    request_id, owner_id = comment_identity(comment)
+    if request_id <= state["cursor"]:
+        return state
+    candidate = copy.deepcopy(state)
+    candidate["cursor"] = request_id
+    result = {"request_id": request_id, "owner_id": owner_id, "who": "",
+              "operation": "invalid", "address": None, "claim_id": None,
+              "status": "rejected", "code": 1, "message": "invalid request"}
     try:
-        return path, json.load(open(path, encoding="utf-8"))
-    except (OSError, ValueError):
-        return path, []
-
-
-def already_matched(addr):
-    """is there src/<addr>.c on the decomp repo's default branch?"""
-    out = sh("api", f"repos/{DECOMP_REPO}/contents/src/{normalise(addr)[2:]}.c",
-             check=False)
-    return '"path"' in (out or "")
-
-
-def open_prs_for(addr):
-    """open PRs in the decomp repo that mention this address"""
-    a1 = normalise(addr).lower()
-    a2 = a1[2:]
-    raw = sh("pr", "list", "--repo", DECOMP_REPO, "--state", "open",
-             "--limit", "100", "--json", "number,title,body,url", check=False)
-    try:
-        prs = json.loads(raw or "[]")
-    except ValueError:
-        return []
-    out = []
-    for pr in prs:
-        blob = f"{pr.get('title', '')}\n{pr.get('body') or ''}".lower()
-        if a1 in blob or a2 in blob:
-            out.append(pr)
-    return out
-
-
-def cmd_claim(args):
-    addr = normalise(args.addr)
-    path, db = unmatchable_db()
-    for rec in db:
-        if rec["address"].upper() == addr.upper():
-            print(f"{addr} is recorded as UNMATCHABLE:")
-            print(f"  {rec.get('reason', 'no reason given')}")
-            if rec.get("tried"):
-                print(f"  flags tried: {rec['tried']}")
-            print("Pick another address, or reopen the discussion on that issue.")
-            return 3
-
-    led = ledger(create=True)
-    rows = rows_of(led["body"])
-    existing = held_by(rows, addr)
-    if existing:
-        print(f"{addr} is already reserved by {existing['who']} "
-              f"(since {existing['claimed_at']})")
-        print(f"  ledger: {led['url']}")
-        print("Pick another address - do not work on one somebody else holds.")
-        return 1
-
-    # work somebody else is already doing, in flight or already landed
-    if already_matched(addr):
-        print(f"{addr} is already matched: src/{addr[2:]}.c is on the default "
-              f"branch of {DECOMP_REPO}.")
-        print("Nothing to reserve - pick another address.")
-        return 4
-    prs = open_prs_for(addr)
-    if prs:
-        print(f"{addr} already appears in {len(prs)} open PR(s):")
-        for pr in prs:
-            print(f"  #{pr['number']}  {pr['title']}")
-            print(f"        {pr['url']}")
-        print("Reserve something else, or coordinate with whoever opened that "
-              "PR - do not duplicate work that is already in review.")
-        return 1
-
-    meta = function_meta(args.decomp_root, addr) or {}
-    ts = now()
-    note = " ".join(filter(None, [
-        args.note,
-        f"[{meta.get('size', '?')} B]" if meta.get("size") else "",
-    ]))
-    rows.append({"address": addr, "who": args.who, "claimed_at": ts,
-                 "last_seen": ts, "note": note or "-"})
-    write(rows, f"**claimed {addr}** by `{args.who}` "
-                f"({meta.get('name', '')}). {note}")
-
-    # Two agents can read the ledger at the same moment and both write; confirm
-    # after the fact that this claim is the one standing.
-    check = held_by(rows_of(ledger()["body"]), addr)
-    if not check or check["who"] != args.who:
-        held = check["who"] if check else "nobody"
-        print(f"race lost: {addr} is now held by {held}", file=sys.stderr)
-        print("Pick another address.", file=sys.stderr)
-        return 1
-
-    print(f"reserved {addr} ({meta.get('name', '')})")
-    print(f"ledger:  {led['url']}")
-    return 0
-
-
-def cmd_check(args):
-    addr = normalise(args.addr)
-    led = ledger()
-    if led:
-        row = held_by(rows_of(led["body"]), addr)
-        if row:
-            print(f"TAKEN    {addr} by {row['who']} since {row['claimed_at']}"
-                  f" (last seen {row['last_seen']})")
-            print(f"         {led['url']}")
-            return 1
-    if already_matched(addr):
-        print(f"MATCHED  {addr} already in src/ on the default branch of "
-              f"{DECOMP_REPO} - nothing to do")
-        return 4
-    prs = open_prs_for(addr)
-    if prs:
-        print(f"IN PR    {addr} is being matched in an open PR:")
-        for pr in prs:
-            print(f"         #{pr['number']}  {pr['title']}")
-        return 5
-    _, db = unmatchable_db()
-    for rec in db:
-        if rec["address"].upper() == addr.upper():
-            print(f"SKIP     {addr} recorded unmatchable: "
-                  f"{rec.get('reason', '')}")
-            return 3
-    print(f"FREE     {addr}")
-    return 0
-
-
-def cmd_list(args):
-    led = ledger()
-    if not led:
-        print("no ledger issue yet - claim something to create it")
-        return 0
-    rows = rows_of(led["body"])
-    if not rows:
-        print("no reservations")
-        return 0
-    print(f"{'address':<12} {'claimed by':<16} {'age':>4}  note")
-    for r in rows:
-        age = age_days(r["last_seen"])
-        flag = "  <- stale" if age is not None and age >= STALE_DAYS else ""
-        print(f"{r['address']:<12} {r['who']:<16} {age if age is not None else '?':>4}"
-              f"  {r['note']}{flag}")
-    print(f"\n{led['url']}")
-    return 0
-
-
-def cmd_ping(args):
-    addr = normalise(args.addr)
-    led = ledger(create=True)
-    rows = rows_of(led["body"])
-    row = held_by(rows, addr)
-    if not row:
-        print(f"{addr} is not reserved", file=sys.stderr)
-        return 1
-    row["last_seen"] = now()
-    write(rows, f"still working on {addr} (`{row['who']}`) - lease refreshed")
-    print(f"pinged {addr}")
-    return 0
-
-
-def cmd_release(args):
-    addr = normalise(args.addr)
-    led = ledger(create=True)
-    rows = rows_of(led["body"])
-    row = held_by(rows, addr)
-    if not row:
-        print(f"{addr} is not reserved", file=sys.stderr)
-        return 1
-    reason = args.reason or "no reason given"
-    rows = [r for r in rows if r["address"].upper() != addr.upper()]
-    write(rows, f"**released {addr}** (was `{row['who']}`): {reason}")
-    print(f"released {addr} (was {row['who']})")
-
-    if args.unmatchable:
-        path, db = unmatchable_db()
-        rec = {"address": addr, "reason": reason, "released_at": now(),
-               "who": row["who"]}
-        if args.tried:
-            rec["tried"] = args.tried
-        db = [d for d in db if d["address"].upper() != addr.upper()] + [rec]
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8", newline="\n") as f:
-            json.dump(sorted(db, key=lambda d: d["address"]), f, indent=2)
-            f.write("\n")
-        print(f"recorded {addr} in known-unmatchable.json")
-    return 0
-
-
-def cmd_sweep(args):
-    led = ledger()
-    if not led:
-        print("no ledger yet")
-        return 0
-    rows = rows_of(led["body"])
-    dropped = []
-    keep = []
-    for r in rows:
-        age = age_days(r["last_seen"])
-        if age is not None and age >= args.days:
-            dropped.append((r, age))
+        request = parse_request(comment.get("body"))
+        if request is None:
+            return candidate
+        result.update({field: request[field] for field in ("who", "operation", "address")})
+        operation = request["operation"]
+        result["claim_id"] = request_id if operation == "claim" else request["claim_id"]
+        row = held_by(candidate, request["address"])
+        if operation == "claim":
+            if row:
+                raise LedgerError("address is already reserved")
+            if request["address"] in skipped:
+                result["code"] = 3
+                raise LedgerError("address is recorded as unmatchable")
+            if len(candidate["rows"]) >= MAX_ROWS:
+                raise LedgerError("ledger row capacity reached")
+            if claim_check is None:
+                raise GuardUnavailable("authoritative duplicate guard is required for claims")
+            code, message = claim_check(request["address"])
+            if code:
+                result["code"] = code
+                raise LedgerError(message)
+            candidate["rows"].append({"address": request["address"], "who": request["who"],
+                                      "claimed_at": timestamp, "last_seen": timestamp,
+                                      "note": request["note"] or "-", "owner_id": owner_id,
+                                      "claim_id": request_id})
         else:
-            keep.append(r)
-    if not dropped:
-        print(f"nothing stale (threshold {args.days} days)")
+            if not row:
+                raise LedgerError("address is not reserved")
+            if row["owner_id"] is None:
+                raise LedgerError("legacy ownership requires maintainer reconciliation")
+            if (row["owner_id"], row["who"], row["claim_id"]) != (
+                    owner_id, request["who"], request["claim_id"]):
+                raise LedgerError("owner, lane, or claim request ID does not match")
+            if operation == "ping":
+                row["last_seen"] = timestamp
+            else:
+                candidate["rows"].remove(row)
+        result["status"] = "accepted"
+        result["code"] = 0
+        result["message"] = operation + " accepted"
+        if operation == "release" and request["unmatchable"]:
+            result["message"] += "; unmatchable evidence requires maintainer review"
+    except GuardUnavailable:
+        raise
+    except LedgerError as error:
+        candidate["rows"] = copy.deepcopy(state["rows"])
+        result["message"] = str(error)[:400]
+    candidate["results"] = (candidate["results"] + [result])[-MAX_RESULTS:]
+    try:
+        render(candidate)
+    except LedgerError:
+        candidate["rows"] = copy.deepcopy(state["rows"])
+        result["status"] = "rejected"
+        result["code"] = 1
+        result["message"] = "ledger capacity or validation failed; no change accepted"
+        render(candidate)
+    return candidate
+
+
+def comments_after(cursor):
+    endpoint()
+    owner, name = KIT_REPO.split("/")
+    comments = []
+    after = None
+    seen_cursors = set()
+    while True:
+        result = api("POST", "graphql", {"query": COMMENTS_QUERY,
+                     "variables": {"owner": owner, "name": name,
+                                   "issue": int(LEDGER_NUMBER), "after": after}})
+        if not isinstance(result, dict) or result.get("errors"):
+            raise LedgerError("GitHub comment query failed")
+        try:
+            connection = result["data"]["repository"]["issue"]["comments"]
+            edges = connection["edges"]
+            page_info = connection["pageInfo"]
+        except (KeyError, TypeError) as error:
+            raise LedgerError("configured ledger comment connection is unavailable") from error
+        if not isinstance(edges, list) or not isinstance(page_info, dict):
+            raise LedgerError("invalid comment connection")
+        for edge in edges:
+            if not isinstance(edge, dict) or not isinstance(edge.get("node"), dict):
+                raise LedgerError("invalid comment node")
+            node = edge["node"]
+            database_id = node.get("fullDatabaseId")
+            if isinstance(database_id, str) and re.fullmatch(r"[1-9][0-9]{0,19}", database_id):
+                database_id = int(database_id)
+            author = node.get("author")
+            if not isinstance(author, dict) or not isinstance(node.get("body"), str):
+                raise LedgerError("invalid server comment author or body")
+            comment = {"id": database_id, "body": node["body"],
+                       "user": {"id": author.get("databaseId"), "type": author.get("__typename")}}
+            request_id, owner_id = comment_identity(comment)
+            if request_id > cursor:
+                comments.append(comment)
+        has_next = page_info.get("hasNextPage")
+        if type(has_next) is not bool:
+            raise LedgerError("invalid comment pagination flag")
+        if not has_next:
+            break
+        after = page_info.get("endCursor")
+        if not edges or not isinstance(after, str) or not after or after in seen_cursors:
+            raise LedgerError("invalid or repeated comment pagination cursor")
+        if edges[-1].get("cursor") != after:
+            raise LedgerError("comment connection cursor does not match its final edge")
+        seen_cursors.add(after)
+    identifiers = [comment["id"] for comment in comments]
+    if len(identifiers) != len(set(identifiers)):
+        raise LedgerError("comment listing changed during pagination; retry drain")
+    return sorted(comments, key=lambda comment: comment["id"])
+
+
+def persist(state, previous_body):
+    body = render(state)
+    current, current_state = ledger()
+    if current["body"] != previous_body:
+        raise LedgerError("ledger changed outside the serialized broker; refusing stale write")
+    updated = api("PATCH", endpoint(), {"body": body})
+    if not isinstance(updated, dict) or updated.get("body") != body:
+        raise Unconfirmed("ledger write acknowledgement differs; retry the broker")
+    return body
+
+
+def drain(days=STALE_DAYS):
+    issue, state = ledger()
+    body = issue["body"]
+    skipped = unmatchable()
+    processed = 0
+    while True:
+        comments = comments_after(state["cursor"])
+        if not comments:
+            break
+        for comment in comments:
+            candidate = apply_comment(state, comment, skipped, now(), claim_check=claim_status)
+            body = persist(candidate, body)
+            state = candidate
+            processed += 1
+    timestamp = now()
+    cutoff = parse_ts(timestamp) - datetime.timedelta(days=days)
+    candidate = copy.deepcopy(state)
+    candidate["rows"] = [row for row in candidate["rows"]
+                         if parse_ts(row["last_seen"]) > cutoff]
+    dropped = len(state["rows"]) - len(candidate["rows"])
+    if dropped:
+        persist(candidate, body)
+    print(f"drained {processed} comment(s); expired {dropped} lease(s)")
+    return 0
+
+
+def trusted_event():
+    endpoint()
+    if os.environ.get("GITHUB_ACTIONS") != "true" or os.environ.get("GITHUB_REPOSITORY") != KIT_REPO:
+        raise LedgerError("broker runs only in the trusted repository workflow")
+    try:
+        with open(os.environ["GITHUB_EVENT_PATH"], encoding="utf-8") as source:
+            event = decode_json(source.read())
+    except (KeyError, OSError) as error:
+        raise LedgerError("trusted workflow event is unavailable") from error
+    if not isinstance(event, dict) or not isinstance(event.get("repository"), dict):
+        raise LedgerError("invalid trusted workflow event")
+    repository = event["repository"]
+    branch = repository.get("default_branch")
+    if repository.get("full_name") != KIT_REPO or not isinstance(branch, str):
+        raise LedgerError("unexpected workflow repository")
+    if os.environ.get("GITHUB_REF") != "refs/heads/" + branch:
+        raise LedgerError("broker must run from the default branch")
+    event_name = os.environ.get("GITHUB_EVENT_NAME")
+    if event_name == "issue_comment":
+        issue = event.get("issue", {})
+        if not isinstance(issue, dict) or event.get("action") != "created" or issue.get("number") != int(LEDGER_NUMBER) or "pull_request" in issue:
+            raise LedgerError("unexpected ledger comment event")
+    elif event_name not in ("schedule", "workflow_dispatch"):
+        raise LedgerError("unsupported broker event")
+    inputs = event.get("inputs") or {}
+    if not isinstance(inputs, dict):
+        raise LedgerError("invalid workflow inputs")
+    days = str(inputs.get("days", STALE_DAYS))
+    if not days.isdigit() or not 1 <= int(days) <= 30:
+        raise LedgerError("sweep days must be between 1 and 30")
+    return int(days)
+
+
+def identity():
+    account = api("GET", "user")
+    if not isinstance(account, dict) or not positive_id(account.get("id")):
+        raise LedgerError("authenticated GitHub identity unavailable")
+    return account["id"]
+
+
+def acknowledged(state, request, request_id, owner_id):
+    result = next((entry for entry in state["results"] if entry["request_id"] == request_id), None)
+    if result is None:
+        if state["cursor"] >= request_id:
+            raise Unconfirmed("request result is no longer retained; ownership is unconfirmed")
+        return None
+    expected_claim = request_id if request["operation"] == "claim" else request["claim_id"]
+    expected = {"owner_id": owner_id, "who": request["who"], "operation": request["operation"],
+                "address": request["address"], "claim_id": expected_claim}
+    if any(result[field] != value for field, value in expected.items()):
+        raise Unconfirmed("persisted request identity differs; ownership is unconfirmed")
+    if result["status"] == "rejected":
+        return result
+    row = held_by(state, request["address"])
+    if request["operation"] in ("claim", "ping"):
+        if not row or (row["owner_id"], row["who"], row["claim_id"]) != (
+                owner_id, request["who"], expected_claim):
+            raise Unconfirmed("accepted lease is no longer held; ownership is unconfirmed")
+    elif row and row["claim_id"] == expected_claim:
+        raise Unconfirmed("release result conflicts with the current row")
+    return result
+
+
+def submit(args):
+    address = normalise(args.addr)
+    issue, state = ledger()
+    row = held_by(state, address)
+    if args.cmd == "claim":
+        if row:
+            print(f"TAKEN {address} by {row['who']}; no request submitted")
+            return 1
+        if address in unmatchable():
+            print(f"SKIP {address}: recorded unmatchable; no request submitted")
+            return 3
+        code, message = claim_status(address)
+        if code:
+            print(message + "; no request submitted")
+            return code
+    owner_id = identity()
+    who = args.who
+    if args.cmd != "claim":
+        if not row or row["owner_id"] is None:
+            raise LedgerError("no authenticated lease; legacy ownership requires maintainer reconciliation")
+        if row["owner_id"] != owner_id:
+            raise LedgerError("lease belongs to a different authenticated actor")
+        who = who or row["who"]
+        claim_id = args.claim_id if args.claim_id is not None else row["claim_id"]
+        if who != row["who"] or claim_id != row["claim_id"]:
+            raise LedgerError("lane or claim request ID does not match the current lease")
+    request = {"operation": args.cmd, "address": address, "who": who or "agent"}
+    if args.cmd == "claim":
+        request["note"] = args.note
+    else:
+        request["claim_id"] = claim_id
+    if args.cmd == "release":
+        request.update(reason=args.reason, unmatchable=args.unmatchable, tried=args.tried)
+    body = REQUEST_PREFIX + json.dumps(request, ensure_ascii=True, separators=(",", ":"))
+    parse_request(body)
+    try:
+        comment = api("POST", endpoint("/comments"), {"body": body})
+        request_id, author_id = comment_identity(comment)
+    except LedgerError as error:
+        raise Unconfirmed(f"request submission could not be confirmed; inspect the ledger before retrying: {error}") from error
+    if author_id != owner_id:
+        raise Unconfirmed("submitted request author differs from authenticated identity")
+    print(f"request {request_id} submitted to ledger #{LEDGER_NUMBER}; not yet accepted")
+    deadline = time.monotonic() + args.wait
+    while True:
+        try:
+            current_issue, current_state = ledger()
+            result = acknowledged(current_state, request, request_id, owner_id)
+        except LedgerError as error:
+            raise Unconfirmed(f"request {request_id} acknowledgement unavailable: {error}") from error
+        if result is not None:
+            print(f"{result['status'].upper()} {address}: {result['message']} (request {request_id})")
+            return result["code"]
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise Unconfirmed(f"request {request_id} timed out unconfirmed; do not begin work or assume release")
+        time.sleep(min(2, remaining))
+
+
+def inspect(args):
+    issue, state = ledger()
+    if args.cmd == "check":
+        address = normalise(args.addr)
+        row = held_by(state, address)
+        if row:
+            owner = row["owner_id"] if row["owner_id"] is not None else "legacy/unverified"
+            print(f"TAKEN {address} by {row['who']} (actor {owner}, claim {row['claim_id']})")
+            return 1
+        code, message = claim_status(address)
+        if code:
+            print(message)
+            return code
+        if address in unmatchable():
+            print(f"SKIP {address}: recorded unmatchable")
+            return 3
+        print(f"FREE {address}; a successful broker claim is required before work")
         return 0
-    summary = "\n".join(
-        f"- **{r['address']}** dropped, held by `{r['who']}` for {age} days "
-        f"without activity" for r, age in dropped)
-    write(keep, f"**swept {len(dropped)} stale reservation(s)** "
-                f"(threshold {args.days} days):\n\n{summary}")
-    print(f"dropped {len(dropped)} stale reservation(s):")
-    for r, age in dropped:
-        print(f"  {r['address']}  {r['who']}  {age}d quiet")
-    time.sleep(0.2)
+    for row in state["rows"]:
+        owner = row["owner_id"] if row["owner_id"] is not None else "legacy/unverified"
+        print(f"{row['address']} {row['who']} actor={owner} claim={row['claim_id']} last_seen={row['last_seen']} {row['note']}")
+    if not state["rows"]:
+        print("no reservations")
+    print(f"ledger #{LEDGER_NUMBER}; processed through comment {state['cursor']}")
     return 0
 
 
 def main():
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    sub = ap.add_subparsers(dest="cmd", required=True)
-
-    p = sub.add_parser("claim", help="reserve an address")
-    p.add_argument("addr")
-    p.add_argument("--who", default=os.environ.get("FFTA_WHO", "agent"))
-    p.add_argument("--note", default="", help="what you intend to do")
-    p.add_argument("--decomp-root", default=os.environ.get("FFTA_ROOT", "."))
-    p.set_defaults(fn=cmd_claim)
-
-    p = sub.add_parser("check",
-                     help="is an address free? (0 free, 1 taken, "
-                          "3 unmatchable, 4 already matched, 5 in an open PR)")
-    p.add_argument("addr")
-    p.set_defaults(fn=cmd_check)
-
-    p = sub.add_parser("list", help="the whole ledger")
-    p.set_defaults(fn=cmd_list)
-
-    p = sub.add_parser("ping", help="refresh a reservation you still hold")
-    p.add_argument("addr")
-    p.set_defaults(fn=cmd_ping)
-
-    p = sub.add_parser("release", help="give an address back")
-    p.add_argument("addr")
-    p.add_argument("--reason", default="")
-    p.add_argument("--unmatchable", action="store_true")
-    p.add_argument("--tried", default="", help="flags/settings already tried")
-    p.set_defaults(fn=cmd_release)
-
-    p = sub.add_parser("sweep", help="drop rows nobody has touched")
-    p.add_argument("--days", type=int, default=STALE_DAYS)
-    p.set_defaults(fn=cmd_sweep)
-
-    ap.add_argument("--no-pull", action="store_true",
-                    help="skip the automatic 'git pull' of this repo")
-    args = ap.parse_args()
-    if not args.no_pull:
-        self_update()
-    return args.fn(args)
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--no-pull", action="store_true", help="skip the automatic kit update")
+    commands = parser.add_subparsers(dest="cmd", required=True)
+    for operation in ("claim", "ping", "release"):
+        command = commands.add_parser(operation)
+        command.add_argument("addr")
+        command.add_argument("--who", default=os.environ.get("FFTA_WHO"), help="agent lane, separate from authenticated ownership")
+        command.add_argument("--wait", type=float, default=120, help="seconds to wait for a persisted broker acknowledgement (0..300)")
+        if operation == "claim":
+            command.add_argument("--note", default="")
+            command.add_argument("--decomp-root", help="accepted for compatibility; metadata is not trusted for authorization")
+        else:
+            command.add_argument("--claim-id", type=int, help="expected original claim request ID")
+        if operation == "release":
+            command.add_argument("--reason", default="")
+            command.add_argument("--unmatchable", action="store_true", help="submit evidence for maintainer review; never changes the database")
+            command.add_argument("--tried", default="")
+    command = commands.add_parser("check")
+    command.add_argument("addr")
+    commands.add_parser("list")
+    commands.add_parser("broker", help="trusted workflow only: drain requests and expire stale rows")
+    args = parser.parse_args()
+    try:
+        if args.cmd == "broker":
+            return drain(trusted_event())
+        if hasattr(args, "wait") and not 0 <= args.wait <= 300:
+            raise LedgerError("wait must be between 0 and 300 seconds")
+        if not args.no_pull:
+            self_update()
+        if args.cmd in ("check", "list"):
+            return inspect(args)
+        return submit(args)
+    except Unconfirmed as error:
+        print(f"UNCONFIRMED: {error}", file=sys.stderr)
+        return 6
+    except (LedgerError, OSError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":
