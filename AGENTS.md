@@ -12,16 +12,35 @@ when a tool needs the decomp repo.
 
 ## The rules, in order of importance
 
-### 1. Claim the address before you touch a function
+### 1. Check the ledger, then claim the address — before you touch a function
 
 Work is parallel, and the ledger is **one issue in this repository** — the
 "address ledger" — with a row per claimed address.
 
 ```sh
-python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 3 unmatchable
+python tools/reserve.py list                    # 1. read the board first
+python tools/reserve.py check 0x08011040        # 2. is this one free?
 python tools/reserve.py claim 0x08011040 --who <you> --note "what you are doing"
-python tools/reserve.py list                     # the whole board
 ```
+
+**Never reserve an address that is already reserved, already matched, or
+already in review.** Read the ledger before you claim, let `check` tell you the
+state of your specific address, and take a free one. `check` reports four
+states:
+
+| exit | state |
+|---|---|
+| 0 | `FREE` — yours to claim |
+| 1 | `TAKEN` — another agent holds it in the ledger |
+| 4 | `MATCHED` — `src/<addr>.c` is already on the decomp repo's default branch |
+| 5 | `IN PR` — an open PR in the decomp repo already matches it |
+| 3 | `SKIP` — recorded unmatchable |
+
+`claim` refuses for all of those, so a duplicate cannot happen even if you
+skip the check: it re-reads the ledger after writing (so two agents claiming at
+the same instant cannot both win), refuses an address already in `src/`, and
+refuses one an open PR already covers. Coordinate with whoever opened that PR
+rather than duplicating work that is in review.
 
 **The tool pulls this repository before every command**, so you always decide
 against the current ledger and the current `known-unmatchable.json`. If it

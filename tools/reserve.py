@@ -17,8 +17,9 @@ no issue-list noise as the project grows.
 
 Working agreement
 -----------------
-1. Before touching a function, claim it.  If the claim is refused, pick another
-   address - do not work on one somebody else holds.
+1. Before touching a function, check the ledger and claim it.  Claim refuses
+   an address that is held, already matched in src/, or already matched in an
+   open PR - if it refuses, pick another address.
 2. A reservation is a *lease*: ping it while you work and release it as soon as
    you stop - including when you conclude the function cannot be matched.
    `sweep` (and the reservations workflow) drops rows quiet for a few days.
@@ -239,6 +240,31 @@ def unmatchable_db():
         return path, []
 
 
+def already_matched(addr):
+    """is there src/<addr>.c on the decomp repo's default branch?"""
+    out = sh("api", f"repos/{DECOMP_REPO}/contents/src/{normalise(addr)[2:]}.c",
+             check=False)
+    return '"path"' in (out or "")
+
+
+def open_prs_for(addr):
+    """open PRs in the decomp repo that mention this address"""
+    a1 = normalise(addr).lower()
+    a2 = a1[2:]
+    raw = sh("pr", "list", "--repo", DECOMP_REPO, "--state", "open",
+             "--limit", "100", "--json", "number,title,body,url", check=False)
+    try:
+        prs = json.loads(raw or "[]")
+    except ValueError:
+        return []
+    out = []
+    for pr in prs:
+        blob = f"{pr.get('title', '')}\n{pr.get('body') or ''}".lower()
+        if a1 in blob or a2 in blob:
+            out.append(pr)
+    return out
+
+
 def cmd_claim(args):
     addr = normalise(args.addr)
     path, db = unmatchable_db()
@@ -261,6 +287,22 @@ def cmd_claim(args):
         print("Pick another address - do not work on one somebody else holds.")
         return 1
 
+    # work somebody else is already doing, in flight or already landed
+    if already_matched(addr):
+        print(f"{addr} is already matched: src/{addr[2:]}.c is on the default "
+              f"branch of {DECOMP_REPO}.")
+        print("Nothing to reserve - pick another address.")
+        return 4
+    prs = open_prs_for(addr)
+    if prs:
+        print(f"{addr} already appears in {len(prs)} open PR(s):")
+        for pr in prs:
+            print(f"  #{pr['number']}  {pr['title']}")
+            print(f"        {pr['url']}")
+        print("Reserve something else, or coordinate with whoever opened that "
+              "PR - do not duplicate work that is already in review.")
+        return 1
+
     meta = function_meta(args.decomp_root, addr) or {}
     ts = now()
     note = " ".join(filter(None, [
@@ -271,6 +313,16 @@ def cmd_claim(args):
                  "last_seen": ts, "note": note or "-"})
     write(rows, f"**claimed {addr}** by `{args.who}` "
                 f"({meta.get('name', '')}). {note}")
+
+    # Two agents can read the ledger at the same moment and both write; confirm
+    # after the fact that this claim is the one standing.
+    check = held_by(rows_of(ledger()["body"]), addr)
+    if not check or check["who"] != args.who:
+        held = check["who"] if check else "nobody"
+        print(f"race lost: {addr} is now held by {held}", file=sys.stderr)
+        print("Pick another address.", file=sys.stderr)
+        return 1
+
     print(f"reserved {addr} ({meta.get('name', '')})")
     print(f"ledger:  {led['url']}")
     return 0
@@ -286,6 +338,16 @@ def cmd_check(args):
                   f" (last seen {row['last_seen']})")
             print(f"         {led['url']}")
             return 1
+    if already_matched(addr):
+        print(f"MATCHED  {addr} already in src/ on the default branch of "
+              f"{DECOMP_REPO} - nothing to do")
+        return 4
+    prs = open_prs_for(addr)
+    if prs:
+        print(f"IN PR    {addr} is being matched in an open PR:")
+        for pr in prs:
+            print(f"         #{pr['number']}  {pr['title']}")
+        return 5
     _, db = unmatchable_db()
     for rec in db:
         if rec["address"].upper() == addr.upper():
@@ -398,7 +460,9 @@ def main():
     p.add_argument("--decomp-root", default=os.environ.get("FFTA_ROOT", "."))
     p.set_defaults(fn=cmd_claim)
 
-    p = sub.add_parser("check", help="is an address free? (0 free, 1 taken, 3 unmatchable)")
+    p = sub.add_parser("check",
+                     help="is an address free? (0 free, 1 taken, "
+                          "3 unmatchable, 4 already matched, 5 in an open PR)")
     p.add_argument("addr")
     p.set_defaults(fn=cmd_check)
 

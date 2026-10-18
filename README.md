@@ -43,24 +43,29 @@ claimed first**, and the claim lives in this repository's single **address
 ledger** issue. Each address has its own row in the machine-readable table.
 
 ```sh
-python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 3 unmatchable
+python tools/reserve.py list                         # read the board first
+python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 4 matched,
+                                                # 5 in a PR, 3 unmatchable
 python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
-python tools/reserve.py list                      # who holds what
 python tools/reserve.py ping 0x08011040           # still on it, bumps the lease
 python tools/reserve.py release 0x08011040 --reason "done, moved to src/"
-python tools/reserve.py sweep --days 3            # release anything quiet
+python tools/reserve.py sweep --days 3            # close reservations nobody touched
 ```
 
 ### The rules
 
-1. **Claim before you touch a function.** `claim` refuses an address somebody
-   else holds — if it refuses you, pick another address. Do not work on a
-   function another agent has reserved.
+1. **Read the ledger, check the address, then claim it — before you touch a
+   function.** Never reserve an address that is already reserved, already
+   matched on the default branch, or already matched in an open PR. `check`
+   reports which of those it is (exit 0/1/4/5/3), and `claim` refuses them all
+   anyway — it re-reads the ledger after writing so two agents claiming at the
+   same instant cannot both win. Coordinate with the author of an open PR
+   rather than duplicating work already in review.
 2. **A reservation is a lease, not a land grab.** Ping it while you work.
    Release it as soon as you stop, including when you conclude the function
    **cannot** be matched — that is exactly when somebody else should be allowed
-   to try. `sweep` runs every 6 hours via the `reservations` workflow and removes
-   rows quiet for 3 days, so a stalled agent cannot hold an address.
+   to try. `sweep` runs every 6 hours via the `reservations` workflow and drops
+   anything quiet for 3 days, so a stalled agent cannot hold an address.
 3. **Release unmatchable addresses, don't hoard them.** `release
    --unmatchable --reason "..." --tried "<flags>"` releases the reservation *and*
    records the address in `known-unmatchable.json`, with the reason and the
