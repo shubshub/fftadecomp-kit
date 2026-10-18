@@ -42,8 +42,15 @@ RULES = [
      "original code, not asm pasted into a C file"),
     ("asm-include", "error", r'#\s*include\s+"[^"]*\.(s|S)"',
      "including an assembly file"),
-    ("optimize-pragma", "error", r"#\s*pragma\s+(?:GCC\s+)?optimize|__attribute__\s*\(\(\s*optimize",
+    ("optimize-pragma", "error",
+     r"#\s*pragma\s+(?:GCC\s+)?optimize\b|__attribute__\s*\(\(?[^)]*optimize",
      "optimisation pragma/attribute: changes code generation outside the source"),
+    ("target-pragma", "error",
+     r"#\s*pragma\s+(?:GCC\s+)?target\b|__attribute__\s*\(\(?[^)]*target",
+     "target pragma/attribute: retargets code generation from inside the source"),
+    ("stringised-pragma", "error", r"\b_Pragma\s*\(|\bpragma\s*\(\s*[A-Za-z_]",
+     "_Pragma / stringised pragma: a banned directive written so that it does "
+     "not read as one - say what it does, or drop it"),
     ("no-standard-errors", "error", r"#\s*pragma\s+GCC\s+diagnostic",
      "disabling diagnostics to silence warnings the original would not have"),
     ("dead-code", "error", r"\bif\s*\(\s*0\s*\)|\bwhile\s*\(\s*0\s*\)|#\s*if\s+0\b",
@@ -56,8 +63,12 @@ RULES = [
      "volatile: it suppresses reordering, which is the classic way to force a "
      "byte match (real I/O code is the only legitimate use - justify it)"),
     ("attribute-steering", "error",
-     r"__attribute__\s*\(\(\s*(used|section|alias|weak|naked|constructor|destructor)",
+     r"__attribute__\s*\(\(\s*_?+(used|section|alias|weak|naked|constructor|destructor|retain|common)",
      "attribute that only affects code placement or emission"),
+    ("emission-pragma", "error",
+     r"#\s*pragma\s+(?:GCC\s+)?_?(used|weak|section|retain|common|extern_weak)\b",
+     "pragma that forces a symbol to exist or where it lands: code placement "
+     "and emission are not the programmer's business in a decompilation"),
 
     # --- legitimate somewhere, must be justified here
     ("noinline", "suspect", r"\bnoinline\b|\balways_inline\b",
