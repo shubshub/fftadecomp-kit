@@ -1,9 +1,30 @@
 [
   {
+    "address": "0x08009888",
+    "reason": "needs a *named* base symbol: agbcc emits base + separate pool offsets only for a symbol it cannot see through, and every literal form folds the offsets into the address (36 B, no frame). The symbol form matches the family but leaves R_ARM_ABS32 data relocations that match.py cannot verify. Third function blocked on the linked build.",
+    "released_at": "2026-10-18T08:37:02Z",
+    "who": "opencode",
+    "tried": "literal base + offsets; offsets in u32 locals; wide offsets; four separate literal pointers; six field/store orderings with a symbol base"
+  },
+  {
     "address": "0x0800BC28",
     "reason": "cannot be verified in isolation: the source needs a *named* data symbol (a real 40-byte record table at 0x02009000). That form compiles to the exact 30 bytes but leaves an unresolved pool relocation, which match.py rejects. Same wall as func_0800BC08.",
     "released_at": "2026-10-18T07:41:11Z",
     "who": "opencode",
     "tried": "literal base: 28 B, base lands in r0, no frame; symbol form: exact 30 B but unverifiable without a linked build"
+  },
+  {
+    "address": "0x08135D38",
+    "reason": "two independent blockers. (1) Three dead computations survive only if their loads are branch conditions that outlive reload, which in C means identical if/else arms - rejected by plausible.py as inert control flow. (2) 0x02000000 + 0x2FC2 must stay unfolded, which needs a named symbol and leaves an R_ARM_ABS32 relocation match.py refuses. Same dead-load mechanism as 0x0814862C/0x0814860C; see Parked/08135D38/README.md.",
+    "released_at": "2026-10-18T09:03:23Z",
+    "who": "opencode",
+    "tried": "all -O levels; volatile (banned, and still loses the dead and); literal base+offset, pointer locals, pointer walks, u16/u32 offsets, static arrays; goto/while/do/switch; if(c)X;X;; call and static-inline variants for the frame"
+  },
+  {
+    "address": "0x0814860C",
+    "reason": "ROM contains a dead u16 load (ldrh r0,[r3], overwritten two instructions later). It is what pushes h into r3 and forces the frame; agbcc deletes any unused load, so no plausible C reproduces it. Only inert if/else does, which plausible.py rejects. Same mechanism as 0x0814862C - see Parked/0814860C/README.md.",
+    "released_at": "2026-10-18T08:38:51Z",
+    "who": "opencode",
+    "tried": "~20 spellings for a dead load (all compile to nothing); corrected struct layout gives exact store instructions; inert if/else reaches 22/32 bytes but is rejected"
   }
 ]

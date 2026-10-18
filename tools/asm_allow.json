@@ -1,0 +1,5 @@
+{
+  "_policy": "Addresses whose byte-exact solution is known to require hand-written assembly or a construct no plausible C produces. A match at one of these addresses is reported as HAND-ASM, not MATCH, and never counts as a decompiled function. ONLY the repository maintainer may add an entry. Agents must not add, edit or 'temporarily' whitelist an address - if a function needs this, park it and say so, and the maintainer decides. Entries are never removed once added: an address that has been solved by hand asm stays listed.",
+  "version": 1,
+  "entries": []
+}

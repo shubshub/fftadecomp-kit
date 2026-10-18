@@ -27,6 +27,7 @@ the line above, e.g. a genuine I/O register access:
 """
 
 import argparse
+import json
 import os
 import re
 import sys
@@ -177,6 +178,32 @@ def check_file(path):
     return check_text(text, os.path.basename(path))
 
 
+def asm_allow_path():
+    return os.environ.get("FFTA_ASM_ALLOW") or os.path.join(
+        os.path.dirname(os.path.abspath(__file__)), "asm_allow.json")
+
+
+def asm_allowed(addr):
+    """is this address on the maintainer's hand-asm allow list?
+
+    The list exists so that a function which provably cannot come from
+    plausible C can still be solved, by hand-written assembly, *by decision*
+    rather than by an agent quietly hacking its way to a match.  Only the
+    repository maintainer may add entries; nothing here writes the file.
+    """
+    path = asm_allow_path()
+    if not addr:
+        return None
+    try:
+        doc = json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    for entry in doc.get("entries", []):
+        if str(entry.get("address", "")).upper() == str(addr).upper():
+            return entry
+    return None
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("paths", nargs="+")
@@ -184,9 +211,14 @@ def main():
     ap.add_argument("--strict", action="store_true",
                     help="treat suspect findings as errors too (default: "
                          "suspect findings also fail unless justified)")
+    ap.add_argument("--addr", default=None,
+                    help="the ROM address these sources implement, so the "
+                         "hand-asm allow list can be consulted")
+    ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
     total = 0
+    all_findings = []
     for p in args.paths:
         files = sorted(
             os.path.join(p, f) for f in os.listdir(p)
@@ -197,15 +229,41 @@ def main():
             if not findings:
                 continue
             total += len(findings)
-            print(f"{f}:")
-            for line, rid, sev, msg in findings:
-                print(f"  {os.path.basename(f)}:{line}: {sev.upper()}: {rid}")
-                print(f"      {msg}")
-    if total and not args.quiet:
+            all_findings.extend(
+                {"file": f, "line": l, "rule": r, "severity": s, "message": m}
+                for l, r, s, m in findings)
+            if not args.json:
+                print(f"{f}:")
+                for line, rid, sev, msg in findings:
+                    print(f"  {os.path.basename(f)}:{line}: {sev.upper()}: {rid}")
+                    print(f"      {msg}")
+
+    allowed = asm_allowed(args.addr) if total else None
+    if args.json:
+        print(json.dumps({"findings": all_findings, "total": total,
+                          "addr": args.addr,
+                          "hand_asm_allowed": bool(allowed),
+                          "allow_entry": allowed}, indent=2))
+        return 1 if total else 0
+
+    if total:
         print(f"\n{total} finding(s): the code does not look like something a "
               f"developer would have written", file=sys.stderr)
         print("A byte-identical compile is not a match if the source is "
               "implausible.", file=sys.stderr)
+        if args.addr:
+            if allowed:
+                print(f"\n{args.addr} IS on the hand-asm allow list "
+                      f"({allowed.get('reason', 'no reason recorded')}).",
+                      file=sys.stderr)
+                print("A match here is HAND-ASM, not a decompilation.",
+                      file=sys.stderr)
+            else:
+                print(f"\n{args.addr} is NOT on the hand-asm allow list, so a "
+                      f"match that needs hand asm is not acceptable here.",
+                      file=sys.stderr)
+                print("Park it and say so; only the maintainer may add an "
+                      "entry to tools/asm_allow.json.", file=sys.stderr)
     return 1 if total else 0
 
 

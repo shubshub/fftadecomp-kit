@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 match.py - compile src/<addr>.c and diff it against the ROM bytes.
 
@@ -650,15 +650,25 @@ def main():
     here = os.path.dirname(os.path.abspath(__file__))
     plaus_path = os.path.join(here, "plausible.py")
     findings = ["plausibility checker is missing"]
+    hand_asm_allowed = None
     if os.path.exists(plaus_path):
         lint_targets = [str(path) for path in source_paths(ROOT, addr)]
-        r = subprocess.run([sys.executable, plaus_path, "--quiet"] + lint_targets,
-                           capture_output=True, text=True)
-        findings = [ln for ln in r.stdout.splitlines() if ln.strip()]
-        if r.returncode and not findings:
-            findings = [ln for ln in r.stderr.splitlines() if ln.strip()]
-            if not findings:
-                findings = [f"plausibility checker failed with exit {r.returncode}"]
+        r = subprocess.run(
+            [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
+             "--json"] + lint_targets,
+            capture_output=True, text=True)
+        try:
+            doc = json.loads(r.stdout)
+            findings = [f"{os.path.basename(f['file'])}:{f['line']}: "
+                        f"{f['severity'].upper()}: {f['rule']}"
+                        for f in doc.get("findings", [])]
+            hand_asm_allowed = doc.get("allow_entry")
+        except ValueError:
+            findings = [ln for ln in r.stdout.splitlines() if ln.strip()]
+            if r.returncode and not findings:
+                findings = [ln for ln in r.stderr.splitlines() if ln.strip()]
+                if not findings:
+                    findings = [f"plausibility checker failed with exit {r.returncode}"]
 
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
@@ -671,19 +681,36 @@ def main():
     exact = identical and plausible
     byte_rows = lcs_align(got_body, want)
 
+    # Byte-identical output from source that no developer would write is not a
+    # match.  It is only acceptable at an address the maintainer has explicitly
+    # put on the hand-asm allow list, and then it is reported as HAND-ASM so it
+    # never counts as a decompilation.
+    if exact:
+        verdict = "MATCH - byte identical"
+    elif identical:
+        verdict = ("HAND-ASM (sanctioned) - byte identical, but the source is "
+                   "not code a developer would have written"
+                   if hand_asm_allowed else
+                   "HAND-ASM REQUIRED BUT NOT ALLOWED - byte identical, yet "
+                   f"0x{addr:08X} is not on the hand-asm allow list; park it, "
+                   "and only the maintainer may add it")
+    else:
+        verdict = "NOT MATCHING - bytes differ"
+
     print(f"\ntarget  {want.hex()}")
     print(f"got     {got_body.hex()}"
-          + ("" if len(got) == span else f"   ({len(got)} bytes compiled)"))
+          + ("" if len(got_body) == span else f"   ({len(got_body)} bytes compiled)"))
     print(f"bytes   {'identical' if identical else 'DIFFER'}")
-    print(f"source  {'plausible' if plausible else 'IMPLAUSIBLE'}")
-    print(f"verdict {'MATCH - byte identical' if exact else
-                 ('IMPLAUSIBLE - bytes match but the source is not code a '
-                  'developer would have written' if identical else
-                  'NOT MATCHING - bytes differ')}\n")
+    print(f"source  {'plausible' if plausible else 'IMPLAUSIBLE'}"
+          + ("" if plausible or hand_asm_allowed else " (not on the allow list)"))
+    print(f"verdict {verdict}\n")
     if findings:
         print("plausibility findings:")
         for line in findings:
             print(f"  {line}")
+    if hand_asm_allowed:
+        print(f"\nhand-asm allow entry for 0x{addr:08X}: "
+              f"{hand_asm_allowed.get('reason', 'no reason recorded')}")
 
     ga = [(instruction.address, instruction.size,
            f"{instruction.mnemonic} {instruction.op_str}".strip())
@@ -739,11 +766,9 @@ def main():
             f.write(f"* ROM bytes: `{want.hex()}` ({span} bytes)\n")
             f.write(f"* compiled : `{got_body.hex()}`\n")
             f.write(f"* source plausibility: "
-                    f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n\n")
-            verdict = ("MATCH - byte identical" if exact else
-                       "IMPLAUSIBLE - bytes match but the source is not code a "
-                       "developer would have written" if identical else
-                       "NOT MATCHING - bytes differ")
+                    f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n")
+            f.write(f"* hand-asm allow list: "
+                    f"{'listed (' + str(hand_asm_allowed.get('reason', 'no reason recorded')) + ')' if hand_asm_allowed else 'not listed'}\n\n")
             f.write(f"**{verdict}** - {same_bytes}/{len(want)} bytes\n")
             if findings:
                 f.write("\nplausibility findings:\n\n")
