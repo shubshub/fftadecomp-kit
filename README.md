@@ -241,11 +241,39 @@ provenance in `r0`–`r3`, `r12` and `lr` is invalidated at each call. The verif
 checks the caller's fallthrough paths, joins, saved-stack balance and return
 provenance; it does not certify the callee's behavior or whole-program return.
 
-External data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
+Unmapped data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
 helper functions, self/intra-function calls, tail calls, linker veneers and
 extra allocated sections remain unsupported. These cases fail closed rather
 than receiving a partial match. Existing relocation-free leaf functions retain
 their original verification profile.
+
+### Named data literals
+
+For a known external object address, add an explicit mapping to the decomp
+checkout's `config/data_symbols.json`, for example:
+
+```json
+{"g_tbl": "0x02009000"}
+```
+
+Names must be ordinary C identifiers, not function or call-helper names;
+addresses must be eight-digit hexadecimal strings. Duplicate keys and malformed
+mappings are rejected. The map supplies reviewed addresses, not guessed ones.
+Only undefined external object/notype symbols with `R_ARM_ABS32` relocations
+qualify. Each relocation must occupy a complete aligned word in the function's
+trailing literal pool and be loaded by a reachable PC-relative instruction.
+Signed addends are supported without address wrapping; self-function references,
+overlapping relocations and unconsumed literal words are rejected.
+
+The linker defines typed absolute objects without allocating their contents.
+Each relocated word must equal its address plus addend; no other bytes may
+change, and the entire linked function must still equal the ROM. This works
+with the existing call and fixed-frame profiles. Data reports use
+`elf-symbol-thumb-data-v1` or `elf-symbol-thumb-frame-data-v1` and bind both
+function and data mappings, source, headers and the applicable control-flow
+summary. Mapping changes invalidate cached evidence and interrupt mixed rebuilds.
+These checks establish relocation fidelity, not the safety of dereferencing a
+mapped address. No game data should be copied into the symbol map.
 
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with

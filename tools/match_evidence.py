@@ -11,6 +11,8 @@ CALL_SUMMARY = "direct Thumb BL with ordinary ARM ABI call summaries"
 FRAMED_SCHEMA = "elf-symbol-thumb-frame-v1"
 FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
 STACK_SUMMARY = "fixed Thumb SP adjustments and direct word accesses with return provenance"
+DATA_SCHEMA = "elf-symbol-thumb-data-v1"
+FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
 
 
 def mapping_snapshot(root):
@@ -22,6 +24,13 @@ def mapping_snapshot(root):
 
 def mapping_fingerprint(snapshot):
     return hashlib.sha256(snapshot).hexdigest() if snapshot is not None else None
+
+
+def data_snapshot(root):
+    try:
+        return (Path(root) / "config" / "data_symbols.json").read_bytes()
+    except FileNotFoundError:
+        return None
 
 
 def source_paths(root, address):
@@ -72,8 +81,19 @@ def report_matches(report, root, address):
         profile_valid = (snapshot is not None and
                          f"* mapping SHA-256: `{mapping_fingerprint(snapshot)}`" in lines and
                          f"* control flow: {CALL_SUMMARY}" in lines)
+    if profiles in ([f"* verification: `{DATA_SCHEMA}`"],
+                    [f"* verification: `{FRAMED_DATA_SCHEMA}`"]):
+        functions = mapping_snapshot(root)
+        data = data_snapshot(root)
+        summaries = [line for line in lines if line.startswith("* control flow:")]
+        profile_valid = (functions is not None and data is not None and
+                         f"* mapping SHA-256: `{mapping_fingerprint(functions)}`" in lines and
+                         f"* data symbols SHA-256: `{mapping_fingerprint(data)}`" in lines and
+                         summaries in ([f"* control flow: {CALL_SUMMARY}"],
+                                       ["* control flow: closed leaf CFG"]))
     if profiles in ([f"* verification: `{FRAMED_SCHEMA}`"],
-                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"]):
+                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"],
+                    [f"* verification: `{FRAMED_DATA_SCHEMA}`"]):
         profile_valid = profile_valid and f"* stack frame: {STACK_SUMMARY}" in lines
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
