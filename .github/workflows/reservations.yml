@@ -1,0 +1,43 @@
+name: reservations
+
+# Keeps the address ledger honest: a reservation is a lease, so anything that
+# has been quiet for a few days gets closed automatically and becomes available
+# again.  Without this, one stalled agent can hold an address forever.
+
+on:
+  schedule:
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: quiet days before a reservation is released
+        required: false
+        default: "3"
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  sweep:
+    name: release stale reservations
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: open reservations before
+        run: |
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label reservation --limit 100 \
+            --json number,title,updatedAt --jq '.[] | "  #\(.number) \(.title) (updated \(.updatedAt))"'
+      - name: close the quiet ones
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/reserve.py sweep --days "${{ github.event.inputs.days || 3 }}"
+      - name: open reservations after
+        run: |
+          gh issue list --repo "$GITHUB_REPOSITORY" --state open \
+            --label reservation --limit 100 \
+            --json number,title --jq '.[] | "  #\(.number) \(.title)"'
