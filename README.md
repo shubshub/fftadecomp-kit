@@ -195,6 +195,12 @@ complement are `0x89`. Earlier reports of a scrambled logo and a computed
 `nintendo_logo_ok` and now include `nintendo_logo_sha256` instead of the invalid
 byte-difference count. These checks do not alter the ROM or certify its payload.
 
+Code discovery is bounded to FFTA's documented code region below
+`0x08150000`. Branch/call traversal and prologue scans do not decode packed
+assets beyond that boundary, and instructions may not straddle it. Literal
+data can still be read elsewhere in the ROM. Generated function spans remain
+provisional; this boundary does not prove that every function has been found.
+
 ## The matching harness
 
 `match.py` exists because "close" is not good enough in a matching decomp: it

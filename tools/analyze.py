@@ -34,6 +34,7 @@ except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
 ROM_BASE = 0x08000000
+CODE_END = 0x08150000
 HEADER_LEN = 0xC0          # GBA header (logo, title, code, pointer fields)
 BLK = 0x400                # 4 KiB granularity for the coverage map
 
@@ -152,6 +153,7 @@ class Analyzer:
         self.rom = rom
         self.dec = dec
         self.n = len(rom)
+        self.code_limit = min(self.n, CODE_END - ROM_BASE)
         # coverage: one byte per 4-byte word (size) or 2-byte halfword (thumb)
         self.arm_seen = bytearray((self.n + 3) // 4)
         self.thumb_seen = bytearray((self.n + 1) // 2)
@@ -169,14 +171,17 @@ class Analyzer:
     def in_rom(self, off, size):
         return 0 <= off and off + size <= self.n
 
+    def in_code(self, off, size):
+        return 0 <= off and off + size <= self.code_limit
+
     def prologue_ish(self, off, thumb=False):
         """cheap ARM/Thumb prologue test used to seed candidate functions"""
         if thumb:
-            if off & 1 or not self.in_rom(off, 2):
+            if off & 1 or not self.in_code(off, 2):
                 return False
             w = struct.unpack_from("<H", self.rom, off)[0]
             return (w >> 8) in (0xB4, 0xB5)      # push {rlist[,lr]}
-        if off & 3 or not self.in_rom(off, 4):
+        if off & 3 or not self.in_code(off, 4):
             return False
         w = struct.unpack_from("<I", self.rom, off)[0]
         if (w & 0x0FFF0000) == 0x092D0000:      # stmdb sp!, {regs...}  (ARM push)
@@ -213,7 +218,7 @@ class Analyzer:
             off, thumb, known = stack.pop()
             unit = 2 if thumb else 4
             seen = self.thumb_seen if thumb else self.arm_seen
-            while self.in_rom(off, unit):
+            while self.in_code(off, unit):
                 idx = off // unit
                 if seen[idx]:
                     break
@@ -222,6 +227,9 @@ class Analyzer:
                     ended = "badinsn"
                     break
                 size = info["sz"]
+                if not self.in_code(off, size):
+                    ended = "code-boundary"
+                    break
                 for position in range(off, off + size, unit):
                     seen[position // unit] = 1
                 count += 1
@@ -253,7 +261,7 @@ class Analyzer:
                     else:
                         tthumb = thumb           # b/bl stay in the current mode
                     toff = tgt & ~1
-                    if self.in_rom(toff, 2 if tthumb else 4) and not (not tthumb and toff & 3):
+                    if self.in_code(toff, 2 if tthumb else 4) and not (not tthumb and toff & 3):
                         target = ROM_BASE + toff + int(tthumb)
                         if info["call"]:
                             self.calls[target] += 1
@@ -305,10 +313,13 @@ class Analyzer:
         count = 0
         previous_pop = ()
         ended = "fallthrough"
-        while count < limit and self.in_rom(position, unit):
+        while count < limit and self.in_code(position, unit):
             info = self.dec.thumb_ins(position) if thumb else self.dec.arm_ins(position)
             if info is None:
                 ended = "badinsn"
+                break
+            if not self.in_code(position, info["sz"]):
+                ended = "code-boundary"
                 break
             count += 1
             position += info["sz"]
@@ -350,7 +361,7 @@ class Analyzer:
         added = 0
         for addr in sorted(set(self.calls) | self.entry_targets):
             off = (addr & ~1) - ROM_BASE
-            if off < 0 or off >= self.n or off in self.functions:
+            if not self.in_code(off, 2 if addr & 1 else 4) or off in self.functions:
                 continue
             tthumb = bool(addr & 1)
             n, stop, endby = self.linear_body(off, tthumb)
@@ -373,8 +384,8 @@ class Analyzer:
 
     def scan_candidates(self):
         """Every 4-aligned address that begins with an ARM push prologue."""
-        return [off for off in range(0, self.n - 4, 4)
-                if off >= HEADER_LEN and self.prologue_ish(off, thumb=False)]
+        return [off for off in range(HEADER_LEN, self.code_limit - 3, 4)
+                if self.prologue_ish(off, thumb=False)]
 
     def verify_thumb(self, off, limit=128):
         """Linear-verify a Thumb candidate: push {...lr} ... pop {..,pc}/bx lr.
@@ -386,7 +397,7 @@ class Analyzer:
         flag it as a return, so it is recognised here, otherwise every
         function using that epilogue swallows the next one.
         """
-        if off & 1 or not self.in_rom(off, 2):
+        if off & 1 or not self.in_code(off, 2):
             return None
         h = struct.unpack_from("<H", self.rom, off)[0]
         if (h >> 8) != 0xB5:                # must be `push {rlist, lr}`
@@ -397,9 +408,9 @@ class Analyzer:
         return None
 
     def scan_thumb_functions(self):
-        """Find verified Thumb functions across the whole ROM."""
+        """Find provisional Thumb functions within the FFTA code region."""
         found = 0
-        for off in range(HEADER_LEN, self.n - 2, 2):
+        for off in range(HEADER_LEN, self.code_limit - 1, 2):
             if self.thumb_seen[off // 2]:
                 continue
             r = self.verify_thumb(off)
@@ -428,7 +439,7 @@ class Analyzer:
 
     def scan_arm_functions(self):
         found = 0
-        for off in range(HEADER_LEN, self.n - 4, 4):
+        for off in range(HEADER_LEN, self.code_limit - 3, 4):
             if self.arm_seen[off // 4]:
                 continue
             r = self.verify_arm(off)
