@@ -14,13 +14,20 @@ when a tool needs the decomp repo.
 
 ### 1. Claim the address before you touch a function
 
-Work is parallel; the ledger is **issues in this repository**, one per address,
-labelled `reservation`.
+Work is parallel, and the ledger is **one issue in this repository** — the
+"address ledger" — with a row per claimed address.
 
 ```sh
 python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 3 unmatchable
 python tools/reserve.py claim 0x08011040 --who <you> --note "what you are doing"
+python tools/reserve.py list                     # the whole board
 ```
+
+**The tool pulls this repository before every command**, so you always decide
+against the current ledger and the current `known-unmatchable.json`. If it
+cannot update (dirty checkout, offline), it says so and continues — check the
+message, and if it warned, `git -C ../fftadecomp-kit pull` yourself before
+trusting the result. `--no-pull` skips it.
 
 If `claim` refuses, **the address belongs to another agent — pick a different
 one.** Do not start work on a function somebody else has reserved, and do not
@@ -41,7 +48,21 @@ When you conclude a function cannot be matched, release it with
 in `known-unmatchable.json`, so the next agent skips it instead of repeating
 your dead end.
 
-### 3. Only byte-exact matches, from plausible source, go in `src/`
+### 3. Rebase before you open a PR
+
+```sh
+git -C ../fftadecomp fetch origin
+git -C ../fftadecomp rebase origin/main      # not merge
+git -C ../fftadecomp push --force-with-lease
+```
+
+Matches land as small, linear commits on top of current `main`. A PR branch
+that has fallen behind gets harder to review and the status block and match
+gates in CI are evaluated against a stale base — the `matches` workflow fails
+any PR that does not contain the current `origin/main` tip, and flags one that
+merged main instead of rebasing.
+
+### 4. Only byte-exact matches, from plausible source, go in `src/`
 
 Both gates, checked by `tools/match.py`:
 

@@ -3,36 +3,38 @@
 reserve.py - claim a function address before working on it, so parallel agents
 do not collide.
 
-The kit repository's issues are the ledger.  One open issue per address:
+The kit repository has ONE issue that is the ledger, and every reservation is a
+row in it.  One issue means one place to look, one thing to subscribe to, and
+no issue-list noise as the project grows.
 
-    claim 0x08011040              # reserve it (refuses if someone else has it)
+    claim 0x08011040              # reserve it (refuses if somebody holds it)
     check 0x08011040              # exit 0 free, 1 taken, 3 known unmatchable
-    list                          # every open reservation
-    ping 0x08011040               # I am still on it (bumps the lease)
+    list                          # the whole ledger
+    ping 0x08011040               # still on it; refreshes the lease
     release 0x08011040 --reason "..."
     release 0x08011040 --unmatchable --reason "no flags reproduce this"
-    sweep --days 3                # close reservations nobody touched
+    sweep --days 3                # drop rows nobody has touched
 
 Working agreement
 -----------------
-1. Before touching a function, claim it.  If the claim is refused, pick
-   another address - do not work on one somebody else has.
-2. A reservation is a *lease*, not a land grab: ping it while you work and
-   release it as soon as you stop - including when you conclude the function
-   cannot be matched.  `sweep` (and the weekly workflow) closes anything that
-   has been quiet for a few days, so a stalled agent cannot hold an address.
+1. Before touching a function, claim it.  If the claim is refused, pick another
+   address - do not work on one somebody else holds.
+2. A reservation is a *lease*: ping it while you work and release it as soon as
+   you stop - including when you conclude the function cannot be matched.
+   `sweep` (and the reservations workflow) drops rows quiet for a few days.
 3. `--unmatchable` also records the address in known-unmatchable.json with the
-   reason and the flags tried, so the next agent does not repeat the work.
+   reason and the flags tried, so the next agent does not repeat the dead end.
 
-The machine-readable part of an issue lives in a marker block:
+Every claim and release is also posted as a comment on the ledger, so the audit
+trail survives rows being removed.
 
-    <!-- ffareservation
-    address: 0x08011040
-    name: func_08011040
-    size: 22
-    claimed_by: some-agent
-    claimed_at: 2026-10-18T06:00:00Z
-    -->
+The machine-readable part of the ledger is the table between the markers:
+
+    <!-- ffta-ledger:start -->
+    | address | claimed by | claimed at | last seen | note |
+    |---|---|---|---|---|
+    | 0x08011040 | opencode | 2026-10-18T05:43:46Z | 2026-10-18T06:10:00Z | ... |
+    <!-- ffta-ledger:end -->
 
 Requires the gh CLI, authenticated for the kit repository.
 """
@@ -48,8 +50,9 @@ import time
 
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
-LABEL = "reservation"
-MARKER = "ffareservation"
+LEDGER_TITLE = os.environ.get("FFTA_LEDGER_TITLE", "address ledger")
+START = "<!-- ffta-ledger:start -->"
+END = "<!-- ffta-ledger:end -->"
 STALE_DAYS = 3
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -69,61 +72,148 @@ def sh(*args, check=True):
     return r.stdout.strip()
 
 
-def ensure_label():
+def self_update(quiet=False):
+    """pull the latest kit before touching the ledger.
+
+    The ledger itself lives on GitHub and is always current, but
+    known-unmatchable.json and this script's logic live in the checkout - a
+    stale kit means a stale view of what is known-unmatchable and an old
+    claim/release implementation.  So every command refreshes first.
+    """
+    repo = os.path.dirname(os.path.abspath(HERE))
+    if not os.path.isdir(os.path.join(repo, ".git")):
+        return False
+    r = subprocess.run(["git", "-C", repo, "pull", "--ff-only", "-q"],
+                       capture_output=True, text=True)
+    if r.returncode != 0:
+        if not quiet:
+            print(f"note: could not update {repo} ({r.stderr.strip() or 'not a git checkout'}); "
+                  f"continuing with the local copy", file=sys.stderr)
+        return False
+    if not quiet and r.stdout.strip():
+        print(f"updated kit from origin: {r.stdout.strip()}")
+    return True
+
+
+def now():
+    return datetime.datetime.now(datetime.timezone.utc).replace(
+        microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def parse_ts(ts):
     try:
-        sh("label", "create", LABEL, "--repo", KIT_REPO,
-           "--description", "a claimed decomp address", "--color", "1d76db")
-    except SystemExit:
-        pass          # already there
-
-
-def parse_marker(body):
-    """pull the key/value block out of an issue body"""
-    m = re.search(rf"<!--\s*{MARKER}(.*?)-->", body or "", re.S)
-    if not m:
+        return datetime.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+    except (ValueError, AttributeError):
         return None
-    out = {}
-    for line in m.group(1).splitlines():
-        if ":" in line:
-            k, v = line.split(":", 1)
-            out[k.strip()] = v.strip()
-    return out
 
 
-def reservations(state="open"):
-    out = sh("issue", "list", "--repo", KIT_REPO, "--state", state,
-             "--label", LABEL, "--limit", "200",
-             "--json", "number,title,body,createdAt,updatedAt,url,author")
-    items = json.loads(out or "[]")
-    for it in items:
-        it["meta"] = parse_marker(it.get("body")) or {}
-    return items
+def age_days(ts):
+    t = parse_ts(ts)
+    return None if t is None else (
+        datetime.datetime.now(datetime.timezone.utc) - t).days
 
+
+# ---------------------------------------------------------------- ledger ---
 
 def normalise(addr):
     return f"0x{int(str(addr), 0):08X}"
 
 
-def find(addr, items=None):
-    addr = normalise(addr).upper()
-    for it in (items if items is not None else reservations()):
-        if it["meta"].get("address", "").upper() == addr:
+def ledger(create=False):
+    """the one issue that holds the table"""
+    items = json.loads(sh("issue", "list", "--repo", KIT_REPO, "--state", "open",
+                          "--limit", "100", "--json", "number,title,body,url",
+                          check=False) or "[]")
+    for it in items:
+        if it["title"].strip().lower() == LEDGER_TITLE.lower():
             return it
+    if not create:
+        return None
+    url = sh("issue", "create", "--repo", KIT_REPO,
+             "--title", LEDGER_TITLE, "--body", render([]))
+    number = int(re.search(r"/issues/(\d+)", url).group(1))
+    pin(number)
+    return {"number": number, "title": LEDGER_TITLE,
+            "body": render([]), "url": url}
+
+
+def pin(number):
+    """best effort: pinned issues are the first thing anybody sees"""
+    r = subprocess.run(
+        ["gh", "api", "graphql", "-f",
+         "query=mutation($id:ID!){addPinToIssue(input:{issueId:$id})"
+         "{clientMutationId}}",
+         "-F", f"id=Issue:{number}"],
+        capture_output=True, text=True)
+    return r.returncode == 0
+
+
+def rows_of(body):
+    m = re.search(re.escape(START) + r"(.*?)" + re.escape(END), body or "", re.S)
+    if not m:
+        return []
+    out = []
+    for line in m.group(1).splitlines():
+        if not line.strip().startswith("|"):
+            continue
+        cells = [c.strip() for c in line.strip().strip("|").split("|")]
+        if len(cells) < 5 or not cells[0].lower().startswith("0x"):
+            continue                       # header or separator
+        out.append({"address": normalise(cells[0]), "who": cells[1],
+                    "claimed_at": cells[2], "last_seen": cells[3],
+                    "note": cells[4] if len(cells) > 4 else ""})
+    return out
+
+
+def render(rows):
+    head = [
+        "# Address ledger",
+        "",
+        "Every decomp address somebody is working on, in one place. One row per",
+        "address; a row that goes quiet for 3 days is dropped automatically, so",
+        "an agent that stops working does not keep an address hostage.",
+        "",
+        "```sh",
+        f"python tools/reserve.py check 0x08011040     # 0 free, 1 taken, 3 unmatchable",
+        f"python tools/reserve.py claim 0x08011040 --who <you> --note \"...\"",
+        f"python tools/reserve.py ping 0x08011040      # still on it",
+        f"python tools/reserve.py release 0x08011040 --reason \"...\"",
+        f"python tools/reserve.py release 0x08011040 --unmatchable --reason \"...\" --tried \"...\"",
+        "```",
+        "",
+        "Claim before you touch a function. If a claim is refused, that address",
+        "belongs to another agent - pick a different one.",
+        "",
+        START,
+        "| address | claimed by | claimed at | last seen | note |",
+        "|---|---|---|---|---|",
+    ]
+    body = [f"| {r['address']} | {r['who']} | {r['claimed_at']} | "
+            f"{r['last_seen']} | {r['note']} |" for r in rows]
+    return "\n".join(head + body + [END, ""])
+
+
+def write(rows, comment=None):
+    led = ledger(create=True)
+    sh("issue", "edit", str(led["number"]), "--repo", KIT_REPO,
+       "--body", render(rows))
+    if comment:
+        sh("issue", "comment", str(led["number"]), "--repo", KIT_REPO,
+           "--body", comment)
+    return led
+
+
+def held_by(rows, addr):
+    addr = normalise(addr).upper()
+    for r in rows:
+        if r["address"].upper() == addr:
+            return r
     return None
 
 
-def unmatchable_db():
-    path = os.path.abspath(UNMATCHABLE_DB)
-    if not os.path.exists(path):
-        return path, []
-    try:
-        return path, json.load(open(path, encoding="utf-8"))
-    except (OSError, ValueError):
-        return path, []
-
+# ------------------------------------------------------------ the commands --
 
 def function_meta(root, addr):
-    """size/name from the decomp repo's analysis, when it is available"""
     cfg = os.path.join(root or ".", "config", "functions.json")
     if not os.path.exists(cfg):
         return None
@@ -135,9 +225,18 @@ def function_meta(root, addr):
     for f in fns:
         if int(f["rom"], 16) == a:
             return {"name": f"func_{f['rom'][2:]}",
-                    "size": int(f["end"], 16) - a,
-                    "mode": f.get("mode", "thumb")}
+                    "size": int(f["end"], 16) - a}
     return None
+
+
+def unmatchable_db():
+    path = os.path.abspath(UNMATCHABLE_DB)
+    if not os.path.exists(path):
+        return path, []
+    try:
+        return path, json.load(open(path, encoding="utf-8"))
+    except (OSError, ValueError):
+        return path, []
 
 
 def cmd_claim(args):
@@ -152,54 +251,41 @@ def cmd_claim(args):
             print("Pick another address, or reopen the discussion on that issue.")
             return 3
 
-    held = find(addr)
-    if held:
-        who = held["meta"].get("claimed_by", held["author"]["login"])
-        when = held["meta"].get("claimed_at", held["createdAt"])
-        print(f"{addr} is already reserved by {who} (since {when})")
-        print(f"  {held['url']}")
+    led = ledger(create=True)
+    rows = rows_of(led["body"])
+    existing = held_by(rows, addr)
+    if existing:
+        print(f"{addr} is already reserved by {existing['who']} "
+              f"(since {existing['claimed_at']})")
+        print(f"  ledger: {led['url']}")
         print("Pick another address - do not work on one somebody else holds.")
         return 1
 
     meta = function_meta(args.decomp_root, addr) or {}
-    ensure_label()
-    now = datetime.datetime.now(datetime.timezone.utc).replace(
-        microsecond=0).isoformat().replace("+00:00", "Z")
-    body = f"""Claiming **{addr}** before working on it.
-
-<!-- {MARKER}
-address: {addr}
-name: {meta.get('name', f'func_{addr[2:]}')}
-size: {meta.get('size', 'unknown')}
-claimed_by: {args.who}
-claimed_at: {now}
--->
-
-Working on: {args.note or 'to be determined'}
-
-Lease: ping with `python tools/reserve.py ping {addr}` while working, and
-release with `release {addr} --reason "..."` when finished - or when the
-function turns out to be unmatchable, so somebody else can pick it up.
-
-`tools/reserve.py sweep` closes reservations quiet for {STALE_DAYS} days.
-"""
-    url = sh("issue", "create", "--repo", KIT_REPO,
-             "--title", f"reserve: {addr} {meta.get('name', f'func_{addr[2:]}')}",
-             "--body", body, "--label", LABEL)
-    print(f"reserved {addr}: {url}")
-    print(f"re-run   python tools/reserve.py check {addr}")
+    ts = now()
+    note = " ".join(filter(None, [
+        args.note,
+        f"[{meta.get('size', '?')} B]" if meta.get("size") else "",
+    ]))
+    rows.append({"address": addr, "who": args.who, "claimed_at": ts,
+                 "last_seen": ts, "note": note or "-"})
+    write(rows, f"**claimed {addr}** by `{args.who}` "
+                f"({meta.get('name', '')}). {note}")
+    print(f"reserved {addr} ({meta.get('name', '')})")
+    print(f"ledger:  {led['url']}")
     return 0
 
 
 def cmd_check(args):
     addr = normalise(args.addr)
-    held = find(addr)
-    if held:
-        who = held["meta"].get("claimed_by", held["author"]["login"])
-        print(f"TAKEN    {addr} by {who} since "
-              f"{held['meta'].get('claimed_at', held['createdAt'])}")
-        print(f"         {held['url']}")
-        return 1
+    led = ledger()
+    if led:
+        row = held_by(rows_of(led["body"]), addr)
+        if row:
+            print(f"TAKEN    {addr} by {row['who']} since {row['claimed_at']}"
+                  f" (last seen {row['last_seen']})")
+            print(f"         {led['url']}")
+            return 1
     _, db = unmatchable_db()
     for rec in db:
         if rec["address"].upper() == addr.upper():
@@ -211,61 +297,58 @@ def cmd_check(args):
 
 
 def cmd_list(args):
-    items = reservations("open")
-    if not items:
-        print("no open reservations")
+    led = ledger()
+    if not led:
+        print("no ledger issue yet - claim something to create it")
         return 0
-    now = datetime.datetime.now(datetime.timezone.utc)
-    print(f"{'address':<12} {'claimed by':<18} {'age':>6}  note")
-    for it in sorted(items, key=lambda x: x["meta"].get("claimed_at", "")):
-        m = it["meta"]
-        who = m.get("claimed_by", it["author"]["login"])
-        try:
-            t = datetime.datetime.fromisoformat(
-                m.get("claimed_at", it["createdAt"]).replace("Z", "+00:00"))
-            age = f"{(now - t).days}d"
-        except ValueError:
-            age = "?"
-        note = m.get("note", "")
-        print(f"{m.get('address', '?'):<12} {who:<18} {age:>6}  {note}")
+    rows = rows_of(led["body"])
+    if not rows:
+        print("no reservations")
+        return 0
+    print(f"{'address':<12} {'claimed by':<16} {'age':>4}  note")
+    for r in rows:
+        age = age_days(r["last_seen"])
+        flag = "  <- stale" if age is not None and age >= STALE_DAYS else ""
+        print(f"{r['address']:<12} {r['who']:<16} {age if age is not None else '?':>4}"
+              f"  {r['note']}{flag}")
+    print(f"\n{led['url']}")
     return 0
 
 
 def cmd_ping(args):
     addr = normalise(args.addr)
-    held = find(addr)
-    if not held:
-        print(f"{addr} is not reserved - nothing to ping", file=sys.stderr)
+    led = ledger(create=True)
+    rows = rows_of(led["body"])
+    row = held_by(rows, addr)
+    if not row:
+        print(f"{addr} is not reserved", file=sys.stderr)
         return 1
-    when = datetime.datetime.now(datetime.timezone.utc).isoformat()
-    sh("issue", "comment", str(held["number"]), "--repo", KIT_REPO,
-       "--body", f"still working on {addr} ({when})")
-    print(f"pinged {addr} (#{held['number']})")
+    row["last_seen"] = now()
+    write(rows, f"still working on {addr} (`{row['who']}`) - lease refreshed")
+    print(f"pinged {addr}")
     return 0
 
 
 def cmd_release(args):
     addr = normalise(args.addr)
-    held = find(addr)
-    if not held:
+    led = ledger(create=True)
+    rows = rows_of(led["body"])
+    row = held_by(rows, addr)
+    if not row:
         print(f"{addr} is not reserved", file=sys.stderr)
         return 1
     reason = args.reason or "no reason given"
-    sh("issue", "comment", str(held["number"]), "--repo", KIT_REPO,
-       "--body", f"released {addr}: {reason}")
-    sh("issue", "close", str(held["number"]), "--repo", KIT_REPO,
-       "--reason", "completed" if not args.unmatchable else "not planned")
-    print(f"released {addr} (#{held['number']})")
+    rows = [r for r in rows if r["address"].upper() != addr.upper()]
+    write(rows, f"**released {addr}** (was `{row['who']}`): {reason}")
+    print(f"released {addr} (was {row['who']})")
 
     if args.unmatchable:
         path, db = unmatchable_db()
-        rec = {"address": addr, "reason": reason,
-               "released_at": datetime.datetime.now(datetime.timezone.utc)
-               .replace(microsecond=0).isoformat().replace("+00:00", "Z"),
-               "issue": held["url"]}
+        rec = {"address": addr, "reason": reason, "released_at": now(),
+               "who": row["who"]}
         if args.tried:
             rec["tried"] = args.tried
-        db = [d for d in db if d["address"].upper() != addr] + [rec]
+        db = [d for d in db if d["address"].upper() != addr.upper()] + [rec]
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "w", encoding="utf-8", newline="\n") as f:
             json.dump(sorted(db, key=lambda d: d["address"]), f, indent=2)
@@ -275,35 +358,31 @@ def cmd_release(args):
 
 
 def cmd_sweep(args):
-    items = reservations("open")
-    now = datetime.datetime.now(datetime.timezone.utc)
-    closed = []
-    for it in items:
-        stamp = it.get("updatedAt") or it["createdAt"]
-        try:
-            t = datetime.datetime.fromisoformat(stamp.replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        days = (now - t).days
-        if days < args.days:
-            continue
-        addr = it["meta"].get("address", it["title"])
-        who = it["meta"].get("claimed_by", it["author"]["login"])
-        sh("issue", "comment", str(it["number"]), "--repo", KIT_REPO,
-           "--body", f"auto-released after {days} days without activity "
-                     f"(lease was {STALE_DAYS} days). Claim it with "
-                     f"`python tools/reserve.py claim {addr}` if you are "
-                     f"still working on it.")
-        sh("issue", "close", str(it["number"]), "--repo", KIT_REPO,
-           "--reason", "not planned")
-        closed.append((addr, who, days))
-        time.sleep(0.5)
-    if closed:
-        print(f"auto-released {len(closed)} stale reservation(s):")
-        for addr, who, days in closed:
-            print(f"  {addr}  {who}  {days}d quiet")
-    else:
+    led = ledger()
+    if not led:
+        print("no ledger yet")
+        return 0
+    rows = rows_of(led["body"])
+    dropped = []
+    keep = []
+    for r in rows:
+        age = age_days(r["last_seen"])
+        if age is not None and age >= args.days:
+            dropped.append((r, age))
+        else:
+            keep.append(r)
+    if not dropped:
         print(f"nothing stale (threshold {args.days} days)")
+        return 0
+    summary = "\n".join(
+        f"- **{r['address']}** dropped, held by `{r['who']}` for {age} days "
+        f"without activity" for r, age in dropped)
+    write(keep, f"**swept {len(dropped)} stale reservation(s)** "
+                f"(threshold {args.days} days):\n\n{summary}")
+    print(f"dropped {len(dropped)} stale reservation(s):")
+    for r, age in dropped:
+        print(f"  {r['address']}  {r['who']}  {age}d quiet")
+    time.sleep(0.2)
     return 0
 
 
@@ -314,37 +393,38 @@ def main():
 
     p = sub.add_parser("claim", help="reserve an address")
     p.add_argument("addr")
-    p.add_argument("--who", default=os.environ.get("FFTA_WHO", "agent"),
-                   help="who is claiming it")
+    p.add_argument("--who", default=os.environ.get("FFTA_WHO", "agent"))
     p.add_argument("--note", default="", help="what you intend to do")
-    p.add_argument("--decomp-root", default=os.environ.get("FFTA_ROOT", "."),
-                   help="decomp repo, for the function's name and size")
+    p.add_argument("--decomp-root", default=os.environ.get("FFTA_ROOT", "."))
     p.set_defaults(fn=cmd_claim)
 
     p = sub.add_parser("check", help="is an address free? (0 free, 1 taken, 3 unmatchable)")
     p.add_argument("addr")
     p.set_defaults(fn=cmd_check)
 
-    p = sub.add_parser("list", help="open reservations")
+    p = sub.add_parser("list", help="the whole ledger")
     p.set_defaults(fn=cmd_list)
 
-    p = sub.add_parser("ping", help="bump a reservation you still hold")
+    p = sub.add_parser("ping", help="refresh a reservation you still hold")
     p.add_argument("addr")
     p.set_defaults(fn=cmd_ping)
 
     p = sub.add_parser("release", help="give an address back")
     p.add_argument("addr")
     p.add_argument("--reason", default="")
-    p.add_argument("--unmatchable", action="store_true",
-                   help="also record it in known-unmatchable.json")
+    p.add_argument("--unmatchable", action="store_true")
     p.add_argument("--tried", default="", help="flags/settings already tried")
     p.set_defaults(fn=cmd_release)
 
-    p = sub.add_parser("sweep", help="close reservations nobody touched")
+    p = sub.add_parser("sweep", help="drop rows nobody has touched")
     p.add_argument("--days", type=int, default=STALE_DAYS)
     p.set_defaults(fn=cmd_sweep)
 
+    ap.add_argument("--no-pull", action="store_true",
+                    help="skip the automatic 'git pull' of this repo")
     args = ap.parse_args()
+    if not args.no_pull:
+        self_update()
     return args.fn(args)
 
 
