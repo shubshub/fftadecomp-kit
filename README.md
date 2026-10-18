@@ -16,6 +16,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/rebuild.py` | concatenates the split and checks it reproduces the base ROM byte for byte (also drives armips) |
 | `tools/match.py` | compiles a decompiled function and diffs it against the ROM, instruction by instruction |
 | `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
+| `tools/reserve.py` | claims a function address in this repo's issues, so parallel agents do not collide |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
 Requires Python 3 and capstone. Nothing else is needed for analysis and
@@ -34,6 +35,42 @@ python ../fftadecomp-kit/tools/match.py 0x08017514      # compile src/… and di
 ```
 
 or set `FFTA_ROOT=/path/to/decomp-repo` and call them with no path.
+
+## Reserving an address before you work on it
+
+Several agents can work on the decomp at once, so **every address has to be
+claimed first**, and the claim lives as an issue in *this* repository — one
+issue per address, labelled `reservation`, with a machine-readable marker block
+so the tool can read the ledger.
+
+```sh
+python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 3 unmatchable
+python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
+python tools/reserve.py list                      # who holds what
+python tools/reserve.py ping 0x08011040           # still on it, bumps the lease
+python tools/reserve.py release 0x08011040 --reason "done, moved to src/"
+python tools/reserve.py sweep --days 3            # close anything quiet
+```
+
+### The rules
+
+1. **Claim before you touch a function.** `claim` refuses an address somebody
+   else holds — if it refuses you, pick another address. Do not work on a
+   function another agent has reserved.
+2. **A reservation is a lease, not a land grab.** Ping it while you work.
+   Release it as soon as you stop, including when you conclude the function
+   **cannot** be matched — that is exactly when somebody else should be allowed
+   to try. `sweep` runs every 6 hours via the `reservations` workflow and closes
+   anything quiet for 3 days, so a stalled agent cannot hold an address.
+3. **Release unmatchable addresses, don't hoard them.** `release
+   --unmatchable --reason "..." --tried "<flags>"` closes the reservation *and*
+   records the address in `known-unmatchable.json`, with the reason and the
+   flags already tried. Later agents get told to skip it instead of repeating
+   the same dead end.
+
+`claim` fills in the function's name and size from the decomp repo's analysis
+(`config/functions.json`), so the issue says which function it is without
+anyone having to look it up.
 
 ## Layout it expects
 
