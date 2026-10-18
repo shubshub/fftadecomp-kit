@@ -507,7 +507,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
     decoder.detail = True
     end = address + len(data)
     alignment = 2 if thumb else 4
-    states = {address: (frozenset({ARM_REG_LR}), (), ())}
+    states = {address: (frozenset({ARM_REG_LR}), (), (), ())}
+    caller_clobbered = (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
+                        ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
     pending = [address]
     instructions = {}
     owners = {}
@@ -534,6 +536,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         return_registers = set(states[current][0])
         stack = list(states[current][1])
         aliases = dict(states[current][2])
+        constants = dict(states[current][3])
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
@@ -566,6 +569,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                     raise ValueError("pop reads outside the saved stack frame")
                 for register, saved_slot in zip(registers, stack):
                     aliases.pop(register, None)
+                    constants.pop(register, None)
                     return_registers.discard(register)
                     if saved_slot[0]:
                         return_registers.add(register)
@@ -591,11 +595,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
             returns.add(current)
             successors = ()
         elif calling:
-            if any(register in aliases for register in
-                   (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2, ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)):
+            if any(register in aliases for register in caller_clobbered):
                 raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
-            return_registers.difference_update((ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
-                                               ARM_REG_R3, ARM_REG_R12, ARM_REG_LR))
+            return_registers.difference_update(caller_clobbered)
+            for register in caller_clobbered:
+                constants.pop(register, None)
             stack = [(saved_return and saved_slot, saved_slot)
                      for saved_return, saved_slot in stack]
             successors = (current + instruction.size,)
@@ -634,9 +638,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                         width = widths.get(instruction.mnemonic)
                         if not thumb or not unconditional or instruction.size != 2 or \
                                 width is None or len(operands) != 2 or len(registers) != 1 or \
-                                operands[0].type != ARM_OP_REG or operand.mem.index:
+                                operands[0].type != ARM_OP_REG:
                             raise ValueError("unsupported stack-alias memory access")
                         offset = aliases[operand.mem.base] + operand.mem.disp
+                        if operand.mem.index:
+                            if operand.mem.index not in constants:
+                                raise ValueError("stack-alias index is not a known constant")
+                            offset += constants[operand.mem.index]
                         if offset % width or not -4 * len(stack) <= offset or offset + width > 0:
                             raise ValueError("stack-alias access is unaligned or outside the tracked frame")
                         allowed_aliases.add(operand.mem.base)
@@ -672,9 +680,20 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                             raise ValueError("unsupported stack-frame write")
                 if (set(read) & aliases.keys()) - allowed_aliases:
                     raise ValueError("unsupported stack-alias use or escape")
+                constant = None
+                if thumb and unconditional and instruction.size == 2 and \
+                        instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+                        operands[0].type == ARM_OP_REG:
+                    if operands[1].type == ARM_OP_IMM:
+                        constant = operands[1].imm
+                    elif operands[1].type == ARM_OP_REG:
+                        constant = constants.get(operands[1].reg)
                 return_registers.difference_update(written)
                 for register in written:
                     aliases.pop(register, None)
+                    constants.pop(register, None)
+                if constant is not None:
+                    constants[operands[0].reg] = constant
                 if assignment is not None:
                     aliases[assignment[0]] = assignment[1]
                 if loaded_return is not None:
@@ -683,7 +702,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                 raise ValueError("unproven program-counter stack return")
             successors = (current + instruction.size,)
         edges[current] = successors
-        outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())))
+        outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())),
+                    tuple(sorted(constants.items())))
         for successor in successors:
             previous = states.get(successor)
             if previous is None:
@@ -696,7 +716,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
                 merged = (previous[0] & outgoing[0],
                           tuple((saved[0] and incoming[0], saved[1] and incoming[1])
                                 for saved, incoming
-                                in zip(previous[1], stack)), outgoing[2])
+                                in zip(previous[1], stack)), outgoing[2],
+                          tuple((register, value) for register, value in previous[3]
+                                if constants.get(register) == value))
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)

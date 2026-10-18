@@ -215,8 +215,13 @@ Local-array addresses formed by 16-bit register moves and constant additions
 or subtractions are tracked relative to entry SP. Aligned byte, halfword and
 word accesses through these aliases must stay inside the allocated/pushed
 frame. Partial stores invalidate the affected word's return-address fact.
+Register-indexed accesses, including signed byte/halfword loads, additionally
+require an exact constant established by a 16-bit immediate move or register
+copy. Writes and restoring pops discard constant facts; calls discard them for
+caller-clobbered registers, and joins retain only identical constants present
+on every incoming path. Unknown or arithmetic-derived indices are rejected.
 Alias facts must agree exactly at control-flow joins. Pushing or storing these
-pointers, unsupported pointer arithmetic, indexed accesses, and carrying an
+pointers, unsupported pointer arithmetic, and carrying an
 alias across a call in a caller-clobbered register are rejected. Callee-saved
 aliases survive only under the existing ABI assumption and are cleared when
 their registers are restored by a pop.
