@@ -123,6 +123,29 @@ def justified(text, line_no):
     return False
 
 
+def inert_control_flow(text):
+    """find `if (c) X; else X;` - identical arms, so the test means nothing.
+
+    This is the shape that appeared in a rejected match: the branches store the
+    same value, so the only effect is to make the compiler keep a frame it
+    would otherwise drop.  Semantically it is `X;`, and nobody writes that.
+    """
+    hits = []
+    pat = re.compile(
+        r"\bif\s*\((?P<cond>[^()]*)\)(?P<a>[^;{}]*?)\s*;?\s*else"
+        r"\s*(?P<b>[^;{}]*?)\s*;")
+    for m in pat.finditer(text):
+        a = " ".join(m.group("a").split())
+        b = " ".join(m.group("b").split())
+        if a and a == b:
+            line = text.count("\n", 0, m.start()) + 1
+            hits.append((line, "inert-control-flow", "suspect",
+                         f"`if ({m.group('cond').strip()}) {a}; else {b};` - both "
+                         f"arms do the same thing, so the test exists only to "
+                         f"change the generated code"))
+    return hits
+
+
 def check_text(text, origin=""):
     """returns list of findings: (line, rule, severity, message)"""
     code = strip_comments_and_strings(text)
@@ -134,6 +157,7 @@ def check_text(text, origin=""):
                 continue
             # an inline-asm-looking thing inside a comment is not code
             findings.append((line, rid, sev, msg))
+    findings += inert_control_flow(code)
     # comments are where hackiness gets admitted, so scan them raw too
     for i, raw in enumerate(text.split("\n"), 1):
         if JUSTIFY in raw:
