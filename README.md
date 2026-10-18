@@ -16,7 +16,7 @@ nothing in it is FFTA-specific — point it at any GBA image.
 | `tools/rebuild.py` | concatenates the split and checks it reproduces the base ROM byte for byte (also drives armips) |
 | `tools/match.py` | compiles a decompiled function and diffs it against the ROM, instruction by instruction |
 | `tools/plausible.py` | rejects source that only exists to make bytes match (inline asm, pragma surgery, dead code, `volatile`, steering padding…) |
-| `tools/reserve.py` | claims a function address in this repo's issues, so parallel agents do not collide |
+| `tools/reserve.py` | submits address requests to the single ledger issue and waits for authenticated broker confirmation |
 | `tools/bootstrap.sh` | toolchain setup (Linux/WSL, works without root) |
 
 Requires Python 3 and capstone. Nothing else is needed for analysis and
@@ -43,41 +43,74 @@ claimed first**, and the claim lives in this repository's single **address
 ledger** issue. Each address has its own row in the machine-readable table.
 
 ```sh
-python tools/reserve.py list                         # read the board first
-python tools/reserve.py check 0x08011040          # 0 free, 1 taken, 4 matched,
-                                                # 5 in a PR, 3 unmatchable
+python tools/reserve.py list                    # read the board first
+python tools/reserve.py check 0x08011040        # then check the address
 python tools/reserve.py claim 0x08011040 --who me --note "four strh pairs"
-python tools/reserve.py ping 0x08011040           # still on it, bumps the lease
-python tools/reserve.py release 0x08011040 --reason "done, moved to src/"
-python tools/reserve.py sweep --days 3            # close reservations nobody touched
+python tools/reserve.py ping 0x08011040 --who me
+python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src/"
 ```
 
 ### The rules
 
-1. **Read the ledger, check the address, then claim it — before you touch a
-   function.** Never reserve an address that is already reserved, already
-   matched on the default branch, or already matched in an open PR. `check`
-   reports which of those it is (exit 0/1/4/5/3), and `claim` refuses them all
-   anyway — it re-reads the ledger after writing so two agents claiming at the
-   same instant cannot both win. Coordinate with the author of an open PR
-   rather than duplicating work already in review.
+1. **Read the ledger, check the address, then claim it.** Never reserve an
+   address already reserved, matched on the decomp default branch, or covered
+   by an open decomp PR. Both the client and broker check these conditions;
+   coordinate with an existing PR's author rather than duplicating work.
+   Start only after `claim` prints
+   `ACCEPTED` and exits zero. A free `check`, a posted request, or a timeout is
+   not a reservation. If another agent holds it, pick another address. Multiple
+   addresses can be claimed separately in the same issue; each needs acceptance.
 2. **A reservation is a lease, not a land grab.** Ping it while you work.
    Release it as soon as you stop, including when you conclude the function
    **cannot** be matched — that is exactly when somebody else should be allowed
-   to try. `sweep` runs every 6 hours via the `reservations` workflow and drops
-   anything quiet for 3 days, so a stalled agent cannot hold an address.
+   to try. The `reservations` workflow drains requests and expires rows quiet
+   for 3 days; a scheduled run also does this every 6 hours.
 3. **Release unmatchable addresses, don't hoard them.** `release
-   --unmatchable --reason "..." --tried "<flags>"` releases the reservation *and*
-   records the address in `known-unmatchable.json`, with the reason and the
-   flags already tried. Later agents get told to skip it instead of repeating
-   the same dead end.
+   --unmatchable --reason "..." --tried="-O1..-O3"` requests release and leaves
+   the evidence in its comment for maintainer review. It does not write
+   `known-unmatchable.json`; an accepted database change still needs review.
 
-`claim` fills in the function's name and size from the decomp repo's analysis
-(`config/functions.json`), so the ledger records its size. Commands pull the
-kit first; investigate update warnings rather than trusting a stale client.
-`--no-pull` skips this update when the checkout has already been synchronized.
-The current table-writing commands require permission to edit the ledger issue;
-an update failure does not create a reservation.
+Clients require authenticated `gh` access to post comments, not permission to
+edit another person's issue. The trusted workflow is the only ledger writer.
+It binds ownership to the comment author's numeric GitHub ID and the original
+claim request ID, not the display label. Use distinct `--who` labels for agents
+sharing an account, and pass `--claim-id <id>` to `ping` or `release` when the
+caller needs to guard a specific claim generation. Without `--who`, those
+commands infer the current lane only after checking the authenticated account.
+
+Requests wait up to 120 seconds by default (`--wait`, maximum 300). Exit status
+is 0 for confirmed acceptance, 1 for a rejected/taken address, 2 for an
+operational error, 3 for a locally recorded unmatchable address, 4 for already
+matched source, 5 for an open PR, or 6 for an **UNCONFIRMED** submission or
+acknowledgement. On exit 6, inspect the ledger
+before retrying; the request may still be processed. Do not start matching.
+
+Commands attempt a fast-forward pull first; investigate update warnings rather
+than trusting a stale client. `--no-pull` skips this update when the checkout has
+already been synchronized. When changing reservation protocols, explicitly pull
+and restart all clients: an already loaded old process still contains old code.
+
+### Deploying the reservation broker
+
+The updated `reservations` workflow must be merged into this repository's
+default branch and enabled before requests can be accepted. It uses
+`issues: write`, `contents: read`, and `pull-requests: read`, checks out the trusted default branch,
+and handles request comments on issue #50, scheduled expiry, and manual runs
+through one concurrency group. Each run drains the durable comment backlog,
+so replacement of a pending workflow run does not discard its requests.
+
+Retire old direct-writing clients before deployment. Legacy rows keep their
+visible labels and timestamps, but have no authenticated owner: they cannot
+be adopted by matching a label. They remain reserved until normal expiry or
+maintainer reconciliation. Manual ledger maintenance must pause all writers;
+GitHub issue edits do not provide compare-and-swap protection.
+
+The broker retains 64 recent receipts and at most 256 rows, accepts requests up
+to 2 KiB, and limits its rendered issue body to 60,000 UTF-8 bytes. Capacity
+errors fail closed without dropping rows. An evicted receipt is unconfirmed,
+not success. The visible table and hidden state must agree; edit neither while
+the broker is running. This protocol does not grant contributors repository
+write access or create separate reservation issues.
 
 Rebase contribution branches onto current `origin/main` before opening a PR;
 do not merge main into the contribution branch. See `AGENTS.md` for the rules.
