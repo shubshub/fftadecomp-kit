@@ -272,8 +272,25 @@ def main():
         return int(f["end"], 16) - k
     twins = [v for v in sigs.values() if len(v) > 1 and size_of(v[0]) >= 16]
 
-    # 4. call-graph cohesion: functions that call each other, transitively
-    #    grouped, used only to score, never to merge on its own
+    # 4. RAM locality.  The game laid its subsystems out contiguously:
+    #    0x0200F370..0x0200F4A8 is 16 globals in 0x140 bytes and all one
+    #    subsystem, but shared-global matching alone splits it into four
+    #    clusters.  Globals in the same 0x100 page belong together.
+    for base in list(base_groups):
+        if not 0x02000000 <= base < 0x04000000:
+            continue
+        page = [b for b in base_groups
+                if 0x02000000 <= b < 0x04000000 and b >> 8 == base >> 8]
+        if len(page) < 2:
+            continue
+        anchors = [b for b in page if len(base_groups[b]) >= 3]
+        if not anchors:
+            continue
+        hub = max(anchors, key=lambda b: len(base_groups[b]))
+        for b in page:
+            for m in base_groups[b]:
+                sets.union(base_groups[hub][0], m)
+
     clusters = defaultdict(list)
     for key in nodes:
         clusters[sets.find(key)].append(key)
@@ -311,24 +328,68 @@ def main():
     out("after, and a wrong confident name is worse than func_080C15DC.")
     out()
 
-    out("## Largest clusters")
+    def carve(members, gap=0x100):
+        """split addresses into runs that are contiguous in the ROM"""
+        runs = []
+        for m in sorted(members):
+            if runs and m - runs[-1][-1] <= gap:
+                runs[-1].append(m)
+            else:
+                runs.append([m])
+        return runs
+
+    out("## Subsystems")
     out()
-    out("| functions | bytes | matched | shared globals | cyc | proposed file |")
+    out("Memory layout and link order are different things, and keeping them")
+    out("apart is the trick.  RAM globals sit in contiguous blocks - one")
+    out("subsystem is 0x0200F370..0x0200F4A8 - but a source file lands")
+    out("contiguously in the *ROM*, and a subsystem is many files.  So globals")
+    out("find the subsystem and ROM contiguity carves the files out of it.")
+    out()
+    out("| subsystem | funcs | bytes | files | matched | globals |")
     out("|---|---|---|---|---|---|")
     for members in multi[:a.top]:
-        roots = sorted(sets.find(m) for m in members)
         cluster_set = set(members)
         bases = sorted({b for b in base_groups
                         for m in by_base[b] if m in cluster_set})
-        in_cycle = sum(1 for m in members
-                       if any(set(c) == set(members) for c in cycles))
-        first = min(members)
-        name = f"module_{first & 0xFFFFF0:06X}.c"
+        size = sum(int(x["end"], 16) - int(x["rom"], 16) for x in funcs
+                   if int(x["rom"], 16) in cluster_set)
+        pages = sorted({b >> 8 for b in bases if 0x02000000 <= b < 0x04000000})
+        where = ", ".join(f"0x{p << 8:08X}" for p in pages) or "rom"
         got = sum(1 for m in members if f"{m:08X}" in matched)
-        out(f"| {len(members)} | "
-            f"{sum(int(x['end'],16)-int(x['rom'],16) for x in funcs if int(x['rom'],16) in set(members)):,} | "
-            f"{got} | {', '.join(f'0x{b:08X}' for b in bases[:2]) or '-'} | "
-            f"{'yes' if in_cycle else '-'} | `{name}` |")
+        out(f"| `{where}` | {len(members)} | {size:,} | {len(carve(members))} | "
+            f"{got} | {', '.join(f'0x{b:08X}' for b in bases[:2]) or '-'} |")
+
+    out()
+    out("## File candidates")
+    out()
+    out("Runs of 3+ functions, contiguous in the ROM - these are the things "
+        "that")
+    out("should become files.  Scattered runs are a shared struct, not a "
+        "module.")
+    out()
+    out("| file | funcs | bytes | matched | globals | members |")
+    out("|---|---|---|---|---|---|")
+    files = []
+    for members in multi:
+        cluster_set = set(members)
+        for run in carve(members):
+            if len(run) < 3:
+                continue
+            bases = sorted({b for b in base_groups
+                            for m in by_base[b] if m in cluster_set})
+            size = sum(int(x["end"], 16) - int(x["rom"], 16) for x in funcs
+                       if int(x["rom"], 16) in set(run))
+            got = sum(1 for m in run if f"{m:08X}" in matched)
+            files.append((run, size, got, bases))
+    files.sort(key=lambda f: -f[1])
+    for run, size, got, bases in files[:25]:
+        name = f"module_{min(run) & 0xFFFFF0:06X}.c"
+        head = ", ".join(f"0x{m:08X}" for m in run[:3])
+        more = "" if len(run) <= 3 else f" +{len(run) - 3}"
+        out(f"| `{name}` | {len(run)} | {size:,} | {got} | "
+            f"{', '.join(f'0x{b:08X}' for b in bases[:2]) or '-'} | "
+            f"{head}{more} |")
 
     out()
     out("## Identical code")
