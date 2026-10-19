@@ -27,6 +27,7 @@ img.shields.io/endpoint?url=... .
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -128,7 +129,8 @@ def collect(root, verify, quiet=False, write_reports=False):
 
     src_dir = os.path.join(root, "src")
     matched_f, matched_b, problems = 0, 0, []
-    for name in sorted(os.listdir(src_dir)) if os.path.isdir(src_dir) else []:
+    for path in sorted(Path(src_dir).rglob("*.c")) if os.path.isdir(src_dir) else []:
+        name = path.name
         if not name.endswith(".c"):
             continue
         addr = name[:-2].upper()

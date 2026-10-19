@@ -30,6 +30,7 @@ import struct
 import subprocess
 import sys
 from contextlib import contextmanager
+from pathlib import Path
 from match_evidence import (CALL_SUMMARY, DATA_SCHEMA, FRAMED_DATA_SCHEMA,
                             FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA, LINKED_SCHEMA,
                             SCHEMA, STACK_SUMMARY, data_snapshot, mapping_fingerprint,
@@ -859,10 +860,16 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
-    src_rel = f"src/{addr:08X}.c"
-    src_abs = os.path.join(ROOT, "src", f"{addr:08X}.c")
-    if not os.path.exists(src_abs):
-        sys.exit(f"no source at {src_abs}")
+    # one file per function, grouped into folders by module - the folder is
+    # evidence, not decoration, so look for the source rather than assuming it
+    # sits at the top of src/
+    candidates = [os.path.join(ROOT, "src", f"{addr:08X}.c")]
+    for path in sorted(Path(ROOT, "src").rglob(f"{addr:08X}.c")):
+        candidates.append(str(path))
+    src_abs = next((c for c in candidates if os.path.exists(c)), None)
+    if not src_abs:
+        sys.exit(f"no source for 0x{addr:08X} under src/")
+    src_rel = os.path.relpath(src_abs, ROOT).replace(os.sep, "/")
     fingerprint = source_fingerprint(ROOT, addr)
     mapping = mapping_snapshot(ROOT)
     data_mapping = data_snapshot(ROOT)

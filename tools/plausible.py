@@ -29,6 +29,7 @@ the line above, e.g. a genuine I/O register access:
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import sys
 
@@ -232,8 +233,8 @@ def main():
     all_findings = []
     for p in args.paths:
         files = sorted(
-            os.path.join(p, f) for f in os.listdir(p)
-            if f.endswith(".c") or f.endswith(".h")) \
+            str(q) for q in Path(p).rglob("*")
+            if q.is_file() and q.suffix in (".c", ".h")) \
             if os.path.isdir(p) else [p]
         for f in files:
             findings = check_file(f)

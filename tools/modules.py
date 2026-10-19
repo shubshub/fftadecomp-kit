@@ -37,6 +37,7 @@ import argparse
 import json
 import os
 import struct
+from pathlib import Path
 from collections import defaultdict
 
 ROM_BASE = 0x08000000
@@ -177,6 +178,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT", "../fftadecomp"))
     ap.add_argument("--out", help="write the report here")
+    ap.add_argument("--moves", action="store_true",
+                    help="include a git-mv plan for grouped sources")
     ap.add_argument("--min-cluster", type=int, default=2)
     ap.add_argument("--top", type=int, default=40)
     a = ap.parse_args()
@@ -186,8 +189,8 @@ def main():
     funcs = json.load(open(os.path.join(root, "config", "functions.json")))
     funcs = [f for f in funcs
              if f.get("mode") == "thumb" and ROM_BASE <= int(f["rom"], 16) < ROM_END]
-    matched = {f[:-2] for f in os.listdir(os.path.join(root, "src"))
-               if f.endswith(".c")}
+    matched = {q.stem for q in
+               Path(root, "src").rglob("*.c")}
 
     # A pool word is only evidence of a global if it could *be* one.  Word
     # alignment matters: this ROM is full of small constants (0x54BA and
@@ -423,6 +426,45 @@ def main():
     for base, members in sorted(base_groups.items(), key=lambda kv: -len(kv[1]))[:25]:
         sample = ", ".join(f"0x{m:08X}" for m in sorted(members)[:4])
         out(f"| `0x{base:08X}` | {len(members)} | {sample} |")
+
+    if a.moves:
+        out("## Move plan")
+        out()
+        out("One file per function stays - agbcc compiles each source on its own "
+            "and")
+        out("match.py depends on that.  The folders are grouping: where the ROM "
+            "evidence")
+        out("says several functions were one source file, they live together.")
+        out()
+        moves = []
+        for members in multi:
+            member_set = set(members)
+            bases = sorted({b for b in base_groups
+                            for m in by_base[b] if m in member_set})
+            # Name the folder for the subsystem, not for one contiguous run.
+            # A run boundary is a guess about where the original file ended;
+            # the RAM page is evidence about where the game's state lives, and
+            # it does not move as more functions turn up.  Splitting one
+            # subsystem across two folders because a run gap crossed 0x100
+            # would be churn dressed up as structure.
+            pages = [(len(by_base[b]), b >> 8) for b in bases
+                     if 0x02000000 <= b < 0x04000000]
+            if pages:
+                folder = f"{max(pages)[1]:05x}"
+            else:
+                folder = f"{min(members) & 0xFFF000:06x}"
+            for m in sorted(member_set):
+                src = Path(root, "src", f"{m:08X}.c")
+                if src.exists():
+                    moves.append((f"src/{m:08X}.c",
+                                  f"src/{folder}/{m:08X}.c", folder))
+        if not moves:
+            out("    (no source files fall in a candidate run)")
+        for old, new, folder in moves:
+            out(f"    {old}  ->  {new}")
+        out(f"\n    {len(moves)} file(s) in {len({m[2] for m in moves})} "
+            f"folder(s); the rest of src/ stays flat until evidence says "
+            f"otherwise.")
 
     if a.out:
         path = a.out if os.path.isabs(a.out) else os.path.join(root, a.out)

@@ -43,6 +43,7 @@ Set FFTA_PUSH_DRY=1 to disable the actual push without using --check-only.
 import argparse
 import json
 import os
+from pathlib import Path
 import re
 import subprocess
 import sys
@@ -158,7 +159,7 @@ def check_reports(root):
         log("    ok: no src/ directory")
         return True
     problems = []
-    names = sorted(f for f in os.listdir(src) if f.endswith(".c"))
+    names = sorted(p.name for p in Path(src).rglob("*.c"))
     for name in names:
         addr = name[:-2]
         path = os.path.join(reports, f"{addr}.md")
@@ -320,7 +321,7 @@ def check_reports_old_unused(repo):
         log("    ok: no src/ directory")
         return True
     problems = []
-    names = sorted(f for f in os.listdir(src) if f.endswith(".c"))
+    names = sorted(p.name for p in Path(src).rglob("*.c"))
     for name in names:
         addr = name[:-2]
         path = os.path.join(reports, f"{addr}.md")

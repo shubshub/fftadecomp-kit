@@ -35,7 +35,7 @@ def data_snapshot(root):
 
 def source_paths(root, address):
     root = Path(root)
-    paths = {root / "src" / f"{address:08X}.c"}
+    paths = {q for q in (root / "src").rglob(f"{address:08X}.c")}
     include = root / "include"
     if include.is_dir():
         paths.update(path for path in include.rglob("*") if path.is_file())
@@ -66,7 +66,9 @@ def verify_dependencies(preprocessed, root, address):
         if dependency not in allowed:
             raise ValueError(f"untracked include dependency: {name}; move shared inputs under include/")
         observed.add(dependency)
-    if (Path(root) / "src" / f"{address:08X}.c").resolve() not in observed:
+    observed = {Path(p).resolve() for p in observed}
+    if not any(q.resolve() in observed
+           for q in (Path(root) / "src").rglob(f"{address:08X}.c")):
         raise ValueError("preprocessor output lacks source dependency markers; do not use -P")
 
 
