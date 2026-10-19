@@ -744,8 +744,27 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None):
         raise ValueError("reachable control-flow region has no path to a verified return")
     code_end = max(instruction.address + instruction.size
                    for instruction in instructions.values())
-    if any(literal % 4 or literal < code_end or literal + 4 > end for literal in literals):
-        raise ValueError("literal read is outside the function's trailing pool")
+    # A literal pool is usually trailing, but agbcc interleaves it when a
+    # switch has enough arms: each 'ldr rX,=const' gets its own word between the
+    # case bodies, and the ROM has it there too, so no source variation avoids
+    # it.  'Literal must sit after the last instruction' is therefore the wrong
+    # rule - it is the trailing-pool assumption, and an interior word always
+    # fails it.
+    #
+    # The real test is whether a literal could be confused with code.  A pool
+    # word is skipped by a branch or stepped over by a fallthrough, so it never
+    # appears in the reachable instruction set; requiring alignment and
+    # non-overlap with that set distinguishes it from a mis-decode.
+    reachable = set()
+    for instruction in instructions.values():
+        reachable.update(range(instruction.address,
+                               instruction.address + instruction.size))
+    for literal in sorted(literals):
+        if literal % 4 or literal < address or literal + 4 > end:
+            raise ValueError("literal read is not an aligned word inside the "
+                             "function")
+        if any(a in reachable for a in range(literal, literal + 4)):
+            raise ValueError("literal read overlaps reachable code")
     return [instructions[current] for current in sorted(instructions)]
 
 
