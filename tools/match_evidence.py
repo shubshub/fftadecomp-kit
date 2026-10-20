@@ -18,6 +18,8 @@ FUNCTION_ADDRESS_SCHEMA = "elf-symbol-thumb-function-addresses-v1"
 FUNCTION_ADDRESS_SUMMARY = "zero-addend mapped Thumb function literals; relocation fidelity, not callback ABI"
 SWITCH_SCHEMA = "elf-symbol-thumb-switches-v1"
 SWITCH_SUMMARY = "one unsigned-guarded local Thumb word table with verified predecessor edges"
+SWITCH_DATA_SCHEMA = "elf-symbol-thumb-switch-data-v1"
+SWITCH_DATA_SUMMARY = "one guarded local Thumb table with one reachable interposed mapped object word"
 BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
 BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
@@ -197,13 +199,24 @@ def switch_fingerprint(address, data, manifest):
     return digest.hexdigest()
 
 
-def switch_report_matches(lines, root, address):
+def switch_data_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (SWITCH_DATA_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, switch_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def switch_report_matches(lines, root, address, *, data_profile=False):
     from match import verify_switches
 
     def single(prefix):
-        matches = [line for line in lines if line.startswith(prefix)]
-        if len(matches) != 1:
-            raise ValueError("missing or duplicate switch evidence")
+        marker = prefix.rstrip(" :") if data_profile else prefix
+        matches = [line for line in lines
+                   if (line.lstrip() if data_profile else line).startswith(marker)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate switch evidence")
         return matches[0][len(prefix):]
 
     def unquote(prefix):
@@ -222,17 +235,29 @@ def switch_report_matches(lines, root, address):
 
     try:
         mapping = mapping_snapshot(root)
+        objects = data_snapshot(root) if data_profile else None
+        summary = SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY
+        excluded = ("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:",
+                    "* function addresses:", "* function address manifest:",
+                    "* function address proof SHA-256:")
+        if data_profile:
+            if single("* verification: ") != f"`{SWITCH_DATA_SCHEMA}`":
+                return False
+            excluded = tuple(prefix.rstrip(":") for prefix in excluded)
         if mapping is None or \
                 unquote("* source SHA-256: ") != source_fingerprint(root, address) or \
                 unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
-                single("* switches: ") != SWITCH_SUMMARY or \
+                single("* switches: ") != summary or \
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                any(line.startswith(("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:",
-                                     "* data symbols SHA-256:", "* function addresses:",
-                                     "* function address manifest:", "* function address proof SHA-256:"))
+                any((line.lstrip() if data_profile else line).startswith(excluded)
                     for line in lines):
+            return False
+        if data_profile:
+            if objects is None or unquote("* data symbols SHA-256: ") != mapping_fingerprint(objects):
+                return False
+        elif any(line.startswith("* data symbols SHA-256:") for line in lines):
             return False
         encoded = unquote("* compiled : ")
         if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
@@ -243,11 +268,13 @@ def switch_report_matches(lines, root, address):
         if switch_manifest(manifest) != encoded_manifest:
             return False
         rom = (Path(root) / "baserom.bin").read_bytes()
-        _, control_flow = verify_switches(data, address, rom, mapping, manifest)
+        _, control_flow = verify_switches(data, address, rom, mapping, manifest,
+                                         data_mapping=objects)
+        fingerprint = switch_data_fingerprint if data_profile else switch_fingerprint
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
-                unquote("* switch proof SHA-256: ") == switch_fingerprint(address, data, manifest))
+                unquote("* switch proof SHA-256: ") == fingerprint(address, data, manifest))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
         return False
 
@@ -313,6 +340,8 @@ def legacy_report_control_flow(lines, root, address, profile):
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{SWITCH_DATA_SCHEMA}`"]:
+        return switch_report_matches(lines, root, address, data_profile=True)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:
         return switch_report_matches(lines, root, address)
     if any(line.startswith(("* switches:", "* switch manifest:", "* switch proof SHA-256:"))

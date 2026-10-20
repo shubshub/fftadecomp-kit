@@ -521,6 +521,33 @@ continue rejecting local section relocations without explicit switch support.
 This profile does not establish source plausibility or callee behavior; those
 retain their existing independent checks.
 
+The distinct `elf-symbol-thumb-switch-data-v1` profile permits one specific
+mixed-data layout: exactly one aligned, explicitly mapped object-address word
+immediately follows the five-instruction dispatch, followed by the local
+table pointer and then its adjacent table. The pointer is fourteen bytes
+after the dispatch start. No other gap, extra object relocation or generalized
+pool placement is admitted. The original switches-v1 profile and default
+binding APIs retain their object-relocation exclusion.
+
+The object word must have a unique named undefined global binding and a valid
+signed addend, and a reachable aligned PC-relative word load must read it.
+The object address cannot point inside the caller. Typed linking validates
+the complete object word, local pointer, case entries and ordinary direct
+calls; it still rejects changes outside those relocation ranges. The CFG
+reserves all relocated words as data before decoding and applies the existing
+guard, predecessor, return-provenance and stack-balance checks. Frames, buffer
+proofs, runtime thunks, callbacks, indirect calls and multiple switches remain
+unsupported.
+
+New-profile reports contain canonical `calls`, `data` and `switch` evidence,
+including the object's offset, name and signed addend. A separate versioned
+fingerprint binds the address, complete bytes and manifest. Replay requires
+current source/header, function-map and object-map fingerprints, reconstructs
+the proof and compares the complete mapped span against the current ROM.
+Missing, duplicate, malformed, stale or mixed-profile evidence is rejected.
+This proves relocation and bounded control-flow fidelity, not object bounds,
+source plausibility or downstream helper behavior.
+
 Legacy cached reports now also require complete compiled/ROM byte evidence,
 the current matching ROM, and a unique mapped caller instruction mode. Their
 existing CFG verifier runs without switch support, using mapped direct-call
