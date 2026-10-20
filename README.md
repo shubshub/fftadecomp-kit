@@ -340,6 +340,42 @@ Missing ROM, changed dependencies and invalid proof metadata make these reports
 uncountable, including during an otherwise offline status check. Existing
 verification schemas retain their original evidence requirements.
 
+### Stack-passed buffer arguments
+
+The separate `elf-symbol-thumb-frame-buffer-calls-v2` profile additionally
+tracks aligned, full-word pointer stores to definitely allocated local stack
+words. The pointer must also target allocated local storage, never a pushed
+save slot. Reloading a pointer-bearing word restores its register alias;
+partial reads or writes of that word are rejected. A full scalar-word overwrite
+clears the slot's pointer provenance. Deallocating and reallocating storage does
+not clear that provenance, and a later call with an uncleared pointer slot
+outside the current local frame is rejected.
+
+Every still-live pointer slot is checked at each later call, including stale
+arguments. Callee SP-relative loads are interpreted relative to its incoming
+SP, accounting for all verified pushes, pops and fixed frame adjustments.
+Nested calls receive the same known incoming slots at their shifted offsets;
+there is no assumed argument count that hides higher stack slots. Buffer reads
+or writes overlapping a pointer-bearing argument word are rejected rather than
+silently changing its meaning. Spilling an incoming buffer pointer within an
+inspected callee remains unsupported.
+
+Register and slot joins conservatively retain a pointer that is present on
+either path. Different possible offsets for the same register or slot remain
+unsupported. Inspected callees may return buffer aliases in `r0`–`r3` or `r12`;
+the caller receives those possible aliases instead of treating those registers
+as pointer-free. Subsequent uses require the same bounds and escape checks.
+Aliases in unrestored callee-saved registers, local-frame pointer returns,
+control-register aliases and unproven return addresses are rejected.
+
+The matcher tries the existing profiles first. A successful version-2 retry
+requires an inspected buffer call and uses its own profile and summary; it does
+not broaden version-1 evidence. The complete caller and inspected ROM spans are
+bound and replayed as above. The ordinary ABI assumptions still apply, and
+combined named data relocations, block transfers, interrupts and indirect-call
+dependencies remain unsupported. A proved output-buffer call alone does not
+admit a caller whose later stale-argument or local-buffer calls cannot be proved.
+
 ### Named data literals
 
 For a known external object address, add an explicit mapping to the decomp
