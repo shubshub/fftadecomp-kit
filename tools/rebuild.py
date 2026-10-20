@@ -58,7 +58,7 @@ def source_inventory(root):
     for path in sorted(source_dir.rglob("*")):
         if path.suffix.lower() != ".c":
             continue
-        if path.parent != source_dir or not path.is_file() or \
+        if not path.is_file() or \
                 not re.fullmatch(r"[0-9A-F]{8}\.c", path.name):
             raise ValueError(f"invalid addressed source: {path.relative_to(root)}")
         address = int(path.stem, 16)
@@ -67,7 +67,7 @@ def source_inventory(root):
         inventory[address] = source_fingerprint(root, address)
     if not inventory:
         raise ValueError("compiled rebuild requires at least one addressed source")
-    return inventory
+    return dict(sorted(inventory.items()))
 
 
 def output_path(root, requested):
