@@ -290,6 +290,10 @@ require an exact constant established by a 16-bit immediate move or register
 copy. Writes and restoring pops discard constant facts; calls discard them for
 caller-clobbered registers, and joins retain only identical constants present
 on every incoming path. Unknown or arithmetic-derived indices are rejected.
+The same exact constants permit the 16-bit `add Rd, sp, Rd` form for low
+registers `r0`–`r7`, producing an alias bounded by the existing frame checks.
+High-register destinations, shifted or wider additions, and register-controlled
+SP writes are not supported by this extension.
 Alias facts must agree exactly at control-flow joins. Pushing or storing these
 pointers, unsupported pointer arithmetic, and carrying an
 alias across a call in a caller-clobbered register are rejected by these

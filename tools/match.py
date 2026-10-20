@@ -823,8 +823,19 @@ def register_alias_assignment(instruction, aliases):
     return operands[0].reg, aliases[source] + displacement, source
 
 
-def stack_alias_assignment(instruction, aliases, depth):
+def stack_alias_assignment(instruction, aliases, depth, constants):
     assignment = register_alias_assignment(instruction, {**aliases, ARM_REG_SP: -4 * depth})
+    operands = instruction.operands
+    if assignment is None and instruction.size == 2 and instruction.mnemonic == "add" and \
+            instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and len(operands) == 3 and \
+            all(operand.type == ARM_OP_REG and not operand.shift.type and
+                not operand.shift.value and not operand.subtracted for operand in operands):
+        destination = operands[0].reg
+        if ARM_REG_R0 <= destination <= ARM_REG_R0 + 7 and \
+                instruction.bytes == bytes((0x68 + destination - ARM_REG_R0, 0x44)) and \
+                operands[1].reg == ARM_REG_SP and operands[2].reg == destination and \
+                destination in constants:
+            assignment = (destination, constants[destination] - 4 * depth, ARM_REG_SP)
     if assignment is None:
         return None
     offset = assignment[1]
@@ -1178,7 +1189,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
                     raise ValueError("unsupported stack-pointer adjustment")
-                assignment = stack_alias_assignment(instruction, aliases, len(stack)) if thumb else None
+                assignment = stack_alias_assignment(instruction, aliases, len(stack), constants) if thumb else None
                 if ARM_REG_SP in registers and assignment is None:
                     raise ValueError("unsupported stack-address materialization")
                 if ARM_REG_PC in registers:
