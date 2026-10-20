@@ -629,6 +629,74 @@ mode are intentionally no longer accepted. Existing schema names are unchanged;
 complete valid Thumb and ARM reports remain supported. Provisional legacy
 mapping extents are not substituted for the complete compiled symbol.
 
+### Preloaded guarded Thumb switches
+
+The distinct `elf-symbol-thumb-preloaded-switch-v1` profile supports one
+read-only leaf layout without broadening either adjacent-switch profile.
+With `D` denoting the shift instruction, its exact narrow Thumb sequence is:
+
+```text
+D-6    ldr  table_base, [pc, #16]
+D-4    cmp  selector, #bound
+D-2    bhi  D-4
+D      lsls accumulator, selector, #2
+D+2    adds accumulator, accumulator, table_base
+D+4    ldr  accumulator, [accumulator]
+D+6    mov  pc, accumulator
+D+8    two zero alignment bytes
+D+10   one mapped external object word
+D+14   local pointer to D+18
+D+18   bound-plus-one local case words
+```
+
+The three registers must be distinct low registers, `D` must be two modulo
+four, and the table must contain 1 through 256 words. Canonical instruction
+encodings and decoded operands must agree. Cases are even instruction entries
+after the table inside the complete symbol. Exactly one reachable PC-relative
+word load reads each of the object and table-pointer words. Every remaining
+byte must belong to a reachable 16-bit instruction; additional pools, gaps,
+unreachable code and code/data overlap are rejected.
+
+The preload has only its immediate predecessor's ordinary fallthrough edge.
+The guard and dispatch instructions cannot be entered midway. Comparison
+predecessors are the preload, its backward guard, and any verified direct
+unconditional case backedges. The preload must dominate the comparison.
+Reverse reachability from the comparison must contain no other write to the
+base register, including implicit writes and restores. Terminal restoration
+outside that region remains subject to the existing stack/return proof.
+Non-stack stores, STM, non-push/pop writeback, calls, local frames, incoming
+stack accesses, runtime thunks, callbacks, division and buffer proofs are
+excluded. This profile cannot be combined with another switch.
+
+The backward default edge is intentional: an out-of-range selector can loop
+forever, and case redirection may also cycle. The existing graph requirement
+that each reachable instruction has some path to a verified return does not
+prove execution termination. Reports explicitly say `termination not proved`.
+No allocation bounds, valid selector domain or pointer lifetime is inferred.
+
+Fresh linking retains the strict raw and linked ELF symbol checks. The local
+pointer and table use the unique local zero-valued `.text` section symbol and
+`R_ARM_ABS32`; the external object uses one named mapped global object binding
+and a checked signed addend. Changes outside validated relocation words,
+extra text, helper symbols, veneers and altered boundaries remain rejected.
+Binding APIs require both `allow_switch_data=True` for mixed object/local
+relocations and `allow_preloaded_switch=True` for this exact layout. Their
+defaults and all legacy layouts, schemas and fingerprints remain unchanged.
+The normal matcher selects this profile only from its exact encoded shape;
+a failed new-profile proof cannot fall back to an older profile.
+
+The canonical manifest has exactly `calls`, `data` and `switch` members,
+with an empty call list, one object offset/name/addend, and the byte-derived
+descriptor including `preload` and `transfer`. A separate versioned digest
+binds the address, complete bytes and manifest. Replay checks current
+source/header, function-map and data-map fingerprints, full mapped ROM equality,
+byte ownership, CFG and base provenance. Missing, malformed, duplicate, stale,
+mixed-profile or recomputed-but-invalid evidence fails. Stripping the new
+metadata and relabeling the dispatch as any older profile also fails. Replay
+reconstructs byte-derived binding and control-flow facts; it does not recreate
+the original ELF symbol-table provenance or recompile the source. Source
+plausibility and meaningful original C remain separate requirements.
+
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with
 `match.py`. Shared preprocessing inputs must live under `include/` or be `.h`

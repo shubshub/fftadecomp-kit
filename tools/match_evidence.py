@@ -20,6 +20,9 @@ SWITCH_SCHEMA = "elf-symbol-thumb-switches-v1"
 SWITCH_SUMMARY = "one unsigned-guarded local Thumb word table with verified predecessor edges"
 SWITCH_DATA_SCHEMA = "elf-symbol-thumb-switch-data-v1"
 SWITCH_DATA_SUMMARY = "one guarded local Thumb table with one reachable interposed mapped object word"
+PRELOADED_SWITCH_SCHEMA = "elf-symbol-thumb-preloaded-switch-v1"
+PRELOADED_SWITCH_SUMMARY = "one preloaded guarded local Thumb table; backward default loop; termination not proved"
+PRELOADED_SWITCH_CONTROL_FLOW = "closed leaf CFG; termination not proved"
 BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
 BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
@@ -285,6 +288,75 @@ def switch_data_fingerprint(address, data, manifest):
     return digest.hexdigest()
 
 
+def preloaded_switch_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (PRELOADED_SWITCH_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, switch_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def preloaded_switch_report_matches(lines, root, address):
+    from match import verify_preloaded_switches
+
+    def single(prefix):
+        marker = "**MATCH" if prefix.startswith("**MATCH") else prefix.rstrip(" :")
+        matches = [line for line in lines if line.lstrip().startswith(marker)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate preloaded switch evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed preloaded switch evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate preloaded switch manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        objects = data_snapshot(root)
+        excluded = ("* stack frame", "* buffer calls", "* buffer proof SHA-256",
+                    "* function addresses", "* function address manifest",
+                    "* function address proof SHA-256", "* unsigned division")
+        if mapping is None or objects is None or \
+                single("* verification: ") != f"`{PRELOADED_SWITCH_SCHEMA}`" or \
+                unquote("* source SHA-256: ") != source_fingerprint(root, address) or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                unquote("* data symbols SHA-256: ") != mapping_fingerprint(objects) or \
+                single("* switches: ") != PRELOADED_SWITCH_SUMMARY or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.lstrip().startswith(excluded) for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* switch manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if switch_manifest(manifest) != encoded_manifest:
+            return False
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        _, control_flow = verify_preloaded_switches(data, address, rom, mapping, objects, manifest)
+        return (single("* control flow: ") == control_flow and
+                single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* switch proof SHA-256: ") ==
+                preloaded_switch_fingerprint(address, data, manifest))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
+
+
 def switch_report_matches(lines, root, address, *, data_profile=False):
     from match import verify_switches
 
@@ -417,6 +489,8 @@ def legacy_report_control_flow(lines, root, address, profile):
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{PRELOADED_SWITCH_SCHEMA}`"]:
+        return preloaded_switch_report_matches(lines, root, address)
     if profiles == [f"* verification: `{UDIVSI3_SCHEMA}`"]:
         return udivsi3_report_matches(lines, root, address)
     if any(line.startswith(("* unsigned division:", "* unsigned division manifest:",

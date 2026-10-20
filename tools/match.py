@@ -40,6 +40,8 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
                             SWITCH_SCHEMA, SWITCH_SUMMARY, switch_fingerprint, switch_manifest,
                             SWITCH_DATA_SCHEMA, SWITCH_DATA_SUMMARY, switch_data_fingerprint,
+                            PRELOADED_SWITCH_SCHEMA, PRELOADED_SWITCH_SUMMARY,
+                            PRELOADED_SWITCH_CONTROL_FLOW, preloaded_switch_fingerprint,
                             UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
                             udivsi3_fingerprint, udivsi3_manifest,
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
@@ -49,7 +51,7 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
 
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
-                          CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT)
+                          CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT, CS_AC_WRITE)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_INS_ADR, ARM_INS_B,
                                     ARM_INS_BL, ARM_INS_CMP, ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
                                     ARM_OP_REG, ARM_REG_CPSR, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP,
@@ -331,12 +333,15 @@ def function_address_target(name, entries, address, size, rom_size):
 
 def call_bindings(image, name, address, mapping, rom_size,
                    rom_image=b'', data_mapping=None, function_relocations=None,
-                   switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None):
+                   switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None,
+                   allow_preloaded_switch=False):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(allow_switch_data) is not bool:
         raise ValueError("switch-data binding opt-in must be Boolean")
+    if type(allow_preloaded_switch) is not bool:
+        raise ValueError("preloaded-switch binding opt-in must be Boolean")
     if function_relocations is not None and \
             (not isinstance(function_relocations, dict) or function_relocations):
         raise ValueError("function-address bindings require an empty collection")
@@ -535,8 +540,11 @@ def call_bindings(image, name, address, mapping, rom_size,
             struct.pack_into("<I", relocated, position, address + addend)
         for position, (_, value) in data_relocations.items():
             struct.pack_into("<I", relocated, position, value)
-        switch_layout(bytes(relocated), address, switch_relocations,
-                      data_relocations if data_relocations else None)
+        layout = selected_switch_layout(bytes(relocated), address, switch_relocations,
+                                        data_relocations if data_relocations else None,
+                                        allow_preloaded_switch)
+        if "preload" in layout and calls:
+            raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
             any(item["name"] and not item["section"] and item["name"] not in targets
                 for item in image["symbols"]):
@@ -546,7 +554,8 @@ def call_bindings(image, name, address, mapping, rom_size,
 
 def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None,
                           function_relocations=None, switch_relocations=None,
-                          allow_switch_data=False, udivsi3_bindings=None):
+                          allow_switch_data=False, udivsi3_bindings=None,
+                          allow_preloaded_switch=False):
     """Validate exact placement and the linker's complete modification surface."""
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
@@ -579,6 +588,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("linked division aliases or thunk combinations are unsupported")
     if type(allow_switch_data) is not bool:
         raise ValueError("switch-data binding opt-in must be Boolean")
+    if type(allow_preloaded_switch) is not bool:
+        raise ValueError("preloaded-switch binding opt-in must be Boolean")
     if switch_relocations and ((data_relocations and not allow_switch_data) or function_relocations):
         raise ValueError("switch evidence cannot combine literal binding profiles")
     if switch_relocations:
@@ -625,8 +636,12 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked switch word does not equal its local section address")
         patched.update(range(relocation, relocation + 4))
     if switch_relocations:
-        switch_layout(linked["text"][:after["size"]], address, switch_relocations,
-                      data_relocations if data_relocations else None)
+        layout = selected_switch_layout(linked["text"][:after["size"]], address,
+                                        switch_relocations,
+                                        data_relocations if data_relocations else None,
+                                        allow_preloaded_switch)
+        if "preload" in layout and calls:
+            raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
            for position, (before_byte, after_byte)
            in enumerate(zip(original["text"], linked["text"]))):
@@ -636,12 +651,13 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
 
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
-               allow_switch_data=False, udivsi3_bindings=None):
+               allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
                                                     function_relocations, switch_relocations,
-                                                    allow_switch_data, udivsi3_bindings)
+                                                    allow_switch_data, udivsi3_bindings,
+                                                    allow_preloaded_switch)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -673,7 +689,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
         raise ValueError("objcopy output does not equal linked ELF .text")
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
-                                  allow_switch_data, udivsi3_bindings),
+                                  allow_switch_data, udivsi3_bindings, allow_preloaded_switch),
             calls, data_relocations)
 
 
@@ -804,6 +820,224 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
         raise ValueError("function-address evidence supports only frameless callers")
     verify_data_literals(instructions, address, literals)
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
+
+
+def preloaded_switch_encoding(data, address, literal):
+    if type(literal) is not int or literal < 20 or literal + 4 > len(data):
+        return None
+    dispatch = literal - 14
+    if (address + dispatch) % 4 != 2:
+        return None
+    words = struct.unpack_from("<7H", data, dispatch - 6)
+    accumulator = words[3] & 7
+    selector = (words[3] >> 3) & 7
+    base = (words[0] >> 8) & 7
+    bound = words[1] & 255
+    expected = (0x4804 | base << 8, 0x2800 | selector << 8 | bound,
+                0xD8FD, 0x0080 | selector << 3 | accumulator,
+                0x1800 | base << 6 | accumulator << 3 | accumulator,
+                0x6800 | accumulator << 3 | accumulator,
+                0x4687 | accumulator << 3)
+    if len({accumulator, selector, base}) != 3 or words != expected:
+        return None
+    return dispatch, accumulator, selector, base, bound
+
+
+def selected_switch_layout(data, address, relocations, data_relocations=None,
+                           allow_preloaded_switch=False):
+    if type(allow_preloaded_switch) is not bool:
+        raise ValueError("preloaded-switch layout opt-in must be Boolean")
+    if allow_preloaded_switch and isinstance(relocations, dict) and relocations and \
+            all(type(offset) is int for offset in relocations) and \
+            preloaded_switch_encoding(data, address, min(relocations)) is not None:
+        return preloaded_switch_layout(data, address, relocations, data_relocations)
+    return switch_layout(data, address, relocations, data_relocations)
+
+
+def preloaded_switch_layout(data, address, relocations, data_relocations):
+    if type(address) is not int or address % 2 or not isinstance(relocations, dict) or \
+            not 2 <= len(relocations) <= 257:
+        raise ValueError("preloaded switch requires one bounded local word table")
+    for offset, addend in relocations.items():
+        if type(offset) is not int or type(addend) is not int or offset < 0 or \
+                (address + offset) % 4 or offset + 4 > len(data) or addend < 0 or \
+                addend % 2 or addend + 2 > len(data) or \
+                struct.unpack_from("<I", data, offset)[0] != address + addend:
+            raise ValueError("invalid preloaded local word or section-relative target")
+    literal = min(relocations)
+    table = literal + 4
+    table_end = table + 4 * (len(relocations) - 1)
+    if sorted(relocations) != list(range(literal, table_end, 4)) or \
+            relocations[literal] != table or \
+            any(relocations[offset] < table_end for offset in range(table, table_end, 4)):
+        raise ValueError("preloaded switch requires adjacent words and forward cases")
+    encoding = preloaded_switch_encoding(data, address, literal)
+    if encoding is None:
+        raise ValueError("preloaded switch requires its exact backward guard and four-op dispatch")
+    dispatch, accumulator, selector, base, bound = encoding
+    if bound != len(relocations) - 2 or data[dispatch + 8:dispatch + 10] != b"\x00\x00":
+        raise ValueError("preloaded switch bound or alignment does not match its table")
+    if not isinstance(data_relocations, dict) or len(data_relocations) != 1:
+        raise ValueError("preloaded switch requires exactly one mapped object word")
+    offset, binding = next(iter(data_relocations.items()))
+    if type(offset) is not int or offset != literal - 4 or \
+            not isinstance(binding, (tuple, list)) or len(binding) != 2 or \
+            not isinstance(binding[0], str) or not binding[0] or \
+            type(binding[1]) is not int or not 0 <= binding[1] <= 0xFFFFFFFF or \
+            address <= binding[1] < address + len(data) or \
+            struct.unpack_from("<I", data, offset)[0] != binding[1]:
+        raise ValueError("invalid preloaded switch object word")
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    decoder.detail = True
+    sequence = list(decoder.disasm(data[dispatch - 6:dispatch + 8], address + dispatch - 6))
+    if len(sequence) != 7 or any(item.size != 2 for item in sequence) or \
+            tuple(item.mnemonic for item in sequence) != \
+            ("ldr", "cmp", "bhi", "lsls", "adds", "ldr", "mov") or \
+            any(item.cc not in (ARM_CC_AL, ARM_CC_INVALID)
+                for position, item in enumerate(sequence) if position != 2):
+        raise ValueError("preloaded dispatch decoding disagrees with its encodings")
+
+    def register(operand, name):
+        return operand.type == ARM_OP_REG and decoder.reg_name(operand.reg) == name
+
+    def immediate(operand, value):
+        return operand.type == ARM_OP_IMM and operand.imm == value
+
+    def memory(operand, name, displacement):
+        return operand.type == ARM_OP_MEM and decoder.reg_name(operand.mem.base) == name and \
+            not operand.mem.index and operand.mem.disp == displacement
+
+    operands = [item.operands for item in sequence]
+    accumulator_name, selector_name, base_name = (f"r{value}" for value in (accumulator, selector, base))
+    if tuple(map(len, operands)) != (2, 2, 1, 3, 3, 2, 2) or \
+            not register(operands[0][0], base_name) or not memory(operands[0][1], "pc", 16) or \
+            not register(operands[1][0], selector_name) or not immediate(operands[1][1], bound) or \
+            not immediate(operands[2][0], address + dispatch - 4) or \
+            not register(operands[3][0], accumulator_name) or \
+            not register(operands[3][1], selector_name) or not immediate(operands[3][2], 2) or \
+            not all(register(operand, name) for operand, name in
+                    zip(operands[4], (accumulator_name, accumulator_name, base_name))) or \
+            not register(operands[5][0], accumulator_name) or \
+            not memory(operands[5][1], accumulator_name, 0) or \
+            not register(operands[6][0], "pc") or not register(operands[6][1], accumulator_name):
+        raise ValueError("preloaded dispatch operands disagree with its encodings")
+    return {"preload": dispatch - 6, "comparison": dispatch - 4, "guard": dispatch - 2,
+            "dispatch": dispatch, "transfer": dispatch + 6, "default": dispatch - 4,
+            "literal": literal, "table": table, "bound": bound,
+            "relocations": [[offset, addend] for offset, addend in sorted(relocations.items())]}
+
+
+def verify_preloaded_switch_cfg(data, address, instructions, edges, predecessors, switch):
+    preload = address + switch["preload"]
+    comparison = address + switch["comparison"]
+    guard = address + switch["guard"]
+    dispatch = address + switch["dispatch"]
+    transfer = address + switch["transfer"]
+    expected = {preload: {preload - 2}, guard: {comparison}, dispatch: {guard}}
+    expected.update({current: {current - 2} for current in range(dispatch + 2, transfer + 2, 2)})
+    if comparison not in instructions or any(
+            current == address or predecessors.get(current) != incoming
+            for current, incoming in expected.items()):
+        raise ValueError("preloaded switch has an unverified predecessor edge")
+    preceding = instructions[preload - 2]
+    if preceding.group(CS_GRP_JUMP) or preceding.group(CS_GRP_CALL) or \
+            ARM_REG_PC in preceding.regs_access()[1] or edges[preload - 2] != (preload,):
+        raise ValueError("preloaded switch requires fallthrough into its table load")
+    incoming = predecessors[comparison]
+    if not {preload, guard} <= incoming:
+        raise ValueError("preloaded switch comparison is missing its initial or loop edge")
+    for predecessor in incoming - {preload, guard}:
+        instruction = instructions[predecessor]
+        if instruction.id != ARM_INS_B or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+                edges[predecessor] != (comparison,):
+            raise ValueError("preloaded switch comparison requires direct unconditional backedges")
+    pending = [address]
+    without_preload = set()
+    while pending:
+        current = pending.pop()
+        if current == preload or current in without_preload:
+            continue
+        without_preload.add(current)
+        pending.extend(edges[current])
+    if comparison in without_preload:
+        raise ValueError("preloaded table load does not dominate its comparison")
+    reaching_guard = {comparison}
+    pending = [comparison]
+    while pending:
+        for predecessor in predecessors[pending.pop()]:
+            if predecessor not in reaching_guard:
+                reaching_guard.add(predecessor)
+                pending.append(predecessor)
+    base = instructions[preload].operands[0].reg
+    literal_loads = []
+    owned = set()
+    for current, instruction in instructions.items():
+        if instruction.size != 2 or instruction.writeback and instruction.mnemonic not in ("push", "pop") or \
+                instruction.mnemonic.startswith(("str", "stm")) or \
+                any(operand.type == ARM_OP_MEM and operand.access & CS_AC_WRITE
+                    for operand in instruction.operands):
+            raise ValueError("preloaded switch requires read-only narrow Thumb instructions")
+        if current != preload and current in reaching_guard and base in instruction.regs_access()[1]:
+            raise ValueError("preloaded table base is clobbered on a path to its guard")
+        owned.update(range(current, current + instruction.size))
+        for operand in instruction.operands:
+            if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC:
+                literal_loads.append(((current + 4) & ~3) + operand.mem.disp)
+    literal = address + switch["literal"]
+    if sorted(literal_loads) != [literal - 4, literal]:
+        raise ValueError("preloaded switch requires exactly its two reachable literal loads")
+    word_bytes = {address + offset + position for offset, _ in switch["relocations"]
+                  for position in range(4)} | set(range(literal - 4, literal))
+    alignment = set(range(dispatch + 8, dispatch + 10))
+    if owned & (word_bytes | alignment) or \
+            owned | word_bytes | alignment != set(range(address, address + len(data))):
+        raise ValueError("preloaded switch does not classify every function byte")
+
+
+def verify_preloaded_switches(data, address, rom, mapping, data_mapping, manifest):
+    if mapping is None or not isinstance(manifest, dict) or set(manifest) != {"calls", "data", "switch"} or \
+            manifest["calls"] != [] or not isinstance(manifest["data"], list) or \
+            len(manifest["data"]) != 1 or not isinstance(manifest["data"][0], list) or \
+            len(manifest["data"][0]) != 3:
+        raise ValueError("invalid preloaded switch manifest or excluded calls")
+    offset, name, addend = manifest["data"][0]
+    objects = parse_data_symbols(data_mapping)
+    if type(offset) is not int or not isinstance(name, str) or name not in objects or \
+            type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF:
+        raise ValueError("invalid preloaded object binding")
+    data_relocations = {offset: (name, objects[name] + addend)}
+    descriptor = manifest["switch"]
+    fields = {"preload", "comparison", "guard", "dispatch", "transfer", "default",
+              "literal", "table", "bound", "relocations"}
+    if not isinstance(descriptor, dict) or set(descriptor) != fields or \
+            any(type(descriptor[field]) is not int for field in fields - {"relocations"}) or \
+            not isinstance(descriptor["relocations"], list):
+        raise ValueError("invalid preloaded switch descriptor")
+    relocations = {}
+    previous = -1
+    for record in descriptor["relocations"]:
+        if not isinstance(record, list) or len(record) != 2 or \
+                any(type(value) is not int for value in record) or record[0] <= previous:
+            raise ValueError("preloaded relocations require unique ordered integer pairs")
+        previous = record[0]
+        relocations[record[0]] = record[1]
+    if preloaded_switch_layout(data, address, relocations, data_relocations) != descriptor:
+        raise ValueError("preloaded switch descriptor does not match its bytes")
+    entries = json.loads(mapping)
+    if not isinstance(entries, list):
+        raise ValueError("preloaded switch requires a function mapping list")
+    callers = [entry for entry in entries if int(entry["rom"], 16) & ~1 == address & ~1]
+    if len(callers) != 1 or callers[0].get("mode") != "thumb" or \
+            int(callers[0]["rom"], 16) != address or \
+            int(callers[0]["end"], 16) != address + len(data) or \
+            not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
+            rom[address - ROM_BASE:address - ROM_BASE + len(data)] != data:
+        raise ValueError("preloaded switch requires its exact mapped full ROM span")
+    instructions = verify_leaf_instructions(data, address, True,
+                                            switch_relocations=relocations,
+                                            switch_data_relocations=data_relocations,
+                                            preloaded_switch=True)
+    return instructions, PRELOADED_SWITCH_CONTROL_FLOW
 
 
 def switch_layout(data, address, relocations, data_relocations=None):
@@ -1242,13 +1476,20 @@ class BufferCallProof:
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
-                             switch_data_relocations=None, udivsi3_context=None):
+                             switch_data_relocations=None, udivsi3_context=None,
+                             preloaded_switch=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
     reserved = set()
     division_constants = None
+    if type(preloaded_switch) is not bool:
+        raise ValueError("preloaded-switch CFG opt-in must be Boolean")
+    if preloaded_switch and (not thumb or validated_calls or buffer_proof is not None or
+                             call_resolver is not None or udivsi3_context is not None or
+                             switch_relocations is None or switch_data_relocations is None):
+        raise ValueError("preloaded switches require isolated leaf and object evidence")
     if udivsi3_context is not None:
         if not isinstance(udivsi3_context, tuple) or len(udivsi3_context) != 3 or \
                 not isinstance(udivsi3_context[2], dict) or udivsi3_context[2] or \
@@ -1262,7 +1503,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch_relocations is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
-        switch = switch_layout(data, address, switch_relocations, switch_data_relocations)
+        layout = preloaded_switch_layout if preloaded_switch else switch_layout
+        switch = layout(data, address, switch_relocations, switch_data_relocations)
         reserved = {address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
                     for position in range(offset, offset + 4)}
@@ -1401,7 +1643,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             successors = (operands[0].imm,)
             if not unconditional:
                 successors += (current + instruction.size,)
-        elif switch is not None and current == address + switch["dispatch"] + 8:
+        elif switch is not None and current == address + (
+                switch["transfer"] if preloaded_switch else switch["dispatch"] + 8):
             successors = tuple(sorted({address + addend for offset, addend
                                        in switch_relocations.items() if offset != switch["literal"]}))
         else:
@@ -1574,18 +1817,21 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if uses_stack_frame(instructions.values()) or any(
                 target in RUNTIME_HELPERS.values() for target in calls.values()):
             raise ValueError("switch evidence excludes fixed frames and runtime call thunks")
-        comparison = address + switch["comparison"]
-        guard = address + switch["guard"]
-        dispatch = address + switch["dispatch"]
-        expected = {guard: {comparison}, dispatch: {guard}}
-        if dispatch - guard == 4:
-            expected[guard + 2] = {guard}
-        expected.update({dispatch + distance: {dispatch + distance - 2}
-                         for distance in range(2, 10, 2)})
-        if comparison not in instructions or any(
-                current == address or predecessors.get(current) != incoming
-                for current, incoming in expected.items()):
-            raise ValueError("switch selector bound is bypassed by an unverified predecessor edge")
+        if preloaded_switch:
+            verify_preloaded_switch_cfg(data, address, instructions, edges, predecessors, switch)
+        else:
+            comparison = address + switch["comparison"]
+            guard = address + switch["guard"]
+            dispatch = address + switch["dispatch"]
+            expected = {guard: {comparison}, dispatch: {guard}}
+            if dispatch - guard == 4:
+                expected[guard + 2] = {guard}
+            expected.update({dispatch + distance: {dispatch + distance - 2}
+                             for distance in range(2, 10, 2)})
+            if comparison not in instructions or any(
+                    current == address or predecessors.get(current) != incoming
+                    for current, incoming in expected.items()):
+                raise ValueError("switch selector bound is bypassed by an unverified predecessor edge")
     reaching_return = set(returns)
     pending = list(returns)
     while pending:
@@ -1797,6 +2043,7 @@ def main():
             division_evidence = None
             address_manifest = None
             switch_evidence = None
+            preloaded_profile = False
             if original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
@@ -1804,7 +2051,8 @@ def main():
                                                           addr, mapping, len(rom), rom, data_mapping,
                                                           function_relocations, switch_relocations,
                                                           allow_switch_data=True,
-                                                          udivsi3_bindings=udivsi3_bindings)
+                                                          udivsi3_bindings=udivsi3_bindings,
+                                                          allow_preloaded_switch=True)
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
@@ -1824,16 +2072,22 @@ def main():
                 switch_evidence = {
                     "calls": [[site - addr, f"func_{target:08X}"]
                               for site, target in sorted(calls.items())],
-                    "switch": switch_layout(got, addr, switch_relocations,
-                                            data_relocations if data_relocations else None)}
+                    "switch": selected_switch_layout(got, addr, switch_relocations,
+                                                     data_relocations if data_relocations else None,
+                                                     allow_preloaded_switch=True)}
+                preloaded_profile = "preload" in switch_evidence["switch"]
                 if data_relocations:
                     objects = parse_data_symbols(data_mapping)
                     switch_evidence["data"] = [
                         [offset, name, value - objects[name]]
                         for offset, (name, value) in sorted(data_relocations.items())]
-                verified_instructions, _ = verify_switches(
-                    got, addr, rom, mapping, switch_evidence,
-                    data_mapping=data_mapping if data_relocations else None)
+                if preloaded_profile:
+                    verified_instructions, _ = verify_preloaded_switches(
+                        got, addr, rom, mapping, data_mapping, switch_evidence)
+                else:
+                    verified_instructions, _ = verify_switches(
+                        got, addr, rom, mapping, switch_evidence,
+                        data_mapping=data_mapping if data_relocations else None)
             elif function_relocations:
                 objects = parse_data_symbols(data_mapping) if data_relocations else {}
                 address_manifest = {
@@ -1880,10 +2134,13 @@ def main():
     if function_relocations:
         schema = FUNCTION_ADDRESS_SCHEMA
     if switch_relocations:
-        schema = SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA
+        schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
+                  SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
     if udivsi3_bindings:
         schema = UDIVSI3_SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
+    if preloaded_profile:
+        control_flow = PRELOADED_SWITCH_CONTROL_FLOW
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -2014,10 +2271,12 @@ def main():
                 proof_digest = function_address_fingerprint(addr, got_body, address_manifest)
                 f.write(f"* function address proof SHA-256: `{proof_digest}`\n")
             if switch_relocations:
-                summary = SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY
+                summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
+                           SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
                 f.write(f"* switches: {summary}\n")
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
-                fingerprint_switch = switch_data_fingerprint if data_profile else switch_fingerprint
+                fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
+                                      switch_data_fingerprint if data_profile else switch_fingerprint)
                 proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
                 f.write(f"* switch proof SHA-256: `{proof_digest}`\n")
             if udivsi3_bindings:
