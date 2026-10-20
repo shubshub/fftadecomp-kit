@@ -12,11 +12,14 @@ This is a from-scratch analysis pass over the base ROM:
 Nothing here needs an ARM toolchain: capstone does the decoding.
 
 Usage:  python tools/analyze.py [rom] [repo-root]
+        python tools/analyze.py [rom] [repo-root] --refine-address 0x08123A1C
 
        The repo root defaults to the current directory, so this tool can
        be run from a decomp repo that vendors it (see fftadecomp-kit).
+       Refinement reads the existing index and emits diagnostic JSON only.
 """
 
+import argparse
 import hashlib
 import json
 import math
@@ -142,6 +145,320 @@ class Decoder:
                 and ops[0].type == 1 and ops[0].reg == ARM_REG_PC
                 and ops[1].type == 1 and ops[1].reg == ARM_REG_LR)
         return d
+
+
+def refinement_boundaries(functions, rom_end=CODE_END):
+    """Validate indexed starts, ignoring their provisional end addresses."""
+    if not isinstance(functions, list):
+        raise ValueError("function index must be a list")
+    starts = {}
+    issues = {}
+    for function in functions:
+        if not isinstance(function, dict) or not isinstance(function.get("rom"), str):
+            raise ValueError("function entry must have a string rom address")
+        try:
+            address = int(function["rom"], 0)
+        except ValueError as error:
+            raise ValueError("invalid function address") from error
+        mode = function.get("mode")
+        problems = issues.setdefault(address, set())
+        if mode not in ("arm", "thumb"):
+            problems.add("invalid mode")
+            mode = None
+        if not ROM_BASE + HEADER_LEN <= address < CODE_END:
+            problems.add("outside code region")
+        if not ROM_BASE <= address or address + (4 if mode == "arm" else 2) > rom_end:
+            problems.add("outside ROM")
+        if address % (4 if mode == "arm" else 2):
+            problems.add("unaligned start")
+        if address in starts:
+            problems.add("duplicate start")
+        starts[address] = mode
+    return starts, {address: problems for address, problems in issues.items() if problems}
+
+
+def refinement_ranges(intervals):
+    """Merge occupied byte intervals without assigning meaning to gaps."""
+    ranges = []
+    for start, end in sorted(intervals):
+        if ranges and start <= ranges[-1][1]:
+            ranges[-1][1] = max(ranges[-1][1], end)
+        else:
+            ranges.append([start, end])
+    return ranges
+
+
+def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
+                    rom_end=CODE_END):
+    """Inspect a byte window beginning at an indexed Thumb entry.
+
+    Closure is structural, assuming ordinary calls return to their continuation
+    and syntactic ABI return forms terminate the path. It is not a return-value,
+    stack-safety, exact-symbol, or exhaustive-inventory proof.
+    """
+    result = {
+        "profile": "bounded-thumb-cfg-inventory-v1",
+        "rom": f"0x{address:08X}" if type(address) is int else None,
+        "mode": None,
+        "index_issue_counts": {},
+        "complete": False,
+        "inventory_complete": False,
+        "cfg_closed": False,
+        "return_policy": "syntactic ABI return forms; no stack-safety proof",
+        "call_policy": "indexed direct Thumb calls; continuation only",
+        "window": None,
+        "candidate_extent": None,
+        "instrs": 0,
+        "code_ranges": [],
+        "literal_ranges": [],
+        "gaps": [],
+        "calls": [],
+        "returns": [],
+        "partial_reasons": [],
+    }
+    reasons = set()
+
+    def fail(reason, position=None):
+        reasons.add(reason if position is None else f"{reason} at 0x{position:08X}")
+
+    if type(address) is not int or address % 2 or not ROM_BASE + HEADER_LEN <= address < CODE_END:
+        fail("invalid entry address")
+    if not isinstance(data, (bytes, bytearray)):
+        fail("window must contain bytes")
+    if type(max_bytes) is not int or max_bytes <= 0 or \
+            type(max_instructions) is not int or max_instructions <= 0:
+        fail("budgets must be positive integers")
+    if type(rom_end) is not int or rom_end < ROM_BASE:
+        fail("invalid ROM end")
+    if reasons:
+        result["partial_reasons"] = sorted(reasons)
+        return result
+    try:
+        starts, index_issues = refinement_boundaries(functions, rom_end)
+    except ValueError as error:
+        fail(f"invalid function index: {error}")
+        starts = {}
+        index_issues = {}
+    result["index_issue_counts"] = dict(sorted(Counter(
+        problem for problems in index_issues.values() for problem in problems).items()))
+    if reasons:
+        result["partial_reasons"] = sorted(reasons)
+        return result
+    result["mode"] = starts.get(address)
+    if address not in starts:
+        fail("entry is not indexed")
+    elif address in index_issues:
+        fail("invalid indexed entry: " + ", ".join(sorted(index_issues[address])))
+    elif starts[address] != "thumb":
+        fail("unsupported ARM entry")
+    if reasons:
+        result["partial_reasons"] = sorted(reasons)
+        return result
+    previous_start = max((start for start in starts if ROM_BASE + HEADER_LEN <= start < address),
+                         default=None)
+    next_start = min((start for start in starts if address < start < CODE_END), default=CODE_END)
+    limits = {"provided window": address + len(data), "byte budget": address + max_bytes,
+              "indexed boundary": next_start, "code boundary": CODE_END, "ROM boundary": rom_end}
+    end = min(limits.values())
+    result["window"] = {
+        "start": f"0x{address:08X}",
+        "end": f"0x{end:08X}",
+        "max_bytes": max_bytes,
+        "max_instructions": max_instructions,
+        "limiting_boundaries": sorted(name for name, limit in limits.items() if limit == end),
+    }
+    for start in (previous_start, next_start if next_start <= end else None):
+        if start in index_issues:
+            fail("ambiguous neighboring start: " + ", ".join(sorted(index_issues[start])), start)
+    if reasons:
+        result["partial_reasons"] = sorted(reasons)
+        return result
+    engine = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    engine.detail = True
+    engine.skipdata = False
+    supported = {
+        "adcs", "add", "adds", "ands", "asrs", "b", "beq", "bne", "bhs", "blo",
+        "bmi", "bpl", "bvs", "bvc", "bhi", "bls", "bge", "blt", "bgt", "ble",
+        "bics", "bl", "bx", "cmn", "cmp", "eors", "ldm", "ldr", "ldrb", "ldrh",
+        "ldrsb", "ldrsh", "lsls", "lsrs", "mov", "movs", "muls", "mvns", "negs",
+        "orrs", "pop", "push", "rors", "rsbs", "sbcs", "stm", "str", "strb",
+        "strh", "sub", "subs", "tst",
+    }
+    pending = [(address, ())]
+    visited = set()
+    instructions = {}
+    owners = {}
+    literals = set()
+    literal_bytes = set()
+    calls = set()
+    returns = set()
+    while pending:
+        position, previous_pop = pending.pop()
+        state = (position, previous_pop)
+        if state in visited:
+            continue
+        visited.add(state)
+        if position % 2 or not address <= position or position + 2 > end:
+            fail("control-flow boundary escape", position)
+            continue
+        if position in literal_bytes:
+            fail("code/literal overlap", position)
+            continue
+        if position in owners and owners[position] != position:
+            fail("instruction-interior target", position)
+            continue
+        if position not in instructions and len(instructions) >= max_instructions:
+            fail("instruction budget exhausted", position)
+            continue
+        offset = position - address
+        instruction = next(engine.disasm(data[offset:offset + min(4, end - position)],
+                                         position, count=1), None)
+        if instruction is None:
+            fail("invalid or truncated instruction", position)
+            continue
+        info = Decoder._describe(instruction)
+        size = instruction.size
+        if position + size > end:
+            fail("instruction crosses boundary", position)
+            continue
+        occupied = range(position, position + size)
+        if any(byte in owners and owners[byte] != position for byte in occupied):
+            fail("overlapping instructions", position)
+            continue
+        if any(byte in literal_bytes for byte in occupied):
+            fail("code/literal overlap", position)
+            continue
+        instructions[position] = size
+        owners.update((byte, position) for byte in occupied)
+        if instruction.mnemonic == "blx":
+            fail("unsupported cross-mode transfer", position)
+            continue
+        if instruction.mnemonic not in supported or \
+                (size != 2 and not (size == 4 and instruction.mnemonic == "bl")):
+            fail("unsupported instruction", position)
+            continue
+        if size == 4:
+            first, second = struct.unpack_from("<HH", data, offset)
+            if first & 0xF800 != 0xF000 or second & 0xF800 != 0xF800:
+                fail("unsupported Thumb BL encoding", position)
+                continue
+        if info["pcldr"] is not None:
+            literal = ((position + 4) & ~3) + info["pcldr"][1]
+            if literal % 4 or not address <= literal or literal + 4 > end:
+                fail("literal outside window", position)
+            else:
+                literals.add(literal)
+                literal_bytes.update(range(literal, literal + 4))
+                if any(byte in owners for byte in range(literal, literal + 4)):
+                    fail("code/literal overlap", literal)
+        popped_return = instruction.mnemonic == "bx" and previous_pop == (info["opreg"],)
+        if info["ret"] or popped_return:
+            returns.add(position)
+            continue
+        if info["call"]:
+            target = info["tgt"] + ROM_BASE if info["tgt"] is not None else None
+            if target is None:
+                fail("unresolved call", position)
+            elif address <= target < end:
+                fail("ambiguous local BL", position)
+            elif target not in starts:
+                fail("unmapped call target", position)
+            elif target in index_issues:
+                fail("ambiguous call target", position)
+            elif starts[target] != "thumb":
+                fail("unsupported cross-mode call", position)
+            else:
+                calls.add((position, target))
+            pending.append((position + size, ()))
+            continue
+        if info["jump"] or info["writes_pc"]:
+            if info["tgt"] is None or instruction.mnemonic == "bx":
+                fail("unresolved jump", position)
+                continue
+            pending.append((info["tgt"] + ROM_BASE, ()))
+            if info["cond"]:
+                pending.append((position + size, ()))
+            continue
+        if any(operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC
+               for operand in instruction.operands):
+            fail("unsupported PC read", position)
+            continue
+        pending.append((position + size, info["pop_regs"]))
+    if not returns:
+        fail("no recognized return")
+    code_ranges = refinement_ranges((start, start + size)
+                                    for start, size in instructions.items())
+    literal_ranges = refinement_ranges((start, start + 4) for start in literals)
+    occupied_ranges = refinement_ranges(code_ranges + literal_ranges)
+    gaps = []
+    cursor = address
+    for start, stop in occupied_ranges:
+        if cursor < start:
+            gaps.append([cursor, start])
+        cursor = stop
+    if occupied_ranges:
+        result["candidate_extent"] = {
+            "start": f"0x{address:08X}", "end": f"0x{cursor:08X}", "bytes": cursor - address,
+        }
+    for name, ranges in (("code_ranges", code_ranges), ("literal_ranges", literal_ranges),
+                         ("gaps", gaps)):
+        result[name] = [[f"0x{start:08X}", f"0x{stop:08X}"] for start, stop in ranges]
+    result["instrs"] = len(instructions)
+    result["calls"] = [{"site": f"0x{site:08X}", "target": f"0x{target:08X}"}
+                       for site, target in sorted(calls)]
+    result["returns"] = [f"0x{site:08X}" for site in sorted(returns)]
+    result["partial_reasons"] = sorted(reasons)
+    result["cfg_closed"] = not reasons
+    return result
+
+
+def refinement_main(arguments):
+    """Run read-only, bounded diagnostics without entering normal discovery."""
+    parser = argparse.ArgumentParser(description="Bounded provisional Thumb CFG refinement")
+    parser.add_argument("rom", nargs="?")
+    parser.add_argument("root", nargs="?")
+    parser.add_argument("--refine-address", type=lambda value: int(value, 0),
+                        action="append", required=True)
+    parser.add_argument("--refine-max-bytes", type=lambda value: int(value, 0), default=4096)
+    parser.add_argument("--refine-max-instructions", type=lambda value: int(value, 0), default=1024)
+    options = parser.parse_args(arguments)
+    here = repo_root(options.root)
+    rom_path = options.rom or os.path.join(here, "baserom.bin")
+    output = {"inventory_complete": False, "results": []}
+
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError("duplicate JSON object key")
+            result[key] = value
+        return result
+
+    try:
+        if options.refine_max_bytes <= 0 or options.refine_max_instructions <= 0:
+            raise ValueError("budgets must be positive integers")
+        with open(os.path.join(here, "config", "functions.json"), encoding="utf-8") as stream:
+            functions = json.load(stream, object_pairs_hook=unique_object)
+        with open(rom_path, "rb") as stream:
+            rom_end = ROM_BASE + os.fstat(stream.fileno()).st_size
+            starts, _ = refinement_boundaries(functions, rom_end)
+            for address in options.refine_address:
+                data = b""
+                if address in starts and ROM_BASE + HEADER_LEN <= address < min(CODE_END, rom_end):
+                    next_start = min((start for start in starts if address < start < CODE_END),
+                                     default=CODE_END)
+                    end = min(address + options.refine_max_bytes, next_start, CODE_END, rom_end)
+                    stream.seek(address - ROM_BASE)
+                    data = stream.read(end - address)
+                output["results"].append(refine_function(
+                    data, address, functions, options.refine_max_bytes,
+                    options.refine_max_instructions, rom_end))
+    except (OSError, ValueError) as error:
+        output["error"] = str(error)
+        print(json.dumps(output, indent=2))
+        return 2
+    print(json.dumps(output, indent=2))
+    return 0
 
 
 # --------------------------------------------------------------------------
@@ -622,6 +939,8 @@ def classify(rom, s, e, kind):
 
 
 def main():
+    if any(argument.startswith("--refine-") for argument in sys.argv[1:]):
+        return refinement_main(sys.argv[1:])
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     here = repo_root(args[1] if len(args) > 1 else None)
     rom_path = args[0] if args else os.path.join(here, "baserom.bin")
@@ -725,4 +1044,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

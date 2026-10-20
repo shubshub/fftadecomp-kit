@@ -38,6 +38,35 @@ python ../fftadecomp-kit/tools/match.py 0x08017514      # compile src/… and di
 
 or set `FFTA_ROOT=/path/to/decomp-repo` and call them with no path.
 
+### Bounded function-inventory diagnostics
+
+Normal analysis produces provisional discovery spans, not complete function
+boundaries. Inspect an indexed Thumb entry without regenerating that tree:
+
+```sh
+python tools/analyze.py ../fftadecomp/baserom.bin ../fftadecomp \
+  --refine-address 0x08123A1C --refine-max-bytes 0x100 \
+  --refine-max-instructions 128
+```
+
+`--refine-address` is repeatable. Defaults are a 4,096-byte window and 1,024
+instructions per entry. The diagnostic reads only bounded ROM windows, stops
+at indexed neighboring starts, and prints JSON to stdout; it never writes
+maps, symbols, segmentation, coverage or source files.
+
+Results separate reachable instruction ranges, literal words and unresolved
+gaps. Direct calls contribute their continuation, not the callee's body.
+`cfg_closed` describes structural closure under ordinary-call and syntactic
+return assumptions, not stack safety, a complete ELF symbol or exhaustive
+discovery. `complete` and `inventory_complete` always remain false.
+
+Unsupported ARM entries, unresolved indirect transfers or switches, ambiguous
+boundaries, instruction/literal overlap and exhausted budgets produce explicit
+partial reasons. Invalid indexed starts with parseable addresses are reported;
+affected entry or neighboring boundaries fail closed. Unparseable addresses
+reject the index. Existing provisional end fields are not trusted as function
+boundaries.
+
 ## Reserving an address before you work on it
 
 Several agents can work on the decomp at once, so **every address has to be
@@ -441,6 +470,64 @@ This profile proves relocation fidelity, not callback ABI compatibility,
 callback behavior or whole-program memory safety. Callback declarations and
 registration contracts still require independent source and ROM review.
 
+### Guarded local Thumb switches
+
+The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted
+local word table. The selector must be checked by adjacent `cmp; bhi default`
+instructions before the dispatch, or by `cmp; bls dispatch; b default`.
+The unsigned bound is an immediate from 0 through 255. The dispatch is exactly
+the five Thumb instructions that shift that selector left two bits, load the
+table address from a PC-relative literal, add the index, load a case address,
+and move that address into PC. Register relationships and effective word
+alignment are checked. The pointer and table are adjacent to the dispatch,
+apart from at most one zero alignment halfword.
+
+The pointer word and every table entry require `R_ARM_ABS32` relocations against
+the unique unnamed, local, zero-valued `.text` section symbol. No arbitrary
+local-label relocation is accepted. Addends are in-symbol section offsets;
+linked words must equal the caller address plus that offset. Case addresses
+are **even local Thumb instruction addresses**, not odd external function
+pointers. The table has exactly bound-plus-one entries, all targeting
+instructions after the table inside the complete caller. Duplicate case
+targets are allowed.
+
+The CFG reserves the pointer and table as data before decoding cases. It
+derives switch successors internally from the verified bytes and relocation
+records, never from a trusted target list. Every case and default must satisfy
+the existing return and stack-balance checks. Predecessor checks prohibit
+entering the guard without its comparison or bypassing the in-range edge into
+any dispatch instruction. Every relocation and dispatch must be reachable.
+These checks establish bounded local control flow, not termination.
+
+Version 1 permits ordinary mapped direct Thumb calls under the unchanged ABI
+summary, but excludes fixed stack frames, buffer proofs, runtime call thunks
+(including addressed aliases), indirect calls, multiple switches, callback
+literals and object-address relocations. Register push/pop saves are allowed.
+Typed linking still rejects extra sections, veneers, altered function
+boundaries and changes outside the validated relocation words. The entire
+function, including table words and alignment, must equal the ROM.
+
+Reports bind the source and headers, current function mapping and complete ROM
+span to a canonical manifest of calls, guard/dispatch locations, bound and
+local relocation offsets/addends. Replay reconstructs the structural proof and
+CFG against the current ROM; recomputed hashes do not excuse invalid guards,
+targets or predecessor edges. Missing, duplicated or malformed evidence fails.
+Switch metadata under an older schema is rejected, and older binding APIs
+continue rejecting local section relocations without explicit switch support.
+This profile does not establish source plausibility or callee behavior; those
+retain their existing independent checks.
+
+Legacy cached reports now also require complete compiled/ROM byte evidence,
+the current matching ROM, and a unique mapped caller instruction mode. Their
+existing CFG verifier runs without switch support, using mapped direct-call
+targets and ROM-checked runtime thunks where the original profile permits
+calls. Buffer profiles retain their existing buffer-proof replay. This prevents
+stripping switch metadata and relabeling a computed dispatch as an older
+profile. Minimal legacy records without body evidence, missing ROM or ambiguous
+mode are intentionally no longer accepted. Existing schema names are unchanged;
+complete valid Thumb and ARM reports remain supported. Provisional legacy
+mapping extents are not substituted for the complete compiled symbol.
+
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with
 `match.py`. Shared preprocessing inputs must live under `include/` or be `.h`
@@ -450,8 +537,8 @@ function fails. `status.py --write --verify` also regenerates the match reports
 and validates their fingerprints before counting a successful compilation. This
 keeps the written status and subsequent offline checks consistent after shared
 header or mapping changes. `--verify` alone and `--check` never rewrite reports;
-`--check` takes precedence if combined with `--write`. Offline report checks are
-cached evidence, not fresh ROM checks.
+`--check` takes precedence if combined with `--write`. Offline report checks
+replay cached evidence against the local ROM; they do not recompile the source.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
 Linked-profile reports also bind the exact `config/functions.json` mapping

@@ -16,6 +16,8 @@ DATA_SCHEMA = "elf-symbol-thumb-data-v1"
 FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
 FUNCTION_ADDRESS_SCHEMA = "elf-symbol-thumb-function-addresses-v1"
 FUNCTION_ADDRESS_SUMMARY = "zero-addend mapped Thumb function literals; relocation fidelity, not callback ABI"
+SWITCH_SCHEMA = "elf-symbol-thumb-switches-v1"
+SWITCH_SUMMARY = "one unsigned-guarded local Thumb word table with verified predecessor edges"
 BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
 BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
@@ -182,9 +184,140 @@ def function_address_report_matches(lines, root, address):
         return False
 
 
+def switch_manifest(manifest):
+    return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+
+
+def switch_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (SWITCH_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, switch_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def switch_report_matches(lines, root, address):
+    from match import verify_switches
+
+    def single(prefix):
+        matches = [line for line in lines if line.startswith(prefix)]
+        if len(matches) != 1:
+            raise ValueError("missing or duplicate switch evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed switch evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate switch manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        if mapping is None or \
+                unquote("* source SHA-256: ") != source_fingerprint(root, address) or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                single("* switches: ") != SWITCH_SUMMARY or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.startswith(("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:",
+                                     "* data symbols SHA-256:", "* function addresses:",
+                                     "* function address manifest:", "* function address proof SHA-256:"))
+                    for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* switch manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if switch_manifest(manifest) != encoded_manifest:
+            return False
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        _, control_flow = verify_switches(data, address, rom, mapping, manifest)
+        return (single("* control flow: ") == control_flow and
+                single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* switch proof SHA-256: ") == switch_fingerprint(address, data, manifest))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
+
+
+def legacy_report_control_flow(lines, root, address, profile):
+    from match import (ROM_BASE, RUNTIME_HELPERS, function_address_target,
+                       thunk_is_call_via, verify_leaf_instructions)
+
+    def single(prefix):
+        values = [line[len(prefix):] for line in lines if line.startswith(prefix)]
+        if len(values) != 1:
+            raise ValueError("missing or duplicate legacy body evidence")
+        return values[0]
+
+    try:
+        encoded = single("* compiled : ")
+        if re.fullmatch(r"`(?:[0-9a-f]{2})+`", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded[1:-1])
+        if single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
+                single("**MATCH - byte identical** - ") != f"{len(data)}/{len(data)} bytes" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                single("* relocations: ") != "none" or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* source SHA-256: ") != f"`{source_fingerprint(root, address)}`":
+            return False
+        mapping = mapping_snapshot(root)
+        if mapping is None:
+            return False
+        entries = json.loads(mapping)
+        if not isinstance(entries, list):
+            return False
+        callers = [entry for entry in entries if int(entry["rom"], 16) & ~1 == address & ~1]
+        if len(callers) != 1 or int(callers[0]["rom"], 16) != address or \
+                callers[0].get("mode") not in ("thumb", "arm"):
+            return False
+        thumb = callers[0]["mode"] == "thumb"
+        if address % (2 if thumb else 4) or not thumb and profile != SCHEMA:
+            return False
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        if not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
+                data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
+            return False
+        if profile in (BUFFER_SCHEMA, STACK_BUFFER_SCHEMA):
+            return True
+        calls = profile in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or \
+            profile in (DATA_SCHEMA, FRAMED_DATA_SCHEMA) and single("* control flow: ") == CALL_SUMMARY
+
+        def resolve(target):
+            if target in RUNTIME_HELPERS.values():
+                register = (target - RUNTIME_HELPERS["_call_via_r0"]) // 4
+                if not thunk_is_call_via(rom, target, register):
+                    raise ValueError("legacy call target does not match its runtime thunk")
+            else:
+                function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom))
+
+        verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None)
+        return True
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
+
+
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:
+        return switch_report_matches(lines, root, address)
+    if any(line.startswith(("* switches:", "* switch manifest:", "* switch proof SHA-256:"))
+           for line in lines):
+        return False
     if profiles == [f"* verification: `{FUNCTION_ADDRESS_SCHEMA}`"]:
         return function_address_report_matches(lines, root, address)
     if any(line.startswith(("* function addresses:", "* function address manifest:",
@@ -223,7 +356,8 @@ def report_matches(report, root, address):
         profile_valid = profile_valid and f"* stack frame: {STACK_SUMMARY}" in lines
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
-    return (profile_valid and
+    return (profile_valid and legacy_report_control_flow(
+                lines, root, address, profiles[0].removeprefix("* verification: `").removesuffix("`")) and
             f"* source SHA-256: `{source_fingerprint(root, address)}`" in lines and
             "* source plausibility: plausible" in lines and
             "* relocations: none" in lines and verdict is not None and
