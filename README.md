@@ -263,7 +263,9 @@ caller-clobbered registers, and joins retain only identical constants present
 on every incoming path. Unknown or arithmetic-derived indices are rejected.
 Alias facts must agree exactly at control-flow joins. Pushing or storing these
 pointers, unsupported pointer arithmetic, and carrying an
-alias across a call in a caller-clobbered register are rejected. Callee-saved
+alias across a call in a caller-clobbered register are rejected by these
+profiles. The separate buffer-call profile below requires additional ROM
+verification for that last case. Callee-saved
 aliases survive only under the existing ABI assumption and are cleared when
 their registers are restored by a pop.
 
@@ -302,6 +304,41 @@ helper functions, self/intra-function calls, tail calls, linker veneers and
 extra allocated sections remain unsupported. These cases fail closed rather
 than receiving a partial match. Existing relocation-free leaf functions retain
 their original verification profile.
+
+### Bounded register buffer calls
+
+The `elf-symbol-thumb-frame-buffer-calls-v1` profile permits a stack alias in
+`r0`–`r3` or `r12` at a direct Thumb call only after checking its effects against
+the current ROM. The caller and each inspected callee must have a unique,
+aligned, complete, non-overlapping Thumb span in `config/functions.json`.
+The existing CFG verifier checks each inspected callee's reachable paths,
+stack balance and return provenance before an additional alias pass runs.
+
+That pass tracks register copies and immediate additions or subtractions.
+Aligned byte, halfword and word accesses must fit entirely within the caller's
+currently allocated local words. Pushed save slots, including saved return
+addresses, cannot be accessed through a passed buffer. Unknown or indexed
+accesses, pointer spills, unrecognized uses, inconsistent alias joins and
+pointer-bearing returns fail closed. Buffer pointers cannot be supplied through
+stack arguments or LR. Combined buffer calls and named data relocations remain
+unsupported.
+
+A nested call receiving an alias in a caller-clobbered register requires the
+same proof, even when that register contains only a stale argument. Overwriting
+the register before use can discharge that obligation. Recursive buffer calls
+and nesting beyond sixteen inspected callees are rejected. Calls with aliases
+only in callee-saved registers retain the existing ordinary ABI assumption.
+Other calls likewise use ordinary ABI summaries; this does not prove arbitrary
+callee behavior, termination, or whole-program memory safety. The bounds are
+allocated stack words; they do not infer C object sizes within those words.
+
+Reports bind the source, function mapping and complete caller bytes, and include
+a fingerprint of the exact ROM spans inspected by the buffer proof. Report
+validation reruns that proof against the local ROM and compares the fingerprint;
+it does not trust supplied safe-callee declarations or stored effect claims.
+Missing ROM, changed dependencies and invalid proof metadata make these reports
+uncountable, including during an otherwise offline status check. Existing
+verification schemas retain their original evidence requirements.
 
 ### Named data literals
 

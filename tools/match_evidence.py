@@ -13,6 +13,8 @@ FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
 STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return provenance"
 DATA_SCHEMA = "elf-symbol-thumb-data-v1"
 FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
+BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
+BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 
 
 def mapping_snapshot(root):
@@ -72,17 +74,49 @@ def verify_dependencies(preprocessed, root, address):
         raise ValueError("preprocessor output lacks source dependency markers; do not use -P")
 
 
+def buffer_report_matches(lines, root, address, mapping):
+    from match import BufferCallProof, verify_leaf_instructions
+
+    compiled = [line for line in lines if line.startswith("* compiled :")]
+    fingerprints = [line for line in lines if line.startswith("* buffer proof SHA-256:")]
+    summaries = [line for line in lines if line.startswith("* buffer calls:")]
+    if len(compiled) != 1 or len(fingerprints) != 1 or \
+            summaries != [f"* buffer calls: {BUFFER_SUMMARY}"]:
+        return False
+    encoded = re.fullmatch(r"\* compiled : `([0-9a-f]+)`", compiled[0])
+    if encoded is None:
+        return False
+    try:
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        data = bytes.fromhex(encoded[1])
+        proof = BufferCallProof(rom, mapping)
+        if proof.span(address) != data:
+            return False
+        verdict = f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"
+        if verdict not in lines:
+            return False
+        verify_leaf_instructions(data, address, True, buffer_proof=proof,
+                                 call_resolver=proof.target)
+        return bool(proof.dependencies) and \
+            fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"]
+    except (OSError, ValueError, KeyError, TypeError, RecursionError):
+        return False
+
+
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
     profile_valid = profiles in ([f"* verification: `{SCHEMA}`"],
                                  [f"* verification: `{FRAMED_SCHEMA}`"])
     if profiles in ([f"* verification: `{LINKED_SCHEMA}`"],
-                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"]):
+                    [f"* verification: `{FRAMED_LINKED_SCHEMA}`"],
+                    [f"* verification: `{BUFFER_SCHEMA}`"]):
         snapshot = mapping_snapshot(root)
         profile_valid = (snapshot is not None and
                          f"* mapping SHA-256: `{mapping_fingerprint(snapshot)}`" in lines and
                          f"* control flow: {CALL_SUMMARY}" in lines)
+        if profiles == [f"* verification: `{BUFFER_SCHEMA}`"]:
+            profile_valid = profile_valid and buffer_report_matches(lines, root, address, snapshot)
     if profiles in ([f"* verification: `{DATA_SCHEMA}`"],
                     [f"* verification: `{FRAMED_DATA_SCHEMA}`"]):
         functions = mapping_snapshot(root)
@@ -95,7 +129,8 @@ def report_matches(report, root, address):
                                        ["* control flow: closed leaf CFG"]))
     if profiles in ([f"* verification: `{FRAMED_SCHEMA}`"],
                     [f"* verification: `{FRAMED_LINKED_SCHEMA}`"],
-                    [f"* verification: `{FRAMED_DATA_SCHEMA}`"]):
+                    [f"* verification: `{FRAMED_DATA_SCHEMA}`"],
+                    [f"* verification: `{BUFFER_SCHEMA}`"]):
         profile_valid = profile_valid and f"* stack frame: {STACK_SUMMARY}" in lines
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
