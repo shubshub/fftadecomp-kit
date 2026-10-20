@@ -24,6 +24,83 @@ BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
 BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
 STACK_BUFFER_SUMMARY = "ROM-checked bounded register and stack buffer arguments with returned alias provenance"
+UDIVSI3_SCHEMA = "elf-symbol-thumb-udivsi3-v1"
+UDIVSI3_SUMMARY = "pinned Thumb unsigned division runtime with CFG-proven nonzero constant divisors"
+UDIVSI3_RUNTIME = "agbcc-thumb-udivsi3-v1"
+
+
+def udivsi3_manifest(manifest):
+    return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+
+
+def udivsi3_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (UDIVSI3_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, udivsi3_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def udivsi3_report_matches(lines, root, address):
+    from match import verify_udivsi3
+
+    def single(prefix):
+        marker = prefix.rstrip(" :-")
+        children = ("* unsigned division manifest", "* unsigned division proof SHA-256") \
+            if marker == "* unsigned division" else ()
+        matches = [line for line in lines if line.lstrip().startswith(marker) and
+                   not line.lstrip().startswith(children)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate division evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed division evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate division manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        if single("* verification: ") != f"`{UDIVSI3_SCHEMA}`" or mapping is None or \
+                unquote("* source SHA-256: ") != source_fingerprint(root, address) or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                single("* unsigned division: ") != UDIVSI3_SUMMARY or \
+                single("* control flow: ") != CALL_SUMMARY or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.lstrip().startswith(("* stack frame", "* buffer calls", "* buffer proof SHA-256",
+                                              "* data symbols SHA-256", "* switches", "* switch manifest",
+                                              "* switch proof SHA-256", "* function addresses",
+                                              "* function address manifest", "* function address proof SHA-256"))
+                    for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* unsigned division manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if udivsi3_manifest(manifest) != encoded_manifest:
+            return False
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        verify_udivsi3(data, address, rom, mapping, manifest)
+        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* unsigned division proof SHA-256: ") ==
+                udivsi3_fingerprint(address, data, manifest))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
 
 
 def mapping_snapshot(root):
@@ -340,6 +417,11 @@ def legacy_report_control_flow(lines, root, address, profile):
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{UDIVSI3_SCHEMA}`"]:
+        return udivsi3_report_matches(lines, root, address)
+    if any(line.startswith(("* unsigned division:", "* unsigned division manifest:",
+                            "* unsigned division proof SHA-256:")) for line in lines):
+        return False
     if profiles == [f"* verification: `{SWITCH_DATA_SCHEMA}`"]:
         return switch_report_matches(lines, root, address, data_profile=True)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:

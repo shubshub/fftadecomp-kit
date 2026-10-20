@@ -474,6 +474,63 @@ This profile proves relocation fidelity, not callback ABI compatibility,
 callback behavior or whole-program memory safety. Callback declarations and
 registration contracts still require independent source and ROM review.
 
+### Audited unsigned division runtime
+
+The separate `elf-symbol-thumb-udivsi3-v1` profile accepts natural unsigned
+32-bit division compiled to `__udivsi3`. This arithmetic runtime is not an
+indirect `_call_via_rN` thunk. Version 1 admits only frameless Thumb callers
+with one or more such calls and optional ordinary mapped direct calls.
+Fixed frames, buffer proofs, runtime thunks, indirect transfers, switches,
+callback literals and named object relocations remain excluded. This profile
+does not by itself verify a larger caller combining those features.
+
+The accepted runtime identity is `agbcc-thumb-udivsi3-v1`: the entire 120-byte
+Thumb function at `[0x08142AB0, 0x08142B28)` and its complete two-byte `__div0`
+dependency at `[0x0814274C, 0x0814274E)`. Their pinned SHA-256 digests are,
+respectively,
+`b01be100af59274950038e7cfbf7d5a68defe1a607369f88634aeb3c9453e408` and
+`abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c`.
+The only dependency call is the Thumb BL at runtime offset `0x70`.
+Both current ROM bodies and exact, unique, nonoverlapping mapped Thumb spans
+are checked on compilation and report replay. Report-supplied hashes cannot
+substitute a different implementation.
+
+Local `agbcc/libgcc/lib1thumb.asm` selections `L_udivsi3` and `L_dvmd_tls`,
+preprocessed and assembled using that tree's libgcc Makefile recipe, produce
+complete ELF function symbols identical to those 120-byte and two-byte ROM
+bodies when `__div0` is typed-bound to its Thumb address. This establishes
+identity for the audited source variant, not the provenance of an arbitrary
+installed libgcc archive. Neither runtime body is copied into the caller.
+
+Each runtime relocation must be a canonical zero-expression `R_ARM_THM_CALL`
+against one zero-valued undefined global function/notype symbol named
+`__udivsi3`. The linked symbol must be global, absolute, function-typed and
+equal to `0x08142AB1`. Noncanonical BL addends, alternate names, addressed
+aliases, pointer/object forms, extra text, veneers and unexplained linker
+changes reject. The existing full-caller-symbol comparison still applies.
+
+At every division site the existing CFG constant analysis must establish
+one concrete nonzero `u32` divisor in `r1` on every incoming path. It preserves
+MOV constants and register copies, intersects equal constants at joins and
+invalidates caller-clobbered values across calls; it is not range analysis.
+Unknown, zero or unequal merged divisors reject. The audited runtime consumes
+`r0` and `r1`, returns the unsigned quotient in `r0`, preserves its saved
+registers and uses no incoming stack arguments. Its zero-divisor path remains
+part of the checked identity but does not make C division by zero defined.
+
+Reports contain a canonical exact-key `calls`, `runtime`, `divisors` manifest.
+Every reachable BL is accounted for, with exactly one ordered divisor record
+per runtime site. Source/headers, mapping, complete caller bytes, manifest and
+schema are bound; replay recomputes the CFG facts and checks the current ROM
+identities. Missing, duplicate, stale or recomputed-but-invalid evidence
+rejects. Reserved runtime addresses cannot be relabeled as ordinary calls
+under old schemas, even after all division metadata is removed; the shared
+CFG verifier and buffer/function-address routes enforce that exclusion.
+Existing non-runtime schemas, fingerprints and default binding APIs are
+unchanged. Runtime binding proves identity and ABI compatibility, not that
+an arbitrary source spelled `/`; natural source still requires plausibility
+and independent review.
+
 ### Guarded local Thumb switches
 
 The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted

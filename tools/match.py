@@ -40,6 +40,8 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
                             SWITCH_SCHEMA, SWITCH_SUMMARY, switch_fingerprint, switch_manifest,
                             SWITCH_DATA_SCHEMA, SWITCH_DATA_SUMMARY, switch_data_fingerprint,
+                            UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
+                            udivsi3_fingerprint, udivsi3_manifest,
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
                             function_address_fingerprint, function_address_manifest,
                             mapping_snapshot, source_fingerprint, source_paths,
@@ -74,6 +76,45 @@ ROM_BASE = 0x08000000
 # verify the thunk against the ROM rather than trusting the name.
 RUNTIME_HELPERS = {f"_call_via_r{n}": 0x08142244 + n * 4
                    for n in range(0, 15)}
+UDIVSI3_ADDRESS = 0x08142AB0
+UDIVSI3_IDENTITIES = (
+    (UDIVSI3_ADDRESS, 0x08142B28,
+     "b01be100af59274950038e7cfbf7d5a68defe1a607369f88634aeb3c9453e408"),
+    (0x0814274C, 0x0814274E,
+     "abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c"),
+)
+
+
+def is_udivsi3_address(address):
+    return any(start <= address & ~1 < end for start, end, _ in UDIVSI3_IDENTITIES)
+
+
+def verify_udivsi3_identity(rom, mapping):
+    if not isinstance(rom, bytes) or not isinstance(mapping, bytes):
+        raise ValueError("division identity requires ROM and mapping snapshots")
+    entries = json.loads(mapping)
+    if not isinstance(entries, list):
+        raise ValueError("division identity requires a function mapping")
+    for start, end, digest in UDIVSI3_IDENTITIES:
+        candidates = [entry for entry in entries if int(entry["rom"], 16) & ~1 == start]
+        if len(candidates) != 1 or int(candidates[0]["rom"], 16) != start or \
+                int(candidates[0]["end"], 16) != end or candidates[0].get("mode") != "thumb" or \
+                not ROM_BASE <= start < end <= ROM_BASE + len(rom):
+            raise ValueError("division runtime requires exact unique mapped Thumb spans")
+        if any(entry is not candidates[0] and int(entry["rom"], 16) < end and
+               int(entry["end"], 16) > start for entry in entries):
+            raise ValueError("division runtime mapping overlaps another function")
+        if hashlib.sha256(rom[start - ROM_BASE:end - ROM_BASE]).hexdigest() != digest:
+            raise ValueError("division runtime or zero-path dependency identity differs")
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    decoder.detail = True
+    dependency = next(decoder.disasm(
+        rom[UDIVSI3_ADDRESS + 0x70 - ROM_BASE:UDIVSI3_ADDRESS + 0x74 - ROM_BASE],
+        UDIVSI3_ADDRESS + 0x70, count=1), None)
+    if dependency is None or dependency.id != ARM_INS_BL or dependency.size != 4 or \
+            len(dependency.operands) != 1 or dependency.operands[0].type != ARM_OP_IMM or \
+            dependency.operands[0].imm != 0x0814274C:
+        raise ValueError("division runtime has an unexpected zero-path dependency")
 
 
 def thunk_is_call_via(rom, address, register):
@@ -259,8 +300,11 @@ def parse_data_symbols(snapshot):
     for name, value in document.items():
         if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
                 name.startswith(("func_", "_call_via_")) or \
+                name in ("__udivsi3", "__div0") or \
                 not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
             raise ValueError("invalid data symbol name or absolute address")
+        if is_udivsi3_address(int(value, 16)):
+            raise ValueError("division runtime cannot be bound as data")
         symbols[name] = int(value, 16)
     return symbols
 
@@ -270,6 +314,8 @@ def function_address_target(name, entries, address, size, rom_size):
     if match is None:
         raise ValueError("function address requires a canonical addressed function")
     target = int(match[1], 16)
+    if is_udivsi3_address(target):
+        raise ValueError("division runtime requires its canonical versioned proof")
     if target in RUNTIME_HELPERS.values():
         raise ValueError("function-address evidence does not support runtime call thunks")
     candidates = [entry for entry in entries
@@ -285,7 +331,7 @@ def function_address_target(name, entries, address, size, rom_size):
 
 def call_bindings(image, name, address, mapping, rom_size,
                    rom_image=b'', data_mapping=None, function_relocations=None,
-                   switch_relocations=None, allow_switch_data=False):
+                   switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
@@ -297,6 +343,9 @@ def call_bindings(image, name, address, mapping, rom_size,
     if switch_relocations is not None and \
             (not isinstance(switch_relocations, dict) or switch_relocations):
         raise ValueError("switch bindings require an empty collection")
+    if udivsi3_bindings is not None and \
+            (not isinstance(udivsi3_bindings, dict) or udivsi3_bindings):
+        raise ValueError("division bindings require an empty collection")
     allocated_text_only(image)
     symbol, offset = function_record(image, name, address, True)
     functions = [item for item in image["symbols"] if item["type"] == 2 and item["section"]]
@@ -381,6 +430,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                 value = target + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + symbol["size"]:
                     raise ValueError("data relocation overflows or references its own function")
+                if is_udivsi3_address(value):
+                    raise ValueError("division runtime cannot be bound through a data addend")
                 positions = set(range(relocation, relocation + 4))
                 if positions & occupied:
                     raise ValueError("overlapping data or call relocations")
@@ -390,7 +441,18 @@ def call_bindings(image, name, address, mapping, rom_size,
                 continue
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
             helper = RUNTIME_HELPERS.get(target_symbol["name"])
-            if helper is not None:
+            division = target_symbol["name"] == "__udivsi3"
+            if division:
+                if udivsi3_bindings is None:
+                    raise ValueError("division runtime requires its versioned proof profile")
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                        sum(item["name"] == "__udivsi3" for item in image["symbols"]) != 1:
+                    raise ValueError("division call requires one undefined global function symbol")
+                verify_udivsi3_identity(rom_image, mapping)
+                target = UDIVSI3_ADDRESS
+                candidates = []
+            elif helper is not None:
                 # agbcc's _call_via_rN: a real call, through a thunk we verify
                 if target_symbol["section"] or target_symbol["bind"] != 1:
                     raise ValueError("call helper must be an undefined symbol")
@@ -407,6 +469,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                         target_symbol["type"] not in (0, 2):
                     raise ValueError("call target must be an undefined addressed function")
                 target = int(match[1], 16)
+                if is_udivsi3_address(target):
+                    raise ValueError("division runtime requires its canonical compiler alias")
                 candidates = []
             for entry in entries:
                 try:
@@ -432,12 +496,27 @@ def call_bindings(image, name, address, mapping, rom_size,
             if relocation % 2 or relocation + 4 > symbol["size"] or instruction is None or \
                     instruction.id != ARM_INS_BL or instruction.size != 4:
                 raise ValueError("call relocation does not cover a Thumb BL instruction")
+            if division:
+                if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM or \
+                        instruction.operands[0].imm != address + relocation:
+                    raise ValueError("division call relocation has a noncanonical addend")
+                udivsi3_bindings[address + relocation] = target_symbol["name"]
             positions = set(range(relocation, relocation + 4))
             if positions & occupied:
                 raise ValueError("overlapping call relocations")
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
+    if udivsi3_bindings:
+        if data_relocations or function_relocations or switch_relocations or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("division evidence excludes literal, switch and thunk combinations")
+        for target_name in targets:
+            definitions = [item for item in image["symbols"] if item["name"] == target_name]
+            if len(definitions) != 1 or definitions[0]["value"] or \
+                    definitions[0]["section"] or definitions[0]["bind"] != 1 or \
+                    definitions[0]["type"] not in (0, 2):
+                raise ValueError("division profile calls require unique undefined global functions")
     if function_relocations and any(target in RUNTIME_HELPERS for target in targets):
         raise ValueError("function-address evidence does not support runtime call thunks")
     if switch_relocations:
@@ -467,7 +546,7 @@ def call_bindings(image, name, address, mapping, rom_size,
 
 def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None,
                           function_relocations=None, switch_relocations=None,
-                          allow_switch_data=False):
+                          allow_switch_data=False, udivsi3_bindings=None):
     """Validate exact placement and the linker's complete modification surface."""
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
@@ -482,6 +561,22 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     data_relocations = data_relocations or {}
     function_relocations = function_relocations or {}
     switch_relocations = switch_relocations or {}
+    if "__udivsi3" in targets:
+        if not isinstance(udivsi3_bindings, dict) or not udivsi3_bindings or \
+                targets["__udivsi3"] != UDIVSI3_ADDRESS or \
+                any(alias != "__udivsi3" or calls.get(site) != UDIVSI3_ADDRESS
+                    for site, alias in udivsi3_bindings.items()) or \
+                set(udivsi3_bindings) != {site for site, target in calls.items()
+                                          if target == UDIVSI3_ADDRESS} or \
+                data_relocations or function_relocations or switch_relocations:
+            raise ValueError("linked division call bindings are incomplete or mixed")
+    elif udivsi3_bindings:
+        raise ValueError("division bindings have no linked runtime")
+    if any(is_udivsi3_address(target) and
+           (target_name != "__udivsi3" or target != UDIVSI3_ADDRESS or not udivsi3_bindings)
+           for target_name, target in targets.items()) or \
+            udivsi3_bindings and any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+        raise ValueError("linked division aliases or thunk combinations are unsupported")
     if type(allow_switch_data) is not bool:
         raise ValueError("switch-data binding opt-in must be Boolean")
     if switch_relocations and ((data_relocations and not allow_switch_data) or function_relocations):
@@ -507,7 +602,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         expected_value = target if target_name in data_names else target | 1
         if len(definitions) != 1 or definitions[0]["type"] != expected_type or \
                 definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value or \
-                (target_name in function_names or switch_relocations) and definitions[0]["bind"] != 1:
+                (target_name in function_names or switch_relocations or udivsi3_bindings) and \
+                definitions[0]["bind"] != 1:
             raise ValueError("linked target lost its absolute symbol type or address")
     if any(item["name"] and not item["section"] for item in linked["symbols"]):
         raise ValueError("linked ELF retains undefined symbols")
@@ -540,12 +636,12 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
 
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
-               allow_switch_data=False):
+               allow_switch_data=False, udivsi3_bindings=None):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
                                                     function_relocations, switch_relocations,
-                                                    allow_switch_data)
+                                                    allow_switch_data, udivsi3_bindings)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -577,7 +673,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
         raise ValueError("objcopy output does not equal linked ELF .text")
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
-                                  allow_switch_data),
+                                  allow_switch_data, udivsi3_bindings),
             calls, data_relocations)
 
 
@@ -588,6 +684,61 @@ def verify_data_literals(instructions, address, data_relocations):
                 operand.mem.base == ARM_REG_PC and not operand.mem.index}
     if any(address + relocation not in literals for relocation in data_relocations):
         raise ValueError("data relocation is not a reachable trailing literal-pool load")
+
+
+def verify_udivsi3(data, address, rom, mapping, manifest):
+    if not isinstance(manifest, dict) or set(manifest) != {"calls", "runtime", "divisors"} or \
+            manifest["runtime"] != UDIVSI3_RUNTIME or \
+            not isinstance(manifest["calls"], list) or not isinstance(manifest["divisors"], list):
+        raise ValueError("invalid division manifest")
+    verify_udivsi3_identity(rom, mapping)
+    entries = json.loads(mapping)
+    callers = [entry for entry in entries if int(entry["rom"], 16) & ~1 == address & ~1]
+    if address % 2 or is_udivsi3_address(address) or len(callers) != 1 or \
+            int(callers[0]["rom"], 16) != address or callers[0].get("mode") != "thumb" or \
+            int(callers[0]["end"], 16) != address + len(data) or \
+            not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
+            any(entry is not callers[0] and int(entry["rom"], 16) < address + len(data) and
+                int(entry["end"], 16) > address for entry in entries):
+        raise ValueError("division caller requires an exact nonoverlapping mapped Thumb span")
+    if data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
+        raise ValueError("division caller differs from the ROM")
+    calls = {}
+    runtime_sites = set()
+    previous = -4
+    for record in manifest["calls"]:
+        if not isinstance(record, list) or len(record) != 2:
+            raise ValueError("invalid division call binding")
+        offset, name = record
+        if type(offset) is not int or not isinstance(name, str) or offset % 2 or \
+                offset < previous + 4 or offset < 0 or offset + 4 > len(data):
+            raise ValueError("division calls must be ordered nonoverlapping complete instructions")
+        previous = offset
+        if name == "__udivsi3":
+            calls[address + offset] = UDIVSI3_ADDRESS
+            runtime_sites.add(offset)
+        else:
+            calls[address + offset] = function_address_target(
+                name, entries, address, len(data), len(rom))
+    expected = {}
+    previous = -1
+    for record in manifest["divisors"]:
+        if not isinstance(record, list) or len(record) != 2:
+            raise ValueError("invalid division constant binding")
+        offset, divisor = record
+        if type(offset) is not int or offset <= previous or offset not in runtime_sites or \
+                type(divisor) is not int or not 1 <= divisor <= 0xFFFFFFFF:
+            raise ValueError("division constants require ordered runtime sites and nonzero u32 values")
+        previous = offset
+        expected[address + offset] = divisor
+    if not runtime_sites or {site - address for site in expected} != runtime_sites:
+        raise ValueError("division constants must cover every runtime call exactly once")
+    observed = {}
+    instructions = verify_leaf_instructions(
+        data, address, True, calls, udivsi3_context=(rom, mapping, observed))
+    if observed != expected:
+        raise ValueError("division constants disagree with verified incoming CFG state")
+    return instructions
 
 
 def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
@@ -643,6 +794,8 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
                 value = objects[name] + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data):
                     raise ValueError("function-address object binding overflows or references itself")
+                if is_udivsi3_address(value):
+                    raise ValueError("division runtime cannot be bound through an object addend")
             if struct.unpack_from("<I", data, offset)[0] != value:
                 raise ValueError("function-address literal does not equal its binding")
             literals[offset] = (name, value)
@@ -918,6 +1071,8 @@ class BufferCallProof:
         self.stack_arguments = stack_arguments
 
     def target(self, address):
+        if is_udivsi3_address(address):
+            raise ValueError("division runtime is outside buffer-call proof profiles")
         candidates = [entry for entry in self.entries
                       if isinstance(entry, dict) and isinstance(entry.get("rom"), str)
                       and int(entry["rom"], 16) & ~1 == address & ~1]
@@ -1087,12 +1242,21 @@ class BufferCallProof:
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
-                             switch_data_relocations=None):
+                             switch_data_relocations=None, udivsi3_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
     reserved = set()
+    division_constants = None
+    if udivsi3_context is not None:
+        if not isinstance(udivsi3_context, tuple) or len(udivsi3_context) != 3 or \
+                not isinstance(udivsi3_context[2], dict) or udivsi3_context[2] or \
+                not thumb or buffer_proof is not None or call_resolver is not None or \
+                switch_relocations is not None or switch_data_relocations is not None:
+            raise ValueError("division verification requires an isolated fresh ROM context")
+        verify_udivsi3_identity(udivsi3_context[0], udivsi3_context[1])
+        division_constants = udivsi3_context[2]
     if switch_data_relocations is not None and switch_relocations is None:
         raise ValueError("switch-data requires a verified local switch")
     if switch_relocations is not None:
@@ -1150,6 +1314,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     instruction.size != 4 or len(operands) != 1 or operands[0].type != ARM_OP_IMM or \
                     address <= operands[0].imm < end:
                 raise ValueError("call is not a validated external direct Thumb BL")
+            target = operands[0].imm
+            if is_udivsi3_address(target):
+                if division_constants is None or target != UDIVSI3_ADDRESS:
+                    raise ValueError("division runtime requires its versioned nonzero-divisor proof")
+                divisor = constants.get(ARM_REG_R1)
+                if type(divisor) is not int or not 1 <= divisor <= 0xFFFFFFFF:
+                    raise ValueError("division requires a CFG-proven nonzero constant in r1")
+                division_constants[current] = divisor
+            elif division_constants is not None and target in RUNTIME_HELPERS.values():
+                raise ValueError("division evidence excludes runtime call thunks")
             if call_resolver is not None:
                 call_resolver(operands[0].imm)
                 calls[current] = operands[0].imm
@@ -1373,6 +1547,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 pending.append(successor)
     if seen_calls != calls.keys():
         raise ValueError("call relocations are not all reachable verified instructions")
+    if division_constants is not None and \
+            (not division_constants or uses_stack_frame(instructions.values())):
+        raise ValueError("division evidence requires runtime calls and a frameless caller")
     if not returns:
         raise ValueError("function has no verified return")
     predecessors = {current: set() for current in instructions}
@@ -1602,6 +1779,8 @@ def main():
             data_relocations = {}
             function_relocations = {}
             switch_relocations = {}
+            udivsi3_bindings = {}
+            division_evidence = None
             address_manifest = None
             switch_evidence = None
             if original["relocations"]:
@@ -1610,12 +1789,24 @@ def main():
                 got, calls, data_relocations = link_calls(runner, workspace, args, original,
                                                           addr, mapping, len(rom), rom, data_mapping,
                                                           function_relocations, switch_relocations,
-                                                          allow_switch_data=True)
+                                                          allow_switch_data=True,
+                                                          udivsi3_bindings=udivsi3_bindings)
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
-            if switch_relocations:
+            if udivsi3_bindings:
+                divisors = {}
+                verify_leaf_instructions(got, addr, True, calls,
+                                         udivsi3_context=(rom, mapping, divisors))
+                division_evidence = {
+                    "calls": [[site - addr, udivsi3_bindings.get(site, f"func_{target:08X}")]
+                              for site, target in sorted(calls.items())],
+                    "runtime": UDIVSI3_RUNTIME,
+                    "divisors": [[site - addr, divisor] for site, divisor in sorted(divisors.items())]}
+                verified_instructions = verify_udivsi3(
+                    got, addr, rom, mapping, division_evidence)
+            elif switch_relocations:
                 switch_evidence = {
                     "calls": [[site - addr, f"func_{target:08X}"]
                               for site, target in sorted(calls.items())],
@@ -1676,6 +1867,8 @@ def main():
         schema = FUNCTION_ADDRESS_SCHEMA
     if switch_relocations:
         schema = SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA
+    if udivsi3_bindings:
+        schema = UDIVSI3_SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
@@ -1813,6 +2006,11 @@ def main():
                 fingerprint_switch = switch_data_fingerprint if data_profile else switch_fingerprint
                 proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
                 f.write(f"* switch proof SHA-256: `{proof_digest}`\n")
+            if udivsi3_bindings:
+                f.write(f"* unsigned division: {UDIVSI3_SUMMARY}\n")
+                f.write(f"* unsigned division manifest: `{udivsi3_manifest(division_evidence)}`\n")
+                proof_digest = udivsi3_fingerprint(addr, got_body, division_evidence)
+                f.write(f"* unsigned division proof SHA-256: `{proof_digest}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")
