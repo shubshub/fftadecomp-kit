@@ -51,8 +51,8 @@ try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_INS_ADR, ARM_INS_B,
-                                    ARM_INS_BL, ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
-                                    ARM_OP_REG, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP,
+                                    ARM_INS_BL, ARM_INS_CMP, ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
+                                    ARM_OP_REG, ARM_REG_CPSR, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP,
                                     ARM_REG_R0, ARM_REG_R1, ARM_REG_R2, ARM_REG_R3,
                                     ARM_REG_R12)
 except ImportError:
@@ -1421,6 +1421,20 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
                 allowed_aliases = {assignment[2]} if assignment is not None else set()
+                if thumb and unconditional and instruction.id == ARM_INS_CMP and \
+                        instruction.size == 2 and not instruction.writeback and \
+                        len(operands) == 2 and operands[0].type == ARM_OP_REG and \
+                        operands[1].type == ARM_OP_IMM and operands[1].imm == 0 and \
+                        all(not operand.shift.type and not operand.shift.value and
+                            not operand.subtracted for operand in operands):
+                    compared = operands[0].reg
+                    if ARM_REG_R0 <= compared <= ARM_REG_R0 + 7 and compared in aliases and \
+                            instruction.bytes == bytes((0, 0x28 + compared - ARM_REG_R0)) and \
+                            set(read) == {compared} and set(written) == {ARM_REG_CPSR}:
+                        offset = aliases[compared]
+                        if -4 * len(stack) <= offset < 0 and \
+                                stack[(offset + 4 * len(stack)) // 4][2]:
+                            allowed_aliases.add(compared)
                 for operand in operands:
                     if operand.type != ARM_OP_MEM:
                         continue

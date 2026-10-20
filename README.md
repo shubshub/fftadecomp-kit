@@ -302,9 +302,22 @@ verification for that last case. Callee-saved
 aliases survive only under the existing ABI assumption and are cleared when
 their registers are restored by a pop.
 
+Canonical 16-bit Thumb `cmp r0-r7, #0` may read an already tracked alias into
+a current, definitely allocated local word. Pushed-save slots, entry-SP and
+one-past addresses, dangling aliases, other comparison operands and encodings
+do not qualify. This changes only the permitted read: alias and return-origin
+facts remain intact, and both conditional branch successors are checked without
+assuming that SP is nonzero. The separate incoming-buffer alias pass is not
+expanded. Existing frame schemas, fingerprints and replay checks are unchanged;
+the same instruction-derived rule runs during fresh verification and replay.
+The fixed-frame exclusions in division, switch and function-address profiles
+still apply.
+
 Register-controlled SP writes and untracked stack-pointer transformations
 remain rejected. This is a bounded CFG profile, not a general proof of memory
-safety, pointer lifetime, or callee behavior.
+safety, pointer lifetime, or callee behavior. In particular, the existing normal
+frame profile can leave a stack alias in a return register after restoring SP;
+null-comparison support does not introduce a new pointer-return policy.
 
 Framed reports use `elf-symbol-thumb-frame-v1` or
 `elf-symbol-thumb-frame-calls-v1` and require an explicit stack-summary line.
