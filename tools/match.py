@@ -990,7 +990,7 @@ def main():
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
-    with open(rom_path, "rb") as original:
+    with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
     exact = identical and plausible
