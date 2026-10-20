@@ -593,11 +593,14 @@ retain their existing independent checks.
 
 The distinct `elf-symbol-thumb-switch-data-v1` profile permits one specific
 mixed-data layout: exactly one aligned, explicitly mapped object-address word
-immediately follows the five-instruction dispatch, followed by the local
-table pointer and then its adjacent table. The pointer is fourteen bytes
-after the dispatch start. No other gap, extra object relocation or generalized
-pool placement is admitted. The original switches-v1 profile and default
-binding APIs retain their object-relocation exclusion.
+follows the five-instruction dispatch and only its required word alignment,
+followed by the local table pointer and then its adjacent table. For absolute
+dispatch address `D`, the object is exactly `align4(D + 10)`: zero or two
+alignment bytes, all zero. The pointer is therefore fourteen or sixteen bytes
+after the dispatch start. An extra gap, a nonzero alignment halfword, an extra
+object relocation or generalized pool placement is not admitted. The original
+switches-v1 profile and default binding APIs retain their object-relocation
+exclusion.
 
 The object word must have a unique named undefined global binding and a valid
 signed addend, and a reachable aligned PC-relative word load must read it.
@@ -614,6 +617,9 @@ including the object's offset, name and signed addend. A separate versioned
 fingerprint binds the address, complete bytes and manifest. Replay requires
 current source/header, function-map and object-map fingerprints, reconstructs
 the proof and compares the complete mapped span against the current ROM.
+The required alignment is derived again from the bound addresses and bytes;
+it adds no metadata field and leaves existing descriptors and fingerprints
+unchanged. Typed linking cannot change those non-relocated alignment bytes.
 Missing, duplicate, malformed, stale or mixed-profile evidence is rejected.
 This proves relocation and bounded control-flow fidelity, not object bounds,
 source plausibility or downstream helper behavior.

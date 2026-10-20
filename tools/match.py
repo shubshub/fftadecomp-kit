@@ -1085,13 +1085,14 @@ def switch_layout(data, address, relocations, data_relocations=None):
         return decoded.operands[0].imm - address
 
     candidates = []
-    for dispatch in ((literal - 14,) if data_relocations is not None
+    for dispatch in ((literal - 14, literal - 16) if data_relocations is not None
                      else (literal - 10, literal - 12)):
         if data_relocations is None:
             if (address + dispatch + 13) & ~3 != address + literal or \
                     any(data[dispatch + 10:literal]):
                 continue
-        elif (address + dispatch + 10) % 4:
+        elif (address + dispatch + 13) & ~3 != address + literal - 4 or \
+                any(data[dispatch + 10:literal - 4]):
             continue
         sequence = [instruction(dispatch + distance) for distance in range(0, 10, 2)]
         if any(item is None or item.cc not in (ARM_CC_AL, ARM_CC_INVALID) for item in sequence) or \
