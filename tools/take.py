@@ -199,7 +199,7 @@ def comment(number, text):
         pass
 
 
-def pending_requests(number, state=None):
+def pending_requests(number, state):
     """broker request comments that have not been answered yet
 
     The broker records its answers in the ledger body, in state["results"] -
@@ -534,7 +534,7 @@ def cmd_doctor(args):
     print(f"ledger            #{number}  (open, parseable)")
     print(f"rows              {len(state['rows'])}")
     print(f"broker cursor     {state.get('cursor')}")
-    pending = pending_requests(number)
+    pending = pending_requests(number, state)
     if pending:
         print(f"pending requests  {len(pending)}")
         for op, a in pending:
