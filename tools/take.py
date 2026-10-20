@@ -69,11 +69,32 @@ for _s in ("stdout", "stderr"):
         pass
 
 
+class GhError(SystemExit):
+    """gh failed; .text is the message, .permission is True if it was a 403
+
+    SystemExit, not RuntimeError, on purpose: this used to be a plain
+    sys.exit(), and the callers that tolerate a failed read - a 404 for
+    'src/<addr>.c does not exist' is the normal answer for an unmatched
+    function - catch SystemExit.  Deriving from it keeps them working, while
+    the more specific 'except GhError' handlers added here still win.
+    """
+
+    def __init__(self, message, permission=False):
+        super().__init__(message)
+        self.text = message
+        self.permission = permission
+
+
 def gh(*args, stdin=None, check=True):
     r = subprocess.run(["gh", *args], input=stdin, capture_output=True,
                        text=True, encoding="utf-8", errors="replace")
     if check and r.returncode != 0:
-        sys.exit(f"gh {' '.join(args[:3])} failed:\n{r.stderr or r.stdout}")
+        message = (r.stderr or r.stdout or "").strip()
+        low = message.lower()
+        permission = ("403" in message or "resource not accessible" in low or
+                      "must have write access" in low or
+                      "permission denied" in low or "not allowed" in low)
+        raise GhError(f"gh {' '.join(args[:3])} failed:\n{message}", permission)
     return r
 
 
@@ -153,7 +174,14 @@ def render(state):
 
 
 def write_ledger(number, state):
-    """write the body through a file - stdin would gain CRLF on Windows"""
+    """write the body through a file - stdin would gain CRLF on Windows
+
+    This edits the ledger issue's *body*, so it needs write access on the
+    issue: being the author, or having triage/write permission on the repo.
+    A third party can comment on a public issue but cannot edit its body, and
+    GitHub answers that with a 403.  cmd_claim catches that and routes to the
+    broker request instead.
+    """
     body = render(state)
     if "\r" in body:
         raise RuntimeError("refusing to write: rendered body contains CR")
@@ -171,8 +199,16 @@ def comment(number, text):
         pass
 
 
-def pending_requests(number):
-    """broker request comments that have not been answered yet"""
+def pending_requests(number, state=None):
+    """broker request comments that have not been answered yet
+
+    The broker records its answers in the ledger body, in state["results"] -
+    not as comments.  This used to look for a 'ffta-ledger-result' comment that
+    the broker never writes, so every request ever submitted stayed pending
+    forever and the tool refused to write anything: 'the broker has N
+    unanswered request(s)'.  A third party hit exactly that, because they can
+    comment on the ledger but cannot edit its body.
+    """
     items = json.loads(gh("api", f"repos/{KIT_REPO}/issues/{number}/comments",
                          "--paginate").stdout or "[]")
     asked, done = set(), set()
@@ -191,7 +227,13 @@ def pending_requests(number):
         if RESULT_MARK in b:
             addr = str(payload.get("address", "")).upper()
             done.add(addr)
-    return sorted(asked - {(op, a) for op, a in done})
+    # the broker's own answers live in the ledger body
+    if state is not None:
+        for result in state.get("results", []):
+            addr = result.get("address")
+            if addr:
+                done.add(str(addr).upper())
+    return sorted(key for key in asked if key[1] not in done)
 
 
 # ------------------------------------------------------------ other sources
@@ -267,13 +309,56 @@ def cmd_check(args):
     return EXIT_OK
 
 
+def broker_request(args, addr, row=None):
+    """post a request comment and wait for the workflow to accept it
+
+    The reservations workflow runs with issues: write on the kit repository,
+    so it can edit the ledger body on a third party's behalf.  That is the
+    only path that works for someone without write access.
+    """
+    import json as _json
+    request = {"operation": args.cmd, "address": addr,
+               "who": getattr(args, "who", None) or "agent"}
+    if args.cmd == "claim":
+        request["note"] = getattr(args, "note", "") or "-"
+    else:
+        # ping and release are bound to the original claim generation
+        claim_id = (row or {}).get("claim_id")
+        if claim_id is None:
+            print("this lease has no claim generation, so the broker cannot "
+                  "match the request to it.")
+            print("Ask a maintainer to reconcile the row.")
+            return EXIT_UNCONFIRMED
+        request["claim_id"] = claim_id
+        request["reason"] = getattr(args, "reason", "") or ""
+        request["unmatchable"] = bool(getattr(args, "unmatchable", False))
+        tried = getattr(args, "tried", "")
+        if tried:
+            request["tried"] = tried
+    body = ("<!-- ffta-reservation-request:v1 -->\n" +
+            _json.dumps(request, ensure_ascii=True, separators=(",", ":")))
+    try:
+        comment_number, _ = fetch_ledger()
+        comment(comment_number, body)
+    except GhError as exc:
+        print(f"could not submit the request: {exc}")
+        print("Check that 'gh' is installed and authenticated with a token "
+              "that can comment on public issues (scope: repo).")
+        return EXIT_UNCONFIRMED
+    print(f"request submitted to ledger #{comment_number}; it is not accepted "
+          f"yet.")
+    print("Do not start work until it is accepted - poll with "
+          f"'take.py list'.")
+    return EXIT_UNCONFIRMED
+
+
 def cmd_claim(args):
     addr = normalise(args.addr)
     code = cmd_check(args)
     if code != EXIT_OK:
         return code
     number, state = fetch_ledger()
-    busy = pending_requests(number)
+    busy = pending_requests(number, state)
     if busy:
         print(f"REFUSING to write: the broker has {len(busy)} unanswered "
               f"request(s) ({', '.join(op + ' ' + a for op, a in busy[:4])}).")
@@ -287,6 +372,18 @@ def cmd_claim(args):
     state["rows"].append(row)
     try:
         write_ledger(number, state)
+    except GhError as exc:
+        if not exc.permission:
+            print(f"write failed: {exc}")
+            return EXIT_UNCONFIRMED
+        # No write access on the issue body - which is the normal case for
+        # anyone but the maintainer.  Posting a request comment needs no write
+        # access, and the reservations workflow applies it on our behalf.
+        print("cannot edit the ledger issue body (no write access on the "
+              "issue).")
+        print("submitting a broker request instead - the reservations "
+              "workflow will apply it.")
+        return broker_request(args, addr, row)
     except RuntimeError as exc:
         print(f"write failed: {exc}")
         return EXIT_UNCONFIRMED
@@ -308,7 +405,15 @@ def cmd_ping(args):
         print(f"{addr} is not reserved by this ledger", file=sys.stderr)
         return EXIT_TAKEN
     row["last_seen"] = now()
-    write_ledger(number, state)
+    try:
+        write_ledger(number, state)
+    except GhError as exc:
+        if not exc.permission:
+            print(f"write failed: {exc}")
+            return EXIT_UNCONFIRMED
+        print("cannot edit the ledger issue body (no write access on the "
+              "issue); submitting a broker request instead.")
+        return broker_request(args, addr, row)
     comment(number, f"lease refreshed on {addr} by `{row.get('who')}`")
     print(f"pinged {addr}")
     return EXIT_OK
@@ -325,6 +430,13 @@ def cmd_release(args):
                      if str(r.get("address", "")).upper() != addr.upper()]
     try:
         write_ledger(number, state)
+    except GhError as exc:
+        if not exc.permission:
+            print(f"write failed: {exc}")
+            return EXIT_UNCONFIRMED
+        print("cannot edit the ledger issue body (no write access on the "
+              "issue); submitting a broker request instead.")
+        return broker_request(args, addr, row)
     except RuntimeError as exc:
         print(f"write failed: {exc}")
         return EXIT_UNCONFIRMED
@@ -502,7 +614,19 @@ def main():
     p.set_defaults(fn=cmd_purge)
 
     args = ap.parse_args()
-    return args.fn(args)
+    try:
+        return args.fn(args)
+    except GhError as exc:
+        # gh() used to exit with a plain message; keep it that way, and say
+        # what a permission failure means, because it is the single most
+        # common way for a new contributor to get stuck.
+        print(str(exc), file=sys.stderr)
+        if exc.permission:
+            print("GitHub refused the write.  If this is the ledger issue, "
+                  "the usual cause is editing an issue body you do not own: "
+                  "commenting on a public issue is allowed, editing it needs "
+                  "write access.", file=sys.stderr)
+        return 1
 
 
 if __name__ == "__main__":
