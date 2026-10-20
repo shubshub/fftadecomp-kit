@@ -47,6 +47,7 @@ from pathlib import Path
 import re
 import subprocess
 import sys
+from rompath import rom_path
 
 KIT = os.path.dirname(os.path.realpath(__file__))
 KIT_ROOT = os.path.realpath(os.path.dirname(KIT))
@@ -94,8 +95,8 @@ def committed_tree(repo, commit):
                                    input=archive.stdout, capture_output=True)
         if extracted.returncode != 0:
             raise ValueError("could not extract the captured commit")
-        source_rom = os.path.join(repo, "baserom.bin")
-        if os.path.exists(source_rom):
+        source_rom = rom_path(repo, required=False)
+        if source_rom and os.path.exists(source_rom):
             shutil.copy2(source_rom, os.path.join(destination, "baserom.bin"))
         return destination
     except (OSError, ValueError) as error:

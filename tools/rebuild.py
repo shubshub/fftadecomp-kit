@@ -18,6 +18,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+from rompath import rom_path
 import re
 import subprocess
 import sys
@@ -87,7 +88,8 @@ def output_path(root, requested):
 def compiled_rebuild(root, requested_output=None):
     root = Path(root)
     output = output_path(root, requested_output)
-    baseline = root / "baserom.bin"
+    baseline = Path(rom_path(str(root), required=False) or
+                    (root / "baserom.bin"))
     baseline_state = file_state(baseline)
     inventory = source_inventory(root)
     mapping = mapping_snapshot(root)
@@ -217,11 +219,11 @@ def main():
         except (OSError, ValueError) as error:
             print(f"compiled rebuild failed: {error}", file=sys.stderr)
             return 1
-    rom_path = os.path.join(here, "baserom.bin")
-    base = open(rom_path, "rb").read()
+    base_file = rom_path(here)
+    base = open(base_file, "rb").read()
     manifest = json.load(open(os.path.join(here, "asm", "manifest.json")))
 
-    print(f"base ROM : {os.path.basename(rom_path)}")
+    print(f"base ROM : {os.path.basename(base_file)}")
     print(f"  size   : {len(base):,}")
     print(f"  sha1   : {sha1(base)}")
 

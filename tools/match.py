@@ -29,6 +29,7 @@ import shutil
 import struct
 import subprocess
 import sys
+from rompath import rom_path
 from contextlib import contextmanager
 from pathlib import Path
 from match_evidence import (CALL_SUMMARY, DATA_SCHEMA, FRAMED_DATA_SCHEMA,
@@ -902,8 +903,8 @@ def main():
         if os.path.lexists(emit):
             sys.exit("--emit refuses to overwrite an existing file")
 
-    rom_path = os.path.join(ROOT, "baserom.bin")
-    with open(rom_path, "rb") as original:
+    rom_file = rom_path(ROOT)
+    with open(rom_file, "rb") as original:
         rom = original.read()
     span = function_span(addr, os.path.join(ROOT, "symbols", "functions.txt"))
     if span is None or span <= 0:

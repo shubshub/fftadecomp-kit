@@ -30,6 +30,7 @@ import argparse
 import os
 import subprocess
 import sys
+from rompath import rom_path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -106,7 +107,7 @@ def main():
     addr = int(args.addr, 16)
     root = os.path.abspath(args.root)
     os.chdir(root)
-    rom = open("baserom.bin", "rb").read()
+    rom = open(rom_path("."), "rb").read()
 
     # the ROM extent: from the analysis, or to the end of the mapped function
     span = 0

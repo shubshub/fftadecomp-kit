@@ -14,6 +14,7 @@ import os
 import shutil
 import subprocess
 import sys
+from rompath import rom_path
 import tempfile
 
 KIT = os.path.dirname(os.path.abspath(__file__))
@@ -64,8 +65,8 @@ def main():
         if blob.stderr:
             pass
 
-    rom = os.path.join(repo, "baserom.bin")
-    if os.path.exists(rom):
+    rom = rom_path(repo)
+    if rom and os.path.exists(rom):
         shutil.copy2(rom, os.path.join(tmp, "baserom.bin"))
 
     env = dict(os.environ)

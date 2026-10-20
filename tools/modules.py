@@ -1,3 +1,4 @@
+from rompath import rom_path
 """Propose a file structure from the ROM.
 
 There are no names and no plaintext in this ROM - every symbol is
@@ -185,7 +186,7 @@ def main():
     a = ap.parse_args()
 
     root = os.path.abspath(a.root)
-    rom = open(os.path.join(root, "baserom.bin"), "rb").read()
+    rom = open(rom_path(root), "rb").read()
     funcs = json.load(open(os.path.join(root, "config", "functions.json")))
     funcs = [f for f in funcs
              if f.get("mode") == "thumb" and ROM_BASE <= int(f["rom"], 16) < ROM_END]
