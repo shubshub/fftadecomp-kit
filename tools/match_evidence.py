@@ -1,6 +1,7 @@
 """Source-bound metadata for cached, offline match reports."""
 
 import hashlib
+import json
 from pathlib import Path
 import re
 
@@ -13,6 +14,8 @@ FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
 STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return provenance"
 DATA_SCHEMA = "elf-symbol-thumb-data-v1"
 FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
+FUNCTION_ADDRESS_SCHEMA = "elf-symbol-thumb-function-addresses-v1"
+FUNCTION_ADDRESS_SUMMARY = "zero-addend mapped Thumb function literals; relocation fidelity, not callback ABI"
 BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v1"
 BUFFER_SUMMARY = "ROM-checked bounded non-escaping register buffer arguments"
 STACK_BUFFER_SCHEMA = "elf-symbol-thumb-frame-buffer-calls-v2"
@@ -106,9 +109,87 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
         return False
 
 
+def function_address_manifest(manifest):
+    return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
+
+
+def function_address_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (FUNCTION_ADDRESS_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, function_address_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
+def function_address_report_matches(lines, root, address):
+    from match import verify_function_addresses
+
+    def single(prefix):
+        matches = [line for line in lines if line.startswith(prefix)]
+        if len(matches) != 1:
+            raise ValueError("missing or duplicate function-address evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed function-address evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate function-address manifest key")
+            result[name] = value
+        return result
+
+    try:
+        functions = mapping_snapshot(root)
+        objects = data_snapshot(root)
+        if functions is None or \
+                unquote("* source SHA-256: ") != source_fingerprint(root, address) or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(functions) or \
+                single("* function addresses: ") != FUNCTION_ADDRESS_SUMMARY or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.startswith(("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:"))
+                    for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* function address manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if function_address_manifest(manifest) != encoded_manifest:
+            return False
+        if manifest.get("data"):
+            if objects is None or unquote("* data symbols SHA-256: ") != mapping_fingerprint(objects):
+                return False
+        elif any(line.startswith("* data symbols SHA-256:") for line in lines):
+            return False
+        rom = (Path(root) / "baserom.bin").read_bytes()
+        _, control_flow = verify_function_addresses(data, address, rom, functions, objects, manifest)
+        return (single("* control flow: ") == control_flow and
+                single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* function address proof SHA-256: ") ==
+                function_address_fingerprint(address, data, manifest))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
+
+
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{FUNCTION_ADDRESS_SCHEMA}`"]:
+        return function_address_report_matches(lines, root, address)
+    if any(line.startswith(("* function addresses:", "* function address manifest:",
+                            "* function address proof SHA-256:")) for line in lines):
+        return False
     profile_valid = profiles in ([f"* verification: `{SCHEMA}`"],
                                  [f"* verification: `{FRAMED_SCHEMA}`"])
     if profiles in ([f"* verification: `{LINKED_SCHEMA}`"],

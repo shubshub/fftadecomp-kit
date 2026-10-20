@@ -35,9 +35,11 @@ from contextlib import contextmanager
 from pathlib import Path
 from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SCHEMA,
                             FRAMED_DATA_SCHEMA,
+                            FUNCTION_ADDRESS_SCHEMA, FUNCTION_ADDRESS_SUMMARY,
                             FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA, LINKED_SCHEMA,
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
+                            function_address_fingerprint, function_address_manifest,
                             mapping_snapshot, source_fingerprint, source_paths,
                             verify_dependencies)
 
@@ -261,11 +263,32 @@ def parse_data_symbols(snapshot):
     return symbols
 
 
+def function_address_target(name, entries, address, size, rom_size):
+    match = re.fullmatch(r"func_([0-9A-F]{8})", name)
+    if match is None:
+        raise ValueError("function address requires a canonical addressed function")
+    target = int(match[1], 16)
+    if target in RUNTIME_HELPERS.values():
+        raise ValueError("function-address evidence does not support runtime call thunks")
+    candidates = [entry for entry in entries
+                  if int(entry["rom"], 16) & ~1 == target & ~1]
+    if target % 2 or len(candidates) != 1 or candidates[0].get("mode") != "thumb" or \
+            int(candidates[0]["rom"], 16) != target or \
+            not ROM_BASE <= target <= ROM_BASE + rom_size - 2:
+        raise ValueError("function address is unknown, ambiguous, misaligned, or not Thumb ROM code")
+    if address <= target < address + size:
+        raise ValueError("self or intra-function addresses are unsupported")
+    return target
+
+
 def call_bindings(image, name, address, mapping, rom_size,
-                   rom_image=b'', data_mapping=None):
+                   rom_image=b'', data_mapping=None, function_relocations=None):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
+    if function_relocations is not None and \
+            (not isinstance(function_relocations, dict) or function_relocations):
+        raise ValueError("function-address bindings require an empty collection")
     allocated_text_only(image)
     symbol, offset = function_record(image, name, address, True)
     functions = [item for item in image["symbols"] if item["type"] == 2 and item["section"]]
@@ -299,6 +322,26 @@ def call_bindings(image, name, address, mapping, rom_size,
             target_symbol = symbols[info >> 8]
             if info & 255 == 2:
                 target_name = target_symbol["name"]
+                if target_name.startswith("func_"):
+                    if function_relocations is None:
+                        raise ValueError("function addresses require their versioned proof profile")
+                    if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                            target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                            sum(item["name"] == target_name for item in image["symbols"]) != 1:
+                        raise ValueError("function address must name an undefined global function")
+                    target = function_address_target(target_name, entries, address,
+                                                     symbol["size"], rom_size)
+                    if (address + relocation) % 4 or relocation + 4 > symbol["size"]:
+                        raise ValueError("function relocation must cover an aligned complete literal word")
+                    if struct.unpack_from("<I", image["text"], relocation)[0]:
+                        raise ValueError("function address addends must be zero")
+                    positions = set(range(relocation, relocation + 4))
+                    if positions & occupied:
+                        raise ValueError("overlapping function, data or call relocations")
+                    occupied.update(positions)
+                    function_relocations[relocation] = (target_name, target | 1)
+                    targets[target_name] = target
+                    continue
                 if target_symbol["section"] or target_symbol["bind"] != 1 or \
                         target_symbol["type"] not in (0, 1) or target_name not in data_symbols:
                     raise ValueError("data target must be an undefined mapped object")
@@ -366,14 +409,17 @@ def call_bindings(image, name, address, mapping, rom_size,
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
-    if not (calls or data_relocations) or \
+    if function_relocations and any(target in RUNTIME_HELPERS for target in targets):
+        raise ValueError("function-address evidence does not support runtime call thunks")
+    if not (calls or data_relocations or function_relocations) or \
             any(item["name"] and not item["section"] and item["name"] not in targets
                 for item in image["symbols"]):
         raise ValueError("unresolved symbols outside the permitted bindings")
     return calls, targets, data_relocations
 
 
-def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None):
+def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None,
+                          function_relocations=None):
     """Validate exact placement and the linker's complete modification surface."""
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
@@ -386,6 +432,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if len(linked["text"]) != len(original["text"]):
         raise ValueError("linker added text or veneers")
     data_relocations = data_relocations or {}
+    function_relocations = function_relocations or {}
+    function_names = {binding[0] for binding in function_relocations.values()}
     data_names = {binding[0] for binding in data_relocations.values()}
     expected_functions = {name} | (set(targets) - data_names)
     actual_functions = [item["name"] for item in linked["symbols"] if item["type"] == 2]
@@ -399,7 +447,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         expected_type = 1 if target_name in data_names else 2
         expected_value = target if target_name in data_names else target | 1
         if len(definitions) != 1 or definitions[0]["type"] != expected_type or \
-                definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value:
+                definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value or \
+                target_name in function_names and definitions[0]["bind"] != 1:
             raise ValueError("linked target lost its absolute symbol type or address")
     if any(item["name"] and not item["section"] for item in linked["symbols"]):
         raise ValueError("linked ELF retains undefined symbols")
@@ -410,6 +459,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         if struct.unpack_from("<I", linked["text"], relocation)[0] != value:
             raise ValueError("linked data word does not equal its mapped address and addend")
         patched.update(range(relocation, relocation + 4))
+    for relocation, (target_name, value) in function_relocations.items():
+        if value != targets[target_name] | 1 or \
+                struct.unpack_from("<I", linked["text"], relocation)[0] != value:
+            raise ValueError("linked function word does not equal its mapped Thumb address")
+        patched.update(range(relocation, relocation + 4))
     if any(before_byte != after_byte and position not in patched
            for position, (before_byte, after_byte)
            in enumerate(zip(original["text"], linked["text"]))):
@@ -418,10 +472,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
 
 
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
-               rom_image=b'', data_mapping=None):
+               rom_image=b'', data_mapping=None, function_relocations=None):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
-                                                    rom_size, rom_image, data_mapping)
+                                                    rom_size, rom_image, data_mapping,
+                                                    function_relocations)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -451,7 +506,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
     linked = elf_image(runner.read_binary(f"{workspace}/f.elf"))
     if runner.read_binary(f"{workspace}/f.linked.bin") != linked["text"]:
         raise ValueError("objcopy output does not equal linked ELF .text")
-    return (linked_function_bytes(original, linked, name, address, calls, targets, data_relocations),
+    return (linked_function_bytes(original, linked, name, address, calls, targets,
+                                  data_relocations, function_relocations),
             calls, data_relocations)
 
 
@@ -462,6 +518,69 @@ def verify_data_literals(instructions, address, data_relocations):
                 operand.mem.base == ARM_REG_PC and not operand.mem.index}
     if any(address + relocation not in literals for relocation in data_relocations):
         raise ValueError("data relocation is not a reachable trailing literal-pool load")
+
+
+def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
+    if mapping is None or not isinstance(manifest, dict) or \
+            set(manifest) != {"calls", "data", "functions"} or \
+            any(not isinstance(records, list) for records in manifest.values()) or \
+            not manifest["functions"]:
+        raise ValueError("invalid function-address manifest")
+    entries = json.loads(mapping)
+    if not isinstance(entries, list):
+        raise ValueError("function mapping must be a list")
+    caller = [entry for entry in entries if int(entry["rom"], 16) & ~1 == address & ~1]
+    if address % 2 or len(caller) != 1 or caller[0].get("mode") != "thumb" or \
+            int(caller[0]["rom"], 16) != address or \
+            int(caller[0]["end"], 16) != address + len(data) or \
+            not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom):
+        raise ValueError("function-address caller requires an exact mapped Thumb span")
+    if rom[address - ROM_BASE:address - ROM_BASE + len(data)] != data:
+        raise ValueError("function-address caller differs from the ROM")
+    objects = parse_data_symbols(data_mapping) if manifest["data"] else {}
+    calls = {}
+    literals = {}
+    occupied = set()
+    for kind, records in manifest.items():
+        previous = -1
+        for record in records:
+            if not isinstance(record, list) or len(record) != (3 if kind == "data" else 2):
+                raise ValueError("invalid function-address binding")
+            offset, name = record[:2]
+            if type(offset) is not int or not isinstance(name, str) or offset <= previous or \
+                    offset < 0 or offset + 4 > len(data):
+                raise ValueError("function-address bindings must be ordered complete words")
+            previous = offset
+            positions = set(range(offset, offset + 4))
+            if positions & occupied:
+                raise ValueError("overlapping function-address manifest bindings")
+            occupied.update(positions)
+            if kind == "calls":
+                if offset % 2:
+                    raise ValueError("function-address call is misaligned")
+                calls[address + offset] = function_address_target(
+                    name, entries, address, len(data), len(rom))
+                continue
+            if (address + offset) % 4:
+                raise ValueError("function-address literal is misaligned")
+            if kind == "functions":
+                value = function_address_target(name, entries, address, len(data), len(rom)) | 1
+            else:
+                addend = record[2]
+                if name not in objects or type(addend) is not int or \
+                        not -0x80000000 <= addend <= 0x7FFFFFFF:
+                    raise ValueError("invalid function-address object binding")
+                value = objects[name] + addend
+                if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data):
+                    raise ValueError("function-address object binding overflows or references itself")
+            if struct.unpack_from("<I", data, offset)[0] != value:
+                raise ValueError("function-address literal does not equal its binding")
+            literals[offset] = (name, value)
+    instructions = verify_leaf_instructions(data, address, True, calls)
+    if uses_stack_frame(instructions):
+        raise ValueError("function-address evidence supports only frameless callers")
+    verify_data_literals(instructions, address, literals)
+    return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
 def thumb_stack_adjustment(instruction):
@@ -1186,24 +1305,39 @@ def main():
                 raise ValueError("objcopy output does not equal ELF .text")
             calls = {}
             data_relocations = {}
+            function_relocations = {}
+            address_manifest = None
             if original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
                 got, calls, data_relocations = link_calls(runner, workspace, args, original,
-                                                          addr, mapping, len(rom), rom, data_mapping)
+                                                          addr, mapping, len(rom), rom, data_mapping,
+                                                          function_relocations)
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
-            try:
-                verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
-                                                                  buffer_proof=buffer_proof)
-            except ValueError:
-                if not thumb or not calls:
-                    raise
-                buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True)
-                verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
-                                                                  buffer_proof=buffer_proof)
+            if function_relocations:
+                objects = parse_data_symbols(data_mapping) if data_relocations else {}
+                address_manifest = {
+                    "calls": [[site - addr, f"func_{target:08X}"]
+                              for site, target in sorted(calls.items())],
+                    "data": [[offset, name, value - objects[name]]
+                             for offset, (name, value) in sorted(data_relocations.items())],
+                    "functions": [[offset, name] for offset, (name, value)
+                                  in sorted(function_relocations.items())]}
+                verified_instructions, _ = verify_function_addresses(
+                    got, addr, rom, mapping, data_mapping, address_manifest)
+            else:
+                try:
+                    verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
+                                                                      buffer_proof=buffer_proof)
+                except ValueError:
+                    if not thumb or not calls:
+                        raise
+                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True)
+                    verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
+                                                                      buffer_proof=buffer_proof)
             verify_data_literals(verified_instructions, addr, data_relocations)
             if buffer_proof.stack_arguments and not buffer_proof.dependencies:
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
@@ -1226,6 +1360,8 @@ def main():
         schema = FRAMED_LINKED_SCHEMA if linked_profile else FRAMED_SCHEMA
     if buffer_proof.dependencies:
         schema = STACK_BUFFER_SCHEMA if buffer_proof.stack_arguments else BUFFER_SCHEMA
+    if function_relocations:
+        schema = FUNCTION_ADDRESS_SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
@@ -1252,7 +1388,7 @@ def main():
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
-    if (linked_profile or data_profile) and mapping_snapshot(ROOT) != mapping:
+    if (linked_profile or data_profile or function_relocations) and mapping_snapshot(ROOT) != mapping:
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
@@ -1344,11 +1480,17 @@ def main():
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-            if linked_profile or data_profile:
+            if linked_profile or data_profile or function_relocations:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
             if data_profile:
                 f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
+            if function_relocations:
+                encoded_manifest = function_address_manifest(address_manifest)
+                f.write(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
+                f.write(f"* function address manifest: `{encoded_manifest}`\n")
+                proof_digest = function_address_fingerprint(addr, got_body, address_manifest)
+                f.write(f"* function address proof SHA-256: `{proof_digest}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")

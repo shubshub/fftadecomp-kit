@@ -404,6 +404,43 @@ summary. Mapping changes invalidate cached evidence and interrupt mixed rebuilds
 These checks establish relocation fidelity, not the safety of dereferencing a
 mapped address. No game data should be copied into the symbol map.
 
+### Named Thumb function addresses
+
+The separate `elf-symbol-thumb-function-addresses-v1` profile admits
+zero-addend `R_ARM_ABS32` literals referring to canonical `func_XXXXXXXX`
+names. The undefined symbol must be global and have function or notype ELF
+type, with a zero undefined value and no duplicate named symbol. Its even
+address must identify exactly one Thumb entry in `config/functions.json`,
+fit inside the ROM, and lie outside the caller. Function names cannot be
+laundered through `config/data_symbols.json` or an older proof profile.
+
+The linker defines an absolute Thumb function symbol, not an object. Both
+the linked symbol value and the complete literal word must equal the mapped
+address with bit zero set. Nonzero addends, weak or local symbols, local
+functions, ARM targets, runtime call thunks, veneers and unresolved symbols
+are rejected. Each function literal must be an aligned word loaded by reachable
+PC-relative code and must not overlap code or another relocation. The existing
+full-symbol and linker-modification checks still apply.
+
+Version 1 supports frameless callers with ordinary direct Thumb calls and
+optional named object literals. It does not admit fixed stack frames, buffer
+proofs, indirect calls or jump tables. Push/pop register saves do not by
+themselves constitute a fixed stack frame. Existing leaf, call, data, frame
+and buffer schemas retain their existing requirements.
+
+Reports bind source and headers, the function mapping, any used object mapping,
+and a canonical manifest of call, object and function-address bindings.
+The manifest and complete caller bytes carry a versioned proof fingerprint.
+Report validation replays the CFG, exact mapped caller extent, literal loads,
+target mappings and literal values against the current local ROM. Missing ROM,
+stale inputs, malformed or duplicate metadata and changed proof contents reject
+the report. New-profile metadata cannot be attached to an older schema.
+Verification also rejects input changes before report or byte emission.
+
+This profile proves relocation fidelity, not callback ABI compatibility,
+callback behavior or whole-program memory safety. Callback declarations and
+registration contracts still require independent source and ROM review.
+
 Reports carry a verification schema and a SHA-256 fingerprint of the source
 and headers. `status.py` rejects legacy or stale reports; regenerate them with
 `match.py`. Shared preprocessing inputs must live under `include/` or be `.h`
