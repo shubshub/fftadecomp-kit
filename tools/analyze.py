@@ -44,6 +44,12 @@ BLK = 0x400                # 4 KiB granularity for the coverage map
 _LOG = []
 
 
+def rom_path_default(here):
+    """the ROM to analyse: the one in this directory, whatever it is called"""
+    from rompath import rom_path
+    return rom_path(here)
+
+
 def repo_root(arg=None):
     """The decomp repo this tool operates on.
 
@@ -423,7 +429,7 @@ def refinement_main(arguments):
     parser.add_argument("--refine-max-instructions", type=lambda value: int(value, 0), default=1024)
     options = parser.parse_args(arguments)
     here = repo_root(options.root)
-    rom_path = options.rom or os.path.join(here, "baserom.bin")
+    rom_path = options.rom or rom_path_default(here)
     output = {"inventory_complete": False, "results": []}
 
     def unique_object(pairs):
@@ -943,7 +949,7 @@ def main():
         return refinement_main(sys.argv[1:])
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     here = repo_root(args[1] if len(args) > 1 else None)
-    rom_path = args[0] if args else os.path.join(here, "baserom.bin")
+    rom_path = args[0] if args else rom_path_default(here)
     json_path = os.path.join(here, "config", "rom_layout.json")
     txt_path = os.path.join(here, "symbols", "functions.txt")
     log_path = os.path.join(here, "logs", "analysis.txt")

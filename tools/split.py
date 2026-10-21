@@ -35,6 +35,12 @@ CODE_CHUNK_MIN = 0x400   # a 64 KiB window needs this many code bytes to
                          # count as a code chunk (kills gfx false positives)
 
 
+def rom_path_default(here):
+    """the ROM to analyse: the one in this directory, whatever it is called"""
+    from rompath import rom_path
+    return rom_path(here)
+
+
 def normalize(cov):
     """merge neighbours and fold implausibly short code runs into data"""
     out = []
@@ -67,7 +73,7 @@ def repo_root(arg=None):
 def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     here = repo_root(args[1] if len(args) > 1 else None)
-    rom_path = args[0] if args else os.path.join(here, "baserom.bin")
+    rom_path = args[0] if args else rom_path_default(here)
     rom = open(rom_path, "rb").read()
 
     cov = json.load(open(os.path.join(here, "config", "coverage.json")))

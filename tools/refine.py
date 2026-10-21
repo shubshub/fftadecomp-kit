@@ -53,6 +53,81 @@ def has_return(rom, a, e):
     return False
 
 
+def bl_targets(rom, a, e):
+    """every Thumb BL target inside a function"""
+    out = []
+    off = a - ROM_BASE
+    stop = e - ROM_BASE
+    while off + 3 < stop:
+        hw = struct.unpack_from("<H", rom, off)[0]
+        n = width(rom, off)
+        if n == 4:
+            hw2 = struct.unpack_from("<H", rom, off + 2)[0]
+            if (hw & 0xF800) == 0xF000 and (hw2 & 0xD000) == 0xD000:
+                s = (hw >> 10) & 1
+                i1 = 1 - (((hw2 >> 13) & 1) ^ s)
+                i2 = 1 - (((hw2 >> 11) & 1) ^ s)
+                v = ((s << 24) | (i1 << 23) | (i2 << 22) |
+                     ((hw & 0x3FF) << 12) | ((hw2 & 0x7FF) << 1))
+                if s:
+                    v -= 1 << 25
+                t = off + 4 + v + ROM_BASE
+                if t % 2 == 0 and ROM_BASE <= t < ROM_BASE + len(rom):
+                    out.append(t)
+        off += n
+    return out
+
+
+def ends_on_conditional_branch(rom, a, e):
+    """the signature of a truncated span
+
+    A conditional branch always falls through, so it can never be the end of a
+    function.  The scanner that built the index stopped there anyway, which is
+    why so many spans were short.  (The other kind of stop - an unconditional
+    branch out - is a legitimate end.)
+    """
+    off = a - ROM_BASE
+    last = None
+    while off < e - ROM_BASE:
+        hw = struct.unpack_from("<H", rom, off)[0]
+        n = width(rom, off)
+        last = (hw, n)
+        off += n
+    if last is None:
+        return False
+    hw, n = last
+    if n == 2:
+        return (hw & 0xF000) == 0xD000 and (hw & 0x0F00) != 0x0F00
+    return (hw & 0xF000) == 0xF000
+
+
+def extend_to_return(rom, a, end, limit):
+    """the end of a function whose span was cut at a conditional branch"""
+    off = end - ROM_BASE
+    stop = limit - ROM_BASE
+    while off < stop:
+        hw = struct.unpack_from("<H", rom, off)[0]
+        n = width(rom, off)
+        off += n
+        if n == 2 and (((hw & 0xFF00) == 0xBD00 and (hw & 0x8000)) or
+                       (hw & 0xFF87) == 0x4700):
+            found = off + ROM_BASE
+            # keep the literal pool with the function
+            while found % 4 and found < limit:
+                found += 2
+            while found + 4 <= limit:
+                word = struct.unpack_from("<I", rom, found - ROM_BASE)[0]
+                data_like = (word == 0 or
+                             ROM_BASE <= word < ROM_BASE + len(rom) or
+                             0x02000000 <= word < 0x04000000 or
+                             0x00010000 <= word < 0x00200000)
+                if not data_like:
+                    break
+                found += 4
+            return found
+    return None
+
+
 def extent_after_return(rom, a, limit):
     """where a frameless leaf ends: its own return"""
     off = a - ROM_BASE
@@ -90,11 +165,8 @@ def verified_extents(repo):
 
 def main():
     repo = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else ".")
-    try:
-        from rompath import rom_path
-        rom = open(rom_path(repo), "rb").read()
-    except ImportError:
-        rom = open(os.path.join(repo, "baserom.bin"), "rb").read()
+    from rompath import rom_path
+    rom = open(rom_path(repo), "rb").read()
 
     cfg_path = os.path.join(repo, "config", "functions.json")
     funcs = json.load(open(cfg_path))
@@ -124,17 +196,21 @@ def main():
         entry["instrs"] = real // 2
         fixed.append((a, old, real))
 
-    # frameless leaves: a callee the index has never seen
+    # Callees the index has never seen.  A matched function's call targets
+    # are read out of the ROM itself, not out of the report text: the report
+    # writes a target as '#0x8007138' - seven digits - and mining the text
+    # for 0x08XXXXXX missed exactly the addresses that were missing, which
+    # left those functions unverifiable.
+    # Every indexed function is scanned, not just the matched ones: a callee
+    # that the index has never seen makes its caller unverifiable, and the
+    # caller that exposes it may be the very function we are trying to
+    # verify - which has no report yet, because it could not be verified.
     leaves = []
-    for addr in extents:
-        a = int(addr, 16)
-        entry = by_start.get(a)
-        if entry is None:
+    for a in sorted(by_start):
+        entry = by_start[a]
+        if entry.get("mode") != "thumb":
             continue
-        report = os.path.join(repo, "docs", "match", f"{addr}.md")
-        text = open(report, encoding="utf-8").read()
-        for target in re.findall(r"\b(0x08[0-9A-F]{6})\b", text):
-            t = int(target, 16)
+        for t in bl_targets(rom, a, int(entry["end"], 16)):
             if t in by_start or t in leaves:
                 continue
             e = extent_after_return(rom, t, t + 0x400)
@@ -142,17 +218,49 @@ def main():
                 leaves.append(t)
 
     added = 0
+    skipped_overlap = []
     for t in sorted(leaves):
         e = extent_after_return(rom, t, t + 0x400)
         if not e:
             continue
-        nxt = next((x for x in starts if x > t), None)
-        if nxt and nxt < e:
+        # the new entry must not sit inside an existing one: some indexed
+        # spans are far too large and swallow whole regions, and adding a
+        # second entry inside one of them makes call_bindings report the
+        # target as ambiguous
+        clash = next((x for x in starts if x != t and x < e and
+                      int(by_start[x]["end"], 16) > t), None)
+        if clash is not None:
+            skipped_overlap.append((t, clash))
             continue
         funcs.append({"rom": f"0x{t:08X}", "end": f"0x{e:08X}", "mode": "thumb",
                       "instrs": (e - t) // 2, "kind": "call"})
         starts = sorted(starts + [t])
+        by_start[t] = funcs[-1]
         added += 1
+
+    # Spans cut at a conditional branch, repaired from the ROM itself.
+    #
+    # The report-driven pass above can only fix a function that has a report,
+    # and a function that needs a repair often cannot get one - the switch
+    # profile, for instance, wants an exact mapped span, and a truncated span
+    # is why it has none.  So this pass does not need a report: a conditional
+    # branch cannot end a function, so the function ends at the next return.
+    extended = 0
+    ordered = sorted((int(f["rom"], 16), f) for f in funcs)
+    for i, (a, entry) in enumerate(ordered):
+        if entry.get("mode") != "thumb":
+            continue
+        end = int(entry["end"], 16)
+        if not ends_on_conditional_branch(rom, a, end):
+            continue
+        nxt = ordered[i + 1][0] if i + 1 < len(ordered) else end + 0x2000
+        limit = min(nxt, end + 0x2000)
+        found = extend_to_return(rom, a, end, limit)
+        if found is None or found <= end or found > nxt:
+            continue
+        entry["end"] = f"0x{found:08X}"
+        entry["instrs"] = (found - a) // 2
+        extended += 1
 
     funcs.sort(key=lambda f: int(f["rom"], 16))
 
@@ -196,10 +304,14 @@ def main():
         with open(sym, "w", encoding="utf-8", newline="\n") as fh:
             fh.write("\n".join(out) + "\n")
 
-    print(f"refined: {len(fixed)} span(s) corrected, {added} frameless leaf/leaves "
-          f"added, {len(funcs):,} entries")
+    print(f"refined: {len(fixed)} span(s) corrected from reports, "
+          f"{extended} extended past a conditional branch, "
+          f"{added} callee/leaves added, {len(funcs):,} entries")
     for addr, why in skipped:
         print(f"  left alone: {addr} ({why})")
+    for addr, clash in skipped_overlap:
+        print(f"  left alone: 0x{addr:08X} (it lies inside the span of "
+              f"0x{clash:08X}, which is too large)")
     return 0
 
 

@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from rompath import rom_path
 from pathlib import Path
 import re
 
@@ -96,7 +97,7 @@ def udivsi3_report_matches(lines, root, address):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if udivsi3_manifest(manifest) != encoded_manifest:
             return False
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         verify_udivsi3(data, address, rom, mapping, manifest)
         return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
@@ -177,7 +178,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
     if encoded is None:
         return False
     try:
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         data = bytes.fromhex(encoded[1])
         proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments)
         if proof.span(address) != data:
@@ -255,7 +256,7 @@ def function_address_report_matches(lines, root, address):
                 return False
         elif any(line.startswith("* data symbols SHA-256:") for line in lines):
             return False
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         _, control_flow = verify_function_addresses(data, address, rom, functions, objects, manifest)
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
@@ -346,7 +347,7 @@ def preloaded_switch_report_matches(lines, root, address):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if switch_manifest(manifest) != encoded_manifest:
             return False
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         _, control_flow = verify_preloaded_switches(data, address, rom, mapping, objects, manifest)
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
@@ -416,7 +417,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if switch_manifest(manifest) != encoded_manifest:
             return False
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
                                          data_mapping=objects)
         fingerprint = switch_data_fingerprint if data_profile else switch_fingerprint
@@ -463,7 +464,7 @@ def legacy_report_control_flow(lines, root, address, profile):
         thumb = callers[0]["mode"] == "thumb"
         if address % (2 if thumb else 4) or not thumb and profile != SCHEMA:
             return False
-        rom = (Path(root) / "baserom.bin").read_bytes()
+        rom = Path(rom_path(root)).read_bytes()
         if not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
                 data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
             return False
