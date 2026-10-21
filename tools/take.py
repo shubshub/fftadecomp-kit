@@ -47,6 +47,7 @@ import sys
 
 KIT_REPO = os.environ.get("FFTA_KIT_REPO", "shubshub/fftadecomp-kit")
 DECOMP_REPO = os.environ.get("FFTA_REPO", "shubshub/fftadecomp")
+DEFAULT_BRANCH = "main"
 LEDGER_TITLE = os.environ.get("FFTA_LEDGER_TITLE", "address ledger").lower()
 STATE_START = "<!-- ffta-ledger-state\n"
 STATE_END = "\nffta-ledger-state -->"
@@ -248,16 +249,49 @@ def unmatchable_db():
         return path, []
 
 
+_MATCHED_TREE = set()
+
+
+def decomp_source_paths():
+    """every path under src/ in the decomp repository, as a set
+
+    src/ is grouped into subsystem folders, so 'src/<addr>.c' is not where a
+    function lives any more - asking the contents API for that exact path
+    misses every function that has been moved into a folder, and a claim would
+    happily take an address that is already matched.
+    """
+    if _MATCHED_TREE:
+        return _MATCHED_TREE
+    try:
+        tree = json.loads(gh("api",
+                             f"repos/{DECOMP_REPO}/git/trees/"
+                             f"{DEFAULT_BRANCH}?recursive=1").stdout or "{}")
+    except SystemExit:
+        return set()
+    for entry in tree.get("tree", []):
+        path = entry.get("path") or ""
+        if path.startswith("src/") and path.endswith(".c"):
+            _MATCHED_TREE.add(os.path.basename(path)[:-2].upper())
+    return _MATCHED_TREE
+
+
 def already_matched(addr, decomp_root=None):
     root = decomp_root or os.environ.get("FFTA_ROOT") or "."
-    if os.path.exists(os.path.join(root, "src", addr[2:] + ".c")):
-        return True
+    src = os.path.join(root, "src")
+    for base, _dirs, files in os.walk(src):
+        if addr[2:] + ".c" in files:
+            return True
+    return addr[2:].upper() in decomp_source_paths()
+
+
+def open_pull_requests():
+    """every open pull request, fetched once"""
     try:
-        out = gh("api",
-                 f"repos/{DECOMP_REPO}/contents/src/{addr[2:]}.c").stdout
-        return bool(out) and '"path"' in out
+        return json.loads(gh("pr", "list", "--repo", DECOMP_REPO, "--state", "open",
+                             "--limit", "100", "--json", "number,title,body",
+                             "url").stdout or "[]")
     except SystemExit:
-        return False
+        return []
 
 
 def in_open_pr(addr):
