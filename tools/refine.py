@@ -112,16 +112,25 @@ def extend_to_return(rom, a, end, limit):
         if n == 2 and (((hw & 0xFF00) == 0xBD00 and (hw & 0x8000)) or
                        (hw & 0xFF87) == 0x4700):
             found = off + ROM_BASE
-            # keep the literal pool with the function
-            while found % 4 and found < limit:
-                found += 2
+            # Keep the literal pool with the function - but only if there
+            # really is one.  Aligning the end up to four bytes
+            # unconditionally swallowed the two bytes of inter-function fill
+            # that sit between a function and the next prologue, and 1,209
+            # entries carried that fill.  The fill is not part of the ELF
+            # symbol either, so the span must not include it.
+            def data_like(word):
+                return (word == 0 or
+                        ROM_BASE <= word < ROM_BASE + len(rom) or
+                        0x02000000 <= word < 0x04000000 or
+                        0x00010000 <= word < 0x00200000)
+
+            aligned = (found + 3) & ~3
+            if aligned != found and aligned + 4 <= limit:
+                if data_like(struct.unpack_from("<I", rom, aligned - ROM_BASE)[0]):
+                    found = aligned
             while found + 4 <= limit:
                 word = struct.unpack_from("<I", rom, found - ROM_BASE)[0]
-                data_like = (word == 0 or
-                             ROM_BASE <= word < ROM_BASE + len(rom) or
-                             0x02000000 <= word < 0x04000000 or
-                             0x00010000 <= word < 0x00200000)
-                if not data_like:
+                if not data_like(word):
                     break
                 found += 4
             return found
@@ -262,6 +271,38 @@ def main():
         entry["instrs"] = (found - a) // 2
         extended += 1
 
+    # Spans that end on the inter-function fill.  The ROM pads a function out
+    # to the next prologue with two zero bytes; the assembler pads with
+    # 0x46c0, and the ELF symbol stops at the last instruction either way.
+    # The old index included that fill, so 0x08036350 claimed 112 bytes for a
+    # 110-byte function and match.py refused it: 'compiled symbol is shorter
+    # than the indexed span'.  A span that ends with exactly two zero bytes
+    # after a return is carrying the fill, not code.
+    trimmed = 0
+    for a, entry in by_start.items():
+        if entry.get("mode") != "thumb":
+            continue
+        end = int(entry["end"], 16)
+        if end - a < 4:
+            continue
+        if rom[end - 2 - ROM_BASE:end - ROM_BASE] != b"\x00\x00":
+            continue
+        # the two bytes before the fill must be a return
+        last = None
+        off = a - ROM_BASE
+        while off < end - ROM_BASE:
+            hw = struct.unpack_from("<H", rom, off)[0]
+            n = width(rom, off)
+            if n == 2 and (((hw & 0xFF00) == 0xBD00 and (hw & 0x8000)) or
+                           (hw & 0xFF87) == 0x4700):
+                last = off + n + ROM_BASE
+            off += n
+        if last is None or last != end - 2:
+            continue
+        entry["end"] = f"0x{last:08X}"
+        entry["instrs"] = (last - a) // 2
+        trimmed += 1
+
     funcs.sort(key=lambda f: int(f["rom"], 16))
 
     overlaps = [(int(funcs[i]["rom"], 16), int(funcs[i]["end"], 16),
@@ -283,7 +324,16 @@ def main():
     if os.path.exists(sym):
         lines = [ln for ln in open(sym, encoding="utf-8").read().splitlines()
                  if ln.split()]
+        # every corrected span, whichever pass corrected it: the report-driven
+        # one and the conditional-branch extension.  symbols/functions.txt used
+        # to get only the first, so a dozen spans were right in
+        # config/functions.json and still short in the text file - and
+        # match.py reads the text file.
         ends = {f"{a:08X}": (real, a + real) for a, _, real in fixed}
+        for a, entry in by_start.items():
+            key = f"{a:08X}"
+            if key not in ends:
+                ends[key] = (int(entry["end"], 16) - a, int(entry["end"], 16))
         out = []
         for ln in lines:
             parts = ln.split()
@@ -305,6 +355,7 @@ def main():
             fh.write("\n".join(out) + "\n")
 
     print(f"refined: {len(fixed)} span(s) corrected from reports, "
+          f"{trimmed} trimmed of trailing fill, "
           f"{extended} extended past a conditional branch, "
           f"{added} callee/leaves added, {len(funcs):,} entries")
     for addr, why in skipped:

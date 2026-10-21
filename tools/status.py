@@ -125,7 +125,24 @@ def collect(root, verify, quiet=False, write_reports=False):
 
     code = [f for f in fns if int(f["rom"], 16) < CODE_END]
     total_fns = len(code)
-    total_bytes = sum(int(f["end"], 16) - int(f["rom"], 16) for f in code)
+    # The denominator is the code that is actually there, which the layout
+    # knows and the index does not: an index span can run over a region the
+    # layout calls data, and a plain sum of spans then counts data as code.
+    # The index also used to under-claim badly - a span cut at a conditional
+    # branch is short - which is why the percentage has moved around so much
+    # between runs.  Take the layout's code segments, and fall back to the
+    # union of index spans when there is no layout.
+    total_bytes = 0
+    layout_path = os.path.join(root, "config", "rom_layout.json")
+    if os.path.exists(layout_path):
+        layout = json.load(open(layout_path, encoding="utf-8"))
+        total_bytes = sum(seg["size"] for seg in layout.get("segments", [])
+                          if seg.get("name", "").startswith("code"))
+    if not total_bytes:
+        covered = set()
+        for f in code:
+            covered.update(range(int(f["rom"], 16), int(f["end"], 16)))
+        total_bytes = len(covered)
 
     src_dir = os.path.join(root, "src")
     matched_f, matched_b, problems = 0, 0, []
