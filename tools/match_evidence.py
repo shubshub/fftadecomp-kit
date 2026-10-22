@@ -689,7 +689,16 @@ def legacy_report_control_flow(lines, root, address, profile):
         return False
 
 
+def valid_match_verdict(report):
+    records = [line for line in report.splitlines()
+               if re.match(r"[ \t]*\*\*[ \t]*(?:MATCH\b|NOT[ \t]+MATCHING\b|HAND-ASM\b)", line)]
+    return len(records) == 1 and re.fullmatch(
+        r"\*\*MATCH - byte identical\*\* - ([1-9][0-9]*)/\1 bytes", records[0]) is not None
+
+
 def report_matches(report, root, address):
+    if not valid_match_verdict(report):
+        return False
     try:
         if function_thunk.selected(report):
             return function_thunk.report_matches(report, root, address)

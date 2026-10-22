@@ -48,6 +48,7 @@ import re
 import subprocess
 import sys
 from rompath import rom_path
+from match_evidence import valid_match_verdict
 
 KIT = os.path.dirname(os.path.realpath(__file__))
 KIT_ROOT = os.path.realpath(os.path.dirname(KIT))
@@ -169,8 +170,8 @@ def check_reports(root):
         text = open(path, encoding="utf-8").read()
         if "IMPLAUSIBLE" in text or "HAND-ASM" in text:
             problems.append(f"{addr}: report is not a clean MATCH")
-        elif "MATCH - byte identical" not in text:
-            problems.append(f"{addr}: report does not say MATCH")
+        elif not valid_match_verdict(text):
+            problems.append(f"{addr}: report does not contain one canonical MATCH verdict")
     if problems:
         log(f"    FAIL  {len(problems)} report problem(s):")
         for p in problems[:8]:
