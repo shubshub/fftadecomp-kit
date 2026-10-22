@@ -19,7 +19,7 @@ SUMMARY = "every reachable node without a return path is a narrow unconditional 
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* data symbols", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
-                     "* function address", "* function buffer", "* software double")
+                     "* function address", "* function buffer", "* software double", "* function-address")
 _replay_active = ContextVar("inert_spin_replay_active", default=False)
 
 

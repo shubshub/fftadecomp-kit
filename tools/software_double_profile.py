@@ -80,7 +80,7 @@ EDGES = (
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* data symbols", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
-                     "* function address", "* function buffer", "* inert spin")
+                     "* function address", "* function buffer", "* inert spin", "* function-address")
 _replay_active = ContextVar("software_double_replay_active", default=False)
 
 

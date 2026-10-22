@@ -1120,12 +1120,66 @@ This is recovered-code evidence, not an exhaustive late-ROM inventory.
 `--verify` performs fresh official matching without rewriting reports;
 `--write --verify` also regenerates and replays them. Fresh no-write verification
 does not require a pre-existing report for legacy profiles; the explicit
-inert-spin and software-double profiles require their saved reports as described
+inert-spin, software-double and function-address/thunk profiles require their saved reports as described
 above. `--check` takes precedence over
 `--write`, and any failed main or late source still makes the status gate fail.
 Hosted report/block checks do not substitute for local ROM-backed matching.
 
 ## Notes for people extending the analysis
+
+### Explicit function literals with canonical call thunks
+
+`match.py --function-address-profile canonical-thunks-v1` selects
+`elf-symbol-thumb-function-address-thunks-v1`; default matching does not select
+it automatically. It requires both original typed function-address literals
+and compiler-generated `_call_via_r0` through `_call_via_r12` calls. Ordinary
+mapped Thumb calls, mapped objects and fixed scalar frames may coexist. Buffer,
+switch, arithmetic-runtime and inert-spin contexts cannot be combined with it.
+
+Each used thunk's four-byte identity includes two executed BX bytes and two
+external alignment bytes. Only canonical original ELF names/relocations are
+admitted; manually naming `_call_via_` identifiers in preprocessed C, addressed
+aliases and thunk-table object/addend substitutes are rejected. Complete original
+and final ELF ownership, typed linking, pools, literal uses, fixed-point stack
+and return provenance, plausibility and exact ROM bytes remain mandatory. A
+tracked stack or saved-return value cannot serve as the thunk target register.
+
+This is conditional caller evidence. It assumes compatible executable indirect
+targets, valid argument backing/types, preserved ABI state and returning callees.
+Ordinary and retained function bindings establish mapped entries, not full callee
+bodies or semantics. It does not prove initialization, argument arity, arbitrary
+alias safety, callback lifetime, installed RAM identity or termination. Inherited
+scalar incoming-SP reads do not add such proofs.
+
+Strict saved reports freshly compile the entire captured source/header universe
+with fixed compiler configuration, check original relocation provenance and
+complete typed linking, and recheck source/maps/index/data/ROM snapshots. Exact
+typed manifests, reserved-marker detection and contradictory-verdict rejection
+apply. Older thunk-caller reports also require fresh default original-ELF proof
+that their caller contains no function-address relocations, so stripping new
+markers cannot downgrade the composition. Conservative legacy buffer replay
+performs this absence proof when it has no direct caller classification.
+That fresh replay retains the already-validated register-buffer or stack-buffer
+mode, independently re-derives its ROM-backed dependency and complete caller
+span, and still checks reachable literal provenance. It does not admit buffers
+to the new explicit composition or replace the existing dependency fingerprint
+and escape checks.
+For every thunk caller, mapped data relocation bases and signed-addend results
+must not alias indexed function entries (even or Thumb-tagged) or the reserved
+thunk table. Such ambiguous code-as-object bindings require canonical function
+provenance; renaming a callback as mapped data cannot bypass the selector.
+Reachable PC-relative pool words matching indexed code entries require the
+canonical function relocation at that offset; reserved thunk-table literals
+are rejected. This is a conservative provenance boundary for ambiguous
+code-valued literals, not proof that a numeric value denotes a function. It
+does not scan instruction bytes, unreachable pool words or unrelated integers.
+
+Status and compiled rebuild use only the fixed selector derived from a strictly
+replayed saved report; stale, malformed or missing reports do not authorize it.
+No-write verification does not refresh evidence. Rebuild preserves selected
+report and text-index snapshots through output publication and cleans owned
+output on failure. No source or Parked promotion follows from installing this
+tool capability; source review and the complete publication gates remain separate.
 
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it

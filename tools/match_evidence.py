@@ -6,6 +6,7 @@ import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
+import function_thunk_profile as function_thunk
 import subprocess
 from rompath import rom_path
 from pathlib import Path
@@ -657,12 +658,15 @@ def legacy_report_control_flow(lines, root, address, profile):
                 data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
             return False
         if profile in (BUFFER_SCHEMA, STACK_BUFFER_SCHEMA):
-            return True
+            return function_thunk.legacy_absence(root, address, data, rom, mapping,
+                                                buffer_stack_arguments=profile == STACK_BUFFER_SCHEMA)
         calls = profile in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or \
             profile in (DATA_SCHEMA, FRAMED_DATA_SCHEMA) and single("* control flow: ") == CALL_SUMMARY
 
+        thunk_calls = set()
         def resolve(target):
             if target in RUNTIME_HELPERS.values():
+                thunk_calls.add(target)
                 register = (target - RUNTIME_HELPERS["_call_via_r0"]) // 4
                 if not thunk_is_call_via(rom, target, register):
                     raise ValueError("legacy call target does not match its runtime thunk")
@@ -677,14 +681,18 @@ def legacy_report_control_flow(lines, root, address, profile):
             verify_addressed_modsi3_source(
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
                 profile == FRAMED_LINKED_SCHEMA)
+        if thunk_calls:
+            function_thunk.legacy_absence(root, address, data, rom, mapping)
         return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
-            RuntimeError):
+            RuntimeError, subprocess.SubprocessError):
         return False
 
 
 def report_matches(report, root, address):
     try:
+        if function_thunk.selected(report):
+            return function_thunk.report_matches(report, root, address)
         if software_double.selected(report):
             return software_double.report_matches(report, root, address)
         if inert_spin.selected(report):

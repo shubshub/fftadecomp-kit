@@ -27,6 +27,7 @@ import tempfile
 from match_evidence import data_snapshot, mapping_snapshot, report_matches, source_fingerprint
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
+import function_thunk_profile as function_thunk
 
 ROM_BASE = 0x08000000
 
@@ -89,6 +90,8 @@ def output_path(root, requested):
 
 def saved_profile_arguments(report, root, address):
     arguments = []
+    if function_thunk.selected(report):
+        arguments += ["--function-address-profile", function_thunk.SELECTOR]
     if software_double.selected(report):
         arguments += ["--software-double-profile", software_double.SELECTOR]
     if inert_spin.selected(report):
