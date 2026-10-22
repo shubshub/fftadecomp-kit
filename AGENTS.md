@@ -40,6 +40,14 @@ and `claim` check the decomp repository's default branch and open pull requests
 as well as the ledger. The broker repeats these checks before accepting a
 claim. Coordinate with an existing PR's author rather than duplicating work.
 
+Broker coordinates cover even addresses in the original 16 MiB ROM image,
+`[0x08000000,0x09000000)`, not RAM aliases or mirrors. Coordinate acceptance
+does not prove a function exists. Before using addresses beyond the former
+`0x08150000` ceiling, deploy the parser on the trusted default branch, let old
+broker jobs finish, and update/restart clients. Old parsers cannot read late
+rows or retained receipts. A local update alone is not authorization to submit
+late requests; follow the rollout and separate status-gate limits in README.
+
 ## Before you push
 
 **Do not run `git push`.** Run the gate, which verifies and then pushes — and

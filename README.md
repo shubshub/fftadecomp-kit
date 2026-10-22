@@ -94,6 +94,13 @@ python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src
 
 ### The rules
 
+Broker addresses use exactly eight hexadecimal digits after `0x`, with even
+alignment inside the original 16 MiB image `[0x08000000,0x09000000)`.
+This validates ROM coordinates, not executable ownership: headers, assets and
+alignment can also have valid coordinates. Establish the complete function
+independently before authoring. RAM aliases and ROM mirrors are not accepted.
+The automatic discovery cutoff at `0x08150000` is not the reservation boundary.
+
 1. **Read the ledger, check the address, then claim it.** Never reserve an
    address already reserved, matched on the decomp default branch, or covered
    by an open decomp PR. Both the client and broker check these conditions;
@@ -133,6 +140,20 @@ already been synchronized. When changing reservation protocols, explicitly pull
 and restart all clients: an already loaded old process still contains old code.
 
 ### Deploying the reservation broker
+
+The full-image address parser must reach the trusted default branch, and old
+broker jobs must finish, before requests at or above `0x08150000` are submitted.
+Update and restart clients too. Old code cannot parse a ledger containing a
+late-address row or retained receipt, even after that lease is released; prefer
+roll-forward repair rather than reverting the parser. Do not edit receipts or
+reset the cursor. An already rejected request stays rejected; after deployment,
+inspect current availability and submit a fresh request when appropriate.
+Local parser acceptance is not deployment or an authenticated lease.
+
+This reservation repair does not expand the status collector: it currently
+rejects sources outside its main-code index. Late-ROM publication additionally
+requires a separately validated status/accounting change; do not bypass that
+gate or present the provisional denominators as whole-game coverage.
 
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
@@ -245,7 +266,9 @@ code boundary: installer `0x08002768` references the 176-byte executable image
 50-, 60- and 62-byte Thumb bodies plus four alignment bytes. Record bounded,
 reference-supported ROM entries without counting their RAM aliases as extra
 functions or assuming the RAM image cannot change. Generated function spans
-and the below-boundary status denominator remain provisional.
+and the main-region function denominator remain provisional. The byte
+denominator sums legacy layout segments named `code*`, including segments
+beyond the discovery cutoff; those labels are not exhaustive code ownership.
 
 During Thumb traversal, the analyzer also recognizes an adjacent immediate
 `cmp` / `bls` guard leading to the five-instruction word-table dispatch
