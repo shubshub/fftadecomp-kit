@@ -236,11 +236,16 @@ complement are `0x89`. Earlier reports of a scrambled logo and a computed
 `nintendo_logo_ok` and now include `nintendo_logo_sha256` instead of the invalid
 byte-difference count. These checks do not alter the ROM or certify its payload.
 
-Code discovery is bounded to FFTA's documented code region below
-`0x08150000`. Branch/call traversal and prologue scans do not decode packed
-assets beyond that boundary, and instructions may not straddle it. Literal
-data can still be read elsewhere in the ROM. Generated function spans remain
-provisional; this boundary does not prove that every function has been found.
+Automatic code discovery is bounded to FFTA's main code region below
+`0x08150000`. Branch/call traversal and prologue scans do not decode beyond
+that boundary, and instructions may not straddle it. Literal data can still
+be read elsewhere in the ROM. This is a tool boundary, not an exhaustive
+code boundary: installer `0x08002768` references the 176-byte executable image
+`[0x08A38A2C,0x08A38ADC)` copied to RAM `0x03005E78`. It contains separate
+50-, 60- and 62-byte Thumb bodies plus four alignment bytes. Record bounded,
+reference-supported ROM entries without counting their RAM aliases as extra
+functions or assuming the RAM image cannot change. Generated function spans
+and the below-boundary status denominator remain provisional.
 
 During Thumb traversal, the analyzer also recognizes an adjacent immediate
 `cmp` / `bls` guard leading to the five-instruction word-table dispatch
