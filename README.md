@@ -502,6 +502,27 @@ protect only that word: descriptor frames and saved control require separate
 byte-range proofs or invalidation of affected facts, with no assumed allocator
 or frame separation. Those additional capabilities are not part of this profile.
 
+### Engine cutpoint diagnostics
+
+`python tools/engine_cutpoints.py --root PATH_TO_GAME` recomputes two real-ROM
+descriptor-copy contexts and the allocator-entry prefixes for sizes40/84.
+Results state exact entry premises, exit registers/flags, ordered memory events,
+byte definedness/alias fragments, open frames and complete input identities.
+
+These are conditional diagnostics, not MATCH reports or replay inputs. The
+copy stops before the callback reload; the kill prefix stops with two frames
+still open, before the allocator's first nested call. No allocator return,
+freshness, runtime-image identity, preceding descriptor preservation, callback
+effect or C type/lifetime property is inferred. Missing premises, unsupported
+instructions or exhausted finite budgets fail closed. Results are recomputed;
+there is no cache, serialized certificate parser or live-verifier consumer.
+
+The incoming-r3 check ends only after a completed overwrite establishes an
+independent value. A retained descriptor value or fragment keeps that check
+active; an unknown overwrite fails closed. The narrow supported provenance
+case is the inspected, numerically separated SP-relative workspace address.
+This does not establish destruction of the separate retained r9 alias.
+
 ### Named data literals
 
 For a known external object address, add an explicit mapping to the decomp
