@@ -39,6 +39,7 @@ from pathlib import Path
 from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SCHEMA,
                             FRAMED_DATA_SCHEMA,
                             FUNCTION_ADDRESS_SCHEMA, FUNCTION_ADDRESS_SUMMARY,
+                            FUNCTION_BUFFER_SCHEMA, function_buffer_fingerprint,
                             FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA, LINKED_SCHEMA,
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
                             SWITCH_SCHEMA, SWITCH_SUMMARY, switch_fingerprint, switch_manifest,
@@ -954,7 +955,7 @@ def verify_modsi3(data, address, rom, mapping, data_mapping, manifest):
     return instructions
 
 
-def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
+def function_address_bindings(data, address, rom, mapping, data_mapping, manifest):
     if mapping is None or not isinstance(manifest, dict) or \
             set(manifest) != {"calls", "data", "functions"} or \
             any(not isinstance(records, list) for records in manifest.values()) or \
@@ -1012,11 +1013,30 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
             if struct.unpack_from("<I", data, offset)[0] != value:
                 raise ValueError("function-address literal does not equal its binding")
             literals[offset] = (name, value)
+    return calls, literals
+
+
+def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
+    calls, literals = function_address_bindings(data, address, rom, mapping, data_mapping, manifest)
     instructions = verify_leaf_instructions(data, address, True, calls)
     if uses_stack_frame(instructions):
         raise ValueError("function-address evidence supports only frameless callers")
     verify_data_literals(instructions, address, literals)
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
+
+
+def verify_function_buffers(data, address, rom, mapping, manifest):
+    calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest)
+    if manifest["data"] or not calls:
+        raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
+    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True)
+    if proof.span(address) != data:
+        raise ValueError("function-buffer caller requires an exact complete mapped span")
+    instructions = verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
+    if not proof.dependencies:
+        raise ValueError("function-buffer evidence requires an inspected buffer call")
+    verify_data_literals(instructions, address, literals)
+    return instructions, proof
 
 
 def preloaded_switch_encoding(data, address, literal):
@@ -1672,6 +1692,13 @@ class BufferCallProof:
         return digest.hexdigest()
 
 
+class FunctionBufferCallProof(BufferCallProof):
+    def target(self, address):
+        if address in RUNTIME_HELPERS.values():
+            raise ValueError("function-buffer evidence excludes runtime call thunks in inspected dependencies")
+        return super().target(address)
+
+
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
                              switch_data_relocations=None, udivsi3_context=None,
@@ -2323,8 +2350,17 @@ def main():
                              for offset, (name, value) in sorted(data_relocations.items())],
                     "functions": [[offset, name] for offset, (name, value)
                                   in sorted(function_relocations.items())]}
-                verified_instructions, _ = verify_function_addresses(
-                    got, addr, rom, mapping, data_mapping, address_manifest)
+                try:
+                    verified_instructions, _ = verify_function_addresses(
+                        got, addr, rom, mapping, data_mapping, address_manifest)
+                except ValueError as address_error:
+                    if data_relocations:
+                        raise
+                    try:
+                        verified_instructions, buffer_proof = verify_function_buffers(
+                            got, addr, rom, mapping, address_manifest)
+                    except ValueError as buffer_error:
+                        raise ValueError(f"{address_error}; function-buffer proof: {buffer_error}") from buffer_error
             else:
                 try:
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
@@ -2358,7 +2394,7 @@ def main():
     if buffer_proof.dependencies:
         schema = STACK_BUFFER_SCHEMA if buffer_proof.stack_arguments else BUFFER_SCHEMA
     if function_relocations:
-        schema = FUNCTION_ADDRESS_SCHEMA
+        schema = FUNCTION_BUFFER_SCHEMA if buffer_proof.dependencies else FUNCTION_ADDRESS_SCHEMA
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
@@ -2399,6 +2435,8 @@ def main():
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
+    if schema == FUNCTION_BUFFER_SCHEMA and report_rom_path(ROOT) != rom_file:
+        sys.exit("selected ROM changed during verification; re-run match.py")
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -2498,6 +2536,11 @@ def main():
                 f.write(f"* function address manifest: `{encoded_manifest}`\n")
                 proof_digest = function_address_fingerprint(addr, got_body, address_manifest)
                 f.write(f"* function address proof SHA-256: `{proof_digest}`\n")
+                if schema == FUNCTION_BUFFER_SCHEMA:
+                    proof_digest = function_buffer_fingerprint(
+                        addr, got_body, address_manifest, fingerprint, mapping,
+                        buffer_proof.fingerprint())
+                    f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
             if switch_relocations:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
                            SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)

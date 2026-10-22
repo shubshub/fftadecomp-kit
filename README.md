@@ -236,11 +236,16 @@ complement are `0x89`. Earlier reports of a scrambled logo and a computed
 `nintendo_logo_ok` and now include `nintendo_logo_sha256` instead of the invalid
 byte-difference count. These checks do not alter the ROM or certify its payload.
 
-Code discovery is bounded to FFTA's documented code region below
-`0x08150000`. Branch/call traversal and prologue scans do not decode packed
-assets beyond that boundary, and instructions may not straddle it. Literal
-data can still be read elsewhere in the ROM. Generated function spans remain
-provisional; this boundary does not prove that every function has been found.
+Automatic code discovery is bounded to FFTA's main code region below
+`0x08150000`. Branch/call traversal and prologue scans do not decode beyond
+that boundary, and instructions may not straddle it. Literal data can still
+be read elsewhere in the ROM. This is a tool boundary, not an exhaustive
+code boundary: installer `0x08002768` references the 176-byte executable image
+`[0x08A38A2C,0x08A38ADC)` copied to RAM `0x03005E78`. It contains separate
+50-, 60- and 62-byte Thumb bodies plus four alignment bytes. Record bounded,
+reference-supported ROM entries without counting their RAM aliases as extra
+functions or assuming the RAM image cannot change. Generated function spans
+and the below-boundary status denominator remain provisional.
 
 During Thumb traversal, the analyzer also recognizes an adjacent immediate
 `cmp` / `bls` guard leading to the five-instruction word-table dispatch
@@ -433,6 +438,46 @@ bound and replayed as above. The ordinary ABI assumptions still apply, and
 combined named data relocations, block transfers, interrupts and indirect-call
 dependencies remain unsupported. A proved output-buffer call alone does not
 admit a caller whose later stale-argument or local-buffer calls cannot be proved.
+
+### Function literals with bounded buffer calls
+
+The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the
+exact named Thumb function-address bindings below with the existing bounded
+register/stack buffer version-2 proof. It requires both a reachable function
+literal and an actually inspected buffer dependency. The matcher preserves
+function-address version 1 when its frameless proof succeeds; otherwise this
+composition must succeed in full or verification fails, without a legacy
+buffer-only fallback. Fixed frames and multiple direct calls are supported;
+named object relocations, switches, runtime-thunk bindings and indirect-call
+dependencies remain excluded. No buffer bounds, escape or provenance check is
+relaxed, and block transfers and incoming-pointer spills remain unsupported.
+Every reached direct call in an inspected dependency is checked against the
+runtime-thunk exclusion, even if the buffer survives only in a callee-saved
+register and no borrowed argument is passed to that call. This restriction is
+specific to the combined profile; the legacy buffer profiles are unchanged.
+
+The new report retains both binding and buffer evidence and adds a
+domain-separated fingerprint covering the profile versions, source/header
+digest, exact function mapping, complete caller bytes, canonical binding
+manifest and fingerprint of all complete inspected dependency spans. Replay
+reruns both proofs against the selected local ROM, recomputes the dependencies
+and checks the captured source, mapping and ROM inputs again before accepting.
+Live verification likewise rejects input changes before report/byte emission.
+Missing, duplicate, malformed or mixed-profile metadata fails closed. Retained
+new-profile fields cannot be relabeled as legacy evidence. Legacy profiles are
+unchanged: complete erasure of all new metadata is not authenticated history
+and may leave a report independently acceptable under an older proof. This
+profile does not claim to prevent that complete-erasure downgrade.
+
+Function literals establish address identity, not callback dispatch, compatible
+C function types, callback effects or descriptor lifetime. Uninspected calls
+retain the ordinary ABI assumption; inspected buffer effects establish bounded
+access and alias flow, not initialized C values or whole-program memory safety.
+In particular, a partially initialized descriptor is not fully initialized by
+copying its representation. A future callback-word no-clobber proof would
+protect only that word: descriptor frames and saved control require separate
+byte-range proofs or invalidation of affected facts, with no assumed allocator
+or frame separation. Those additional capabilities are not part of this profile.
 
 ### Named data literals
 
