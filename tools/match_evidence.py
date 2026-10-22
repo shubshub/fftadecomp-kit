@@ -5,6 +5,7 @@ import json
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import inert_spin_profile as inert_spin
+import software_double_profile as software_double
 import subprocess
 from rompath import rom_path
 from pathlib import Path
@@ -684,6 +685,8 @@ def legacy_report_control_flow(lines, root, address, profile):
 
 def report_matches(report, root, address):
     try:
+        if software_double.selected(report):
+            return software_double.report_matches(report, root, address)
         if inert_spin.selected(report):
             return inert_spin.report_matches(report, root, address)
     except ValueError:
