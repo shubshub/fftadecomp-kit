@@ -194,11 +194,23 @@ working files. The gate checks that the branch and commit remain unchanged and
 pushes that exact commit. `--working-tree --check-only` validates uncommitted
 game edits; publication with `--working-tree` requires a clean checkout too.
 
+The archive uses a copy of the selected local ROM. The gate pins `FFTA_ROM`
+to that copy during committed-game checks and restores the previous environment
+afterward. A failed ROM selection or copy stops publication; the gate never
+substitutes a different ROM.
+
 Use `--force` only for an intentional history rewrite. The gate captures the
 remote tip before validation and uses an explicit force-with-lease, so a remote
 change during verification rejects the push rather than being overwritten.
 
 ## Layout it expects
+
+Commands using automatic ROM selection honor a nonempty `FFTA_ROM` first.
+An invalid explicit path fails even if another ROM exists. Without an override,
+`baserom.bin` takes precedence; otherwise exactly one existing `.gba` file in
+the decompilation root is accepted, with a case-insensitive extension. Multiple
+candidates are an error. Optional lookup permits true absence, not ambiguity
+or an invalid override.
 
 ```
 <decomp repo>/
@@ -543,6 +555,70 @@ Existing non-runtime schemas, fingerprints and default binding APIs are
 unchanged. Runtime binding proves identity and ABI compatibility, not that
 an arbitrary source spelled `/`; natural source still requires plausibility
 and independent review.
+
+### Audited signed remainder runtime
+
+The separate `elf-symbol-thumb-modsi3-s16-v1` profile accepts natural signed
+remainder compiled to `__modsi3`. Every runtime call requires a signed-16-range
+dividend in `r0` and a nonzero signed-32 divisor in `r1`. This excludes both
+division by zero and the `INT_MIN / -1` overflow pair. Ordinary direct Thumb
+calls and PUSH/POP saves are supported; explicit stack frames, stack aliases,
+buffer proofs, thunks, switches, function-address relocations and unsigned
+runtime mixing remain excluded.
+
+The complete runtime at `[0x08142950,0x08142A1E)` is pinned to SHA-256
+`e29c5cee2bafd4fcf3d248a70964d363a3222d67d3eac9031acc95247242fc53`.
+Its two-byte zero handler at `[0x0814274C,0x0814274E)` has SHA-256
+`abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c`.
+The dependency BL and exact, unique, nonoverlapping Thumb mappings are checked.
+The caller must also match its entire unique mapped ROM span. A runtime alias
+requires a unique undefined global zero-valued function/notype symbol and a
+canonical zero-expression Thumb BL relocation; typed linking and complete
+symbol comparison remain mandatory.
+
+The operand pass intersects facts at CFG joins and converges across backedges
+before checking calls. Thumb16 ASR-immediate 16 establishes the signed range;
+MOV/MOVS and ADD/ADDS-zero preserve supported facts. Other writes invalidate
+them. An adjacent register-zero CMP and BEQ/BNE establishes nonzero only on
+the appropriate edge when the comparison is the branch's sole predecessor.
+Coincident branch/fallthrough destinations establish no guard. Calls discard
+caller-clobbered facts; callee-saved facts survive only under the ordinary ABI
+summary. This proves the restricted operand domain, not arbitrary C
+definedness, memory safety or termination.
+
+The canonical manifest contains exactly `runtime`, `calls`, `operands` and
+`data`. Replay checks current source/headers, mappings, complete caller and
+runtime bytes, rederives the CFG facts, and rejects malformed, duplicate,
+missing or rehashed-but-invalid evidence. Signed markers under weaker schemas
+are rejected.
+
+Named data is a deliberately conservative subset: every reachable PC-relative
+literal valued in `[0x02000000,0x10000000)` needs exactly one mapped-data record.
+Both its named base and addend result must be in `[0x02000000,0x04000000)` or
+the loaded ROM range; runtime and self references are forbidden. I/O, video,
+SRAM and unloaded ROM-mirror values therefore fail, as do address-shaped
+scalar constants without an eligible binding. This is a restricted literal
+contract, not a claim that integer values recover pointer or original
+relocation provenance. Fresh compilation separately verifies actual ELF
+relocations. Removing data records and recomputing hashes cannot evade this
+subset.
+
+Existing explicit `func_08142950` calls retain machine-helper semantics,
+including possible zero divisors, rather than acquiring the C `%` contract.
+Only legacy calls-v1/frame-calls-v1 reports reaching that runtime trigger
+compiler-backed replay. It captures the fingerprinted source/header tree,
+preprocesses and checks dependencies, compiles with default toolchain options,
+then verifies canonical addressed relocations, complete linked bytes,
+plausibility and frame classification. Original and captured inputs are
+rechecked, and recursive replay is rejected. No report-supplied object,
+compiler command or source regex establishes provenance.
+
+This compatibility path requires the installed default compiler and binutils
+during replay and trusts their normal search environment, as fresh compilation
+already does; it is not toolchain attestation. Other legacy reports retain
+their existing replay path. A byte-identical `%` replacement cannot become an
+addressed-helper report merely by deleting signed metadata. Zero-handler
+machine behavior does not make C `% 0` defined.
 
 ### Guarded local Thumb switches
 

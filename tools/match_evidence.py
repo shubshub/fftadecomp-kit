@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+import modsi3_profile as modsi3
 from rompath import rom_path
 from pathlib import Path
 import re
@@ -31,6 +32,13 @@ STACK_BUFFER_SUMMARY = "ROM-checked bounded register and stack buffer arguments 
 UDIVSI3_SCHEMA = "elf-symbol-thumb-udivsi3-v1"
 UDIVSI3_SUMMARY = "pinned Thumb unsigned division runtime with CFG-proven nonzero constant divisors"
 UDIVSI3_RUNTIME = "agbcc-thumb-udivsi3-v1"
+
+
+def report_rom_path(root):
+    try:
+        return rom_path(root)
+    except SystemExit as error:
+        raise ValueError(str(error)) from error
 
 
 def udivsi3_manifest(manifest):
@@ -97,7 +105,7 @@ def udivsi3_report_matches(lines, root, address):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if udivsi3_manifest(manifest) != encoded_manifest:
             return False
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         verify_udivsi3(data, address, rom, mapping, manifest)
         return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
@@ -178,7 +186,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
     if encoded is None:
         return False
     try:
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         data = bytes.fromhex(encoded[1])
         proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments)
         if proof.span(address) != data:
@@ -256,7 +264,7 @@ def function_address_report_matches(lines, root, address):
                 return False
         elif any(line.startswith("* data symbols SHA-256:") for line in lines):
             return False
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_function_addresses(data, address, rom, functions, objects, manifest)
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
@@ -347,7 +355,7 @@ def preloaded_switch_report_matches(lines, root, address):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if switch_manifest(manifest) != encoded_manifest:
             return False
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_preloaded_switches(data, address, rom, mapping, objects, manifest)
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
@@ -417,7 +425,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if switch_manifest(manifest) != encoded_manifest:
             return False
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
                                          data_mapping=objects)
         fingerprint = switch_data_fingerprint if data_profile else switch_fingerprint
@@ -429,9 +437,82 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         return False
 
 
+def modsi3_report_matches(lines, root, address):
+    from match import verify_modsi3
+
+    def single(prefix):
+        marker = prefix.rstrip(" :-")
+        children = ("* signed remainder manifest", "* signed remainder proof SHA-256") \
+            if marker == "* signed remainder" else ()
+        matches = [line for line in lines if line.lstrip().startswith(marker) and
+                   not line.lstrip().startswith(children)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate signed remainder evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed signed remainder evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate signed remainder manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        source_digest = source_fingerprint(root, address)
+        if single("* verification: ") != f"`{modsi3.SCHEMA}`" or mapping is None or \
+                unquote("* source SHA-256: ") != source_digest or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                single("* signed remainder: ") != modsi3.SUMMARY or \
+                single("* control flow: ") != CALL_SUMMARY or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.lstrip().startswith(("* stack frame", "* buffer calls", "* buffer proof",
+                                              "* unsigned division", "* switches", "* switch manifest",
+                                              "* switch proof", "* function addresses",
+                                              "* function address manifest", "* function address proof"))
+                    for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* signed remainder manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if modsi3.manifest_text(manifest) != encoded_manifest:
+            return False
+        objects = data_snapshot(root) if manifest.get("data") else None
+        if objects is not None:
+            if unquote("* data symbols SHA-256: ") != mapping_fingerprint(objects):
+                return False
+        elif any(line.lstrip().startswith("* data symbols SHA-256") for line in lines):
+            return False
+        selected_rom = report_rom_path(root)
+        rom = Path(selected_rom).read_bytes()
+        verify_modsi3(data, address, rom, mapping, objects, manifest)
+        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* signed remainder proof SHA-256: ") ==
+                modsi3.fingerprint(address, data, manifest) and
+                source_fingerprint(root, address) == source_digest and
+                mapping_snapshot(root) == mapping and
+                (objects is None or data_snapshot(root) == objects) and
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+        return False
+
+
 def legacy_report_control_flow(lines, root, address, profile):
     from match import (ROM_BASE, RUNTIME_HELPERS, function_address_target,
-                       thunk_is_call_via, verify_leaf_instructions)
+                       thunk_is_call_via, verify_leaf_instructions, verify_addressed_modsi3_source)
 
     def single(prefix):
         values = [line[len(prefix):] for line in lines if line.startswith(prefix)]
@@ -464,7 +545,7 @@ def legacy_report_control_flow(lines, root, address, profile):
         thumb = callers[0]["mode"] == "thumb"
         if address % (2 if thumb else 4) or not thumb and profile != SCHEMA:
             return False
-        rom = Path(rom_path(root)).read_bytes()
+        rom = Path(report_rom_path(root)).read_bytes()
         if not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
                 data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
             return False
@@ -481,15 +562,27 @@ def legacy_report_control_flow(lines, root, address, profile):
             else:
                 function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom))
 
-        verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None)
+        try:
+            verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None)
+        except modsi3.AddressedRemainderRequired:
+            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA):
+                return False
+            verify_addressed_modsi3_source(
+                root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
+                profile == FRAMED_LINKED_SCHEMA)
         return True
-    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
+            RuntimeError):
         return False
 
 
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{modsi3.SCHEMA}`"]:
+        return modsi3_report_matches(lines, root, address)
+    if any(line.lstrip().startswith("* signed remainder") for line in lines):
+        return False
     if profiles == [f"* verification: `{PRELOADED_SWITCH_SCHEMA}`"]:
         return preloaded_switch_report_matches(lines, root, address)
     if profiles == [f"* verification: `{UDIVSI3_SCHEMA}`"]:
