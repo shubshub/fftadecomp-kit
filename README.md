@@ -984,6 +984,49 @@ read back over (`--wsl Ubuntu`, `--wsl-path` for where the toolchain lives).
 Note that some old cc1s (agbcc, GCC 2.9) **do not run the preprocessor** — the
 tool runs `cpp -nostdinc -undef -I include` first and hands the result over.
 
+## Explicit mixed-return inert spins
+
+`match.py --control-flow-profile mixed-return-inert-spin-v1` selects the
+separate `elf-symbol-thumb-mixed-return-inert-spin-v1` report profile. Ordinary
+matching and all older schemas keep their existing return-reachability rule.
+The new profile requires a normal verified return and at least one reachable
+instruction without a graph path to a return. **Every** such instruction must
+itself be an unconditional narrow Thumb branch to its own address. Pure-spin
+functions, multi-instruction cycles and even branch-only feeders are excluded.
+
+The complete converged instruction, stack/provenance, local-alias, call and
+literal checks still run, including checks after return classification. A
+fixed frame may remain allocated on the spin arm; actual returns must balance
+it. Ordinary typed mapped Thumb calls and fixed frames are supported, but
+buffer proofs, switches, function/object relocations, indirect-call thunks and
+signed/unsigned division/remainder profiles cannot be combined with this
+profile. No automatic fallback or caller-address exception selects it.
+
+Only the fixed approved agbcc `-mthumb-interwork -O2` configuration is accepted.
+The original ELF must own one complete Thumb function and its pools, without
+other allocated contents or unresolved relocations. Both function indexes
+must agree with that complete extent. Reports bind source/header inputs,
+both index snapshots, full bytes and canonical derived call/frame/spin
+evidence. Every report replay freshly compiles a captured copy of the entire
+existing `source_paths` dependency universe, inspects the original ELF and
+typed link, and reruns the CFG and plausibility checks. Rehashed metadata is
+not a substitute for this provenance. Replay has bounded subprocesses,
+nonrecursive guards and disk-backed cleanup; it fails closed when unavailable.
+
+Status selects this policy only from its explicit saved schema, never from
+an address or a failed ordinary verification. Fresh no-write verification
+also requires the saved new-schema report to replay successfully; stale
+inputs require `--write --verify` to regenerate and replay it. A report header
+selects policy but cannot grant a match. Mixed, stripped or downgraded proof
+markers do not relax the old verifier. The existing push/status gate uses
+these same checks.
+
+This proves a narrow local machine-CFG property, not termination, initialized
+locals, general C definedness, arbitrary pointer safety, callback semantics
+or external-callee correctness. A conditional loop with an exit already
+accepted by the ordinary profile can still run forever. Source contracts,
+plausibility and separate semantic review remain required.
+
 ## Status accounting
 
 The two existing percentage badges and table rows retain their legacy
@@ -1004,7 +1047,8 @@ This is recovered-code evidence, not an exhaustive late-ROM inventory.
 
 `--verify` performs fresh official matching without rewriting reports;
 `--write --verify` also regenerates and replays them. Fresh no-write verification
-does not require a pre-existing report. `--check` takes precedence over
+does not require a pre-existing report for legacy profiles; the explicit
+inert-spin profile requires its saved report as described above. `--check` takes precedence over
 `--write`, and any failed main or late source still makes the status gate fail.
 Hosted report/block checks do not substitute for local ROM-backed matching.
 

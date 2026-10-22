@@ -33,6 +33,7 @@ import sys
 import tempfile
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
+import inert_spin_profile as inert_spin
 import signal
 from contextvars import ContextVar
 from rompath import rom_path
@@ -1862,7 +1863,8 @@ class FunctionBufferCallProof(BufferCallProof):
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
                              switch_data_relocations=None, udivsi3_context=None,
-                             preloaded_switch=False, modsi3_context=None, divsi3_context=None):
+                             preloaded_switch=False, modsi3_context=None, divsi3_context=None,
+                             inert_spin_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
@@ -1870,6 +1872,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     reserved = set()
     division_constants = None
     signed_numeric = False
+    if inert_spin_context is not None:
+        if type(inert_spin_context) is not dict or inert_spin_context or not thumb or \
+                buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
+                switch_data_relocations is not None or udivsi3_context is not None or \
+                modsi3_context is not None or divsi3_context is not None or preloaded_switch:
+            raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
+               modsi3.reserved(target) or divsi3.reserved(target)
+               for target in (validated_calls or {}).values()):
+            raise ValueError("inert spins exclude arithmetic runtimes and call thunks")
     if divsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_relocations is not None or switch_data_relocations is not None or \
@@ -2254,7 +2266,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if predecessor not in reaching_return:
                 reaching_return.add(predecessor)
                 pending.append(predecessor)
-    if reaching_return != instructions.keys():
+    if inert_spin_context is not None:
+        spins = sorted(instructions.keys() - reaching_return)
+        if not spins:
+            raise ValueError("inert-spin profile requires a reachable nonreturning self-branch")
+        for current in spins:
+            instruction = instructions[current]
+            if instruction.id != ARM_INS_B or instruction.size != 2 or \
+                    instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+                    bytes(instruction.bytes) != b"\xfe\xe7" or len(instruction.operands) != 1 or \
+                    instruction.operands[0].type != ARM_OP_IMM or \
+                    instruction.operands[0].imm != current or set(edges[current]) != {current}:
+                raise ValueError("every non-return-reaching node must itself be an inert narrow self-branch")
+    elif reaching_return != instructions.keys():
         raise ValueError("reachable control-flow region has no path to a verified return")
     code_end = max(instruction.address + instruction.size
                    for instruction in instructions.values())
@@ -2291,6 +2315,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if uses_stack_frame(instructions.values()):
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         modsi3.prove_operands(instructions, edges, address, modsi3_context[2])
+    if inert_spin_context is not None:
+        inert_spin_context["spins"] = [current - address for current in spins]
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -2392,6 +2418,7 @@ def main():
     ap.add_argument("--linker", default=DEFAULT_LD)
     ap.add_argument("--flags", default=DEFAULT_FLAGS)
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
+    ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))
@@ -2437,6 +2464,15 @@ def main():
     if not ROM_BASE <= addr < ROM_BASE + len(rom):
         sys.exit("function address is outside the ROM")
     thumb = args.mode == "thumb"
+    spin_profile = args.control_flow_profile == inert_spin.SELECTOR
+    function_index = inert_spin.index_snapshot(ROOT) if spin_profile else None
+    if spin_profile:
+        try:
+            inert_spin.fixed_configuration(args)
+        except ValueError as error:
+            sys.exit(str(error))
+        if not thumb or len(list(Path(ROOT, "src").rglob(f"{addr:08X}.c"))) != 1:
+            sys.exit("inert spins require one uniquely addressed Thumb source")
 
     print(f"function  0x{addr:08X}   {span} bytes ({'Thumb' if thumb else 'ARM'})")
     print(f"source    {src_rel}")
@@ -2461,7 +2497,13 @@ def main():
             address_manifest = None
             switch_evidence = None
             preloaded_profile = False
-            if original["relocations"]:
+            spin_evidence = None
+            if spin_profile:
+                if not thumb:
+                    raise ValueError("inert spins require Thumb mode")
+                got, calls = inert_spin.object_bytes(runner, workspace, args, original, addr, mapping, rom)
+                linked_profile = bool(calls)
+            elif original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
                 got, calls, data_relocations = link_calls(runner, workspace, args, original,
@@ -2476,7 +2518,14 @@ def main():
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
-            if divsi3_bindings:
+            if spin_profile:
+                context = {}
+                verified_instructions = verify_leaf_instructions(got, addr, True, calls,
+                                                                  inert_spin_context=context)
+                spin_evidence = {"calls": inert_spin.call_records(calls, addr),
+                                 "frame": uses_stack_frame(verified_instructions), "spins": context["spins"]}
+                verified_instructions = inert_spin.verify(got, addr, rom, mapping, function_index, spin_evidence)
+            elif divsi3_bindings:
                 if (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) != \
                         (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS):
                     raise ValueError("signed quotient requires the fixed approved toolchain configuration")
@@ -2598,9 +2647,13 @@ def main():
         schema = modsi3.SCHEMA
     if quotient_evidence is not None:
         schema = divsi3.SCHEMA
+    if spin_profile:
+        schema = inert_spin.SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     if preloaded_profile:
         control_flow = PRELOADED_SWITCH_CONTROL_FLOW
+    if spin_profile:
+        control_flow = inert_spin.CONTROL_FLOW
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -2626,13 +2679,17 @@ def main():
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
-    if (linked_profile or data_profile or function_relocations or switch_relocations) and \
+    if (linked_profile or data_profile or function_relocations or switch_relocations or spin_profile) and \
             mapping_snapshot(ROOT) != mapping:
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
     if schema == FUNCTION_BUFFER_SCHEMA and report_rom_path(ROOT) != rom_file:
         sys.exit("selected ROM changed during verification; re-run match.py")
+    if spin_profile and (inert_spin.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file):
+        sys.exit("inert-spin function index or selected ROM changed during verification; re-run match.py")
+    if spin_profile and hand_asm_allowed:
+        sys.exit("inert spins exclude hand-ASM exceptions")
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -2721,7 +2778,7 @@ def main():
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-            if linked_profile or data_profile or function_relocations or switch_relocations:
+            if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
             if data_profile:
@@ -2761,6 +2818,13 @@ def main():
                 f.write(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
                 proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence)
                 f.write(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
+            if spin_profile:
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+                f.write(f"* inert spins: {inert_spin.SUMMARY}\n")
+                f.write(f"* inert spin manifest: `{inert_spin.manifest_text(spin_evidence)}`\n")
+                proof_digest = inert_spin.fingerprint(addr, got_body, spin_evidence, fingerprint,
+                                                      mapping, function_index)
+                f.write(f"* inert spin proof SHA-256: `{proof_digest}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")
