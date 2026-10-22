@@ -6,7 +6,7 @@ which meant a copy had to be made for anything else - a dump named for its
 region, say.  Nothing about the tools needs that name, so they resolve it
 instead:
 
-    1. $FFTA_ROM, if set - an explicit path always wins;
+    1. $FFTA_ROM, if set - an explicit path must exist and always wins;
     2. baserom.bin in the repository root, if it is there;
     3. otherwise the single .gba in the repository root.
 
@@ -33,19 +33,28 @@ def rom_candidates(root):
 
 
 def rom_path(root=".", required=True):
-    """the ROM to build against, or None if there is not exactly one"""
+    """Resolve one ROM; optional absence is allowed, invalid selection is not."""
     root = os.path.abspath(root)
-    for path in rom_candidates(root):
+    env = os.environ.get("FFTA_ROM")
+    if env:
+        path = env if os.path.isabs(env) else os.path.join(root, env)
         if os.path.isfile(path):
             return path
-    if not required:
-        return None
-    gbas = [p for p in rom_candidates(root) if p.lower().endswith(".gba")]
+        raise SystemExit(f"FFTA_ROM does not name a ROM file: {path}")
+    baseline = os.path.join(root, "baserom.bin")
+    if os.path.isfile(baseline):
+        return baseline
+    gbas = [path for path in rom_candidates(root)
+            if path.lower().endswith(".gba") and os.path.isfile(path)]
     if len(gbas) > 1:
         raise SystemExit(
             f"more than one .gba in {root} and no baserom.bin:\n  " +
             "\n  ".join(os.path.basename(p) for p in gbas) +
             "\nSet $FFTA_ROM to the one to use.")
+    if gbas:
+        return gbas[0]
+    if not required:
+        return None
     raise SystemExit(
         f"no ROM in {root}.  Put the .gba there, or set $FFTA_ROM to its path.")
 

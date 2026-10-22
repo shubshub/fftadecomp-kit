@@ -84,6 +84,7 @@ def committed_tree(repo, commit):
     import tempfile
     destination = None
     try:
+        source_rom = rom_path(repo)
         build = os.path.join(repo, "build")
         os.makedirs(build, exist_ok=True)
         destination = tempfile.mkdtemp(prefix="ffta_push_", dir=build)
@@ -95,11 +96,9 @@ def committed_tree(repo, commit):
                                    input=archive.stdout, capture_output=True)
         if extracted.returncode != 0:
             raise ValueError("could not extract the captured commit")
-        source_rom = rom_path(repo, required=False)
-        if source_rom and os.path.exists(source_rom):
-            shutil.copy2(source_rom, os.path.join(destination, "baserom.bin"))
+        shutil.copy2(source_rom, os.path.join(destination, "baserom.bin"))
         return destination
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, SystemExit) as error:
         if destination is not None:
             shutil.rmtree(destination, ignore_errors=True)
         log(f"    FAIL  committed-tree verification: {error}")
@@ -465,6 +464,9 @@ def main():
     if tree is None:
         log("\nNOTHING PUSHED - could not materialize the committed tree.")
         return 1
+    previous_rom = os.environ.get("FFTA_ROM")
+    if use_committed:
+        os.environ["FFTA_ROM"] = os.path.join(tree, "baserom.bin")
     try:
         checks += (check_kit_tools(repo),) if args.kit else (
             check_matches(tree, badge_base(repo)),
@@ -473,6 +475,10 @@ def main():
         )
     finally:
         if use_committed:
+            if previous_rom is None:
+                os.environ.pop("FFTA_ROM", None)
+            else:
+                os.environ["FFTA_ROM"] = previous_rom
             import shutil
             shutil.rmtree(tree, ignore_errors=True)
     if not all(checks):
