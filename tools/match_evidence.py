@@ -3,6 +3,8 @@
 import hashlib
 import json
 import modsi3_profile as modsi3
+import divsi3_profile as divsi3
+import subprocess
 from rompath import rom_path
 from pathlib import Path
 import re
@@ -548,6 +550,71 @@ def modsi3_report_matches(lines, root, address):
         return False
 
 
+def divsi3_report_matches(lines, root, address):
+    from match import DEFAULT_CC, DEFAULT_FLAGS, verify_divsi3_source
+
+    def single(prefix):
+        marker = prefix.rstrip(" :-")
+        children = ("* signed quotient manifest", "* signed quotient proof SHA-256") \
+            if marker == "* signed quotient" else ()
+        matches = [line for line in lines if line.lstrip().startswith(marker) and
+                   not line.lstrip().startswith(children)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate signed quotient evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed signed quotient evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate signed quotient manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        source_digest = source_fingerprint(root, address)
+        if single("* verification: ") != f"`{divsi3.SCHEMA}`" or mapping is None or \
+                unquote("* source SHA-256: ") != source_digest or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                single("* signed quotient: ") != divsi3.SUMMARY or \
+                single("* control flow: ") != CALL_SUMMARY or \
+                unquote("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.lstrip().startswith(("* stack frame", "* buffer", "* data symbols",
+                                              "* unsigned division", "* signed remainder", "* switches",
+                                              "* switch manifest", "* switch proof", "* function address",
+                                              "* function buffer")) for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* signed quotient manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if divsi3.manifest_text(manifest) != encoded_manifest or \
+                single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
+                single("**MATCH - byte identical** - ") != f"{len(data)}/{len(data)} bytes" or \
+                unquote("* signed quotient proof SHA-256: ") != divsi3.fingerprint(address, data, manifest):
+            return False
+        selected_rom = report_rom_path(root)
+        rom = Path(selected_rom).read_bytes()
+        verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest)
+        return (source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == mapping and
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
+            RuntimeError, subprocess.SubprocessError):
+        return False
+
+
 def legacy_report_control_flow(lines, root, address, profile):
     from match import (ROM_BASE, RUNTIME_HELPERS, function_address_target,
                        thunk_is_call_via, verify_leaf_instructions, verify_addressed_modsi3_source)
@@ -617,6 +684,10 @@ def legacy_report_control_flow(lines, root, address, profile):
 def report_matches(report, root, address):
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{divsi3.SCHEMA}`"]:
+        return divsi3_report_matches(lines, root, address)
+    if any(line.lstrip().startswith("* signed quotient") for line in lines):
+        return False
     if profiles == [f"* verification: `{FUNCTION_BUFFER_SCHEMA}`"]:
         return function_address_report_matches(lines, root, address, buffer_profile=True)
     if any(line.lstrip().startswith("* function buffer") for line in lines):

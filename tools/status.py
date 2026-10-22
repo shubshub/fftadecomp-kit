@@ -8,10 +8,13 @@ status.py - how much of the ROM is actually decompiled.
     python tools/status.py --check         # exit 1 if the README is stale
     python tools/status.py --badges badges # shields.io endpoint JSON
 
-Counts two things over the functions in the code region:
+Retains two legacy provisional metrics:
 
     functions matched / total
-    bytes matched / total        (sum of the matched functions' spans)
+    bytes matched / total        (main indexed spans / legacy layout code sizes)
+
+Additional verified late-ROM functions and complete-body bytes are reported
+separately, without a guessed denominator or whole-ROM completion percentage.
 
 A function counts as matched when src/<addr>.c exists *and* its match report
 says the bytes are identical.  --verify recompiles instead of trusting the
@@ -32,6 +35,7 @@ import re
 import subprocess
 import sys
 from match_evidence import report_matches
+from rompath import rom_path
 
 # the status block uses block-drawing characters; Windows consoles are cp1252
 for _stream in ("stdout", "stderr"):
@@ -42,7 +46,9 @@ for _stream in ("stdout", "stderr"):
 
 START = "<!-- ffta-status:start -->"
 END = "<!-- ffta-status:end -->"
-CODE_END = 0x08150000          # end of the code region (from the analysis)
+CODE_END = 0x08150000
+ROM_BASE = 0x08000000
+ROM_END = 0x09000000
 
 # colour thresholds for a percentage badge
 COLOR_THRESHOLDS = [(20, "red"), (40, "orange"), (60, "yellow"),
@@ -117,6 +123,54 @@ def bar(frac, width=28):
     return "█" * filled + "░" * (width - filled)
 
 
+def report_extent(report, *, strict=True):
+    prefix = "* compiled" if strict else "* compiled : "
+    records = [line for line in report.splitlines()
+               if (line.lstrip() if strict else line).startswith(prefix)]
+    if len(records) != 1:
+        raise ValueError("missing or duplicate compiled-body evidence")
+    match = re.fullmatch(r"\* compiled : `((?:[0-9a-f]{2})+)`", records[0])
+    if match is None:
+        raise ValueError("malformed compiled-body evidence")
+    return len(match[1]) // 2
+
+
+def matcher_extent(output, *, strict=True):
+    prefix = "extent" if strict else "extent    "
+    records = [line for line in output.splitlines()
+               if (line.lstrip() if strict else line).startswith(prefix)]
+    if len(records) != 1:
+        raise ValueError("missing or duplicate matcher extent")
+    match = re.fullmatch(
+        r"extent    ([1-9][0-9]*) bytes \(complete ELF symbol; [^\r\n]+; no relocations\)",
+        records[0])
+    if match is None:
+        raise ValueError("malformed matcher extent")
+    return int(match[1])
+
+
+def late_mapping(root, address, entries):
+    matches = [entry for entry in entries if int(entry["rom"], 16) == address]
+    if len(matches) != 1:
+        raise ValueError("late source requires one unique indexed function")
+    entry = matches[0]
+    mode = entry.get("mode")
+    if mode not in ("thumb", "arm"):
+        raise ValueError("late function mode must be thumb or arm")
+    end = int(entry["end"], 16)
+    alignment = 2 if mode == "thumb" else 4
+    if address % alignment or end <= address or (end - address) % alignment:
+        raise ValueError("late function entry/body is not positive and mode-aligned")
+    selected_end = min(ROM_END, ROM_BASE + os.path.getsize(rom_path(root)))
+    if not CODE_END <= address < end <= selected_end:
+        raise ValueError("late function extent is outside the original ROM")
+    for other in entries:
+        if other is not entry and int(other["rom"], 16) < end and \
+                address < int(other["end"], 16):
+            raise ValueError("late function extent overlaps another indexed function")
+    return end - address, mode
+
+
 def collect(root, verify, quiet=False, write_reports=False):
     cfg = os.path.join(root, "config", "functions.json")
     if not os.path.exists(cfg):
@@ -125,13 +179,6 @@ def collect(root, verify, quiet=False, write_reports=False):
 
     code = [f for f in fns if int(f["rom"], 16) < CODE_END]
     total_fns = len(code)
-    # The denominator is the code that is actually there, which the layout
-    # knows and the index does not: an index span can run over a region the
-    # layout calls data, and a plain sum of spans then counts data as code.
-    # The index also used to under-claim badly - a span cut at a conditional
-    # branch is short - which is why the percentage has moved around so much
-    # between runs.  Take the layout's code segments, and fall back to the
-    # union of index spans when there is no layout.
     total_bytes = 0
     layout_path = os.path.join(root, "config", "rom_layout.json")
     if os.path.exists(layout_path):
@@ -146,21 +193,40 @@ def collect(root, verify, quiet=False, write_reports=False):
 
     src_dir = os.path.join(root, "src")
     matched_f, matched_b, problems = 0, 0, []
-    for path in sorted(Path(src_dir).rglob("*.c")) if os.path.isdir(src_dir) else []:
+    paths = sorted(Path(src_dir).rglob("*.c")) if os.path.isdir(src_dir) else []
+    source_counts = {}
+    for path in paths:
+        identity = path.stem.upper()
+        source_counts[identity] = source_counts.get(identity, 0) + 1
+    verified_bodies = []
+    for path in paths:
         name = path.name
         if not name.endswith(".c"):
             continue
         addr = name[:-2].upper()
-        span = next((int(f["end"], 16) - int(f["rom"], 16)
-                     for f in code if f["rom"][2:].upper() == addr), None)
+        late = bool(re.fullmatch(r"[0-9A-F]{8}", addr)) and int(addr, 16) >= CODE_END
+        if late:
+            try:
+                if name != f"{addr}.c" or source_counts[addr] != 1:
+                    raise ValueError("late source requires one canonical addressed source")
+                span, mode = late_mapping(root, int(addr, 16), fns)
+            except (OSError, ValueError, KeyError, TypeError, SystemExit) as error:
+                problems.append(f"{addr}: {error}")
+                continue
+        else:
+            span = next((int(f["end"], 16) - int(f["rom"], 16)
+                         for f in code if f["rom"][2:].upper() == addr), None)
         if span is None:
             problems.append(f"{addr}: src/{name} does not match a known function")
             continue
 
         ok = False
+        report = None
         if verify:
             here = os.path.dirname(os.path.abspath(__file__))
             command = [sys.executable, os.path.join(here, "match.py"), "--root", root, addr]
+            if late:
+                command += ["--mode", mode]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
@@ -169,19 +235,53 @@ def collect(root, verify, quiet=False, write_reports=False):
             rep = os.path.join(root, "docs", "match", f"{addr}.md")
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
-                    ok = report_matches(report_file.read(), root, int(addr, 16))
+                    report = report_file.read()
+                    ok = report_matches(report, root, int(addr, 16))
             else:
                 ok = False
                 problems.append(f"{addr}: no match report in docs/match/")
         if ok:
-            matched_f += 1
-            matched_b += span
+            extents, extent_errors = [], []
+            evidence = [(matcher_extent, result.stdout)] if verify else []
+            if report is not None:
+                evidence.append((report_extent, report))
+            for extract, payload in evidence:
+                try:
+                    extents.append(extract(payload, strict=late))
+                except ValueError as error:
+                    extent_errors.append(str(error))
+            if late and extent_errors:
+                problems.append(f"{addr}: {extent_errors[0]}")
+                continue
+            if late and any(extent != span for extent in extents):
+                problems.append(f"{addr}: complete verified body disagrees with the late indexed extent")
+                continue
+            body_size = max(extents) if extents else None
+            verified_bodies.append((int(addr, 16), body_size, late))
+            if not late:
+                matched_f += 1
+                matched_b += span
         elif not verify:
             problems.append(f"{addr}: no current, source-bound MATCH report; re-run match.py")
         else:
             problems.append(f"{addr}: DOES NOT MATCH")
 
-    return total_fns, matched_f, total_bytes, matched_b, problems
+    late_f, late_b = 0, 0
+    unknown_main_extent = any(size is None and not late for _, size, late in verified_bodies)
+    for index, (address, size, late) in enumerate(verified_bodies):
+        if not late:
+            continue
+        if unknown_main_extent:
+            problems.append(f"{address:08X}: cannot exclude overlap with an unknown complete main-body extent")
+            continue
+        if any(other_address < address + size and address < other_address + other_size
+               for other_index, (other_address, other_size, _) in enumerate(verified_bodies)
+               if other_index != index):
+            problems.append(f"{address:08X}: late function overlaps another verified body")
+            continue
+        late_f += 1
+        late_b += size
+    return total_fns, matched_f, total_bytes, matched_b, problems, late_f, late_b
 
 
 def badge_url(label, percent, badge_base):
@@ -193,7 +293,8 @@ def badge_url(label, percent, badge_base):
     return static_badge(label, percent)
 
 
-def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_base=None):
+def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_base=None,
+           *, late_f=0, late_b=0):
     pf = matched_f / total_f if total_f else 0.0
     pb = matched_b / total_b if total_b else 0.0
     label = f"{prefix} " if prefix else ""
@@ -201,6 +302,8 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
         START,
         "",
         "### Decompilation status",
+        "",
+        "Legacy provisional metrics (including the two percentage badges):",
         "",
         f"![{label}functions]({badge_url(f'{label}functions', pf * 100, badge_base)}) "
         f"![{label}bytes]({badge_url(f'{label}bytes', pb * 100, badge_base)})",
@@ -212,15 +315,24 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
         f"| Bytes matched | {matched_b:,} / {total_b:,} | **{pb * 100:.2f}%** | "
         f"`{bar(pb)}` |",
         "",
-        f"Measured over {total_f:,} provisional function entries in the code\n"
-        f"region (`0x08000000`-`0x{CODE_END - 1:08X}`), counting indexed spans.\n"
-        f"The index can contain truncated or overlapping spans; these figures\n"
-        f"do not certify complete-function or whole-ROM coverage.\n"
+        f"The function denominator counts {total_f:,} provisional index entries\n"
+        f"starting below `0x{CODE_END:08X}`; matched main bytes count indexed spans.\n"
+        f"The byte denominator sums all legacy layout segments named `code*`,\n"
+        f"including late-ROM labels, or falls back to the union of main indexed\n"
+        f"spans when that sum is zero or the layout is absent. Labels do not\n"
+        f"prove code ownership; index spans can be truncated or overlapping.\n"
         f"Generated by `tools/status.py` from `config/functions.json` and the\n"
         f"match reports in `docs/match/`.",
         "",
-        f"**{matched_f:,} functions and {matched_b:,} bytes are byte-exact.**\n"
+        f"**Legacy credit: {matched_f:,} matched functions and {matched_b:,} indexed bytes.**\n"
         f"Only exact matches are committed - see the rule in *Matching*.",
+        "",
+        f"**Additional verified late-ROM spans: {late_f:,} functions; "
+        f"{late_b:,} complete-body bytes.**\n"
+        f"These separately indexed and verified ROM bodies include their internal\n"
+        f"literal pools, exclude external alignment and RAM aliases, and do not\n"
+        f"alter the legacy metrics. No late-ROM denominator is established;\n"
+        f"neither summary certifies exhaustive whole-game coverage.",
     ]
     if problems:
         lines += ["", "```", "needs attention:"] + [f"  {p}" for p in problems] + ["```"]
@@ -249,12 +361,13 @@ def main():
     args = ap.parse_args()
 
     root = repo_root(args.root)
-    tf, mf, tb, mb, problems = collect(root, args.verify,
-                                      write_reports=args.verify and args.write and not args.check)
+    tf, mf, tb, mb, problems, late_f, late_b = collect(
+        root, args.verify, write_reports=args.verify and args.write and not args.check)
     badge_base = None if args.static_badges else (
         args.badge_base or os.environ.get("FFTA_BADGE_BASE")
         or badge_base_from_remote(root))
-    block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix, badge_base)
+    block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix, badge_base,
+                           late_f=late_f, late_b=late_b)
 
     if args.badges:
         out = os.path.abspath(args.badges)

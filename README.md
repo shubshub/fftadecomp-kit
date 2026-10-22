@@ -150,10 +150,13 @@ reset the cursor. An already rejected request stays rejected; after deployment,
 inspect current availability and submit a fresh request when appropriate.
 Local parser acceptance is not deployment or an authenticated lease.
 
-This reservation repair does not expand the status collector: it currently
-rejects sources outside its main-code index. Late-ROM publication additionally
-requires a separately validated status/accounting change; do not bypass that
-gate or present the provisional denominators as whole-game coverage.
+Reservation coordinates and status accounting are separate gates. Status uses
+the full function index, but late sources must independently satisfy the normal
+compiler/report gates and strict unique-entry, mode, alignment, bounds,
+non-overlap and complete-extent checks. An index row does not establish code
+ownership or authorize a reservation. The parser deployment and authenticated
+lease requirements above still apply; provisional percentages are not
+whole-game coverage.
 
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
@@ -645,6 +648,58 @@ unchanged. Runtime binding proves identity and ABI compatibility, not that
 an arbitrary source spelled `/`; natural source still requires plausibility
 and independent review.
 
+### Audited signed quotient with positive constant divisor
+
+The `elf-symbol-thumb-divsi3-positive-constant-v1` profile accepts canonical
+compiler-generated `__divsi3` calls with a CFG-proven positive signed32 constant
+divisor. It allows arbitrary signed32 dividends: a divisor in `1..0x7FFFFFFF`
+excludes division by zero and `INT_MIN / -1`. Ordinary mapped direct Thumb
+calls and register PUSH/POP saves may coexist. Explicit frames, stack aliases
+or arguments, buffers, switches, indirect thunks, callbacks, named object
+relocations and other arithmetic runtime profiles remain excluded.
+
+The pinned `agbcc-thumb-divsi3-v1` identity is the complete 146-byte Thumb
+function `[0x081426B8,0x0814274A)`, SHA-256
+`80b13b14c17b297e6c92a50aeddcacdffbe951729bcb1290e205055950655884`, and its
+two-byte handler `[0x0814274C,0x0814274E)`, SHA-256
+`abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c`.
+Exact unique nonoverlapping Thumb mappings, current ROM bytes and the dependency
+BL at helper offset `0x8A` are checked. External alignment is not part of either
+symbol. The zero handler's machine behavior does not define C division by zero.
+
+Each canonical zero-expression `R_ARM_THM_CALL` must reference one zero-valued
+undefined global FUNC/NOTYPE `__divsi3`. Typed linking binds it only to absolute
+Thumb FUNC `0x081426B9`. Addressed/interior aliases, objects/addends, runtime
+address literals, extra functions/text, veneers and unexplained byte changes
+reject. Old schemas do not grandfather addressed signed-quotient calls.
+
+A profile-local constant pass converges over the validated CFG before testing
+call obligations. It supports unconditional Thumb16 MOV/MOVS immediate/copy and
+constant LSL immediate with u32 wrap, retaining only equal facts at joins.
+Other writes kill facts; calls kill caller-saved facts. This proves both MOV100
+and MOV180/LSL1=360 without widening other profiles or assuming a dividend range.
+It does not prove general C memory safety, caller termination or callee semantics.
+
+Reports contain exact canonical `runtime`, `calls`, `divisors` metadata. Every
+signed-schema replay **freshly compiles captured source/headers** under the fixed
+approved `agbcc -mthumb-interwork -O2` configuration, revalidates the original
+canonical ELF symbols/relocations and typed complete link, compares the derived
+manifest and full body with the saved/current ROM, and rechecks all inputs.
+Fingerprints and linked bytes alone cannot distinguish a canonical compiler
+alias from a forged report around addressed source. Replay therefore requires
+the local toolchain and cannot accept a cache-only result. It is guarded against
+reentry, uses 120-second per-command limits with owned POSIX process-group
+cleanup, and removes its own disk-backed temporary artifacts on all exits.
+Signed-schema replay fails closed on non-POSIX hosts, including native Windows.
+
+Activation requires one immutable selected toolkit/game source-report-map pair
+to pass the full joint verification gate. Keep the old selected pair until that
+exact new pair is available; separate repository updates are not atomic, and
+arbitrary latest-tool/latest-game combinations are not an activation contract. Existing
+addressed callers must be explicitly corrected and independently byte-verified;
+do not enable these exclusions against an unmigrated selected game snapshot.
+There is no signed-quotient addressed-source exception or automatic rewrite.
+
 ### Audited signed remainder runtime
 
 The separate `elf-symbol-thumb-modsi3-s16-v1` profile accepts natural signed
@@ -878,7 +933,8 @@ and validates their fingerprints before counting a successful compilation. This
 keeps the written status and subsequent offline checks consistent after shared
 header or mapping changes. `--verify` alone and `--check` never rewrite reports;
 `--check` takes precedence if combined with `--write`. Offline report checks
-replay cached evidence against the local ROM; they do not recompile the source.
+replay evidence against the local ROM. Schema-specific checks can also require
+fresh source compilation, as the signed-quotient profile does.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
 Linked-profile reports also bind the exact `config/functions.json` mapping
@@ -927,6 +983,30 @@ read back over (`--wsl Ubuntu`, `--wsl-path` for where the toolchain lives).
 
 Note that some old cc1s (agbcc, GCC 2.9) **do not run the preprocessor** — the
 tool runs `cpp -nostdinc -undef -I include` first and hands the result over.
+
+## Status accounting
+
+The two existing percentage badges and table rows retain their legacy
+provisional bases. The function denominator counts entries starting below
+`0x08150000`; matched main bytes count indexed spans. The byte denominator sums
+all legacy layout segments named `code*`, including late-ROM labels, falling
+back to the union of main indexed spans when that sum is zero or the layout is
+absent. Layout labels do not prove executable ownership, and historical index
+spans may be truncated or overlapping. These numbers are not whole-game
+completion percentages.
+
+Additional verified late-ROM spans are reported separately as absolute
+function and complete-body byte counts, without a guessed denominator. Their
+complete ELF/report extent must equal the unique indexed extent. Internal
+literal pools count; external alignment and installation-time RAM aliases do
+not. No late count changes a legacy numerator, denominator or percentage.
+This is recovered-code evidence, not an exhaustive late-ROM inventory.
+
+`--verify` performs fresh official matching without rewriting reports;
+`--write --verify` also regenerates and replays them. Fresh no-write verification
+does not require a pre-existing report. `--check` takes precedence over
+`--write`, and any failed main or late source still makes the status gate fail.
+Hosted report/block checks do not substitute for local ROM-backed matching.
 
 ## Notes for people extending the analysis
 
