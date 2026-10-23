@@ -36,6 +36,7 @@ import divsi3_profile as divsi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
+import empty_body_profile as empty_body
 import signal
 from contextvars import ContextVar
 from rompath import rom_path
@@ -2560,6 +2561,8 @@ def main():
     if not ROM_BASE <= addr < ROM_BASE + len(rom):
         sys.exit("function address is outside the ROM")
     thumb = args.mode == "thumb"
+    empty_index = empty_body.index_snapshot(ROOT)
+    empty_profile = False
     spin_profile = args.control_flow_profile == inert_spin.SELECTOR
     double_profile = args.software_double_profile == software_double.SELECTOR
     thunk_profile = args.function_address_profile == function_thunk.SELECTOR
@@ -2816,12 +2819,26 @@ def main():
             checker_result = (_run_replay_process(checker_command, ROOT, software_double.REPLAY_TIMEOUT)
                               if double_profile or thunk_profile else subprocess.run(checker_command, capture_output=True, text=True))
             findings, hand_asm_allowed = plausibility_result(checker_result, addr)
+            if findings and identical and schema == SCHEMA and thumb:
+                try:
+                    software_double.fixed_configuration(args)
+                    empty_body.check_findings(checker_result, ROOT, addr)
+                    empty_body.verify_object(object_data, text_data, addr, thumb, rom, mapping, empty_index)
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
+                else:
+                    findings = []
+                    empty_profile = True
+                    schema = empty_body.SCHEMA
         except (OSError, ValueError, TypeError, RecursionError, subprocess.SubprocessError) as error:
             findings = [f"plausibility checker failed: {error}"]
 
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
+    if empty_profile and (mapping_snapshot(ROOT) != mapping or
+                          empty_body.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file):
+        sys.exit("empty-body indexes or selected ROM changed during verification; re-run match.py")
     if (linked_profile or data_profile or function_relocations or switch_relocations or spin_profile) and \
             mapping_snapshot(ROOT) != mapping:
         sys.exit("function mapping changed during verification; re-run match.py")
@@ -2931,6 +2948,11 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
+            if empty_profile:
+                f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+                f.write(f"* control flow: {control_flow}\n")
+                f.write(f"* empty body: {empty_body.SUMMARY}\n")
             if framed_profile:
                 f.write(f"* stack frame: {STACK_SUMMARY}\n")
             if buffer_proof.dependencies:

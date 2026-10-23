@@ -211,7 +211,7 @@ Both gates, checked by `tools/match.py`:
   local CFG or direct-Thumb-call profile
 - **plausibility** — `tools/plausible.py` rejects source that only exists to
   make bytes match: inline asm, optimisation pragmas, dead code, `volatile`,
-  empty/placeholder bodies, steering padding, and comments that admit the code
+  unproved empty/placeholder bodies, steering padding, and comments that admit the code
   steers the compiler
 
 ```sh
@@ -220,6 +220,12 @@ python tools/status.py --write --verify                    # recompiles everythi
 ```
 
 Byte-identical output from implausible source is **IMPLAUSIBLE**, not a match.
+The standalone checker still rejects empty bodies. Only the match/report/push
+path can discharge one canonical empty `void func_ADDRESS(void) {}` body when
+the fixed toolchain and both indexes prove an exact complete two-byte Thumb
+`bx lr`, with correct ELF ownership, mode, alignment, CFG and no relocations.
+The `elf-symbol-thumb-empty-v1` report replays compilation; other findings,
+placeholder markers and hand-asm allowances remain disqualifying. See README.
 Direct Thumb calls require typed linking to unique, aligned function-index
 targets and exact comparison of the relocated bytes. That profile uses an ABI
 call summary, not a proof that the callee returns or preserves its contract.

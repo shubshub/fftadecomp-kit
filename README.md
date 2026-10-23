@@ -972,6 +972,32 @@ and original byte counts. An identical full-ROM SHA-1 proves integration of the
 currently matched code, not that the remaining original code is decompiled.
 Without `--compiled`, the existing manifest-concatenation check is unchanged.
 
+### Evidence-bound empty functions
+
+The standalone `plausible.py` checker still rejects empty bodies. `match.py`
+can discharge exactly one `empty-body` finding using
+`elf-symbol-thumb-empty-v1`: the sole addressed source must contain only
+`void func_ADDRESS(void) {}` (comments and whitespace are allowed), and the
+default toolchain must emit one ordinary global Thumb function whose complete
+ELF symbol is exactly `bx lr` (`7047`, two bytes). Both function indexes must
+agree on a unique, nonoverlapping two-byte span and one instruction. The ROM,
+ELF mode/alignment, closed return CFG and absence of relocations must agree.
+Other findings, placeholder markers even in comments, additional functions,
+headers with empty bodies and hand-assembly allowances cannot use this exception.
+
+Reports bind source/header inputs and both indexes. Consuming a report freshly
+compiles captured sources with the default toolchain and rechecks the original
+ELF and plausibility findings; unavailable replay fails closed. Missing,
+duplicated, altered or stale fields fail, including relabeling the report as a
+legacy profile. The push plausibility sweep accepts the source only through
+this same report verifier. This proves the complete function body, not external
+section padding, the historical C signature, or behavior for invalid return
+addresses. Other empty C spellings and ARM-mode no-ops remain unsupported.
+
+Focused checks (requires the installed default compiler, binutils and Capstone):
+`PYTHONDONTWRITEBYTECODE=1 python tests/test_empty_body.py`.
+Test workspaces are created under `build/`, or `FFTA_TEST_SCRATCH` if set.
+
 It also gates on \plausible.py\: byte-identical output from source that looks
 like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
 steering padding) is reported **IMPLAUSIBLE**, not a match. Exit status is 0
