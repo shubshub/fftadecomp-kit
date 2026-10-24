@@ -56,6 +56,12 @@ maps, symbols, segmentation, coverage or source files.
 
 Results separate reachable instruction ranges, literal words and unresolved
 gaps. Direct calls contribute their continuation, not the callee's body.
+`literal_reads` records each reached PC-relative word read by `site`, `address`,
+`size` and `inside_window`, sorted by instruction address. Repeated reads of one
+word remain separate observations. External reads are recorded without fetching
+their values or widening the window; they still produce partial reasons.
+These read dependencies do not establish ownership or permit matching, and
+only valid in-window words contribute to `literal_ranges`.
 `cfg_closed` describes structural closure under ordinary-call and syntactic
 return assumptions, not stack safety, a complete ELF symbol or exhaustive
 discovery. `complete` and `inventory_complete` always remain false.
@@ -93,6 +99,13 @@ python tools/reserve.py release 0x08011040 --who me --reason "done, moved to src
 ```
 
 ### The rules
+
+Broker addresses use exactly eight hexadecimal digits after `0x`, with even
+alignment inside the original 16 MiB image `[0x08000000,0x09000000)`.
+This validates ROM coordinates, not executable ownership: headers, assets and
+alignment can also have valid coordinates. Establish the complete function
+independently before authoring. RAM aliases and ROM mirrors are not accepted.
+The automatic discovery cutoff at `0x08150000` is not the reservation boundary.
 
 1. **Read the ledger, check the address, then claim it.** Never reserve an
    address already reserved, matched on the decomp default branch, or covered
@@ -133,6 +146,23 @@ already been synchronized. When changing reservation protocols, explicitly pull
 and restart all clients: an already loaded old process still contains old code.
 
 ### Deploying the reservation broker
+
+The full-image address parser must reach the trusted default branch, and old
+broker jobs must finish, before requests at or above `0x08150000` are submitted.
+Update and restart clients too. Old code cannot parse a ledger containing a
+late-address row or retained receipt, even after that lease is released; prefer
+roll-forward repair rather than reverting the parser. Do not edit receipts or
+reset the cursor. An already rejected request stays rejected; after deployment,
+inspect current availability and submit a fresh request when appropriate.
+Local parser acceptance is not deployment or an authenticated lease.
+
+Reservation coordinates and status accounting are separate gates. Status uses
+the full function index, but late sources must independently satisfy the normal
+compiler/report gates and strict unique-entry, mode, alignment, bounds,
+non-overlap and complete-extent checks. An index row does not establish code
+ownership or authorize a reservation. The parser deployment and authenticated
+lease requirements above still apply; provisional percentages are not
+whole-game coverage.
 
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
@@ -245,7 +275,9 @@ code boundary: installer `0x08002768` references the 176-byte executable image
 50-, 60- and 62-byte Thumb bodies plus four alignment bytes. Record bounded,
 reference-supported ROM entries without counting their RAM aliases as extra
 functions or assuming the RAM image cannot change. Generated function spans
-and the below-boundary status denominator remain provisional.
+and the main-region function denominator remain provisional. The byte
+denominator sums legacy layout segments named `code*`, including segments
+beyond the discovery cutoff; those labels are not exhaustive code ownership.
 
 During Thumb traversal, the analyzer also recognizes an adjacent immediate
 `cmp` / `bls` guard leading to the five-instruction word-table dispatch
@@ -423,6 +455,14 @@ or writes overlapping a pointer-bearing argument word are rejected rather than
 silently changing its meaning. Spilling an incoming buffer pointer within an
 inspected callee remains unsupported.
 
+Version 2 also permits unshifted register-indexed byte, halfword and word
+accesses, including signed loads, when every reaching path proves the index
+constant through immediate/register `mov` instructions. Arithmetic and loads
+do not establish constants; writes, pops and caller-clobbered calls invalidate
+them. Joins retain only identical constants present on every incoming path.
+The existing local-word bounds, alignment, pointer-slot overlap and escape
+checks still apply. Version 1 continues to reject all register-indexed accesses.
+
 Register and slot joins conservatively retain a pointer that is present on
 either path. Different possible offsets for the same register or slot remain
 unsupported. Inspected callees may return buffer aliases in `r0`–`r3` or `r12`;
@@ -479,6 +519,27 @@ protect only that word: descriptor frames and saved control require separate
 byte-range proofs or invalidation of affected facts, with no assumed allocator
 or frame separation. Those additional capabilities are not part of this profile.
 
+### Engine cutpoint diagnostics
+
+`python tools/engine_cutpoints.py --root PATH_TO_GAME` recomputes two real-ROM
+descriptor-copy contexts and the allocator-entry prefixes for sizes40/84.
+Results state exact entry premises, exit registers/flags, ordered memory events,
+byte definedness/alias fragments, open frames and complete input identities.
+
+These are conditional diagnostics, not MATCH reports or replay inputs. The
+copy stops before the callback reload; the kill prefix stops with two frames
+still open, before the allocator's first nested call. No allocator return,
+freshness, runtime-image identity, preceding descriptor preservation, callback
+effect or C type/lifetime property is inferred. Missing premises, unsupported
+instructions or exhausted finite budgets fail closed. Results are recomputed;
+there is no cache, serialized certificate parser or live-verifier consumer.
+
+The incoming-r3 check ends only after a completed overwrite establishes an
+independent value. A retained descriptor value or fragment keeps that check
+active; an unknown overwrite fails closed. The narrow supported provenance
+case is the inspected, numerically separated SP-relative workspace address.
+This does not establish destruction of the separate retained r9 alias.
+
 ### Named data literals
 
 For a known external object address, add an explicit mapping to the decomp
@@ -492,8 +553,10 @@ Names must be ordinary C identifiers, not function or call-helper names;
 addresses must be eight-digit hexadecimal strings. Duplicate keys and malformed
 mappings are rejected. The map supplies reviewed addresses, not guessed ones.
 Only undefined external object/notype symbols with `R_ARM_ABS32` relocations
-qualify. Each relocation must occupy a complete aligned word in the function's
-trailing literal pool and be loaded by a reachable PC-relative instruction.
+qualify. Each relocation must occupy a complete aligned word inside the function
+and be loaded by a reachable PC-relative instruction. The word must be disjoint
+from every reachable instruction byte. Trailing pools and branch-skipped middle
+pools are supported; entering a pool as code or falling through it is rejected.
 Signed addends are supported without address wrapping; self-function references,
 overlapping relocations and unconsumed literal words are rejected.
 
@@ -600,6 +663,58 @@ Existing non-runtime schemas, fingerprints and default binding APIs are
 unchanged. Runtime binding proves identity and ABI compatibility, not that
 an arbitrary source spelled `/`; natural source still requires plausibility
 and independent review.
+
+### Audited signed quotient with positive constant divisor
+
+The `elf-symbol-thumb-divsi3-positive-constant-v1` profile accepts canonical
+compiler-generated `__divsi3` calls with a CFG-proven positive signed32 constant
+divisor. It allows arbitrary signed32 dividends: a divisor in `1..0x7FFFFFFF`
+excludes division by zero and `INT_MIN / -1`. Ordinary mapped direct Thumb
+calls and register PUSH/POP saves may coexist. Explicit frames, stack aliases
+or arguments, buffers, switches, indirect thunks, callbacks, named object
+relocations and other arithmetic runtime profiles remain excluded.
+
+The pinned `agbcc-thumb-divsi3-v1` identity is the complete 146-byte Thumb
+function `[0x081426B8,0x0814274A)`, SHA-256
+`80b13b14c17b297e6c92a50aeddcacdffbe951729bcb1290e205055950655884`, and its
+two-byte handler `[0x0814274C,0x0814274E)`, SHA-256
+`abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c`.
+Exact unique nonoverlapping Thumb mappings, current ROM bytes and the dependency
+BL at helper offset `0x8A` are checked. External alignment is not part of either
+symbol. The zero handler's machine behavior does not define C division by zero.
+
+Each canonical zero-expression `R_ARM_THM_CALL` must reference one zero-valued
+undefined global FUNC/NOTYPE `__divsi3`. Typed linking binds it only to absolute
+Thumb FUNC `0x081426B9`. Addressed/interior aliases, objects/addends, runtime
+address literals, extra functions/text, veneers and unexplained byte changes
+reject. Old schemas do not grandfather addressed signed-quotient calls.
+
+A profile-local constant pass converges over the validated CFG before testing
+call obligations. It supports unconditional Thumb16 MOV/MOVS immediate/copy and
+constant LSL immediate with u32 wrap, retaining only equal facts at joins.
+Other writes kill facts; calls kill caller-saved facts. This proves both MOV100
+and MOV180/LSL1=360 without widening other profiles or assuming a dividend range.
+It does not prove general C memory safety, caller termination or callee semantics.
+
+Reports contain exact canonical `runtime`, `calls`, `divisors` metadata. Every
+signed-schema replay **freshly compiles captured source/headers** under the fixed
+approved `agbcc -mthumb-interwork -O2` configuration, revalidates the original
+canonical ELF symbols/relocations and typed complete link, compares the derived
+manifest and full body with the saved/current ROM, and rechecks all inputs.
+Fingerprints and linked bytes alone cannot distinguish a canonical compiler
+alias from a forged report around addressed source. Replay therefore requires
+the local toolchain and cannot accept a cache-only result. It is guarded against
+reentry, uses 120-second per-command limits with owned POSIX process-group
+cleanup, and removes its own disk-backed temporary artifacts on all exits.
+Signed-schema replay fails closed on non-POSIX hosts, including native Windows.
+
+Activation requires one immutable selected toolkit/game source-report-map pair
+to pass the full joint verification gate. Keep the old selected pair until that
+exact new pair is available; separate repository updates are not atomic, and
+arbitrary latest-tool/latest-game combinations are not an activation contract. Existing
+addressed callers must be explicitly corrected and independently byte-verified;
+do not enable these exclusions against an unmigrated selected game snapshot.
+There is no signed-quotient addressed-source exception or automatic rewrite.
 
 ### Audited signed remainder runtime
 
@@ -834,7 +949,8 @@ and validates their fingerprints before counting a successful compilation. This
 keeps the written status and subsequent offline checks consistent after shared
 header or mapping changes. `--verify` alone and `--check` never rewrite reports;
 `--check` takes precedence if combined with `--write`. Offline report checks
-replay cached evidence against the local ROM; they do not recompile the source.
+replay evidence against the local ROM. Schema-specific checks can also require
+fresh source compilation, as the signed-quotient profile does.
 The existing function index is provisional and includes truncated or overlapping
 spans, so its percentages do not establish whole-function or whole-ROM completion.
 Linked-profile reports also bind the exact `config/functions.json` mapping
@@ -858,10 +974,45 @@ It rejects overlapping or out-of-range symbols, failed matches, changed inputs,
 and mismatched final bytes. The optional output must be a new file under the
 decomp repo's `build/` directory; existing files are never overwritten.
 
+The explicit software-double and inert-spin profiles are selected only from a
+current saved report using their strict profile parsers and fresh report replay.
+The rebuild then passes the corresponding fixed selector to the matcher with
+`--no-write --emit`; it never derives compiler options from report text or falls
+back after failed verification. Selected reports and the function text index
+must remain unchanged through output verification. Ordinary compilation without
+an opt-in report retains the default matcher policy, including when no report
+exists. Reports are never regenerated by a compiled rebuild.
+
 The result is explicitly a **partial mixed C/ROM build**, with separate compiled
 and original byte counts. An identical full-ROM SHA-1 proves integration of the
 currently matched code, not that the remaining original code is decompiled.
 Without `--compiled`, the existing manifest-concatenation check is unchanged.
+
+### Evidence-bound empty functions
+
+The standalone `plausible.py` checker still rejects empty bodies. `match.py`
+can discharge exactly one `empty-body` finding using
+`elf-symbol-thumb-empty-v1`: the sole addressed source must contain only
+`void func_ADDRESS(void) {}` (comments and whitespace are allowed), and the
+default toolchain must emit one ordinary global Thumb function whose complete
+ELF symbol is exactly `bx lr` (`7047`, two bytes). Both function indexes must
+agree on a unique, nonoverlapping two-byte span and one instruction. The ROM,
+ELF mode/alignment, closed return CFG and absence of relocations must agree.
+Other findings, placeholder markers even in comments, additional functions,
+headers with empty bodies and hand-assembly allowances cannot use this exception.
+
+Reports bind source/header inputs and both indexes. Consuming a report freshly
+compiles captured sources with the default toolchain and rechecks the original
+ELF and plausibility findings; unavailable replay fails closed. Missing,
+duplicated, altered or stale fields fail, including relabeling the report as a
+legacy profile. The push plausibility sweep accepts the source only through
+this same report verifier. This proves the complete function body, not external
+section padding, the historical C signature, or behavior for invalid return
+addresses. Other empty C spellings and ARM-mode no-ops remain unsupported.
+
+Focused checks (requires the installed default compiler, binutils and Capstone):
+`PYTHONDONTWRITEBYTECODE=1 python tests/test_empty_body.py`.
+Test workspaces are created under `build/`, or `FFTA_TEST_SCRATCH` if set.
 
 It also gates on \plausible.py\: byte-identical output from source that looks
 like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
@@ -884,7 +1035,193 @@ read back over (`--wsl Ubuntu`, `--wsl-path` for where the toolchain lives).
 Note that some old cc1s (agbcc, GCC 2.9) **do not run the preprocessor** — the
 tool runs `cpp -nostdinc -undef -I include` first and hands the result over.
 
+## Explicit mixed-return inert spins
+
+`match.py --control-flow-profile mixed-return-inert-spin-v1` selects the
+separate `elf-symbol-thumb-mixed-return-inert-spin-v1` report profile. Ordinary
+matching and all older schemas keep their existing return-reachability rule.
+The new profile requires a normal verified return and at least one reachable
+instruction without a graph path to a return. **Every** such instruction must
+itself be an unconditional narrow Thumb branch to its own address. Pure-spin
+functions, multi-instruction cycles and even branch-only feeders are excluded.
+
+The complete converged instruction, stack/provenance, local-alias, call and
+literal checks still run, including checks after return classification. A
+fixed frame may remain allocated on the spin arm; actual returns must balance
+it. Ordinary typed mapped Thumb calls and fixed frames are supported, but
+buffer proofs, switches, function/object relocations, indirect-call thunks and
+signed/unsigned division/remainder or software-double profiles cannot be combined with this
+profile. No automatic fallback or caller-address exception selects it.
+
+Only the fixed approved agbcc `-mthumb-interwork -O2` configuration is accepted.
+The original ELF must own one complete Thumb function and its pools, without
+other allocated contents or unresolved relocations. Both function indexes
+must agree with that complete extent. Reports bind source/header inputs,
+both index snapshots, full bytes and canonical derived call/frame/spin
+evidence. Every report replay freshly compiles a captured copy of the entire
+existing `source_paths` dependency universe, inspects the original ELF and
+typed link, and reruns the CFG and plausibility checks. Rehashed metadata is
+not a substitute for this provenance. Replay has bounded subprocesses,
+nonrecursive guards and disk-backed cleanup; it fails closed when unavailable.
+
+Status selects this policy only from its explicit saved schema, never from
+an address or a failed ordinary verification. Fresh no-write verification
+also requires the saved new-schema report to replay successfully; stale
+inputs require `--write --verify` to regenerate and replay it. A report header
+selects policy but cannot grant a match. Mixed, stripped or downgraded proof
+markers do not relax the old verifier. The existing push/status gate uses
+these same checks.
+
+This proves a narrow local machine-CFG property, not termination, initialized
+locals, general C definedness, arbitrary pointer safety, callback semantics
+or external-callee correctness. A conditional loop with an exit already
+accepted by the ordinary profile can still run forever. Source contracts,
+plausibility and separate semantic review remain required.
+
+## Target binary64 conversions, subtraction and division
+
+`match.py --software-double-profile convert-sub-div-target-v1` explicitly
+selects `elf-symbol-thumb-df-convert-sub-div-target-v1`. Only the fixed agbcc
+`-mthumb-interwork -O2` configuration is supported. At least one fresh original
+ELF call relocation must name `__floatdidf`, `__floatsidf`, `__subdf3` or
+`__divdf3`. No add/sub-only option is installed. Direct add, multiply, private
+integer helpers and every other floating operation remain unsupported.
+
+All twelve complete runtime identities in `software_double_profile.py` are
+mandatory, including pools, internal alignment and 28 dependency edges.
+Both function indexes must contain their exact unique, nonoverlapping Thumb
+extents and instruction counts. Legacy truncated metadata cannot substitute
+for these spans. Their entire intervals are reserved against addressed-call,
+data/base/addend, function-literal, raw-literal and older-report bypasses.
+Only the four canonical caller entries are exposed; transitive private calls
+are justified by the pinned closure, not caller-access exceptions.
+
+The original ELF must contain one complete Thumb function, canonical undefined
+global call symbols and canonical BL addends. Typed linking must preserve all
+other bytes, with no veneers, residual relocations or unexpected allocated
+contents. Ordinary typed direct calls, balanced fixed frames, bounded local
+aliases, numeric literals and inherited aligned scalar SP reads are supported.
+Direct incoming scalar reads have no verifier-proved argument-count or upper
+bound. Compatible C signatures, initialized readable backing, lifetimes and
+capacity remain source-review preconditions. Stores outside the tracked frame
+still reject. Buffers, stack-argument proof contexts, resolvers, switches,
+object/function relocations, thunks, integer runtimes and inert spins cannot
+compose with this profile. Ordinary callees retain entry-only binding and ABI
+assumptions: their complete bodies, semantics and return behavior are not proved.
+
+Binary64 values use high-word/low-word register and memory order, with
+little-endian bytes within each word. Signed64 conversion instead consumes
+integer low/high words; signed32 conversion consumes r0. This is an explicit
+target-machine-state contract, not unrestricted IEEE arithmetic or a pure
+function of operand values. Entry RAM and stack bytes are state inputs and
+persist between calls. Exceptional paths read the mutable private record at
+`[0x03005E50,0x03005E64)`: the same operands can yield qNaN or negative zero
+under different record states. Private stack reads can precede a write in
+the current invocation; per-pack and whole-runtime write epochs differ.
+No implicit zero initialization, finite-intermediate assumption, all-state
+termination, general C definedness or physical stack-capacity proof is claimed.
+The closed helper graph's maximum stack chain is 220 bytes below call-time SP,
+in addition to the caller frame and any separately assumed ordinary callee.
+
+The exact six-key manifest records runtime/ABI/semantics IDs, all dependencies,
+derived frame usage and every reachable call. Reports bind the source and full
+`source_paths` header universe, both maps, whole ROM, fixed configuration and
+complete caller. Every replay freshly captures and compiles those inputs,
+checks original ELF provenance, relinks and reruns CFG/plausibility checks.
+Rehashed manifests cannot turn addressed source into canonical provenance.
+Subprocesses are bounded, replay is nonrecursive, and temporary disk-backed
+workspaces are cleaned. Compilation failure or input/universe/ROM-path drift
+fails closed; there is no cache or alternate acceptance fallback.
+
+Status dispatches only the explicit saved schema. Offline checks and fresh
+no-write verification require successful saved-report replay; an independent
+fresh compile cannot hide stale evidence. Explicit `--write --verify` refreshes
+unambiguous evidence. Mixed, malformed, duplicate, downgraded or contradictory
+verdict/profile markers reject, including horizontal-whitespace variants.
+The normal status and push-match gates use these same rules; no target-address
+allowlist, source rewrite or progress exception is introduced.
+
+## Status accounting
+
+The two existing percentage badges and table rows retain their legacy
+provisional bases. The function denominator counts entries starting below
+`0x08150000`; matched main bytes count indexed spans. The byte denominator sums
+all legacy layout segments named `code*`, including late-ROM labels, falling
+back to the union of main indexed spans when that sum is zero or the layout is
+absent. Layout labels do not prove executable ownership, and historical index
+spans may be truncated or overlapping. These numbers are not whole-game
+completion percentages.
+
+Additional verified late-ROM spans are reported separately as absolute
+function and complete-body byte counts, without a guessed denominator. Their
+complete ELF/report extent must equal the unique indexed extent. Internal
+literal pools count; external alignment and installation-time RAM aliases do
+not. No late count changes a legacy numerator, denominator or percentage.
+This is recovered-code evidence, not an exhaustive late-ROM inventory.
+
+`--verify` performs fresh official matching without rewriting reports;
+`--write --verify` also regenerates and replays them. Fresh no-write verification
+does not require a pre-existing report for legacy profiles; the explicit
+inert-spin, software-double and function-address/thunk profiles require their saved reports as described
+above. `--check` takes precedence over
+`--write`, and any failed main or late source still makes the status gate fail.
+Hosted report/block checks do not substitute for local ROM-backed matching.
+
 ## Notes for people extending the analysis
+
+### Explicit function literals with canonical call thunks
+
+`match.py --function-address-profile canonical-thunks-v1` selects
+`elf-symbol-thumb-function-address-thunks-v1`; default matching does not select
+it automatically. It requires both original typed function-address literals
+and compiler-generated `_call_via_r0` through `_call_via_r12` calls. Ordinary
+mapped Thumb calls, mapped objects and fixed scalar frames may coexist. Buffer,
+switch, arithmetic-runtime and inert-spin contexts cannot be combined with it.
+
+Each used thunk's four-byte identity includes two executed BX bytes and two
+external alignment bytes. Only canonical original ELF names/relocations are
+admitted; manually naming `_call_via_` identifiers in preprocessed C, addressed
+aliases and thunk-table object/addend substitutes are rejected. Complete original
+and final ELF ownership, typed linking, pools, literal uses, fixed-point stack
+and return provenance, plausibility and exact ROM bytes remain mandatory. A
+tracked stack or saved-return value cannot serve as the thunk target register.
+
+This is conditional caller evidence. It assumes compatible executable indirect
+targets, valid argument backing/types, preserved ABI state and returning callees.
+Ordinary and retained function bindings establish mapped entries, not full callee
+bodies or semantics. It does not prove initialization, argument arity, arbitrary
+alias safety, callback lifetime, installed RAM identity or termination. Inherited
+scalar incoming-SP reads do not add such proofs.
+
+Strict saved reports freshly compile the entire captured source/header universe
+with fixed compiler configuration, check original relocation provenance and
+complete typed linking, and recheck source/maps/index/data/ROM snapshots. Exact
+typed manifests, reserved-marker detection and contradictory-verdict rejection
+apply. Older thunk-caller reports also require fresh default original-ELF proof
+that their caller contains no function-address relocations, so stripping new
+markers cannot downgrade the composition. Conservative legacy buffer replay
+performs this absence proof when it has no direct caller classification.
+That fresh replay retains the already-validated register-buffer or stack-buffer
+mode, independently re-derives its ROM-backed dependency and complete caller
+span, and still checks reachable literal provenance. It does not admit buffers
+to the new explicit composition or replace the existing dependency fingerprint
+and escape checks.
+For every thunk caller, mapped data relocation bases and signed-addend results
+must not alias indexed function entries (even or Thumb-tagged) or the reserved
+thunk table. Such ambiguous code-as-object bindings require canonical function
+provenance; renaming a callback as mapped data cannot bypass the selector.
+Reachable PC-relative pool words matching indexed code entries require the
+canonical function relocation at that offset; reserved thunk-table literals
+are rejected. This is a conservative provenance boundary for ambiguous
+code-valued literals, not proof that a numeric value denotes a function. It
+does not scan instruction bytes, unreachable pool words or unrelated integers.
+
+Status and compiled rebuild use only the fixed selector derived from a strictly
+replayed saved report; stale, malformed or missing reports do not authorize it.
+No-write verification does not refresh evidence. Rebuild preserves selected
+report and text-index snapshots through output publication and cleans owned
+output on failure. No source or Parked promotion follows from installing this
+tool capability; source review and the complete publication gates remain separate.
 
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
@@ -894,3 +1231,128 @@ tool runs `cpp -nostdinc -undef -I include` first and hands the result over.
   4bpp tile data, where the byte pair `0xB5xx` looks like `push {rX, lr}`.
 * `rebuild.py` is the gate: if the concatenation does not reproduce the ROM, the
   split is wrong and nothing downstream is safe.
+
+# Scalar-frame two-constant switches
+
+The explicit `--switch-profile two-constants-frame-v1` selector and
+`elf-symbol-thumb-switch-two-constants-frame-v1` schema compose the guarded
+two-constant table with fixed scalar SP frames. This is a separate opt-in:
+`two-constants-v2` still rejects frames and retains its exact serialization.
+Neither default matching nor failed replay upgrades or falls back to it.
+
+The same converged CFG worklist follows all cases, defaults and backedges,
+tracking stack depth, saved-return facts, scalar slots and ordinary ABI call
+clobbers. At least one reached nonzero narrow fixed allocation is required.
+Narrow fixed SP adjustments, PUSH/POP, direct aligned SP word loads/stores and
+ordinary incoming fifth/later argument reads are supported. Every verified
+return restores entry depth; joins require equal depth and intersect return
+facts. Stable loops are not termination proofs. Every SP-to-register address
+formation rejects, even when dead or overwritten; non-PUSH/POP block transfers,
+dynamic/wide adjustments, invalid stores and fabricated returns also reject.
+Buffer/resolver, function/object literal, runtime/thunk, preloaded-switch and
+inert contexts cannot combine with this policy.
+
+Only this schema adds the exact marker `fixed Thumb scalar SP frames; no
+stack-address materialization` and a `frame` manifest with policy
+`fixed-scalar-sp-v1`, sorted `adjustments` pairs `[instruction_offset,
+signed_byte_delta]`, and sorted `accesses` triples `[instruction_offset,
+"ldr"|"str",sp_displacement]`. These are instruction-derived facts collected
+after successful full-graph verification, not trusted input bounds. Replay
+freshly rebuilds the captured source and compares the entire canonical report;
+unknown/duplicate keys, altered summaries, mixed schemas and malformed selectors
+reject. The fingerprint is domain-separated from v2. Status/rebuild forward the
+exact saved selector; frame rebuilds cross-check emitted size against the saved
+report and canonical matcher extent, excluding placement-prefix bytes.
+
+Original/linked ELF ownership, all raw relocation extents/addends, two reached
+unrelocated words, deterministic placement, regular-file identity capture,
+source/header/map/index/ROM bindings, bounded subprocesses and cleanup are
+unchanged. Tool identity is checked for drift during fresh capture; no new
+persistent tool-hash field is claimed for the old fingerprint.
+
+This is conditional caller evidence under the ordinary returning ABI, not a
+proof of scalar initializedness, physical stack capacity, exact r4-r11 value
+restoration, pointer-free incoming bits, allocator safety or arbitrary memory
+effects. It does not import the private region engine or admit E03F8's buffer,
+callback, descriptor and lifetime composition. Synthetic natural-C tests are
+not authorization to retry frozen game candidates.
+
+# Two-constant switch placement profile
+
+The opt-in `thumb-entry-context-v1` build stage supports both even
+function-origin classes without changing legacy ownership gates. No game
+function is admitted merely by installing the capability.
+
+The explicit `--switch-profile two-constants-v2` path supports one unsigned-guarded
+five-instruction Thumb dispatch with exactly two reached, unrelocated constant
+words between the dispatch and its relocated local pointer/table. Default CLI
+and legacy profiles do not select it. It excludes frames, stack buffers,
+function/object literals, callbacks, runtime thunks and additional indirect
+transfers. Recognizing E03F8's pool placement does not discharge its other
+verification obligations or admit a game source.
+
+Issuance and `elf-symbol-thumb-switch-two-constants-v2` report replay each capture
+the uniquely addressed C source and all tracked include inputs, compile with the
+fixed default tool tuple, inspect every original ELF relocation, link typed
+targets, and regenerate the complete CFG/ownership manifest. Both indexes and
+the approved 16 MiB ROM identity are required. The ROM is read directly, never
+copied into replay scratch. Tool resolution/content and live/captured inputs
+are checked for drift. Child processes have a 120-second bound and process-group
+cleanup; replay workspaces reside under the selected root's disk-backed `build/`.
+The operator must not place that root on tmpfs.
+
+The private assembly parser accepts only the fixed compiler header, Thumb/text
+entry envelope, four-byte zero-fill entry alignment, one addressed global sized
+function, local numeric/long-branch/end labels, the enumerated Thumb instruction
+mnemonics, `.word` expressions and four-byte zero-fill internal alignment. It
+accepts only the compiler's exact conditional-branch and long-jump annotations;
+arbitrary comments, strings, macros/includes, alternate sections, extra functions,
+emitting prefixes and other directives reject. Input is bounded to 1 MiB.
+
+For target A, the stage derives p=A%4 and B=A-p. Zero-origin assembly is unchanged;
+base-two assembly inserts exactly `\t.space\t2, 0\n` immediately before the unique
+entry `.thumb_func`, after entry alignment. Raw compiler output is retained
+unchanged throughout compilation. No result-dependent rewrite or source/flag
+selection occurs. Genuine complete original and linked ELF remain in section
+coordinates: the function occupies [p,p+N), the section links at B, and its entry
+is A|1. Exactly p zero prefix bytes and the separately checked external alignment
+suffix earn no function credit. Raw relocations/addends remain section-relative;
+only validated manifest offsets are derived by subtracting p. Existing legacy
+binders never receive a normalized or stripped object.
+
+The strict `placement` manifest member binds the rule, derived origin/prefix and
+raw assembly, placed assembly, original ELF and linked ELF SHA-256 identities.
+The linked ELF hash uses the exact byte snapshot parsed and validated, not a
+later unvalidated reread. Linked ELF and objcopy output must remain regular
+files with unchanged contents and filesystem identities through the final
+workspace capture check; mutation or replacement rejects issuance and replay
+before any report or emitted body is written.
+Artifact descriptors open nonblockingly without following symlinks and must
+identify regular files before any read. FIFOs reject without waiting for a
+writer; descriptor closure and path/descriptor identity checks remain mandatory.
+Every replay regenerates them with stable logical filenames; reports cannot
+choose placement or supply objects. Prior private v1 selectors/reports reject
+terminally rather than silently selecting the amended build contract.
+
+The new report family has strict canonical fields and JSON; malformed or mixed
+markers and failed fresh replay reject terminally. Its source/manifest/input
+fingerprint is not a substitute for original-ELF provenance. Status and rebuild
+forward only the explicit saved selector. Old schemas and fingerprint algorithms
+remain unchanged.
+
+Successful issuance prints the canonical complete-symbol extent from the freshly
+verified body. Late-address status verification checks this against both the
+indexed span and replayed report; missing, duplicate, malformed or disagreeing
+extent output remains a terminal failure.
+
+Focused checks: `python -m unittest discover -s tests -p 'test_switch_*.py' -v`
+with the ARM tools on `PATH` and disk-backed `TMPDIR`. The natural-C fixture uses
+real fixed tools and fresh report replay. Synthetic fixture ROM trust is patched
+only inside tests; production exposes no alternative-ROM or ELF-injection API.
+Synthetic assembly/fault-injection tests establish verifier discrimination, not
+hand-assembly game matches. `tests/switch_compatibility_probe.py` compares exact
+legacy body/schema/manifest/proof identities against an unchanged toolkit.
+Natural source positives cover both function origins and dispatch alignment
+classes, short and long unsigned guards, and ordinary typed calls. Late status
+and rebuild fixtures verify function-only output while preserving nonzero
+external prefix bytes. These are finite verifier tests, not game-match credit.

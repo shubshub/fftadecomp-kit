@@ -32,6 +32,12 @@ import subprocess
 import sys
 import tempfile
 import modsi3_profile as modsi3
+import divsi3_profile as divsi3
+import inert_spin_profile as inert_spin
+import software_double_profile as software_double
+import function_thunk_profile as function_thunk
+import empty_body_profile as empty_body
+import signal
 from contextvars import ContextVar
 from rompath import rom_path
 from contextlib import contextmanager
@@ -140,11 +146,32 @@ DEFAULT_FLAGS = "-mthumb-interwork -O2"
 DEFAULT_WSL_PATH = "$HOME/armtc/root/usr/bin"
 
 
+SIGNED_REPLAY_TIMEOUT = 120
+
+
+def _run_replay_process(command, root, timeout, shell=False):
+    if os.name != "posix":
+        raise ValueError("bounded signed replay requires POSIX process-group cleanup")
+    with subprocess.Popen(command, cwd=root, shell=shell, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, text=True, start_new_session=True) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+        except BaseException:
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.communicate()
+            raise
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+
+
 class Runner:
     """Runs shell commands, transparently through WSL on Windows."""
 
-    def __init__(self, cc, wsl_distro="Ubuntu", wsl_path="", root=None):
+    def __init__(self, cc, wsl_distro="Ubuntu", wsl_path="", root=None, timeout=None):
         self.wsl = None
+        self.timeout = timeout
         self.root = ROOT if root is None else repo_root(root)
         self.prefix = f"export PATH={wsl_path}:$PATH; " if wsl_path else ""
         if platform.system() == "Windows" and not shutil.which(cc.split("/")[-1]):
@@ -156,10 +183,13 @@ class Runner:
         if self.wsl:
             here = "/mnt/c/" + "/".join(self.root[3:].split(os.sep))
             cmd = f"{self.prefix}cd {here} && {cmd}"
-            r = subprocess.run(self.wsl + [cmd], capture_output=True, text=True)
+            r = (_run_replay_process(self.wsl + [cmd], self.root, self.timeout)
+                 if self.timeout is not None else
+                 subprocess.run(self.wsl + [cmd], capture_output=True, text=True))
         else:
-            r = subprocess.run(cmd, shell=True, capture_output=True, text=True,
-                               cwd=self.root)
+            r = (_run_replay_process(cmd, self.root, self.timeout, shell=True)
+                 if self.timeout is not None else
+                 subprocess.run(cmd, shell=True, capture_output=True, text=True, cwd=self.root))
         if r.returncode != 0:
             raise RuntimeError((r.stderr or r.stdout or "command failed").strip())
         return r.stdout
@@ -325,10 +355,11 @@ def parse_data_symbols(snapshot):
     for name, value in document.items():
         if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
                 name.startswith(("func_", "_call_via_")) or \
-                name in ("__udivsi3", "__modsi3", "__div0") or \
+                name in ("__udivsi3", "__modsi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or \
                 not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
             raise ValueError("invalid data symbol name or absolute address")
-        if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)):
+        if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)) or \
+                divsi3.reserved(int(value, 16)) or software_double.reserved(int(value, 16)):
             raise ValueError("division runtime cannot be bound as data")
         symbols[name] = int(value, 16)
     return symbols
@@ -339,7 +370,7 @@ def function_address_target(name, entries, address, size, rom_size):
     if match is None:
         raise ValueError("function address requires a canonical addressed function")
     target = int(match[1], 16)
-    if is_udivsi3_address(target) or modsi3.reserved(target):
+    if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or software_double.reserved(target):
         raise ValueError("division runtime requires its canonical versioned proof")
     if target in RUNTIME_HELPERS.values():
         raise ValueError("function-address evidence does not support runtime call thunks")
@@ -357,10 +388,22 @@ def function_address_target(name, entries, address, size, rom_size):
 def call_bindings(image, name, address, mapping, rom_size,
                    rom_image=b'', data_mapping=None, function_relocations=None,
                    switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None,
-                   allow_preloaded_switch=False, modsi3_bindings=None):
+                   allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
+                   double_bindings=None, double_index=None, function_thunks=False, *,
+                   allow_switch_constants=False):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
+    from switch_constants_profile import check_opt_in
+    check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
+                 function_relocations, allow_switch_data, udivsi3_bindings,
+                 allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
+                 double_bindings, double_index, function_thunks)
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
+    if type(function_thunks) is not bool or function_thunks and (
+            function_relocations is None or switch_relocations is not None or allow_switch_data or
+            allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or
+            divsi3_bindings is not None or double_bindings is not None or double_index is not None):
+        raise ValueError("function thunks require isolated typed function bindings")
     if type(allow_switch_data) is not bool:
         raise ValueError("switch-data binding opt-in must be Boolean")
     if type(allow_preloaded_switch) is not bool:
@@ -377,6 +420,17 @@ def call_bindings(image, name, address, mapping, rom_size,
     if modsi3_bindings is not None and \
             (not isinstance(modsi3_bindings, dict) or modsi3_bindings):
         raise ValueError("signed remainder bindings require an empty collection")
+    if divsi3_bindings is not None and (not isinstance(divsi3_bindings, dict) or divsi3_bindings):
+        raise ValueError("signed quotient bindings require an empty collection")
+    if double_bindings is not None:
+        if not isinstance(double_bindings, dict) or double_bindings or data_mapping is not None or \
+                function_relocations is not None or switch_relocations is not None or allow_switch_data or \
+                allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or \
+                divsi3_bindings is not None:
+            raise ValueError("software double requires isolated empty call bindings")
+        software_double.verify_identity(rom_image, mapping, double_index)
+    elif double_index is not None:
+        raise ValueError("software-double index requires its binding context")
     allocated_text_only(image)
     symbol, offset = function_record(image, name, address, True)
     functions = [item for item in image["symbols"] if item["type"] == 2 and item["section"]]
@@ -461,7 +515,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                 value = target + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + symbol["size"]:
                     raise ValueError("data relocation overflows or references its own function")
-                if is_udivsi3_address(value) or modsi3.reserved(value):
+                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or software_double.reserved(value):
                     raise ValueError("division runtime cannot be bound through a data addend")
                 positions = set(range(relocation, relocation + 4))
                 if positions & occupied:
@@ -473,8 +527,29 @@ def call_bindings(image, name, address, mapping, rom_size,
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
             helper = RUNTIME_HELPERS.get(target_symbol["name"])
             division = target_symbol["name"] == "__udivsi3"
+            quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
-            if remainder:
+            double_operation = target_symbol["name"] in software_double.OPERATIONS
+            if double_operation:
+                if double_bindings is None:
+                    raise ValueError("software double requires its explicit canonical profile")
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                        sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
+                    raise ValueError("software double requires one undefined global function symbol")
+                target = software_double.OPERATIONS[target_symbol["name"]]
+                candidates = []
+            elif quotient:
+                if divsi3_bindings is None:
+                    raise ValueError("signed quotient requires its canonical positive-constant profile")
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                        sum(item["name"] == "__divsi3" for item in image["symbols"]) != 1:
+                    raise ValueError("signed quotient requires one undefined global function symbol")
+                divsi3.verify_identity(rom_image, mapping)
+                target = divsi3.ADDRESS
+                candidates = []
+            elif remainder:
                 if modsi3_bindings is None:
                     raise ValueError("signed remainder requires its isolated binding profile")
                 if target_symbol["section"] or target_symbol["bind"] != 1 or \
@@ -511,7 +586,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                         target_symbol["type"] not in (0, 2):
                     raise ValueError("call target must be an undefined addressed function")
                 target = int(match[1], 16)
-                if is_udivsi3_address(target) or modsi3.reserved(target):
+                if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or software_double.reserved(target):
                     raise ValueError("division runtime requires its canonical compiler alias")
                 candidates = []
             for entry in entries:
@@ -538,11 +613,12 @@ def call_bindings(image, name, address, mapping, rom_size,
             if relocation % 2 or relocation + 4 > symbol["size"] or instruction is None or \
                     instruction.id != ARM_INS_BL or instruction.size != 4:
                 raise ValueError("call relocation does not cover a Thumb BL instruction")
-            if division or remainder:
+            if division or remainder or quotient or double_operation:
                 if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM or \
                         instruction.operands[0].imm != address + relocation:
                     raise ValueError("division call relocation has a noncanonical addend")
-                bindings = modsi3_bindings if remainder else udivsi3_bindings
+                bindings = (double_bindings if double_operation else divsi3_bindings if quotient else
+                            modsi3_bindings if remainder else udivsi3_bindings)
                 bindings[address + relocation] = target_symbol["name"]
             positions = set(range(relocation, relocation + 4))
             if positions & occupied:
@@ -550,6 +626,24 @@ def call_bindings(image, name, address, mapping, rom_size,
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
+    if double_bindings is not None:
+        if not double_bindings or data_relocations or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("software double requires canonical operations without data or thunks")
+        for target_name in targets:
+            definitions = [item for item in image["symbols"] if item["name"] == target_name]
+            if len(definitions) != 1 or definitions[0]["value"] or definitions[0]["section"] or \
+                    definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
+                raise ValueError("software-double calls require unique undefined global functions")
+    if divsi3_bindings:
+        if udivsi3_bindings or modsi3_bindings or data_relocations or function_relocations or \
+                switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("signed quotient excludes other runtime, literal, switch and thunk profiles")
+        for target_name in targets:
+            definitions = [item for item in image["symbols"] if item["name"] == target_name]
+            if len(definitions) != 1 or definitions[0]["value"] or definitions[0]["section"] or \
+                    definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
+                raise ValueError("signed quotient calls require unique undefined global functions")
     if modsi3_bindings:
         aliases = set(modsi3_bindings.values())
         if aliases not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
@@ -572,7 +666,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["section"] or definitions[0]["bind"] != 1 or \
                     definitions[0]["type"] not in (0, 2):
                 raise ValueError("division profile calls require unique undefined global functions")
-    if function_relocations and any(target in RUNTIME_HELPERS for target in targets):
+    if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets):
         raise ValueError("function-address evidence does not support runtime call thunks")
     if switch_relocations:
         if (data_relocations and not allow_switch_data) or function_relocations or \
@@ -592,21 +686,30 @@ def call_bindings(image, name, address, mapping, rom_size,
             struct.pack_into("<I", relocated, position, value)
         layout = selected_switch_layout(bytes(relocated), address, switch_relocations,
                                         data_relocations if data_relocations else None,
-                                        allow_preloaded_switch)
+                                        allow_preloaded_switch,
+                                        allow_switch_constants=allow_switch_constants)
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
             any(item["name"] and not item["section"] and item["name"] not in targets
                 for item in image["symbols"]):
         raise ValueError("unresolved symbols outside the permitted bindings")
+    function_thunk.verify_data_bindings(calls, data_relocations, data_symbols, entries)
     return calls, targets, data_relocations
 
 
 def linked_function_bytes(original, linked, name, address, calls, targets, data_relocations=None,
                           function_relocations=None, switch_relocations=None,
                           allow_switch_data=False, udivsi3_bindings=None,
-                          allow_preloaded_switch=False, modsi3_bindings=None):
+                          allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
+                          double_bindings=None, function_thunks=False, *,
+                          allow_switch_constants=False):
     """Validate exact placement and the linker's complete modification surface."""
+    from switch_constants_profile import check_opt_in
+    check_opt_in(allow_switch_constants, switch_relocations, data_relocations or None,
+                 function_relocations, allow_switch_data, udivsi3_bindings,
+                 allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
+                 double_bindings, function_thunks)
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
     allocated_text_only(linked)
@@ -619,7 +722,40 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("linker added text or veneers")
     data_relocations = data_relocations or {}
     function_relocations = function_relocations or {}
+    if function_thunks:
+        if type(function_thunks) is not bool or not function_relocations or \
+                not any(name in function_thunk.ALIASES for name in targets) or switch_relocations or \
+                allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None or \
+                modsi3_bindings is not None or divsi3_bindings is not None or double_bindings is not None:
+            raise ValueError("linked function-thunk bindings are incomplete or mixed")
+    elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
+        raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
+    double_targets = {name: target for name, target in targets.items() if software_double.reserved(target)}
+    if double_targets:
+        if not isinstance(double_bindings, dict) or not double_bindings or \
+                any(alias not in software_double.OPERATIONS or calls.get(site) != software_double.OPERATIONS[alias]
+                    for site, alias in double_bindings.items()) or \
+                double_targets != {alias: software_double.OPERATIONS[alias] for alias in double_bindings.values()} or \
+                set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target)} or \
+                udivsi3_bindings or modsi3_bindings or divsi3_bindings or data_relocations or \
+                function_relocations or switch_relocations or allow_switch_data or allow_preloaded_switch or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("linked software-double bindings are incomplete or mixed")
+    elif double_bindings is not None:
+        raise ValueError("software-double bindings have no linked runtime")
+    quotient_targets = {name: target for name, target in targets.items() if divsi3.reserved(target)}
+    if quotient_targets:
+        if quotient_targets != {"__divsi3": divsi3.ADDRESS} or \
+                not isinstance(divsi3_bindings, dict) or not divsi3_bindings or \
+                any(alias != "__divsi3" or calls.get(site) != divsi3.ADDRESS
+                    for site, alias in divsi3_bindings.items()) or \
+                set(divsi3_bindings) != {site for site, target in calls.items() if divsi3.reserved(target)} or \
+                udivsi3_bindings or modsi3_bindings or data_relocations or function_relocations or \
+                switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("linked signed quotient bindings are incomplete or mixed")
+    elif divsi3_bindings:
+        raise ValueError("signed quotient bindings have no linked runtime")
     remainder_targets = {name: target for name, target in targets.items() if modsi3.reserved(target)}
     if remainder_targets:
         if not isinstance(modsi3_bindings, dict) or not modsi3_bindings or \
@@ -678,7 +814,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         if len(definitions) != 1 or definitions[0]["type"] != expected_type or \
                 definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value or \
                 (target_name in function_names or switch_relocations or udivsi3_bindings or
-                 modsi3_bindings) and \
+                 modsi3_bindings or divsi3_bindings or double_bindings) and \
                 definitions[0]["bind"] != 1:
             raise ValueError("linked target lost its absolute symbol type or address")
     if any(item["name"] and not item["section"] for item in linked["symbols"]):
@@ -704,7 +840,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         layout = selected_switch_layout(linked["text"][:after["size"]], address,
                                         switch_relocations,
                                         data_relocations if data_relocations else None,
-                                        allow_preloaded_switch)
+                                        allow_preloaded_switch,
+                                        allow_switch_constants=allow_switch_constants)
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
@@ -717,13 +854,16 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
                allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False,
-               modsi3_bindings=None):
+               modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
+               function_thunks=False, *, allow_switch_constants=False):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
                                                     function_relocations, switch_relocations,
                                                     allow_switch_data, udivsi3_bindings,
-                                                    allow_preloaded_switch, modsi3_bindings)
+                                                    allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
+                                                    double_bindings, double_index, function_thunks,
+                                                    allow_switch_constants=allow_switch_constants)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -756,7 +896,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
                                   allow_switch_data, udivsi3_bindings, allow_preloaded_switch,
-                                  modsi3_bindings),
+                                  modsi3_bindings, divsi3_bindings, double_bindings, function_thunks,
+                                  allow_switch_constants=allow_switch_constants),
             calls, data_relocations)
 
 
@@ -766,7 +907,7 @@ def verify_data_literals(instructions, address, data_relocations):
                 if instruction.mnemonic == "ldr" and operand.type == ARM_OP_MEM and
                 operand.mem.base == ARM_REG_PC and not operand.mem.index}
     if any(address + relocation not in literals for relocation in data_relocations):
-        raise ValueError("data relocation is not a reachable trailing literal-pool load")
+        raise ValueError("data relocation is not a reachable PC-relative literal-pool load")
 
 
 _addressed_replay_active = ContextVar("addressed_remainder_replay_active", default=False)
@@ -827,6 +968,105 @@ def verify_addressed_modsi3_source(root, address, data, rom, mapping, source_dig
         return instructions
     finally:
         _addressed_replay_active.reset(token)
+
+
+def verify_divsi3(data, address, rom, mapping, manifest):
+    if not isinstance(manifest, dict) or set(manifest) != {"runtime", "calls", "divisors"} or \
+            manifest["runtime"] != divsi3.RUNTIME or \
+            not isinstance(manifest["calls"], list) or not isinstance(manifest["divisors"], list):
+        raise ValueError("invalid signed quotient manifest")
+    divsi3.verify_identity(rom, mapping)
+    entries = json.loads(mapping)
+    calls, bindings = {}, {}
+    previous = -4
+    for record in manifest["calls"]:
+        if not isinstance(record, list) or len(record) != 2:
+            raise ValueError("invalid signed quotient call binding")
+        offset, name = record
+        if type(offset) is not int or not isinstance(name, str) or offset % 2 or \
+                offset < previous + 4 or offset < 0 or offset + 4 > len(data):
+            raise ValueError("signed quotient calls must be ordered nonoverlapping instructions")
+        previous = offset
+        if name == "__divsi3":
+            calls[address + offset] = divsi3.ADDRESS
+            bindings[address + offset] = name
+        else:
+            calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
+    expected = {}
+    previous = -1
+    for record in manifest["divisors"]:
+        if not isinstance(record, list) or len(record) != 2:
+            raise ValueError("invalid signed quotient divisor binding")
+        offset, divisor = record
+        if type(offset) is not int or offset <= previous or address + offset not in bindings or \
+                type(divisor) is not int or not 1 <= divisor <= 0x7FFFFFFF:
+            raise ValueError("signed quotient divisors must be ordered positive signed32 constants")
+        previous = offset
+        expected[address + offset] = divisor
+    if not bindings or set(expected) != set(bindings):
+        raise ValueError("signed quotient divisors must cover every runtime call exactly once")
+    observed = {}
+    instructions = verify_leaf_instructions(
+        data, address, True, calls, divsi3_context=(rom, mapping, bindings, observed))
+    if observed != expected:
+        raise ValueError("signed quotient divisors disagree with final incoming CFG facts")
+    return instructions
+
+
+_signed_replay_active = ContextVar("signed_quotient_replay_active", default=False)
+
+
+def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest):
+    if _signed_replay_active.get():
+        raise ValueError("recursive signed quotient replay is unsupported")
+    token = _signed_replay_active.set(True)
+    try:
+        root = Path(root)
+        candidates = list((root / "src").rglob(f"{address:08X}.c"))
+        if len(candidates) != 1 or source_fingerprint(root, address) != source_digest or \
+                mapping_snapshot(root) != mapping:
+            raise ValueError("signed quotient replay inputs differ")
+        selected_rom = report_rom_path(root)
+        if Path(selected_rom).read_bytes() != rom:
+            raise ValueError("signed quotient replay ROM differs")
+        args = argparse.Namespace(cc=DEFAULT_CC, cpp=DEFAULT_CPP, assembler=DEFAULT_AS,
+                                  objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS)
+        (root / "build").mkdir(exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="ffta_signed_replay_", dir=root / "build") as directory:
+            captured = Path(directory)
+            for path in source_paths(root, address):
+                destination = captured / path.relative_to(root)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(path.read_bytes())
+            if source_fingerprint(captured, address) != source_digest:
+                raise ValueError("signed quotient source capture differs")
+            runner = Runner(DEFAULT_CC, "Ubuntu", DEFAULT_WSL_PATH, root=captured,
+                            timeout=SIGNED_REPLAY_TIMEOUT)
+            with runner.workspace() as workspace:
+                _, _, original = compile_object(runner, workspace, args, captured, address,
+                                                 candidates[0].relative_to(root).as_posix())
+                bindings = {}
+                got, calls, literals = link_calls(runner, workspace, args, original, address,
+                                                  mapping, len(rom), rom, divsi3_bindings=bindings)
+                fresh_calls = [[site - address, bindings.get(site, f"func_{target:08X}")]
+                               for site, target in sorted(calls.items())]
+                if not bindings or set(bindings.values()) != {"__divsi3"} or literals or \
+                        got != data or fresh_calls != manifest.get("calls"):
+                    raise ValueError("signed quotient lacks fresh canonical ELF provenance")
+                instructions = verify_divsi3(got, address, rom, mapping, manifest)
+            checker = Path(__file__).resolve().with_name("plausible.py")
+            result = _run_replay_process(
+                [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
+                [str(path) for path in source_paths(captured, address)], captured, SIGNED_REPLAY_TIMEOUT)
+            findings, _ = plausibility_result(result, address)
+            if findings or source_fingerprint(captured, address) != source_digest:
+                raise ValueError("signed quotient captured source changed or is implausible")
+        if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
+                report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
+            raise ValueError("signed quotient replay inputs changed")
+        return instructions
+    finally:
+        _signed_replay_active.reset(token)
 
 
 def verify_udivsi3(data, address, rom, mapping, manifest):
@@ -929,7 +1169,7 @@ def verify_modsi3(data, address, rom, mapping, data_mapping, manifest):
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data) or \
                         not modsi3.supported_data(objects[name], len(rom)) or \
                         not modsi3.supported_data(value, len(rom)) or \
-                        is_udivsi3_address(value) or modsi3.reserved(value) or \
+                        is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or software_double.reserved(value) or \
                         struct.unpack_from("<I", data, offset)[0] != value:
                     raise ValueError("signed remainder literal differs or uses a forbidden address")
                 literals[offset] = (name, value)
@@ -1008,7 +1248,7 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
                 value = objects[name] + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data):
                     raise ValueError("function-address object binding overflows or references itself")
-                if is_udivsi3_address(value) or modsi3.reserved(value):
+                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or software_double.reserved(value):
                     raise ValueError("division runtime cannot be bound through an object addend")
             if struct.unpack_from("<I", data, offset)[0] != value:
                 raise ValueError("function-address literal does not equal its binding")
@@ -1061,7 +1301,11 @@ def preloaded_switch_encoding(data, address, literal):
 
 
 def selected_switch_layout(data, address, relocations, data_relocations=None,
-                           allow_preloaded_switch=False):
+                           allow_preloaded_switch=False, *, allow_switch_constants=False):
+    from switch_constants_profile import check_opt_in, layout
+    check_opt_in(allow_switch_constants, relocations, data_relocations, allow_preloaded_switch)
+    if allow_switch_constants:
+        return layout(data, address, relocations)
     if type(allow_preloaded_switch) is not bool:
         raise ValueError("preloaded-switch layout opt-in must be Boolean")
     if allow_preloaded_switch and isinstance(relocations, dict) and relocations and \
@@ -1523,7 +1767,7 @@ class BufferCallProof:
         self.stack_arguments = stack_arguments
 
     def target(self, address):
-        if is_udivsi3_address(address) or modsi3.reserved(address):
+        if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or software_double.reserved(address):
             raise ValueError("division runtime is outside buffer-call proof profiles")
         candidates = [entry for entry in self.entries
                       if isinstance(entry, dict) and isinstance(entry.get("rom"), str)
@@ -1582,7 +1826,7 @@ class BufferCallProof:
                                                      call_resolver=self.target)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
-            states = {address: (tuple(sorted(arguments.items())), 0)}
+            states = {address: (tuple(sorted(arguments.items())), 0, ())}
             pending = [address]
             returned = ()
             while pending:
@@ -1590,6 +1834,7 @@ class BufferCallProof:
                 instruction = by_address[current]
                 aliases = dict(states[current][0])
                 depth = states[current][1]
+                constants = dict(states[current][2])
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
@@ -1603,6 +1848,7 @@ class BufferCallProof:
                 elif instruction.mnemonic == "pop":
                     for register in registers:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
                     depth -= len(registers)
                 elif thumb_stack_adjustment(instruction) is not None:
                     depth -= thumb_stack_adjustment(instruction)
@@ -1613,6 +1859,7 @@ class BufferCallProof:
                     result = self.check_arguments(operands[0].imm, passed, stack, nested, protected)
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
                     aliases.update(result)
                 else:
                     assignment = register_alias_assignment(instruction, aliases)
@@ -1632,9 +1879,17 @@ class BufferCallProof:
                         width = widths.get(instruction.mnemonic)
                         if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
                                 width is None or len(operands) != 2 or len(registers) != 1 or \
-                                operands[0].type != ARM_OP_REG or operand.mem.index:
+                                operands[0].type != ARM_OP_REG or \
+                                operand.mem.index and not self.stack_arguments:
                             raise ValueError("unsupported buffer memory access")
                         offset = aliases[operand.mem.base] + operand.mem.disp
+                        if operand.mem.index:
+                            if instruction.writeback or operand.shift.type or operand.shift.value or \
+                                    operand.subtracted or operand.mem.scale != 1 or operand.mem.disp:
+                                raise ValueError("unsupported indexed buffer memory access")
+                            if operand.mem.index not in constants or operand.mem.index in aliases:
+                                raise ValueError("buffer index is not a known scalar constant")
+                            offset += constants[operand.mem.index]
                         self.access(offset, width, stack)
                         if any(offset < slot + 4 and offset + width > slot for slot in protected):
                             raise ValueError("buffer access overlaps a pointer-bearing argument slot")
@@ -1643,8 +1898,20 @@ class BufferCallProof:
                         allowed.add(operand.mem.base)
                     if (set(read) & aliases.keys()) - allowed:
                         raise ValueError("unsupported buffer pointer use or escape")
+                    constant = None
+                    if self.stack_arguments and instruction.size == 2 and \
+                            instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and \
+                            instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+                            operands[0].type == ARM_OP_REG:
+                        if operands[1].type == ARM_OP_IMM:
+                            constant = operands[1].imm
+                        elif operands[1].type == ARM_OP_REG:
+                            constant = constants.get(operands[1].reg)
                     for register in written:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
+                    if constant is not None:
+                        constants[operands[0].reg] = constant
                     if assignment is not None:
                         if assignment[0] in (ARM_REG_SP, ARM_REG_PC, ARM_REG_LR):
                             raise ValueError("buffer pointer cannot overwrite a control register")
@@ -1665,7 +1932,7 @@ class BufferCallProof:
                         successors += (current + instruction.size,)
                 else:
                     successors = (current + instruction.size,)
-                outgoing = (tuple(sorted(aliases.items())), depth)
+                outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())))
                 for successor in successors:
                     if successor not in states:
                         states[successor] = outgoing
@@ -1674,7 +1941,9 @@ class BufferCallProof:
                         previous = states[successor]
                         if not self.stack_arguments or previous[1] != depth:
                             raise ValueError("inconsistent buffer aliases at control-flow join")
-                        merged = (merge_possible_aliases(previous[0], outgoing[0]), depth)
+                        merged = (merge_possible_aliases(previous[0], outgoing[0]), depth,
+                                  tuple((register, value) for register, value in previous[2]
+                                        if constants.get(register) == value))
                         if merged != previous:
                             states[successor] = merged
                             pending.append(successor)
@@ -1702,14 +1971,65 @@ class FunctionBufferCallProof(BufferCallProof):
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
                              switch_data_relocations=None, udivsi3_context=None,
-                             preloaded_switch=False, modsi3_context=None):
+                             preloaded_switch=False, modsi3_context=None, divsi3_context=None,
+                             inert_spin_context=None, double_context=None, function_thunk_context=None, *,
+                             allow_switch_constants=False, allow_switch_scalar_frame=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    from switch_constants_profile import check_opt_in, layout as constants_layout
+    check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
+                 switch_data_relocations, udivsi3_context, preloaded_switch, modsi3_context,
+                 divsi3_context, inert_spin_context, double_context, function_thunk_context)
+    if allow_switch_constants and not thumb:
+        raise ValueError("switch constants require Thumb mode")
+    if type(allow_switch_scalar_frame) is not bool or \
+            allow_switch_scalar_frame and not (allow_switch_constants and thumb):
+        raise ValueError("scalar switch frames require explicit Boolean two-constant Thumb policy")
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
     reserved = set()
     division_constants = None
     signed_numeric = False
+    if function_thunk_context is not None:
+        if type(function_thunk_context) is not dict or function_thunk_context or not thumb or \
+                buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
+                switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
+                divsi3_context is not None or inert_spin_context is not None or double_context is not None or preloaded_switch:
+            raise ValueError("function thunks require an isolated ordinary caller context")
+        if not any(target in function_thunk.ALIASES.values() for target in (validated_calls or {}).values()) or \
+                any(is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or
+                    software_double.reserved(target) or function_thunk.reserved(target) and
+                    target not in function_thunk.ALIASES.values() for target in (validated_calls or {}).values()):
+            raise ValueError("function thunks require supported canonical calls without other runtimes")
+    if double_context is not None:
+        if not thumb or buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
+                switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
+                divsi3_context is not None or inert_spin_context is not None or preloaded_switch:
+            raise ValueError("software double requires an isolated direct-call context")
+        software_double.verify_context(data, address, validated_calls or {}, double_context)
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
+               modsi3.reserved(target) or divsi3.reserved(target)
+               for target in (validated_calls or {}).values()):
+            raise ValueError("software double excludes other runtimes and call thunks")
+    if inert_spin_context is not None:
+        if type(inert_spin_context) is not dict or inert_spin_context or not thumb or \
+                buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
+                switch_data_relocations is not None or udivsi3_context is not None or \
+                modsi3_context is not None or divsi3_context is not None or preloaded_switch:
+            raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
+               modsi3.reserved(target) or divsi3.reserved(target) or software_double.reserved(target)
+               for target in (validated_calls or {}).values()):
+            raise ValueError("inert spins exclude arithmetic runtimes and call thunks")
+    if divsi3_context is not None:
+        if not thumb or buffer_proof is not None or call_resolver is not None or \
+                switch_relocations is not None or switch_data_relocations is not None or \
+                udivsi3_context is not None or modsi3_context is not None or preloaded_switch:
+            raise ValueError("signed quotient requires an isolated direct-call profile")
+        divsi3.verify_context(data, address, validated_calls or {}, divsi3_context)
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or modsi3.reserved(target)
+               for target in (validated_calls or {}).values()):
+            raise ValueError("signed quotient excludes other runtimes and thunks")
     if modsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_relocations is not None or switch_data_relocations is not None or \
@@ -1738,11 +2058,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch_relocations is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
-        layout = preloaded_switch_layout if preloaded_switch else switch_layout
-        switch = layout(data, address, switch_relocations, switch_data_relocations)
-        reserved = {address + position
+        if allow_switch_constants:
+            switch = constants_layout(data, address, switch_relocations)
+            reserved.update(range(address + switch["dispatch"] + 10,
+                                  address + switch["literal"]))
+        else:
+            layout = preloaded_switch_layout if preloaded_switch else switch_layout
+            switch = layout(data, address, switch_relocations, switch_data_relocations)
+        reserved.update({address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
-                    for position in range(offset, offset + 4)}
+                    for position in range(offset, offset + 4)})
     end = address + len(data)
     alignment = 2 if thumb else 4
     states = {address: (frozenset({ARM_REG_LR}), (), (), (), ())}
@@ -1783,6 +2108,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
         adjustment = thumb_stack_adjustment(instruction) if thumb else None
+        if allow_switch_scalar_frame:
+            if instruction.mnemonic.startswith(("ldm", "stm")):
+                raise ValueError("scalar switch frames exclude block transfers")
+            if not stack_operation and adjustment is None and ARM_REG_SP in registers:
+                raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
         if CS_GRP_INT in instruction.groups or calling and not (calls or call_resolver):
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
@@ -1792,6 +2122,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     address <= operands[0].imm < end:
                 raise ValueError("call is not a validated external direct Thumb BL")
             target = operands[0].imm
+            if software_double.reserved(target):
+                if double_context is None or current not in double_context[3] or \
+                        software_double.OPERATIONS.get(double_context[3][current]) != target:
+                    raise ValueError("software double requires its canonical runtime proof")
+            if divsi3.reserved(target) and target != 0x0814274C:
+                if divsi3_context is None or target != divsi3.ADDRESS or current not in divsi3_context[2]:
+                    raise ValueError("signed quotient requires its canonical positive-constant proof")
             if modsi3.reserved(target) and target != 0x0814274C:
                 if modsi3_context is None:
                     if target == modsi3.ADDRESS:
@@ -1866,6 +2203,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             returns.add(current)
             successors = ()
         elif calling:
+            if function_thunk_context is not None and operands[0].imm in function_thunk.ALIASES.values():
+                target_number = (operands[0].imm - function_thunk.START) // 4
+                target_register = ARM_REG_R0 + target_number
+                if target_register in aliases or target_register in return_registers:
+                    raise ValueError("indirect target carries tracked stack or return provenance")
             returned_aliases = {}
             if pointer_slots or any(register in aliases for register in caller_clobbered):
                 if buffer_proof is None:
@@ -2057,9 +2399,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         for successor in successors:
             predecessors[successor].add(current)
     if switch is not None:
-        if uses_stack_frame(instructions.values()) or any(
+        if (not allow_switch_scalar_frame and uses_stack_frame(instructions.values())) or any(
                 target in RUNTIME_HELPERS.values() for target in calls.values()):
             raise ValueError("switch evidence excludes fixed frames and runtime call thunks")
+        if allow_switch_scalar_frame and not any(
+                (thumb_stack_adjustment(instruction) or 0) < 0 for instruction in instructions.values()):
+            raise ValueError("scalar switch frames require a reached nonzero fixed allocation")
         if preloaded_switch:
             verify_preloaded_switch_cfg(data, address, instructions, edges, predecessors, switch)
         else:
@@ -2082,7 +2427,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if predecessor not in reaching_return:
                 reaching_return.add(predecessor)
                 pending.append(predecessor)
-    if reaching_return != instructions.keys():
+    if inert_spin_context is not None:
+        spins = sorted(instructions.keys() - reaching_return)
+        if not spins:
+            raise ValueError("inert-spin profile requires a reachable nonreturning self-branch")
+        for current in spins:
+            instruction = instructions[current]
+            if instruction.id != ARM_INS_B or instruction.size != 2 or \
+                    instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+                    bytes(instruction.bytes) != b"\xfe\xe7" or len(instruction.operands) != 1 or \
+                    instruction.operands[0].type != ARM_OP_IMM or \
+                    instruction.operands[0].imm != current or set(edges[current]) != {current}:
+                raise ValueError("every non-return-reaching node must itself be an inert narrow self-branch")
+    elif reaching_return != instructions.keys():
         raise ValueError("reachable control-flow region has no path to a verified return")
     code_end = max(instruction.address + instruction.size
                    for instruction in instructions.values())
@@ -2107,12 +2464,22 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              "function")
         if any(a in reachable for a in range(literal, literal + 4)):
             raise ValueError("literal read overlaps reachable code")
+        if divsi3.reserved(struct.unpack_from("<I", data, literal - address)[0]):
+            raise ValueError("signed quotient runtime cannot be materialized as a literal")
+        if software_double.reserved(struct.unpack_from("<I", data, literal - address)[0]):
+            raise ValueError("software-double runtime cannot be materialized as a literal")
     if switch_data_relocations is not None:
         verify_data_literals(instructions.values(), address, switch_data_relocations)
+    if divsi3_context is not None:
+        if uses_stack_frame(instructions.values()):
+            raise ValueError("signed quotient requires a frameless caller")
+        divsi3_context[3].update(divsi3.prove_divisors(instructions, edges, address, divsi3_context[2]))
     if signed_numeric:
         if uses_stack_frame(instructions.values()):
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         modsi3.prove_operands(instructions, edges, address, modsi3_context[2])
+    if inert_spin_context is not None:
+        inert_spin_context["spins"] = [current - address for current in spins]
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -2214,6 +2581,10 @@ def main():
     ap.add_argument("--linker", default=DEFAULT_LD)
     ap.add_argument("--flags", default=DEFAULT_FLAGS)
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
+    ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
+    ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
+    ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
+    ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1"))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))
@@ -2227,6 +2598,9 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.switch_profile is not None:
+        from switch_constants_profile import issue
+        return issue(Path(ROOT), addr, args)
     # one file per function, grouped into folders by module - the folder is
     # evidence, not decoration, so look for the source rather than assuming it
     # sits at the top of src/
@@ -2259,13 +2633,41 @@ def main():
     if not ROM_BASE <= addr < ROM_BASE + len(rom):
         sys.exit("function address is outside the ROM")
     thumb = args.mode == "thumb"
+    empty_index = empty_body.index_snapshot(ROOT)
+    empty_profile = False
+    spin_profile = args.control_flow_profile == inert_spin.SELECTOR
+    double_profile = args.software_double_profile == software_double.SELECTOR
+    thunk_profile = args.function_address_profile == function_thunk.SELECTOR
+    function_index = inert_spin.index_snapshot(ROOT) if spin_profile or double_profile or thunk_profile else None
+    if thunk_profile:
+        try:
+            function_thunk.fixed_configuration(args)
+        except ValueError as error:
+            sys.exit(str(error))
+        if spin_profile or double_profile or not thumb or len(list(Path(ROOT, "src").rglob(f"{addr:08X}.c"))) != 1:
+            sys.exit("function thunks require a unique Thumb source and isolated explicit selector")
+    if double_profile:
+        try:
+            software_double.fixed_configuration(args)
+        except ValueError as error:
+            sys.exit(str(error))
+        if spin_profile or not thumb or len(list(Path(ROOT, "src").rglob(f"{addr:08X}.c"))) != 1:
+            sys.exit("software double requires one unique Thumb source and no other profile selector")
+    if spin_profile:
+        try:
+            inert_spin.fixed_configuration(args)
+        except ValueError as error:
+            sys.exit(str(error))
+        if not thumb or len(list(Path(ROOT, "src").rglob(f"{addr:08X}.c"))) != 1:
+            sys.exit("inert spins require one uniquely addressed Thumb source")
 
     print(f"function  0x{addr:08X}   {span} bytes ({'Thumb' if thumb else 'ARM'})")
     print(f"source    {src_rel}")
     print(f"compiler  {args.cc} {args.flags}")
 
     # the compile runs in a shell (possibly inside WSL), so give it a POSIX path
-    runner = Runner(args.cc, args.wsl, args.wsl_path)
+    runner = Runner(args.cc, args.wsl, args.wsl_path,
+                    timeout=software_double.REPLAY_TIMEOUT if double_profile or thunk_profile else None)
     try:
         with runner.workspace() as workspace:
             object_data, text_data, original = compile_object(
@@ -2276,12 +2678,30 @@ def main():
             switch_relocations = {}
             udivsi3_bindings = {}
             modsi3_bindings = {}
+            divsi3_bindings = {}
+            quotient_evidence = None
             remainder_evidence = None
             division_evidence = None
             address_manifest = None
             switch_evidence = None
             preloaded_profile = False
-            if original["relocations"]:
+            spin_evidence = None
+            double_evidence = None
+            thunk_evidence = None
+            if thunk_profile:
+                got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
+                    runner, workspace, args, original, addr, mapping, rom, data_mapping)
+                linked_profile = True
+            elif double_profile:
+                got, calls, double_bindings = software_double.object_bytes(
+                    runner, workspace, args, original, addr, mapping, rom, function_index)
+                linked_profile = True
+            elif spin_profile:
+                if not thumb:
+                    raise ValueError("inert spins require Thumb mode")
+                got, calls = inert_spin.object_bytes(runner, workspace, args, original, addr, mapping, rom)
+                linked_profile = bool(calls)
+            elif original["relocations"]:
                 if not thumb:
                     raise ValueError("linked profile supports only Thumb callers")
                 got, calls, data_relocations = link_calls(runner, workspace, args, original,
@@ -2290,12 +2710,45 @@ def main():
                                                           allow_switch_data=True,
                                                           udivsi3_bindings=udivsi3_bindings,
                                                           allow_preloaded_switch=True,
-                                                          modsi3_bindings=modsi3_bindings)
+                                                          modsi3_bindings=modsi3_bindings,
+                                                          divsi3_bindings=divsi3_bindings)
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
-            if modsi3_bindings:
+            if thunk_profile:
+                verified_instructions = verify_leaf_instructions(got, addr, True, calls, function_thunk_context={})
+                thunk_evidence = function_thunk.make_manifest(calls, function_relocations, data_relocations,
+                                                             addr, rom, data_mapping, verified_instructions)
+                verified_instructions = function_thunk.verify(got, addr, rom, mapping, function_index,
+                                                               data_mapping, thunk_evidence)
+            elif double_profile:
+                verified_instructions = verify_leaf_instructions(
+                    got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings))
+                double_evidence = software_double.make_manifest(calls, addr, double_bindings, verified_instructions)
+                verified_instructions = software_double.verify(
+                    got, addr, rom, mapping, function_index, double_evidence)
+            elif spin_profile:
+                context = {}
+                verified_instructions = verify_leaf_instructions(got, addr, True, calls,
+                                                                  inert_spin_context=context)
+                spin_evidence = {"calls": inert_spin.call_records(calls, addr),
+                                 "frame": uses_stack_frame(verified_instructions), "spins": context["spins"]}
+                verified_instructions = inert_spin.verify(got, addr, rom, mapping, function_index, spin_evidence)
+            elif divsi3_bindings:
+                if (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) != \
+                        (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS):
+                    raise ValueError("signed quotient requires the fixed approved toolchain configuration")
+                divisors = {}
+                verify_leaf_instructions(got, addr, True, calls,
+                                         divsi3_context=(rom, mapping, divsi3_bindings, divisors))
+                quotient_evidence = {
+                    "runtime": divsi3.RUNTIME,
+                    "calls": [[site - addr, divsi3_bindings.get(site, f"func_{target:08X}")]
+                              for site, target in sorted(calls.items())],
+                    "divisors": [[site - addr, divisor] for site, divisor in sorted(divisors.items())]}
+                verified_instructions = verify_divsi3(got, addr, rom, mapping, quotient_evidence)
+            elif modsi3_bindings:
                 verified_instructions = verify_leaf_instructions(
                     got, addr, True, calls, modsi3_context=(rom, mapping, modsi3_bindings))
                 if set(modsi3_bindings.values()) == {"__modsi3"}:
@@ -2372,6 +2825,8 @@ def main():
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof)
             verify_data_literals(verified_instructions, addr, data_relocations)
+            function_thunk.verify_literal_bindings(got, addr, verified_instructions, calls,
+                                                    mapping, function_relocations)
             if buffer_proof.stack_arguments and not buffer_proof.dependencies:
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
             if buffer_proof.dependencies and data_relocations:
@@ -2402,9 +2857,21 @@ def main():
         schema = UDIVSI3_SCHEMA
     if remainder_evidence is not None:
         schema = modsi3.SCHEMA
+    if quotient_evidence is not None:
+        schema = divsi3.SCHEMA
+    if spin_profile:
+        schema = inert_spin.SCHEMA
+    if double_profile:
+        schema = software_double.SCHEMA
+    if thunk_profile:
+        schema = function_thunk.SCHEMA
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     if preloaded_profile:
         control_flow = PRELOADED_SWITCH_CONTROL_FLOW
+    if spin_profile:
+        control_flow = inert_spin.CONTROL_FLOW
+    if thunk_profile:
+        control_flow = function_thunk.CONTROL_FLOW
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -2419,24 +2886,58 @@ def main():
     if os.path.exists(plaus_path):
         lint_targets = [str(path) for path in source_paths(ROOT, addr)]
         try:
-            checker_result = subprocess.run(
-                [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
-                 "--json"] + lint_targets,
-                capture_output=True, text=True)
+            checker_command = [sys.executable, plaus_path, "--quiet", "--addr", f"0x{addr:08X}",
+                               "--json"] + lint_targets
+            checker_result = (_run_replay_process(checker_command, ROOT, software_double.REPLAY_TIMEOUT)
+                              if double_profile or thunk_profile else subprocess.run(checker_command, capture_output=True, text=True))
             findings, hand_asm_allowed = plausibility_result(checker_result, addr)
-        except (OSError, ValueError, TypeError, RecursionError) as error:
+            if findings and identical and schema == SCHEMA and thumb:
+                try:
+                    software_double.fixed_configuration(args)
+                    empty_body.check_findings(checker_result, ROOT, addr)
+                    empty_body.verify_object(object_data, text_data, addr, thumb, rom, mapping, empty_index)
+                except (OSError, ValueError, KeyError, TypeError):
+                    pass
+                else:
+                    findings = []
+                    empty_profile = True
+                    schema = empty_body.SCHEMA
+        except (OSError, ValueError, TypeError, RecursionError, subprocess.SubprocessError) as error:
             findings = [f"plausibility checker failed: {error}"]
 
     plausible = not findings
     if source_fingerprint(ROOT, addr) != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
-    if (linked_profile or data_profile or function_relocations or switch_relocations) and \
+    if empty_profile and (mapping_snapshot(ROOT) != mapping or
+                          empty_body.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file):
+        sys.exit("empty-body indexes or selected ROM changed during verification; re-run match.py")
+    if (linked_profile or data_profile or function_relocations or switch_relocations or spin_profile) and \
             mapping_snapshot(ROOT) != mapping:
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
     if schema == FUNCTION_BUFFER_SCHEMA and report_rom_path(ROOT) != rom_file:
         sys.exit("selected ROM changed during verification; re-run match.py")
+    if spin_profile and (inert_spin.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file):
+        sys.exit("inert-spin function index or selected ROM changed during verification; re-run match.py")
+    if spin_profile and hand_asm_allowed:
+        sys.exit("inert spins exclude hand-ASM exceptions")
+    if thunk_profile:
+        if hand_asm_allowed:
+            sys.exit("function thunks exclude hand-ASM exceptions")
+        try:
+            function_thunk.verify_source(ROOT, addr, got_body, rom, mapping, function_index,
+                                         data_mapping, fingerprint, thunk_evidence)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"function-thunk source replay failed: {error}")
+    if double_profile:
+        if software_double.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file or hand_asm_allowed:
+            sys.exit("software-double index/ROM selection changed or hand-ASM exception requested")
+        try:
+            software_double.verify_source(ROOT, addr, got_body, rom, mapping, function_index,
+                                          fingerprint, double_evidence)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"software-double source replay failed: {error}")
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -2519,18 +3020,23 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
+            if empty_profile:
+                f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+                f.write(f"* control flow: {control_flow}\n")
+                f.write(f"* empty body: {empty_body.SUMMARY}\n")
             if framed_profile:
                 f.write(f"* stack frame: {STACK_SUMMARY}\n")
             if buffer_proof.dependencies:
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-            if linked_profile or data_profile or function_relocations or switch_relocations:
+            if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
             if data_profile:
                 f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
-            if function_relocations:
+            if function_relocations and not thunk_profile:
                 encoded_manifest = function_address_manifest(address_manifest)
                 f.write(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
                 f.write(f"* function address manifest: `{encoded_manifest}`\n")
@@ -2560,6 +3066,37 @@ def main():
                 f.write(f"* signed remainder manifest: `{modsi3.manifest_text(remainder_evidence)}`\n")
                 proof_digest = modsi3.fingerprint(addr, got_body, remainder_evidence)
                 f.write(f"* signed remainder proof SHA-256: `{proof_digest}`\n")
+            if quotient_evidence is not None:
+                f.write(f"* signed quotient: {divsi3.SUMMARY}\n")
+                f.write(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
+                proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence)
+                f.write(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
+            if spin_profile:
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+                f.write(f"* inert spins: {inert_spin.SUMMARY}\n")
+                f.write(f"* inert spin manifest: `{inert_spin.manifest_text(spin_evidence)}`\n")
+                proof_digest = inert_spin.fingerprint(addr, got_body, spin_evidence, fingerprint,
+                                                      mapping, function_index)
+                f.write(f"* inert spin proof SHA-256: `{proof_digest}`\n")
+            if double_profile:
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+                f.write(f"* software double: {software_double.SUMMARY}\n")
+                f.write(f"* software double ABI: `{software_double.ABI}`\n")
+                f.write(f"* software double runtime: `{software_double.RUNTIME}`\n")
+                f.write(f"* software double semantics: `{software_double.SEMANTICS}`\n")
+                f.write(f"* software double manifest: `{software_double.manifest_text(double_evidence)}`\n")
+                proof_digest = software_double.fingerprint(addr, got_body, double_evidence, fingerprint,
+                                                           mapping, function_index, rom)
+                f.write(f"* software double proof SHA-256: `{proof_digest}`\n")
+            if thunk_profile:
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+                f.write(f"* function-address thunks: {function_thunk.SELECTOR}\n")
+                f.write(f"* function-address-thunk manifest: `{function_thunk.manifest_text(thunk_evidence)}`\n")
+                proof_digest = function_thunk.fingerprint(addr, got_body, thunk_evidence, fingerprint,
+                                                          mapping, function_index, data_mapping, rom)
+                f.write(f"* function-address-thunk sha256: `{proof_digest}`\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")

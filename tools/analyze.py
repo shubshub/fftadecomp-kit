@@ -217,6 +217,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         "instrs": 0,
         "code_ranges": [],
         "literal_ranges": [],
+        "literal_reads": [],
         "gaps": [],
         "calls": [],
         "returns": [],
@@ -296,6 +297,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     owners = {}
     literals = set()
     literal_bytes = set()
+    literal_reads = {}
     calls = set()
     returns = set()
     while pending:
@@ -350,6 +352,10 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 continue
         if info["pcldr"] is not None:
             literal = ((position + 4) & ~3) + info["pcldr"][1]
+            literal_reads[position] = {
+                "site": f"0x{position:08X}", "address": f"0x{literal:08X}",
+                "size": 4, "inside_window": address <= literal and literal + 4 <= end,
+            }
             if literal % 4 or not address <= literal or literal + 4 > end:
                 fail("literal outside window", position)
             else:
@@ -410,6 +416,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                          ("gaps", gaps)):
         result[name] = [[f"0x{start:08X}", f"0x{stop:08X}"] for start, stop in ranges]
     result["instrs"] = len(instructions)
+    result["literal_reads"] = [literal_reads[site] for site in sorted(literal_reads)]
     result["calls"] = [{"site": f"0x{site:08X}", "target": f"0x{target:08X}"}
                        for site, target in sorted(calls)]
     result["returns"] = [f"0x{site:08X}" for site in sorted(returns)]

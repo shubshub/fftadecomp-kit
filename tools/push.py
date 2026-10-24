@@ -48,6 +48,9 @@ import re
 import subprocess
 import sys
 from rompath import rom_path
+from match_evidence import valid_match_verdict
+import empty_body_profile as empty_body
+import plausible
 
 KIT = os.path.dirname(os.path.realpath(__file__))
 KIT_ROOT = os.path.realpath(os.path.dirname(KIT))
@@ -138,14 +141,23 @@ def check_matches(root, badge=""):
 def check_plausible(root):
     log("[4/5] sources are plausible")
     for target in ("src", "include"):
-        if not os.path.isdir(os.path.join(root, target)):
-            continue
-        code, out = run([sys.executable, os.path.join(KIT, "plausible.py"),
-                         os.path.join(root, target)], cwd=root)
-        if code != 0:
-            log(f"    FAIL  {target}/ contains implausible source")
-            for line in out.strip().splitlines()[-10:]:
-                log(f"    {line}")
+        for path in sorted((Path(root) / target).rglob("*")):
+            if not path.is_file() or path.suffix not in (".c", ".h"):
+                continue
+            findings = plausible.check_file(path)
+            if not findings:
+                continue
+            if target == "src" and re.fullmatch(r"[0-9A-F]{8}\.c", path.name) and \
+                    len(findings) == 1 and findings[0][1] == "empty-body":
+                report = Path(root) / "docs" / "match" / f"{path.stem}.md"
+                try:
+                    if empty_body.report_matches(report.read_text(encoding="utf-8"), root, int(path.stem, 16)):
+                        continue
+                except OSError:
+                    pass
+            log(f"    FAIL  {path.relative_to(root)} contains implausible source")
+            for line, rule, severity, _ in findings[-10:]:
+                log(f"    {line}: {severity.upper()}: {rule}")
             return False
     log("    ok: no inline asm, no steering pragmas, no inert control flow")
     return True
@@ -169,8 +181,8 @@ def check_reports(root):
         text = open(path, encoding="utf-8").read()
         if "IMPLAUSIBLE" in text or "HAND-ASM" in text:
             problems.append(f"{addr}: report is not a clean MATCH")
-        elif "MATCH - byte identical" not in text:
-            problems.append(f"{addr}: report does not say MATCH")
+        elif not valid_match_verdict(text):
+            problems.append(f"{addr}: report does not contain one canonical MATCH verdict")
     if problems:
         log(f"    FAIL  {len(problems)} report problem(s):")
         for p in problems[:8]:

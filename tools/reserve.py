@@ -224,8 +224,8 @@ def normalise(address):
     if not isinstance(address, str) or not re.fullmatch(r"0[xX][0-9A-Fa-f]{8}", address):
         raise LedgerError("address must be 0x followed by eight hex digits")
     value = int(address, 16)
-    if not 0x08000000 <= value < 0x08150000 or value % 2:
-        raise LedgerError("address must be aligned inside the ROM code region")
+    if not 0x08000000 <= value < 0x09000000 or value % 2:
+        raise LedgerError("address must be halfword-aligned inside the 16 MiB ROM image [0x08000000, 0x09000000)")
     return f"0x{value:08X}"
 
 
