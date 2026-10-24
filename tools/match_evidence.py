@@ -8,6 +8,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import empty_body_profile as empty_body
+import switch_constants_profile as switch_constants
 import subprocess
 from rompath import rom_path
 from pathlib import Path
@@ -701,6 +702,8 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        if switch_constants.selected(report):
+            return switch_constants.report_matches(report, root, address)
         if empty_body.SCHEMA in report or any(
                 line.lstrip().startswith("* empty body") for line in report.splitlines()):
             return empty_body.report_matches(report, root, address)

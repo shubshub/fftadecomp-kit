@@ -1231,3 +1231,83 @@ tool capability; source review and the complete publication gates remain separat
   4bpp tile data, where the byte pair `0xB5xx` looks like `push {rX, lr}`.
 * `rebuild.py` is the gate: if the concatenation does not reproduce the ROM, the
   split is wrong and nothing downstream is safe.
+
+# Two-constant switch placement profile
+
+The opt-in `thumb-entry-context-v1` build stage supports both even
+function-origin classes without changing legacy ownership gates. No game
+function is admitted merely by installing the capability.
+
+The explicit `--switch-profile two-constants-v2` path supports one unsigned-guarded
+five-instruction Thumb dispatch with exactly two reached, unrelocated constant
+words between the dispatch and its relocated local pointer/table. Default CLI
+and legacy profiles do not select it. It excludes frames, stack buffers,
+function/object literals, callbacks, runtime thunks and additional indirect
+transfers. Recognizing E03F8's pool placement does not discharge its other
+verification obligations or admit a game source.
+
+Issuance and `elf-symbol-thumb-switch-two-constants-v2` report replay each capture
+the uniquely addressed C source and all tracked include inputs, compile with the
+fixed default tool tuple, inspect every original ELF relocation, link typed
+targets, and regenerate the complete CFG/ownership manifest. Both indexes and
+the approved 16 MiB ROM identity are required. The ROM is read directly, never
+copied into replay scratch. Tool resolution/content and live/captured inputs
+are checked for drift. Child processes have a 120-second bound and process-group
+cleanup; replay workspaces reside under the selected root's disk-backed `build/`.
+The operator must not place that root on tmpfs.
+
+The private assembly parser accepts only the fixed compiler header, Thumb/text
+entry envelope, four-byte zero-fill entry alignment, one addressed global sized
+function, local numeric/long-branch/end labels, the enumerated Thumb instruction
+mnemonics, `.word` expressions and four-byte zero-fill internal alignment. It
+accepts only the compiler's exact conditional-branch and long-jump annotations;
+arbitrary comments, strings, macros/includes, alternate sections, extra functions,
+emitting prefixes and other directives reject. Input is bounded to 1 MiB.
+
+For target A, the stage derives p=A%4 and B=A-p. Zero-origin assembly is unchanged;
+base-two assembly inserts exactly `\t.space\t2, 0\n` immediately before the unique
+entry `.thumb_func`, after entry alignment. Raw compiler output is retained
+unchanged throughout compilation. No result-dependent rewrite or source/flag
+selection occurs. Genuine complete original and linked ELF remain in section
+coordinates: the function occupies [p,p+N), the section links at B, and its entry
+is A|1. Exactly p zero prefix bytes and the separately checked external alignment
+suffix earn no function credit. Raw relocations/addends remain section-relative;
+only validated manifest offsets are derived by subtracting p. Existing legacy
+binders never receive a normalized or stripped object.
+
+The strict `placement` manifest member binds the rule, derived origin/prefix and
+raw assembly, placed assembly, original ELF and linked ELF SHA-256 identities.
+The linked ELF hash uses the exact byte snapshot parsed and validated, not a
+later unvalidated reread. Linked ELF and objcopy output must remain regular
+files with unchanged contents and filesystem identities through the final
+workspace capture check; mutation or replacement rejects issuance and replay
+before any report or emitted body is written.
+Artifact descriptors open nonblockingly without following symlinks and must
+identify regular files before any read. FIFOs reject without waiting for a
+writer; descriptor closure and path/descriptor identity checks remain mandatory.
+Every replay regenerates them with stable logical filenames; reports cannot
+choose placement or supply objects. Prior private v1 selectors/reports reject
+terminally rather than silently selecting the amended build contract.
+
+The new report family has strict canonical fields and JSON; malformed or mixed
+markers and failed fresh replay reject terminally. Its source/manifest/input
+fingerprint is not a substitute for original-ELF provenance. Status and rebuild
+forward only the explicit saved selector. Old schemas and fingerprint algorithms
+remain unchanged.
+
+Successful issuance prints the canonical complete-symbol extent from the freshly
+verified body. Late-address status verification checks this against both the
+indexed span and replayed report; missing, duplicate, malformed or disagreeing
+extent output remains a terminal failure.
+
+Focused checks: `python -m unittest discover -s tests -p 'test_switch_*.py' -v`
+with the ARM tools on `PATH` and disk-backed `TMPDIR`. The natural-C fixture uses
+real fixed tools and fresh report replay. Synthetic fixture ROM trust is patched
+only inside tests; production exposes no alternative-ROM or ELF-injection API.
+Synthetic assembly/fault-injection tests establish verifier discrimination, not
+hand-assembly game matches. `tests/switch_compatibility_probe.py` compares exact
+legacy body/schema/manifest/proof identities against an unchanged toolkit.
+Natural source positives cover both function origins and dispatch alignment
+classes, short and long unsigned guards, and ordinary typed calls. Late status
+and rebuild fixtures verify function-only output while preserving nonzero
+external prefix bytes. These are finite verifier tests, not game-match credit.

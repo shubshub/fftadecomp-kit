@@ -38,6 +38,7 @@ from match_evidence import report_matches
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
+import switch_constants_profile as switch_constants
 from rompath import rom_path
 
 # the status block uses block-drawing characters; Windows consoles are cp1252
@@ -229,10 +230,12 @@ def collect(root, verify, quiet=False, write_reports=False):
         spin_profile = False
         double_profile = False
         thunk_profile = False
+        constants_profile = False
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
             try:
+                constants_profile = switch_constants.selected(saved_report)
                 double_profile = software_double.selected(saved_report)
                 thunk_profile = function_thunk.selected(saved_report)
                 spin_profile = inert_spin.selected(saved_report)
@@ -253,11 +256,13 @@ def collect(root, verify, quiet=False, write_reports=False):
                 command += ["--software-double-profile", software_double.SELECTOR]
             if thunk_profile:
                 command += ["--function-address-profile", function_thunk.SELECTOR]
+            if constants_profile:
+                command += ["--switch-profile", switch_constants.SELECTOR]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
             ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or spin_profile or double_profile or thunk_profile) and ok:
+        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()

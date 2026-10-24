@@ -389,8 +389,14 @@ def call_bindings(image, name, address, mapping, rom_size,
                    rom_image=b'', data_mapping=None, function_relocations=None,
                    switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None,
                    allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
-                   double_bindings=None, double_index=None, function_thunks=False):
+                   double_bindings=None, double_index=None, function_thunks=False, *,
+                   allow_switch_constants=False):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
+    from switch_constants_profile import check_opt_in
+    check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
+                 function_relocations, allow_switch_data, udivsi3_bindings,
+                 allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
+                 double_bindings, double_index, function_thunks)
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(function_thunks) is not bool or function_thunks and (
@@ -680,7 +686,8 @@ def call_bindings(image, name, address, mapping, rom_size,
             struct.pack_into("<I", relocated, position, value)
         layout = selected_switch_layout(bytes(relocated), address, switch_relocations,
                                         data_relocations if data_relocations else None,
-                                        allow_preloaded_switch)
+                                        allow_preloaded_switch,
+                                        allow_switch_constants=allow_switch_constants)
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
@@ -695,8 +702,14 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           function_relocations=None, switch_relocations=None,
                           allow_switch_data=False, udivsi3_bindings=None,
                           allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
-                          double_bindings=None, function_thunks=False):
+                          double_bindings=None, function_thunks=False, *,
+                          allow_switch_constants=False):
     """Validate exact placement and the linker's complete modification surface."""
+    from switch_constants_profile import check_opt_in
+    check_opt_in(allow_switch_constants, switch_relocations, data_relocations or None,
+                 function_relocations, allow_switch_data, udivsi3_bindings,
+                 allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
+                 double_bindings, function_thunks)
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
     allocated_text_only(linked)
@@ -827,7 +840,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         layout = selected_switch_layout(linked["text"][:after["size"]], address,
                                         switch_relocations,
                                         data_relocations if data_relocations else None,
-                                        allow_preloaded_switch)
+                                        allow_preloaded_switch,
+                                        allow_switch_constants=allow_switch_constants)
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
@@ -841,14 +855,15 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
                allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False,
                modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
-               function_thunks=False):
+               function_thunks=False, *, allow_switch_constants=False):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
                                                     function_relocations, switch_relocations,
                                                     allow_switch_data, udivsi3_bindings,
                                                     allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
-                                                    double_bindings, double_index, function_thunks)
+                                                    double_bindings, double_index, function_thunks,
+                                                    allow_switch_constants=allow_switch_constants)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -881,7 +896,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
                                   allow_switch_data, udivsi3_bindings, allow_preloaded_switch,
-                                  modsi3_bindings, divsi3_bindings, double_bindings, function_thunks),
+                                  modsi3_bindings, divsi3_bindings, double_bindings, function_thunks,
+                                  allow_switch_constants=allow_switch_constants),
             calls, data_relocations)
 
 
@@ -1285,7 +1301,11 @@ def preloaded_switch_encoding(data, address, literal):
 
 
 def selected_switch_layout(data, address, relocations, data_relocations=None,
-                           allow_preloaded_switch=False):
+                           allow_preloaded_switch=False, *, allow_switch_constants=False):
+    from switch_constants_profile import check_opt_in, layout
+    check_opt_in(allow_switch_constants, relocations, data_relocations, allow_preloaded_switch)
+    if allow_switch_constants:
+        return layout(data, address, relocations)
     if type(allow_preloaded_switch) is not bool:
         raise ValueError("preloaded-switch layout opt-in must be Boolean")
     if allow_preloaded_switch and isinstance(relocations, dict) and relocations and \
@@ -1952,8 +1972,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
                              switch_data_relocations=None, udivsi3_context=None,
                              preloaded_switch=False, modsi3_context=None, divsi3_context=None,
-                             inert_spin_context=None, double_context=None, function_thunk_context=None):
+                             inert_spin_context=None, double_context=None, function_thunk_context=None, *,
+                             allow_switch_constants=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    from switch_constants_profile import check_opt_in, layout as constants_layout
+    check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
+                 switch_data_relocations, udivsi3_context, preloaded_switch, modsi3_context,
+                 divsi3_context, inert_spin_context, double_context, function_thunk_context)
+    if allow_switch_constants and not thumb:
+        raise ValueError("switch constants require Thumb mode")
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
@@ -2028,11 +2055,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch_relocations is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
-        layout = preloaded_switch_layout if preloaded_switch else switch_layout
-        switch = layout(data, address, switch_relocations, switch_data_relocations)
-        reserved = {address + position
+        if allow_switch_constants:
+            switch = constants_layout(data, address, switch_relocations)
+            reserved.update(range(address + switch["dispatch"] + 10,
+                                  address + switch["literal"]))
+        else:
+            layout = preloaded_switch_layout if preloaded_switch else switch_layout
+            switch = layout(data, address, switch_relocations, switch_data_relocations)
+        reserved.update({address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
-                    for position in range(offset, offset + 4)}
+                    for position in range(offset, offset + 4)})
     end = address + len(data)
     alignment = 2 if thumb else 4
     states = {address: (frozenset({ARM_REG_LR}), (), (), (), ())}
@@ -2541,6 +2573,7 @@ def main():
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
+    ap.add_argument("--switch-profile", choices=("two-constants-v2",))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))
@@ -2554,6 +2587,9 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.switch_profile is not None:
+        from switch_constants_profile import issue
+        return issue(Path(ROOT), addr, args)
     # one file per function, grouped into folders by module - the folder is
     # evidence, not decoration, so look for the source rather than assuming it
     # sits at the top of src/
