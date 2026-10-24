@@ -1806,7 +1806,7 @@ class BufferCallProof:
                                                      call_resolver=self.target)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
-            states = {address: (tuple(sorted(arguments.items())), 0)}
+            states = {address: (tuple(sorted(arguments.items())), 0, ())}
             pending = [address]
             returned = ()
             while pending:
@@ -1814,6 +1814,7 @@ class BufferCallProof:
                 instruction = by_address[current]
                 aliases = dict(states[current][0])
                 depth = states[current][1]
+                constants = dict(states[current][2])
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
@@ -1827,6 +1828,7 @@ class BufferCallProof:
                 elif instruction.mnemonic == "pop":
                     for register in registers:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
                     depth -= len(registers)
                 elif thumb_stack_adjustment(instruction) is not None:
                     depth -= thumb_stack_adjustment(instruction)
@@ -1837,6 +1839,7 @@ class BufferCallProof:
                     result = self.check_arguments(operands[0].imm, passed, stack, nested, protected)
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
                     aliases.update(result)
                 else:
                     assignment = register_alias_assignment(instruction, aliases)
@@ -1856,9 +1859,17 @@ class BufferCallProof:
                         width = widths.get(instruction.mnemonic)
                         if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
                                 width is None or len(operands) != 2 or len(registers) != 1 or \
-                                operands[0].type != ARM_OP_REG or operand.mem.index:
+                                operands[0].type != ARM_OP_REG or \
+                                operand.mem.index and not self.stack_arguments:
                             raise ValueError("unsupported buffer memory access")
                         offset = aliases[operand.mem.base] + operand.mem.disp
+                        if operand.mem.index:
+                            if instruction.writeback or operand.shift.type or operand.shift.value or \
+                                    operand.subtracted or operand.mem.scale != 1 or operand.mem.disp:
+                                raise ValueError("unsupported indexed buffer memory access")
+                            if operand.mem.index not in constants or operand.mem.index in aliases:
+                                raise ValueError("buffer index is not a known scalar constant")
+                            offset += constants[operand.mem.index]
                         self.access(offset, width, stack)
                         if any(offset < slot + 4 and offset + width > slot for slot in protected):
                             raise ValueError("buffer access overlaps a pointer-bearing argument slot")
@@ -1867,8 +1878,20 @@ class BufferCallProof:
                         allowed.add(operand.mem.base)
                     if (set(read) & aliases.keys()) - allowed:
                         raise ValueError("unsupported buffer pointer use or escape")
+                    constant = None
+                    if self.stack_arguments and instruction.size == 2 and \
+                            instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and \
+                            instruction.mnemonic in ("mov", "movs") and len(operands) == 2 and \
+                            operands[0].type == ARM_OP_REG:
+                        if operands[1].type == ARM_OP_IMM:
+                            constant = operands[1].imm
+                        elif operands[1].type == ARM_OP_REG:
+                            constant = constants.get(operands[1].reg)
                     for register in written:
                         aliases.pop(register, None)
+                        constants.pop(register, None)
+                    if constant is not None:
+                        constants[operands[0].reg] = constant
                     if assignment is not None:
                         if assignment[0] in (ARM_REG_SP, ARM_REG_PC, ARM_REG_LR):
                             raise ValueError("buffer pointer cannot overwrite a control register")
@@ -1889,7 +1912,7 @@ class BufferCallProof:
                         successors += (current + instruction.size,)
                 else:
                     successors = (current + instruction.size,)
-                outgoing = (tuple(sorted(aliases.items())), depth)
+                outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())))
                 for successor in successors:
                     if successor not in states:
                         states[successor] = outgoing
@@ -1898,7 +1921,9 @@ class BufferCallProof:
                         previous = states[successor]
                         if not self.stack_arguments or previous[1] != depth:
                             raise ValueError("inconsistent buffer aliases at control-flow join")
-                        merged = (merge_possible_aliases(previous[0], outgoing[0]), depth)
+                        merged = (merge_possible_aliases(previous[0], outgoing[0]), depth,
+                                  tuple((register, value) for register, value in previous[2]
+                                        if constants.get(register) == value))
                         if merged != previous:
                             states[successor] = merged
                             pending.append(successor)

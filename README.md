@@ -449,6 +449,14 @@ or writes overlapping a pointer-bearing argument word are rejected rather than
 silently changing its meaning. Spilling an incoming buffer pointer within an
 inspected callee remains unsupported.
 
+Version 2 also permits unshifted register-indexed byte, halfword and word
+accesses, including signed loads, when every reaching path proves the index
+constant through immediate/register `mov` instructions. Arithmetic and loads
+do not establish constants; writes, pops and caller-clobbered calls invalidate
+them. Joins retain only identical constants present on every incoming path.
+The existing local-word bounds, alignment, pointer-slot overlap and escape
+checks still apply. Version 1 continues to reject all register-indexed accesses.
+
 Register and slot joins conservatively retain a pointer that is present on
 either path. Different possible offsets for the same register or slot remain
 unsupported. Inspected callees may return buffer aliases in `r0`–`r3` or `r12`;
