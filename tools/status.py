@@ -235,7 +235,7 @@ def collect(root, verify, quiet=False, write_reports=False):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
             try:
-                constants_profile = switch_constants.selected(saved_report)
+                constants_profile = switch_constants.selected_policy(saved_report)
                 double_profile = software_double.selected(saved_report)
                 thunk_profile = function_thunk.selected(saved_report)
                 spin_profile = inert_spin.selected(saved_report)
@@ -257,7 +257,7 @@ def collect(root, verify, quiet=False, write_reports=False):
             if thunk_profile:
                 command += ["--function-address-profile", function_thunk.SELECTOR]
             if constants_profile:
-                command += ["--switch-profile", switch_constants.SELECTOR]
+                command += ["--switch-profile", constants_profile.selector]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)

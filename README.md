@@ -1232,6 +1232,51 @@ tool capability; source review and the complete publication gates remain separat
 * `rebuild.py` is the gate: if the concatenation does not reproduce the ROM, the
   split is wrong and nothing downstream is safe.
 
+# Scalar-frame two-constant switches
+
+The explicit `--switch-profile two-constants-frame-v1` selector and
+`elf-symbol-thumb-switch-two-constants-frame-v1` schema compose the guarded
+two-constant table with fixed scalar SP frames. This is a separate opt-in:
+`two-constants-v2` still rejects frames and retains its exact serialization.
+Neither default matching nor failed replay upgrades or falls back to it.
+
+The same converged CFG worklist follows all cases, defaults and backedges,
+tracking stack depth, saved-return facts, scalar slots and ordinary ABI call
+clobbers. At least one reached nonzero narrow fixed allocation is required.
+Narrow fixed SP adjustments, PUSH/POP, direct aligned SP word loads/stores and
+ordinary incoming fifth/later argument reads are supported. Every verified
+return restores entry depth; joins require equal depth and intersect return
+facts. Stable loops are not termination proofs. Every SP-to-register address
+formation rejects, even when dead or overwritten; non-PUSH/POP block transfers,
+dynamic/wide adjustments, invalid stores and fabricated returns also reject.
+Buffer/resolver, function/object literal, runtime/thunk, preloaded-switch and
+inert contexts cannot combine with this policy.
+
+Only this schema adds the exact marker `fixed Thumb scalar SP frames; no
+stack-address materialization` and a `frame` manifest with policy
+`fixed-scalar-sp-v1`, sorted `adjustments` pairs `[instruction_offset,
+signed_byte_delta]`, and sorted `accesses` triples `[instruction_offset,
+"ldr"|"str",sp_displacement]`. These are instruction-derived facts collected
+after successful full-graph verification, not trusted input bounds. Replay
+freshly rebuilds the captured source and compares the entire canonical report;
+unknown/duplicate keys, altered summaries, mixed schemas and malformed selectors
+reject. The fingerprint is domain-separated from v2. Status/rebuild forward the
+exact saved selector; frame rebuilds cross-check emitted size against the saved
+report and canonical matcher extent, excluding placement-prefix bytes.
+
+Original/linked ELF ownership, all raw relocation extents/addends, two reached
+unrelocated words, deterministic placement, regular-file identity capture,
+source/header/map/index/ROM bindings, bounded subprocesses and cleanup are
+unchanged. Tool identity is checked for drift during fresh capture; no new
+persistent tool-hash field is claimed for the old fingerprint.
+
+This is conditional caller evidence under the ordinary returning ABI, not a
+proof of scalar initializedness, physical stack capacity, exact r4-r11 value
+restoration, pointer-free incoming bits, allocator safety or arbitrary memory
+effects. It does not import the private region engine or admit E03F8's buffer,
+callback, descriptor and lifetime composition. Synthetic natural-C tests are
+not authorization to retry frozen game candidates.
+
 # Two-constant switch placement profile
 
 The opt-in `thumb-entry-context-v1` build stage supports both even

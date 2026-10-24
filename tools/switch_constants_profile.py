@@ -28,6 +28,33 @@ _active = ContextVar("switch_constants_replay_active", default=False)
 _compile_object = placement.compile_object
 
 
+@dataclass(frozen=True)
+class SwitchPolicy:
+    schema: str
+    selector: str
+    scalar_frame: bool
+
+
+LEGACY_POLICY = SwitchPolicy(SCHEMA, SELECTOR, False)
+FRAME_POLICY = SwitchPolicy("elf-symbol-thumb-switch-two-constants-frame-v1",
+                            "two-constants-frame-v1", True)
+FRAME_SUMMARY = "fixed Thumb scalar SP frames; no stack-address materialization"
+FRAME_RULE = "fixed-scalar-sp-v1"
+
+
+def policy_for(selector):
+    for policy in (LEGACY_POLICY, FRAME_POLICY):
+        if type(selector) is str and selector == policy.selector:
+            return policy
+    raise ValueError("unknown switch-constants policy")
+
+
+def checked_policy(policy):
+    if policy is not LEGACY_POLICY and policy is not FRAME_POLICY:
+        raise ValueError("unknown switch-constants policy object")
+    return policy
+
+
 def canonical(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"))
 
@@ -205,12 +232,14 @@ def _original_records(original, address, mapping, rom_size):
     return records
 
 
-def _manifest(data, address, calls, relocations):
-    from capstone.arm import ARM_OP_MEM, ARM_REG_PC
-    from match import verify_leaf_instructions
+def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
+    from capstone.arm import ARM_OP_MEM, ARM_REG_PC, ARM_REG_SP
+    from match import verify_leaf_instructions, thumb_stack_adjustment
+    checked_policy(policy)
     descriptor = layout(data, address, relocations)
     instructions = verify_leaf_instructions(data, address, True, calls,
-                                            switch_relocations=relocations, allow_switch_constants=True)
+                                            switch_relocations=relocations, allow_switch_constants=True,
+                                            allow_switch_scalar_frame=policy.scalar_frame)
     owned = set(range(descriptor["dispatch"] + 10,
                       descriptor["table"] + 4 * (descriptor["bound"] + 1)))
     loads = {}
@@ -237,8 +266,19 @@ def _manifest(data, address, calls, relocations):
             if offset - 1 in missing and offset % 2:
                 continue
             raise ValueError("unowned complete-symbol bytes")
-    return {"calls": [[site - address, f"func_{target:08X}"] for site, target in sorted(calls.items())],
-            "switch": descriptor, "constants": constants}, len(instructions)
+    manifest = {"calls": [[site - address, f"func_{target:08X}"] for site, target in sorted(calls.items())],
+                "switch": descriptor, "constants": constants}
+    if policy.scalar_frame:
+        adjustments, accesses = [], []
+        for instruction in sorted(instructions, key=lambda item: item.address):
+            adjustment = thumb_stack_adjustment(instruction)
+            if adjustment is not None:
+                adjustments.append([instruction.address - address, adjustment * 4])
+            for operand in instruction.operands:
+                if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP:
+                    accesses.append([instruction.address - address, instruction.mnemonic, operand.mem.disp])
+        manifest["frame"] = {"policy": FRAME_RULE, "adjustments": adjustments, "accesses": accesses}
+    return manifest, len(instructions)
 
 
 def _linked_bytes(original, linked, address, records, calls, targets, relocations):
@@ -302,7 +342,7 @@ def _artifact_snapshot(path):
         os.close(descriptor)
 
 
-def _object_bytes(runner, workspace, args, original, address, mapping, rom):
+def _object_bytes(runner, workspace, args, original, address, mapping, rom, policy=LEGACY_POLICY):
     from match import elf_image
     records = _original_records(original, address, mapping, len(rom))
     base, prefix = placement.origin(address)
@@ -345,7 +385,7 @@ def _object_bytes(runner, workspace, args, original, address, mapping, rom):
     if captured["f.linked.bin"][0] != linked["text"]:
         raise ValueError("objcopy output does not equal linked ELF text")
     data = _linked_bytes(original, linked, address, records, calls, targets, relocations)
-    manifest, count = _manifest(data, address, calls, relocations)
+    manifest, count = _manifest(data, address, calls, relocations, checked_policy(policy))
     descriptor = manifest["switch"]
     gap = set(range(descriptor["dispatch"] + 10, descriptor["literal"]))
     if any(gap.intersection(range(site - prefix, site - prefix + 4)) for site, _ in records):
@@ -401,10 +441,11 @@ def _checker_snapshot():
             allowance.read_bytes() if allowance.exists() else None)
 
 
-def _build_from_source(root, address):
+def _build_from_source(root, address, policy=LEGACY_POLICY):
     from match import Runner, elf_image, _run_replay_process, plausibility_result
     from match_evidence import source_fingerprint, report_rom_path
     from inert_spin_profile import validate_span
+    checked_policy(policy)
     if _active.get():
         raise ValueError("recursive switch source replay")
     token = _active.set(True)
@@ -465,7 +506,8 @@ def _build_from_source(root, address):
                 placed, _ = placement.place(stage["f.raw.s"], address)
                 if stage["f.s"] != placed or stage["f.o"] != object_data or elf_image(object_data) != original:
                     raise ValueError("fresh placement capture differs")
-                body, manifest, count, linked_capture = _object_bytes(runner, workspace, args, original, address, mapping, rom)
+                body, manifest, count, linked_capture = _object_bytes(runner, workspace, args, original,
+                                                                     address, mapping, rom, policy)
                 base, prefix = placement.origin(address)
                 manifest["placement"] = {"rule": placement.RULE, "section_base": base,
                     "function_offset": prefix, "prefix_size": prefix,
@@ -496,10 +538,11 @@ def _build_from_source(root, address):
 
 
 def verify_source(root, address, *, expected_bytes, expected_manifest, expected_source_path,
-                  expected_source_digest, expected_mapping_digest, expected_index_digest, expected_rom_digest):
+                  expected_source_digest, expected_mapping_digest, expected_index_digest, expected_rom_digest,
+                  policy=LEGACY_POLICY):
     manifest_json = canonical(expected_manifest)
-    _parse_manifest(manifest_json, len(expected_bytes))
-    result = _build_from_source(root, address)
+    _parse_manifest(manifest_json, len(expected_bytes), policy)
+    result = _build_from_source(root, address, policy)
     if (result.body, result.manifest_json, result.source_path, result.source_digest,
         result.mapping_digest, result.index_digest, result.rom_digest) != \
             (expected_bytes, manifest_json, expected_source_path, expected_source_digest,
@@ -508,9 +551,9 @@ def verify_source(root, address, *, expected_bytes, expected_manifest, expected_
     return result
 
 
-def fingerprint(address, result):
+def fingerprint(address, result, policy=LEGACY_POLICY):
     proof = hashlib.sha256()
-    for payload in (SCHEMA.encode(), address.to_bytes(4, "little"), result.body,
+    for payload in (checked_policy(policy).schema.encode(), address.to_bytes(4, "little"), result.body,
                     result.manifest_json.encode(), result.source_path.encode(),
                     result.source_digest.encode(), result.mapping_digest.encode(),
                     result.index_digest.encode(), result.rom_digest.encode(), canonical(configuration()).encode()):
@@ -519,17 +562,21 @@ def fingerprint(address, result):
     return proof.hexdigest()
 
 
-def selected(report):
+def selected_policy(report):
     normalized = [re.sub(r"[ \t]+", " ", line.strip()).lower() for line in report.splitlines()]
-    if not any("switch-two-constants" in line or line.startswith("* switch constants") for line in normalized):
-        return False
+    if not any("switch-two-constants" in line or line.startswith(("* switch constants", "* scalar frame"))
+               for line in normalized):
+        return None
     verification = [line for line in report.splitlines()
                     if re.sub(r"[ \t]+", " ", line.strip()).startswith("* verification")]
-    if verification != [f"* verification: `{SCHEMA}`"]:
+    policies = [policy for policy in (LEGACY_POLICY, FRAME_POLICY)
+                if verification == [f"* verification: `{policy.schema}`"]]
+    if len(policies) != 1:
         raise ValueError("mixed or malformed switch-constants selection")
+    policy = policies[0]
     fields = [line for line in report.splitlines()
               if re.sub(r"[ \t]+", " ", line.strip()).startswith("* switch constants:")]
-    if fields != [f"* switch constants: {SELECTOR}"]:
+    if fields != [f"* switch constants: {policy.selector}"]:
         raise ValueError("missing or malformed switch-constants selector")
     family = [line for line in report.splitlines()
               if re.sub(r"[ \t]+", " ", line.strip()).lower().startswith("* switch constants")]
@@ -543,10 +590,19 @@ def selected(report):
                  "* signed", "* software double", "* inert", "* empty")
     if any(line.startswith(forbidden) for line in normalized):
         raise ValueError("mixed switch-constants profiles")
-    return True
+    frames = [line for line in report.splitlines()
+              if re.sub(r"[ \t]+", " ", line.strip()).lower().startswith("* scalar frame")]
+    if frames != ([f"* scalar frame: {FRAME_SUMMARY}"] if policy.scalar_frame else []):
+        raise ValueError("missing, mixed or malformed scalar-frame marker")
+    return policy
 
 
-def _parse_manifest(encoded, size):
+def selected(report):
+    return selected_policy(report) is not None
+
+
+def _parse_manifest(encoded, size, policy=LEGACY_POLICY):
+    checked_policy(policy)
     def unique(pairs):
         result = {}
         for key, value in pairs:
@@ -578,8 +634,32 @@ def _parse_manifest(encoded, size):
 
     manifest = json.loads(encoded, object_pairs_hook=unique)
     if canonical(manifest) != encoded or type(manifest) is not dict or \
-            set(manifest) != {"calls", "switch", "constants", "placement"}:
+            set(manifest) != {"calls", "switch", "constants", "placement"} | ({"frame"} if policy.scalar_frame else set()):
         raise ValueError("noncanonical switch manifest")
+    if policy.scalar_frame:
+        frame = manifest["frame"]
+        if type(frame) is not dict or set(frame) != {"policy", "adjustments", "accesses"} or \
+                frame["policy"] != FRAME_RULE:
+            raise ValueError("invalid scalar-frame manifest")
+        for kind, length in (("adjustments", 2), ("accesses", 3)):
+            if type(frame[kind]) is not list:
+                raise ValueError("invalid scalar-frame records")
+            previous = -1
+            for record in frame[kind]:
+                if type(record) is not list or len(record) != length:
+                    raise ValueError("invalid scalar-frame record")
+                integer(record[0])
+                if record[0] % 2 or record[0] <= previous:
+                    raise ValueError("unordered scalar-frame records")
+                previous = record[0]
+                if kind == "adjustments":
+                    if type(record[1]) is not int or record[1] % 4 or not -508 <= record[1] <= 508:
+                        raise ValueError("invalid scalar-frame byte adjustment")
+                elif record[1] not in ("ldr", "str") or type(record[2]) is not int or \
+                        record[2] % 4 or not 0 <= record[2] <= 1020:
+                    raise ValueError("invalid scalar-frame access")
+        if not any(record[1] < 0 for record in frame["adjustments"]):
+            raise ValueError("scalar-frame manifest requires a nonzero allocation")
     context = manifest["placement"]
     if type(context) is not dict or set(context) != {"rule", "section_base", "function_offset", "prefix_size",
             "raw_assembly_sha256", "placed_assembly_sha256", "original_elf_sha256", "linked_elf_sha256"} or \
@@ -622,10 +702,11 @@ def _parse_manifest(encoded, size):
     return manifest
 
 
-def render_report(address, result):
+def render_report(address, result, policy=LEGACY_POLICY):
+    checked_policy(policy)
     size = len(result.body)
-    return "\n".join((f"# 0x{address:08X}", "", f"* verification: `{SCHEMA}`",
-        f"* switch constants: {SELECTOR}", f"* compiler: `{configuration()[0]} {configuration()[5]}`",
+    lines = (f"# 0x{address:08X}", "", f"* verification: `{policy.schema}`",
+        f"* switch constants: {policy.selector}", f"* compiler: `{configuration()[0]} {configuration()[5]}`",
         f"* source: `{result.source_path}`", f"* source SHA-256: `{result.source_digest}`",
         f"* mapping SHA-256: `{result.mapping_digest}`", f"* function index SHA-256: `{result.index_digest}`",
         f"* ROM SHA-256: `{result.rom_digest}`", f"* control flow: {CONTROL_FLOW}",
@@ -633,14 +714,18 @@ def render_report(address, result):
         "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
         "* source plausibility: plausible", "* hand-asm allow list: not listed",
         f"* switch constants manifest: `{result.manifest_json}`",
-        f"* switch constants proof SHA-256: `{fingerprint(address, result)}`",
+        f"* switch constants proof SHA-256: `{fingerprint(address, result, policy)}`",
         f"* ROM bytes: `{result.body.hex()}` ({size} bytes)", f"* compiled : `{result.body.hex()}`", "",
-        f"**MATCH - byte identical** - {size}/{size} bytes", ""))
+        f"**MATCH - byte identical** - {size}/{size} bytes", "")
+    if policy.scalar_frame:
+        lines = lines[:10] + (f"* scalar frame: {FRAME_SUMMARY}",) + lines[10:]
+    return "\n".join(lines)
 
 
 def report_matches(report, root, address):
     try:
-        if not selected(report):
+        policy = selected_policy(report)
+        if policy is None:
             return False
         fields = {}
         for line in report.splitlines():
@@ -661,6 +746,8 @@ def report_matches(report, root, address):
                     "* reached instructions", "* verified extent", "* relocations", "* source plausibility",
                     "* hand-asm allow list", "* switch constants manifest", "* switch constants proof SHA-256",
                     "* ROM bytes", "* compiled "}
+        if policy.scalar_frame:
+            required.add("* scalar frame")
         if set(fields) != required or quoted("* compiler") != f"{configuration()[0]} {configuration()[5]}" or \
                 fields["* control flow"] != CONTROL_FLOW or fields["* relocations"] != "none" or \
                 fields["* source plausibility"] != "plausible" or fields["* hand-asm allow list"] != "not listed" or \
@@ -676,12 +763,13 @@ def report_matches(report, root, address):
         if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
             raise ValueError("invalid compiled bytes")
         body = bytes.fromhex(encoded)
-        manifest = _parse_manifest(quoted("* switch constants manifest"), len(body))
+        manifest = _parse_manifest(quoted("* switch constants manifest"), len(body), policy)
         result = verify_source(root, address, expected_bytes=body, expected_manifest=manifest,
             expected_source_path=quoted("* source"), expected_source_digest=quoted("* source SHA-256"),
             expected_mapping_digest=quoted("* mapping SHA-256"),
-            expected_index_digest=quoted("* function index SHA-256"), expected_rom_digest=quoted("* ROM SHA-256"))
-        return report == render_report(address, result)
+            expected_index_digest=quoted("* function index SHA-256"), expected_rom_digest=quoted("* ROM SHA-256"),
+            policy=policy)
+        return report == render_report(address, result, policy)
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, struct.error, UnicodeError, subprocess.SubprocessError):
         return False
@@ -700,8 +788,9 @@ def issue(root, address, args):
             output = (root / args.emit).resolve()
             if (root / "build").resolve() not in output.parents or output.exists():
                 raise ValueError("--emit must name a new file under build/")
-        result = _build_from_source(root, address)
-        report = render_report(address, result)
+        policy = policy_for(args.switch_profile)
+        result = _build_from_source(root, address, policy)
+        report = render_report(address, result, policy)
         if output is not None:
             output.parent.mkdir(parents=True, exist_ok=True)
             with output.open("xb") as stream:

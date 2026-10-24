@@ -702,7 +702,7 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
-        if switch_constants.selected(report):
+        if switch_constants.selected_policy(report) is not None:
             return switch_constants.report_matches(report, root, address)
         if empty_body.SCHEMA in report or any(
                 line.lstrip().startswith("* empty body") for line in report.splitlines()):

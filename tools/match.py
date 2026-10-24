@@ -1973,7 +1973,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_data_relocations=None, udivsi3_context=None,
                              preloaded_switch=False, modsi3_context=None, divsi3_context=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
-                             allow_switch_constants=False):
+                             allow_switch_constants=False, allow_switch_scalar_frame=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     from switch_constants_profile import check_opt_in, layout as constants_layout
     check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
@@ -1981,6 +1981,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                  divsi3_context, inert_spin_context, double_context, function_thunk_context)
     if allow_switch_constants and not thumb:
         raise ValueError("switch constants require Thumb mode")
+    if type(allow_switch_scalar_frame) is not bool or \
+            allow_switch_scalar_frame and not (allow_switch_constants and thumb):
+        raise ValueError("scalar switch frames require explicit Boolean two-constant Thumb policy")
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
@@ -2105,6 +2108,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
         adjustment = thumb_stack_adjustment(instruction) if thumb else None
+        if allow_switch_scalar_frame:
+            if instruction.mnemonic.startswith(("ldm", "stm")):
+                raise ValueError("scalar switch frames exclude block transfers")
+            if not stack_operation and adjustment is None and ARM_REG_SP in registers:
+                raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
         if CS_GRP_INT in instruction.groups or calling and not (calls or call_resolver):
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
@@ -2391,9 +2399,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         for successor in successors:
             predecessors[successor].add(current)
     if switch is not None:
-        if uses_stack_frame(instructions.values()) or any(
+        if (not allow_switch_scalar_frame and uses_stack_frame(instructions.values())) or any(
                 target in RUNTIME_HELPERS.values() for target in calls.values()):
             raise ValueError("switch evidence excludes fixed frames and runtime call thunks")
+        if allow_switch_scalar_frame and not any(
+                (thumb_stack_adjustment(instruction) or 0) < 0 for instruction in instructions.values()):
+            raise ValueError("scalar switch frames require a reached nonzero fixed allocation")
         if preloaded_switch:
             verify_preloaded_switch_cfg(data, address, instructions, edges, predecessors, switch)
         else:
@@ -2573,7 +2584,7 @@ def main():
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
-    ap.add_argument("--switch-profile", choices=("two-constants-v2",))
+    ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1"))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))

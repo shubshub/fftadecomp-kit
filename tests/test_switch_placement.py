@@ -60,6 +60,8 @@ def record_nonregular_capture(record):
 
 
 class PlacementTests(unittest.TestCase):
+    policy = profile.LEGACY_POLICY
+
     def setUp(self):
         scratch = Path(__file__).resolve().parents[1] / "build"
         scratch.mkdir(exist_ok=True)
@@ -67,7 +69,7 @@ class PlacementTests(unittest.TestCase):
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
 
-    def prepare(self, address, source=SOURCE):
+    def prepare(self, address, source=SOURCE, policy=profile.LEGACY_POLICY):
         root = self.root / f"{address:08X}_{len(list(self.root.iterdir()))}"
         (root / "src").mkdir(parents=True)
         relative = f"src/{address:08X}.c"
@@ -83,7 +85,7 @@ class PlacementTests(unittest.TestCase):
                         for symbol in image["symbols"] if symbol["name"].startswith("func_") and not symbol["section"]]
             mapping = json.dumps(entries).encode()
             body, manifest, count, linked_capture = profile._object_bytes(runner, workspace, fixed_args(), image,
-                                                                        address, mapping, bytes(8192))
+                                                                        address, mapping, bytes(8192), policy)
             raw = runner.read_binary(f"{workspace}/f.raw.s")
             placed = runner.read_binary(f"{workspace}/f.s")
             linked = runner.read_binary(f"{workspace}/f.elf")
@@ -115,7 +117,7 @@ class PlacementTests(unittest.TestCase):
         for source in (SOURCE, PIPELINE_SOURCE):
             for address in (0x08000000, 0x08000002):
                 root, rom, captured = self.prepare(address, source)
-                arguments = ["match.py", "--root", str(root), "--switch-profile", profile.SELECTOR, f"{address:08X}"]
+                arguments = ["match.py", "--root", str(root), "--switch-profile", self.policy.selector, f"{address:08X}"]
                 with self.subTest(address=address, pipeline=source == PIPELINE_SOURCE), \
                         self.trusted_fixture(root, rom), patch.object(sys, "argv", arguments), \
                         contextlib.redirect_stdout(io.StringIO()), \
@@ -163,7 +165,7 @@ class PlacementTests(unittest.TestCase):
         with runner.workspace() as workspace:
             (Path(workspace) / "f.o").write_bytes(original)
             result = profile._object_bytes(runner, workspace, fixed_args(), match.elf_image(original),
-                                          address, mapping, bytes(8192))
+                                          address, mapping, bytes(8192), self.policy)
             linked = runner.read_binary(f"{workspace}/f.elf")
         return result[:3], linked
 
@@ -225,7 +227,7 @@ class PlacementTests(unittest.TestCase):
                         (Path(workspace) / "f.o").write_bytes(bad)
                         with self.assertRaises(ValueError):
                             profile._object_bytes(runner, workspace, fixed_args(), match.elf_image(bad),
-                                                  address, mapping, bytes(8192))
+                                                  address, mapping, bytes(8192), self.policy)
                         bad_linked = runner.read_binary(f"{workspace}/f.elf")
                     self.assertEqual(match.elf_image(good_linked)["text"], match.elf_image(bad_linked)["text"])
                     self.assertEqual(len(profile._original_records(match.elf_image(bad), address, mapping, 8192)),
@@ -248,7 +250,7 @@ class PlacementTests(unittest.TestCase):
 
                     with self.trusted_fixture(root, rom):
                         with patch.object(profile, "_compile_object", side_effect=inject(good)):
-                            report = profile.render_report(address, profile._build_from_source(root, address))
+                            report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
                             self.assertTrue(match_evidence.report_matches(report, root, address))
                         with patch.object(profile, "_compile_object", side_effect=inject(bad)), \
                                 patch.object(match_evidence, "switch_report_matches") as legacy:
@@ -388,7 +390,7 @@ class PlacementTests(unittest.TestCase):
         root, rom, _ = self.prepare(address)
         compile_original = profile._compile_object
         with self.trusted_fixture(root, rom):
-            report = profile.render_report(address, profile._build_from_source(root, address))
+            report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
             for name in ("f.raw.s", "f.s", "f.o"):
                 def corrupt(runner, workspace, *args, **kwargs):
                     result = compile_original(runner, workspace, *args, **kwargs)
@@ -411,7 +413,7 @@ class PlacementTests(unittest.TestCase):
 
     def linked_capture_drift(self, address, name, change, final_boundary=False):
         root, rom, _ = self.prepare(address)
-        arguments = ["match.py", "--root", str(root), "--switch-profile", profile.SELECTOR,
+        arguments = ["match.py", "--root", str(root), "--switch-profile", self.policy.selector,
                      "--emit", "build/rejected.bin", f"{address:08X}"]
         report_path = root / f"docs/match/{address:08X}.md"
         output_path = root / "build/rejected.bin"
@@ -449,7 +451,7 @@ class PlacementTests(unittest.TestCase):
             return result
 
         with self.trusted_fixture(root, rom):
-            clean_report = profile.render_report(address, profile._build_from_source(root, address))
+            clean_report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
             stdout = io.StringIO()
             with patch.object(profile, "_object_bytes", side_effect=after_object), \
                     patch.object(inert_spin_profile, "validate_span", side_effect=after_span), \
@@ -573,7 +575,7 @@ class PlacementTests(unittest.TestCase):
     def nonregular_capture(self, name, final_boundary):
         address = 0x08000002
         root, rom, _ = self.prepare(address)
-        arguments = ["match.py", "--root", str(root), "--switch-profile", profile.SELECTOR,
+        arguments = ["match.py", "--root", str(root), "--switch-profile", self.policy.selector,
                      "--emit", "build/rejected.bin", f"{address:08X}"]
         report_path = root / f"docs/match/{address:08X}.md"
         output_path = root / "build/rejected.bin"
@@ -598,7 +600,7 @@ class PlacementTests(unittest.TestCase):
 
         try:
             with self.trusted_fixture(root, rom):
-                clean_report = profile.render_report(address, profile._build_from_source(root, address))
+                clean_report = profile.render_report(address, profile._build_from_source(root, address, self.policy), self.policy)
                 stdout = io.StringIO()
                 issuance_timeout, replay_timeout = False, False
                 with patch.object(profile, "_artifact_snapshot", side_effect=substitute), \
@@ -726,7 +728,7 @@ class PlacementTests(unittest.TestCase):
 
         def actual_match(command, **kwargs):
             self.assertEqual(command[:2], [sys.executable, str(tools / "match.py")])
-            self.assertIn(profile.SELECTOR, command)
+            self.assertIn(self.policy.selector, command)
             result = run([sys.executable, "-c", launcher, *command[2:]], timeout=120, **kwargs)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             record = {"command": command, "stdout": result.stdout, "stderr": result.stderr, "exit": result.returncode}
@@ -742,9 +744,13 @@ class PlacementTests(unittest.TestCase):
         output = root / "build/rebuilt.bin"
         with self.trusted_fixture(root, rom), patch.object(status.subprocess, "run", side_effect=actual_match):
             command = [sys.executable, str(tools / "match.py"), "--root", str(root), f"{address:08X}",
-                       "--switch-profile", profile.SELECTOR]
+                       "--switch-profile", self.policy.selector]
             actual_match(command, capture_output=True, text=True)
-            self.assertEqual(status.collect(str(root), True, quiet=True), (0, 0, 0, 0, [], 1, len(body)))
+            main_entries = [entry for entry in json.loads((root / "config/functions.json").read_text())
+                            if int(entry["rom"], 16) < status.CODE_END]
+            main_bytes = sum(int(entry["end"], 16) - int(entry["rom"], 16) for entry in main_entries)
+            self.assertEqual(status.collect(str(root), True, quiet=True),
+                             (len(main_entries), 0, main_bytes, 0, [], 1, len(body)))
             with contextlib.redirect_stdout(io.StringIO()) as log:
                 self.assertEqual(rebuild.compiled_rebuild(root, str(output)), 0)
             self.assertEqual(output.read_bytes(), rom)

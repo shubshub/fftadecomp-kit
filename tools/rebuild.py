@@ -91,8 +91,9 @@ def output_path(root, requested):
 
 def saved_profile_arguments(report, root, address):
     arguments = []
-    if switch_constants.selected(report):
-        arguments += ["--switch-profile", switch_constants.SELECTOR]
+    constants_policy = switch_constants.selected_policy(report)
+    if constants_policy is not None:
+        arguments += ["--switch-profile", constants_policy.selector]
     if function_thunk.selected(report):
         arguments += ["--function-address-profile", function_thunk.SELECTOR]
     if software_double.selected(report):
@@ -146,6 +147,10 @@ def compiled_rebuild(root, requested_output=None):
             if not emitted.is_file() or emitted.is_symlink():
                 raise ValueError(f"0x{address:08X}: matcher emitted no regular payload")
             size = emitted.stat().st_size
+            if switch_constants.selected_policy(report.decode("utf-8")) is switch_constants.FRAME_POLICY:
+                from status import matcher_extent, report_extent
+                if size != matcher_extent(result.stdout) or size != report_extent(report.decode("utf-8")):
+                    raise ValueError(f"0x{address:08X}: compiled byte mismatch with scalar-frame extent")
             if not size or address < ROM_BASE or address + size > ROM_BASE + baseline_state[0]:
                 raise ValueError(f"0x{address:08X}: compiled extent is empty or outside the ROM")
             if address < previous_end:
