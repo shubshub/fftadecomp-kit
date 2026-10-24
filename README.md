@@ -56,6 +56,12 @@ maps, symbols, segmentation, coverage or source files.
 
 Results separate reachable instruction ranges, literal words and unresolved
 gaps. Direct calls contribute their continuation, not the callee's body.
+`literal_reads` records each reached PC-relative word read by `site`, `address`,
+`size` and `inside_window`, sorted by instruction address. Repeated reads of one
+word remain separate observations. External reads are recorded without fetching
+their values or widening the window; they still produce partial reasons.
+These read dependencies do not establish ownership or permit matching, and
+only valid in-window words contribute to `literal_ranges`.
 `cfg_closed` describes structural closure under ordinary-call and syntactic
 return assumptions, not stack safety, a complete ELF symbol or exhaustive
 discovery. `complete` and `inventory_complete` always remain false.
