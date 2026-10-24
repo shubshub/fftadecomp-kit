@@ -553,8 +553,10 @@ Names must be ordinary C identifiers, not function or call-helper names;
 addresses must be eight-digit hexadecimal strings. Duplicate keys and malformed
 mappings are rejected. The map supplies reviewed addresses, not guessed ones.
 Only undefined external object/notype symbols with `R_ARM_ABS32` relocations
-qualify. Each relocation must occupy a complete aligned word in the function's
-trailing literal pool and be loaded by a reachable PC-relative instruction.
+qualify. Each relocation must occupy a complete aligned word inside the function
+and be loaded by a reachable PC-relative instruction. The word must be disjoint
+from every reachable instruction byte. Trailing pools and branch-skipped middle
+pools are supported; entering a pool as code or falling through it is rejected.
 Signed addends are supported without address wrapping; self-function references,
 overlapping relocations and unconsumed literal words are rejected.
 

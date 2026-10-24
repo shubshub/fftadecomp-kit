@@ -238,8 +238,10 @@ be proven constants; unknown or arithmetic-derived indices still fail. Alias
 escapes, inconsistent alias joins, dynamic adjustments, out-of-frame stores and
 unbalanced returns still fail; do not steer source around these checks.
 Known external data symbols can be listed in `config/data_symbols.json` for
-typed absolute linking. Only reachable trailing `R_ARM_ABS32` literal words
-qualify; all relocated bytes are compared. Do not invent addresses to make a
+typed absolute linking. Only `R_ARM_ABS32` relocations in complete aligned
+in-function literal words referenced by reachable PC-relative loads qualify.
+The words must not overlap reachable instructions; trailing and branch-skipped
+middle pools are supported. All relocated bytes are compared. Do not invent addresses to make a
 match. Data reports bind both mappings, and stale mappings invalidate evidence.
 See `README.md` for the precise boundary; do not work around a rejected relocation.
 Do not try to reach a match by trickery — a tricked match is worth nothing and

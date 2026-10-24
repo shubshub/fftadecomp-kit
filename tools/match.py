@@ -891,7 +891,7 @@ def verify_data_literals(instructions, address, data_relocations):
                 if instruction.mnemonic == "ldr" and operand.type == ARM_OP_MEM and
                 operand.mem.base == ARM_REG_PC and not operand.mem.index}
     if any(address + relocation not in literals for relocation in data_relocations):
-        raise ValueError("data relocation is not a reachable trailing literal-pool load")
+        raise ValueError("data relocation is not a reachable PC-relative literal-pool load")
 
 
 _addressed_replay_active = ContextVar("addressed_remainder_replay_active", default=False)
