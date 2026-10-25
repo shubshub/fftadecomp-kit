@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
 
 
-SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s2b-sol61")
+SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s3a-sol61")
 ADDRESS = 0x08000002
 DEPENDENCY_SHA256 = "6edf9439e64096d31aa616fbadf5bb3c684893fb05c7b6ae790f3d0c3a0ba917"
 
@@ -1524,6 +1524,281 @@ class FreshCaptureTests(unittest.TestCase):
             state.locate(pointer, 0, 4)
         with self.assertRaisesRegex(profile.Failure, "declared live storage"):
             state.locate(state.registers["sp"], 0, 4)
+
+    def restoration_case(self):
+        # New negative/control runs must not overwrite the retained S2b matrix.
+        with patch.dict(os.environ):
+            os.environ.pop("FFTA_REGISTRATION_HELPER_EVIDENCE", None)
+            return self.helper_case(self.cases[0], "D8BD8")
+
+    def restoration_boundary(self):
+        """Fresh genuine execution supplies every positive state and save."""
+        capture = self.execution_capture(self.restoration_case(), self.helper_premises)
+        snapshots = {}
+        original = profile._restoration_plan
+
+        def observe(state, following, program, bound, budget):
+            if state.pc == 0x080D8C48:
+                snapshots.update(state=copy.deepcopy(state), following=following, program=dict(program))
+            return original(state, following, program, bound, budget)
+
+        with patch.object(profile, "_restoration_plan", observe):
+            positive = profile.execute_restoration_prefixes(capture).encoded
+        self.assertIn("state", snapshots)
+        return capture, snapshots, positive
+
+    def test_restoration_decoded_corridor_hostiles(self):
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        capture, boundary, positive = self.restoration_boundary()
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        decoder.detail = True
+        # Negative twins alter decoded operations at the actual fresh boundary;
+        # no synthetic capture or hand-authored successful path is admitted.
+        twins = [
+            ("intervening-nop", 0x080D8C4A, "c046"),
+            ("omitted-r3-pop", 0x080D8C4A, "30bc"),
+            ("omitted-r5-pop", 0x080D8C4A, "18bc"),
+            ("eventual-r3-overwrite", 0x080D8C4A, "0446"),
+            ("pending-read", 0x080D8C4A, "1846"),
+            ("pending-propagation", 0x080D8C4A, "1c46"),
+            ("pending-dereference", 0x080D8C4A, "1868"),
+            ("pending-store", 0x080D8C4A, "0360"),
+            ("pending-branch", 0x080D8C4A, "00e0"),
+            ("pending-call", 0x080D8C4A, "00f000f8"),
+            ("pending-allocation", 0x080D8C4A, "81b0"),
+            ("pending-return", 0x080D8C4A, "7047"),
+            ("pending-sp-reuse", 0x080D8C4A, "01b0"),
+            ("pop-control-destination", 0x080D8C4A, "00bd"),
+            ("r8-mov-immediate", 0x080D8C4C, "0023"),
+            ("r8-wrong-shuttle", 0x080D8C4C, "a046"),
+            ("r9-omitted-restore", 0x080D8C4E, "c046"),
+            ("r9-wrong-shuttle", 0x080D8C4E, "9946"),
+            ("r10-omitted-restore", 0x080D8C50, "c046"),
+            ("r10-wrong-shuttle", 0x080D8C50, "a246"),
+            ("r6-omitted-pop", 0x080D8C52, "b0bc"),
+            ("unrelated-mov", 0x080D8C4E, "1246"),
+        ]
+        for label, pc, encoding in twins:
+            with self.subTest(twin=label):
+                state = copy.deepcopy(boundary["state"])
+                program = dict(boundary["program"])
+                instruction = next(decoder.disasm(bytes.fromhex(encoding), pc, count=1))
+                program[pc] = instruction
+                with self.assertRaises(profile.Failure):
+                    profile._restoration_plan(state, boundary["following"], program, capture, profile._CallerBudget())
+        # A refused proof never changes the immutable capture or a following run.
+        self.assertEqual(profile.execute_restoration_prefixes(capture).encoded, positive)
+
+    def test_restoration_witness_and_retired_fragment_hostiles(self):
+        capture, boundary, positive = self.restoration_boundary()
+        baseline = boundary["state"]
+        witnesses = profile._restoration_pop(baseline, boundary["program"][boundary["following"]])
+        incoming_r8 = witnesses["r3"]
+
+        def missing(state):
+            state.saves.pop(incoming_r8)
+
+        def consumed(state):
+            state.saves[incoming_r8]["consumed"] = 0
+
+        def nested(state):
+            other = next(saved for saved in state.saves.values() if saved["record"]["register"] == "r8" and
+                         state.regions[saved["record"]["location"]["region"]]["frame"] != state.context["frame"])
+            state.saves[incoming_r8] = copy.deepcopy(other)
+
+        def wrong_original(state):
+            state.saves[incoming_r8]["record"]["register"] = "r9"
+
+        def unsaved(state):
+            record = state.saves[incoming_r8]["record"]
+            # Even an equal-valued record in a live slot needs its historical
+            # frame membership and actual creation event, not a new witness ID.
+            forged = copy.deepcopy(state.saves.pop(incoming_r8))
+            forged["record"] = {**record, "witness": "unsaved-equal-value"}
+            state.saves["unsaved-equal-value"] = forged
+
+        def corrupted_byte(state):
+            location = state.saves[incoming_r8]["record"]["location"]
+            state.memory[state.key(location["region"], location["offset"])] = {"tag": "constant", "value": 0}
+
+        def corrupted_bit(state):
+            location = state.saves[incoming_r8]["record"]["location"]
+            key = state.key(location["region"], location["offset"])
+            before = state.memory_bits[key]
+            state.memory_bits[key] = tuple(1 if bit == 0 else 0 for bit in before)
+
+        def retired_source(state):
+            state.regions[state.saves[incoming_r8]["record"]["location"]["region"]]["lifetime"] = "retired"
+
+        def r5_wrong_entry_save(state):
+            state.saves[witnesses["r5"]]["record"]["register"] = "r8"
+
+        def r6_corrupted_save(state):
+            saved = next(saved for saved in state.saves.values() if saved["record"]["register"] == "r6" and
+                         state.regions[saved["record"]["location"]["region"]]["frame"] == state.context["frame"])
+            location = saved["record"]["location"]
+            state.memory[state.key(location["region"], location["offset"])] = {"tag": "constant", "value": 0}
+
+        def r12(state):
+            state.registers["r12"] = state.registers["r3"]
+
+        def forged_sp(state):
+            state.registers["sp"] = state.registers["r3"]
+
+        def forged_backing(state):
+            old = state.values[state.registers["sp"]]
+            region = copy.deepcopy(state.regions[old["region"]])
+            region["id"] = "same-address-other-backing"
+            state.regions[region["id"]] = region
+            state.registers["sp"] = state.pointer(region["id"], old["offset"])
+
+        def live_fragment(state):
+            key = state.key("helper-output", 0)
+            state.memory[key] = {"tag": "fragment", "value": state.registers["r3"], "index": 1}
+            state.memory_bits[key] = state.bitvector(state.registers["r3"])[8:16]
+
+        for mutate in (missing, consumed, nested, wrong_original, unsaved, corrupted_byte, corrupted_bit,
+                       retired_source, r5_wrong_entry_save, r6_corrupted_save, r12, forged_sp, forged_backing, live_fragment):
+            with self.subTest(twin=mutate.__name__):
+                state = copy.deepcopy(baseline)
+                mutate(state)
+                with self.assertRaises(profile.Failure):
+                    state.check_live_aliases()
+                    profile._restoration_plan(state, boundary["following"], boundary["program"], capture, profile._CallerBudget())
+        self.assertEqual(profile.execute_restoration_prefixes(capture).encoded, positive)
+
+    def test_restoration_fixed_limits_refuse_without_partial_result(self):
+        capture = self.execution_capture(self.restoration_case(), self.helper_premises)
+        for name, limit in (("MAX_CALLER_STATES", 2), ("MAX_CALLER_TRANSFERS", 10), ("MAX_CALLER_DEPTH", 1)):
+            with self.subTest(limit=name), patch.object(profile, name, limit), self.assertRaises(profile.Failure):
+                profile.execute_restoration_prefixes(capture)
+
+    def test_fresh_restoration_instruction_twins_and_following_control(self):
+        case = self.restoration_case()
+        original = case[-1]
+        twins = (("immediate-nop", 0x080D8C4A, "c046"), ("omitted-r5", 0x080D8C4A, "18bc"),
+                 ("r8-immediate", 0x080D8C4C, "0023"), ("omitted-r9", 0x080D8C4E, "c046"),
+                 ("omitted-r10", 0x080D8C50, "c046"), ("omitted-r6", 0x080D8C52, "b0bc"))
+        try:
+            for label, pc, encoding in twins:
+                with self.subTest(twin=label):
+                    rom = bytearray(original)
+                    replacement = bytes.fromhex(encoding)
+                    rom[pc - profile.ROM_BASE:pc - profile.ROM_BASE + len(replacement)] = replacement
+                    (case[3] / "baserom.bin").write_bytes(rom)
+                    capture = self.execution_capture((*case[:-1], bytes(rom)), self.helper_premises)
+                    self.assertEqual(len(capture.commands), 7)
+                    with self.assertRaises(profile.Failure):
+                        profile.execute_restoration_prefixes(capture)
+        finally:
+            (case[3] / "baserom.bin").write_bytes(original)
+        capture = self.execution_capture(case, self.helper_premises)
+        result = profile.execute_restoration_prefixes(capture).inspect()
+        self.assertEqual(len(capture.commands), 7)
+        selected = next(prefix for prefix in result["prefixes"] if prefix["pending_restores"])
+        self.assertEqual(selected["status"], "suspended-registration")
+        self.assertEqual(selected["pending"], [])
+
+    def test_restoration_actual_transition_rechecks_proof(self):
+        capture, _, positive = self.restoration_boundary()
+        original = profile._restoration_transfer
+        for drift in ("instruction", "saved-byte", "consumed-save", "control"):
+            changed = []
+
+            def intervene(state, instruction, bound, program, budget):
+                if state.pc == 0x080D8C4A and state.pending and not changed:
+                    changed.append(drift)
+                    if drift == "instruction":
+                        state.corridor[0]["encoding"] = "c046"
+                    elif drift == "control":
+                        state.registers["lr"] = state.registers["r3"]
+                    else:
+                        witness = next(item["witness"] for item in state.pending.values() if item["register"] == "r3")
+                        saved = state.saves[witness]
+                        if drift == "consumed-save":
+                            saved["consumed"] = 0
+                        else:
+                            location = saved["record"]["location"]
+                            state.memory[state.key(location["region"], location["offset"])] = {"tag": "constant", "value": 0}
+                return original(state, instruction, bound, program, budget)
+
+            with self.subTest(drift=drift), patch.object(profile, "_restoration_transfer", intervene), self.assertRaises(profile.Failure):
+                profile.execute_restoration_prefixes(capture)
+            self.assertEqual(changed, [drift])
+        self.assertEqual(profile.execute_restoration_prefixes(capture).encoded, positive)
+
+    def test_four_fresh_d8_retirement_corridors_reach_registration(self):
+        for case in self.cases:
+            with self.subTest(case=case[:2]):
+                evidence = os.environ.get("FFTA_REGISTRATION_RESTORATION_EVIDENCE")
+                with patch.dict(os.environ, {"FFTA_REGISTRATION_HELPER_EVIDENCE": str(Path(evidence) / "preparation")} if evidence else {}):
+                    helper_case = self.helper_case(case, "D8BD8")
+                capture = self.execution_capture(helper_case, self.helper_premises)
+                result = profile.execute_restoration_prefixes(capture).inspect()
+                self.assertEqual(result["kind"], "internal-incomplete-restoration-prefixes-v1")
+                self.assertFalse(result["complete"])
+                self.assertEqual(len(result["prefixes"]), 9)
+                self.assertEqual(len(capture.commands), 7)
+                self.assertTrue(all(not prefix["pending"] and not prefix["active_calls"] for prefix in result["prefixes"]))
+                selected = next(prefix for prefix in result["prefixes"] if any(
+                    decision["kind"] == "switch" and decision["choice"] == 0 for decision in prefix["decisions"]))
+                self.assertEqual(selected["status"], "suspended-registration")
+                self.assertTrue(all(call["output"] is not None for call in selected["helper_calls"]))
+                self.assertEqual([(item["register"], item["kind"]) for item in selected["pending_restores"]],
+                                 [("r3", "next-pop-shuttle"), ("r5", "next-pop-shuttle"), ("r6", "nonvolatile"), ("r8", "nonvolatile")])
+                pending = {item["register"]: item for item in selected["pending_restores"]}
+                self.assertEqual(pending["r3"]["witness"], pending["r8"]["witness"])
+                self.assertEqual(pending["r3"]["operations"], [{"body": "body/080D8BD8", "pc": 0x080D8C4A}])
+                self.assertEqual(pending["r8"]["operations"], [{"body": "body/080D8BD8", "pc": pc} for pc in (0x080D8C4A, 0x080D8C4C)])
+                self.assertEqual(pending["r6"]["operations"], [{"body": "body/080D8BD8", "pc": pc}
+                                                            for pc in (0x080D8C4A, 0x080D8C4C, 0x080D8C4E, 0x080D8C50, 0x080D8C52)])
+                frames = {frame["id"]: frame for frame in selected["frames"]}
+                values = {value["id"]: value for value in selected["values"]}
+                d8 = next(call for call in selected["helper_calls"] if call["target"] == "body/080D8BD8")
+                saved = next(save for save in frames[d8["frame"]]["saves"] if save["witness"] == pending["r8"]["witness"])
+                self.assertEqual(saved["register"], "r8")
+                self.assertEqual(saved["value"], d8["input"]["registers"]["r8"])
+                if case[0] == "expanded":
+                    self.assertNotEqual(saved["value"], capture.fixed.request.to_dict()["entry"]["registers"]["r8"])
+                self.assertEqual(d8["output"]["registers"]["r8"], saved["value"])
+                self.assertEqual(pending["r5"]["restored_value"], d8["input"]["registers"]["r10"])
+                self.assertEqual(pending["r6"]["restored_value"], d8["input"]["registers"]["r6"])
+                for register in ("r6", "r8", "r9", "r10"):
+                    self.assertEqual(d8["output"]["registers"][register], d8["input"]["registers"][register])
+                nested = next(call for call in selected["helper_calls"] if call["target"] == "body/0801C918")
+                self.assertNotIn(pending["r8"]["witness"], {save["witness"] for save in frames[nested["frame"]]["saves"]})
+                creation = next(event for event in selected["events"] if event["tag"] == "save-create" and
+                                event["witness"] == pending["r8"]["witness"])
+                self.assertEqual(creation["location"], {"body": "body/080D8BD8", "pc": 0x080D8BE0})
+                self.assertEqual(values[d8["output"]["lr"]]["tag"], "control")
+                self.assertEqual(values[d8["output"]["sp"]], {**values[d8["input"]["sp"]], "id": d8["output"]["sp"]})
+                retirements = [event for event in selected["events"] if event["tag"] == "retire-stack" and event["location"]["pc"] == 0x080D8C48]
+                self.assertEqual(len(retirements), 1)
+                self.assertEqual(pending["r3"]["retired"], [retirements[0]["region"]])
+                self.assertEqual(pending["r8"]["retired"], [retirements[0]["region"]])
+                for obligation in pending.values():
+                    self.assertEqual(selected["events"][obligation["opened"]]["tag"], "pending-open")
+                    self.assertEqual(selected["events"][obligation["opened"]]["obligation"], obligation)
+                    discharge = next(event for event in selected["events"] if event["tag"] == "pending-discharge" and event["obligation"] == obligation["id"])
+                    self.assertEqual(discharge["location"], obligation["overwrite"])
+                stores = [event["location"]["pc"] for event in selected["events"] if event["tag"] == "instruction" and
+                          event["location"]["body"] != capture.to_dict()["caller"]["id"] and len(event["encoding"]) == 4 and
+                          int.from_bytes(bytes.fromhex(event["encoding"]), "little") & 0xf800 == 0x8000]
+                self.assertEqual(stores, [0x080D8C00, 0x080D8C06, 0x0801CA84, 0x0801CA88, 0x0801CA90,
+                                          0x0801C930, 0x0801C938, 0x0801C946, 0x0801C94E, 0x0801C950])
+                written = [bytes(part["value"] for write in event["writes"] for part in write["bytes"]).hex()
+                           for event in selected["events"] if event["tag"] == "instruction" and event["location"]["pc"] in stores]
+                self.assertEqual(written, ["feff", "0300", "d0ff", "5000", "7000", "b0ff", "baff", "e8ff", "fcff", "4000"])
+                self.assert_memory_origin_closure(selected)
+                if evidence:
+                    directory = Path(evidence) / f"{case[0]}-{case[1] % 4}"
+                    directory.mkdir(parents=True, exist_ok=False)
+                    (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+                    (directory / "commands.json").write_bytes(encoded(capture.commands))
+                    (directory / "request.json").write_bytes(capture.fixed.request.file_bytes)
+                    for label, data in capture.artifacts:
+                        (directory / label).write_bytes(data)
+                    (directory / "prefixes.json").write_bytes(encoded(result))
 
     def test_four_fresh_decoded_helpers_reach_registration_without_abi_erasure(self):
         for case in self.cases:

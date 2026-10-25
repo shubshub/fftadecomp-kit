@@ -1,7 +1,8 @@
 """Inactive registration foundation: capture and decoded execution prefixes.
 
-Internal helper execution stops before registration and S3 retirement. It
-supplies no completed public history, registration proof or public report.
+The retained helper API stops before S3 retirement. The additive restoration
+API continues proved corridors to registration entry; both remain incomplete
+and supply no completed public history, registration proof or public report.
 """
 
 from dataclasses import dataclass
@@ -2859,6 +2860,299 @@ def execute_helper_prefixes(capture):
         raise Failure("identity", "malformed bound helper capture") from error
 
 
+class _RestorationState(_HelperState):
+    """Internal P7 policy: immediate retirement with proved save restorations."""
+
+    def __init__(self, context, body, rom):
+        super().__init__(context, body, rom)
+        self.pending, self.pending_restores = {}, {}
+        self.corridor = []
+        self._trial_aliases = False
+
+    def stack_address(self):
+        address = super().stack_address()
+        require(self.values[self.registers["sp"]]["region"] == self.stack_region,
+                "restoration SP lacks original backing identity", "local-effect")
+        return address
+
+    def retired_registers(self):
+        retired = {region["id"] for region in self.regions.values() if region["lifetime"] == "retired"}
+        return {name: sorted(self.aliases(reference) & retired) for name, reference in self.registers.items()
+                if name != "sp" and self.aliases(reference) & retired}
+
+    def check_live_aliases(self):
+        # The trial policy changes only register treatment. Live storage never
+        # receives an exception, including incidental fragments outside arguments.
+        retired = {region["id"] for region in self.regions.values() if region["lifetime"] == "retired"}
+        for key, part in self.memory.items():
+            if part["tag"] == "fragment" and self.aliases(part["value"]) & retired:
+                require(not any(region["lifetime"] == "live" and region["kind"] != "stack-domain" and
+                                self.base(region["id"])[0] == key[0] and self.base(region["id"])[1] <= key[1] <
+                                self.base(region["id"])[1] + region["size"] for region in self.regions.values()),
+                        "live storage retains retired fragment", "local-effect")
+        if not self._trial_aliases:
+            covered = {obligation["register"]: obligation["retired"] for obligation in self.pending.values()}
+            require(self.retired_registers() == covered, "retired alias lacks exact pending restoration", "local-effect")
+
+    def export_identities(self, digest):
+        return {**super().export_identities(digest), **{identifier: identifier.replace(_ZERO_DIGEST, digest)
+                                                       for identifier in self.pending_restores}}
+
+    def export_members(self):
+        return {**super().export_members(), "pending": sorted(self.pending.values(), key=lambda item: item["id"]),
+                "pending_restores": sorted(self.pending_restores.values(), key=lambda item: item["id"])}
+
+    def snapshot(self):
+        result = super().snapshot()
+        result["pending"] = copy.deepcopy(sorted(self.pending.values(), key=lambda item: item["id"]))
+        return result
+
+    def guard(self, instruction):
+        if self.pending:
+            require(self.corridor and self.corridor[0] == {"location": {"body": self.body["id"], "pc": self.pc},
+                                                       "encoding": bytes(instruction.bytes).hex()},
+                    "unexpected instruction in pending restoration corridor", "local-effect")
+        else:
+            require(not self.corridor, "restoration corridor outlived its obligations", "local-effect")
+
+    def enter(self, body, instruction):
+        require(not self.pending, "pending restoration crosses call", "local-effect")
+        return super().enter(body, instruction)
+
+    def leave(self):
+        require(not self.pending, "pending restoration crosses return", "local-effect")
+        return super().leave()
+
+
+def _restoration_original(state, register):
+    require(register in (*private.NONVOLATILE[:-1], "lr"), "save is not an entry restoration witness", "local-effect")
+    return state.context["lr"] if register == "lr" else state.context["registers"][register]
+
+
+def _restoration_save(state, witness, *, live=True):
+    """Bind a real current-frame creation and exact still-readable saved word."""
+    require(witness in state.saves, "missing restoration save witness", "local-effect")
+    saved = state.saves[witness]
+    record = saved["record"]
+    frame = state.frames[state.context["frame"]]
+    location = record["location"]
+    region = state.regions[location["region"]]
+    require(record in frame["saves"] and region["frame"] == frame["id"] and location["region"] in frame["allocations"] and
+            region["kind"] == "stack-allocation" and location["size"] == 4,
+            "restoration witness is not owned by current frame", "local-effect")
+    created = saved["created"]
+    require(type(created) is int and 0 <= created < len(state.events) and
+            state.events[created]["tag"] == "save-create" and state.events[created]["witness"] == witness and
+            state.events[created]["location"]["body"] == state.body["id"], "restoration lacks genuine save creation", "local-effect")
+    original = _restoration_original(state, record["register"])
+    require(state.equivalent(record["value"], original) and state.bitvector(record["value"]) == state.bitvector(original),
+            "restoration save is not the helper entry value", "local-effect")
+    require(not state.aliases(record["value"]) & {region["id"] for region in state.regions.values() if region["lifetime"] == "retired"},
+            "restoration value retains retired storage", "local-effect")
+    if live:
+        require(saved["consumed"] is None and region["lifetime"] == "live", "restoration source save is consumed or retired", "local-effect")
+        parts, bits = [], []
+        for index in range(4):
+            key = state.key(location["region"], location["offset"] + index)
+            require(key in state.memory, "restoration saved byte is absent", "local-effect")
+            parts.append(state.memory[key])
+            bits.extend(state.memory_bits.get(key, state.part_bits(state.memory[key])))
+        require(parts == private.value_bytes(state.values[record["value"]]) and tuple(bits) == state.bitvector(record["value"]),
+                "restoration saved bytes or bits differ", "local-effect")
+    else:
+        consumed = saved["consumed"]
+        require(type(consumed) is int and 0 <= consumed < len(state.events) and
+                state.events[consumed]["tag"] == "save-consume" and state.events[consumed]["witness"] == witness,
+                "restoration shuttle lacks actual save consumption", "local-effect")
+    return record
+
+
+def _restoration_pop(state, instruction):
+    from capstone.arm import ARM_OP_REG
+    require(instruction.mnemonic == "pop" and instruction.operands and all(operand.type == ARM_OP_REG for operand in instruction.operands),
+            "restoration requires decoded POP", "local-effect")
+    names = [private.Checker.regname(instruction, operand.reg) for operand in instruction.operands]
+    require(all(name in private.REGISTERS[:8] for name in names) and names == sorted(set(names), key=lambda name: int(name[1:])),
+            "restoration POP has unsupported destinations", "local-effect")
+    state.stack_address()
+    result = {}
+    for index, name in enumerate(names):
+        location = state.locate(state.registers["sp"], index * 4, 4)
+        matches = [witness for witness, saved in state.saves.items() if saved["consumed"] is None and saved["record"]["location"] == location]
+        require(len(matches) == 1, "restoration POP lacks exact live witness", "local-effect")
+        _restoration_save(state, matches[0])
+        result[name] = matches[0]
+    return result
+
+
+def _restoration_operation(state, instruction, unresolved):
+    """Admit only operations needed by this exact straight-line restoration."""
+    from capstone.arm import ARM_OP_REG, ARM_OP_IMM, ARM_OP_MEM
+    names = [private.Checker.regname(instruction, operand.reg) if operand.type == ARM_OP_REG else None for operand in instruction.operands]
+    if instruction.mnemonic == "pop":
+        witnesses = _restoration_pop(state, instruction)
+        require(any(name in unresolved or state.saves[witness]["record"]["register"] in unresolved for name, witness in witnesses.items()),
+                "unrelated POP in restoration corridor", "local-effect")
+        return None
+    if instruction.mnemonic in ("mov", "movs"):
+        require(len(names) == 2 and names[0] in private.NONVOLATILE[:-1] and
+                names[1] in state.registers and names[1] not in state.retired_registers(),
+                "pending alias propagation or unrelated MOV", "local-effect")
+        witness = state.restored_by.get(names[1])
+        record = _restoration_save(state, witness, live=False)
+        require(record["register"] == names[0] and state.equivalent(state.registers[names[1]], record["value"]) and
+                state.bitvector(state.registers[names[1]]) == state.bitvector(record["value"]),
+                "MOV is not the exact saved entry restoration", "local-effect")
+        require(names[0] in unresolved or names[0] in state.touched and (state.restored_by.get(names[0]) != witness or
+                not state.equivalent(state.registers[names[0]], record["value"])),
+                "unnecessary MOV in restoration corridor", "local-effect")
+        return None
+    if instruction.mnemonic == "ldr":
+        require(len(names) == 2 and names[0] in private.REGISTERS[:8] and instruction.operands[1].type == ARM_OP_MEM and
+                private.Checker.regname(instruction, instruction.operands[1].mem.base) == "sp" and not instruction.operands[1].mem.index,
+                "restoration load is not an exact SP saved word", "local-effect")
+        location = state.locate(state.registers["sp"], instruction.operands[1].mem.disp, 4)
+        matches = [witness for witness, saved in state.saves.items() if saved["consumed"] is None and saved["record"]["location"] == location]
+        require(len(matches) == 1, "restoration load lacks exact save witness", "local-effect")
+        record = _restoration_save(state, matches[0])
+        require(record["register"] in unresolved, "unrelated save load in restoration corridor", "local-effect")
+        return matches[0]
+    if instruction.mnemonic == "add" and names[0] == "sp":
+        require(len(names) == 2 and instruction.operands[1].type == ARM_OP_IMM and instruction.operands[1].imm > 0,
+                "dynamic restoration SP adjustment", "local-effect")
+        start, size = state.stack_address(), instruction.operands[1].imm
+        regions = [region for region in state.regions.values() if region["kind"] == "stack-allocation" and region["lifetime"] == "live" and
+                   region["frame"] == state.context["frame"] and start <= state.base(region["id"])[1] < start + size]
+        require(size % 4 == 0 and sum(region["size"] for region in regions) == size and all(
+            any(saved["record"]["location"]["region"] == region["id"] and saved["consumed"] is not None for saved in state.saves.values())
+            for region in regions), "restoration SP adjustment is not consumed-save retirement", "local-effect")
+        return None
+    raise Failure("local-effect", "forbidden instruction in restoration corridor: " + instruction.mnemonic)
+
+
+def _restoration_load(state, instruction, witness):
+    destination = private.Checker.regname(instruction, instruction.operands[0].reg)
+    record = _restoration_save(state, witness)
+    before = state.registers[destination]
+    state.reads, state.writes = [], []
+    state.read(record["location"])
+    state.registers[destination] = record["value"]
+    state.identities[destination] = record["register"]
+    state.restored_by[destination] = witness
+    state.saves[witness]["consumed"] = len(state.events)
+    state.event("save-consume", witness=witness, register=destination)
+    if destination in private.NONVOLATILE:
+        state.touched.add(destination)
+        state.restore_steps[destination].append(len(state.events))
+    following = instruction.address + instruction.size
+    changes = [] if before == record["value"] else [{"register": destination, "before": before, "after": record["value"]}]
+    state.event("instruction", encoding=bytes(instruction.bytes).hex(), registers=changes, reads=state.reads, writes=[], next_pc=following)
+    state.check_live_aliases()
+    return following
+
+
+def _restoration_plan(state, following, program, capture, budget):
+    """Prove from actual decoded operations; the isolated state is discarded."""
+    aliases = state.retired_registers()
+    require(aliases and all(name in private.REGISTERS[:12] for name in aliases), "retired r12/control has no restoration exception", "local-effect")
+    probe = copy.deepcopy(state)
+    probe.pc = following
+    probe._trial_aliases = True
+    require(following in program, "restoration continuation is not owned")
+    first = program[following]
+    low = {name for name in aliases if name in private.REGISTERS[:4]}
+    first_pop = _restoration_pop(probe, first) if low else {}
+    require(low <= set(first_pop), "low retired alias requires immediately next POP overwrite", "local-effect")
+    kinds = {name: "nonvolatile" for name in aliases}
+    for name in low:
+        kinds[name] = "next-pop-shuttle"
+    if first.mnemonic == "pop" and not first_pop:
+        first_pop = _restoration_pop(probe, first)
+    for name in set(aliases) & set(first_pop):
+        if probe.saves[first_pop[name]]["record"]["register"] != name:
+            kinds[name] = "next-pop-shuttle"
+    unresolved, records, operations, corridor = set(aliases), {}, [], []
+    while unresolved:
+        budget.transfer()
+        require(probe.pc in program, "restoration leaves owned instructions")
+        instruction = program[probe.pc]
+        location = {"body": probe.body["id"], "pc": probe.pc}
+        witness = _restoration_operation(probe, instruction, unresolved)
+        operations.append(location)
+        corridor.append({"location": location, "encoding": bytes(instruction.bytes).hex()})
+        next_pc = _restoration_load(probe, instruction, witness) if witness is not None else _helper_transfer(probe, instruction, capture)
+        remaining = probe.retired_registers()
+        require(set(remaining) <= unresolved, "restoration introduced unproved retired alias", "local-effect")
+        for name in sorted(unresolved - set(remaining), key=lambda name: int(name[1:])):
+            restored = probe.restored_by.get(name)
+            record = _restoration_save(probe, restored, live=False)
+            if kinds[name] == "nonvolatile":
+                require(record["register"] == name and probe.equivalent(probe.registers[name], _restoration_original(probe, name)) and
+                        probe.bitvector(probe.registers[name]) == probe.bitvector(_restoration_original(probe, name)),
+                        "nonvolatile overwrite is not original-entry restoration", "local-effect")
+            else:
+                require(len(operations) == 1 and instruction.mnemonic == "pop" and name in first_pop and restored == first_pop[name],
+                        "shuttle overwrite is not the immediately next genuine POP", "local-effect")
+            records[name] = {"kind": kinds[name], "register": name, "retired": aliases[name], "overwrite": location,
+                             "witness": restored, "restored_value": record["value"], "operations": copy.deepcopy(operations)}
+        unresolved &= set(remaining)
+        probe.pc = next_pc
+    return [records[name] for name in sorted(records, key=lambda name: int(name[1:]))], corridor
+
+
+def _restoration_transfer(state, instruction, capture, program, budget):
+    state.guard(instruction)
+    retiring = instruction.mnemonic == "pop" or instruction.mnemonic == "add" and instruction.op_str.startswith("sp,")
+    trial = copy.deepcopy(state) if retiring or state.pending else state
+    trial._trial_aliases = bool(retiring or state.pending)
+    unresolved = {obligation["register"] for obligation in state.pending.values()}
+    witness = _restoration_operation(trial, instruction, unresolved) if unresolved else None
+    following = _restoration_load(trial, instruction, witness) if witness is not None else _helper_transfer(trial, instruction, capture)
+    if unresolved:
+        trial.corridor.pop(0)
+        for identifier, obligation in list(trial.pending.items()):
+            if obligation["overwrite"] == {"body": trial.body["id"], "pc": instruction.address}:
+                require(trial.restored_by.get(obligation["register"]) == obligation["witness"] and
+                        trial.equivalent(trial.registers[obligation["register"]], obligation["restored_value"]) and
+                        trial.bitvector(trial.registers[obligation["register"]]) == trial.bitvector(obligation["restored_value"]),
+                        "actual restoration disagrees with proved saved identity", "local-effect")
+                trial.pending.pop(identifier)
+                trial.event("pending-discharge", obligation=identifier)
+    elif trial.retired_registers():
+        require(retiring and any(region["lifetime"] == "live" and trial.regions[reference]["lifetime"] == "retired"
+                                 for reference, region in state.regions.items()),
+                "pending restoration requires an actual immediate retirement", "local-effect")
+        records, trial.corridor = _restoration_plan(trial, following, program, capture, budget)
+        for record in records:
+            identifier = trial.new_id("o")
+            obligation = {"id": identifier, **record, "opened": len(trial.events)}
+            trial.pending[identifier] = obligation
+            trial.pending_restores[identifier] = obligation
+            trial.event("pending-open", obligation=obligation)
+    trial._trial_aliases = False
+    trial.check_live_aliases()
+    return trial, following
+
+
+@dataclass(frozen=True)
+class RestorationPrefixes:
+    """Incomplete internal P7 continuation only; no P5/public proof export."""
+    encoded: str
+
+    def inspect(self):
+        return private.decode(self.encoded)
+
+
+def execute_restoration_prefixes(capture):
+    """Continue proved retirement corridors, stopping before registration."""
+    try:
+        return _execute_caller_prefixes(capture, qualify_helpers=True, restore=True)
+    except RecursionError as error:
+        raise Failure("unsupported", "restoration representation depth exhausted") from error
+    except (KeyError, TypeError, ValueError, struct.error) as error:
+        raise Failure("identity", "malformed bound restoration capture") from error
+
+
 def execute_caller_prefixes(capture):
     """Explore decoded caller prefixes; every external call remains unqualified.
 
@@ -2873,10 +3167,11 @@ def execute_caller_prefixes(capture):
         raise Failure("identity", "malformed bound caller capture") from error
 
 
-def _execute_caller_prefixes(capture, qualify_helpers=False):
+def _execute_caller_prefixes(capture, qualify_helpers=False, restore=False):
     record, program, calls = _caller_program(capture)
     context = capture.fixed.request.to_dict()["entry"]
-    initial = (_HelperState if qualify_helpers else _CallerState)(context, record["caller"], capture.fixed.rom.data)
+    state_type = _RestorationState if restore else _HelperState if qualify_helpers else _CallerState
+    initial = state_type(context, record["caller"], capture.fixed.rom.data)
     initial.literal_bindings = {item["resolved"]["linked_address"]: item["resolved"]
                                for item in record["relocations"] if item["kind"] == 2}
     initial.function_targets = {item["role"]: item["target"] | 1 for item in record["placement"]["bindings"]
@@ -2897,10 +3192,13 @@ def _execute_caller_prefixes(capture, qualify_helpers=False):
             current_program = program if in_caller else helper_programs[state.body["start"]][1]
             require(state.pc in current_program, "execution leaves owned instruction starts")
             insn = current_program[state.pc]
+            if restore:
+                state.guard(insn)
             if insn.mnemonic == "bl":
                 target = calls[state.pc]["target"] if in_caller else insn.operands[0].imm
                 role = "registration" if state.pc == capture.fixed.request.to_dict()["site"] else "helper"
                 if not qualify_helpers or role == "registration":
+                    require(not restore or not state.pending, "registration has pending restoration", "local-effect")
                     finished.append(state.output("suspended-" + role, target))
                     break
                 if target not in helper_programs:
@@ -2958,7 +3256,9 @@ def _execute_caller_prefixes(capture, qualify_helpers=False):
                         candidate.pc = destination
                         pending.append(candidate)
                 break
-            if qualify_helpers:
+            if restore:
+                state, following = _restoration_transfer(state, insn, capture, current_program, budget)
+            elif qualify_helpers:
                 retiring = insn.mnemonic == "pop" or insn.mnemonic == "add" and insn.op_str.startswith("sp,")
                 trial = copy.deepcopy(state) if retiring else state
                 try:
@@ -3001,9 +3301,11 @@ def _execute_caller_prefixes(capture, qualify_helpers=False):
     require(len(paths) == len(set(paths)), "duplicate completed prefix trace with unmerged states", "unsupported")
     require(finished and any(item["status"] == "returned-prefix" for item in finished) and
             any(item["status"].startswith("suspended-") for item in finished), "incomplete caller prefix exploration", "unsupported")
-    result_type = HelperPrefixes if qualify_helpers else CallerPrefixes
-    return result_type(canonical({"kind": "internal-incomplete-helper-prefixes-v1" if qualify_helpers else "internal-incomplete-caller-prefixes-v1", "complete": False,
+    result_type = RestorationPrefixes if restore else HelperPrefixes if qualify_helpers else CallerPrefixes
+    kind = "internal-incomplete-restoration-prefixes-v1" if restore else "internal-incomplete-helper-prefixes-v1" if qualify_helpers else "internal-incomplete-caller-prefixes-v1"
+    return result_type(canonical({"kind": kind, "complete": False,
                                     "raw_inputs": raw, "prefixes": sorted(finished, key=lambda item: item["path"]),
                                     "states": budget.states, "transfers": budget.transfers,
-                                    "remaining": (["S3 private bridge/projection/retirement", "lossless P5 materialization and complete histories"] if qualify_helpers else
+                                    "remaining": (["P6 private bridge/projection/import", "post-registration caller retirement/return", "lossless P5 materialization and complete histories"] if restore else
+                                                  ["S3 private bridge/projection/retirement", "lossless P5 materialization and complete histories"] if qualify_helpers else
                                                   ["S2b helper qualification", "S3 private bridge/projection/retirement", "complete P5 histories"])}))
