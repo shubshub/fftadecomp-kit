@@ -1,11 +1,11 @@
-"""Internal input/acquisition and fresh-capture foundation for registration.
+"""Inactive registration foundation: acquisition, capture and caller prefixes.
 
-This module cannot execute caller semantics, issue or replay a public report.
-Raw-input records must eventually come from actual decoded caller dataflow;
-validating their shape here does not establish that provenance.
+Internal execution stops before every unqualified external call. It supplies
+neither completed public histories nor a registration proof or public report.
 """
 
 from dataclasses import dataclass
+import copy
 import hashlib
 import os
 from pathlib import Path
@@ -38,8 +38,8 @@ ROM_SHA1 = "4ac05441f4de70a4ec3dd932116346c61b8783d9"
 CAPTURE_TIMEOUT = 60
 PLACEMENT_RULE = "thumb-entry-typed-registration-context-v1"
 REMAINING_OBLIGATIONS = (
-    "S1: independent fresh-capture review before downstream integration",
-    "P4-P5: decoded raw-input provenance, guarded caller/helper execution, histories and coverage",
+    "S2a: independent review of instruction-derived internal caller prefixes",
+    "S2b/P5: full helper qualification, outputs and complete histories/coverage",
     "P6-P7: private bridge, live projection/import, immediate retirement and restoration",
     "P8: complete canonical reports, replay, terminal consumer routing and atomic publication",
 )
@@ -1714,3 +1714,887 @@ def _capture_caller(acquisition, address, workspace):
         acquisition._recheck_metadata()
     acquisition._recheck_metadata()
     return capture
+
+
+# These are refusal limits, never widening or successful partial-proof limits.
+MAX_CALLER_STATES = 4096
+MAX_CALLER_TRANSFERS = 262144
+MAX_CALLER_DEPTH = 16
+_ZERO_DIGEST = "0" * 64
+_BRANCH_CHOICES = (1, 0)
+
+
+class _CallerBudget:
+    def __init__(self):
+        self.states = 0
+        self.transfers = 0
+
+    def state(self):
+        self.states += 1
+        require(self.states <= MAX_CALLER_STATES, "caller state budget exhausted", "unsupported")
+
+    def transfer(self):
+        self.transfers += 1
+        require(self.transfers <= MAX_CALLER_TRANSFERS, "caller transfer budget exhausted", "unsupported")
+
+
+@dataclass(frozen=True)
+class CallerPrefixes:
+    """Internal, incomplete execution only; deliberately not a P5 PathHistory.
+
+    The bit sidecar is required to interpret partially known scalar bytes.
+    These records cannot be imported as a public State or a certificate.
+    """
+    encoded: str
+
+    def inspect(self):
+        return private.decode(self.encoded)
+
+
+def _caller_program(capture):
+    """Reconstruct the already bound original/linked ownership, then close CFG."""
+    require(type(capture) is BoundCapture, "caller execution requires a bound capture")
+    record, artifacts = capture.to_dict(), dict(capture.artifacts)
+    require(set(record) == {"inputs", "caller", "placement", "relocations", "switch"} and
+            record["inputs"] == capture.fixed.to_dict(), "capture fixed inputs differ")
+    labels_required = {"preprocessed", "raw_assembly", "placed_assembly", "original_elf", "original_binary",
+                       "binding_assembly", "binding_elf", "linker_script", "linked_elf", "linked_binary"}
+    require(set(artifacts) == labels_required, "capture stage inventory differs")
+    require(len(artifacts) == len(capture.artifacts), "duplicate capture artifact")
+    for label, data in artifacts.items():
+        require(record["placement"][label] == private.pin(data), "capture artifact pin differs")
+    address = capture.fixed.address
+    original, linked = _elf(artifacts["original_elf"]), _elf(artifacts["linked_elf"])
+    size, suffix = _envelope(original, address, linked=False)
+    require(_envelope(linked, address, linked=True) == (size, suffix), "capture envelope differs")
+    require(artifacts["original_binary"] == original["text"] and artifacts["linked_binary"] == linked["text"],
+            "capture binary differs")
+    labels, partition = _partition(artifacts["placed_assembly"], original, address, size)
+    named, objects = _maps(capture.fixed)
+    relocations, bindings = _original_relocations(original, address, size, labels, partition, named, objects,
+                                                  capture.fixed.request.to_dict()["site"])
+    _source_binding_agreement(artifacts["preprocessed"], bindings)
+    _symbol_ownership(original, address, size, bindings, partition, stage="original")
+    bound_symbols = _symbol_ownership(_elf(artifacts["binding_elf"]), address, size, bindings, partition, stage="binding")
+    linked_symbols = _symbol_ownership(linked, address, size, bindings, partition, stage="linked")
+    for binding in bindings:
+        binding.update(symbol=bound_symbols[binding["name"]], linked_symbol=linked_symbols[binding["name"]])
+    require(artifacts["binding_assembly"] == _binding_assembly(bindings) and
+            artifacts["linker_script"] == _linker_script(address), "capture binding/script bytes differ")
+    require(record["placement"] == {"rule": PLACEMENT_RULE, "section_base": address - address % 4,
+                                    "function_offset": address % 4, "prefix_size": address % 4, "suffix_size": suffix,
+                                    "bindings": bindings, **{label: private.pin(data) for label, data in artifacts.items()}},
+            "capture placement differs")
+    instructions = _linked_records(original, linked, address, relocations, partition)
+    switch = _switch(linked, address, size, relocations, partition, instructions)
+    require(relocations == record["relocations"] and switch == record["switch"], "capture resolution differs")
+    body = linked["text"][address % 4:address % 4 + size]
+    require(body == capture.fixed.rom.data[address - ROM_BASE:address - ROM_BASE + size] and
+            hashlib.sha256(body).hexdigest() == record["caller"]["sha256"], "capture caller bytes differ")
+    expected = {"instruction": "code", "literal": "literals", "alignment": "alignment"}
+    for role, key in expected.items():
+        require(record["caller"][key] == [{"start": address + item["offset"] - address % 4,
+                                           "end": address + item["offset"] - address % 4 + item["size"]}
+                                          for item in partition if item["role"] == role], "capture partition differs")
+    require(record["caller"]["start"] == address and record["caller"]["end"] == address + size,
+            "capture caller extent differs")
+    require(record["caller"]["id"] == f"body/{address:08X}" and record["caller"]["role"] == "caller" and
+            record["caller"]["runtime_start"] is None, "capture caller identity differs")
+    program = {address + offset: instruction for offset, instruction in instructions.items()}
+    calls = {item["resolved"]["linked_address"]: item["resolved"] for item in relocations if item["kind"] == 10}
+    _closed_caller_cfg(program, calls, switch, address)
+    return record, program, calls
+
+
+def _closed_caller_cfg(program, calls, switch, address):
+    from capstone.arm import ARM_OP_IMM, ARM_OP_REG
+    branches = {"beq", "bne", "bhi", "bls", "bhs", "blo"}
+    allowed = {"push", "pop", "mov", "movs", "add", "adds", "sub", "subs", "lsls", "lsrs", "asrs",
+               "ands", "orrs", "cmp", "ldr", "ldrb", "ldrh", "str", "strb", "strh", "b", "bl", "bx", "nop"} | branches
+    edges = {}
+    require(address in program, "caller CFG lacks entry instruction")
+    for pc, insn in program.items():
+        require(pc == insn.address and insn.size in (2, 4), "caller instruction coordinates differ")
+        mnemonic, operands = insn.mnemonic, insn.operands
+        require(mnemonic in allowed, "unsupported caller instruction: " + mnemonic, "unsupported")
+        following = pc + insn.size
+        names = [private.Checker.regname(insn, operand.reg) for operand in operands if operand.type == ARM_OP_REG]
+        if mnemonic == "bl":
+            require(pc in calls and len(operands) == 1 and operands[0].type == ARM_OP_IMM and
+                    calls[pc]["target"] == operands[0].imm, "caller call binding differs")
+            targets = [following]
+        elif mnemonic == "bx" or mnemonic == "pop" and "pc" in names:
+            require(mnemonic == "pop" or len(operands) == 1 and operands[0].type == ARM_OP_REG,
+                    "malformed caller return")
+            targets = []
+        elif mnemonic == "mov" and names and names[0] == "pc":
+            require(pc == address + switch["dispatch_offset"] + 8, "unclassified computed caller transfer")
+            targets = [address + item["target_offset"] for item in switch["targets"]]
+        elif mnemonic == "b" or mnemonic in branches:
+            require(len(operands) == 1 and operands[0].type == ARM_OP_IMM, "malformed caller branch")
+            targets = [operands[0].imm] + ([] if mnemonic == "b" else [following])
+        else:
+            require("pc" not in names[:1], "unsupported caller PC write")
+            targets = [following]
+        require(all(target in program for target in targets), "caller edge targets non-instruction bytes")
+        edges[pc] = tuple(targets)
+    reached, pending = set(), [address]
+    while pending:
+        pc = pending.pop()
+        if pc not in reached:
+            reached.add(pc)
+            pending.extend(edges[pc])
+    require(reached == set(program), "caller CFG omits owned instructions")
+    return edges
+
+
+class _CallerState:
+    """Private-shaped provenance records plus exact internal scalar bit facts."""
+
+    base = private.Checker.base
+    interval = private.Checker.interval
+    overlap = private.Checker.overlap
+    key = private.Checker.key
+    equivalent = private.Checker.equivalent
+
+    def __init__(self, context, body, rom=b""):
+        view = _Entry(context)
+        require(len(view.frames) <= MAX_CALLER_DEPTH, "caller frame depth exhausted", "unsupported")
+        self.context = copy.deepcopy(context)
+        self.values, self.regions, self.frames = copy.deepcopy((view.values, view.regions, view.frames))
+        self.memory = copy.deepcopy(view.memory)
+        self.memory_bits = {}
+        self.registers = dict(context["registers"], sp=context["sp"], lr=context["lr"])
+        self.body = body
+        self.pc = body["start"]
+        self.events, self.decisions, self.edges = [], [], []
+        self.bits, self.domains, self.counters = {}, {}, {}
+        self.flags = None
+        self.switch_choice = None
+        self.comparisons = []
+        self.conditionals = []
+        self.saves = {}
+        self.touched = set()
+        self.restore_steps = {register: [] for register in private.NONVOLATILE}
+        self.restored_by = {}
+        self.literal_bindings = {}
+        self.literal_values = {}
+        self.function_targets = {}
+        for frame in self.frames.values():
+            for save in frame["saves"]:
+                self.saves[save["witness"]] = {"record": save, "created": None, "consumed": None}
+        self.stack_region = self.values[context["sp"]]["region"]
+        require(self.regions[self.stack_region]["kind"] == "stack-domain", "caller SP requires backing domain", "unsupported")
+        self.stack_anchor, self.stack_base = self.base(self.stack_region)
+        self.rom = rom
+        if rom:
+            for region in self.regions.values():
+                anchor, start = self.base(region["id"])
+                if anchor == "concrete" and max(start, ROM_BASE) < min(start + region["size"], ROM_BASE + len(rom)):
+                    require(region["kind"] == "rom" and region["permission"] == "r" and
+                            ROM_BASE <= start < start + region["size"] <= ROM_BASE + len(rom),
+                            "entry storage contradicts bound ROM ownership", "contradictory-condition")
+            for key, part in self.memory.items():
+                if key[0] == "concrete" and ROM_BASE <= key[1] < ROM_BASE + len(rom):
+                    require(part == {"tag": "constant", "value": rom[key[1] - ROM_BASE]},
+                            "entry cell contradicts bound ROM bytes", "contradictory-condition")
+        identifier = self.new_id("r")
+        self.regions[identifier] = {"id": identifier, "base": {"tag": "concrete", "address": body["start"]},
+                                    "size": body["end"] - body["start"], "permission": "r", "kind": "rom",
+                                    "lifetime": "live", "frame": None}
+
+    def new_id(self, kind):
+        ordinal = self.counters.get(kind, 0)
+        require(ordinal < 1000000, "caller identity ordinal exhausted", "unsupported")
+        self.counters[kind] = ordinal + 1
+        return f"pub/{kind}/{_ZERO_DIGEST}/{ordinal:06d}"
+
+    def event(self, tag, **members):
+        self.events.append({"tag": tag, "step": len(self.events),
+                            "location": {"body": self.body["id"], "pc": self.pc}, **members})
+
+    def make(self, tag, **members):
+        identifier = self.new_id("v")
+        self.values[identifier] = {"id": identifier, "tag": tag, **members}
+        return identifier
+
+    def constant(self, number):
+        require(0 <= number <= 0xffffffff, "wrapping scalar arithmetic", "unsupported")
+        return self.make("constant", width=4, value=number)
+
+    def pointer(self, region, offset):
+        require(0 <= offset <= self.regions[region]["size"], "caller pointer outside storage", "local-effect")
+        return self.make("pointer", region=region, offset=offset)
+
+    def fragments(self, reference, active=()):
+        require(reference not in active and len(active) < MAX_CALLER_DEPTH, "caller provenance depth exhausted", "unsupported")
+        value = self.values[reference]
+        if value["tag"] in ("pointer", "function", "control"):
+            return {reference}
+        if value["tag"] == "constant" and any(region["kind"] == "stack-allocation" and
+                self.base(region["id"])[0] == "concrete" and self.base(region["id"])[1] <= value["value"] <=
+                self.base(region["id"])[1] + region["size"] for region in self.regions.values()):
+            return {reference}
+        if value["tag"] == "bytes":
+            return set().union(*(self.fragments(part["value"], (*active, reference))
+                                 for part in value["bytes"] if part["tag"] == "fragment"))
+        return set()
+
+    def aliases(self, reference):
+        result = set()
+        for fragment in self.fragments(reference):
+            value = self.values[fragment]
+            if value["tag"] == "pointer":
+                anchor, address = self.key(value["region"], value["offset"])
+            elif value["tag"] == "constant":
+                anchor, address = "concrete", value["value"]
+            else:
+                continue
+            result.update(region["id"] for region in self.regions.values() if region["kind"] == "stack-allocation" and
+                          self.base(region["id"])[0] == anchor and self.base(region["id"])[1] <= address <=
+                          self.base(region["id"])[1] + region["size"])
+        return result
+
+    def borrowed(self, reference, displacement=0):
+        value = self.values[reference]
+        if value["tag"] == "pointer" and self.regions[value["region"]]["kind"] == "stack-domain":
+            location = self.locate(reference, displacement, 1)
+            return self.pointer(location["region"], location["offset"])
+        return reference
+
+    def check_live_aliases(self):
+        retired = {region["id"] for region in self.regions.values() if region["lifetime"] == "retired"}
+        for name, reference in self.registers.items():
+            require(name == "sp" or not self.aliases(reference) & retired,
+                    "retired caller alias requires S3 restoration proof", "local-effect")
+        for key, part in self.memory.items():
+            if part["tag"] == "fragment" and self.aliases(part["value"]) & retired:
+                require(not any(region["lifetime"] == "live" and region["kind"] != "stack-domain" and
+                                self.base(region["id"])[0] == key[0] and self.base(region["id"])[1] <= key[1] < self.base(region["id"])[1] + region["size"]
+                                for region in self.regions.values()), "live caller storage retains retired fragment", "local-effect")
+
+    def bitvector(self, reference, active=()):
+        require(reference not in active and len(active) < MAX_CALLER_DEPTH, "caller bit provenance depth exhausted", "unsupported")
+        if reference not in self.bits:
+            value = self.values[reference]
+            if value["tag"] == "constant":
+                bits = tuple((value["value"] >> index) & 1 for index in range(private.width(value) * 8))
+            elif value["tag"] == "bytes":
+                bits = []
+                for part in value["bytes"]:
+                    if part["tag"] == "constant":
+                        bits.extend((part["value"] >> index) & 1 for index in range(8))
+                    elif part["tag"] == "fragment":
+                        bits.extend(self.bitvector(part["value"], (*active, reference))[part["index"] * 8:part["index"] * 8 + 8])
+                    else:
+                        bits.extend(("byte", canonical(part["origin"]), index) for index in range(8))
+                bits = tuple(bits)
+            else:
+                bits = tuple(("value", reference, index) for index in range(private.width(value) * 8))
+            self.bits[reference] = bits
+        return self.bits[reference]
+
+    def root(self, reference):
+        bits = self.bitvector(reference)
+        for name, root in self.context["registers"].items():
+            raw = self.bitvector(root)
+            if bits == raw:
+                return ("u32", root, name)
+            if bits == raw[:8] + (0,) * 24:
+                return ("low8", root, name)
+        return None
+
+    def number(self, reference):
+        value = self.values[reference]
+        if value["tag"] == "pointer":
+            anchor, start = self.base(value["region"])
+            return start + value["offset"] if anchor == "concrete" else None
+        if value["tag"] == "control":
+            return value["target"]
+        if value["tag"] == "function":
+            return self.function_targets.get(value["body"])
+        bits = self.bitvector(reference)
+        concrete = []
+        for bit in bits:
+            if type(bit) is int:
+                concrete.append(bit)
+            elif bit[0] == "value":
+                domain = self.domains.get(("u32", bit[1])) or (self.domains.get(("low8", bit[1])) if bit[2] < 8 else None)
+                if domain is None or len(domain) != 1 or domain[0][0] != domain[0][1]:
+                    return None
+                concrete.append((domain[0][0] >> bit[2]) & 1)
+            else:
+                return None
+        return sum(bit << index for index, bit in enumerate(concrete))
+
+    def transformed(self, bits, sources):
+        """Keep origin bytes as an overapproximation; exact bits stay mandatory.
+
+        No known pointer/control/function fragments may enter this operation.
+        A partial scalar byte keeps its prior origin, never a fabricated zero.
+        """
+        require(all(not self.fragments(source) for source in sources), "arithmetic would erase pointer fragments", "local-effect")
+        parts = []
+        for index in range(4):
+            byte = bits[index * 8:index * 8 + 8]
+            if all(type(bit) is int for bit in byte):
+                parts.append({"tag": "constant", "value": sum(bit << offset for offset, bit in enumerate(byte))})
+                continue
+            atoms = [bit for bit in byte if type(bit) is not int]
+            origins = set((bit[0], bit[1]) for bit in atoms)
+            require(len(origins) == 1, "mixed scalar byte origins unsupported", "unsupported")
+            tag, origin = next(iter(origins))
+            if tag == "value":
+                original = self.values[origin]
+                require(original["tag"] == "symbolic", "unsupported scalar bit origin", "unsupported")
+                parts.append({"tag": "unknown", "origin": original["origin"]})
+            else:
+                parts.append({"tag": "unknown", "origin": private.decode(origin)})
+        result = self.make("bytes", width=4, bytes=parts)
+        self.bits[result] = tuple(bits)
+        return result
+
+    def assemble(self, parts, bits, extend=False):
+        size = len(parts)
+        if all(part["tag"] == "fragment" and part["value"] == parts[0]["value"] and part["index"] == index
+               for index, part in enumerate(parts)):
+            ref = parts[0]["value"]
+            if private.width(self.values[ref]) == size and (not extend or size == 4):
+                require(self.bitvector(ref) == tuple(bits), "saved fragment bit identity differs", "local-effect")
+                return ref
+        if extend:
+            parts = parts + [{"tag": "constant", "value": 0}] * (4 - size)
+            bits = tuple(bits) + (0,) * ((4 - size) * 8)
+        ref = self.make("bytes", width=4 if extend else size, bytes=parts)
+        self.bits[ref] = tuple(bits)
+        return ref
+
+    def loaded(self, location, parts, bits):
+        return self.assemble(parts, bits, extend=location["size"] != 4)
+
+    def literal_value(self, address):
+        if address not in self.literal_values:
+            binding = self.literal_bindings[address]
+            if binding["tag"] == "function":
+                require(binding["role"] == "callback", "unsupported typed function literal", "unsupported")
+                reference = self.make("function", body="callback")
+            else:
+                storage = self.locate(self.constant(binding["target"]), 0, 1)
+                reference = self.pointer(storage["region"], storage["offset"])
+            self.literal_values[address] = reference
+        return self.literal_values[address]
+
+    def locate(self, reference, displacement, size):
+        value = self.values[reference]
+        stack_domain = False
+        if value["tag"] == "pointer":
+            region = self.regions[value["region"]]
+            require(region["lifetime"] == "live", "caller uses retired pointer", "local-effect")
+            offset = value["offset"] + displacement
+            require(0 <= offset and offset + size <= region["size"],
+                    "caller access lacks declared live storage within originating region", "local-effect")
+            anchor, start = self.key(value["region"], value["offset"])
+            require((start + displacement) % size == 0, "unaligned caller memory access", "local-effect")
+            # Physical aliases never expand a typed pointer's authority. Only
+            # the stack backing domain needs resolution to an actual allocation.
+            if region["kind"] != "stack-domain":
+                return private.slc(region["id"], offset, size)
+            stack_domain = True
+        else:
+            require(not self.fragments(reference), "fragment used as memory address", "local-effect")
+            anchor, start = "concrete", self.number(reference)
+            require(start is not None, "unclassified caller memory address", "unsupported")
+        start += displacement
+        require(start % size == 0, "unaligned caller memory access", "local-effect")
+        matches = []
+        for region in self.regions.values():
+            key, base = self.base(region["id"])
+            owned = region["kind"] == "stack-allocation" if stack_domain else region["kind"] != "stack-domain"
+            if owned and region["lifetime"] == "live" and key == anchor and base <= start and start + size <= base + region["size"]:
+                matches.append(region)
+        require(matches, "caller access lacks declared live storage", "local-effect")
+        require(not stack_domain or len(matches) == 1, "caller stack access lacks unique live allocation", "local-effect")
+        region = min(matches, key=lambda item: (item["size"], item["kind"] != "stack-allocation", item["kind"] != "external", item["id"]))
+        return private.slc(region["id"], start - self.base(region["id"])[1], size)
+
+    def read(self, location):
+        parts, bits = [], []
+        region = self.regions[location["region"]]
+        require(region["lifetime"] == "live" and region["permission"] in ("r", "rw", "rx"), "caller read permission/lifetime", "local-effect")
+        for index in range(location["size"]):
+            key = self.key(location["region"], location["offset"] + index)
+            if region["kind"] == "rom" and key[0] == "concrete" and (key[1] & ~3) in self.literal_bindings:
+                word = key[1] & ~3
+                self.memory[key] = {"tag": "fragment", "value": self.literal_value(word), "index": key[1] - word}
+            elif key not in self.memory:
+                if region["kind"] == "rom":
+                    require(key[0] == "concrete" and ROM_BASE <= key[1] < ROM_BASE + len(self.rom), "caller ROM read outside bound image")
+                    self.memory[key] = {"tag": "constant", "value": self.rom[key[1] - ROM_BASE]}
+                else:
+                    self.memory[key] = {"tag": "unknown", "origin": {"tag": "memory", "region": location["region"], "offset": location["offset"] + index}}
+            part = self.memory[key]
+            parts.append(part)
+            bits.extend(self.memory_bits.get(key, self.part_bits(part)))
+        self.reads.append({"location": location, "bytes": parts})
+        return parts, tuple(bits)
+
+    def part_bits(self, part):
+        if part["tag"] == "constant":
+            return tuple((part["value"] >> index) & 1 for index in range(8))
+        if part["tag"] == "fragment":
+            return self.bitvector(part["value"])[part["index"] * 8:part["index"] * 8 + 8]
+        return tuple(("byte", canonical(part["origin"]), index) for index in range(8))
+
+    def write(self, location, reference, *, save=False):
+        require(self.regions[location["region"]]["permission"] == "rw", "caller write permission", "local-effect")
+        parts = private.value_bytes(self.values[reference])[:location["size"]]
+        bits = self.bitvector(reference)
+        require(len(parts) == location["size"], "caller store width differs")
+        for index, part in enumerate(parts):
+            key = self.key(location["region"], location["offset"] + index)
+            require(save or not any(item["consumed"] is None and self.overlap(location, item["record"]["location"])
+                                    for item in self.saves.values()), "caller write corrupts save witness", "local-effect")
+            self.memory[key] = copy.deepcopy(part)
+            self.memory_bits[key] = bits[index * 8:index * 8 + 8]
+        self.writes.append({"location": location, "bytes": parts})
+
+    def stack_address(self):
+        value = self.values[self.registers["sp"]]
+        require(value["tag"] == "pointer", "caller SP lost identity", "local-effect")
+        anchor, address = self.key(value["region"], value["offset"])
+        require(anchor == self.stack_anchor and address % 4 == 0, "caller SP backing/alignment changed", "local-effect")
+        return address
+
+    def allocate(self, size):
+        previous = self.stack_address()
+        address = previous - size
+        domain = self.regions[self.stack_region]
+        require(size > 0 and size % 4 == 0 and self.stack_base <= address < previous <= self.stack_base + domain["size"],
+                "caller stack allocation exceeds backing", "local-effect")
+        identifier = self.new_id("r")
+        region = {"id": identifier, "base": {"tag": "relative", "region": self.stack_region, "offset": address - self.stack_base},
+                  "size": size, "permission": "rw", "kind": "stack-allocation", "lifetime": "live", "frame": self.context["frame"]}
+        self.regions[identifier] = region
+        location = private.slc(identifier, 0, size)
+        require(not any(other["id"] != identifier and other["kind"] == "stack-allocation" and other["lifetime"] == "live" and
+                        self.overlap(location, private.slc(other["id"], 0, other["size"])) for other in self.regions.values()),
+                "caller stack/save allocation overlap", "local-effect")
+        self.frames[self.context["frame"]]["allocations"].append(identifier)
+        self.registers["sp"] = self.pointer(self.stack_region, address - self.stack_base)
+        self.event("allocate-stack", region=identifier)
+        return identifier
+
+    def retire(self, size):
+        start = self.stack_address()
+        end = start + size
+        regions = [region for region in self.regions.values() if region["kind"] == "stack-allocation" and
+                   region["lifetime"] == "live" and region["frame"] == self.context["frame"] and
+                   start <= self.base(region["id"])[1] < end]
+        require(size > 0 and size % 4 == 0 and sum(region["size"] for region in regions) == size and
+                all(self.base(region["id"])[1] + region["size"] <= end for region in regions), "partial or unbalanced caller retirement", "local-effect")
+        for region in regions:
+            require(not any(save["consumed"] is None and save["record"]["location"]["region"] == region["id"] for save in self.saves.values()),
+                    "caller retirement leaves live save", "local-effect")
+            region["lifetime"] = "retired"
+            self.event("retire-stack", region=region["id"])
+        self.registers["sp"] = self.pointer(self.stack_region, end - self.stack_base)
+        # S3 restoration corridors are unavailable: refuse, never tolerate an alias.
+        self.check_live_aliases()
+
+    def domain(self, root):
+        return self.domains.get(root[:2], ((0, 255 if root[0] == "low8" else 0xffffffff),))
+
+    def refine(self, root, predicate, number, taken):
+        require(not any(reference == root[1] and kind != root[0] for kind, reference in self.domains),
+                "mixed full-word/low-byte refinements unsupported", "unsupported")
+        maximum = 255 if root[0] == "low8" else 0xffffffff
+        ranges = {"beq": [(number, number)], "bne": [(0, number - 1), (number + 1, maximum)],
+                  "bhi": [(number + 1, maximum)], "bls": [(0, number)],
+                  "bhs": [(number, maximum)], "blo": [(0, number - 1)]}[predicate]
+        if not taken:
+            complement, cursor = [], 0
+            for low, high in ranges:
+                low, high = max(0, low), min(maximum, high)
+                if low <= high:
+                    if cursor < low:
+                        complement.append((cursor, low - 1))
+                    cursor = high + 1
+            if cursor <= maximum:
+                complement.append((cursor, maximum))
+            ranges = complement
+        result = tuple((max(low, lower), min(high, upper)) for low, high in self.domain(root)
+                       for lower, upper in ranges if max(low, lower) <= min(high, upper))
+        if result:
+            self.domains[root[:2]] = result
+        return bool(result)
+
+    def decision(self, kind, choice, target):
+        self.decisions.append({"location": {"body": self.body["id"], "pc": self.pc}, "kind": kind,
+                               "choice": choice, "target": {"body": self.body["id"], "pc": target}})
+
+    def output(self, status, target=None):
+        digest = hashlib.sha256(b"conditional-registration-path-v1\0" + canonical(self.decisions).encode()).hexdigest()
+        # Only generated reserved IDs change; entry IDs/anchors cannot use pub/.
+        replacements = {identifier: identifier.replace(_ZERO_DIGEST, digest) for registry in
+                        (self.values, self.regions, self.saves) for identifier in registry if identifier.startswith("pub/")}
+
+        def rename(value):
+            if type(value) is dict:
+                return {key: rename(child) for key, child in value.items()}
+            if type(value) in (list, tuple):
+                return [rename(child) for child in value]
+            return replacements.get(value, value) if type(value) is str else value
+
+        cells = []
+        for key, part in self.memory.items():
+            matches = [region for region in self.regions.values() if region["kind"] != "stack-domain" and region["lifetime"] == "live" and
+                       self.base(region["id"])[0] == key[0] and self.base(region["id"])[1] <= key[1] < self.base(region["id"])[1] + region["size"]]
+            if matches:
+                region = min(matches, key=lambda item: (item["size"], item["kind"] != "stack-allocation", item["kind"] != "external", item["id"]))
+                cells.append({"location": private.slc(region["id"], key[1] - self.base(region["id"])[1], 1), "bytes": [part]})
+        cells.sort(key=lambda item: (item["location"]["region"], item["location"]["offset"]))
+        output = rename({"path": "path/" + digest, "decisions": self.decisions, "status": status,
+                       "site": {"body": self.body["id"], "pc": self.pc}, "target": target,
+                       "registers": {name: self.registers[name] for name in private.REGISTERS}, "sp": self.registers["sp"], "lr": self.registers["lr"],
+                       "values": sorted(self.values.values(), key=lambda item: item["id"]),
+                       "regions": sorted(self.regions.values(), key=lambda item: item["id"]),
+                       "frames": sorted(self.frames.values(), key=lambda item: item["id"]),
+                       "saves": sorted(self.saves.values(), key=lambda item: item["record"]["witness"]),
+                       "touched": sorted(self.touched), "restore_witnesses": self.restored_by,
+                       "function_targets": self.function_targets,
+                       "register_change_steps": self.restore_steps,
+                       "cells": cells, "cell_bits": [{"location": cell["location"], "bits": self.memory_bits.get(
+                           self.key(cell["location"]["region"], cell["location"]["offset"]), self.part_bits(cell["bytes"][0]))} for cell in cells],
+                       "events": self.events, "edges": self.edges,
+                       "bits": [{"value": ref, "bits": self.bitvector(ref)} for ref in sorted(self.values)],
+                       "domains": [{"kind": kind, "value": ref, "ranges": ranges} for (kind, ref), ranges in sorted(self.domains.items())]})
+        # Encoded origins occur only in typed bit facts, never ordinary ID lists.
+        for sidecar in ("bits", "cell_bits"):
+            for fact in output[sidecar]:
+                for bit in fact["bits"]:
+                    if type(bit) is list and bit[0] == "byte":
+                        bit[1] = canonical(rename(private.decode(bit[1])))
+        return output
+
+
+def _caller_transfer(state, insn, capture):
+    """One actual instruction. Branches and unqualified calls are handled outside."""
+    from capstone.arm import ARM_OP_REG, ARM_OP_IMM, ARM_OP_MEM
+    operands, mnemonic = insn.operands, insn.mnemonic
+    names = [private.Checker.regname(insn, operand.reg) if operand.type == ARM_OP_REG else None for operand in operands]
+    before = dict(state.registers)
+    before_witnesses = dict(state.restored_by)
+    state.reads, state.writes = [], []
+    following = insn.address + insn.size
+
+    def source(operand):
+        if operand.type == ARM_OP_REG:
+            name = private.Checker.regname(insn, operand.reg)
+            require(name in state.registers, "unsupported caller source register", "unsupported")
+            return state.registers[name]
+        require(operand.type == ARM_OP_IMM, "unsupported caller operand", "unsupported")
+        return state.constant(operand.imm)
+
+    def assign(name, reference):
+        require(name in state.registers, "unsupported caller destination register", "unsupported")
+        state.registers[name] = reference
+        state.restored_by.pop(name, None)
+
+    if mnemonic in ("mov", "movs"):
+        require(len(operands) == 2 and names[0] is not None, "malformed caller MOV")
+        if names[0] == "pc":
+            following = state.number(source(operands[1]))
+            require(following is not None, "unresolved caller dispatch", "unsupported")
+        else:
+            reference = source(operands[1])
+            assign(names[0], state.borrowed(reference) if names[0] != "sp" else reference)
+            if names[1] in before_witnesses:
+                state.restored_by[names[0]] = before_witnesses[names[1]]
+    elif mnemonic in ("adds", "add", "subs", "sub"):
+        require(len(operands) in (2, 3) and names[0] is not None, "malformed caller ADD/SUB")
+        first = state.registers[names[0]] if len(operands) == 2 else source(operands[1])
+        second = source(operands[-1])
+        amount = state.number(second)
+        require(amount is not None, "caller arithmetic has unknown displacement", "unsupported")
+        if mnemonic.startswith("sub"):
+            amount = -amount
+        if state.values[second]["tag"] == "pointer":
+            require(mnemonic.startswith("add") and names[0] != "sp" and not state.fragments(first),
+                    "unsupported pointer arithmetic operands", "local-effect")
+            displacement = state.number(first)
+            require(displacement is not None, "unknown pointer index", "unsupported")
+            pointer = state.values[second]
+            assign(names[0], state.pointer(pointer["region"], pointer["offset"] + displacement))
+        elif state.fragments(second):
+            raise Failure("local-effect", "caller arithmetic would erase pointer fragments")
+        elif names[0] == "sp":
+            require(first == state.registers["sp"] and amount % 4 == 0 and amount != 0, "unsupported caller SP adjustment", "unsupported")
+            if amount < 0:
+                state.allocate(-amount)
+            else:
+                state.retire(amount)
+        elif amount == 0:
+            assign(names[0], state.borrowed(first))
+            original_name = names[0] if len(operands) == 2 else names[1]
+            if original_name in before_witnesses:
+                state.restored_by[names[0]] = before_witnesses[original_name]
+        elif state.values[first]["tag"] == "pointer":
+            value = state.values[first]
+            offset = value["offset"] + amount
+            if state.regions[value["region"]]["kind"] == "stack-domain":
+                location = state.locate(first, amount, 1)
+                assign(names[0], state.pointer(location["region"], location["offset"]))
+            else:
+                assign(names[0], state.pointer(value["region"], offset))
+        else:
+            require(not state.fragments(first), "caller arithmetic would erase pointer fragments", "local-effect")
+            number = state.number(first)
+            require(number is not None, "unsupported unknown scalar addition", "unsupported")
+            assign(names[0], state.constant(number + amount))
+    elif mnemonic in ("ands", "orrs", "lsls", "lsrs", "asrs"):
+        require(names[0] is not None and len(operands) in (2, 3), "malformed caller bit operation")
+        first = state.registers[names[0]] if len(operands) == 2 else source(operands[1])
+        second = source(operands[-1])
+        require(not state.fragments(first) and not state.fragments(second), "arithmetic would erase pointer fragments", "local-effect")
+        left = state.bitvector(first)
+        if mnemonic in ("ands", "orrs"):
+            right = state.bitvector(second)
+            bits = []
+            for a, b in zip(left, right):
+                if mnemonic == "ands":
+                    bit = 0 if a == 0 or b == 0 else b if a == 1 else a if b == 1 or a == b else None
+                else:
+                    bit = 1 if a == 1 or b == 1 else b if a == 0 else a if b == 0 or a == b else None
+                require(bit is not None, "mixed unknown bit operation unsupported", "unsupported")
+                bits.append(bit)
+        else:
+            shift = state.number(second)
+            require(shift is not None and 0 <= shift <= 32, "unsupported caller shift", "unsupported")
+            if mnemonic == "lsls":
+                bits = ((0,) * shift + left)[:32]
+            else:
+                fill = left[-1] if mnemonic == "asrs" else 0
+                bits = left[shift:] + (fill,) * shift
+        assign(names[0], state.transformed(tuple(bits), (first, second)))
+    elif mnemonic == "cmp":
+        require(len(operands) == 2, "malformed caller CMP")
+        left, right = source(operands[0]), source(operands[1])
+        require(not state.fragments(left) and not state.fragments(right), "comparison of pointer fragments unsupported", "unsupported")
+        state.flags = (left, right)
+        root, number = state.root(left), state.number(right)
+        if root is not None and number is not None:
+            state.comparisons.append((state.pc, root, number))
+    elif mnemonic in ("ldr", "ldrb", "ldrh", "str", "strb", "strh"):
+        require(len(operands) == 2 and names[0] is not None and operands[1].type == ARM_OP_MEM,
+                "malformed caller memory instruction")
+        operand = operands[1].mem
+        require(not operand.index, "indexed caller memory access unsupported", "unsupported")
+        base = private.Checker.regname(insn, operand.base)
+        size = 1 if mnemonic.endswith("b") else 2 if mnemonic.endswith("h") else 4
+        if base == "pc":
+            require(mnemonic == "ldr", "nonword caller literal access")
+            address = ((insn.address + 4) & ~3) + operand.disp
+            require(any(span["start"] <= address and address + 4 <= span["end"] for span in state.body["literals"]),
+                    "caller literal is not owned")
+            location = state.locate(state.constant(address), 0, 4)
+            parts, bits = state.read(location)
+            assign(names[0], state.loaded(location, parts, bits))
+        else:
+            require(base in state.registers, "unsupported caller memory base", "unsupported")
+            location = state.locate(state.registers[base], operand.disp, size)
+            if mnemonic.startswith("ldr"):
+                parts, bits = state.read(location)
+                assign(names[0], state.loaded(location, parts, bits))
+            else:
+                # No helper/registration retention assumptions are available.
+                require(state.regions[location["region"]]["kind"] == "stack-allocation" or
+                        not state.fragments(state.registers[names[0]]), "external caller retention of pointer fragment", "local-effect")
+                state.write(location, state.registers[names[0]])
+    elif mnemonic == "push":
+        require(names and all(name in (*private.REGISTERS[:8], "lr") for name in names), "malformed caller PUSH")
+        require(names == sorted(set(names), key=lambda name: 14 if name == "lr" else int(name[1:])), "unordered caller PUSH")
+        # Separate words permit exact subsequent partial POP retirement.
+        allocated = [state.allocate(4) for _ in names]
+        start = state.stack_address()
+        for index, name in enumerate(names):
+            region = allocated[-1 - index]
+            require(state.base(region)[1] == start + index * 4, "caller PUSH allocation order differs")
+            reference = before[name]
+            state.write(private.slc(region, 0, 4), reference, save=True)
+            originals = [register for register in (*private.NONVOLATILE[:-1], "lr")
+                         if state.equivalent(reference, state.context["lr"] if register == "lr" else state.context["registers"][register])]
+            require(len(originals) == 1, "caller PUSH lacks unique original save value", "unsupported")
+            witness = state.new_id("s")
+            save = {"witness": witness, "register": originals[0], "location": private.slc(region, 0, 4), "value": reference}
+            state.saves[witness] = {"record": save, "created": len(state.events), "consumed": None}
+            state.frames[state.context["frame"]]["saves"].append(save)
+            state.event("save-create", witness=witness)
+    elif mnemonic == "pop":
+        require(names and all(name in private.REGISTERS[:8] for name in names), "unsupported caller POP destination", "unsupported")
+        require(names == sorted(set(names), key=lambda name: int(name[1:])), "unordered caller POP")
+        for index, name in enumerate(names):
+            location = state.locate(before["sp"], index * 4, 4)
+            matches = [(witness, save) for witness, save in state.saves.items() if save["consumed"] is None and
+                       state.interval(save["record"]["location"]) == state.interval(location) and
+                       save["record"]["location"]["region"] == location["region"]]
+            require(len(matches) == 1, "caller POP lacks exact live save witness", "local-effect")
+            witness, save = matches[0]
+            parts, bits = state.read(location)
+            reference = state.assemble(parts, bits)
+            require(state.equivalent(reference, save["record"]["value"]) and
+                    parts == private.value_bytes(state.values[save["record"]["value"]]), "caller POP save bytes disagree", "local-effect")
+            assign(name, reference)
+            save["consumed"] = len(state.events)
+            state.event("save-consume", witness=witness, register=name)
+            state.restored_by[name] = witness
+        state.retire(len(names) * 4)
+    elif mnemonic == "b":
+        following = operands[0].imm
+    elif mnemonic == "bx":
+        require(len(names) == 1 and names[0] in state.registers, "malformed caller BX")
+        target = state.registers[names[0]]
+        require(target == state.context["lr"], "caller return control identity differs", "local-effect")
+        for name in private.NONVOLATILE:
+            original = state.context["sp"] if name == "sp" else state.context["registers"][name]
+            require(state.equivalent(state.registers[name], original), "caller return nonvolatile identity differs: " + name, "local-effect")
+            if name != "sp" and name in state.touched:
+                witness = state.restored_by.get(name)
+                require(witness in state.saves and state.saves[witness]["record"]["register"] == name and
+                        state.equivalent(state.saves[witness]["record"]["value"], original) and state.saves[witness]["consumed"] is not None,
+                        "touched caller register lacks actual save restoration: " + name, "local-effect")
+        require(not any(region["kind"] == "stack-allocation" and region["frame"] == state.context["frame"] and
+                        region["lifetime"] == "live" for region in state.regions.values()), "caller return retains local storage", "local-effect")
+        address = state.number(target)
+        require(address is not None and address & 1, "caller return address is undeclared", "unsupported")
+        following = address & ~1
+    else:
+        require(mnemonic == "nop", "unsupported caller transfer", "unsupported")
+    # CMP flags are valid only across instructions that do not alter them.
+    if mnemonic in ("adds", "subs", "movs", "ands", "orrs", "lsls", "lsrs", "asrs"):
+        state.flags = None
+    state.check_live_aliases()
+    changes = []
+    for name in (*private.REGISTERS, "sp", "lr"):
+        if before[name] != state.registers[name]:
+            changes.append({"register": name, "before": before[name], "after": state.registers[name]})
+            if name in private.NONVOLATILE:
+                state.touched.add(name)
+                state.restore_steps[name].append(len(state.events))
+    state.event("instruction", encoding=bytes(insn.bytes).hex(), registers=changes,
+                reads=state.reads, writes=state.writes, next_pc=following)
+    return following
+
+
+def execute_caller_prefixes(capture):
+    """Explore decoded caller prefixes; every external call remains unqualified.
+
+    No caller-selected paths, role overrides, effects, budgets or summaries are
+    accepted. A returned object is explicitly incomplete and ineligible.
+    """
+    try:
+        return _execute_caller_prefixes(capture)
+    except RecursionError as error:
+        raise Failure("unsupported", "caller representation depth exhausted") from error
+    except (KeyError, TypeError, ValueError, struct.error) as error:
+        raise Failure("identity", "malformed bound caller capture") from error
+
+
+def _execute_caller_prefixes(capture):
+    record, program, calls = _caller_program(capture)
+    context = capture.fixed.request.to_dict()["entry"]
+    initial = _CallerState(context, record["caller"], capture.fixed.rom.data)
+    initial.literal_bindings = {item["resolved"]["linked_address"]: item["resolved"]
+                               for item in record["relocations"] if item["kind"] == 2}
+    initial.function_targets = {item["role"]: item["target"] | 1 for item in record["placement"]["bindings"]
+                                if item["role"] == "callback"}
+    budget = _CallerBudget()
+    budget.state()
+    pending, finished = [initial], []
+    selector_roots, count_roots, excluded_seven = set(), set(), set()
+    comparison_pc = capture.fixed.address + record["switch"]["comparison_offset"]
+    dispatch_pc = capture.fixed.address + record["switch"]["dispatch_offset"]
+    branches = {"beq", "bne", "bhi", "bls", "bhs", "blo"}
+    while pending:
+        state = pending.pop()
+        while True:
+            budget.transfer()
+            require(state.pc in program, "caller execution leaves owned instruction starts")
+            insn = program[state.pc]
+            if state.pc in calls:
+                role = "registration" if state.pc == capture.fixed.request.to_dict()["site"] else "helper"
+                finished.append(state.output("suspended-" + role, calls[state.pc]["target"]))
+                break
+            if state.pc == comparison_pc:
+                register = private.Checker.regname(insn, insn.operands[0].reg)
+                root = state.root(state.registers[register])
+                require(root is not None and root[0] == "low8", "switch selector lacks decoded low-byte raw provenance", "unsupported")
+                selector_roots.add(root)
+                candidates = {item_root for item_root, number in state.conditionals if number == 0 and item_root != root and item_root[0] == "low8"}
+                count_roots.update(candidates)
+                excluded_seven.update(item_root for item_root, number in state.conditionals if number == 7 and item_root == root)
+            if state.pc == dispatch_pc and state.switch_choice is None:
+                shift = insn.operands[1]
+                root = state.root(state.registers[private.Checker.regname(insn, shift.reg)])
+                require(root is not None and root in selector_roots, "dispatch selector provenance differs")
+                for item in reversed(record["switch"]["targets"]):
+                    candidate = copy.deepcopy(state)
+                    if candidate.refine(root, "beq", item["index"], True):
+                        budget.state()
+                        candidate.switch_choice = item["index"]
+                        pending.append(candidate)
+                break
+            if insn.mnemonic in branches:
+                require(state.flags is not None, "caller branch lacks actual CMP flags", "unsupported")
+                left, right = state.flags
+                root, number = state.root(left), state.number(right)
+                if root is not None and number is not None and insn.mnemonic in ("beq", "bne"):
+                    state.conditionals.append((root, number))
+                following, target = insn.address + insn.size, insn.operands[0].imm
+                concrete = state.number(left)
+                for taken in _BRANCH_CHOICES:
+                    candidate = copy.deepcopy(state)
+                    if root is not None and number is not None:
+                        feasible = candidate.refine(root, insn.mnemonic, number, bool(taken))
+                    else:
+                        require(concrete is not None and number is not None, "unsupported caller branch predicate", "unsupported")
+                        outcome = {"beq": concrete == number, "bne": concrete != number, "bhi": concrete > number,
+                                   "bls": concrete <= number, "bhs": concrete >= number, "blo": concrete < number}[insn.mnemonic]
+                        feasible = outcome == bool(taken)
+                    if feasible:
+                        budget.state()
+                        destination = target if taken else following
+                        candidate.decision("branch", taken, destination)
+                        candidate.event("instruction", encoding=bytes(insn.bytes).hex(), registers=[], reads=[], writes=[], next_pc=destination)
+                        candidate.edges.append({"from": insn.address, "to": destination,
+                                                "kind": "branch-taken" if taken else "branch-fallthrough"})
+                        candidate.pc = destination
+                        pending.append(candidate)
+                break
+            following = _caller_transfer(state, insn, capture)
+            if insn.mnemonic == "mov" and state.pc == dispatch_pc + 8:
+                choice = state.switch_choice
+                require(choice is not None and following == capture.fixed.address + record["switch"]["targets"][choice]["target_offset"],
+                        "decoded dispatch target differs")
+                state.decision("switch", choice, following)
+                kind = "switch-case"
+            elif insn.mnemonic == "bx":
+                state.edges.append({"from": insn.address, "to": None, "kind": "return"})
+                finished.append(state.output("returned-prefix", state.context["lr"]))
+                break
+            else:
+                kind = "branch-taken" if insn.mnemonic == "b" else "fallthrough"
+            state.edges.append({"from": insn.address, "to": following, "kind": kind})
+            state.pc = following
+    require(len(selector_roots) == len(count_roots) == 1 and selector_roots == excluded_seven,
+            "caller raw-role normalization/early-return evidence differs", "unsupported")
+    count, selector = next(iter(count_roots)), next(iter(selector_roots))
+    raw = [{"role": role, "register": root[2], "value": root[1]} for role, root in (("count", count), ("selector", selector))]
+    validate_raw_inputs(capture.fixed.request, raw)
+    paths = [item["path"] for item in finished]
+    require(len(paths) == len(set(paths)), "duplicate completed prefix trace with unmerged states", "unsupported")
+    require(finished and any(item["status"] == "returned-prefix" for item in finished) and
+            any(item["status"].startswith("suspended-") for item in finished), "incomplete caller prefix exploration", "unsupported")
+    return CallerPrefixes(canonical({"kind": "internal-incomplete-caller-prefixes-v1", "complete": False,
+                                    "raw_inputs": raw, "prefixes": sorted(finished, key=lambda item: item["path"]),
+                                    "states": budget.states, "transfers": budget.transfers,
+                                    "remaining": ["S2b helper qualification", "S3 private bridge/projection/retirement", "complete P5 histories"]}))

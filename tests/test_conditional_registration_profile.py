@@ -1,4 +1,4 @@
-"""S1 foundation tests; fresh synthetic captures, no public MATCH results."""
+"""S1 capture and incomplete S2 caller-prefix tests; no public MATCH results."""
 
 import copy
 import hashlib
@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
 
 
-SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s1b-sol61/repair-f1-f2")
+SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s2a-typed-origin-repair-sol61")
 ADDRESS = 0x08000002
 DEPENDENCY_SHA256 = "6edf9439e64096d31aa616fbadf5bb3c684893fb05c7b6ae790f3d0c3a0ba917"
 
@@ -889,6 +889,643 @@ class FreshCaptureTests(unittest.TestCase):
                 patch.dict(os.environ, {"FFTA_ROM": str(game / "baserom.bin")}, clear=False):
             with profile.Acquisition(game_root=game, kit_root=self.kit) as acquisition:
                 return profile.capture_caller(acquisition, address, self.workspace)
+
+    def execution_capture(self, case=None, mutate=None):
+        """Separate S2 entry premises; all original S1 contexts stay intact."""
+        case = case or self.cases[0]
+        _, address, _, game, _ = case
+        path = game / profile.context_path(address)
+        before = path.read_bytes()
+        request = profile.private.decode(before.decode())
+        entry = request["entry"]
+        next(region for region in entry["regions"] if region["id"] == "stack")["size"] = 4104
+        request["conditions"][0]["parameters"]["domain"]["size"] = 4104
+        next(value for value in entry["values"] if value["id"] == "return-control")["target"] = 0x0801F001
+        entry["frames"][0]["parent"] = "argument-frame"
+        entry["frames"].append({"id": "argument-frame", "invocation": "argument-invocation", "parent": None,
+                                 "entry_sp": "argument-sp", "allocations": ["arguments"], "saves": []})
+        entry["frames"].sort(key=lambda item: item["id"])
+        entry["values"].append({"id": "argument-sp", "tag": "pointer", "region": "stack", "offset": 4104})
+        entry["values"].sort(key=lambda item: item["id"])
+        entry["regions"].append({"id": "arguments", "base": {"tag": "relative", "region": "stack", "offset": 4096},
+                                  "size": 8, "permission": "rw", "kind": "stack-allocation", "lifetime": "live", "frame": "argument-frame"})
+        entry["regions"].sort(key=lambda item: item["id"])
+        if mutate:
+            mutate(request)
+        try:
+            path.write_bytes(encoded(request))
+            return self.capture(case)
+        finally:
+            path.write_bytes(before)
+
+    def pointer_case(self, statement):
+        """Fresh genuine-C twin, with separately compiled synthetic trust."""
+        temporary = tempfile.TemporaryDirectory(prefix="pointer-case-", dir=SCRATCH)
+        self.addCleanup(temporary.cleanup)
+        game = Path(temporary.name)
+        baseline = self.cases[0]
+        _, address, _, original_game, old_rom = baseline
+        for path in ("src", "include", "config/conditional_registration", "symbols", "prepare"):
+            (game / path).mkdir(parents=True, exist_ok=True)
+        source = (original_game / "src/08000000.c").read_bytes().replace(b"    u32 delay;\n", b"    u32 delay;\n" + statement)
+        (game / "src/08000000.c").write_bytes(source)
+        (game / "include/fixture.h").write_bytes((original_game / "include/fixture.h").read_bytes())
+        for name in ("config/functions.json", "symbols/functions.txt", "symbols/ffta.sym", "config/data_symbols.json"):
+            (game / name).write_bytes((original_game / name).read_bytes())
+        names = sorted(set(profile.re.findall(r"synthetic_[a-z]+(?:_[0-5])?", source.decode())) |
+                       {"synthetic_callback", "synthetic_registration"})
+        bindings = [{"name": name, "kind": "function", "target": 0x08010000 + index * 0x100} for index, name in enumerate(names)]
+        bindings.append({"name": "manager_cell", "kind": "object", "target": 0x0200F430})
+        bindings.sort(key=lambda item: item["name"])
+        prepare = game / "prepare"
+        tools = {role: os.path.expandvars(spelling) for role, spelling in profile.TOOL_SPELLINGS}
+
+        def run(role, *arguments):
+            profile._run([tools[role], *map(str, arguments)], game, prepare)
+
+        run("cpp", "-nostdinc", "-undef", "-I", "include", "src/08000000.c", "-o", prepare / "caller.i")
+        run("cc", *profile.FLAGS.split(), prepare / "caller.i", "-o", prepare / "caller.raw.s")
+        (prepare / "caller.s").write_bytes(profile.place_registration((prepare / "caller.raw.s").read_bytes(), address,
+                                                                    {item["name"]: item for item in bindings}))
+        run("assembler", "-mthumb-interwork", prepare / "caller.s", "-o", prepare / "caller.o")
+        original = profile._elf((prepare / "caller.o").read_bytes())
+        size = next(symbol["size"] for symbol in profile._symbols(original) if symbol["name"] == "func_08000000")
+        sites = [address + offset for section in original["relocations"]
+                 for offset, info in struct.iter_unpack("<II", original["section_data"][section])
+                 if profile.raw_symbol(original, original["sections"][section][6], info >> 8)["name"] == "synthetic_registration"]
+        self.assertEqual(len(sites), 1)
+        (prepare / "bindings.s").write_bytes(profile._binding_assembly(bindings))
+        run("assembler", "-mthumb-interwork", prepare / "bindings.s", "-o", prepare / "bindings.o")
+        (prepare / "caller.ld").write_bytes(profile._linker_script(address))
+        run("linker", "--fatal-warnings", "--no-undefined", "--no-relax", "--orphan-handling=error", "-T", prepare / "caller.ld",
+            "-e", "func_08000000", prepare / "caller.o", prepare / "bindings.o", "-o", prepare / "caller.elf")
+        run("objcopy", "-O", "binary", "--only-section=.text", prepare / "caller.elf", prepare / "caller.bin")
+        rom = bytearray(old_rom)
+        rom[:size] = (prepare / "caller.bin").read_bytes()[:size]
+        (game / "baserom.bin").write_bytes(rom)
+        functions = profile.private.decode((game / "config/functions.json").read_text())
+        functions[0]["end"] = f"0x{address + size:08X}"
+        (game / "config/functions.json").write_bytes(encoded(functions))
+        lines = (game / "symbols/functions.txt").read_text().splitlines()
+        lines[0] = f"0x{address:08X} 0x{address + size:08X} {size}"
+        (game / "symbols/functions.txt").write_text("\n".join(lines) + "\n")
+        lines = (game / "symbols/ffta.sym").read_text().splitlines()
+        lines[0] = f"0x{address:08X} {size:06X} func_{address:08X}"
+        (game / "symbols/ffta.sym").write_text("\n".join(lines) + "\n")
+        request = profile.private.decode((original_game / profile.context_path(address)).read_text())
+        request["site"] = sites[0]
+        (game / profile.context_path(address)).write_bytes(encoded(request))
+        shutil.rmtree(prepare)
+        return ("pointer", address, size, game, bytes(rom))
+
+    def record_pointer_capture(self, capture, name, outcome):
+        destination = os.environ.get("FFTA_REGISTRATION_POINTER_EVIDENCE")
+        if destination:
+            directory = Path(destination) / name
+            directory.mkdir(parents=True, exist_ok=False)
+            for label, data in capture.artifacts:
+                (directory / label).write_bytes(data)
+            (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+            (directory / "commands.json").write_bytes(encoded(capture.commands))
+            (directory / "request.json").write_bytes(capture.fixed.request.file_bytes)
+            (directory / "source.c").write_bytes(next(artifact.data for artifact in capture.fixed.sources
+                                                     if profile.private.decode(artifact.path_json)["path"].endswith(".c")))
+            (directory / "outcome.json").write_bytes(encoded(outcome))
+
+    def assert_memory_origin_closure(self, prefix):
+        values = {value["id"]: value for value in prefix["values"]}
+        regions = {region["id"]: region for region in prefix["regions"]}
+        seen = {"bits": set(), "cell_bits": set()}
+
+        def original_part(part, active=()):
+            if part["tag"] != "fragment":
+                return part
+            reference = part["value"]
+            self.assertNotIn(reference, active)
+            value = values[reference]
+            if value["tag"] != "bytes":
+                return part
+            return original_part(value["bytes"][part["index"]], (*active, reference))
+
+        def check(sidecar, bits, parts):
+            self.assertEqual(len(bits), len(parts) * 8)
+            for index, bit in enumerate(bits):
+                part = original_part(parts[index // 8])
+                if type(bit) is int:
+                    self.assertIn(bit, (0, 1))
+                    if part["tag"] == "constant":
+                        self.assertEqual(bit, (part["value"] >> (index % 8)) & 1)
+                elif bit[0] == "value":
+                    self.assertIn(bit[1], values)
+                    self.assertTrue(0 <= bit[2] < profile.private.width(values[bit[1]]) * 8)
+                else:
+                    self.assertEqual(bit[0], "byte")
+                    origin = profile.private.decode(bit[1])
+                    self.assertEqual(bit[1], profile.canonical(origin))
+                    self.assertTrue(0 <= bit[2] < 8)
+                    self.assertEqual(part, {"tag": "unknown", "origin": origin})
+                    if origin["tag"] == "memory":
+                        self.assertIn(origin["region"], regions)
+                        self.assertTrue(0 <= origin["offset"] < regions[origin["region"]]["size"])
+                        seen[sidecar].add(origin["region"])
+
+        for fact in prefix["bits"]:
+            self.assertIn(fact["value"], values)
+            check("bits", fact["bits"], profile.private.value_bytes(values[fact["value"]]))
+        cells = {profile.canonical(cell["location"]): cell["bytes"] for cell in prefix["cells"]}
+        self.assertEqual(len(cells), len(prefix["cell_bits"]))
+        for fact in prefix["cell_bits"]:
+            self.assertIn(fact["location"]["region"], regions)
+            check("cell_bits", fact["bits"], cells[profile.canonical(fact["location"])])
+        return seen
+
+    def test_fresh_allocation_ids_are_not_bit_atoms(self):
+        captures = []
+        for owner in ("byte", "bytes"):
+            def premise(request, owner=owner):
+                entry = request["entry"]
+                next(region for region in entry["regions"] if region["id"] == "arguments")["id"] = owner
+                frame = next(frame for frame in entry["frames"] if frame["id"] == "argument-frame")
+                frame["allocations"] = [owner, "other1", "other2"]
+                for name, offset in (("other1", 1000), ("other2", 2000)):
+                    entry["regions"].append({"id": name, "base": {"tag": "relative", "region": "stack", "offset": offset},
+                                              "size": 4, "permission": "rw", "kind": "stack-allocation",
+                                              "lifetime": "live", "frame": "argument-frame"})
+                entry["regions"].sort(key=lambda item: item["id"])
+            capture = self.execution_capture(self.cases[0], mutate=premise)
+            captures.append(capture)
+            self.assertEqual(len(capture.commands), 7)
+            source = next(artifact.data for artifact in capture.fixed.sources
+                          if profile.private.decode(artifact.path_json)["path"].endswith(".c"))
+            self.assertEqual(source, (Path(__file__).parent / "fixtures/conditional_registration_profile/compact.c").read_bytes())
+            result = profile.execute_caller_prefixes(capture).inspect()
+            self.assertFalse(result["complete"])
+            self.assertEqual(len(result["prefixes"]), 9)
+            for prefix in result["prefixes"]:
+                frame = next(frame for frame in prefix["frames"] if frame["id"] == "argument-frame")
+                self.assertEqual(frame["allocations"], [owner, "other1", "other2"])
+                seen = self.assert_memory_origin_closure(prefix)
+                self.assertIn(owner, seen["bits"])
+                self.assertIn(owner, seen["cell_bits"])
+            self.record_pointer_capture(capture, "allocation-id-" + owner, result)
+        for label in ("raw_assembly", "placed_assembly", "original_elf", "original_binary", "binding_assembly",
+                      "binding_elf", "linker_script", "linked_elf", "linked_binary"):
+            self.assertEqual(dict(captures[0].artifacts)[label], dict(captures[1].artifacts)[label])
+
+    def test_fresh_local_and_ancestor_memory_origins_resolve_in_both_sidecars(self):
+        case = self.pointer_case(b"    left = descriptor.words[0];\n")
+        capture = self.execution_capture(case)
+        self.assertEqual(len(capture.commands), 7)
+        result = profile.execute_caller_prefixes(capture).inspect()
+        self.assertEqual(len(result["prefixes"]), 9)
+        generated_seen = {"bits": 0, "cell_bits": 0}
+        for prefix in result["prefixes"]:
+            seen = self.assert_memory_origin_closure(prefix)
+            for sidecar in seen:
+                self.assertIn("arguments", seen[sidecar])
+                generated = {identifier for identifier in seen[sidecar] if identifier.startswith("pub/r/")}
+                self.assertTrue(all(prefix["path"].split("/")[1] in identifier for identifier in generated))
+                generated_seen[sidecar] += len(generated)
+                if prefix["status"] == "suspended-helper":
+                    self.assertTrue(generated)
+        self.assertTrue(all(count > 0 for count in generated_seen.values()))
+        self.record_pointer_capture(capture, "local-origin", result)
+
+    def test_output_renames_memory_origin_identity_without_changing_bits(self):
+        entry = fixture()["entry"]
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        state = profile._CallerState(entry, body)
+        region = state.allocate(16)
+        state.reads, state.writes = [], []
+        location = profile.private.slc(region, 4, 4)
+        parts, bits = state.read(location)
+        original = state.assemble(parts, bits)
+        masked_bits = tuple(0 if index % 3 == 0 else bit for index, bit in enumerate(bits))
+        masked = state.transformed(masked_bits, [original])
+        state.write(profile.private.slc(region, 8, 4), masked)
+        prefix = state.output("suspended-helper")
+        seen = self.assert_memory_origin_closure(prefix)
+        exported = next(item["id"] for item in prefix["regions"] if item["kind"] == "stack-allocation")
+        self.assertNotEqual(exported, region)
+        self.assertEqual(seen, {"bits": {exported}, "cell_bits": {exported}})
+        facts = {item["value"]: item["bits"] for item in prefix["bits"]}
+        reference = masked.replace(profile._ZERO_DIGEST, prefix["path"].split("/")[1])
+        for before, after in zip(masked_bits, facts[reference]):
+            if type(before) is int:
+                self.assertEqual(after, before)
+            else:
+                self.assertEqual(after[0], before[0])
+                self.assertEqual(after[2], before[2])
+                origin = profile.private.decode(before[1])
+                self.assertEqual(origin["region"], region)
+                origin["region"] = exported
+                self.assertEqual(profile.private.decode(after[1]), origin)
+        cells = {profile.canonical(item["location"]): item["bits"] for item in prefix["cell_bits"]}
+        for index in range(4):
+            self.assertEqual(cells[profile.canonical(profile.private.slc(exported, 8 + index, 1))],
+                             facts[reference][index * 8:index * 8 + 8])
+        self.assertEqual(state.bits[masked], masked_bits)
+        self.assertEqual(state.output("suspended-helper"), prefix)
+
+    def test_fresh_typed_pointer_extent_cannot_read_adjacent_sibling(self):
+        case = self.pointer_case(b"    left = *((u32 *)data + 1);\n")
+        captures = []
+        for owner_size in (4, 8):
+            def premise(request, owner_size=owner_size):
+                entry = request["entry"]
+                for identifier, base, size, permission in (("data-owner", 0x02030000, owner_size, "r"), ("sibling", 0x02030004, 4, "rw")):
+                    entry["regions"].append({"id": identifier, "base": {"tag": "concrete", "address": base}, "size": size,
+                                              "permission": permission, "kind": "external", "lifetime": "live", "frame": None})
+                entry["regions"].sort(key=lambda item: item["id"])
+                entry["values"].append({"id": "data-pointer", "tag": "pointer", "region": "data-owner", "offset": 0})
+                entry["values"].sort(key=lambda item: item["id"])
+                entry["registers"]["r2"] = "data-pointer"
+            capture = self.execution_capture(case, mutate=premise)
+            captures.append(capture)
+            self.assertEqual(len(capture.commands), 7)
+            if owner_size == 4:
+                with self.assertRaisesRegex(profile.Failure, "originating region") as refusal:
+                    profile.execute_caller_prefixes(capture)
+                self.record_pointer_capture(capture, "adjacent-read-refused", {"status": "refused", "reason": str(refusal.exception)})
+            else:
+                result = profile.execute_caller_prefixes(capture).inspect()
+                self.assertEqual(len(result["prefixes"]), 9)
+                accesses = [access for prefix in result["prefixes"] for event in prefix["events"] if event["tag"] == "instruction"
+                            for access in event["reads"] if access["location"]["region"] in ("data-owner", "sibling")]
+                self.assertEqual(len(accesses), 9)
+                self.assertTrue(all(access["location"] == profile.private.slc("data-owner", 4, 4) for access in accesses))
+                self.record_pointer_capture(capture, "adjacent-read-in-owner", result)
+        self.assertEqual(dict(captures[0].artifacts)["linked_binary"], dict(captures[1].artifacts)["linked_binary"])
+
+    def test_fresh_typed_readonly_pointer_cannot_write_through_alias(self):
+        case = self.pointer_case(b"    *(u32 *)data = left;\n")
+        captures = []
+        for owner_permission in ("r", "rw"):
+            def premise(request, owner_permission=owner_permission):
+                entry = request["entry"]
+                for identifier, permission in (("zz-readonly", owner_permission), ("aa-writable", "rw")):
+                    entry["regions"].append({"id": identifier, "base": {"tag": "concrete", "address": 0x02030000}, "size": 4,
+                                              "permission": permission, "kind": "external", "lifetime": "live", "frame": None})
+                entry["regions"].sort(key=lambda item: item["id"])
+                entry["values"].append({"id": "data-pointer", "tag": "pointer", "region": "zz-readonly", "offset": 0})
+                entry["values"].sort(key=lambda item: item["id"])
+                entry["registers"]["r2"] = "data-pointer"
+            capture = self.execution_capture(case, mutate=premise)
+            captures.append(capture)
+            self.assertEqual(len(capture.commands), 7)
+            if owner_permission == "r":
+                with self.assertRaisesRegex(profile.Failure, "write permission") as refusal:
+                    profile.execute_caller_prefixes(capture)
+                self.record_pointer_capture(capture, "readonly-write-refused", {"status": "refused", "reason": str(refusal.exception)})
+            else:
+                result = profile.execute_caller_prefixes(capture).inspect()
+                self.assertEqual(len(result["prefixes"]), 9)
+                accesses = [access for prefix in result["prefixes"] for event in prefix["events"] if event["tag"] == "instruction"
+                            for access in event["writes"] if access["location"]["region"] in ("zz-readonly", "aa-writable")]
+                self.assertEqual(len(accesses), 9)
+                self.assertTrue(all(access["location"] == profile.private.slc("zz-readonly", 0, 4) for access in accesses))
+                self.record_pointer_capture(capture, "readonly-write-in-owner", result)
+        self.assertEqual(dict(captures[0].artifacts)["linked_binary"], dict(captures[1].artifacts)["linked_binary"])
+
+    def test_typed_pointer_boundaries_permissions_and_access_origins(self):
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        for permission in ("r", "rw"):
+            entry = fixture()["entry"]
+            for identifier, base, size, mode in (("extent-owner", 0x02030000, 8, permission),
+                                                 ("aa-alias", 0x02030004, 4, "rw")):
+                entry["regions"].append({"id": identifier, "base": {"tag": "concrete", "address": base}, "size": size,
+                                          "permission": mode, "kind": "external", "lifetime": "live", "frame": None})
+            entry["regions"].sort(key=lambda item: item["id"])
+            state = profile._CallerState(entry, body)
+            pointer = state.pointer("extent-owner", 0)
+            state.reads, state.writes = [], []
+            location = state.locate(pointer, 4, 4)
+            self.assertEqual(location, profile.private.slc("extent-owner", 4, 4))
+            parts, _ = state.read(location)
+            self.assertTrue(all(part["origin"]["region"] == "extent-owner" for part in parts))
+            self.assertEqual(state.locate(pointer, 7, 1), profile.private.slc("extent-owner", 7, 1))
+            for displacement, width in ((8, 1), (4, 8), (-4, 4)):
+                with self.subTest(displacement=displacement, width=width), self.assertRaisesRegex(profile.Failure, "originating region"):
+                    state.locate(pointer, displacement, width)
+            if permission == "r":
+                with self.assertRaisesRegex(profile.Failure, "write permission"):
+                    state.write(location, state.constant(0))
+            else:
+                state.write(location, state.constant(0))
+                self.assertEqual(state.writes[-1]["location"], location)
+
+    def test_stack_backing_needs_live_allocation_and_typed_owner_bounds(self):
+        entry = fixture()["entry"]
+        next(value for value in entry["values"] if value["id"] == "stack-pointer")["offset"] = 4000
+        entry["regions"].append({"id": "external-coverage", "base": {"tag": "relative", "region": "stack", "offset": 3992},
+                                  "size": 24, "permission": "rw", "kind": "external", "lifetime": "live", "frame": None})
+        entry["regions"].sort(key=lambda item: item["id"])
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        state = profile._CallerState(entry, body)
+        with self.assertRaisesRegex(profile.Failure, "declared live storage"):
+            state.locate(state.registers["sp"], 0, 4)
+        region = state.allocate(8)
+        pointer = state.pointer(region, 0)
+        self.assertEqual(state.locate(state.registers["sp"], 0, 4), profile.private.slc(region, 0, 4))
+        with self.assertRaisesRegex(profile.Failure, "originating region"):
+            state.locate(pointer, 8, 4)
+        state.retire(8)
+        with self.assertRaisesRegex(profile.Failure, "retired pointer"):
+            state.locate(pointer, 0, 4)
+        with self.assertRaisesRegex(profile.Failure, "declared live storage"):
+            state.locate(state.registers["sp"], 0, 4)
+
+    def test_four_fresh_instruction_derived_caller_prefixes(self):
+        for case in self.cases:
+            with self.subTest(case=case[:2]):
+                capture = self.execution_capture(case)
+                result = profile.execute_caller_prefixes(capture).inspect()
+                self.assertFalse(result["complete"])
+                self.assertEqual(result["kind"], "internal-incomplete-caller-prefixes-v1")
+                self.assertEqual(result["raw_inputs"], [{"role": "count", "register": "r1", "value": "r1"},
+                                                        {"role": "selector", "register": "r0", "value": "r0"}])
+                self.assertEqual(len(result["prefixes"]), 9)
+                suspended = [prefix for prefix in result["prefixes"] if prefix["status"] == "suspended-helper"]
+                returned = [prefix for prefix in result["prefixes"] if prefix["status"] == "returned-prefix"]
+                self.assertEqual((len(suspended), len(returned)), (6, 3))
+                self.assertEqual(sorted(decision["choice"] for prefix in suspended for decision in prefix["decisions"]
+                                        if decision["kind"] == "switch"), list(range(6)))
+                for prefix in result["prefixes"]:
+                    digest = hashlib.sha256(b"conditional-registration-path-v1\0" +
+                                            profile.canonical(prefix["decisions"]).encode()).hexdigest()
+                    self.assertEqual(prefix["path"], "path/" + digest)
+                    self.assertEqual([event["step"] for event in prefix["events"]], list(range(len(prefix["events"]))))
+                    values = {value["id"]: value for value in prefix["values"]}
+                    for value in values.values():
+                        profile.private.validate(value, "Value")
+                    for frame in prefix["frames"]:
+                        profile.private.validate(frame, "Frame")
+                    for region in prefix["regions"]:
+                        profile.private.validate(region, "Region")
+                    for event in prefix["events"]:
+                        if event["tag"] == "instruction":
+                            offset = event["location"]["pc"] - case[1] + case[1] % 4
+                            self.assertEqual(bytes.fromhex(event["encoding"]), dict(capture.artifacts)["linked_binary"][offset:offset + len(event["encoding"]) // 2])
+                    self.assertFalse(any(event["tag"] in ("ordinary-abi", "call-enter", "call-return", "frame-enter", "private-event")
+                                         for event in prefix["events"]))
+                    if prefix["status"] == "suspended-helper":
+                        self.assertNotEqual(prefix["events"][-1]["location"], prefix["site"])
+                        self.assertEqual(prefix["lr"], "return-control")
+                        self.assertTrue(any(value["tag"] == "unknown" for cell in prefix["cells"] for value in cell["bytes"]))
+                        bits = {item["value"]: item["bits"] for item in prefix["bits"]}
+                        # Actual mask values loaded from the two interposed words.
+                        self.assertEqual([item["value"] for item in capture.to_dict()["switch"]["constants"]], [0xFF00FF00, 0x0F0F0F0F])
+                        first = bits[prefix["registers"]["r0"]]
+                        second = bits[prefix["registers"]["r1"]]
+                        self.assertTrue(all(bit == 0 for index, bit in enumerate(first) if not (0xFF00FF00 >> index) & 1))
+                        self.assertTrue(all(type(bit) is list for index, bit in enumerate(first) if (0xFF00FF00 >> index) & 1))
+                        self.assertTrue(all(bit == 0 for index, bit in enumerate(second) if not (0x0F0F0F0F >> index) & 1))
+                        self.assertTrue(all(type(bit) is list for index, bit in enumerate(second) if (0x0F0F0F0F >> index) & 1))
+                    else:
+                        self.assertEqual(prefix["registers"]["r4"], "r4")
+                        self.assertEqual(prefix["registers"]["r7"], "r7")
+                        sp = values[prefix["sp"]]
+                        self.assertEqual((sp["region"], sp["offset"]), ("stack", 4096))
+                        self.assertTrue(all(save["consumed"] is not None for save in prefix["saves"]))
+                        self.assertTrue(all(region["lifetime"] == "retired" for region in prefix["regions"]
+                                            if region["frame"] == "caller-frame"))
+                        if case[0] == "expanded":
+                            high = [save for save in prefix["saves"] if save["record"]["register"] == "r8"]
+                            self.assertEqual(len(high), 1)
+                            self.assertEqual(high[0]["record"]["value"], "r8")
+                # Examples check the derived disjunction, never select engine paths.
+                for count in (0, 1, 255, 256, 0xA1234501, 0xFFFFFFFF):
+                    for selector in (0, 1, 5, 6, 7, 8, 255, 0xFE123400, 0xFFFFFFFF):
+                        matching = []
+                        for prefix in result["prefixes"]:
+                            constraints = {item["value"]: item["ranges"] for item in prefix["domains"] if item["kind"] == "low8"}
+                            if all(any(low <= number & 255 <= high for low, high in constraints.get(ref, [[0, 255]]))
+                                   for ref, number in (("r1", count), ("r0", selector))):
+                                matching.append(prefix)
+                        self.assertEqual(len(matching), 1, (count, selector))
+                        self.assertEqual(matching[0]["status"], "suspended-helper" if count & 255 and selector & 255 <= 5 else "returned-prefix")
+                destination = os.environ.get("FFTA_REGISTRATION_PREFIX_EVIDENCE")
+                if destination:
+                    directory = Path(destination) / f"{case[0]}-{case[1]:08X}"
+                    directory.mkdir(parents=True, exist_ok=False)
+                    (directory / "prefixes.json").write_bytes(encoded(result))
+                    (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+                    (directory / "request.json").write_bytes(capture.fixed.request.file_bytes)
+                    (directory / "commands.json").write_bytes(encoded(capture.commands))
+                    for label, data in capture.artifacts:
+                        (directory / label).write_bytes(data)
+
+    def test_prefix_capture_revalidates_raw_records_and_pins(self):
+        capture = self.execution_capture()
+        for change in (lambda record: record["switch"]["targets"].pop(),
+                       lambda record: record["relocations"][0].update(raw_info=0),
+                       lambda record: record["caller"]["code"].pop(),
+                       lambda record: record["placement"]["linked_binary"].update(size=1)):
+            record = capture.to_dict()
+            change(record)
+            altered = profile.BoundCapture(capture.fixed, capture.artifacts, profile.canonical(record), capture.commands)
+            with self.assertRaises(profile.Failure):
+                profile.execute_caller_prefixes(altered)
+
+    def test_prefix_closed_graph_rejects_omitted_case_default_and_return(self):
+        capture = self.execution_capture()
+        record, program, calls = profile._caller_program(capture)
+        switch, address = record["switch"], capture.fixed.address
+        omitted = [address + item["target_offset"] for item in switch["targets"]]
+        omitted += [address + switch["default_offset"], next(pc for pc, insn in program.items() if insn.mnemonic == "bx")]
+        for pc in omitted:
+            altered = dict(program)
+            del altered[pc]
+            with self.subTest(pc=pc), self.assertRaises(profile.Failure):
+                profile._closed_caller_cfg(altered, calls, switch, address)
+        # Actual Thumb branch to the middle of a four-byte BL is not a boundary.
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        decoder.detail = True
+        site = next(pc for pc, insn in program.items() if insn.mnemonic == "b")
+        interior = next(iter(calls)) + 2
+        encoding = struct.pack("<H", 0xE000 | (((interior - site - 4) // 2) & 0x7FF))
+        altered = dict(program)
+        altered[site] = next(decoder.disasm(encoding, site))
+        with self.assertRaisesRegex(profile.Failure, "non-instruction"):
+            profile._closed_caller_cfg(altered, calls, switch, address)
+
+    def test_prefix_refuses_pointer_and_fragment_scalarization(self):
+        def pointer_argument(request):
+            request["entry"]["cells"] = [{"location": profile.private.slc("arguments", 0, 4),
+                                            "bytes": profile.private.value_bytes({"id": "owner", "tag": "pointer"})}]
+        capture = self.execution_capture(mutate=pointer_argument)
+        with self.assertRaisesRegex(profile.Failure, "pointer fragments"):
+            profile.execute_caller_prefixes(capture)
+        for register in ("r0", "r1"):
+            def pointer_root(request, register=register):
+                request["entry"]["registers"][register] = "owner"
+            with self.subTest(register=register):
+                capture = self.execution_capture(mutate=pointer_root)
+                with self.assertRaises(profile.Failure):
+                    profile.execute_caller_prefixes(capture)
+
+    def test_prefix_refuses_missing_argument_and_live_stack_conflict(self):
+        capture = self.capture()
+        with self.assertRaisesRegex(profile.Failure, "declared live storage"):
+            profile.execute_caller_prefixes(capture)
+
+        def conflict(request):
+            entry = request["entry"]
+            entry["frames"][0]["allocations"].append("conflict")
+            entry["frames"][0]["allocations"].sort()
+            entry["regions"].append({"id": "conflict", "base": {"tag": "relative", "region": "stack", "offset": 4080},
+                                      "size": 16, "permission": "rw", "kind": "stack-allocation", "lifetime": "live", "frame": "argument-frame"})
+            entry["regions"].sort(key=lambda item: item["id"])
+        capture = self.execution_capture(mutate=conflict)
+        with self.assertRaisesRegex(profile.Failure, "overlap"):
+            profile.execute_caller_prefixes(capture)
+
+    def test_prefix_refuses_budget_exhaustion_without_partial_result(self):
+        capture = self.execution_capture()
+        for name, limit in (("MAX_CALLER_STATES", 2), ("MAX_CALLER_TRANSFERS", 10), ("MAX_CALLER_DEPTH", 1)):
+            with self.subTest(name=name), patch.object(profile, name, limit), self.assertRaises(profile.Failure):
+                profile.execute_caller_prefixes(capture)
+
+    def test_prefix_disjunction_preserved_in_both_join_visitation_orders(self):
+        capture = self.execution_capture(self.cases[2])
+        first = profile.execute_caller_prefixes(capture).encoded
+        with patch.object(profile, "_BRANCH_CHOICES", (0, 1)):
+            second = profile.execute_caller_prefixes(capture).encoded
+        self.assertEqual(first, second)
+
+    def test_caller_budget_exact_fixed_boundaries(self):
+        self.assertEqual((profile.MAX_CALLER_STATES, profile.MAX_CALLER_TRANSFERS, profile.MAX_CALLER_DEPTH), (4096, 262144, 16))
+        budget = profile._CallerBudget()
+        for _ in range(4096):
+            budget.state()
+        with self.assertRaisesRegex(profile.Failure, "state budget"):
+            budget.state()
+        for _ in range(262144):
+            budget.transfer()
+        with self.assertRaisesRegex(profile.Failure, "transfer budget"):
+            budget.transfer()
+
+    def test_caller_provenance_depth_exact_boundary(self):
+        request = fixture()
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        for depth in (16, 17):
+            state = profile._CallerState(request["entry"], body)
+            reference = "owner"
+            for _ in range(depth - 1):
+                reference = state.make("bytes", width=1, bytes=[{"tag": "fragment", "value": reference, "index": 0}])
+            if depth == 16:
+                self.assertEqual(state.fragments(reference), {"owner"})
+                self.assertEqual(len(state.bitvector(reference)), 8)
+            else:
+                with self.assertRaisesRegex(profile.Failure, "depth exhausted"):
+                    state.fragments(reference)
+                with self.assertRaisesRegex(profile.Failure, "depth exhausted"):
+                    state.bitvector(reference)
+
+    def test_caller_retirement_refuses_aliases_and_fragments_without_corridor(self):
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        for fragmented in (False, True):
+            state = profile._CallerState(fixture()["entry"], body)
+            region = state.allocate(8)
+            pointer = state.pointer(region, 0)
+            state.registers["r3"] = state.make("bytes", width=4, bytes=profile.private.value_bytes(state.values[pointer])) if fragmented else pointer
+            with self.subTest(fragmented=fragmented), self.assertRaisesRegex(profile.Failure, "S3 restoration"):
+                state.retire(8)
+        state = profile._CallerState(fixture()["entry"], body)
+        state.allocate(8)
+        state.registers["r3"] = state.borrowed(state.registers["sp"])
+        self.assertEqual(state.values[state.registers["r3"]]["region"], next(region["id"] for region in state.regions.values() if region["frame"] == "caller-frame"))
+        with self.assertRaisesRegex(profile.Failure, "S3 restoration"):
+            state.retire(8)
+
+    def test_decoded_save_bytes_and_protected_write_conflicts(self):
+        capture = self.execution_capture()
+        record, program, _ = profile._caller_program(capture)
+        state = profile._CallerState(capture.fixed.request.to_dict()["entry"], record["caller"], capture.fixed.rom.data)
+        push = program[capture.fixed.address]
+        profile._caller_transfer(state, push, capture)
+        self.assertEqual(len(state.saves), 5)
+        save = next(iter(state.saves.values()))["record"]
+        state.writes = []
+        with self.assertRaisesRegex(profile.Failure, "corrupts save"):
+            state.write(save["location"], state.constant(0))
+        # A same-address value is insufficient when its exact protected bytes differ.
+        state.memory[state.key(save["location"]["region"], 0)] = {"tag": "constant", "value": 0}
+        pop = next(insn for insn in program.values() if insn.mnemonic == "pop" and len(insn.operands) == 4)
+        state.pc = pop.address
+        with self.assertRaisesRegex(profile.Failure, "save bytes disagree"):
+            profile._caller_transfer(state, pop, capture)
+
+    def test_decoded_shifts_and_parameter_rmw_preserve_unknown_byte_bits(self):
+        capture = self.execution_capture()
+        record, program, _ = profile._caller_program(capture)
+        state = profile._CallerState(capture.fixed.request.to_dict()["entry"], record["caller"], capture.fixed.rom.data)
+        # Unit transfers use actual freshly decoded instructions, and produce no
+        # prefix/proof success beyond an unqualified helper boundary.
+        shifts = [insn for insn in program.values() if insn.mnemonic in ("lsls", "lsrs") and
+                  len(insn.operands) == 3 and insn.operands[2].imm == 16]
+        self.assertEqual(len(shifts), 2)
+        for insn in shifts:
+            state.pc = insn.address
+            profile._caller_transfer(state, insn, capture)
+        bits = state.bitvector(state.registers["r1"])
+        self.assertEqual(bits[:16], state.bitvector("r0")[:16])
+        self.assertEqual(bits[16:], (0,) * 16)
+        state.allocate(40)
+        location = state.locate(state.registers["sp"], 32, 4)
+        state.reads, state.writes = [], []
+        parts, original = state.read(location)
+        self.assertTrue(all(part["tag"] == "unknown" for part in parts))
+        # The exact instruction-derived RMW masks preserve the fourth byte.
+        mask = 0xFF000000
+        retained = tuple(bit if (mask >> index) & 1 else 0 for index, bit in enumerate(original))
+        inserted = tuple((0x005A1234 >> index) & 1 for index in range(32))
+        result = tuple(a if b == 0 else b for a, b in zip(retained, inserted))
+        source = state.assemble(parts, original)
+        changed = state.transformed(result, (source,))
+        state.write(location, changed)
+        _, reread = state.read(location)
+        self.assertEqual(reread[24:], original[24:])
+        self.assertEqual(reread[:24], inserted[:24])
+
+    def test_typed_literal_partial_reads_preserve_function_pointer_fragments(self):
+        capture = self.execution_capture()
+        record, program, _ = profile._caller_program(capture)
+        state = profile._CallerState(capture.fixed.request.to_dict()["entry"], record["caller"], capture.fixed.rom.data)
+        state.literal_bindings = {item["resolved"]["linked_address"]: item["resolved"] for item in record["relocations"] if item["kind"] == 2}
+        callback = next(item["resolved"] for item in record["relocations"] if item["resolved"]["role"] == "callback")
+        state.function_targets = {"callback": callback["target"] | 1}
+        state.reads = []
+        location = state.locate(state.constant(callback["linked_address"]), 1, 1)
+        parts, bits = state.read(location)
+        self.assertEqual(parts[0]["tag"], "fragment")
+        self.assertEqual(parts[0]["index"], 1)
+        value = state.assemble(parts, bits, extend=True)
+        self.assertEqual(state.values[parts[0]["value"]]["tag"], "function")
+        with self.assertRaisesRegex(profile.Failure, "pointer fragments"):
+            state.transformed((0,) * 32, (value,))
+        mask = next(insn for insn in program.values() if insn.mnemonic == "ands")
+        names = [profile.private.Checker.regname(mask, operand.reg) for operand in mask.operands]
+        state.registers[names[0]] = value
+        state.registers[names[1]] = state.constant(0)
+        state.pc = mask.address
+        with self.assertRaisesRegex(profile.Failure, "pointer fragments"):
+            profile._caller_transfer(state, mask, capture)
+
+    def test_prefix_entry_cannot_override_actual_rom_cells_or_ownership(self):
+        def changed(request, *, ownership=False):
+            entry = request["entry"]
+            entry["regions"].append({"id": "declared-rom", "base": {"tag": "concrete", "address": request["address"]},
+                                      "size": 2, "permission": "rw" if ownership else "r", "kind": "external" if ownership else "rom",
+                                      "lifetime": "live", "frame": None})
+            entry["regions"].sort(key=lambda item: item["id"])
+            if not ownership:
+                entry["cells"] = [{"location": profile.private.slc("declared-rom", 0, 1), "bytes": [{"tag": "constant", "value": 0}]}]
+        for ownership in (False, True):
+            capture = self.execution_capture(mutate=lambda request: changed(request, ownership=ownership))
+            with self.subTest(ownership=ownership), self.assertRaisesRegex(profile.Failure, "bound ROM"):
+                profile.execute_caller_prefixes(capture)
 
     def test_four_fresh_natural_captures(self):
         for case in self.cases:
