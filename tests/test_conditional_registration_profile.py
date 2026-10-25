@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
 
 
-SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s3a-sol61")
+SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-bitbyte-sol61")
 ADDRESS = 0x08000002
 DEPENDENCY_SHA256 = "6edf9439e64096d31aa616fbadf5bb3c684893fb05c7b6ae790f3d0c3a0ba917"
 
@@ -802,6 +802,166 @@ class AcquisitionTests(unittest.TestCase):
         self.capture.close()
         with self.assertRaises(profile.Failure):
             self.capture.recheck()
+
+
+class BitByteRecordTests(unittest.TestCase):
+    @staticmethod
+    def records():
+        entry = fixture()["entry"]
+        return {**{key: entry[key] for key in ("values", "regions", "frames", "cells")}, "accesses": []}
+
+    @staticmethod
+    def masked(origin=None):
+        origin = origin or {"tag": "memory", "region": "heap", "offset": 12}
+        return {"tag": "bits", "bits": [{"tag": "origin-bit", "origin": copy.deepcopy(origin), "index": index}
+                                          for index in range(4)] + [0] * 4}
+
+    def test_private_compatible_complete_records_round_trip_without_renaming(self):
+        record = self.records()
+        record["values"].append({"id": "composed", "tag": "bytes", "width": 4,
+                                  "bytes": [{"tag": "fragment", "value": "owner", "index": index} for index in range(4)]})
+        record["cells"] = [{"location": profile.private.slc("heap", 0, 4),
+                             "bytes": [{"tag": "fragment", "value": "composed", "index": index} for index in range(4)]}]
+        record["accesses"] = copy.deepcopy(record["cells"])
+        result = profile.lower_bitbyte_records(record)
+        self.assertEqual(result.inspect(), record)
+        for name, spec in (("values", "Value"), ("cells", "Cell"), ("accesses", "Access"), ("frames", "Frame"), ("regions", "Region")):
+            for item in result.inspect()[name]:
+                profile.private.validate(item, spec)
+        codec = profile._BitByteCodec(record)
+        original = record["cells"][0]["bytes"][0]
+        self.assertEqual(codec.normalize_byte(original, codec.byte_bits(original)), original)
+        self.assertNotEqual(original["value"], "owner")
+        returned = result.inspect()
+        returned["values"].clear()
+        self.assertEqual(result.inspect(), record)
+        record["frames"].append({"id": "historical-frame", "invocation": "caller-invocation", "parent": "caller-frame",
+                                  "entry_sp": "stack-pointer", "allocations": [], "saves": []})
+        self.assertEqual(profile.lower_bitbyte_records(record).inspect(), record)
+        record["frames"][-1]["entry_sp"] = "r0"
+        with self.assertRaisesRegex(profile.Failure, "SP"):
+            profile.lower_bitbyte_records(record)
+
+    def test_closed_public_byte_and_atom_shapes_and_irreducibility(self):
+        valid = self.masked()
+        variants = [None, True, {"tag": "bits", "bits": [0] * 7}, {"tag": "bits", "bits": [0] * 9},
+                    {"tag": "bits", "bits": [0] * 8}, {**valid, "extra": 0},
+                    {"tag": "bits", "bits": [True] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [0.0] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": ["0"] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "origin-bit", "origin": "heap:12", "index": 0}] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "origin-bit", "origin": valid["bits"][0]["origin"], "index": 8}] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "value-bit", "value": "owner", "index": 32}] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "value-bit", "value": "head", "index": 0}] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "value-bit", "value": "absent", "index": 0}] + valid["bits"][1:]},
+                    {"tag": "bits", "bits": [{"tag": "origin-bit", "origin": {"tag": "memory", "region": "heap", "offset": 4096}, "index": 0}] + valid["bits"][1:]}]
+        for part in variants:
+            record = self.records()
+            record["cells"] = [{"location": profile.private.slc("heap", 0, 1), "bytes": [part]}]
+            with self.subTest(part=part), self.assertRaises(profile.Failure):
+                profile.validate_bitbyte_records(record)
+        codec = profile._BitByteCodec(self.records())
+        self.assertEqual(codec.byte_bits(valid), valid["bits"])
+        self.assertEqual(codec.normalize_byte({"tag": "unknown", "origin": valid["bits"][0]["origin"]}, valid["bits"]), valid)
+        for source in ("owner", "return-control", "r0"):
+            bits = [{"tag": "value-bit", "value": source, "index": index} for index in range(8)]
+            with self.subTest(source=source), self.assertRaisesRegex(profile.Failure, "reducible"):
+                codec.byte_bits({"tag": "bits", "bits": bits})
+        unknown = [{"tag": "origin-bit", "origin": valid["bits"][0]["origin"], "index": index} for index in range(8)]
+        with self.assertRaisesRegex(profile.Failure, "reducible"):
+            codec.byte_bits({"tag": "bits", "bits": unknown})
+        with self.assertRaisesRegex(profile.Failure, "duplicate JSON"):
+            profile.private.decode('{"tag":"bits","tag":"unknown"}')
+
+    def test_bitbyte_lineage_preservation_and_complete_source_refusal(self):
+        record = self.records()
+        codec = profile._BitByteCodec(record)
+        for source in ("owner", "return-control"):
+            original = {"tag": "fragment", "value": source, "index": 0}
+            bits = codec.byte_bits(original)
+            self.assertEqual(codec.normalize_byte(original, bits), original)
+            with self.subTest(source=source), self.assertRaisesRegex(profile.Failure, "lineage"):
+                codec.normalize_byte(original, [0] + bits[1:])
+        record["values"].append({"id": "masked-source", "tag": "bytes", "width": 2,
+                                  "bytes": [{"tag": "constant", "value": 7}, self.masked()]})
+        record["cells"] = [{"location": profile.private.slc("heap", 0, 1),
+                             "bytes": [{"tag": "fragment", "value": "masked-source", "index": 0}]}]
+        profile.validate_bitbyte_records(record)
+        with self.assertRaisesRegex(profile.Failure, "irreducible Value masked-source"):
+            profile.lower_bitbyte_records(record)
+        # Unused upper bits of the supplied complete definition cannot be cut.
+        changed = copy.deepcopy(record)
+        changed["values"][-1]["bytes"][1] = {"tag": "unknown", "origin": {"tag": "memory", "region": "heap", "offset": 12}}
+        self.assertNotEqual(profile._BitByteCodec(record).value_bits("masked-source"), profile._BitByteCodec(changed).value_bits("masked-source"))
+        self.assertEqual(profile.lower_bitbyte_records(changed).inspect(), changed)
+
+    def test_bitbyte_descriptor_priority_lineage_and_structured_origins(self):
+        record = self.records()
+        record["values"] += [{"id": "other-owner", "tag": "pointer", "region": "metadata", "offset": 0},
+                             {"id": "callback-value", "tag": "function", "body": "callback"}]
+        record["regions"] += [{"id": "concrete-domain", "base": {"tag": "concrete", "address": 0x02050000}, "size": 8,
+                                "permission": "rw", "kind": "stack-domain", "lifetime": "live", "frame": None},
+                               {"id": "concrete-local", "base": {"tag": "relative", "region": "concrete-domain", "offset": 0}, "size": 8,
+                                "permission": "rw", "kind": "stack-allocation", "lifetime": "retired", "frame": "caller-frame"}]
+        record["frames"][0]["allocations"] = ["concrete-local"]
+        record["values"].append({"id": "concrete-address", "tag": "constant", "width": 4, "value": 0x02050004})
+        codec = profile._BitByteCodec(record)
+        for source in ("callback-value", "concrete-address"):
+            part = {"tag": "fragment", "value": source, "index": 0}
+            bits = codec.byte_bits(part)
+            self.assertEqual(codec.normalize_byte(part, bits), part)
+            altered = copy.deepcopy(bits)
+            altered[0] = 1 if altered[0] == 0 else 0
+            with self.subTest(source=source), self.assertRaisesRegex(profile.Failure, "lineage"):
+                codec.normalize_byte(part, altered)
+        with self.assertRaisesRegex(profile.Failure, "lineage"):
+            codec.normalize_byte({"tag": "fragment", "value": "owner", "index": 0},
+                                 codec.byte_bits({"tag": "fragment", "value": "other-owner", "index": 0}))
+        value_bits = codec.byte_bits({"tag": "fragment", "value": "r0", "index": 0})
+        origin = {"tag": "register", "invocation": "caller-invocation", "register": "r0"}
+        origin_bits = codec.byte_bits({"tag": "unknown", "origin": origin})
+        self.assertNotEqual(value_bits, origin_bits)
+        self.assertEqual(codec.normalize_byte({"tag": "unknown", "origin": origin}, value_bits),
+                         {"tag": "fragment", "value": "r0", "index": 0})
+
+    def test_codec_validity_does_not_authenticate_altered_scalar_origins(self):
+        for offset in (12, 13):
+            record = self.records()
+            record["cells"] = [{"location": profile.private.slc("heap", 0, 1), "bytes": [self.masked(
+                {"tag": "memory", "region": "heap", "offset": offset})]}]
+            profile.validate_bitbyte_records(record)
+            with self.assertRaisesRegex(profile.Failure, "irreducible Cell"):
+                profile.lower_bitbyte_records(record)
+        with self.assertRaises(profile.Failure):
+            profile.execute_bitbyte_prefixes({"kind": "internal-incomplete-bitbyte-prefixes-v1", "complete": False})
+
+    def test_bitbyte_reference_kinds_cycles_and_exact_depth(self):
+        for depth in (16, 17):
+            record = self.records()
+            previous = "r0"
+            for number in range(depth - 1):
+                identifier = "chain-" + str(number)
+                record["values"].append({"id": identifier, "tag": "bytes", "width": 1,
+                                          "bytes": [{"tag": "fragment", "value": previous, "index": 0}]})
+                previous = identifier
+            if depth == 16:
+                profile.validate_bitbyte_records(record)
+            else:
+                with self.assertRaisesRegex(profile.Failure, "depth"):
+                    profile.validate_bitbyte_records(record)
+        for source in ("caller-frame", "heap", "self", "absent"):
+            record = self.records()
+            record["values"].append({"id": "self", "tag": "bytes", "width": 1,
+                                      "bytes": [{"tag": "fragment", "value": source, "index": 0}]})
+            with self.subTest(source=source), self.assertRaises(profile.Failure):
+                profile.validate_bitbyte_records(record)
+        record = self.records()
+        record["cells"] = [{"location": profile.private.slc("heap", 0, 1), "bytes": [self.masked(
+            {"tag": "register", "invocation": "other-invocation", "register": "r0"})]}]
+        with self.assertRaisesRegex(profile.Failure, "origin"):
+            profile.validate_bitbyte_records(record)
+        with patch.object(profile, "MAX_CALLER_TRANSFERS", 3), self.assertRaisesRegex(profile.Failure, "traversal budget"):
+            profile.validate_bitbyte_records(self.records())
 
 
 class FreshCaptureTests(unittest.TestCase):
@@ -1726,6 +1886,181 @@ class FreshCaptureTests(unittest.TestCase):
                 profile.execute_restoration_prefixes(capture)
             self.assertEqual(changed, [drift])
         self.assertEqual(profile.execute_restoration_prefixes(capture).encoded, positive)
+
+    def test_fresh_bitbyte_identity_preserves_all_actual_facts(self):
+        capture = self.execution_capture(self.cases[2])
+        result = profile.execute_bitbyte_prefixes(capture)
+        record = result.inspect()
+        self.assertEqual(record["kind"], "internal-incomplete-bitbyte-prefixes-v1")
+        self.assertFalse(record["complete"])
+        self.assertEqual(len(record["prefixes"]), 9)
+        for prefix in record["prefixes"]:
+            self.assert_bitbyte_actual_facts(prefix)
+        first = result.encoded
+        record["prefixes"].clear()
+        self.assertEqual(result.encoded, first)
+        self.assertEqual(profile.execute_bitbyte_prefixes(capture).encoded, first)
+
+    def test_twelve_fresh_bitbyte_variants_preserve_values_boundaries_and_accesses(self):
+        for case in self.cases:
+            for variant in ("identity", "DBDA0", "D8BD8"):
+                with self.subTest(case=case[:2], variant=variant):
+                    evidence = os.environ.get("FFTA_REGISTRATION_BITBYTE_EVIDENCE")
+                    with patch.dict(os.environ):
+                        os.environ.pop("FFTA_REGISTRATION_HELPER_EVIDENCE", None)
+                        if evidence:
+                            os.environ["FFTA_REGISTRATION_HELPER_EVIDENCE"] = str(Path(evidence) / "preparation")
+                        prepared = case if variant == "identity" else self.helper_case(case, variant)
+                    capture = self.execution_capture(prepared, self.helper_premises if variant != "identity" else None)
+                    result = profile.execute_bitbyte_prefixes(capture).inspect()
+                    self.assertEqual(len(capture.commands), 7)
+                    self.assertEqual(len(result["prefixes"]), 9)
+                    self.assertFalse(result["complete"])
+                    for prefix in result["prefixes"]:
+                        codec = self.assert_bitbyte_actual_facts(prefix)
+                        self.assertEqual(prefix["pending"], [])
+                        if case[0] == "expanded" and prefix["status"] == "suspended-registration":
+                            reference = prefix["registers"]["r4"]
+                            self.assertTrue(any(part["tag"] == "bits" for part in codec.values[reference]["bytes"]))
+                            # A complete record conversion cannot drop incidental r4.
+                            supplied = {key: prefix[key] for key in ("values", "regions", "frames", "cells")}
+                            supplied["accesses"] = []
+                            with self.assertRaisesRegex(profile.Failure, "private record conversion: irreducible"):
+                                profile.lower_bitbyte_records(supplied)
+                    if evidence:
+                        directory = Path(evidence) / f"{case[0]}-{case[1] % 4}-{variant}"
+                        directory.mkdir(parents=True, exist_ok=False)
+                        (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+                        (directory / "commands.json").write_bytes(encoded(capture.commands))
+                        (directory / "request.json").write_bytes(capture.fixed.request.file_bytes)
+                        for label, data in capture.artifacts:
+                            (directory / label).write_bytes(data)
+                        (directory / "prefixes.json").write_bytes(encoded(result))
+
+    def test_fresh_bitbyte_overwritten_accesses_and_intermediate_writes_survive(self):
+        source = ("unsigned int FUNCTION(unsigned int a, unsigned int b) {\n"
+                  "volatile unsigned int *p = (volatile unsigned int *)0x02030100;\n"
+                  "unsigned int kept; p[0] = b; kept = p[0]; p[0] = 0;\n"
+                  "p[1] = kept; p[1] = 1; p[2] = kept >> 8; return kept; }\n")
+        with patch.dict(os.environ):
+            os.environ.pop("FFTA_REGISTRATION_HELPER_EVIDENCE", None)
+            case = self.helper_case(self.cases[2], wrapper=source)
+        capture = self.execution_capture(case, self.helper_premises)
+        result = profile.execute_bitbyte_prefixes(capture).inspect()
+        prefix = next(prefix for prefix in result["prefixes"] if any(
+            decision["kind"] == "switch" and decision["choice"] == 0 for decision in prefix["decisions"]))
+        self.assert_bitbyte_actual_facts(prefix)
+        facts = [fact for fact in prefix["actual_bit_facts"]["accesses"] if fact["location"]["region"] == "helper-output"]
+        zero = [fact for fact in facts if fact["location"]["offset"] == 0]
+        self.assertEqual([fact["kind"] for fact in zero], ["writes", "reads", "writes"])
+        self.assertEqual(zero[0]["bits"], zero[1]["bits"])
+        self.assertNotEqual(zero[0]["bits"], zero[2]["bits"])
+        self.assertEqual(zero[2]["bits"], [0] * 32)
+        self.assertTrue(any(type(bit) is dict for bit in zero[0]["bits"]))
+        self.assertEqual([fact["occurrence"] for fact in facts], sorted(fact["occurrence"] for fact in facts))
+        self.assertEqual([fact["step"] for fact in facts], sorted(fact["step"] for fact in facts))
+        for offset in range(4):
+            cell = next(cell for cell in prefix["cells"] if cell["location"] == profile.private.slc("helper-output", offset, 1))
+            self.assertEqual(cell["bytes"], [{"tag": "constant", "value": 0}])
+        evidence = os.environ.get("FFTA_REGISTRATION_BITBYTE_EVIDENCE")
+        if evidence:
+            directory = Path(evidence) / "historical-overwrite"
+            directory.mkdir(parents=True, exist_ok=False)
+            (directory / "source.c").write_text(source)
+            (directory / "commands.json").write_bytes(encoded(capture.commands))
+            (directory / "prefixes.json").write_bytes(encoded(result))
+
+    def test_bitbyte_branch_order_registry_order_and_refused_run_isolation(self):
+        capture = self.execution_capture(self.cases[0])
+        baseline = profile.execute_bitbyte_prefixes(capture).encoded
+        with patch.object(profile, "_BRANCH_CHOICES", (0, 1)):
+            self.assertEqual(profile.execute_bitbyte_prefixes(capture).encoded, baseline)
+        original = profile._BitByteState.output
+
+        def reversed_registries(state, *arguments):
+            for name in ("values", "regions", "frames", "saves"):
+                setattr(state, name, dict(reversed(list(getattr(state, name).items()))))
+            return original(state, *arguments)
+
+        with patch.object(profile._BitByteState, "output", reversed_registries):
+            self.assertEqual(profile.execute_bitbyte_prefixes(capture).encoded, baseline)
+        original_access = profile._BitByteState._byte_access
+
+        def future_access(state, *arguments):
+            original_access(state, *arguments)
+            fact = profile.private.decode(state._byte_pending_accesses[-1])
+            fact["available"] = 0
+            state._byte_pending_accesses[-1] = profile.canonical(fact)
+
+        with patch.object(profile._BitByteState, "_byte_access", future_access), self.assertRaisesRegex(profile.Failure, "future"):
+            profile.execute_bitbyte_prefixes(capture)
+        self.assertEqual(profile.execute_bitbyte_prefixes(capture).encoded, baseline)
+
+    def test_bitbyte_actual_facts_reject_wellformed_history_edits_and_masked_r4_lowering(self):
+        capture = self.execution_capture(self.cases[2])
+        materialized = profile.execute_bitbyte_prefixes(capture).inspect()
+        actual = next(prefix for prefix in materialized["prefixes"] if prefix["status"] == "suspended-registration")
+        raw = next(prefix for prefix in profile.execute_restoration_prefixes(capture).inspect()["prefixes"] if prefix["path"] == actual["path"])
+        facts = copy.deepcopy(actual["actual_bit_facts"])
+        facts["boundaries"] = [boundary for boundary in facts["boundaries"] if boundary["kind"] != "terminal"]
+        masked = actual["registers"]["r4"]
+        r4 = next(value for value in actual["values"] if value["id"] == masked)
+        argument_frame = next(frame for frame in actual["frames"] if frame["id"] == "argument-frame")
+        supplied = {"values": [r4, next(value for value in actual["values"] if value["id"] == argument_frame["entry_sp"])],
+                    "regions": [region for region in actual["regions"] if region["id"] in ("stack", "arguments")],
+                    "frames": [argument_frame], "cells": [], "accesses": []}
+        profile.validate_bitbyte_records(supplied)
+        with self.assertRaisesRegex(profile.Failure, "irreducible Value " + masked):
+            profile.lower_bitbyte_records(supplied)
+        for twin in ("value-envelope", "read-envelope", "boundary-envelope", "missing-access", "future-fragment"):
+            edited, mandatory = copy.deepcopy(raw), copy.deepcopy(facts)
+            if twin == "value-envelope":
+                value = next(value for value in edited["values"] if value["id"] == masked)
+                value["bytes"][0]["origin"]["offset"] = 5
+            elif twin == "read-envelope":
+                event = next(event for event in edited["events"] if event["tag"] == "instruction" and any(
+                    access["location"] == profile.private.slc("arguments", 4, 4) for access in event["reads"]))
+                access = next(access for access in event["reads"] if access["location"] == profile.private.slc("arguments", 4, 4))
+                access["bytes"][0]["origin"]["offset"] = 5
+            elif twin == "boundary-envelope":
+                cell = next(cell for cell in edited["helper_calls"][0]["input"]["cells"] if cell["bytes"][0]["tag"] == "unknown")
+                cell["bytes"][0]["origin"]["offset"] ^= 1
+            elif twin == "missing-access":
+                mandatory["accesses"].pop()
+            else:
+                source = next(fact["descriptor"]["id"] for fact in reversed(mandatory["values"])
+                              if fact["descriptor"]["tag"] == "control")
+                value = next(value for value in edited["values"] if value["id"] == masked)
+                value["bytes"][0] = {"tag": "fragment", "value": source, "index": 0}
+                next(fact for fact in mandatory["values"] if fact["descriptor"]["id"] == masked)["descriptor"] = copy.deepcopy(value)
+            # Shape validity is separate: the mutation is not an executed fact.
+            profile.validate_bitbyte_records({**{key: edited[key] for key in ("values", "regions", "frames", "cells")}, "accesses": []})
+            with self.subTest(twin=twin), self.assertRaises(profile.Failure):
+                profile._normalize_bitbyte_prefix(edited, mandatory)
+        self.assertEqual(profile.execute_bitbyte_prefixes(capture).inspect(), materialized)
+
+    def assert_bitbyte_actual_facts(self, prefix):
+        accesses = [access for event in prefix["events"] if event["tag"] == "instruction"
+                    for kind in ("reads", "writes") for access in event[kind]]
+        record = {key: prefix[key] for key in ("values", "regions", "frames", "cells")}
+        record["accesses"] = accesses
+        codec = profile._BitByteCodec(record)
+        facts = prefix["actual_bit_facts"]
+        self.assertEqual({fact["descriptor"]["id"] for fact in facts["values"]}, set(codec.values))
+        for fact in facts["values"]:
+            self.assertEqual(codec.value_bits(fact["descriptor"]["id"]), fact["bits"])
+        for fact in facts["accesses"]:
+            access = prefix["events"][fact["step"]][fact["kind"]][fact["ordinal"]]
+            self.assertEqual(access["location"], fact["location"])
+            self.assertEqual([bit for part in access["bytes"] for bit in codec.byte_bits(part)], fact["bits"])
+        for boundary in facts["boundaries"]:
+            state = prefix if boundary["kind"] == "terminal" else prefix["helper_calls"][boundary["occurrence"]][
+                "input" if boundary["kind"] == "helper-input" else "output"]
+            self.assertEqual(len(state["cells"]), len(boundary["state"]["cells"]))
+            expected = {profile.canonical(fact["location"]): fact["bits"] for fact in boundary["state"]["cell_bits"]}
+            for cell in state["cells"]:
+                self.assertEqual([bit for part in cell["bytes"] for bit in codec.byte_bits(part)], expected[profile.canonical(cell["location"])])
+        return codec
 
     def test_four_fresh_d8_retirement_corridors_reach_registration(self):
         for case in self.cases:

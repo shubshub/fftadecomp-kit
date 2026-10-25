@@ -1,8 +1,8 @@
 """Inactive registration foundation: capture and decoded execution prefixes.
 
-The retained helper API stops before S3 retirement. The additive restoration
-API continues proved corridors to registration entry; both remain incomplete
-and supply no completed public history, registration proof or public report.
+The retained helper API stops before S3 retirement. Additive restoration and
+BitByte APIs continue proved corridors to registration entry. Every result is
+incomplete and supplies no public history, registration proof or public report.
 """
 
 from dataclasses import dataclass
@@ -3153,6 +3153,478 @@ def execute_restoration_prefixes(capture):
         raise Failure("identity", "malformed bound restoration capture") from error
 
 
+class _BitByteCodec:
+    """Closed record vocabulary only; validity does not authenticate execution."""
+
+    base = private.Checker.base
+    interval = private.Checker.interval
+    origin = _Entry.origin
+
+    def __init__(self, record):
+        self._visits = 0
+        require(type(record) is dict and set(record) == {"values", "regions", "frames", "cells", "accesses"},
+                "wrong public byte record fields")
+        seen = set()
+        for name in ("values", "regions", "frames"):
+            require(type(record[name]) is list, "public records require lists")
+            registry = {}
+            for item in record[name]:
+                if name == "values" and type(item) is dict and item.get("tag") == "bytes":
+                    require(set(item) == {"id", "tag", "width", "bytes"}, "wrong public Value fields")
+                    private.validate(item["id"], "ID")
+                    private.validate(item["width"], "Width")
+                    require(type(item["bytes"]) is list and len(item["bytes"]) == item["width"], "public Value width differs")
+                else:
+                    private.validate(item, {"values": "Value", "regions": "Region", "frames": "Frame"}[name])
+                require(item["id"] not in seen, "duplicate or wrong-kind public definition")
+                registry[item["id"]] = copy.deepcopy(item)
+                seen.add(item["id"])
+            setattr(self, name, registry)
+        self.invocations = set()
+        for frame in self.frames.values():
+            require(frame["invocation"] not in seen or frame["invocation"] in self.invocations, "wrong-kind public invocation")
+            seen.add(frame["invocation"])
+            self.invocations.add(frame["invocation"])
+            for save in frame["saves"]:
+                require(save["witness"] not in seen, "duplicate public save witness")
+                seen.add(save["witness"])
+        for region in self.regions.values():
+            self._region_depth(region["id"])
+            self.base(region["id"])
+            if region["base"]["tag"] == "allocated":
+                self.interval(region["base"]["domain"])
+            require(region["frame"] is None or region["frame"] in self.frames, "dangling public owner frame")
+            require((region["kind"] == "stack-allocation") == (region["frame"] is not None), "public allocation owner differs")
+        for frame in self.frames.values():
+            self._frame_depth(frame["id"])
+            require(frame["entry_sp"] in self.values and private.width(self.values[frame["entry_sp"]]) == 4,
+                    "dangling public entry SP")
+            _Entry.stack_pointer(self, frame["entry_sp"])
+            require(frame["allocations"] == sorted(region["id"] for region in self.regions.values() if region["frame"] == frame["id"]),
+                    "public frame allocation membership differs")
+            for save in frame["saves"]:
+                self.interval(save["location"])
+                require(save["value"] in self.values and private.width(self.values[save["value"]]) == 4 and
+                        save["location"]["size"] == 4 and self.regions[save["location"]["region"]]["frame"] == frame["id"],
+                        "public save ownership/value differs")
+        for value in self.values.values():
+            if value["tag"] == "pointer":
+                require(value["region"] in self.regions and value["offset"] <= self.regions[value["region"]]["size"], "dangling public pointer")
+            elif value["tag"] == "symbolic":
+                self.origin(value["origin"])
+            elif value["tag"] == "control":
+                require(value["invocation"] in self.invocations and (value["target"] is None or value["target"] & 1), "invalid public control")
+            elif value["tag"] == "constant":
+                require(value["value"] < 1 << (8 * private.width(value)), "public constant width overflow")
+            elif value["tag"] == "condition-word":
+                for location in value["excluded"]:
+                    self.interval(location)
+            self.value_bits(value["id"])
+        for name in ("cells", "accesses"):
+            require(type(record[name]) is list, "public records require lists")
+            for access in record[name]:
+                require(type(access) is dict and set(access) == {"location", "bytes"}, "wrong public Cell/Access fields")
+                private.validate(access["location"], "Slice")
+                self.interval(access["location"])
+                require(type(access["bytes"]) is list and len(access["bytes"]) == access["location"]["size"], "public access width differs")
+                for part in access["bytes"]:
+                    self.byte_bits(part)
+
+    def _visit(self):
+        self._visits += 1
+        require(self._visits <= MAX_CALLER_TRANSFERS, "public byte traversal budget exhausted", "unsupported")
+
+    def _region_depth(self, reference, active=()):
+        self._visit()
+        require(reference in self.regions and reference not in active and len(active) < MAX_CALLER_DEPTH,
+                "public region depth/cycle", "unsupported")
+        base = self.regions[reference]["base"]
+        if base["tag"] == "relative":
+            self._region_depth(base["region"], (*active, reference))
+        elif base["tag"] == "allocated":
+            self._region_depth(base["domain"]["region"], (*active, reference))
+
+    def _frame_depth(self, reference, active=()):
+        self._visit()
+        require(reference in self.frames and reference not in active and len(active) < MAX_CALLER_DEPTH,
+                "public frame depth/cycle", "unsupported")
+        parent = self.frames[reference]["parent"]
+        if parent is not None:
+            self._frame_depth(parent, (*active, reference))
+
+    def atom(self, bit):
+        self._visit()
+        if type(bit) is int:
+            require(bit in (0, 1), "invalid public constant bit")
+            return bit
+        require(type(bit) is dict and bit.get("tag") in ("value-bit", "origin-bit"), "invalid public bit atom")
+        if bit["tag"] == "origin-bit":
+            require(set(bit) == {"tag", "origin", "index"}, "wrong OriginBit fields")
+            private.validate(bit["origin"], "Origin")
+            require(type(bit["index"]) is int and 0 <= bit["index"] < 8, "invalid origin bit index")
+            self.origin(bit["origin"])
+        else:
+            require(set(bit) == {"tag", "value", "index"}, "wrong ValueBit fields")
+            require(type(bit["value"]) is str and bit["value"] in self.values, "dangling ValueBit")
+            source = self.values[bit["value"]]
+            require(source["tag"] in ("symbolic", "pointer", "function", "control", "condition-word"), "ValueBit requires opaque Value")
+            require(type(bit["index"]) is int and 0 <= bit["index"] < 8 * private.width(source), "invalid value bit index")
+        return copy.deepcopy(bit)
+
+    @staticmethod
+    def fallback(bits):
+        if all(type(bit) is int for bit in bits):
+            return {"tag": "constant", "value": sum(bit << index for index, bit in enumerate(bits))}
+        if all(type(bit) is dict and bit["tag"] == "origin-bit" and bit["index"] == index and
+               bit["origin"] == bits[0]["origin"] for index, bit in enumerate(bits)):
+            return {"tag": "unknown", "origin": copy.deepcopy(bits[0]["origin"])}
+        if all(type(bit) is dict and bit["tag"] == "value-bit" and bit["value"] == bits[0]["value"] and
+               bit["index"] == bits[0]["index"] + index for index, bit in enumerate(bits)) and bits[0]["index"] % 8 == 0:
+            return {"tag": "fragment", "value": bits[0]["value"], "index": bits[0]["index"] // 8}
+        return {"tag": "bits", "bits": copy.deepcopy(bits)}
+
+    def byte_bits(self, part, active=()):
+        self._visit()
+        require(type(part) is dict, "public byte requires an object")
+        if part.get("tag") == "bits":
+            require(set(part) == {"tag", "bits"} and type(part["bits"]) is list and len(part["bits"]) == 8, "wrong BitByte fields/width")
+            bits = [self.atom(bit) for bit in part["bits"]]
+            require(self.fallback(bits)["tag"] == "bits", "reducible BitByte")
+            return bits
+        private.validate(part, "Byte")
+        if part["tag"] == "constant":
+            return [(part["value"] >> index) & 1 for index in range(8)]
+        if part["tag"] == "unknown":
+            self.origin(part["origin"])
+            return [{"tag": "origin-bit", "origin": copy.deepcopy(part["origin"]), "index": index} for index in range(8)]
+        require(part["value"] in self.values and part["index"] < private.width(self.values[part["value"]]), "dangling/invalid public fragment")
+        return self.value_bits(part["value"], active)[part["index"] * 8:part["index"] * 8 + 8]
+
+    def value_bits(self, reference, active=()):
+        self._visit()
+        require(reference in self.values and reference not in active and len(active) < MAX_CALLER_DEPTH,
+                "public value reference/cycle/depth", "unsupported")
+        value = self.values[reference]
+        if value["tag"] == "constant":
+            return [(value["value"] >> index) & 1 for index in range(8 * private.width(value))]
+        if value["tag"] == "bytes":
+            return [bit for part in value["bytes"] for bit in self.byte_bits(part, (*active, reference))]
+        return [{"tag": "value-bit", "value": reference, "index": index} for index in range(8 * private.width(value))]
+
+    def lineage(self, part, active=()):
+        self._visit()
+        if part["tag"] == "fragment":
+            reference = part["value"]
+            require(reference not in active and len(active) < MAX_CALLER_DEPTH, "public lineage depth/cycle", "unsupported")
+            value = self.values[reference]
+            if value["tag"] in ("pointer", "function", "control"):
+                return {reference}
+            if value["tag"] == "constant" and any(region["kind"] == "stack-allocation" and self.base(region["id"])[0] == "concrete" and
+                    self.base(region["id"])[1] <= value["value"] <= self.base(region["id"])[1] + region["size"] for region in self.regions.values()):
+                return {reference}
+            if value["tag"] == "bytes":
+                return set().union(*(self.lineage(child, (*active, reference)) for child in value["bytes"]))
+        if part["tag"] == "bits":
+            return set().union(*(self.lineage({"tag": "fragment", "value": bit["value"], "index": bit["index"] // 8}, active)
+                                 for bit in part["bits"] if type(bit) is dict and bit["tag"] == "value-bit"))
+        return set()
+
+    def normalize_byte(self, original, bits):
+        require(type(bits) is list and len(bits) == 8, "incomplete mandatory byte facts")
+        bits = [self.atom(bit) for bit in bits]
+        expanded = self.byte_bits(original)
+        if expanded == bits:
+            return copy.deepcopy(original)
+        require(not self.lineage(original), "normalization would erase/change known lineage", "local-effect")
+        return self.fallback(bits)
+
+
+def validate_bitbyte_records(record):
+    """Validate closed complete records, not their execution provenance."""
+    try:
+        _BitByteCodec(record)
+    except RecursionError as error:
+        raise Failure("unsupported", "public byte record depth exhausted") from error
+    except (KeyError, TypeError, ValueError) as error:
+        raise Failure("identity", "malformed public byte records") from error
+
+
+@dataclass(frozen=True)
+class PrivateByteRecords:
+    """Unchanged private records only; no selected roots or projection claim."""
+    encoded: str
+
+    def inspect(self):
+        return private.decode(self.encoded)
+
+
+def lower_bitbyte_records(record):
+    """Losslessly retain every supplied definition or refuse the whole record."""
+    try:
+        record = copy.deepcopy(record)
+    except RecursionError as error:
+        raise Failure("unsupported", "private byte record depth exhausted") from error
+    validate_bitbyte_records(record)
+    for value in record["values"]:
+        if value["tag"] == "bytes":
+            require(not any(part["tag"] == "bits" for part in value["bytes"]),
+                    "private record conversion: irreducible Value " + value["id"], "unsupported")
+        private.validate(value, "Value")
+    for name, spec in (("cells", "Cell"), ("accesses", "Access")):
+        for access in record[name]:
+            require(not any(part["tag"] == "bits" for part in access["bytes"]),
+                    "private record conversion: irreducible " + spec + " " + canonical(access["location"]), "unsupported")
+            private.validate(access, spec)
+    return PrivateByteRecords(canonical(record))
+
+
+def _public_atoms(bits):
+    result = []
+    for bit in bits:
+        if type(bit) is int:
+            require(bit in (0, 1), "invalid mandatory constant bit")
+            result.append(bit)
+        else:
+            require(type(bit) in (tuple, list) and len(bit) == 3 and bit[0] in ("value", "byte"), "malformed mandatory bit atom")
+            result.append({"tag": "value-bit", "value": bit[1], "index": bit[2]} if bit[0] == "value" else
+                          {"tag": "origin-bit", "origin": private.decode(bit[1]), "index": bit[2]})
+    return result
+
+
+def _public_snapshot(snapshot):
+    result = copy.deepcopy(snapshot)
+    for sidecar in ("bits", "cell_bits"):
+        for fact in result[sidecar]:
+            fact["bits"] = _public_atoms(fact["bits"])
+    return result
+
+
+class _BitByteState(_RestorationState):
+    """Actual-state-local immutable facts; discarded probes own their copies."""
+
+    def __init__(self, context, body, rom):
+        self._byte_values, self._byte_pending_values = [], []
+        self._byte_accesses, self._byte_pending_accesses = [], []
+        self._byte_boundaries, self._byte_hint, self._byte_occurrence = [], None, 0
+        super().__init__(context, body, rom)
+        for value in self.values.values():
+            self._byte_values.append(canonical({"descriptor": value, "bits": _public_atoms(self.bitvector(value["id"])),
+                                               "step": 0, "entry": True}))
+
+    def make(self, tag, **members):
+        reference = super().make(tag, **members)
+        self._byte_pending_values.append(canonical(self.values[reference]))
+        return reference
+
+    def _byte_flush(self):
+        for descriptor in self._byte_pending_values:
+            value = private.decode(descriptor)
+            require(value == self.values[value["id"]], "generated Value descriptor drift")
+            self._byte_values.append(canonical({"descriptor": value, "bits": _public_atoms(self.bitvector(value["id"])),
+                                               "step": len(self.events), "entry": False}))
+        self._byte_pending_values = []
+
+    def _byte_access(self, kind, location, parts, bits):
+        self._byte_flush()
+        accesses = self.reads if kind == "reads" else self.writes
+        self._byte_pending_accesses.append(canonical({"occurrence": self._byte_occurrence, "kind": kind, "ordinal": len(accesses) - 1,
+            "location": location, "bytes": parts, "bits": _public_atoms(bits), "available": len(self._byte_values)}))
+
+    def read(self, location):
+        parts, bits = super().read(location)
+        self._byte_access("reads", location, parts, bits)
+        return parts, bits
+
+    def write(self, location, reference, *, save=False):
+        super().write(location, reference, save=save)
+        self._byte_access("writes", location, self.writes[-1]["bytes"], self.bitvector(reference)[:location["size"] * 8])
+
+    def event(self, tag, **members):
+        self._byte_flush()
+        if tag == "instruction":
+            facts = [private.decode(item) for item in self._byte_pending_accesses]
+            for kind in ("reads", "writes"):
+                actual = [fact for fact in facts if fact["kind"] == kind]
+                require(len(actual) == len(members[kind]) and all(fact["ordinal"] == index and
+                        {key: fact[key] for key in ("location", "bytes")} == access for index, (fact, access) in enumerate(zip(actual, members[kind]))),
+                        "actual instruction access facts disagree")
+            self._byte_accesses.extend(canonical({**fact, "step": len(self.events)}) for fact in facts)
+            self._byte_pending_accesses = []
+            self._byte_occurrence += 1
+        return super().event(tag, **members)
+
+    def snapshot(self):
+        self._byte_flush()
+        snapshot = super().snapshot()
+        require(self._byte_hint is not None, "unbound actual helper boundary")
+        self._byte_boundaries.append(canonical({"kind": self._byte_hint[0], "occurrence": self._byte_hint[1],
+            "step": len(self.events), "available": len(self._byte_values), "state": _public_snapshot(snapshot)}))
+        return snapshot
+
+    def enter(self, body, instruction):
+        self._byte_hint = ("helper-input", len(self.helper_calls))
+        try:
+            return super().enter(body, instruction)
+        finally:
+            self._byte_hint = None
+
+    def leave(self):
+        self._byte_hint = ("helper-output", self.scopes[-1]["call"])
+        try:
+            return super().leave()
+        finally:
+            self._byte_hint = None
+
+    def output(self, status, target=None):
+        self._byte_flush()
+        require(not self._byte_pending_accesses, "unfinished actual access evidence")
+        output = super().output(status, target)
+        digest = output["path"].split("/")[1]
+        replacements = {identifier: identifier.replace(_ZERO_DIGEST, digest) for registry in (self.values, self.regions, self.frames, self.saves)
+                        for identifier in registry if identifier.startswith("pub/")}
+        replacements.update(self.export_identities(digest))
+
+        def rename(value):
+            if type(value) is dict:
+                return {key: rename(child) for key, child in value.items()}
+            if type(value) is list:
+                return [rename(child) for child in value]
+            return replacements.get(value, value) if type(value) is str else value
+
+        facts = rename({"values": [private.decode(item) for item in self._byte_values],
+                        "accesses": [private.decode(item) for item in self._byte_accesses],
+                        "boundaries": [private.decode(item) for item in self._byte_boundaries]})
+        return _normalize_bitbyte_prefix(output, facts)
+
+
+def _normalize_bitbyte_prefix(output, facts):
+    """Compare retained actual facts before replacing any public Byte envelope."""
+    output = _public_snapshot(output)
+    original = {value["id"]: value for value in output["values"]}
+    definitions = {fact["descriptor"]["id"]: fact for fact in facts["values"]}
+    require(len(definitions) == len(facts["values"]) and set(definitions) == set(original), "missing/duplicate historical Value facts")
+    positions = {fact["descriptor"]["id"]: index for index, fact in enumerate(facts["values"])}
+    entry = {reference for reference, fact in definitions.items() if fact["entry"]}
+    normalized, active = {}, set()
+    dependencies = {"values": list(original.values()), "regions": output["regions"], "frames": output["frames"], "cells": [], "accesses": []}
+    codec = _BitByteCodec(dependencies)
+
+    def available(bits, count):
+        for bit in bits:
+            codec.atom(bit)
+            if type(bit) is dict and bit["tag"] == "value-bit":
+                require(positions[bit["value"]] < count, "future historical bit reference")
+
+    def normalize(reference):
+        if reference in normalized:
+            return
+        require(reference not in active and len(active) < MAX_CALLER_DEPTH, "normalization cycle/depth", "unsupported")
+        active.add(reference)
+        fact, value = definitions[reference], original[reference]
+        require(fact["descriptor"] == value, "historical Value descriptor differs")
+        require(len(fact["bits"]) == private.width(value) * 8, "incomplete historical Value bits")
+        for bit in fact["bits"]:
+            codec.atom(bit)
+            if type(bit) is dict and bit["tag"] == "value-bit" and bit["value"] != reference:
+                require(bit["value"] in entry or positions[bit["value"]] < positions[reference], "future historical Value bits")
+        result = copy.deepcopy(value)
+        if value["tag"] == "bytes":
+            for part in value["bytes"]:
+                if part["tag"] == "fragment":
+                    source = part["value"]
+                    require(source in entry or positions[source] < positions[reference], "future historical fragment")
+                    normalize(source)
+            result["bytes"] = [codec.normalize_byte(part, fact["bits"][index * 8:index * 8 + 8]) for index, part in enumerate(value["bytes"])]
+        else:
+            require(codec.value_bits(reference) == fact["bits"], "opaque/constant Value facts differ", "local-effect")
+        codec.values[reference] = result
+        require(codec.value_bits(reference) == fact["bits"], "normalized Value loses mandatory bits")
+        normalized[reference] = result
+        active.remove(reference)
+
+    for reference in sorted(original):
+        normalize(reference)
+    expected = {fact["value"]: fact["bits"] for fact in output["bits"]}
+    require(len(expected) == len(output["bits"]) and all(expected[reference] == definitions[reference]["bits"] for reference in original),
+            "terminal Value facts disagree with actual generation")
+    output["values"] = [normalized[reference] for reference in sorted(normalized)]
+
+    def cells(snapshot, count):
+        require(set(fact["value"] for fact in snapshot["bits"]) == set(list(positions)[:count]), "boundary Value definitions differ")
+        for fact in snapshot["bits"]:
+            require(fact["bits"] == definitions[fact["value"]]["bits"], "boundary Value bits differ")
+        by_location = {canonical(fact["location"]): fact["bits"] for fact in snapshot["cell_bits"]}
+        require(len(by_location) == len(snapshot["cell_bits"]) == len(snapshot["cells"]), "missing/duplicate boundary cell facts")
+        for cell in snapshot["cells"]:
+            bits = by_location[canonical(cell["location"])]
+            require(len(bits) == cell["location"]["size"] * 8, "incomplete boundary cell bits")
+            available(bits, count)
+            cell["bytes"] = [codec.normalize_byte(part, bits[index * 8:index * 8 + 8]) for index, part in enumerate(cell["bytes"])]
+
+    boundary_keys = {(fact["kind"], fact["occurrence"]): fact for fact in facts["boundaries"]}
+    require(len(boundary_keys) == len(facts["boundaries"]), "duplicate actual helper boundary")
+    used = set()
+    for call in output["helper_calls"]:
+        for field, kind in (("input", "helper-input"), ("output", "helper-output")):
+            if call[field] is None:
+                continue
+            key = (kind, call["occurrence"])
+            require(key in boundary_keys, "missing actual helper boundary")
+            boundary = boundary_keys[key]
+            call[field] = _public_snapshot(call[field])
+            require(call[field] == boundary["state"], "actual helper boundary changed")
+            cells(call[field], boundary["available"])
+            used.add(key)
+    require(used == set(boundary_keys), "orphan actual helper boundary")
+    terminal = {key: copy.deepcopy(output[key]) for key in ("registers", "sp", "lr", "cells", "bits", "cell_bits", "pending")}
+    terminal.update({lifetime: sorted(region["id"] for region in output["regions"] if region["kind"] in ("stack-allocation", "external") and
+                                    region["lifetime"] == lifetime) for lifetime in ("live", "retired")})
+    facts["boundaries"].append({"kind": "terminal", "occurrence": None, "step": len(output["events"]),
+                                "available": len(definitions), "state": copy.deepcopy(terminal)})
+    cells(output, len(definitions))
+    access_keys = {(fact["step"], fact["kind"], fact["ordinal"]): fact for fact in facts["accesses"]}
+    require(len(access_keys) == len(facts["accesses"]), "duplicate historical access fact")
+    used, occurrence = set(), 0
+    for event in output["events"]:
+        if event["tag"] != "instruction":
+            continue
+        for kind in ("reads", "writes"):
+            for ordinal, access in enumerate(event[kind]):
+                key = (event["step"], kind, ordinal)
+                require(key in access_keys, "missing historical Access bits")
+                fact = access_keys[key]
+                require(fact["occurrence"] == occurrence and {key: fact[key] for key in ("location", "bytes")} == access,
+                        "actual historical Access differs")
+                require(len(fact["bits"]) == access["location"]["size"] * 8, "incomplete historical Access bits")
+                available(fact["bits"], fact["available"])
+                access["bytes"] = [codec.normalize_byte(part, fact["bits"][index * 8:index * 8 + 8]) for index, part in enumerate(access["bytes"])]
+                used.add(key)
+        occurrence += 1
+    require(used == set(access_keys), "orphan historical Access facts")
+    output["actual_bit_facts"] = facts
+    return output
+
+
+@dataclass(frozen=True)
+class BitBytePrefixes:
+    """Fresh incomplete public-byte representation, never a full P5 history."""
+    encoded: str
+
+    def inspect(self):
+        return private.decode(self.encoded)
+
+
+def execute_bitbyte_prefixes(capture):
+    """Execute the bound caller anew; supplied histories/checkpoints are invalid."""
+    require(type(capture) is BoundCapture, "BitByte execution requires a bound capture")
+    try:
+        return _execute_caller_prefixes(capture, qualify_helpers=True, restore=True, bitbyte=True)
+    except RecursionError as error:
+        raise Failure("unsupported", "BitByte execution depth exhausted") from error
+    except (KeyError, TypeError, ValueError, struct.error) as error:
+        raise Failure("identity", "malformed bound BitByte execution") from error
+
+
 def execute_caller_prefixes(capture):
     """Explore decoded caller prefixes; every external call remains unqualified.
 
@@ -3167,10 +3639,10 @@ def execute_caller_prefixes(capture):
         raise Failure("identity", "malformed bound caller capture") from error
 
 
-def _execute_caller_prefixes(capture, qualify_helpers=False, restore=False):
+def _execute_caller_prefixes(capture, qualify_helpers=False, restore=False, bitbyte=False):
     record, program, calls = _caller_program(capture)
     context = capture.fixed.request.to_dict()["entry"]
-    state_type = _RestorationState if restore else _HelperState if qualify_helpers else _CallerState
+    state_type = _BitByteState if bitbyte else _RestorationState if restore else _HelperState if qualify_helpers else _CallerState
     initial = state_type(context, record["caller"], capture.fixed.rom.data)
     initial.literal_bindings = {item["resolved"]["linked_address"]: item["resolved"]
                                for item in record["relocations"] if item["kind"] == 2}
@@ -3301,8 +3773,8 @@ def _execute_caller_prefixes(capture, qualify_helpers=False, restore=False):
     require(len(paths) == len(set(paths)), "duplicate completed prefix trace with unmerged states", "unsupported")
     require(finished and any(item["status"] == "returned-prefix" for item in finished) and
             any(item["status"].startswith("suspended-") for item in finished), "incomplete caller prefix exploration", "unsupported")
-    result_type = RestorationPrefixes if restore else HelperPrefixes if qualify_helpers else CallerPrefixes
-    kind = "internal-incomplete-restoration-prefixes-v1" if restore else "internal-incomplete-helper-prefixes-v1" if qualify_helpers else "internal-incomplete-caller-prefixes-v1"
+    result_type = BitBytePrefixes if bitbyte else RestorationPrefixes if restore else HelperPrefixes if qualify_helpers else CallerPrefixes
+    kind = "internal-incomplete-bitbyte-prefixes-v1" if bitbyte else "internal-incomplete-restoration-prefixes-v1" if restore else "internal-incomplete-helper-prefixes-v1" if qualify_helpers else "internal-incomplete-caller-prefixes-v1"
     return result_type(canonical({"kind": kind, "complete": False,
                                     "raw_inputs": raw, "prefixes": sorted(finished, key=lambda item: item["path"]),
                                     "states": budget.states, "transfers": budget.transfers,
