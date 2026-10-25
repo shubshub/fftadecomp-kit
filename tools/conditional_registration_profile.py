@@ -1,7 +1,7 @@
-"""Inactive registration foundation: acquisition, capture and caller prefixes.
+"""Inactive registration foundation: capture and decoded execution prefixes.
 
-Internal execution stops before every unqualified external call. It supplies
-neither completed public histories nor a registration proof or public report.
+Internal helper execution stops before registration and S3 retirement. It
+supplies no completed public history, registration proof or public report.
 """
 
 from dataclasses import dataclass
@@ -38,8 +38,8 @@ ROM_SHA1 = "4ac05441f4de70a4ec3dd932116346c61b8783d9"
 CAPTURE_TIMEOUT = 60
 PLACEMENT_RULE = "thumb-entry-typed-registration-context-v1"
 REMAINING_OBLIGATIONS = (
-    "S2a: independent review of instruction-derived internal caller prefixes",
-    "S2b/P5: full helper qualification, outputs and complete histories/coverage",
+    "S2b: independent review of bounded decoded helper execution and state facts",
+    "P5: lossless schema representation and complete histories/coverage",
     "P6-P7: private bridge, live projection/import, immediate retirement and restoration",
     "P8: complete canonical reports, replay, terminal consumer routing and atomic publication",
 )
@@ -2236,7 +2236,8 @@ class _CallerState:
         digest = hashlib.sha256(b"conditional-registration-path-v1\0" + canonical(self.decisions).encode()).hexdigest()
         # Only generated reserved IDs change; entry IDs/anchors cannot use pub/.
         replacements = {identifier: identifier.replace(_ZERO_DIGEST, digest) for registry in
-                        (self.values, self.regions, self.saves) for identifier in registry if identifier.startswith("pub/")}
+                        (self.values, self.regions, self.saves, self.frames) for identifier in registry if identifier.startswith("pub/")}
+        replacements.update(self.export_identities(digest))
 
         def rename(value):
             if type(value) is dict:
@@ -2267,14 +2268,27 @@ class _CallerState:
                            self.key(cell["location"]["region"], cell["location"]["offset"]), self.part_bits(cell["bytes"][0]))} for cell in cells],
                        "events": self.events, "edges": self.edges,
                        "bits": [{"value": ref, "bits": self.bitvector(ref)} for ref in sorted(self.values)],
-                       "domains": [{"kind": kind, "value": ref, "ranges": ranges} for (kind, ref), ranges in sorted(self.domains.items())]})
+                       "domains": [{"kind": kind, "value": ref, "ranges": ranges} for (kind, ref), ranges in sorted(self.domains.items())],
+                       **self.export_members()})
         # Encoded origins occur only in typed bit facts, never ordinary ID lists.
-        for sidecar in ("bits", "cell_bits"):
-            for fact in output[sidecar]:
-                for bit in fact["bits"]:
-                    if type(bit) is list and bit[0] == "byte":
-                        bit[1] = canonical(rename(private.decode(bit[1])))
+        snapshots = [output]
+        for call in output.get("helper_calls", []):
+            snapshots.append(call["input"])
+            if call["output"] is not None:
+                snapshots.append(call["output"])
+        for snapshot in snapshots:
+            for sidecar in ("bits", "cell_bits"):
+                for fact in snapshot[sidecar]:
+                    for bit in fact["bits"]:
+                        if type(bit) is list and bit[0] == "byte":
+                            bit[1] = canonical(rename(private.decode(bit[1])))
         return output
+
+    def export_identities(self, digest):
+        return {}
+
+    def export_members(self):
+        return {}
 
 
 def _caller_transfer(state, insn, capture):
@@ -2485,6 +2499,366 @@ def _caller_transfer(state, insn, capture):
     return following
 
 
+def _helper_program(fixed, target):
+    """Close one mapped Thumb body over its actual ROM bytes, without summaries."""
+    from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+    from capstone.arm import ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG
+    named, _ = _maps(fixed)
+    matches = [(name, extent) for name, extent in named.items() if extent[0] == target]
+    require(len(matches) == 1 and matches[0][1][2] == "thumb", "helper target lacks unique mapped Thumb body", "unsupported")
+    _, (start, end, _) = matches[0]
+    require(ROM_BASE <= start < end <= ROM_BASE + len(fixed.rom.data), "helper extent outside bound ROM")
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    decoder.detail = True
+    program, occupied, literals, pending = {}, set(), set(), [start]
+    branches = {"beq", "bne", "bhi", "bls", "bhs", "blo", "bgt", "ble", "bge", "blt"}
+    allowed = {"push", "pop", "mov", "movs", "add", "adds", "sub", "subs", "lsls", "lsrs", "asrs", "muls",
+               "ands", "orrs", "cmp", "ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "str", "strb", "strh", "b", "bl", "bx", "nop"} | branches
+    while pending:
+        pc = pending.pop()
+        if pc in program:
+            continue
+        require(start <= pc < end and pc % 2 == 0 and pc not in occupied and pc not in literals,
+                "helper edge targets non-instruction bytes")
+        instruction = next(decoder.disasm(fixed.rom.data[pc - ROM_BASE:min(pc + 4, end) - ROM_BASE], pc, count=1), None)
+        require(instruction is not None and instruction.size in (2, 4) and pc + instruction.size <= end,
+                "helper instruction is truncated")
+        insn_bytes = set(range(pc, pc + instruction.size))
+        require(not insn_bytes & (occupied | literals), "helper instruction/literal ownership overlap")
+        require(instruction.mnemonic in allowed, "unsupported helper instruction: " + instruction.mnemonic, "unsupported")
+        program[pc] = instruction
+        occupied.update(insn_bytes)
+        operands, mnemonic = instruction.operands, instruction.mnemonic
+        names = [private.Checker.regname(instruction, operand.reg) if operand.type == ARM_OP_REG else None for operand in operands]
+        for operand in operands:
+            if operand.type == ARM_OP_MEM and private.Checker.regname(instruction, operand.mem.base) == "pc":
+                require(mnemonic == "ldr" and not operand.mem.index, "unsupported helper PC memory operand", "unsupported")
+                word = ((pc + 4) & ~3) + operand.mem.disp
+                span = set(range(word, word + 4))
+                require(start <= word and word + 4 <= end and not span & occupied, "helper literal ownership differs")
+                literals.update(span)
+        following = pc + instruction.size
+        if mnemonic == "bx":
+            require(len(names) == 1 and names[0] not in (None, "pc", "sp"), "unsupported helper return", "unsupported")
+            targets = []
+        elif mnemonic == "b" or mnemonic in branches:
+            require(len(operands) == 1 and operands[0].type == ARM_OP_IMM, "malformed helper branch")
+            targets = [operands[0].imm] + ([] if mnemonic == "b" else [following])
+        elif mnemonic == "bl":
+            require(len(operands) == 1 and operands[0].type == ARM_OP_IMM, "unsupported indirect helper call", "unsupported")
+            targets = [following]
+        else:
+            require(not names or names[0] != "pc", "unsupported computed helper transfer", "unsupported")
+            targets = [following]
+        pending.extend(targets)
+        require(len(program) <= MAX_CALLER_TRANSFERS, "helper decoding budget exhausted", "unsupported")
+
+    def spans(addresses):
+        result = []
+        for address in sorted(addresses):
+            if result and result[-1]["end"] == address:
+                result[-1]["end"] += 1
+            else:
+                result.append({"start": address, "end": address + 1})
+        return result
+
+    alignment = spans(set(range(start, end)) - occupied - literals)
+    require(all(item["end"] - item["start"] == 2 and item["start"] % 2 == 0 and
+                fixed.rom.data[item["start"] - ROM_BASE:item["end"] - ROM_BASE] == b"\0\0" for item in alignment),
+            "helper has unclassified mapped bytes", "unsupported")
+    body = {"id": f"body/{start:08X}", "role": "helper", "start": start, "end": end,
+            "sha256": hashlib.sha256(fixed.rom.data[start - ROM_BASE:end - ROM_BASE]).hexdigest(),
+            "code": spans(occupied), "literals": spans(literals), "alignment": alignment, "runtime_start": None}
+    return body, program
+
+
+class _HelperState(_CallerState):
+    """Decoded helper scopes; all inherited provenance and liveness rules apply."""
+
+    def __init__(self, context, body, rom):
+        super().__init__(context, body, rom)
+        self.caller_context = self.context
+        self.scopes, self.helper_calls = [], []
+        self.identities = {register: register for register in (*private.REGISTERS, "sp", "lr")}
+        self.frame_evidence = [{"frame": frame, "call": None, "entered": None, "returned": None, "mode": "entry"}
+                               for frame in sorted(self.frames)]
+        self.bound_bodies = {body["id"]: body}
+        self.invocations = set()
+
+    def root(self, reference):
+        current = self.context
+        self.context = self.caller_context
+        try:
+            return super().root(reference)
+        finally:
+            self.context = current
+
+    def constant(self, number):
+        # Actual Thumb scalar arithmetic wraps at 32 bits. Pointer arithmetic
+        # still uses the inherited typed extent checks and never wraps.
+        return super().constant(number & 0xffffffff if self.scopes else number)
+
+    def snapshot(self):
+        # Reuse the accepted complete live-byte canonicalization and bit export.
+        # The private snapshot intentionally has sidecars and is not P5 State.
+        extra = self.helper_calls
+        self.helper_calls = []
+        try:
+            result = super().output("internal-helper-boundary")
+        finally:
+            self.helper_calls = extra
+        digest = result["path"].split("/")[1]
+
+        def restore(value):
+            if type(value) is dict:
+                return {key: restore(child) for key, child in value.items()}
+            if type(value) is list:
+                return [restore(child) for child in value]
+            return value.replace(digest, _ZERO_DIGEST) if type(value) is str and value.startswith("pub/") else value
+
+        state = restore({key: result[key] for key in ("registers", "sp", "lr", "cells", "bits", "cell_bits")})
+        # Origin atoms contain encoded IDs; undo only those typed atoms.
+        for sidecar in ("bits", "cell_bits"):
+            for fact in state[sidecar]:
+                for bit in fact["bits"]:
+                    if type(bit) is list and bit[0] == "byte":
+                        bit[1] = canonical(restore(private.decode(bit[1])))
+        for lifetime in ("live", "retired"):
+            state[lifetime] = sorted(region["id"] for region in self.regions.values()
+                                     if region["kind"] in ("stack-allocation", "external") and region["lifetime"] == lifetime)
+        state["pending"] = []  # No S3 retirement has executed or opened a corridor.
+        return state
+
+    def export_identities(self, digest):
+        return {identifier: identifier.replace(_ZERO_DIGEST, digest) for identifier in self.invocations}
+
+    def export_members(self):
+        return {"helper_calls": self.helper_calls, "frame_evidence": self.frame_evidence,
+                "bodies": sorted(self.bound_bodies.values(), key=lambda body: body["id"]),
+                "active_calls": [scope["call"] for scope in self.scopes]}
+
+    def enter(self, body, insn):
+        require(len(self.caller_context["frames"]) + len(self.scopes) < MAX_CALLER_DEPTH,
+                "helper frame depth exhausted", "unsupported")
+        occurrence = len(self.helper_calls)
+        input_state = self.snapshot()
+        frame, invocation = self.new_id("f"), self.new_id("i")
+        self.invocations.add(invocation)
+        call = {"occurrence": occurrence, "site": {"body": self.body["id"], "pc": self.pc}, "target": body["id"],
+                "kind": "bounded-region", "frame": frame, "input": input_state, "output": None,
+                "events": {"begin": len(self.events), "end": None}, "dependencies": []}
+        self.helper_calls.append(call)
+        scope = {"context": self.context, "body": self.body, "pc": insn.address + insn.size, "call": occurrence,
+                 "flags": self.flags, "identities": self.identities, "touched": self.touched,
+                 "restored_by": self.restored_by, "restore_steps": self.restore_steps,
+                 "literal_bindings": self.literal_bindings, "literal_values": self.literal_values}
+        self.scopes.append(scope)
+        control = self.make("control", invocation=invocation, target=(insn.address + insn.size) | 1)
+        before = self.registers["lr"]
+        self.registers["lr"] = control
+        self.event("instruction", encoding=bytes(insn.bytes).hex(),
+                   registers=[{"register": "lr", "before": before, "after": control}], reads=[], writes=[], next_pc=body["start"])
+        self.event("call-enter", occurrence=occurrence, target=body["id"], kind="bounded-region")
+        self.frames[frame] = {"id": frame, "invocation": invocation, "parent": self.context["frame"],
+                              "entry_sp": self.registers["sp"], "allocations": [], "saves": []}
+        self.context = {"invocation": invocation, "frame": frame,
+                        "registers": {name: self.registers[name] for name in private.REGISTERS},
+                        "sp": self.registers["sp"], "lr": control}
+        self.body, self.pc = body, body["start"]
+        self.literal_bindings, self.literal_values = {}, {}
+        self.identities = {register: register for register in (*private.REGISTERS, "sp", "lr")}
+        self.touched, self.restored_by = set(), {}
+        self.restore_steps = {register: [] for register in private.NONVOLATILE}
+        self.bound_bodies[body["id"]] = body
+        identifier = self.new_id("r")
+        self.regions[identifier] = {"id": identifier, "base": {"tag": "concrete", "address": body["start"]},
+                                    "size": body["end"] - body["start"], "permission": "r", "kind": "rom",
+                                    "lifetime": "live", "frame": None}
+        entered = len(self.events)
+        self.event("frame-enter", frame=frame)
+        self.frame_evidence.append({"frame": frame, "call": occurrence, "entered": entered, "returned": None, "mode": "decoded"})
+
+    def leave(self):
+        frame = self.context["frame"]
+        next(item for item in self.frame_evidence if item["frame"] == frame)["returned"] = len(self.events) - 1
+        scope = self.scopes.pop()
+        call = self.helper_calls[scope["call"]]
+        call["output"] = self.snapshot()
+        calls = self.helper_calls[scope["call"]:]
+        dependencies = {item["target"] for item in calls}
+        call["dependencies"] = [{"body": body, "sha256": self.bound_bodies[body]["sha256"]} for body in sorted(dependencies)]
+        self.context, self.body, self.pc = scope["context"], scope["body"], scope["pc"]
+        self.identities, self.touched = scope["identities"], scope["touched"]
+        self.restored_by, self.restore_steps = scope["restored_by"], scope["restore_steps"]
+        self.literal_bindings, self.literal_values = scope["literal_bindings"], scope["literal_values"]
+        # Only ABI nonvolatiles have just been proved restored. Volatiles keep
+        # their actual callee results and every surviving pointer fragment.
+        for register in ("r0", "r1", "r2", "r3", "r12", "lr"):
+            self.identities.pop(register, None)
+            self.restored_by.pop(register, None)
+        # Keep the callee's actual final flags, including preserved CMP facts.
+        # A decoded identity helper does not invent ABI flag clobbers.
+        self.event("call-return", occurrence=call["occurrence"], target=call["target"], kind="bounded-region")
+        call["events"]["end"] = len(self.events)
+
+
+def _helper_transfer(state, insn, capture):
+    """The inherited instruction rules plus actual helper operand forms."""
+    from capstone.arm import ARM_OP_REG, ARM_OP_MEM
+    names = [private.Checker.regname(insn, operand.reg) if operand.type == ARM_OP_REG else None for operand in insn.operands]
+    before, identities = dict(state.registers), dict(state.identities)
+    mnemonic = insn.mnemonic
+    if mnemonic not in ("push", "pop", "muls", "ldrsb", "ldrsh") and not (
+            len(insn.operands) == 2 and insn.operands[1].type == ARM_OP_MEM and insn.operands[1].mem.index):
+        following = _caller_transfer(state, insn, capture)
+        if mnemonic in ("mov", "movs") and names[1] in identities:
+            state.identities[names[0]] = identities[names[1]]
+        else:
+            for name in (*private.REGISTERS, "sp", "lr"):
+                if before[name] != state.registers[name]:
+                    state.identities.pop(name, None)
+        return following
+    state.reads, state.writes = [], []
+    if mnemonic == "push":
+        require(names and names == sorted(set(names), key=lambda name: 14 if name == "lr" else int(name[1:])) and
+                all(name in (*private.REGISTERS[:8], "lr") for name in names), "malformed helper PUSH")
+        allocated = [state.allocate(4) for _ in names]
+        for index, name in enumerate(names):
+            region, reference = allocated[-1 - index], before[name]
+            state.write(private.slc(region, 0, 4), reference, save=True)
+            witness = state.new_id("s")
+            save = {"witness": witness, "register": identities.get(name, name), "location": private.slc(region, 0, 4), "value": reference}
+            state.saves[witness] = {"record": save, "created": len(state.events), "consumed": None}
+            state.frames[state.context["frame"]]["saves"].append(save)
+            state.event("save-create", witness=witness)
+    elif mnemonic == "pop":
+        require(names and all(name in private.REGISTERS[:8] for name in names) and
+                names == sorted(set(names), key=lambda name: int(name[1:])), "unsupported helper POP", "unsupported")
+        for index, name in enumerate(names):
+            location = state.locate(before["sp"], index * 4, 4)
+            matches = [(witness, save) for witness, save in state.saves.items() if save["consumed"] is None and
+                       state.interval(save["record"]["location"]) == state.interval(location) and
+                       save["record"]["location"]["region"] == location["region"]]
+            require(len(matches) == 1, "helper POP lacks exact live save witness", "local-effect")
+            witness, save = matches[0]
+            parts, bits = state.read(location)
+            reference = save["record"]["value"]
+            require(parts == private.value_bytes(state.values[reference]) and bits == state.bitvector(reference),
+                    "helper POP saved byte/bit identity differs", "local-effect")
+            state.registers[name] = reference
+            state.identities[name] = save["record"]["register"]
+            state.restored_by[name] = witness
+            save["consumed"] = len(state.events)
+            state.event("save-consume", witness=witness, register=name)
+        state.retire(len(names) * 4)
+    elif mnemonic == "muls":
+        require(len(names) == 3 and all(name in state.registers for name in names), "malformed helper MUL")
+        references = [state.registers[name] for name in names[1:]]
+        require(not any(state.fragments(ref) for ref in references), "helper MUL would erase pointer fragments", "local-effect")
+        numbers = [state.number(ref) for ref in references]
+        require(all(number is not None for number in numbers), "unknown helper multiplication cannot be represented faithfully", "unsupported")
+        state.registers[names[0]] = state.constant(numbers[0] * numbers[1])
+        state.restored_by.pop(names[0], None)
+        state.identities.pop(names[0], None)
+    else:
+        require(len(insn.operands) == 2 and insn.operands[1].type == ARM_OP_MEM and names[0] in state.registers,
+                "malformed helper indexed/signed access")
+        operand = insn.operands[1].mem
+        base = private.Checker.regname(insn, operand.base)
+        require(base in state.registers, "unsupported helper indexed base", "unsupported")
+        displacement = operand.disp
+        if operand.index:
+            index = state.registers[private.Checker.regname(insn, operand.index)]
+            require(not state.fragments(index), "helper index would erase pointer fragments", "local-effect")
+            number = state.number(index)
+            require(number is not None, "unknown helper memory index", "unsupported")
+            displacement += number
+        size = 1 if mnemonic.endswith("b") else 2 if mnemonic.endswith("h") else 4
+        location = state.locate(state.registers[base], displacement, size)
+        if mnemonic.startswith("ldr"):
+            parts, bits = state.read(location)
+            reference = state.loaded(location, parts, bits)
+            if mnemonic in ("ldrsb", "ldrsh"):
+                require(not state.fragments(reference), "signed helper load would erase pointer fragments", "local-effect")
+                extended = bits + (bits[-1],) * (32 - len(bits))
+                reference = state.transformed(extended, (reference,))
+            state.registers[names[0]] = reference
+            state.restored_by.pop(names[0], None)
+            state.identities.pop(names[0], None)
+        else:
+            require(state.regions[location["region"]]["kind"] == "stack-allocation" or not state.fragments(state.registers[names[0]]),
+                    "external helper retention of pointer fragment", "local-effect")
+            state.write(location, state.registers[names[0]])
+    if insn.update_flags:
+        state.flags = None
+    state.check_live_aliases()
+    changes = [{"register": name, "before": before[name], "after": state.registers[name]}
+               for name in (*private.REGISTERS, "sp", "lr") if before[name] != state.registers[name]]
+    for change in changes:
+        if change["register"] in private.NONVOLATILE:
+            state.touched.add(change["register"])
+            state.restore_steps[change["register"]].append(len(state.events))
+    following = insn.address + insn.size
+    state.event("instruction", encoding=bytes(insn.bytes).hex(), registers=changes, reads=state.reads, writes=state.writes, next_pc=following)
+    return following
+
+
+@dataclass(frozen=True)
+class HelperPrefixes:
+    """Internal S2b execution with mandatory sidecars; never a full P5 history."""
+    encoded: str
+
+    def inspect(self):
+        return private.decode(self.encoded)
+
+    def p5_state(self, path):
+        """Materialize only a lossless P5 State, within this incomplete result."""
+        prefixes = [prefix for prefix in self.inspect()["prefixes"] if prefix["path"] == path]
+        require(len(prefixes) == 1, "unknown internal helper path")
+        prefix = prefixes[0]
+        values = {value["id"]: value for value in prefix["values"]}
+
+        def value_bits(reference, active=()):
+            require(reference not in active and len(active) < MAX_CALLER_DEPTH, "P5 representation depth exhausted", "unsupported")
+            value = values[reference]
+            if value["tag"] == "constant":
+                return [(value["value"] >> index) & 1 for index in range(private.width(value) * 8)]
+            if value["tag"] == "bytes":
+                return [bit for part in value["bytes"] for bit in part_bits(part, (*active, reference))]
+            return [["value", reference, index] for index in range(private.width(value) * 8)]
+
+        def part_bits(part, active=()):
+            if part["tag"] == "constant":
+                return [(part["value"] >> index) & 1 for index in range(8)]
+            if part["tag"] == "fragment":
+                return value_bits(part["value"], active)[part["index"] * 8:part["index"] * 8 + 8]
+            return [["byte", canonical(part["origin"]), index] for index in range(8)]
+
+        for fact in prefix["bits"]:
+            require(fact["bits"] == value_bits(fact["value"]),
+                    "P5 Value cannot represent mandatory bit facts: " + fact["value"], "unsupported")
+        cells = {canonical(cell["location"]): cell["bytes"][0] for cell in prefix["cells"]}
+        for fact in prefix["cell_bits"]:
+            require(fact["bits"] == part_bits(cells[canonical(fact["location"])]),
+                    "P5 Byte cannot represent mandatory bit facts: " + canonical(fact["location"]), "unsupported")
+        regions = prefix["regions"]
+        state = {key: prefix[key] for key in ("registers", "sp", "lr", "cells")}
+        state.update({lifetime: sorted(region["id"] for region in regions if region["kind"] in ("stack-allocation", "external") and
+                                      region["lifetime"] == lifetime) for lifetime in ("live", "retired")})
+        state["pending"] = []
+        return state
+
+
+def execute_helper_prefixes(capture):
+    """Qualify actual helpers, stopping before registration or S3 retirement."""
+    try:
+        return _execute_caller_prefixes(capture, qualify_helpers=True)
+    except RecursionError as error:
+        raise Failure("unsupported", "helper representation depth exhausted") from error
+    except (KeyError, TypeError, ValueError, struct.error) as error:
+        raise Failure("identity", "malformed bound helper capture") from error
+
+
 def execute_caller_prefixes(capture):
     """Explore decoded caller prefixes; every external call remains unqualified.
 
@@ -2499,10 +2873,10 @@ def execute_caller_prefixes(capture):
         raise Failure("identity", "malformed bound caller capture") from error
 
 
-def _execute_caller_prefixes(capture):
+def _execute_caller_prefixes(capture, qualify_helpers=False):
     record, program, calls = _caller_program(capture)
     context = capture.fixed.request.to_dict()["entry"]
-    initial = _CallerState(context, record["caller"], capture.fixed.rom.data)
+    initial = (_HelperState if qualify_helpers else _CallerState)(context, record["caller"], capture.fixed.rom.data)
     initial.literal_bindings = {item["resolved"]["linked_address"]: item["resolved"]
                                for item in record["relocations"] if item["kind"] == 2}
     initial.function_targets = {item["role"]: item["target"] | 1 for item in record["placement"]["bindings"]
@@ -2510,6 +2884,7 @@ def _execute_caller_prefixes(capture):
     budget = _CallerBudget()
     budget.state()
     pending, finished = [initial], []
+    helper_programs = {}
     selector_roots, count_roots, excluded_seven = set(), set(), set()
     comparison_pc = capture.fixed.address + record["switch"]["comparison_offset"]
     dispatch_pc = capture.fixed.address + record["switch"]["dispatch_offset"]
@@ -2518,13 +2893,22 @@ def _execute_caller_prefixes(capture):
         state = pending.pop()
         while True:
             budget.transfer()
-            require(state.pc in program, "caller execution leaves owned instruction starts")
-            insn = program[state.pc]
-            if state.pc in calls:
+            in_caller = state.body["id"] == record["caller"]["id"]
+            current_program = program if in_caller else helper_programs[state.body["start"]][1]
+            require(state.pc in current_program, "execution leaves owned instruction starts")
+            insn = current_program[state.pc]
+            if insn.mnemonic == "bl":
+                target = calls[state.pc]["target"] if in_caller else insn.operands[0].imm
                 role = "registration" if state.pc == capture.fixed.request.to_dict()["site"] else "helper"
-                finished.append(state.output("suspended-" + role, calls[state.pc]["target"]))
-                break
-            if state.pc == comparison_pc:
+                if not qualify_helpers or role == "registration":
+                    finished.append(state.output("suspended-" + role, target))
+                    break
+                if target not in helper_programs:
+                    helper_programs[target] = _helper_program(capture.fixed, target)
+                state.edges.append({"from": insn.address, "to": target, "kind": "helper-call"})
+                state.enter(helper_programs[target][0], insn)
+                continue
+            if in_caller and state.pc == comparison_pc:
                 register = private.Checker.regname(insn, insn.operands[0].reg)
                 root = state.root(state.registers[register])
                 require(root is not None and root[0] == "low8", "switch selector lacks decoded low-byte raw provenance", "unsupported")
@@ -2532,7 +2916,7 @@ def _execute_caller_prefixes(capture):
                 candidates = {item_root for item_root, number in state.conditionals if number == 0 and item_root != root and item_root[0] == "low8"}
                 count_roots.update(candidates)
                 excluded_seven.update(item_root for item_root, number in state.conditionals if number == 7 and item_root == root)
-            if state.pc == dispatch_pc and state.switch_choice is None:
+            if in_caller and state.pc == dispatch_pc and state.switch_choice is None:
                 shift = insn.operands[1]
                 root = state.root(state.registers[private.Checker.regname(insn, shift.reg)])
                 require(root is not None and root in selector_roots, "dispatch selector provenance differs")
@@ -2543,7 +2927,7 @@ def _execute_caller_prefixes(capture):
                         candidate.switch_choice = item["index"]
                         pending.append(candidate)
                 break
-            if insn.mnemonic in branches:
+            if insn.mnemonic in branches | ({"bgt", "ble", "bge", "blt"} if qualify_helpers else set()):
                 require(state.flags is not None, "caller branch lacks actual CMP flags", "unsupported")
                 left, right = state.flags
                 root, number = state.root(left), state.number(right)
@@ -2553,12 +2937,16 @@ def _execute_caller_prefixes(capture):
                 concrete = state.number(left)
                 for taken in _BRANCH_CHOICES:
                     candidate = copy.deepcopy(state)
-                    if root is not None and number is not None:
+                    if root is not None and number is not None and insn.mnemonic in branches:
                         feasible = candidate.refine(root, insn.mnemonic, number, bool(taken))
                     else:
                         require(concrete is not None and number is not None, "unsupported caller branch predicate", "unsupported")
+                        signed_left = concrete - 0x100000000 if concrete & 0x80000000 else concrete
+                        signed_right = number - 0x100000000 if number & 0x80000000 else number
                         outcome = {"beq": concrete == number, "bne": concrete != number, "bhi": concrete > number,
-                                   "bls": concrete <= number, "bhs": concrete >= number, "blo": concrete < number}[insn.mnemonic]
+                                   "bls": concrete <= number, "bhs": concrete >= number, "blo": concrete < number,
+                                   "bgt": signed_left > signed_right, "ble": signed_left <= signed_right,
+                                   "bge": signed_left >= signed_right, "blt": signed_left < signed_right}[insn.mnemonic]
                         feasible = outcome == bool(taken)
                     if feasible:
                         budget.state()
@@ -2570,14 +2958,33 @@ def _execute_caller_prefixes(capture):
                         candidate.pc = destination
                         pending.append(candidate)
                 break
-            following = _caller_transfer(state, insn, capture)
-            if insn.mnemonic == "mov" and state.pc == dispatch_pc + 8:
+            if qualify_helpers:
+                retiring = insn.mnemonic == "pop" or insn.mnemonic == "add" and insn.op_str.startswith("sp,")
+                trial = copy.deepcopy(state) if retiring else state
+                try:
+                    following = _helper_transfer(trial, insn, capture)
+                except Failure as error:
+                    retired = sorted(region for region in state.regions if state.regions[region]["lifetime"] == "live" and
+                                     trial.regions[region]["lifetime"] == "retired")
+                    if retired and "requires S3 restoration proof" in str(error):
+                        finished.append(state.output("suspended-S3-retirement", {"instruction": bytes(insn.bytes).hex(),
+                                                                               "would_retire": retired, "obligation": str(error)}))
+                        break
+                    raise
+                state = trial
+            else:
+                following = _caller_transfer(state, insn, capture)
+            if in_caller and insn.mnemonic == "mov" and state.pc == dispatch_pc + 8:
                 choice = state.switch_choice
                 require(choice is not None and following == capture.fixed.address + record["switch"]["targets"][choice]["target_offset"],
                         "decoded dispatch target differs")
                 state.decision("switch", choice, following)
                 kind = "switch-case"
             elif insn.mnemonic == "bx":
+                if qualify_helpers and state.scopes:
+                    state.edges.append({"from": insn.address, "to": following, "kind": "helper-return"})
+                    state.leave()
+                    continue
                 state.edges.append({"from": insn.address, "to": None, "kind": "return"})
                 finished.append(state.output("returned-prefix", state.context["lr"]))
                 break
@@ -2594,7 +3001,9 @@ def _execute_caller_prefixes(capture):
     require(len(paths) == len(set(paths)), "duplicate completed prefix trace with unmerged states", "unsupported")
     require(finished and any(item["status"] == "returned-prefix" for item in finished) and
             any(item["status"].startswith("suspended-") for item in finished), "incomplete caller prefix exploration", "unsupported")
-    return CallerPrefixes(canonical({"kind": "internal-incomplete-caller-prefixes-v1", "complete": False,
+    result_type = HelperPrefixes if qualify_helpers else CallerPrefixes
+    return result_type(canonical({"kind": "internal-incomplete-helper-prefixes-v1" if qualify_helpers else "internal-incomplete-caller-prefixes-v1", "complete": False,
                                     "raw_inputs": raw, "prefixes": sorted(finished, key=lambda item: item["path"]),
                                     "states": budget.states, "transfers": budget.transfers,
-                                    "remaining": ["S2b helper qualification", "S3 private bridge/projection/retirement", "complete P5 histories"]}))
+                                    "remaining": (["S3 private bridge/projection/retirement", "lossless P5 materialization and complete histories"] if qualify_helpers else
+                                                  ["S2b helper qualification", "S3 private bridge/projection/retirement", "complete P5 histories"])}))

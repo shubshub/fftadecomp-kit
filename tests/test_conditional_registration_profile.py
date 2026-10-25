@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
 
 
-SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s2a-typed-origin-repair-sol61")
+SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-s2b-sol61")
 ADDRESS = 0x08000002
 DEPENDENCY_SHA256 = "6edf9439e64096d31aa616fbadf5bb3c684893fb05c7b6ae790f3d0c3a0ba917"
 
@@ -992,6 +992,296 @@ class FreshCaptureTests(unittest.TestCase):
                                                      if profile.private.decode(artifact.path_json)["path"].endswith(".c")))
             (directory / "outcome.json").write_bytes(encoded(outcome))
 
+    def helper_case(self, case, chain=None, wrapper=None):
+        """Fresh genuine-C helper code, synthetic trust, no cached capture input."""
+        temporary = tempfile.TemporaryDirectory(prefix="helper-case-", dir=SCRATCH)
+        self.addCleanup(temporary.cleanup)
+        game = Path(temporary.name)
+        layout, address, size, baseline, baseline_rom = case
+        for path in ("src", "include", "config/conditional_registration", "symbols", "prepare"):
+            (game / path).mkdir(parents=True, exist_ok=True)
+        for relative in (f"src/{address:08X}.c", "include/fixture.h", "config/functions.json", "symbols/functions.txt",
+                         "symbols/ffta.sym", "config/data_symbols.json", profile.context_path(address)):
+            (game / relative).write_bytes((baseline / relative).read_bytes())
+        functions = profile.private.decode((game / "config/functions.json").read_text())
+        symbols = (game / "symbols/ffta.sym").read_text().splitlines()
+        helper_target = int(next(line.split()[0] for line in symbols if line.endswith(" synthetic_select_0")), 16)
+        names = {line.split()[2]: int(line.split()[0], 16) for line in symbols}
+        real_bodies = {}
+        if chain:
+            inputs = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-effects-implementation/inputs/functions.json")
+            maps = profile.private.decode(inputs.read_text())
+            targets = {0x080DBDA0, 0x0801C918} if chain == "DBDA0" else {0x080D8BD8, 0x080A880C, 0x0801CC18, 0x0801CA78, 0x0801C918}
+            with open("/home/user/Downloads/Final Fantasy Tactics Advance (USA, Australia).gba", "rb") as stream:
+                for target in sorted(targets):
+                    end = int(next(item["end"] for item in maps if int(item["rom"], 16) == target), 16)
+                    stream.seek(target - profile.ROM_BASE)
+                    real_bodies[target] = stream.read(end - target)
+                    names[f"func_{target:08X}"] = target
+            target = 0x080DBDA0 if chain == "DBDA0" else 0x080D8BD8
+            wrapper = (f"extern void func_{target:08X}(void *, void *, void *, void *);\n"
+                       f"unsigned int func_{helper_target:08X}(unsigned int left, unsigned int right) {{\n"
+                       f"func_{target:08X}((void *)0x02030000, (void *)0x02030100, (void *)0x02030104, (void *)0x02030108);\n"
+                       "return 7;\n}\n")
+        else:
+            wrapper = wrapper.replace("FUNCTION", f"func_{helper_target:08X}")
+        names[f"func_{helper_target:08X}"] = helper_target
+        prepare = game / "prepare"
+        (prepare / "helper.c").write_text(wrapper)
+        tools = {role: os.path.expandvars(spelling) for role, spelling in profile.TOOL_SPELLINGS}
+        commands = []
+
+        def run(role, *arguments):
+            commands.append(profile._run([tools[role], *map(str, arguments)], game, prepare)[0])
+
+        run("cpp", "-nostdinc", "-undef", prepare / "helper.c", "-o", prepare / "helper.i")
+        run("cc", *profile.FLAGS.split(), prepare / "helper.i", "-o", prepare / "helper.raw.s")
+        externals = {name: {"kind": "function", "target": target} for name, target in names.items()}
+        (prepare / "helper.s").write_bytes(profile.place_registration((prepare / "helper.raw.s").read_bytes(), helper_target, externals))
+        run("assembler", "-mthumb-interwork", prepare / "helper.s", "-o", prepare / "helper.o")
+        original = profile._elf((prepare / "helper.o").read_bytes())
+        helper_size = next(symbol["size"] for symbol in profile._symbols(original) if symbol["name"] == f"func_{helper_target:08X}")
+        bindings = [{"name": name, "kind": "function", "target": target} for name, target in sorted(names.items())
+                    if target != helper_target]
+        (prepare / "bindings.s").write_bytes(profile._binding_assembly(bindings))
+        run("assembler", "-mthumb-interwork", prepare / "bindings.s", "-o", prepare / "bindings.o")
+        (prepare / "helper.ld").write_bytes(profile._linker_script(helper_target))
+        run("linker", "--fatal-warnings", "--no-undefined", "--no-relax", "--orphan-handling=error", "-T", prepare / "helper.ld",
+            "-e", f"func_{helper_target:08X}", prepare / "helper.o", prepare / "bindings.o", "-o", prepare / "helper.elf")
+        run("objcopy", "-O", "binary", "--only-section=.text", prepare / "helper.elf", prepare / "helper.bin")
+        image = (prepare / "helper.bin").read_bytes()
+        rom = bytearray(max(len(baseline_rom), max((target - profile.ROM_BASE + len(data) for target, data in real_bodies.items()), default=0)))
+        rom[:len(baseline_rom)] = baseline_rom
+        offset = helper_target - profile.ROM_BASE
+        rom[offset:offset + helper_size] = image[helper_target % 4:helper_target % 4 + helper_size]
+        for target, data in real_bodies.items():
+            rom[target - profile.ROM_BASE:target - profile.ROM_BASE + len(data)] = data
+        for item in functions:
+            if int(item["rom"], 16) == helper_target:
+                item["end"] = f"0x{helper_target + helper_size:08X}"
+        functions.extend({"rom": f"0x{target:08X}", "end": f"0x{target + len(data):08X}", "mode": "thumb"}
+                         for target, data in real_bodies.items())
+        (game / "config/functions.json").write_bytes(encoded(functions))
+        (game / "symbols/functions.txt").write_text("".join(
+            f"{item['rom']} {item['end']} {int(item['end'], 16) - int(item['rom'], 16)}\n" for item in functions))
+        symbols = [f"0x{helper_target:08X} {helper_size:06X} synthetic_select_0" if line.endswith(" synthetic_select_0") else line for line in symbols]
+        symbols.extend(f"0x{target:08X} {len(data):06X} func_{target:08X}" for target, data in real_bodies.items())
+        (game / "symbols/ffta.sym").write_text("\n".join(symbols) + "\n")
+        (game / "baserom.bin").write_bytes(rom)
+        evidence = os.environ.get("FFTA_REGISTRATION_HELPER_EVIDENCE")
+        if evidence:
+            label = chain or "probe-" + hashlib.sha256(wrapper.encode()).hexdigest()[:12]
+            directory = Path(evidence) / f"{layout}-{address % 4}-{label}"
+            directory.mkdir(parents=True)
+            (directory / "source.c").write_text(wrapper)
+            (directory / "commands.json").write_bytes(encoded(commands))
+            (directory / "assembly.s").write_bytes((prepare / "helper.raw.s").read_bytes())
+        shutil.rmtree(prepare)
+        self.assertEqual(len(commands), 6)
+        return (layout, address, size, game, bytes(rom))
+
+    def helper_premises(self, request):
+        """Declared entry bytes, not decoded initialization or universal facts."""
+        entry = request["entry"]
+        descriptions = [("helper-source", 0x02030000, 16, "r"), ("helper-output", 0x02030100, 12, "rw"),
+                        ("helper-table", 0x02030200, 1024, "r"), ("helper-global", 0x02007F10, 12, "r"),
+                        ("helper-offsets", 0x02007F40, 36, "r")]
+        for identifier, address, size, permission in descriptions:
+            entry["regions"].append({"id": identifier, "base": {"tag": "concrete", "address": address}, "size": size,
+                                      "permission": permission, "kind": "external", "lifetime": "live", "frame": None})
+        source = bytes.fromhex("0000000000000000f0fffe03f8ff0000")
+        for identifier, offset, data in (("helper-source", 0, source), ("helper-global", 8, b"\x04"),
+                                         ("helper-offsets", 32, bytes.fromhex("0a001400")), ("helper-table", 532, b"\x05")):
+            entry["cells"].append({"location": profile.private.slc(identifier, offset, len(data)),
+                                     "bytes": [{"tag": "constant", "value": value} for value in data]})
+        pointer = {"id": "helper-table-pointer", "tag": "pointer", "region": "helper-table", "offset": 0}
+        entry["values"].append(pointer)
+        entry["cells"].append({"location": profile.private.slc("helper-global", 4, 4), "bytes": profile.private.value_bytes(pointer)})
+        entry["regions"].sort(key=lambda item: item["id"])
+        entry["values"].sort(key=lambda item: item["id"])
+        entry["cells"].sort(key=profile.canonical)
+
+    def test_actual_nested_output_chains_and_retained_residues(self):
+        expected_d8 = [0x080D8C00, 0x080D8C06, 0x0801CA84, 0x0801CA88, 0x0801CA90,
+                       0x0801C930, 0x0801C938, 0x0801C946, 0x0801C94E, 0x0801C950]
+        for case in self.cases:
+            for chain in ("DBDA0", "D8BD8"):
+                with self.subTest(case=case[:2], chain=chain):
+                    helper_case = self.helper_case(case, chain)
+                    capture = self.execution_capture(helper_case, self.helper_premises)
+                    result = profile.execute_helper_prefixes(capture).inspect()
+                    self.assertEqual(len(capture.commands), 7)
+                    self.assertEqual(len(result["prefixes"]), 9)
+                    selected = next(prefix for prefix in result["prefixes"] if any(
+                        decision["kind"] == "switch" and decision["choice"] == 0 for decision in prefix["decisions"]))
+                    stores = [event for event in selected["events"] if event["tag"] == "instruction" and
+                              event["location"]["body"] != capture.to_dict()["caller"]["id"] and
+                              len(event["encoding"]) == 4 and int.from_bytes(bytes.fromhex(event["encoding"]), "little") & 0xf800 == 0x8000]
+                    if chain == "D8BD8":
+                        self.assertEqual(selected["status"], "suspended-S3-retirement")
+                        self.assertEqual(selected["site"]["pc"], 0x080D8C48)
+                        self.assertEqual([event["location"]["pc"] for event in stores], expected_d8)
+                        self.assertEqual([bytes(part["value"] for part in event["writes"][0]["bytes"]).hex() for event in stores],
+                                         ["feff", "0300", "d0ff", "5000", "7000", "b0ff", "baff", "e8ff", "fcff", "4000"])
+                        values = {value["id"]: value for value in selected["values"]}
+                        self.assertEqual(values[selected["registers"]["r3"]]["tag"], "pointer")
+                        self.assertEqual(values[selected["registers"]["r8"]]["tag"], "pointer")
+                        self.assertIn(values[selected["registers"]["r3"]]["region"], selected["target"]["would_retire"])
+                        self.assertEqual(len(selected["active_calls"]), 2)
+                        self.assertEqual(sum(call["output"] is None for call in selected["helper_calls"]), 2)
+                        d8_frame = next(call["frame"] for call in selected["helper_calls"] if call["target"] == "body/080D8BD8")
+                        c9_frame = next(call["frame"] for call in selected["helper_calls"] if call["target"] == "body/0801C918")
+                        frames = {frame["id"]: frame for frame in selected["frames"]}
+                        high = {save["register"]: save for save in frames[d8_frame]["saves"] if save["register"] in ("r8", "r9", "r10")}
+                        self.assertEqual(set(high), {"r8", "r9", "r10"})
+                        d8_call = next(call for call in selected["helper_calls"] if call["frame"] == d8_frame)
+                        self.assertEqual(high["r8"]["value"], d8_call["input"]["registers"]["r8"])
+                        nested_r8 = next(save for save in frames[c9_frame]["saves"] if save["register"] == "r8")
+                        self.assertNotEqual(nested_r8["witness"], high["r8"]["witness"])
+                        self.assertEqual(values[nested_r8["value"]]["tag"], "pointer")
+                    else:
+                        self.assertEqual(selected["status"], "suspended-registration")
+                        self.assertEqual([event["location"]["pc"] for event in stores], expected_d8[-5:])
+                        self.assertTrue(all(call["output"] is not None for call in selected["helper_calls"]))
+                    self.assert_memory_origin_closure(selected)
+                    for value in selected["values"]:
+                        profile.private.validate(value, "Value")
+                    for frame in selected["frames"]:
+                        profile.private.validate(frame, "Frame")
+                    evidence = os.environ.get("FFTA_REGISTRATION_HELPER_EVIDENCE")
+                    if evidence:
+                        directory = Path(evidence) / f"{case[0]}-{case[1] % 4}-{chain}"
+                        (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+                        (directory / "capture-commands.json").write_bytes(encoded(capture.commands))
+                        (directory / "request.json").write_bytes(capture.fixed.request.file_bytes)
+                        for label, data in capture.artifacts:
+                            (directory / label).write_bytes(data)
+                        (directory / "prefixes.json").write_bytes(encoded(result))
+
+    def test_fresh_helper_unknown_output_bytes_are_materialized_without_initialization(self):
+        source = "unsigned int FUNCTION(unsigned int a, unsigned int b) { return *(volatile unsigned int *)0x02030100; }\n"
+        case = self.helper_case(self.cases[0], wrapper=source)
+        result = profile.execute_helper_prefixes(self.execution_capture(case, self.helper_premises)).inspect()
+        prefix = next(prefix for prefix in result["prefixes"] if prefix["helper_calls"])
+        call = prefix["helper_calls"][0]
+        self.assertEqual(prefix["status"], "suspended-registration")
+        self.assertFalse(any(cell["location"]["region"] == "helper-output" for cell in call["input"]["cells"]))
+        materialized = [cell for cell in call["output"]["cells"] if cell["location"]["region"] == "helper-output"]
+        self.assertEqual(len(materialized), 4)
+        for index, cell in enumerate(materialized):
+            self.assertEqual(cell["bytes"], [{"tag": "unknown", "origin": {"tag": "memory", "region": "helper-output", "offset": index}}])
+        self.assert_memory_origin_closure(prefix)
+
+    def test_fresh_helper_pointer_fragment_erasure_refuses(self):
+        source = "unsigned int FUNCTION(unsigned int a, unsigned int b) { volatile unsigned int x; return (unsigned int)&x & 255; }\n"
+        case = self.helper_case(self.cases[0], wrapper=source)
+        with self.assertRaisesRegex(profile.Failure, "erase pointer fragments"):
+            profile.execute_helper_prefixes(self.execution_capture(case))
+
+    def test_fresh_helper_generated_byte_origins_close_in_both_call_snapshots(self):
+        source = ("extern unsigned int synthetic_callback(unsigned int, unsigned int);\n"
+                  "unsigned int FUNCTION(unsigned int a, unsigned int b) { volatile unsigned int local; "
+                  "return synthetic_callback(local, b); }\n")
+        case = self.helper_case(self.cases[0], wrapper=source)
+        result = profile.execute_helper_prefixes(self.execution_capture(case)).inspect()
+        prefix = next(prefix for prefix in result["prefixes"] if prefix["helper_calls"])
+        self.assertEqual(prefix["status"], "suspended-registration")
+        self.assert_memory_origin_closure(prefix)
+        regions = {region["id"]: region for region in prefix["regions"]}
+        snapshots = [snapshot for call in prefix["helper_calls"] for snapshot in (call["input"], call["output"])]
+        seen = {sidecar: 0 for sidecar in ("bits", "cell_bits")}
+        for snapshot in snapshots:
+            self.assertIsNotNone(snapshot)
+            for sidecar in seen:
+                for fact in snapshot[sidecar]:
+                    for bit in fact["bits"]:
+                        if type(bit) is list and bit[0] == "byte":
+                            origin = profile.private.decode(bit[1])
+                            if origin["tag"] == "memory" and origin["region"].startswith("pub/"):
+                                seen[sidecar] += 1
+                                self.assertIn(origin["region"], regions)
+                                self.assertNotIn(profile._ZERO_DIGEST, origin["region"])
+                                self.assertLess(origin["offset"], regions[origin["region"]]["size"])
+        self.assertTrue(all(seen.values()))
+
+    def test_fresh_helper_save_corruption_and_in_allocation_control(self):
+        template = ("extern unsigned int synthetic_callback(unsigned int, unsigned int);\n"
+                    "unsigned int FUNCTION(unsigned int a, unsigned int b) { volatile unsigned int local[1]; "
+                    "local[INDEX] = 0; return synthetic_callback(a, b); }\n")
+        for index in (0, 1):
+            with self.subTest(index=index):
+                case = self.helper_case(self.cases[0], wrapper=template.replace("INDEX", str(index)))
+                capture = self.execution_capture(case)
+                if index:
+                    with self.assertRaisesRegex(profile.Failure, "corrupts save witness"):
+                        profile.execute_helper_prefixes(capture)
+                else:
+                    result = profile.execute_helper_prefixes(capture).inspect()
+                    prefix = next(prefix for prefix in result["prefixes"] if prefix["helper_calls"])
+                    self.assertEqual(prefix["status"], "suspended-registration")
+                    self.assertEqual(len(prefix["helper_calls"]), 2)
+                    self.assertTrue(all(call["output"] is not None for call in prefix["helper_calls"]))
+                    self.assertTrue(any(save["consumed"] is not None for save in prefix["saves"]))
+
+    def test_fresh_helper_fixed_transfer_and_depth_limits_refuse(self):
+        looping = "unsigned int FUNCTION(unsigned int a, unsigned int b) { for (;;) {} }\n"
+        case = self.helper_case(self.cases[0], wrapper=looping)
+        capture = self.execution_capture(case)
+        with patch.object(profile, "MAX_CALLER_TRANSFERS", 128), self.assertRaisesRegex(profile.Failure, "transfer.*exhausted"):
+            profile.execute_helper_prefixes(capture)
+        recursive = "unsigned int FUNCTION(unsigned int a, unsigned int b) { return FUNCTION(a, b) + 1; }\n"
+        case = self.helper_case(self.cases[0], wrapper=recursive)
+        with self.assertRaisesRegex(profile.Failure, "frame depth exhausted"):
+            profile.execute_helper_prefixes(self.execution_capture(case))
+
+    def test_fresh_helper_branch_uses_actual_known_bits_and_unsupported_gap_refuses(self):
+        known = "unsigned int FUNCTION(unsigned int a, unsigned int b) { if ((a & 255) == 0) return 1; return 2; }\n"
+        case = self.helper_case(self.cases[0], wrapper=known)
+        result = profile.execute_helper_prefixes(self.execution_capture(case)).inspect()
+        prefix = next(prefix for prefix in result["prefixes"] if prefix["helper_calls"])
+        helper = prefix["helper_calls"][0]
+        decisions = [decision for decision in prefix["decisions"] if decision["location"]["body"] == helper["target"]]
+        self.assertEqual(len(decisions), 1)
+        values = {value["id"]: value for value in prefix["values"]}
+        self.assertEqual(values[helper["output"]["registers"]["r0"]]["value"], 1)
+        unknown = "unsigned int FUNCTION(unsigned int a, unsigned int b) { return *(volatile unsigned int *)0x02030100 * 3; }\n"
+        case = self.helper_case(self.cases[0], wrapper=unknown)
+        with self.assertRaisesRegex(profile.Failure, "unknown scalar addition|unknown helper multiplication|mixed scalar byte origins unsupported"):
+            profile.execute_helper_prefixes(self.execution_capture(case, self.helper_premises))
+
+    def test_fresh_helper_malformed_owned_target_refuses(self):
+        source = "unsigned int FUNCTION(unsigned int a, unsigned int b) { return a; }\n"
+        case = self.helper_case(self.cases[0], wrapper=source)
+        layout, address, size, game, original = case
+        target = int(next(line.split()[0] for line in (game / "symbols/ffta.sym").read_text().splitlines()
+                          if line.endswith(" synthetic_select_0")), 16)
+        rom = bytearray(original)
+        rom[target - profile.ROM_BASE:target - profile.ROM_BASE + 2] = bytes.fromhex("00e0")
+        (game / "baserom.bin").write_bytes(rom)
+        malformed = (layout, address, size, game, bytes(rom))
+        with self.assertRaisesRegex(profile.Failure, "helper edge targets non-instruction bytes"):
+            profile.execute_helper_prefixes(self.execution_capture(malformed))
+
+    def test_p5_state_materialization_requires_all_bits_and_preserves_typed_origins(self):
+        entry = fixture()["entry"]
+        body = {"id": "body/08000002", "start": ADDRESS, "end": ADDRESS + 2, "literals": []}
+        state = profile._HelperState(entry, body, b"")
+        region = state.allocate(4)
+        state.reads, state.writes = [], []
+        parts, bits = state.read(profile.private.slc(region, 0, 4))
+        reference = state.loaded(profile.private.slc(region, 0, 4), parts, bits)
+        prefix = state.output("internal-live-local")
+        self.assert_memory_origin_closure(prefix)
+        result = profile.HelperPrefixes(profile.canonical({"prefixes": [prefix]}))
+        materialized = result.p5_state(prefix["path"])
+        self.assertEqual(set(materialized), {"registers", "sp", "lr", "cells", "live", "retired", "pending"})
+        self.assertEqual(materialized["cells"], prefix["cells"])
+        state.bits[reference] = (0,) + state.bitvector(reference)[1:]
+        prefix = state.output("internal-known-bit")
+        result = profile.HelperPrefixes(profile.canonical({"prefixes": [prefix]}))
+        with self.assertRaisesRegex(profile.Failure, "P5 Value cannot represent mandatory bit facts"):
+            result.p5_state(prefix["path"])
+
     def assert_memory_origin_closure(self, prefix):
         values = {value["id"]: value for value in prefix["values"]}
         regions = {region["id"]: region for region in prefix["regions"]}
@@ -1234,6 +1524,41 @@ class FreshCaptureTests(unittest.TestCase):
             state.locate(pointer, 0, 4)
         with self.assertRaisesRegex(profile.Failure, "declared live storage"):
             state.locate(state.registers["sp"], 0, 4)
+
+    def test_four_fresh_decoded_helpers_reach_registration_without_abi_erasure(self):
+        for case in self.cases:
+            with self.subTest(case=case[:2]):
+                capture = self.execution_capture(case)
+                result_object = profile.execute_helper_prefixes(capture)
+                result = result_object.inspect()
+                self.assertFalse(result["complete"])
+                self.assertEqual(result["kind"], "internal-incomplete-helper-prefixes-v1")
+                self.assertEqual(len(result["prefixes"]), 9)
+                registration = [prefix for prefix in result["prefixes"] if prefix["status"] == "suspended-registration"]
+                self.assertEqual(len(registration), 6)
+                for prefix in registration:
+                    self.assertTrue(prefix["helper_calls"])
+                    for call in prefix["helper_calls"]:
+                        self.assertIsNotNone(call["output"])
+                        self.assertEqual(call["input"]["registers"], call["output"]["registers"])
+                        self.assertNotEqual(call["input"]["lr"], call["output"]["lr"])
+                        self.assertEqual(call["dependencies"], [{"body": call["target"], "sha256": hashlib.sha256(bytes.fromhex("7047")).hexdigest()}])
+                    self.assertEqual(len(prefix["frame_evidence"]), 2 + len(prefix["helper_calls"]))
+                    self.assertTrue(all(item["returned"] is not None for item in prefix["frame_evidence"] if item["mode"] == "decoded"))
+                    self.assertEqual([event["step"] for event in prefix["events"]], list(range(len(prefix["events"]))))
+                    with self.assertRaisesRegex(profile.Failure, "P5 Value cannot represent mandatory bit facts"):
+                        result_object.p5_state(prefix["path"])
+                self.assertEqual(sorted(decision["choice"] for prefix in registration for decision in prefix["decisions"]
+                                        if decision["kind"] == "switch"), list(range(6)))
+                evidence = os.environ.get("FFTA_REGISTRATION_HELPER_EVIDENCE")
+                if evidence:
+                    directory = Path(evidence) / f"identity-{case[0]}-{case[1] % 4}"
+                    directory.mkdir(parents=True)
+                    (directory / "capture.json").write_bytes(encoded(capture.to_dict()))
+                    (directory / "capture-commands.json").write_bytes(encoded(capture.commands))
+                    for label, data in capture.artifacts:
+                        (directory / label).write_bytes(data)
+                    (directory / "prefixes.json").write_bytes(encoded(result))
 
     def test_four_fresh_instruction_derived_caller_prefixes(self):
         for case in self.cases:
