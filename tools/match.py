@@ -45,7 +45,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SCHEMA,
                             FRAMED_DATA_SCHEMA,
-                            FUNCTION_ADDRESS_SCHEMA, FUNCTION_ADDRESS_SUMMARY,
+                            FUNCTION_ADDRESS_SCHEMA, FRAMED_FUNCTION_ADDRESS_SCHEMA,
+                            FUNCTION_ADDRESS_SUMMARY,
                             FUNCTION_BUFFER_SCHEMA, function_buffer_fingerprint,
                             FRAMED_LINKED_SCHEMA, FRAMED_SCHEMA, LINKED_SCHEMA,
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
@@ -1361,8 +1362,6 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
 def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
     calls, literals = function_address_bindings(data, address, rom, mapping, data_mapping, manifest)
     instructions = verify_leaf_instructions(data, address, True, calls)
-    if uses_stack_frame(instructions):
-        raise ValueError("function-address evidence supports only frameless callers")
     verify_data_literals(instructions, address, literals)
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
@@ -2993,7 +2992,8 @@ def main():
     if buffer_proof.dependencies:
         schema = STACK_BUFFER_SCHEMA if buffer_proof.stack_arguments else BUFFER_SCHEMA
     if function_relocations:
-        schema = FUNCTION_BUFFER_SCHEMA if buffer_proof.dependencies else FUNCTION_ADDRESS_SCHEMA
+        schema = (FUNCTION_BUFFER_SCHEMA if buffer_proof.dependencies else
+                  FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
@@ -3186,7 +3186,9 @@ def main():
                 encoded_manifest = function_address_manifest(address_manifest)
                 f.write(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
                 f.write(f"* function address manifest: `{encoded_manifest}`\n")
-                proof_digest = function_address_fingerprint(addr, got_body, address_manifest)
+                proof_digest = function_address_fingerprint(
+                    addr, got_body, address_manifest,
+                    framed=schema == FRAMED_FUNCTION_ADDRESS_SCHEMA)
                 f.write(f"* function address proof SHA-256: `{proof_digest}`\n")
                 if schema == FUNCTION_BUFFER_SCHEMA:
                     proof_digest = function_buffer_fingerprint(

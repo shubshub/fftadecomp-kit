@@ -25,6 +25,7 @@ STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return proven
 DATA_SCHEMA = "elf-symbol-thumb-data-v1"
 FRAMED_DATA_SCHEMA = "elf-symbol-thumb-frame-data-v1"
 FUNCTION_ADDRESS_SCHEMA = "elf-symbol-thumb-function-addresses-v1"
+FRAMED_FUNCTION_ADDRESS_SCHEMA = "elf-symbol-thumb-frame-function-addresses-v1"
 FUNCTION_ADDRESS_SUMMARY = "zero-addend mapped Thumb function literals; relocation fidelity, not callback ABI"
 FUNCTION_BUFFER_SCHEMA = "elf-symbol-thumb-function-buffer-calls-v1"
 SWITCH_SCHEMA = "elf-symbol-thumb-switches-v1"
@@ -215,9 +216,10 @@ def function_address_manifest(manifest):
     return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
 
 
-def function_address_fingerprint(address, data, manifest):
+def function_address_fingerprint(address, data, manifest, *, framed=False):
     digest = hashlib.sha256()
-    for payload in (FUNCTION_ADDRESS_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+    schema = FRAMED_FUNCTION_ADDRESS_SCHEMA if framed else FUNCTION_ADDRESS_SCHEMA
+    for payload in (schema.encode("ascii"), address.to_bytes(4, "little"),
                     data, function_address_manifest(manifest).encode("ascii")):
         digest.update(len(payload).to_bytes(8, "little"))
         digest.update(payload)
@@ -272,7 +274,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 not buffer_profile and any(line.startswith(
-                    ("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:")) for line in lines):
+                    ("* buffer calls:", "* buffer proof SHA-256:")) for line in lines):
             return False
         if buffer_profile and (
                 single("* verification: ") != f"`{FUNCTION_BUFFER_SCHEMA}`" or
@@ -301,19 +303,25 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
                         address, data, manifest, source_digest, functions, proof.fingerprint()):
                 return False
-            if uses_stack_frame(instructions):
-                if single("* stack frame: ") != STACK_SUMMARY:
-                    return False
-            elif any(line.lstrip().startswith("* stack frame") for line in lines):
-                return False
             control_flow = CALL_SUMMARY
         else:
-            _, control_flow = verify_function_addresses(data, address, rom, functions, objects, manifest)
+            instructions, control_flow = verify_function_addresses(
+                data, address, rom, functions, objects, manifest)
+            schema = FRAMED_FUNCTION_ADDRESS_SCHEMA if uses_stack_frame(instructions) else FUNCTION_ADDRESS_SCHEMA
+            if single("* verification: ") != f"`{schema}`":
+                return False
+        framed = uses_stack_frame(instructions)
+        if framed:
+            if single("* stack frame: ") != STACK_SUMMARY:
+                return False
+        elif any(line.lstrip().startswith("* stack frame") for line in lines):
+            return False
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* function address proof SHA-256: ") ==
-                function_address_fingerprint(address, data, manifest) and
+                function_address_fingerprint(address, data, manifest,
+                                             framed=framed and not buffer_profile) and
                 (not buffer_profile or (source_fingerprint(root, address) == source_digest and
                  mapping_snapshot(root) == functions and report_rom_path(root) == selected_rom and
                  Path(selected_rom).read_bytes() == rom)))
@@ -831,7 +839,8 @@ def report_matches(report, root, address):
     if any(line.startswith(("* switches:", "* switch manifest:", "* switch proof SHA-256:"))
            for line in lines):
         return False
-    if profiles == [f"* verification: `{FUNCTION_ADDRESS_SCHEMA}`"]:
+    if profiles in ([f"* verification: `{FUNCTION_ADDRESS_SCHEMA}`"],
+                    [f"* verification: `{FRAMED_FUNCTION_ADDRESS_SCHEMA}`"]):
         return function_address_report_matches(lines, root, address)
     if any(line.startswith(("* function addresses:", "* function address manifest:",
                             "* function address proof SHA-256:")) for line in lines):
