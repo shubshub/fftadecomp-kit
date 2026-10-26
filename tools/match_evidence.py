@@ -4,6 +4,7 @@ import hashlib
 import json
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
+import umodsi3_profile as umodsi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -555,6 +556,87 @@ def modsi3_report_matches(lines, root, address):
         return False
 
 
+def umodsi3_report_matches(lines, root, address):
+    from match import DEFAULT_CC, DEFAULT_FLAGS, verify_umodsi3_source, uses_stack_frame
+
+    def single(prefix):
+        marker = prefix.rstrip(" :-")
+        children = ("* unsigned remainder manifest", "* unsigned remainder proof SHA-256") \
+            if marker == "* unsigned remainder" else ()
+        matches = [line for line in lines if line.lstrip().startswith(marker) and
+                   not line.lstrip().startswith(children)]
+        if len(matches) != 1 or not matches[0].startswith(prefix):
+            raise ValueError("missing, malformed or duplicate unsigned remainder evidence")
+        return matches[0][len(prefix):]
+
+    def unquote(prefix):
+        value = single(prefix)
+        if len(value) < 2 or value[0] != "`" or value[-1] != "`":
+            raise ValueError("malformed unsigned remainder evidence")
+        return value[1:-1]
+
+    def unique_members(pairs):
+        result = {}
+        for name, value in pairs:
+            if name in result:
+                raise ValueError("duplicate unsigned remainder manifest key")
+            result[name] = value
+        return result
+
+    try:
+        mapping = mapping_snapshot(root)
+        source_digest = source_fingerprint(root, address)
+        if single("* verification: ") != f"`{umodsi3.SCHEMA}`" or mapping is None or \
+                unquote("* source SHA-256: ") != source_digest or \
+                unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
+                single("* unsigned remainder: ") != umodsi3.SUMMARY or \
+                single("* control flow: ") != CALL_SUMMARY or \
+                unquote("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
+                single("* source plausibility: ") != "plausible" or \
+                single("* relocations: ") != "none" or \
+                single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
+                any(line.lstrip().startswith(("* buffer calls", "* buffer proof", "* signed remainder", "* signed quotient",
+                                              "* unsigned division", "* switches", "* switch manifest",
+                                              "* switch proof", "* function addresses",
+                                              "* function address manifest", "* function address proof"))
+                    for line in lines):
+            return False
+        encoded = unquote("* compiled : ")
+        if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
+            return False
+        data = bytes.fromhex(encoded)
+        encoded_manifest = unquote("* unsigned remainder manifest: ")
+        manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
+        if umodsi3.manifest_text(manifest) != encoded_manifest:
+            return False
+        objects = data_snapshot(root) if manifest.get("data") else None
+        if objects is not None:
+            if unquote("* data symbols SHA-256: ") != mapping_fingerprint(objects):
+                return False
+        elif any(line.lstrip().startswith("* data symbols SHA-256") for line in lines):
+            return False
+        selected_rom = report_rom_path(root)
+        rom = Path(selected_rom).read_bytes()
+        instructions = verify_umodsi3_source(root, address, data, rom, mapping,
+                                             data_snapshot(root), source_digest, manifest)
+        if uses_stack_frame(instructions):
+            if single("* stack frame: ") != STACK_SUMMARY:
+                return False
+        elif any(line.lstrip().startswith("* stack frame") for line in lines):
+            return False
+        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+                single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
+                unquote("* unsigned remainder proof SHA-256: ") ==
+                umodsi3.fingerprint(address, data, manifest) and
+                source_fingerprint(root, address) == source_digest and
+                mapping_snapshot(root) == mapping and
+                (objects is None or data_snapshot(root) == objects) and
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
+            RuntimeError, subprocess.SubprocessError):
+        return False
+
+
 def divsi3_report_matches(lines, root, address):
     from match import DEFAULT_CC, DEFAULT_FLAGS, verify_divsi3_source
 
@@ -719,6 +801,10 @@ def report_matches(report, root, address):
         return False
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    if profiles == [f"* verification: `{umodsi3.SCHEMA}`"]:
+        return umodsi3_report_matches(lines, root, address)
+    if any(line.lstrip().startswith("* unsigned remainder") for line in lines):
+        return False
     if profiles == [f"* verification: `{divsi3.SCHEMA}`"]:
         return divsi3_report_matches(lines, root, address)
     if any(line.lstrip().startswith("* signed quotient") for line in lines):
