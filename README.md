@@ -1025,6 +1025,13 @@ like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
 steering padding) is reported **IMPLAUSIBLE**, not a match. Exit status is 0
 only when the bytes match *and* the source is plausible.
 
+The documented hardware `volatile` exception requires an adjacent actual
+`plausible:` comment and a direct access within `0x04000000..0x040003FF`,
+or a pointer initialized to an external symbol mapped into that register
+window by `config/data_symbols.json`. Such a pointer may only be used for
+member access; retargeting, shadowing and escapes remain rejected. A comment
+alone cannot permit volatile RAM or local variables, asm or steering pragmas.
+
 It handles the compiler stage as `cc -> .s`, so it works with a classic cc1
 (GCC 2.9 / agbcc), with modern gcc and with clang:
 

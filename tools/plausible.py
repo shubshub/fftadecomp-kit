@@ -19,8 +19,10 @@ Rules
 error   the construct has no plausible reading as original source
 suspect the construct is legitimate *somewhere*, but must be justified here
 
-A finding is cleared by a comment containing `plausible:` on the same line or
-the line above, e.g. a genuine I/O register access:
+A suspect finding is cleared by a comment containing `plausible:` on the same
+line or the line above. Volatile additionally requires a direct I/O access or
+a pointer used only for member access to an external symbol mapped into the
+GBA I/O register window:
 
     /* plausible: hardware register, volatile is required here */
     *(volatile u16 *)0x04000000 = v;
@@ -136,6 +138,61 @@ def justified(text, line_no):
     return False
 
 
+def hardware_volatile_offsets(text, code, data_symbols):
+    """Recognize documented, directly bound MMIO qualifiers, not local steering."""
+    allowed = set()
+    if not re.search(r"\bvolatile\b", code):
+        return allowed
+    comments = []
+    tokens = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*[\s\S]*?\*/'
+    for token in re.finditer(tokens, text):
+        if token[0].startswith(("//", "/*")) and JUSTIFY in token[0]:
+            comments.append(text.count("\n", 0, token.end()) + 1)
+
+    def justified_io(offset, address):
+        line = text.count("\n", 0, offset) + 1
+        return 0x04000000 <= address < 0x04000400 and any(
+            comment in (line, line - 1) for comment in comments)
+
+    ctype = r"(?:struct\s+|union\s+)?[A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*"
+    direct = (r"\*\s*\(\s*(?P<v>volatile)\s+" + ctype +
+              r"\s*\*\s*\)\s*(?P<address>0x[0-9a-fA-F]+)[uUlL]*\b(?=\s*(?:[;=),]|$))")
+    for match in re.finditer(direct, code):
+        if justified_io(match.start("v"), int(match["address"], 16)):
+            allowed.add(match.start("v"))
+
+    bound = (r"\b(?P<v>volatile)\s+" + ctype +
+             r"\s*\*\s*(?:const\s+)?(?P<local>[A-Za-z_]\w*)\s*=\s*"
+             r"&\s*(?P<symbol>[A-Za-z_]\w*)\s*;")
+    bindings = list(re.finditer(bound, code))
+    for match in bindings:
+        symbol = match["symbol"]
+        value = data_symbols.get(symbol)
+        try:
+            address = int(value, 0) if isinstance(value, str) else int(value)
+        except (TypeError, ValueError):
+            continue
+        declaration = re.search(r"(?m)^\s*extern\s+" + ctype + r"\s+" +
+                                re.escape(symbol) + r"\s*;", code)
+        if declaration is None:
+            continue
+        # Reject shadow declarations, pointer retargeting and pointer escapes.
+        references = list(re.finditer(r"\b" + re.escape(symbol) + r"\b", code))
+        if any(not declaration.start() <= ref.start() < declaration.end() and
+               not re.search(r"&\s*$", code[:ref.start()]) for ref in references):
+            continue
+        local_uses = re.finditer(r"\b" + re.escape(match["local"]) + r"\b", code)
+        declarations = [item.span("local") for item in bindings
+                        if item["local"] == match["local"]]
+        if any(ref.span() not in declarations and
+               (not re.match(r"\s*->", code[ref.end():]) or
+                re.search(r"&\s*$", code[:ref.start()])) for ref in local_uses):
+            continue
+        if justified_io(match.start("v"), address):
+            allowed.add(match.start("v"))
+    return allowed
+
+
 def inert_control_flow(text):
     """find `if (c) X; else X;` - identical arms, so the test means nothing.
 
@@ -202,13 +259,16 @@ def statement_macro_tails(code):
     return tails
 
 
-def check_text(text, origin=""):
+def check_text(text, origin="", data_symbols=None):
     """returns list of findings: (line, rule, severity, message)"""
     code = strip_comments_and_strings(text)
     macro_tails = statement_macro_tails(code)
+    hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
     findings = []
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, code):
+            if rid == "volatile" and m.start() in hardware_qualifiers:
+                continue
             if rid == "dead-code" and m.start() in macro_tails:
                 continue
             line = code.count("\n", 0, m.start()) + 1
@@ -233,7 +293,18 @@ def check_file(path):
         text = open(path, encoding="utf-8", errors="replace").read()
     except OSError as e:
         return [(0, "unreadable", "error", str(e))]
-    return check_text(text, os.path.basename(path))
+    data_symbols = {}
+    for parent in Path(path).resolve().parents:
+        mapping = parent / "config" / "data_symbols.json"
+        if mapping.is_file():
+            try:
+                value = json.loads(mapping.read_text())
+                if isinstance(value, dict):
+                    data_symbols = value
+            except (OSError, ValueError):
+                pass
+            break
+    return check_text(text, os.path.basename(path), data_symbols)
 
 
 def asm_allow_path():
