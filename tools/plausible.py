@@ -159,12 +159,58 @@ def inert_control_flow(text):
     return hits
 
 
+def statement_macro_tails(code):
+    """Offsets of `while (0)` closing complete, nonempty do-statement macros.
+
+    Such a macro executes its body once. Only its closing condition is exempt;
+    the body is still scanned for dead code and every other forbidden construct.
+    Comments and literals have already been blanked without changing offsets.
+    """
+    logical = re.sub(r"\\\r?\n", lambda match: " " * len(match[0]), code)
+    tails = set()
+    headers = re.finditer(
+        r"(?m)^[ \t]*#[ \t]*define[ \t]+[A-Za-z_]\w*(?:\([^()\r\n]*\))?", logical)
+    for header in headers:
+        end = logical.find("\n", header.end())
+        if end < 0:
+            end = len(logical)
+        opener = re.match(r"\s*do\b\s*\{", logical[header.end():end])
+        if opener is None:
+            continue
+        opening = header.end() + opener.end() - 1
+        depth = 1
+        closing = opening + 1
+        while closing < end and depth:
+            if logical[closing] == "{":
+                depth += 1
+            elif logical[closing] == "}":
+                depth -= 1
+            closing += 1
+        if depth or not logical[opening + 1:closing - 1].strip(" \t\r\n;"):
+            continue
+        body = code[opening + 1:closing - 1]
+        joined_body = re.sub(r"\\\r?\n", "", body)
+        # Do not let a newly accepted wrapper conceal a forbidden token split
+        # across physical lines; the ordinary rule scan retains source offsets.
+        if any(re.search(pattern, joined_body) and not re.search(pattern, body)
+               for _, _, pattern, _ in RULES) or \
+                (inert_control_flow(joined_body) and not inert_control_flow(body)):
+            continue
+        tail = re.fullmatch(r"\s*(while\s*\(\s*0\s*\))\s*;?\s*", logical[closing:end])
+        if tail is not None:
+            tails.add(closing + tail.start(1))
+    return tails
+
+
 def check_text(text, origin=""):
     """returns list of findings: (line, rule, severity, message)"""
     code = strip_comments_and_strings(text)
+    macro_tails = statement_macro_tails(code)
     findings = []
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, code):
+            if rid == "dead-code" and m.start() in macro_tails:
+                continue
             line = code.count("\n", 0, m.start()) + 1
             if sev == "suspect" and justified(text, line):
                 continue
