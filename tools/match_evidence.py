@@ -8,6 +8,7 @@ import umodsi3_profile as umodsi3
 import ashldi3_profile as ashldi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
+import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import empty_body_profile as empty_body
 import switch_constants_profile as switch_constants
@@ -793,6 +794,8 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        if software_float.selected(report):
+            return software_float.report_matches(report, root, address)
         if ashldi3.selected(report):
             return ashldi3.report_matches(report, root, address)
         if switch_constants.selected_policy(report) is not None:

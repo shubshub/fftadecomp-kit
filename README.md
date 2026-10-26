@@ -1117,6 +1117,50 @@ aliases, interior/odd runtime addresses, wrong or overlapping owners, modified
 runtime bodies, mixed profiles and stale evidence fail closed. The normal
 matcher, status verification and publication gate use this same automatic path.
 
+## Canonical single-precision multiply and unsigned conversion
+
+Natural C that emits `__mulsf3` or `__fixunssfsi` automatically selects
+`elf-symbol-thumb-sf-mul-fixuns-target-v1`. Only these canonical undefined
+global helper symbols bind to `0x08143CEC` and `0x081428AC`, respectively.
+The fixed agbcc `-mthumb-interwork -O2` toolchain is required. The ABI passes
+single-precision bit patterns in `r0`/`r1` and returns the multiply or unsigned
+integer result in `r0`.
+
+The approved complete ROM SHA-256 is
+`43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19`.
+All ten complete runtime bodies and sixteen native dependency edges in
+`software_float_profile.py` are pinned. Both indexes must agree on exact,
+unique, nonoverlapping Thumb owners and reachable instruction counts, including
+the helpers' trailing literal pools. Legacy truncated or linearly counted
+metadata is rejected.
+
+A runtime-specific check reuses bounded native CFG/body partitioning and then
+tracks actual register saves, local stack words, all return paths and bounded
+formal output writes. Dependency footprints are applied only after the
+dependency itself passes. Every return restores `r4` through `r11`, balances
+`sp`, and transfers through the saved entry return address. Both public scalar
+helpers have no external writes. These checks do not broaden ordinary call
+summaries. The semantics describe the pinned target machine, with RAM reads
+and uninitialized local values as state inputs; they do not establish general
+IEEE arithmetic, C conversion definedness, arbitrary pointer safety or loop
+termination.
+
+Mapped object literals, ordinary indexed direct Thumb calls and existing
+scalar frame checks can compose with this profile. Ordinary external callees
+retain their returning ABI assumption. Other runtime profiles, callbacks,
+function literals, switches, buffer proofs and inert spins remain excluded.
+Runtime entry/interior/odd addresses cannot be smuggled through addressed
+aliases, objects or addends. Helpers require canonical zero-addend Thumb call
+relocations; the linker may change only independently checked relocation bytes.
+
+Reports bind both indexes, mapped data, source and headers, the approved ROM,
+complete exact caller bytes, dependency identities and fixed compiler setup.
+Cached validation recompiles captured source, relinks the original ELF and
+reruns CFG, runtime ABI and plausibility checks. A non-exact caller, stale
+mapping, altered proof, duplicate field or mixed profile fails closed. Focused
+tests create synthetic callers in memory using only the local approved runtime;
+no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
+
 ## Target binary64 conversions, subtraction and division
 
 `match.py --software-double-profile convert-sub-div-target-v1` explicitly
