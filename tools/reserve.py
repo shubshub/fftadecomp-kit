@@ -44,6 +44,8 @@ MAX_RESULTS = 64
 MAX_ROWS = 256
 MAX_REQUEST_BYTES = 2048
 MAX_BODY_BYTES = 60000
+MAX_ISSUE_COMMENTS = 2500
+COMMENT_CAPACITY_MESSAGE = "Commenting is disabled on issues with more than 2500 comments"
 HERE = os.path.dirname(os.path.abspath(__file__))
 UNMATCHABLE_DB = os.path.join(HERE, "..", "known-unmatchable.json")
 ROW_FIELDS = {"address", "who", "claimed_at", "last_seen", "note",
@@ -105,6 +107,10 @@ class GuardUnavailable(LedgerError):
     pass
 
 
+class CommentCapacityReached(LedgerError):
+    pass
+
+
 def positive_id(value):
     return type(value) is int and value > 0
 
@@ -137,6 +143,11 @@ def api(method, endpoint, payload=None):
     except (OSError, subprocess.TimeoutExpired) as error:
         raise LedgerError(f"GitHub request failed: {error}") from error
     if result.returncode:
+        if method == "POST" and positive_id(LEDGER_NUMBER) and \
+                endpoint == f"repos/{KIT_REPO}/issues/{LEDGER_NUMBER}/comments" and \
+                result.stderr.strip() == f"gh: {COMMENT_CAPACITY_MESSAGE} (HTTP 403)":
+            raise CommentCapacityReached(
+                "ledger comment capacity reached; no request submitted; maintainer action required")
         raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
     return decode_json(result.stdout)
 
@@ -750,6 +761,11 @@ def acknowledged(state, request, request_id, owner_id):
 def submit(args):
     address = normalise(args.addr)
     issue, state = ledger()
+    comments = issue.get("comments")
+    if type(comments) is int and comments >= MAX_ISSUE_COMMENTS:
+        raise CommentCapacityReached(
+            f"ledger comment capacity reached ({comments}/{MAX_ISSUE_COMMENTS}); "
+            "no request submitted; maintainer action required")
     row = held_by(state, address)
     if args.cmd == "claim":
         if row:
@@ -785,6 +801,8 @@ def submit(args):
     try:
         comment = api("POST", endpoint("/comments"), {"body": body})
         request_id, author_id = comment_identity(comment)
+    except CommentCapacityReached:
+        raise
     except LedgerError as error:
         raise Unconfirmed(f"request submission could not be confirmed; inspect the ledger before retrying: {error}") from error
     if author_id != owner_id:

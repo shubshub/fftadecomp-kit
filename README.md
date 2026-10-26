@@ -140,6 +140,14 @@ matched source, 5 for an open PR, or 6 for an **UNCONFIRMED** submission or
 acknowledgement. On exit 6, inspect the ledger
 before retrying; the request may still be processed. Do not start matching.
 
+When the server reports an integer ledger comment count of at least 2,500,
+request commands stop before posting and exit 2 with `no request submitted`.
+The exact GitHub HTTP 403 refusal, `Commenting is disabled on issues with more
+than 2500 comments`, also exits 2 if capacity fills between the read and POST.
+Other submission failures remain unconfirmed (exit 6). Read-only `list` and
+`check` remain available. Capacity recovery requires maintainer action; the
+client never retries, deletes comments, or creates or rotates ledger issues.
+
 Broker commands attempt a fast-forward pull first; investigate update warnings rather
 than trusting a stale client. `--no-pull` skips this update when the checkout has
 already been synchronized. When changing reservation protocols, explicitly pull
