@@ -1091,6 +1091,32 @@ or external-callee correctness. A conditional loop with an exit already
 accepted by the ordinary profile can still run forever. Source contracts,
 plausibility and separate semantic review remain required.
 
+## Canonical 64-bit left-shift runtime
+
+Natural C shifts that emit `__ashldi3` automatically select
+`elf-symbol-thumb-ashldi3-target-v1`. Only the canonical undefined global
+compiler symbol can bind to the complete Thumb runtime at `0x0814220C`.
+Both function indexes must agree on its unique nonoverlapping span and
+instruction count; its complete body hash and closed-leaf return/stack proof
+are checked. A focused test recompiles the local agbcc split-word reference
+algorithm and requires the exact pinned body.
+
+The ABI takes the low/high words in `r0`/`r1` and the shift count in `r2`, and
+returns the low/high result in `r0`/`r1`. The versioned semantics describe the
+actual ARMv4T register shifts. They agree with unsigned C left shift for counts
+0 through 63; the profile does not claim that C shifts outside that domain are
+defined, or prove a caller's shift-count range. Caller analysis retains the
+ordinary conservative register clobbers, fixed-frame checks and return-address
+provenance. Mapped data literals and scalar frames are supported; other callees,
+runtime profiles, function literals, switches and call thunks are excluded.
+
+Reports bind the source and headers, both function indexes, data mapping,
+complete caller bytes, ROM snapshot and fixed toolchain. Cached validation
+recompiles and relinks captured source and reruns plausibility. Addressed
+aliases, interior/odd runtime addresses, wrong or overlapping owners, modified
+runtime bodies, mixed profiles and stale evidence fail closed. The normal
+matcher, status verification and publication gate use this same automatic path.
+
 ## Target binary64 conversions, subtraction and division
 
 `match.py --software-double-profile convert-sub-div-target-v1` explicitly

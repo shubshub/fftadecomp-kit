@@ -34,6 +34,7 @@ import tempfile
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import umodsi3_profile as umodsi3
+import ashldi3_profile as ashldi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -357,11 +358,11 @@ def parse_data_symbols(snapshot):
     for name, value in document.items():
         if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
                 name.startswith(("func_", "_call_via_")) or \
-                name in ("__udivsi3", "__modsi3", "__umodsi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or \
+                name in ("__udivsi3", "__modsi3", "__umodsi3", "__ashldi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or \
                 not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
             raise ValueError("invalid data symbol name or absolute address")
         if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)) or \
-                divsi3.reserved(int(value, 16)) or umodsi3.reserved(int(value, 16)) or software_double.reserved(int(value, 16)):
+                divsi3.reserved(int(value, 16)) or umodsi3.reserved(int(value, 16)) or ashldi3.reserved(int(value, 16)) or software_double.reserved(int(value, 16)):
             raise ValueError("division runtime cannot be bound as data")
         symbols[name] = int(value, 16)
     return symbols
@@ -372,7 +373,7 @@ def function_address_target(name, entries, address, size, rom_size):
     if match is None:
         raise ValueError("function address requires a canonical addressed function")
     target = int(match[1], 16)
-    if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or software_double.reserved(target):
+    if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target):
         raise ValueError("division runtime requires its canonical versioned proof")
     if target in RUNTIME_HELPERS.values():
         raise ValueError("function-address evidence does not support runtime call thunks")
@@ -392,13 +393,15 @@ def call_bindings(image, name, address, mapping, rom_size,
                    switch_relocations=None, allow_switch_data=False, udivsi3_bindings=None,
                    allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                    double_bindings=None, double_index=None, function_thunks=False, *,
-                   allow_switch_constants=False, umodsi3_bindings=None):
+                   allow_switch_constants=False, umodsi3_bindings=None,
+                   ashldi3_bindings=None, ashldi3_index=None):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
                  function_relocations, allow_switch_data, udivsi3_bindings,
                  allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
-                 double_bindings, double_index, function_thunks, umodsi3_bindings)
+                 double_bindings, double_index, function_thunks, umodsi3_bindings,
+                 ashldi3_bindings, ashldi3_index)
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(function_thunks) is not bool or function_thunks and (
@@ -426,6 +429,10 @@ def call_bindings(image, name, address, mapping, rom_size,
         raise ValueError("signed quotient bindings require an empty collection")
     if umodsi3_bindings is not None and (type(umodsi3_bindings) is not dict or umodsi3_bindings):
         raise ValueError("unsigned remainder bindings require an empty collection")
+    if ashldi3_bindings is not None and (type(ashldi3_bindings) is not dict or ashldi3_bindings):
+        raise ValueError("ashldi3 bindings require an empty collection")
+    if ashldi3_index is not None and ashldi3_bindings is None:
+        raise ValueError("ashldi3 index requires its binding context")
     if double_bindings is not None:
         if not isinstance(double_bindings, dict) or double_bindings or data_mapping is not None or \
                 function_relocations is not None or switch_relocations is not None or allow_switch_data or \
@@ -519,7 +526,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                 value = target + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + symbol["size"]:
                     raise ValueError("data relocation overflows or references its own function")
-                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or software_double.reserved(value):
+                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value):
                     raise ValueError("division runtime cannot be bound through a data addend")
                 positions = set(range(relocation, relocation + 4))
                 if positions & occupied:
@@ -531,11 +538,22 @@ def call_bindings(image, name, address, mapping, rom_size,
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
             helper = RUNTIME_HELPERS.get(target_symbol["name"])
             division = target_symbol["name"] == "__udivsi3"
+            left_shift = target_symbol["name"] == "__ashldi3"
             unsigned_remainder = target_symbol["name"] == "__umodsi3"
             quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
             double_operation = target_symbol["name"] in software_double.OPERATIONS
-            if double_operation:
+            if left_shift:
+                if ashldi3_bindings is None:
+                    raise ValueError("ashldi3 requires its canonical target-machine profile")
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                        sum(item["name"] == "__ashldi3" for item in image["symbols"]) != 1:
+                    raise ValueError("ashldi3 requires one undefined global function symbol")
+                ashldi3.verify_identity(rom_image, mapping, ashldi3_index)
+                target = ashldi3.ADDRESS
+                candidates = []
+            elif double_operation:
                 if double_bindings is None:
                     raise ValueError("software double requires its explicit canonical profile")
                 if target_symbol["section"] or target_symbol["bind"] != 1 or \
@@ -601,7 +619,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                         target_symbol["type"] not in (0, 2):
                     raise ValueError("call target must be an undefined addressed function")
                 target = int(match[1], 16)
-                if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or software_double.reserved(target):
+                if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target):
                     raise ValueError("division runtime requires its canonical compiler alias")
                 candidates = []
             for entry in entries:
@@ -628,11 +646,11 @@ def call_bindings(image, name, address, mapping, rom_size,
             if relocation % 2 or relocation + 4 > symbol["size"] or instruction is None or \
                     instruction.id != ARM_INS_BL or instruction.size != 4:
                 raise ValueError("call relocation does not cover a Thumb BL instruction")
-            if division or remainder or quotient or double_operation or unsigned_remainder:
+            if division or remainder or quotient or double_operation or unsigned_remainder or left_shift:
                 if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM or \
                         instruction.operands[0].imm != address + relocation:
                     raise ValueError("division call relocation has a noncanonical addend")
-                bindings = (umodsi3_bindings if unsigned_remainder else
+                bindings = (ashldi3_bindings if left_shift else umodsi3_bindings if unsigned_remainder else
                             double_bindings if double_operation else divsi3_bindings if quotient else
                             modsi3_bindings if remainder else udivsi3_bindings)
                 bindings[address + relocation] = target_symbol["name"]
@@ -642,6 +660,16 @@ def call_bindings(image, name, address, mapping, rom_size,
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
+    if ashldi3_bindings:
+        if any(target != ashldi3.ADDRESS for target in calls.values()) or udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or \
+                double_bindings is not None or function_relocations or switch_relocations or function_thunks or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("ashldi3 excludes other runtime, switch, function and thunk profiles")
+        for target_name in set(targets) - {value[0] for value in data_relocations.values()}:
+            definitions = [item for item in image["symbols"] if item["name"] == target_name]
+            if len(definitions) != 1 or definitions[0]["value"] or definitions[0]["section"] or \
+                    definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
+                raise ValueError("ashldi3 calls require unique undefined global functions")
     if umodsi3_bindings:
         if udivsi3_bindings or modsi3_bindings or divsi3_bindings or double_bindings is not None or \
                 function_relocations or switch_relocations or function_thunks or \
@@ -729,13 +757,13 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_switch_data=False, udivsi3_bindings=None,
                           allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                           double_bindings=None, function_thunks=False, *,
-                          allow_switch_constants=False, umodsi3_bindings=None):
+                          allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None):
     """Validate exact placement and the linker's complete modification surface."""
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_relocations or None,
                  function_relocations, allow_switch_data, udivsi3_bindings,
                  allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
-                 double_bindings, function_thunks, umodsi3_bindings)
+                 double_bindings, function_thunks, umodsi3_bindings, ashldi3_bindings)
     if linked["type"] != 2 or linked["relocations"]:
         raise ValueError("expected an executable ELF without remaining relocations")
     allocated_text_only(linked)
@@ -757,6 +785,20 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
         raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
+    shift_targets = {name: target for name, target in targets.items() if ashldi3.reserved(target)}
+    if shift_targets:
+        if any(target != ashldi3.ADDRESS for target in calls.values()) or \
+                shift_targets != {"__ashldi3": ashldi3.ADDRESS} or \
+                type(ashldi3_bindings) is not dict or not ashldi3_bindings or \
+                any(alias != "__ashldi3" or calls.get(site) != ashldi3.ADDRESS
+                    for site, alias in ashldi3_bindings.items()) or \
+                set(ashldi3_bindings) != {site for site, target in calls.items() if ashldi3.reserved(target)} or \
+                udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or \
+                double_bindings is not None or function_relocations or switch_relocations or function_thunks or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            raise ValueError("linked ashldi3 bindings are incomplete or mixed")
+    elif ashldi3_bindings:
+        raise ValueError("ashldi3 bindings have no linked runtime")
     unsigned_remainder_targets = {name: target for name, target in targets.items()
                                   if umodsi3.reserved(target)}
     if unsigned_remainder_targets:
@@ -854,7 +896,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         if len(definitions) != 1 or definitions[0]["type"] != expected_type or \
                 definitions[0]["section"] != 0xFFF1 or definitions[0]["value"] != expected_value or \
                 (target_name in function_names or switch_relocations or udivsi3_bindings or
-                 modsi3_bindings or divsi3_bindings or double_bindings or umodsi3_bindings) and \
+                 modsi3_bindings or divsi3_bindings or double_bindings or umodsi3_bindings or ashldi3_bindings) and \
                 definitions[0]["bind"] != 1:
             raise ValueError("linked target lost its absolute symbol type or address")
     if any(item["name"] and not item["section"] for item in linked["symbols"]):
@@ -895,7 +937,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
                allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False,
                modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
-               function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None):
+               function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
+               ashldi3_bindings=None, ashldi3_index=None):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
@@ -904,7 +947,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
                                                     double_bindings, double_index, function_thunks,
                                                     allow_switch_constants=allow_switch_constants,
-                                                    umodsi3_bindings=umodsi3_bindings)
+                                                    umodsi3_bindings=umodsi3_bindings,
+                                                    ashldi3_bindings=ashldi3_bindings, ashldi3_index=ashldi3_index)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -939,7 +983,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   allow_switch_data, udivsi3_bindings, allow_preloaded_switch,
                                   modsi3_bindings, divsi3_bindings, double_bindings, function_thunks,
                                   allow_switch_constants=allow_switch_constants,
-                                  umodsi3_bindings=umodsi3_bindings),
+                                  umodsi3_bindings=umodsi3_bindings,
+                                  ashldi3_bindings=ashldi3_bindings),
             calls, data_relocations)
 
 
@@ -1272,7 +1317,7 @@ def verify_modsi3(data, address, rom, mapping, data_mapping, manifest):
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data) or \
                         not modsi3.supported_data(objects[name], len(rom)) or \
                         not modsi3.supported_data(value, len(rom)) or \
-                        is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or software_double.reserved(value) or \
+                        is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value) or \
                         struct.unpack_from("<I", data, offset)[0] != value:
                     raise ValueError("signed remainder literal differs or uses a forbidden address")
                 literals[offset] = (name, value)
@@ -1351,7 +1396,7 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
                 value = objects[name] + addend
                 if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data):
                     raise ValueError("function-address object binding overflows or references itself")
-                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or software_double.reserved(value):
+                if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value):
                     raise ValueError("division runtime cannot be bound through an object addend")
             if struct.unpack_from("<I", data, offset)[0] != value:
                 raise ValueError("function-address literal does not equal its binding")
@@ -1868,7 +1913,7 @@ class BufferCallProof:
         self.stack_arguments = stack_arguments
 
     def target(self, address):
-        if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or software_double.reserved(address):
+        if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or ashldi3.reserved(address) or software_double.reserved(address):
             raise ValueError("division runtime is outside buffer-call proof profiles")
         candidates = [entry for entry in self.entries
                       if isinstance(entry, dict) and isinstance(entry.get("rom"), str)
@@ -2075,13 +2120,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              preloaded_switch=False, modsi3_context=None, divsi3_context=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
-                             umodsi3_context=None):
+                             umodsi3_context=None, ashldi3_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     from switch_constants_profile import check_opt_in, layout as constants_layout
     check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
                  switch_data_relocations, udivsi3_context, preloaded_switch, modsi3_context,
                  divsi3_context, inert_spin_context, double_context, function_thunk_context,
-                 umodsi3_context)
+                 umodsi3_context, ashldi3_context)
     if allow_switch_constants and not thumb:
         raise ValueError("switch constants require Thumb mode")
     if type(allow_switch_scalar_frame) is not bool or \
@@ -2093,6 +2138,18 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     reserved = set()
     division_constants = None
     signed_numeric = False
+    if ashldi3_context is not None:
+        if not thumb or buffer_proof is not None or call_resolver is not None or \
+                switch_relocations is not None or switch_data_relocations is not None or \
+                udivsi3_context is not None or modsi3_context is not None or divsi3_context is not None or \
+                umodsi3_context is not None or inert_spin_context is not None or double_context is not None or \
+                function_thunk_context is not None or preloaded_switch:
+            raise ValueError("ashldi3 requires an isolated ordinary direct-call context")
+        ashldi3.verify_context(data, address, validated_calls or {}, ashldi3_context)
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
+               modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or
+               software_double.reserved(target) for target in (validated_calls or {}).values()):
+            raise ValueError("ashldi3 excludes other runtimes and thunks")
     if umodsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_relocations is not None or switch_data_relocations is not None or \
@@ -2102,7 +2159,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("unsigned remainder requires an isolated ordinary direct-call context")
         umodsi3.verify_context(data, address, validated_calls or {}, umodsi3_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
-               modsi3.reserved(target) or divsi3.reserved(target) or software_double.reserved(target)
+               modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target)
                for target in (validated_calls or {}).values()):
             raise ValueError("unsigned remainder excludes other runtimes and thunks")
     if function_thunk_context is not None:
@@ -2113,7 +2170,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("function thunks require an isolated ordinary caller context")
         if not any(target in function_thunk.ALIASES.values() for target in (validated_calls or {}).values()) or \
                 any(is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or
-                    software_double.reserved(target) or function_thunk.reserved(target) and
+                    ashldi3.reserved(target) or software_double.reserved(target) or function_thunk.reserved(target) and
                     target not in function_thunk.ALIASES.values() for target in (validated_calls or {}).values()):
             raise ValueError("function thunks require supported canonical calls without other runtimes")
     if double_context is not None:
@@ -2133,7 +2190,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
             raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
-               modsi3.reserved(target) or divsi3.reserved(target) or software_double.reserved(target)
+               modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target)
                for target in (validated_calls or {}).values()):
             raise ValueError("inert spins exclude arithmetic runtimes and call thunks")
     if divsi3_context is not None:
@@ -2237,6 +2294,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     address <= operands[0].imm < end:
                 raise ValueError("call is not a validated external direct Thumb BL")
             target = operands[0].imm
+            if ashldi3.reserved(target):
+                if ashldi3_context is None or target != ashldi3.ADDRESS or current not in ashldi3_context[3]:
+                    raise ValueError("ashldi3 requires its canonical target-machine proof")
             if umodsi3.reserved(target):
                 if umodsi3_context is None or target != umodsi3.ADDRESS or \
                         current not in umodsi3_context[2]:
@@ -2585,6 +2645,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("literal read overlaps reachable code")
         if divsi3.reserved(struct.unpack_from("<I", data, literal - address)[0]):
             raise ValueError("signed quotient runtime cannot be materialized as a literal")
+        if ashldi3.reserved(struct.unpack_from("<I", data, literal - address)[0]):
+            raise ValueError("ashldi3 runtime cannot be materialized as a literal")
         if umodsi3.reserved(struct.unpack_from("<I", data, literal - address)[0]):
             raise ValueError("unsigned remainder runtime cannot be materialized as a literal")
         if software_double.reserved(struct.unpack_from("<I", data, literal - address)[0]):
@@ -2803,6 +2865,8 @@ def main():
             modsi3_bindings = {}
             divsi3_bindings = {}
             umodsi3_bindings = {}
+            ashldi3_bindings = {}
+            shift_evidence = None
             quotient_evidence = None
             remainder_evidence = None
             division_evidence = None
@@ -2837,7 +2901,9 @@ def main():
                                                           allow_preloaded_switch=True,
                                                           modsi3_bindings=modsi3_bindings,
                                                           divsi3_bindings=divsi3_bindings,
-                                                          umodsi3_bindings=umodsi3_bindings)
+                                                          umodsi3_bindings=umodsi3_bindings,
+                                                          ashldi3_bindings=ashldi3_bindings,
+                                                          ashldi3_index=empty_index)
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
@@ -2861,6 +2927,14 @@ def main():
                 spin_evidence = {"calls": inert_spin.call_records(calls, addr),
                                  "frame": uses_stack_frame(verified_instructions), "spins": context["spins"]}
                 verified_instructions = inert_spin.verify(got, addr, rom, mapping, function_index, spin_evidence)
+            elif ashldi3_bindings:
+                ashldi3.fixed_configuration(args)
+                verified_instructions = verify_leaf_instructions(
+                    got, addr, True, calls, ashldi3_context=(rom, mapping, empty_index, ashldi3_bindings))
+                shift_evidence = ashldi3.make_manifest(calls, addr, ashldi3_bindings,
+                                                       data_relocations, data_mapping, verified_instructions)
+                verified_instructions = ashldi3.verify(
+                    got, addr, rom, mapping, empty_index, data_mapping, shift_evidence)
             elif umodsi3_bindings:
                 umodsi3.fixed_configuration(args)
                 divisors = {}
@@ -3003,6 +3077,8 @@ def main():
         schema = modsi3.SCHEMA
     if quotient_evidence is not None:
         schema = divsi3.SCHEMA
+    if shift_evidence is not None:
+        schema = ashldi3.SCHEMA
     if unsigned_remainder_evidence is not None:
         schema = umodsi3.SCHEMA
     if spin_profile:
@@ -3084,6 +3160,14 @@ def main():
                                           fingerprint, double_evidence)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             sys.exit(f"software-double source replay failed: {error}")
+    if shift_evidence is not None:
+        if ashldi3.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file or hand_asm_allowed:
+            sys.exit("ashldi3 index/ROM selection changed or hand-ASM exception requested")
+        try:
+            ashldi3.verify_source(ROOT, addr, got_body, rom, mapping, empty_index,
+                                  data_mapping, fingerprint, shift_evidence)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"ashldi3 source replay failed: {error}")
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -3204,6 +3288,14 @@ def main():
                                       switch_data_fingerprint if data_profile else switch_fingerprint)
                 proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
                 f.write(f"* switch proof SHA-256: `{proof_digest}`\n")
+            if shift_evidence is not None:
+                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+                f.write(f"* ashldi3: {ashldi3.SUMMARY}\n")
+                f.write(f"* ashldi3 manifest: `{ashldi3.manifest_text(shift_evidence)}`\n")
+                proof_digest = ashldi3.fingerprint(addr, got_body, shift_evidence, fingerprint,
+                                                   mapping, empty_index, data_mapping, rom)
+                f.write(f"* ashldi3 proof SHA-256: `{proof_digest}`\n")
             if unsigned_remainder_evidence is not None:
                 f.write(f"* unsigned remainder: {umodsi3.SUMMARY}\n")
                 f.write(f"* unsigned remainder manifest: `{umodsi3.manifest_text(unsigned_remainder_evidence)}`\n")

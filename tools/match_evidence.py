@@ -5,6 +5,7 @@ import json
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import umodsi3_profile as umodsi3
+import ashldi3_profile as ashldi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -792,6 +793,8 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        if ashldi3.selected(report):
+            return ashldi3.report_matches(report, root, address)
         if switch_constants.selected_policy(report) is not None:
             return switch_constants.report_matches(report, root, address)
         if empty_body.SCHEMA in report or any(
