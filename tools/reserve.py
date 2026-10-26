@@ -46,6 +46,7 @@ MAX_REQUEST_BYTES = 2048
 MAX_BODY_BYTES = 60000
 MAX_ISSUE_COMMENTS = 2500
 COMMENT_CAPACITY_MESSAGE = "Commenting is disabled on issues with more than 2500 comments"
+READ_RETRY_DELAYS = (1, 2)
 HERE = os.path.dirname(os.path.abspath(__file__))
 UNMATCHABLE_DB = os.path.join(HERE, "..", "known-unmatchable.json")
 ROW_FIELDS = {"address", "who", "claimed_at", "last_seen", "note",
@@ -137,19 +138,34 @@ def api(method, endpoint, payload=None):
     if payload is not None:
         command += ["--input", "-"]
         data = json.dumps(payload)
-    try:
-        result = subprocess.run(command, input=data, capture_output=True,
-                                text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise LedgerError(f"GitHub request failed: {error}") from error
-    if result.returncode:
-        if method == "POST" and positive_id(LEDGER_NUMBER) and \
-                endpoint == f"repos/{KIT_REPO}/issues/{LEDGER_NUMBER}/comments" and \
-                result.stderr.strip() == f"gh: {COMMENT_CAPACITY_MESSAGE} (HTTP 403)":
-            raise CommentCapacityReached(
-                "ledger comment capacity reached; no request submitted; maintainer action required")
-        raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
-    return decode_json(result.stdout)
+    # Only fixed queries are proven read-only; a GraphQL POST may also mutate.
+    read_only = (method == "GET" and endpoint != "graphql") or (
+        method in ("GET", "POST") and endpoint == "graphql" and
+        isinstance(payload, dict) and set(payload) <= {"query", "variables"} and
+        payload.get("query") in (COMMENTS_QUERY, CLAIM_QUERY, PR_FILES_QUERY))
+    for attempt in range(len(READ_RETRY_DELAYS) + 1):
+        try:
+            result = subprocess.run(command, input=data, capture_output=True,
+                                    text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            if read_only and isinstance(error, subprocess.TimeoutExpired) and \
+                    attempt < len(READ_RETRY_DELAYS):
+                time.sleep(READ_RETRY_DELAYS[attempt])
+                continue
+            raise LedgerError(f"GitHub request failed: {error}") from error
+        if result.returncode:
+            if method == "POST" and positive_id(LEDGER_NUMBER) and \
+                    endpoint == f"repos/{KIT_REPO}/issues/{LEDGER_NUMBER}/comments" and \
+                    result.stderr.strip() == f"gh: {COMMENT_CAPACITY_MESSAGE} (HTTP 403)":
+                raise CommentCapacityReached(
+                    "ledger comment capacity reached; no request submitted; maintainer action required")
+            if read_only and attempt < len(READ_RETRY_DELAYS) and re.fullmatch(
+                    r"gh: (?:HTTP (?:502|503|504)|[^\r\n]+ \(HTTP (?:502|503|504)\))",
+                    result.stderr.strip()):
+                time.sleep(READ_RETRY_DELAYS[attempt])
+                continue
+            raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
+        return decode_json(result.stdout)
 
 
 def endpoint(suffix=""):
