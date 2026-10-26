@@ -594,6 +594,12 @@ proofs, indirect calls or jump tables. Push/pop register saves do not by
 themselves constitute a fixed stack frame. Existing leaf, call, data, frame
 and buffer schemas retain their existing requirements.
 
+Fixed-frame callers use `elf-symbol-thumb-frame-function-addresses-v1`.
+They must pass the existing constant-frame, bounded-access, stack-alias and
+balanced-return checks, as well as the same typed literal checks. Reports bind
+the separate schema and require the verified stack-frame summary. Dynamic or
+unbalanced frames and stack aliases escaping across calls remain rejected.
+
 Reports bind source and headers, the function mapping, any used object mapping,
 and a canonical manifest of call, object and function-address bindings.
 The manifest and complete caller bytes carry a versioned proof fingerprint.
