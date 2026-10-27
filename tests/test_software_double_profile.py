@@ -136,7 +136,7 @@ class SoftwareDoubleTests(unittest.TestCase):
 
     def test_native_all_five_operations_and_ordinary_call(self):
         self.fixture()
-        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS)-{"__adddf3", "__fixdfsi"})
+        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS)-{"__adddf3", "__fixdfsi", "__muldf3", "__ltdf2"})
         self.assertIn(0x08000200, self.calls.values())
         self.assertEqual(len(self.verify()), len(self.instructions))
         with self.assertRaises(ValueError):
@@ -316,6 +316,142 @@ class SoftwareDoubleTests(unittest.TestCase):
                                     self.mapping, self.index, self.rom))
             self.assertFalse(evidence.report_matches(report, self.root, BASE))
             self.assertFalse(evidence.report_matches(forged, self.root, BASE))
+
+
+    def test_native_comparison_and_all_binary64_arithmetic_symbols(self):
+        source = """double func_08000000(double a, double b)
+{
+    if (a < b) return (a - b) / (a * b);
+    return a + b;
+}
+"""
+        self.fixture(source)
+        expected = {"__ltdf2", "__muldf3", "__subdf3", "__divdf3", "__adddf3"}
+        self.assertEqual(set(self.bindings.values()), expected)
+        self.assertEqual({row["name"] for row in self.original["symbols"]
+                          if row["name"] and not row["section"]}, expected)
+        self.assertEqual(len(self.verify()), len(self.instructions))
+        report = self.native_report()
+        opening, reading = self.patched_rom()
+        with opening, reading:
+            self.assertTrue(profile.report_matches(report, self.root, BASE))
+            (self.root / "src/08000000.c").write_text(source.replace("a * b", "a + b"))
+            self.assertFalse(profile.report_matches(report, self.root, BASE))
+
+    def test_canonical_add_multiply_addresses_and_wrong_link_rejected(self):
+        self.assertEqual(profile.OPERATIONS["__adddf3"], 0x08143080)
+        self.assertEqual(profile.OPERATIONS["__muldf3"], 0x081430F0)
+        for operator, name, target, wrong in (("+", "__adddf3", 0x08143080, 0x081430F0),
+                                               ("*", "__muldf3", 0x081430F0, 0x08143080)):
+            with self.subTest(operator=operator):
+                self.fixture("double func_08000000(double a, double b) { return a " +
+                             operator + " b; }\n")
+                self.assertEqual(set(self.bindings.values()), {name})
+                self.assertEqual(set(self.calls.values()), {target})
+                site = next(iter(self.bindings))
+                # A body linked to the other runtime is not a canonical caller,
+                # even though both complete runtime identities are approved.
+                displacement = wrong - site - 4
+                words = (0xF000 | ((displacement >> 12) & 0x7FF),
+                         0xF800 | ((displacement >> 1) & 0x7FF))
+                altered = copy.deepcopy(self.linked)
+                raw = bytearray(altered["text"])
+                struct.pack_into("<HH", raw, site - BASE, *words)
+                altered["text"] = bytes(raw)
+                next(row for row in altered["symbols"] if row["name"] == name)["value"] = wrong | 1
+                with self.assertRaises(ValueError):
+                    match.linked_function_bytes(self.original, altered, "func_08000000", BASE,
+                        self.calls, {name: target}, {}, double_bindings=self.bindings)
+                wrong_calls = dict(self.calls); wrong_calls[site] = wrong
+                with self.assertRaises(ValueError):
+                    match.verify_leaf_instructions(bytes(raw), BASE, True, wrong_calls,
+                        double_context=(self.rom, self.mapping, self.index, self.bindings))
+
+    def test_native_arithmetic_comparison_closure_exact_output_contracts(self):
+        self.fixture("double func_08000000(double a, double b) { return a*b; }\n")
+        proofs = profile.prove_arithmetic_comparison_closure(self.rom, json.loads(self.mapping))
+        self.assertEqual(set(proofs), set(profile.ARITHMETIC_COMPARISON_CLOSURE))
+        for start, formal in ((0x08142D34, 1), (0x08142E10, 2)):
+            self.assertEqual(proofs[start]["writes"], [(formal, n, 4) for n in range(0, 20, 4)])
+        for start in (0x08143080, 0x081430B4, 0x0814339C, 0x0814379C):
+            self.assertFalse(proofs[start]["writes"])
+            self.assertTrue(proofs[start]["returns"])
+
+    def test_comparison_runtime_identity_and_dual_index_ownership(self):
+        self.fixture("int func_08000000(double a, double b) { return a<b; }\n")
+        for address in (0x08143080, 0x08142E10, 0x08143528, 0x0814379C):
+            changed = bytearray(self.rom); changed[address - BASE] ^= 1
+            with self.subTest(address=address), self.assertRaisesRegex(ValueError, "runtime identity"):
+                profile.verify_identity(bytes(changed), self.mapping, self.index)
+        entries = json.loads(self.mapping)
+        for kind in ("duplicate", "mode", "short", "count", "odd", "missing"):
+            changed = copy.deepcopy(entries)
+            row = next(row for row in changed if row["rom"] == "0x0814379C")
+            if kind == "duplicate": changed.append(copy.deepcopy(row))
+            elif kind == "mode": row["mode"] = "arm"
+            elif kind == "short": row["end"] = "0x081437E8"
+            elif kind == "count": row["instrs"] += 1
+            elif kind == "odd": row["rom"] = "0x0814379D"
+            else: changed.remove(row)
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                profile.verify_identity(self.rom, json.dumps(changed).encode(), self.index)
+        changed = self.index.replace(b"081437EA 78 36", b"081437EA 78 37")
+        self.assertNotEqual(changed, self.index)
+        with self.assertRaises(ValueError): profile.verify_identity(self.rom, self.mapping, changed)
+
+    def test_arithmetic_kernel_write_and_comparison_restore_are_proved(self):
+        self.fixture("double func_08000000(double a, double b) { return a*b; }\n")
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        entries = json.loads(self.mapping)
+        proofs = profile.prove_arithmetic_comparison_closure(self.rom, entries)
+        for start, kind in ((0x08142E10, "store"), (0x0814379C, "restore")):
+            instructions = [i for a, b in proofs[start]["layout"]["code_ranges"]
+                            for i in decoder.disasm(self.rom[int(a, 16)-BASE:int(b, 16)-BASE], int(a, 16))]
+            if kind == "store":
+                instruction = next(i for i in instructions if i.mnemonic == "str" and "#0x10]" in i.op_str)
+                word = struct.unpack_from("<H", self.rom, instruction.address-BASE)[0]
+                word = (word & ~0x7C0) | (5 << 6)  # Escape the five-word formal result.
+            else:
+                instruction = next(i for i in instructions if i.mnemonic == "pop" and "r4" in i.op_str)
+                word = struct.unpack_from("<H", self.rom, instruction.address-BASE)[0] ^ ((1 << 4) | (1 << 5))
+            changed = bytearray(self.rom); struct.pack_into("<H", changed, instruction.address-BASE, word)
+            with self.subTest(kind=kind), self.assertRaises(ValueError):
+                profile.prove_arithmetic_comparison_closure(bytes(changed), entries)
+
+    def test_shared_comparison_needs_exact_canonical_context(self):
+        self.fixture("double func_08000000(double a, double b) { return a<b ? a*b : a+b; }\n")
+        site = next(site for site, name in self.bindings.items() if name == "__ltdf2")
+        for name in ("func_0814379C", "__gtdf2", "__ltdf2_alias"):
+            altered = copy.deepcopy(self.original)
+            next(row for row in altered["symbols"] if row["name"] == "__ltdf2")["name"] = name
+            with self.subTest(name=name), self.assertRaises(ValueError): self.binding(altered)
+        for name in ("__gtdf2", "func_0814379C"):
+            bindings = dict(self.bindings)
+            bindings[site] = name
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                match.verify_leaf_instructions(self.body, BASE, True, self.calls,
+                    double_context=(self.rom, self.mapping, self.index, bindings))
+        with self.assertRaises(ValueError):
+            match.verify_leaf_instructions(self.body, BASE, True, self.calls,
+                double_context=(self.rom, self.mapping, self.index, self.bindings),
+                float_context=(self.rom, self.mapping, self.index, {site: "__ltdf2"}))
+        with self.assertRaises(ValueError): self.binding(float_bindings={})
+        with self.assertRaises(ValueError):
+            self.fixture("double func_08000000(float a, float b) { return (double)(a*b); }\n")
+
+    def test_comparison_manifest_runtime_version_and_dependency_replay(self):
+        self.fixture("double func_08000000(double a, double b) { return a<b ? a*b : a+b; }\n")
+        for key, value in (("runtime", "agbcc-thumb-df-convert-add-sub-div-trunc-fix-mod-s16-closure-v5"),
+                           ("dependencies", self.manifest["dependencies"][:-1]), ("calls", [])):
+            manifest = copy.deepcopy(self.manifest); manifest[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError): self.verify(manifest)
+        altered = copy.deepcopy(self.linked)
+        body = bytearray(altered["text"]); body[0] ^= 1; altered["text"] = bytes(body)
+        targets = {name: profile.OPERATIONS[name] for name in self.bindings.values()}
+        with self.assertRaises(ValueError):
+            match.linked_function_bytes(self.original, altered, "func_08000000", BASE,
+                                        self.calls, targets, {}, double_bindings=self.bindings)
 
 
 if __name__ == "__main__":

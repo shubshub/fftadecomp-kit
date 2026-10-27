@@ -6,6 +6,7 @@ import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import umodsi3_profile as umodsi3
 import ashldi3_profile as ashldi3
+import lshrdi3_profile as lshrdi3
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import software_float_profile as software_float
@@ -796,6 +797,8 @@ def report_matches(report, root, address):
     try:
         if software_float.selected(report):
             return software_float.report_matches(report, root, address)
+        if lshrdi3.selected(report):
+            return lshrdi3.report_matches(report, root, address)
         if ashldi3.selected(report):
             return ashldi3.report_matches(report, root, address)
         if switch_constants.selected_policy(report) is not None:

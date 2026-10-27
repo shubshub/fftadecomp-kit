@@ -14,16 +14,17 @@ import tempfile
 
 SCHEMA = "elf-symbol-thumb-df-convert-sub-div-target-v1"
 SELECTOR = "convert-sub-div-target-v1"
-RUNTIME = "agbcc-thumb-df-convert-add-sub-div-trunc-fix-mod-s16-closure-v5"
+RUNTIME = "agbcc-thumb-df-convert-add-sub-div-mul-lt-trunc-fix-mod-s16-closure-v6"
 ABI = "agbcc-thumb-df-sf-mixed-integer-v2"
 SEMANTICS = "target-machine-state-v1"
-SUMMARY = ("pinned target binary64 conversion/add/sub/div/trunc/signed-conversion runtime; entry RAM and stack are state inputs; "
+SUMMARY = ("pinned target binary64 conversion/add/sub/div/mul/lt/trunc/signed-conversion runtime; entry RAM and stack are state inputs; "
            "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor; "
            "unrestricted IEEE semantics not proved")
 OPERATIONS = {"__floatdidf": 0x081428E4, "__floatsidf": 0x0814383C,
               "__subdf3": 0x081430B4, "__divdf3": 0x0814339C,
-              "__truncdfsf2": 0x08143980, "__adddf3": 0x081430F0,
-              "__fixdfsi": 0x081438BC}
+              "__truncdfsf2": 0x08143980, "__adddf3": 0x08143080,
+              "__fixdfsi": 0x081438BC, "__muldf3": 0x081430F0,
+              "__ltdf2": 0x0814379C}
 IDENTITIES = (
     (0x081428E4, 0x08142950, 40,
      "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
@@ -45,6 +46,10 @@ IDENTITIES = (
      "751f3196c6c084a8d79554ff85b18083f8e0b7e483c36c8dbe2eff90c14bf27d"),
     (0x0814339C, 0x08143528, 188,
      "724ac20cf05719a0fbe4d032862cdc3ba94f1085aa6fbf1d6bc01e598e23adbf"),
+    (0x08143528, 0x0814362A, 129,
+     "29c2eb0eb1f6a9b824ecfb2bd55d4b006da808992cb6e61f9998057d23c280eb"),
+    (0x0814379C, 0x081437EA, 36,
+     "93610c0c0b2e7dd92aba95bfb314fe742a48924abf71d8658d9c01d118af2360"),
     (0x0814383C, 0x081438BC, 56,
      "99b0db82e85f6860b32c8ae93795730b88afaec7134f3ab439db123a7a9f9c0a"),
     (0x081438BC, 0x08143930, 53,
@@ -86,6 +91,9 @@ EDGES = (
     (0x81433AC, 0x8142D34),
     (0x81433B6, 0x8142D34),
     (0x8143512, 0x8142BE8),
+    (0x81437AC, 0x8142D34),
+    (0x81437B6, 0x8142D34),
+    (0x81437DE, 0x8143528),
     (0x81438AC, 0x8142BE8),
     (0x81438C8, 0x8142D34),
     (0x814391A, 0x8144378),
@@ -96,12 +104,15 @@ EDGES = (
 # The new conversion reuses the double unpacker and single packer. Only the
 # public conversion is a caller operation; the other three bodies stay private.
 TRUNCATION_CLOSURE = (0x08142D34, 0x08143980, 0x081439C8, 0x08144314)
-# Addition receives two binary64 register pairs and returns one pair. Its
+# Multiplication receives two binary64 register pairs and returns one pair. Its
 # unpacker writes five words only to the caller's real local output record.
 # These complete bodies were already pinned private dependencies; exposing the
 # canonical compiler entry additionally requires their restoring ABI proof.
-ADDITION_CLOSURE = (0x08142A20, 0x08142BE8, 0x08142D34, 0x081430F0, 0x08144378)
+MULTIPLICATION_CLOSURE = (0x08142A20, 0x08142BE8, 0x08142D34, 0x081430F0, 0x08144378)
 SIGNED_CONVERSION_CLOSURE = (0x08142D34, 0x081438BC, 0x08144378)
+ARITHMETIC_COMPARISON_CLOSURE = (
+    0x08142A94, 0x08142BE8, 0x08142D34, 0x08142E10, 0x08143080,
+    0x081430B4, 0x0814339C, 0x08143528, 0x0814379C, 0x08144378)
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
@@ -111,6 +122,11 @@ _replay_active = ContextVar("software_double_replay_active", default=False)
 
 def reserved(address):
     return any(start <= address & ~1 < end for start, end, _, _ in IDENTITIES)
+
+
+def shared_float_call(name, target):
+    """Only the existing canonical comparison belongs to either isolated profile."""
+    return name == "__ltdf2" and target == OPERATIONS[name] == 0x0814379C
 
 
 def dependency_records():
@@ -240,8 +256,9 @@ def verify_identity(rom, mapping, index):
         if first & 0xF800 != 0xF000 or second & 0xF800 != 0xF800 or site + 4 + displacement != target:
             raise ValueError("software-double dependency edge differs")
     prove_truncation_closure(rom, entries)
-    prove_addition_closure(rom, entries)
+    prove_multiplication_closure(rom, entries)
     prove_signed_conversion_closure(rom, entries)
+    prove_arithmetic_comparison_closure(rom, entries)
     return entries, rows
 
 
@@ -274,8 +291,8 @@ def prove_truncation_closure(rom, entries):
     return proofs
 
 
-def prove_addition_closure(rom, entries):
-    """Prove every addition dependency, frame, bounded write and native return.
+def prove_multiplication_closure(rom, entries):
+    """Prove every multiplication dependency, frame, bounded write and native return.
 
     The public entry has no external writes. Unpacked operands and scratch
     records must remain inside its established local frame; no IEEE arithmetic
@@ -283,21 +300,21 @@ def prove_addition_closure(rom, entries):
     """
     from software_float_profile import prove_runtime
     identities = {start: (end, count) for start, end, count, _ in IDENTITIES
-                  if start in ADDITION_CLOSURE}
-    pending, proofs = set(ADDITION_CLOSURE), {}
+                  if start in MULTIPLICATION_CLOSURE}
+    pending, proofs = set(MULTIPLICATION_CLOSURE), {}
     while pending:
         ready = [start for start in sorted(pending)
                  if all(target in proofs for site, target in EDGES
                         if start <= site < identities[start][0])]
         if not ready:
-            raise ValueError("software-double addition closure is recursive or incomplete")
+            raise ValueError("software-double multiplication closure is recursive or incomplete")
         for start in ready:
             end, count = identities[start]
             writes = tuple((1, offset, 4) for offset in range(0, 20, 4)) \
                 if start == 0x08142D34 else ()
             proofs[start] = prove_runtime(
                 rom, entries, start, end, count, proofs, call_edges=EDGES,
-                scalar_entries=(OPERATIONS["__adddf3"],), allowed_writes=writes,
+                scalar_entries=(OPERATIONS["__muldf3"],), allowed_writes=writes,
                 stack_load_widths=(1, 2, 4),
                 stack_store_widths=(1, 2, 4) if start == 0x08142BE8 else (4,))
             pending.remove(start)
@@ -329,6 +346,38 @@ def prove_signed_conversion_closure(rom, entries):
                 rom, entries, start, end, count, proofs, call_edges=EDGES,
                 scalar_entries=(OPERATIONS["__fixdfsi"],), allowed_writes=writes,
                 stack_load_widths=(1, 2, 4))
+            pending.remove(start)
+    return proofs
+
+
+def prove_arithmetic_comparison_closure(rom, entries):
+    """Prove the exact native add/sub/div/less-than closure and ABI.
+
+    The unpacker and arithmetic kernel each write five formal output words,
+    respectively through R1 and R2. Public binary64 operations must contain
+    those writes in their real local frames and restore all saved registers.
+    Numeric inputs remain target-state values, without an IEEE claim.
+    """
+    from software_float_profile import prove_runtime
+    identities = {start: (end, count) for start, end, count, _ in IDENTITIES
+                  if start in ARITHMETIC_COMPARISON_CLOSURE}
+    pending, proofs = set(ARITHMETIC_COMPARISON_CLOSURE), {}
+    while pending:
+        ready = [start for start in sorted(pending)
+                 if all(target in proofs for site, target in EDGES
+                        if start <= site < identities[start][0])]
+        if not ready:
+            raise ValueError("software-double arithmetic comparison closure is recursive or incomplete")
+        for start in ready:
+            end, count = identities[start]
+            output = {0x08142D34: 1, 0x08142E10: 2}.get(start)
+            writes = () if output is None else tuple((output, n, 4) for n in range(0, 20, 4))
+            proofs[start] = prove_runtime(
+                rom, entries, start, end, count, proofs, call_edges=EDGES,
+                scalar_entries=tuple(OPERATIONS[name] for name in
+                                     ("__adddf3", "__subdf3", "__divdf3", "__ltdf2")),
+                allowed_writes=writes, stack_load_widths=(1, 2, 4),
+                stack_store_widths=(1, 2, 4) if start == 0x08142BE8 else (4,))
             pending.remove(start)
     return proofs
 

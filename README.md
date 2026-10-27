@@ -1125,6 +1125,22 @@ aliases, interior/odd runtime addresses, wrong or overlapping owners, modified
 runtime bodies, mixed profiles and stale evidence fail closed. The normal
 matcher, status verification and publication gate use this same automatic path.
 
+## Canonical 64-bit logical-right-shift runtime
+
+Natural unsigned 64-bit `>>` expressions emitting `__lshrdi3` automatically
+select `elf-symbol-thumb-lshrdi3-target-v1`. The complete Thumb runtime at
+`0x08144378..0x081443AE` is pinned to the fixed-compiler split-word reference:
+54 bytes, 27 instructions, low/high input and result in `r0`/`r1`, count in
+`r2`. A conservative CFG proof requires every call's count to be in 0..63;
+unknown, negative or excessive counts are rejected. It recognizes bounded
+nonwrapping register arithmetic, masks and adjacent comparison guards. Unknown
+loads discard numeric facts. Both indexes, complete runtime bytes, typed ELF
+relocations, caller stack/return provenance and fresh source replay are checked
+as for left shift. Explicit runtime identifiers in preprocessed source, addressed
+aliases, mixed operations/profiles and forged or stale evidence are rejected.
+Mapped data and fixed scalar frames remain supported. Existing left-shift
+reports and count semantics are unchanged.
+
 ## Canonical float multiply, unsigned conversion and double comparison
 
 Natural C that emits `__mulsf3`, `__fixunssfsi`, `__extendsfdf2` or `__ltdf2`
@@ -1189,16 +1205,16 @@ no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
 selects `elf-symbol-thumb-df-convert-sub-div-target-v1`. Only the fixed agbcc
 `-mthumb-interwork -O2` configuration is supported. At least one fresh original
 ELF call relocation must name `__floatdidf`, `__floatsidf`, `__adddf3`, `__subdf3`,
-`__divdf3`, `__truncdfsf2` or `__fixdfsi`. Multiply, private integer helpers and
-other floating operations remain unsupported.
+`__divdf3`, `__muldf3`, `__ltdf2`, `__truncdfsf2` or `__fixdfsi`. Private
+integer helpers and other floating operations remain unsupported.
 
-All sixteen complete runtime identities in `software_double_profile.py` are
-mandatory, including pools, internal alignment and 32 dependency edges.
+All eighteen complete runtime identities in `software_double_profile.py` are
+mandatory, including pools, internal alignment and 36 dependency edges.
 Both function indexes must contain their exact unique, nonoverlapping Thumb
 extents and instruction counts. Legacy truncated metadata cannot substitute
 for these spans. Their entire intervals are reserved against addressed-call,
 data/base/addend, function-literal, raw-literal and older-report bypasses.
-Only the seven canonical double caller entries are exposed; transitive private calls
+Only the nine canonical double caller entries are exposed; transitive private calls
 are justified by the pinned closure, not caller-access exceptions.
 
 The truncation closure adds the complete 72-byte/32-instruction conversion,
@@ -1211,6 +1227,30 @@ saved registers. Subword stack loads are bounded and supply unknown state,
 never saved-register provenance. Each runtime closure supplies its exact call
 edges, public entries and bounded output policy to the shared interpreter;
 word-only stack access remains the default.
+
+The add/subtract/divide/comparison closure checks ten complete native
+bodies, their reachable CFGs, actual frames, saved-register restoration and
+returns. The unpacker writes exactly five words through formal R1; the
+arithmetic kernel writes exactly five words through formal R2. Public entries
+must contain those writes inside their real local frames and have no external
+writes. Addition returns a register pair; comparison returns its scalar target
+result. All numeric operands remain machine-state inputs; unrestricted IEEE
+semantics are not asserted.
+
+Canonical symbol identity is independently grounded in the local agbcc runtime
+source compiled with the fixed configuration: the complete `__adddf3` object
+body matches ROM `08143080` (52 bytes), while `__muldf3` matches `081430F0`
+(684 bytes). The multiplication closure proves its five complete native bodies,
+bounded unpacker output and restoring public ABI. Canonical ELF names are kept
+through linking; addition and multiplication addresses cannot be interchanged.
+
+The existing canonical `__ltdf2` entry may belong to the isolated software-float
+or software-double profile. Its exact undefined ELF symbol, address, call-site
+binding and active context must agree. This does not combine those profiles:
+simultaneous contexts, other single-precision operations in double callers,
+addressed aliases, private runtime calls and unproved integer-runtime mixtures
+remain refused. Versioned dependency manifests and fresh source/report replay
+include the new closure; old runtime manifests cannot assert this capability.
 
 The original ELF must contain one complete Thumb function, canonical undefined
 global call symbols and canonical BL addends. Typed linking must preserve all

@@ -10,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 
+NAME = "ashldi3"
 SCHEMA = "elf-symbol-thumb-ashldi3-target-v1"
 RUNTIME = "agbcc-thumb-ashldi3-v1"
 ABI = "agbcc-thumb-di-r0-r1-shift-r2-v1"
@@ -20,7 +21,7 @@ DIGEST = "6a654c08094c50c91ace78cf2bf460ef7235fea0abafb0357b970163ff1faa52"
 FORBIDDEN = ("* buffer", "* unsigned division", "* unsigned remainder", "* signed remainder",
              "* signed quotient", "* software double", "* inert spin", "* empty body",
              "* switches", "* switch manifest", "* switch proof", "* function address",
-             "* function-address", "* function buffer")
+             "* function-address", "* function buffer", "* lshrdi3")
 _replay_active = ContextVar("ashldi3_replay_active", default=False)
 
 
@@ -316,3 +317,15 @@ def report_matches(report, root, address):
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False
+
+
+def for_bindings(bindings):
+    """Select one canonical shift operation; mixed or missing bindings fail closed."""
+    if type(bindings) is not dict or not bindings:
+        raise ValueError("shift requires nonempty canonical bindings")
+    if set(bindings.values()) == {"__ashldi3"}:
+        return sys.modules[__name__]
+    if set(bindings.values()) == {"__lshrdi3"}:
+        import lshrdi3_profile
+        return lshrdi3_profile
+    raise ValueError("shift bindings must name one canonical operation")

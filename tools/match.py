@@ -359,7 +359,7 @@ def parse_data_symbols(snapshot):
     for name, value in document.items():
         if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
                 name.startswith(("func_", "_call_via_")) or \
-                name in ("__udivsi3", "__modsi3", "__umodsi3", "__ashldi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or name in software_float.OPERATIONS or \
+                name in ("__udivsi3", "__modsi3", "__umodsi3", "__ashldi3", "__lshrdi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or name in software_float.OPERATIONS or \
                 not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
             raise ValueError("invalid data symbol name or absolute address")
         if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)) or \
@@ -446,7 +446,8 @@ def call_bindings(image, name, address, mapping, rom_size,
         if not isinstance(double_bindings, dict) or double_bindings or \
                 data_mapping is not None and not allow_double_data or \
                 function_relocations is not None or switch_relocations is not None or allow_switch_data or \
-                allow_preloaded_switch or udivsi3_bindings is not None or divsi3_bindings is not None:
+                allow_preloaded_switch or udivsi3_bindings is not None or divsi3_bindings is not None or \
+                float_bindings is not None:
             raise ValueError("software double requires isolated empty call bindings")
         software_double.verify_identity(rom_image, mapping, double_index)
     elif double_index is not None:
@@ -547,12 +548,13 @@ def call_bindings(image, name, address, mapping, rom_size,
             match = re.fullmatch(r"func_([0-9A-F]{8})", target_symbol["name"])
             helper = RUNTIME_HELPERS.get(target_symbol["name"])
             division = target_symbol["name"] == "__udivsi3"
-            left_shift = target_symbol["name"] == "__ashldi3"
+            left_shift = target_symbol["name"] in ("__ashldi3", "__lshrdi3")
             unsigned_remainder = target_symbol["name"] == "__umodsi3"
             quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
             double_operation = target_symbol["name"] in software_double.OPERATIONS
-            float_operation = target_symbol["name"] in software_float.OPERATIONS
+            float_operation = target_symbol["name"] in software_float.OPERATIONS and not (
+                double_operation and double_bindings is not None)
             if float_operation:
                 if float_bindings is None:
                     raise ValueError("software float requires its canonical target-machine profile")
@@ -568,10 +570,11 @@ def call_bindings(image, name, address, mapping, rom_size,
                     raise ValueError("ashldi3 requires its canonical target-machine profile")
                 if target_symbol["section"] or target_symbol["bind"] != 1 or \
                         target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
-                        sum(item["name"] == "__ashldi3" for item in image["symbols"]) != 1:
+                        sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
                     raise ValueError("ashldi3 requires one undefined global function symbol")
-                ashldi3.verify_identity(rom_image, mapping, ashldi3_index)
-                target = ashldi3.ADDRESS
+                shift = ashldi3.for_bindings({address + relocation: target_symbol["name"]})
+                shift.verify_identity(rom_image, mapping, ashldi3_index)
+                target = shift.ADDRESS
                 candidates = []
             elif double_operation:
                 if double_bindings is None:
@@ -693,7 +696,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
                 raise ValueError("software-float calls require unique undefined global functions")
     if ashldi3_bindings:
-        if any(target != ashldi3.ADDRESS for target in calls.values()) or udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or \
+        shift = ashldi3.for_bindings(ashldi3_bindings)
+        if any(target != shift.ADDRESS for target in calls.values()) or udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or \
                 double_bindings is not None or function_relocations or switch_relocations or function_thunks or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("ashldi3 excludes other runtime, switch, function and thunk profiles")
@@ -810,6 +814,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if len(linked["text"]) != len(original["text"]):
         raise ValueError("linker added text or veneers")
     data_relocations = data_relocations or {}
+    if double_bindings is not None and float_bindings is not None:
+        raise ValueError("linked software float and double require isolated contexts")
     if type(allow_double_data) is not bool or allow_double_data and double_bindings is None:
         raise ValueError("linked software-double data requires its explicit runtime context")
     function_relocations = function_relocations or {}
@@ -823,7 +829,9 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
     float_targets = {name: target for name, target in targets.items()
-                     if software_float.reserved(target)}
+                     if software_float.reserved(target) and not (
+                         double_bindings is not None and software_double.shared_float_call(name, target) or
+                         ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if float_targets:
         if type(float_bindings) is not dict or not float_bindings or \
                 any(alias not in software_float.OPERATIONS or calls.get(site) != software_float.OPERATIONS[alias]
@@ -836,14 +844,15 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked software-float bindings are incomplete or mixed")
     elif float_bindings:
         raise ValueError("software-float bindings have no linked runtime")
-    shift_targets = {name: target for name, target in targets.items() if ashldi3.reserved(target)}
+    shift = ashldi3.for_bindings(ashldi3_bindings) if ashldi3_bindings else ashldi3
+    shift_targets = {name: target for name, target in targets.items() if shift.reserved(target)}
     if shift_targets:
-        if any(target != ashldi3.ADDRESS for target in calls.values()) or \
-                shift_targets != {"__ashldi3": ashldi3.ADDRESS} or \
+        if any(target != shift.ADDRESS for target in calls.values()) or \
+                shift_targets != {"__" + shift.NAME: shift.ADDRESS} or \
                 type(ashldi3_bindings) is not dict or not ashldi3_bindings or \
-                any(alias != "__ashldi3" or calls.get(site) != ashldi3.ADDRESS
+                any(calls.get(site) != shift.ADDRESS
                     for site, alias in ashldi3_bindings.items()) or \
-                set(ashldi3_bindings) != {site for site, target in calls.items() if ashldi3.reserved(target)} or \
+                set(ashldi3_bindings) != {site for site, target in calls.items() if shift.reserved(target)} or \
                 udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or \
                 double_bindings is not None or function_relocations or switch_relocations or function_thunks or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
@@ -864,7 +873,10 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked unsigned remainder bindings are incomplete or mixed")
     elif umodsi3_bindings:
         raise ValueError("unsigned remainder bindings have no linked runtime")
-    double_targets = {name: target for name, target in targets.items() if software_double.reserved(target)}
+    double_targets = {name: target for name, target in targets.items()
+                      if software_double.reserved(target) and not (
+                          float_bindings is not None and software_double.shared_float_call(name, target) or
+                          ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if double_targets:
         if not isinstance(double_bindings, dict) or not double_bindings or \
                 any(alias not in software_double.OPERATIONS or calls.get(site) != software_double.OPERATIONS[alias]
@@ -2207,8 +2219,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         software_float.verify_context(data, address, validated_calls or {}, float_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
                modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or
-               ashldi3.reserved(target) or software_double.reserved(target)
-               for target in (validated_calls or {}).values()):
+               ashldi3.reserved(target) or software_double.reserved(target) and not
+               software_double.shared_float_call(float_context[3].get(site), target)
+               for site, target in (validated_calls or {}).items()):
             raise ValueError("software float excludes other runtimes and thunks")
     if ashldi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
@@ -2217,10 +2230,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 umodsi3_context is not None or inert_spin_context is not None or double_context is not None or \
                 function_thunk_context is not None or preloaded_switch:
             raise ValueError("ashldi3 requires an isolated ordinary direct-call context")
-        ashldi3.verify_context(data, address, validated_calls or {}, ashldi3_context)
+        if type(ashldi3_context) is not tuple or len(ashldi3_context) != 4:
+            raise ValueError("shift requires an isolated canonical runtime context")
+        shift = ashldi3.for_bindings(ashldi3_context[3])
+        shift.verify_context(data, address, validated_calls or {}, ashldi3_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
                modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or
-               software_double.reserved(target) or software_float.reserved(target) for target in (validated_calls or {}).values()):
+               (software_double.reserved(target) or software_float.reserved(target)) and
+               target != shift.ADDRESS
+               for target in (validated_calls or {}).values()):
             raise ValueError("ashldi3 excludes other runtimes and thunks")
     if umodsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
@@ -2368,7 +2386,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     address <= operands[0].imm < end:
                 raise ValueError("call is not a validated external direct Thumb BL")
             target = operands[0].imm
-            if software_float.reserved(target):
+            if software_float.reserved(target) and not (
+                    double_context is not None and
+                    software_double.shared_float_call(double_context[3].get(current), target) or
+                    ashldi3_context is not None and
+                    target == ashldi3.for_bindings(ashldi3_context[3]).ADDRESS):
                 if float_context is None or current not in float_context[3] or \
                         software_float.OPERATIONS.get(float_context[3][current]) != target:
                     raise ValueError("software float requires its canonical runtime proof")
@@ -2379,7 +2401,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if umodsi3_context is None or target != umodsi3.ADDRESS or \
                         current not in umodsi3_context[2]:
                     raise ValueError("unsigned remainder requires its canonical constant-divisor proof")
-            if software_double.reserved(target):
+            if software_double.reserved(target) and not (
+                    float_context is not None and
+                    software_double.shared_float_call(float_context[3].get(current), target) or
+                    ashldi3_context is not None and
+                    target == ashldi3.for_bindings(ashldi3_context[3]).ADDRESS):
                 if double_context is None or current not in double_context[3] or \
                         software_double.OPERATIONS.get(double_context[3][current]) != target:
                     raise ValueError("software double requires its canonical runtime proof")
@@ -2739,6 +2765,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         divsi3_context[3].update(divsi3.prove_divisors(instructions, edges, address, divsi3_context[2]))
     if umodsi3_context is not None:
         umodsi3_context[3].update(umodsi3.prove_divisors(instructions, edges, address, umodsi3_context[2]))
+    if ashldi3_context is not None:
+        shift = ashldi3.for_bindings(ashldi3_context[3])
+        if hasattr(shift, "prove_counts"):
+            shift.prove_counts(instructions, edges, address, ashldi3_context[3], data)
     if signed_numeric:
         # Only the canonical double composition may reuse the complete local
         # stack/save/restore proof above. The operand proof remains register-only:
@@ -2953,6 +2983,7 @@ def main():
             float_bindings = {}
             float_evidence = None
             shift_evidence = None
+            shift_profile = ashldi3
             quotient_evidence = None
             remainder_evidence = None
             division_evidence = None
@@ -3025,12 +3056,13 @@ def main():
                 verified_instructions = software_float.verify(
                     got, addr, rom, mapping, empty_index, data_mapping, float_evidence)
             elif ashldi3_bindings:
-                ashldi3.fixed_configuration(args)
+                shift_profile = ashldi3.for_bindings(ashldi3_bindings)
+                shift_profile.fixed_configuration(args)
                 verified_instructions = verify_leaf_instructions(
                     got, addr, True, calls, ashldi3_context=(rom, mapping, empty_index, ashldi3_bindings))
-                shift_evidence = ashldi3.make_manifest(calls, addr, ashldi3_bindings,
+                shift_evidence = shift_profile.make_manifest(calls, addr, ashldi3_bindings,
                                                        data_relocations, data_mapping, verified_instructions)
-                verified_instructions = ashldi3.verify(
+                verified_instructions = shift_profile.verify(
                     got, addr, rom, mapping, empty_index, data_mapping, shift_evidence)
             elif umodsi3_bindings:
                 umodsi3.fixed_configuration(args)
@@ -3177,7 +3209,7 @@ def main():
     if float_evidence is not None:
         schema = software_float.SCHEMA
     if shift_evidence is not None:
-        schema = ashldi3.SCHEMA
+        schema = shift_profile.SCHEMA
     if unsigned_remainder_evidence is not None:
         schema = umodsi3.SCHEMA
     if spin_profile:
@@ -3269,10 +3301,10 @@ def main():
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             sys.exit(f"software-float source replay failed: {error}")
     if shift_evidence is not None:
-        if ashldi3.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file or hand_asm_allowed:
+        if shift_profile.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file or hand_asm_allowed:
             sys.exit("ashldi3 index/ROM selection changed or hand-ASM exception requested")
         try:
-            ashldi3.verify_source(ROOT, addr, got_body, rom, mapping, empty_index,
+            shift_profile.verify_source(ROOT, addr, got_body, rom, mapping, empty_index,
                                   data_mapping, fingerprint, shift_evidence)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             sys.exit(f"ashldi3 source replay failed: {error}")
@@ -3407,11 +3439,11 @@ def main():
             if shift_evidence is not None:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
                 f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* ashldi3: {ashldi3.SUMMARY}\n")
-                f.write(f"* ashldi3 manifest: `{ashldi3.manifest_text(shift_evidence)}`\n")
-                proof_digest = ashldi3.fingerprint(addr, got_body, shift_evidence, fingerprint,
+                f.write(f"* {shift_profile.NAME}: {shift_profile.SUMMARY}\n")
+                f.write(f"* {shift_profile.NAME} manifest: `{shift_profile.manifest_text(shift_evidence)}`\n")
+                proof_digest = shift_profile.fingerprint(addr, got_body, shift_evidence, fingerprint,
                                                    mapping, empty_index, data_mapping, rom)
-                f.write(f"* ashldi3 proof SHA-256: `{proof_digest}`\n")
+                f.write(f"* {shift_profile.NAME} proof SHA-256: `{proof_digest}`\n")
             if unsigned_remainder_evidence is not None:
                 f.write(f"* unsigned remainder: {umodsi3.SUMMARY}\n")
                 f.write(f"* unsigned remainder manifest: `{umodsi3.manifest_text(unsigned_remainder_evidence)}`\n")
