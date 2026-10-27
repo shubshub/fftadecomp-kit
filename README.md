@@ -1183,22 +1183,22 @@ mapping, altered proof, duplicate field or mixed profile fails closed. Focused
 tests create synthetic callers in memory using only the local approved runtime;
 no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
 
-## Target binary64 conversions, subtraction and division
+## Target binary64 conversions and arithmetic
 
 `match.py --software-double-profile convert-sub-div-target-v1` explicitly
 selects `elf-symbol-thumb-df-convert-sub-div-target-v1`. Only the fixed agbcc
 `-mthumb-interwork -O2` configuration is supported. At least one fresh original
-ELF call relocation must name `__floatdidf`, `__floatsidf`, `__subdf3`,
-`__divdf3` or `__truncdfsf2`. No add/sub-only option is installed. Direct add, multiply, private
-integer helpers and every other floating operation remain unsupported.
+ELF call relocation must name `__floatdidf`, `__floatsidf`, `__adddf3`, `__subdf3`,
+`__divdf3`, `__truncdfsf2` or `__fixdfsi`. Multiply, private integer helpers and
+other floating operations remain unsupported.
 
-All fifteen complete runtime identities in `software_double_profile.py` are
-mandatory, including pools, internal alignment and 31 dependency edges.
+All sixteen complete runtime identities in `software_double_profile.py` are
+mandatory, including pools, internal alignment and 32 dependency edges.
 Both function indexes must contain their exact unique, nonoverlapping Thumb
 extents and instruction counts. Legacy truncated metadata cannot substitute
 for these spans. Their entire intervals are reserved against addressed-call,
 data/base/addend, function-literal, raw-literal and older-report bypasses.
-Only the five canonical caller entries are exposed; transitive private calls
+Only the seven canonical double caller entries are exposed; transitive private calls
 are justified by the pinned closure, not caller-access exceptions.
 
 The truncation closure adds the complete 72-byte/32-instruction conversion,
@@ -1227,7 +1227,21 @@ PC-relative loads. Each undefined global object must have an evidence-backed
 reserved runtime intervals are checked before and after linking. Numeric address
 constants cannot substitute for object relocations, even with a rehashed report.
 Buffers, stack-argument proof contexts, resolvers, switches, function relocations,
-thunks, integer runtimes and inert spins cannot compose with this profile.
+thunks, other integer runtimes and inert spins cannot compose with this profile.
+The only integer-runtime composition is the original compiler `__modsi3`
+symbol. Every remainder site must have a CFG-proven signed16 dividend in r0
+and nonzero divisor in r1; loads from unknown memory or locals supply no
+operand facts. Its exact 206-byte/102-instruction runtime and two-byte zero
+hook require both ownership indexes, pinned bytes and native restoring ABI
+proof. The hook's MOV PC,LR and runtime's MOV PC,LR / POP PC returns are
+accepted only at explicitly pinned sites, after complete SP and callee-save
+restoration checks; the shared runtime interpreter's default remains unchanged.
+Balanced fixed frames may compose only after the existing complete double
+caller stack/save/return proof. Standalone numeric MOD remains frameless.
+A versioned remainder manifest records exact dependencies, sites and domain;
+canonical BL relocations, typed data provenance and fresh source replay remain
+mandatory. Addressed MOD aliases, signed/unsigned quotient and unsigned
+remainder combinations still reject.
 Ordinary callees retain entry-only binding and ABI assumptions: their complete
 bodies, semantics and return behavior are not proved.
 

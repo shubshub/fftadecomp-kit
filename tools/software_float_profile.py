@@ -126,7 +126,7 @@ def dependency_records():
 
 def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=None,
                   scalar_entries=None, allowed_writes=None, stack_load_widths=(4,),
-                  stack_store_widths=(4,), stack_input_words=(), stack_adjusted_returns=False):
+                  stack_store_widths=(4,), stack_input_words=(), stack_adjusted_returns=False, thumb_pc_returns=()):
     """Prove this pinned body's local returns and callee-saved/write ABI.
 
     This is deliberately separate from the caller verifier. Loads are target
@@ -148,6 +148,9 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                              stack_adjusted_returns=stack_adjusted_returns)
     expected_calls = {site: target for site, target in
                       (EDGES if call_edges is None else call_edges) if start <= site < end}
+    if not isinstance(thumb_pc_returns, tuple) or any(type(site) is not int or site % 2 or
+            not start <= site < end for site in thumb_pc_returns) or len(set(thumb_pc_returns)) != len(thumb_pc_returns):
+        raise ValueError("software-float explicit Thumb PC return sites are invalid")
     public = OPERATIONS.values() if scalar_entries is None else scalar_entries
     permitted_writes = ({(number, offset, 4) for number in range(4) for offset in range(0, 16, 4)}
                         if allowed_writes is None else set(allowed_writes))
@@ -237,6 +240,20 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                 saved.remove(offset)
             sp += 4 * len(regs)
             registers[ARM_REG_SP] = ("stack", 0, sp)
+            if ARM_REG_PC in regs:
+                if site not in thumb_pc_returns or registers[ARM_REG_PC] != ("entry", ARM_REG_LR, 0) or \
+                        sp or saved or any(registers.get(r) != ("entry", r, 0)
+                                           for r in range(ARM_REG_R4, ARM_REG_R11 + 1)):
+                    raise ValueError("software-float Thumb POP PC return/restoration is unproved")
+                returns.add(site)
+                successors = ()
+        elif mnemonic in ("mov", "movs") and regs and regs[0] == ARM_REG_PC:
+            if site not in thumb_pc_returns or instruction.size != 2 or regs != [ARM_REG_PC, ARM_REG_LR] or \
+                    registers.get(ARM_REG_LR) != ("entry", ARM_REG_LR, 0) or sp or saved or \
+                    any(registers.get(r) != ("entry", r, 0) for r in range(ARM_REG_R4, ARM_REG_R11 + 1)):
+                raise ValueError("software-float Thumb MOV PC return/restoration is unproved")
+            returns.add(site)
+            successors = ()
         elif mnemonic == "bx":
             if len(regs) != 1 or registers.get(regs[0]) != ("entry", ARM_REG_LR, 0) or sp or saved or \
                     any(registers.get(r) != ("entry", r, 0) for r in range(ARM_REG_R4, ARM_REG_R11 + 1)):
@@ -332,7 +349,8 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
-    if set(instructions) != set(edges) or returns != {int(site, 16) for site in layout["returns"]}:
+    if not set(thumb_pc_returns) <= returns or \
+            set(instructions) != set(edges) or returns != {int(site, 16) for site in layout["returns"]}:
         raise ValueError("software-float runtime ABI proof omitted reachable instructions or returns")
     reaching = set(returns)
     while True:

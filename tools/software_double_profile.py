@@ -1,4 +1,4 @@
-"""Canonical target-state binary64 conversions, truncation, subtraction and division."""
+"""Canonical target-state binary64 conversions, signed conversion, truncation and arithmetic."""
 
 import argparse
 from contextvars import ContextVar
@@ -14,14 +14,16 @@ import tempfile
 
 SCHEMA = "elf-symbol-thumb-df-convert-sub-div-target-v1"
 SELECTOR = "convert-sub-div-target-v1"
-RUNTIME = "agbcc-thumb-df-convert-sub-div-trunc-closure-v2"
+RUNTIME = "agbcc-thumb-df-convert-add-sub-div-trunc-fix-mod-s16-closure-v5"
 ABI = "agbcc-thumb-df-sf-mixed-integer-v2"
 SEMANTICS = "target-machine-state-v1"
-SUMMARY = ("pinned target binary64 conversion/sub/div/trunc runtime; entry RAM and stack are state inputs; "
+SUMMARY = ("pinned target binary64 conversion/add/sub/div/trunc/signed-conversion runtime; entry RAM and stack are state inputs; "
+           "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor; "
            "unrestricted IEEE semantics not proved")
 OPERATIONS = {"__floatdidf": 0x081428E4, "__floatsidf": 0x0814383C,
               "__subdf3": 0x081430B4, "__divdf3": 0x0814339C,
-              "__truncdfsf2": 0x08143980}
+              "__truncdfsf2": 0x08143980, "__adddf3": 0x081430F0,
+              "__fixdfsi": 0x081438BC}
 IDENTITIES = (
     (0x081428E4, 0x08142950, 40,
      "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
@@ -45,6 +47,8 @@ IDENTITIES = (
      "724ac20cf05719a0fbe4d032862cdc3ba94f1085aa6fbf1d6bc01e598e23adbf"),
     (0x0814383C, 0x081438BC, 56,
      "99b0db82e85f6860b32c8ae93795730b88afaec7134f3ab439db123a7a9f9c0a"),
+    (0x081438BC, 0x08143930, 53,
+     "327a2c60d3bd9a1ae330269c1ac62adb3632dd975251432fdb36bdacc9e6b2c8"),
     (0x08143980, 0x081439C8, 32,
      "acb4499634230b81e5a935184b68ddda30d9c6eb08041a49ceccab21d05f4223"),
     (0x081439C8, 0x08143A84, 86,
@@ -83,6 +87,8 @@ EDGES = (
     (0x81433B6, 0x8142D34),
     (0x8143512, 0x8142BE8),
     (0x81438AC, 0x8142BE8),
+    (0x81438C8, 0x8142D34),
+    (0x814391A, 0x8144378),
     (0x814398C, 0x8142D34),
     (0x81439B8, 0x8144314),
     (0x8144322, 0x81439C8),
@@ -90,6 +96,12 @@ EDGES = (
 # The new conversion reuses the double unpacker and single packer. Only the
 # public conversion is a caller operation; the other three bodies stay private.
 TRUNCATION_CLOSURE = (0x08142D34, 0x08143980, 0x081439C8, 0x08144314)
+# Addition receives two binary64 register pairs and returns one pair. Its
+# unpacker writes five words only to the caller's real local output record.
+# These complete bodies were already pinned private dependencies; exposing the
+# canonical compiler entry additionally requires their restoring ABI proof.
+ADDITION_CLOSURE = (0x08142A20, 0x08142BE8, 0x08142D34, 0x081430F0, 0x08144378)
+SIGNED_CONVERSION_CLOSURE = (0x08142D34, 0x081438BC, 0x08144378)
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
@@ -228,6 +240,8 @@ def verify_identity(rom, mapping, index):
         if first & 0xF800 != 0xF000 or second & 0xF800 != 0xF800 or site + 4 + displacement != target:
             raise ValueError("software-double dependency edge differs")
     prove_truncation_closure(rom, entries)
+    prove_addition_closure(rom, entries)
+    prove_signed_conversion_closure(rom, entries)
     return entries, rows
 
 
@@ -260,6 +274,65 @@ def prove_truncation_closure(rom, entries):
     return proofs
 
 
+def prove_addition_closure(rom, entries):
+    """Prove every addition dependency, frame, bounded write and native return.
+
+    The public entry has no external writes. Unpacked operands and scratch
+    records must remain inside its established local frame; no IEEE arithmetic
+    model or generic floating-call exception is introduced.
+    """
+    from software_float_profile import prove_runtime
+    identities = {start: (end, count) for start, end, count, _ in IDENTITIES
+                  if start in ADDITION_CLOSURE}
+    pending, proofs = set(ADDITION_CLOSURE), {}
+    while pending:
+        ready = [start for start in sorted(pending)
+                 if all(target in proofs for site, target in EDGES
+                        if start <= site < identities[start][0])]
+        if not ready:
+            raise ValueError("software-double addition closure is recursive or incomplete")
+        for start in ready:
+            end, count = identities[start]
+            writes = tuple((1, offset, 4) for offset in range(0, 20, 4)) \
+                if start == 0x08142D34 else ()
+            proofs[start] = prove_runtime(
+                rom, entries, start, end, count, proofs, call_edges=EDGES,
+                scalar_entries=(OPERATIONS["__adddf3"],), allowed_writes=writes,
+                stack_load_widths=(1, 2, 4),
+                stack_store_widths=(1, 2, 4) if start == 0x08142BE8 else (4,))
+            pending.remove(start)
+    return proofs
+
+
+def prove_signed_conversion_closure(rom, entries):
+    """Prove the pinned double-to-signed-int helper and its private dependencies.
+
+    Runtime numeric loads are machine-state inputs. The unpacker may write
+    only its five-word formal result; the public conversion must contain
+    those writes in its local frame and restore every native return path.
+    """
+    from software_float_profile import prove_runtime
+    identities = {start: (end, count) for start, end, count, _ in IDENTITIES
+                  if start in SIGNED_CONVERSION_CLOSURE}
+    pending, proofs = set(SIGNED_CONVERSION_CLOSURE), {}
+    while pending:
+        ready = [start for start in sorted(pending)
+                 if all(target in proofs for site, target in EDGES
+                        if start <= site < identities[start][0])]
+        if not ready:
+            raise ValueError("software-double signed conversion closure is recursive or incomplete")
+        for start in ready:
+            end, count = identities[start]
+            writes = tuple((1, offset, 4) for offset in range(0, 20, 4)) \
+                if start == 0x08142D34 else ()
+            proofs[start] = prove_runtime(
+                rom, entries, start, end, count, proofs, call_edges=EDGES,
+                scalar_entries=(OPERATIONS["__fixdfsi"],), allowed_writes=writes,
+                stack_load_widths=(1, 2, 4))
+            pending.remove(start)
+    return proofs
+
+
 def validate_span(data, address, rom, mapping, index):
     entries, rows = verify_identity(rom, mapping, index)
     entry = span_record(address, address + len(data), entries, rows, rom)
@@ -274,16 +347,55 @@ def call_records(calls, address, bindings):
             for site, target in sorted(calls.items())]
 
 
+def prove_remainder_closure(rom, mapping, index):
+    """Re-use the pinned MOD body and prove its exact local scalar ABI."""
+    from match import modsi3
+    from software_float_profile import prove_runtime
+    modsi3.verify_identity(rom, mapping)
+    entries, rows = indices(mapping, index)
+    for start, end, count in ((modsi3.ADDRESS, 0x08142A1E, 102),
+                              (0x0814274C, 0x0814274E, 1)):
+        if span_record(start, end, entries, rows, rom)["instrs"] != count:
+            raise ValueError("software-double remainder runtime instruction count differs")
+    # The exact zero-path MOV PC,LR and MOD MOV PC,LR / POP PC sites reuse
+    # the restoring ABI interpreter. Its default BX-only policy is unchanged.
+    start = 0x0814274C
+    proofs = {start: prove_runtime(
+        rom, entries, start, 0x0814274E, 1, {}, call_edges=(),
+        scalar_entries=(start,), allowed_writes=(), thumb_pc_returns=(start,))}
+    proofs[modsi3.ADDRESS] = prove_runtime(
+        rom, entries, modsi3.ADDRESS, 0x08142A1E, 102, proofs,
+        call_edges=((0x08142A16, start),), scalar_entries=(modsi3.ADDRESS,), allowed_writes=(),
+        thumb_pc_returns=(0x08142A12, 0x08142A1C))
+    return proofs
+
+
+def remainder_record(calls, address, bindings):
+    from match import modsi3
+    sites = sorted(site - address for site, name in bindings.items() if name == "__modsi3")
+    return {"runtime": modsi3.RUNTIME, "dependencies": [list(row) for row in modsi3.IDENTITIES],
+            "calls": sites, "dividend": "signed16", "divisor": "nonzero"} if sites else None
+
+
 def verify_context(data, address, calls, context):
+    from match import modsi3
     if not isinstance(context, tuple) or len(context) != 4 or \
             not isinstance(context[3], dict) or not context[3]:
         raise ValueError("software double requires an isolated canonical runtime context")
     rom, mapping, index, bindings = context
     validate_span(data, address, rom, mapping, index)
-    if any(type(site) is not int or name not in OPERATIONS or calls.get(site) != OPERATIONS[name]
-           for site, name in bindings.items()) or \
-            set(bindings) != {site for site, target in calls.items() if reserved(target)}:
+    operations = dict(OPERATIONS, __modsi3=modsi3.ADDRESS)
+    if not any(name in OPERATIONS for name in bindings.values()) or \
+            any(type(site) is not int or name not in operations or calls.get(site) != operations[name]
+                for site, name in bindings.items()) or \
+            set(bindings) != {site for site, target in calls.items()
+                              if reserved(target) or modsi3.reserved(target)}:
         raise ValueError("software-double runtime call bindings are incomplete or mixed")
+    remainder = {site: name for site, name in bindings.items() if name == "__modsi3"}
+    if remainder:
+        modsi3.verify_context(data, address, calls, (rom, mapping, remainder))
+        prove_remainder_closure(rom, mapping, index)
+    return remainder
 
 
 def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
@@ -291,8 +403,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                        parse_data_symbols, verify_data_literals, modsi3, ARM_OP_MEM, ARM_REG_PC)
     entries, entry = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or \
-            set(manifest) not in ({"runtime", "abi", "semantics", "dependencies", "frame", "calls"},
-                                 {"runtime", "abi", "semantics", "dependencies", "frame", "calls", "data"}) or \
+            set(manifest) - {"data", "remainder"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
             manifest["runtime"] != RUNTIME or manifest["abi"] != ABI or manifest["semantics"] != SEMANTICS or \
             type(manifest["dependencies"]) is not list or \
             any(type(record) is not list or len(record) != 3 or \
@@ -311,12 +422,16 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
         if type(offset) is not int or not isinstance(name, str) or offset % 2 or \
                 offset < previous + 4 or offset < 0 or offset + 4 > len(data):
             raise ValueError("software-double calls must be ordered nonoverlapping instructions")
-        if name in OPERATIONS:
-            calls[address + offset] = OPERATIONS[name]
+        if name in OPERATIONS or name == "__modsi3":
+            calls[address + offset] = modsi3.ADDRESS if name == "__modsi3" else OPERATIONS[name]
             bindings[address + offset] = name
         else:
             calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
         previous = offset
+    remainder = remainder_record(calls, address, bindings)
+    if ("remainder" in manifest) != (remainder is not None) or \
+            remainder is not None and manifest["remainder"] != remainder:
+        raise ValueError("software-double signed remainder evidence differs")
     literals, occupied = {}, {byte - address for site in calls for byte in range(site, site + 4)}
     objects = parse_data_symbols(data_mapping) if "data" in manifest else {}
     previous = -1
@@ -365,6 +480,9 @@ def make_manifest(calls, address, bindings, instructions, *, literals=None, data
     manifest = {"runtime": RUNTIME, "abi": ABI, "semantics": SEMANTICS,
             "dependencies": dependency_records(), "frame": uses_stack_frame(instructions),
             "calls": call_records(calls, address, bindings)}
+    remainder = remainder_record(calls, address, bindings)
+    if remainder is not None:
+        manifest["remainder"] = remainder
     if literals:
         objects = parse_data_symbols(data_mapping)
         manifest["data"] = [[offset, name, value - objects[name]]
@@ -375,7 +493,7 @@ def make_manifest(calls, address, bindings, instructions, *, literals=None, data
 def object_bytes(runner, workspace, args, original, address, mapping, rom, index, *,
                  data_mapping=None, data_relocations=None):
     from match import (allocated_text_only, function_record, function_address_target,
-                       link_calls, parse_data_symbols)
+                       link_calls, parse_data_symbols, modsi3)
     fixed_configuration(args)
     if original["type"] != 1:
         raise ValueError("software double requires a relocatable original ELF")
@@ -391,7 +509,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
     entries, _ = verify_identity(rom, mapping, index)
     if data_relocations is not None and (type(data_relocations) is not dict or data_relocations):
         raise ValueError("software-double data provenance requires an empty collection")
-    objects, has_data = None, False
+    objects, has_data, has_remainder = None, False, False
     for section_index in original["relocations"]:
         section = original["sections"][section_index]
         if section[1] != 9 or section[7] != original["text_index"] or section[9] != 8 or section[5] % 8:
@@ -413,20 +531,24 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                     raise ValueError("software-double data requires one undefined mapped global object")
                 has_data = True
                 continue
-            if target["name"] not in OPERATIONS:
+            if target["name"] == "__modsi3":
+                has_remainder = True
+            elif target["name"] not in OPERATIONS:
                 function_address_target(target["name"], entries, address, symbol["size"], len(rom))
             if target["section"] or target["bind"] != 1 or target["type"] not in (0, 2) or \
                     target["value"] or sum(item["name"] == target["name"]
                                            for item in original["symbols"]) != 1:
                 raise ValueError("software-double calls require unique undefined global functions")
     if original["relocations"]:
-        bindings = {}
+        bindings, remainder_bindings = {}, {}
         data, calls, literals = link_calls(runner, workspace, args, original, address, mapping, len(rom), rom,
                                           data_mapping=data_mapping if has_data else None,
                                           double_bindings=bindings, double_index=index,
+                                          modsi3_bindings=remainder_bindings if has_remainder else None,
                                           allow_double_data=has_data)
         if not bindings:
             raise ValueError("software double requires at least one canonical runtime call")
+        bindings.update(remainder_bindings)
         if data_relocations is not None:
             data_relocations.update(literals)
         return data, calls, bindings

@@ -446,8 +446,7 @@ def call_bindings(image, name, address, mapping, rom_size,
         if not isinstance(double_bindings, dict) or double_bindings or \
                 data_mapping is not None and not allow_double_data or \
                 function_relocations is not None or switch_relocations is not None or allow_switch_data or \
-                allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or \
-                divsi3_bindings is not None:
+                allow_preloaded_switch or udivsi3_bindings is not None or divsi3_bindings is not None:
             raise ValueError("software double requires isolated empty call bindings")
         software_double.verify_identity(rom_image, mapping, double_index)
     elif double_index is not None:
@@ -606,6 +605,8 @@ def call_bindings(image, name, address, mapping, rom_size,
             elif remainder:
                 if modsi3_bindings is None:
                     raise ValueError("signed remainder requires its isolated binding profile")
+                if double_bindings is not None and target_symbol["name"] != "__modsi3":
+                    raise ValueError("software-double composition requires canonical __modsi3 provenance")
                 if target_symbol["section"] or target_symbol["bind"] != 1 or \
                         target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
                         sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
@@ -713,6 +714,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                 raise ValueError("unsigned remainder calls require unique undefined global functions")
     if double_bindings is not None:
         if not double_bindings or data_relocations and not allow_double_data or \
+                modsi3_bindings is not None and not modsi3_bindings or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("software double requires canonical operations and isolated typed data without thunks")
         for target_name in set(targets) - {binding[0] for binding in data_relocations.values()}:
@@ -732,6 +734,7 @@ def call_bindings(image, name, address, mapping, rom_size,
     if modsi3_bindings:
         aliases = set(modsi3_bindings.values())
         if aliases not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
+                double_bindings is not None and aliases != {"__modsi3"} or \
                 udivsi3_bindings or function_relocations or switch_relocations or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()) or \
                 aliases == {modsi3.ADDRESSED_NAME} and data_relocations:
@@ -868,7 +871,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                     for site, alias in double_bindings.items()) or \
                 double_targets != {alias: software_double.OPERATIONS[alias] for alias in double_bindings.values()} or \
                 set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target)} or \
-                udivsi3_bindings or modsi3_bindings or divsi3_bindings or \
+                udivsi3_bindings or divsi3_bindings or \
+                modsi3_bindings is not None and not modsi3_bindings or \
                 data_relocations and not allow_double_data or \
                 function_relocations or switch_relocations or allow_switch_data or allow_preloaded_switch or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
@@ -891,6 +895,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if remainder_targets:
         if not isinstance(modsi3_bindings, dict) or not modsi3_bindings or \
                 set(modsi3_bindings.values()) not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
+                double_bindings is not None and set(modsi3_bindings.values()) != {"__modsi3"} or \
                 remainder_targets != {next(iter(modsi3_bindings.values())): modsi3.ADDRESS} or \
                 any(calls.get(site) != modsi3.ADDRESS for site in modsi3_bindings) or \
                 set(modsi3_bindings) != {site for site, target in calls.items()
@@ -2245,11 +2250,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
                 divsi3_context is not None or inert_spin_context is not None or preloaded_switch:
             raise ValueError("software double requires an isolated direct-call context")
-        software_double.verify_context(data, address, validated_calls or {}, double_context)
+        remainder_bindings = software_double.verify_context(data, address, validated_calls or {}, double_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
-               modsi3.reserved(target) or divsi3.reserved(target)
+               (modsi3.reserved(target) and target != modsi3.ADDRESS) or divsi3.reserved(target)
                for target in (validated_calls or {}).values()):
             raise ValueError("software double excludes other runtimes and call thunks")
+        if remainder_bindings:
+            modsi3_context = (double_context[0], double_context[1], remainder_bindings)
     if inert_spin_context is not None:
         if type(inert_spin_context) is not dict or inert_spin_context or not thumb or \
                 buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
@@ -2733,7 +2740,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if umodsi3_context is not None:
         umodsi3_context[3].update(umodsi3.prove_divisors(instructions, edges, address, umodsi3_context[2]))
     if signed_numeric:
-        if uses_stack_frame(instructions.values()):
+        # Only the canonical double composition may reuse the complete local
+        # stack/save/restore proof above. The operand proof remains register-only:
+        # frame adjustments kill SP facts and unknown local loads yield no facts.
+        # Standalone remainder retains its existing frameless boundary.
+        if uses_stack_frame(instructions.values()) and double_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         modsi3.prove_operands(instructions, edges, address, modsi3_context[2])
     if inert_spin_context is not None:

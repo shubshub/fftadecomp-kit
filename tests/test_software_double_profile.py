@@ -136,7 +136,7 @@ class SoftwareDoubleTests(unittest.TestCase):
 
     def test_native_all_five_operations_and_ordinary_call(self):
         self.fixture()
-        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS))
+        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS)-{"__adddf3", "__fixdfsi"})
         self.assertIn(0x08000200, self.calls.values())
         self.assertEqual(len(self.verify()), len(self.instructions))
         with self.assertRaises(ValueError):
@@ -238,7 +238,8 @@ class SoftwareDoubleTests(unittest.TestCase):
 
     def test_typed_linking_rejects_changed_bytes_and_missing_binding(self):
         self.fixture()
-        targets = dict(profile.OPERATIONS, func_08000200=0x08000200)
+        targets = {name: profile.OPERATIONS[name] for name in self.bindings.values()}
+        targets["func_08000200"] = 0x08000200
         altered = copy.deepcopy(self.linked)
         text = bytearray(altered["text"]); text[0] ^= 1; altered["text"] = bytes(text)
         with self.assertRaisesRegex(ValueError, "outside permitted relocations"):
