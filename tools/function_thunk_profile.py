@@ -145,8 +145,8 @@ def original_bindings(image, address, mapping, rom, objects):
     calls, targets, literals = call_bindings(image, f"func_{address:08X}", address, mapping,
                                             len(rom), rom, objects, functions,
                                             function_thunks=True)
-    if not functions or not any(name in ALIASES for name in targets):
-        raise ValueError("function thunks require both function literals and canonical calls")
+    if not any(name in ALIASES for name in targets):
+        raise ValueError("function thunks require canonical calls")
     for name, value in targets.items():
         if reserved(value) and name not in ALIASES:
             raise ValueError("reserved thunk requires its canonical call alias")
@@ -188,10 +188,11 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     if type(manifest) is not dict or set(manifest) != keys or manifest["runtime"] != RUNTIME or \
             manifest["abi"] != ABI or type(manifest["frame"]) is not bool or \
             any(type(manifest[name]) is not list for name in keys - {"runtime", "abi", "frame"}) or \
-            not manifest["functions"] or not manifest["thunks"]:
+            not manifest["thunks"]:
         raise ValueError("invalid function-thunk manifest")
     ordinary = {name: manifest[name] for name in ("calls", "functions", "data")}
-    calls, literals = function_address_bindings(data, address, rom, mapping, objects, ordinary)
+    calls, literals = function_address_bindings(
+        data, address, rom, mapping, objects, ordinary, allow_empty_functions=True)
     if any(reserved(target) for target in calls.values()) or any(reserved(value) for _, value in literals.values()):
         raise ValueError("reserved thunk binding outside canonical calls")
     occupied = {position for records in ordinary.values() for record in records

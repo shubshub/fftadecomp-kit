@@ -1264,8 +1264,10 @@ Hosted report/block checks do not substitute for local ROM-backed matching.
 
 `match.py --function-address-profile canonical-thunks-v1` selects
 `elf-symbol-thumb-function-address-thunks-v1`; default matching does not select
-it automatically. It requires both original typed function-address literals
-and compiler-generated `_call_via_r0` through `_call_via_r12` calls. Ordinary
+it automatically. It requires compiler-generated `_call_via_r0` through
+`_call_via_r12` calls. The callback may come from a context or an incoming
+argument; function-address literals are optional. Any such literals still
+require original typed ELF provenance. Ordinary
 mapped Thumb calls, mapped objects and fixed scalar frames may coexist. Buffer,
 switch, arithmetic-runtime and inert-spin contexts cannot be combined with it.
 

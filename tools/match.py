@@ -803,7 +803,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     data_relocations = data_relocations or {}
     function_relocations = function_relocations or {}
     if function_thunks:
-        if type(function_thunks) is not bool or not function_relocations or \
+        if type(function_thunks) is not bool or \
                 not any(name in function_thunk.ALIASES for name in targets) or switch_relocations or \
                 allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None or \
                 modsi3_bindings is not None or divsi3_bindings is not None or double_bindings is not None:
@@ -1384,11 +1384,12 @@ def verify_modsi3(data, address, rom, mapping, data_mapping, manifest):
     return instructions
 
 
-def function_address_bindings(data, address, rom, mapping, data_mapping, manifest):
-    if mapping is None or not isinstance(manifest, dict) or \
+def function_address_bindings(data, address, rom, mapping, data_mapping, manifest, *,
+                              allow_empty_functions=False):
+    if type(allow_empty_functions) is not bool or mapping is None or not isinstance(manifest, dict) or \
             set(manifest) != {"calls", "data", "functions"} or \
             any(not isinstance(records, list) for records in manifest.values()) or \
-            not manifest["functions"]:
+            not manifest["functions"] and not allow_empty_functions:
         raise ValueError("invalid function-address manifest")
     entries = json.loads(mapping)
     if not isinstance(entries, list):
