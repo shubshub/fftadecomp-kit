@@ -1252,6 +1252,15 @@ addressed aliases, private runtime calls and unproved integer-runtime mixtures
 remain refused. Versioned dependency manifests and fresh source/report replay
 include the new closure; old runtime manifests cannot assert this capability.
 
+The canonical `__fixunsdfdi` entry is additionally pinned at
+`0814278C..08142862` (214 bytes, 80 reachable instructions), with the complete
+unsigned-conversion dependency closure and restoring ABI. This exact owner may
+also remain authored C: only its full pinned body/hash, exact dual-index owner
+and count pass the reserved-caller exception. Other runtime owners, interior or
+recursive calls, addressed aliases, forged bodies and stale manifests remain
+refused. Credited source still requires fixed-toolchain original ELF provenance,
+complete native byte/CFG/ABI checks, plausibility and fresh report/source replay.
+
 The original ELF must contain one complete Thumb function, canonical undefined
 global call symbols and canonical BL addends. Typed linking must preserve all
 other bytes, with no veneers, residual relocations or unexpected allocated

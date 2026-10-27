@@ -14,18 +14,27 @@ import tempfile
 
 SCHEMA = "elf-symbol-thumb-df-convert-sub-div-target-v1"
 SELECTOR = "convert-sub-div-target-v1"
-RUNTIME = "agbcc-thumb-df-convert-add-sub-div-mul-lt-trunc-fix-mod-s16-closure-v6"
+RUNTIME = "agbcc-thumb-df-convert-add-sub-div-mul-lt-trunc-fix-negdi-fixuns-cmp-negdf-fixunsdi-mod-s16-closure-v9"
 ABI = "agbcc-thumb-df-sf-mixed-integer-v2"
 SEMANTICS = "target-machine-state-v1"
-SUMMARY = ("pinned target binary64 conversion/add/sub/div/mul/lt/trunc/signed-conversion runtime; entry RAM and stack are state inputs; "
+SUMMARY = ("pinned target binary64 conversion/add/sub/div/mul/lt/trunc, word/wide conversion, signed-wide comparison and integer/double-negation runtime; entry RAM and stack are state inputs; "
            "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor; "
            "unrestricted IEEE semantics not proved")
 OPERATIONS = {"__floatdidf": 0x081428E4, "__floatsidf": 0x0814383C,
               "__subdf3": 0x081430B4, "__divdf3": 0x0814339C,
               "__truncdfsf2": 0x08143980, "__adddf3": 0x08143080,
               "__fixdfsi": 0x081438BC, "__muldf3": 0x081430F0,
-              "__ltdf2": 0x0814379C}
+              "__ltdf2": 0x0814379C, "__negdi2": 0x08142A94,
+              "__fixunsdfsi": 0x08142864, "__cmpdi2": 0x0814435C,
+              "__negdf2": 0x08143930, "__fixunsdfdi": 0x0814278C}
+# The one runtime owner admitted as authored C must retain this complete
+# canonical identity; ordinary runtime owners remain excluded below.
+UNSIGNED_WIDE_OWNER = (0x0814278C, 0x08142862, 80,
+    "f73dcb3cef4b4139a1a556d79f806d5157e9c5ec9148782cdbb5c8d1194eb436")
 IDENTITIES = (
+    UNSIGNED_WIDE_OWNER,
+    (0x08142864, 0x081428AC, 24,
+     "fd5184d8b27f51a2488233b7489aedd3be4912345a47329f6e54feb91c872fd1"),
     (0x081428E4, 0x08142950, 40,
      "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
     (0x08142A20, 0x08142A94, 56,
@@ -48,22 +57,50 @@ IDENTITIES = (
      "724ac20cf05719a0fbe4d032862cdc3ba94f1085aa6fbf1d6bc01e598e23adbf"),
     (0x08143528, 0x0814362A, 129,
      "29c2eb0eb1f6a9b824ecfb2bd55d4b006da808992cb6e61f9998057d23c280eb"),
+    (0x0814374C, 0x0814379C, 37,
+     "decfdbbb0ae65d7944a10157515ae318e66590b609048ecb28c8b3cf604db9fe"),
     (0x0814379C, 0x081437EA, 36,
      "93610c0c0b2e7dd92aba95bfb314fe742a48924abf71d8658d9c01d118af2360"),
     (0x0814383C, 0x081438BC, 56,
      "99b0db82e85f6860b32c8ae93795730b88afaec7134f3ab439db123a7a9f9c0a"),
     (0x081438BC, 0x08143930, 53,
      "327a2c60d3bd9a1ae330269c1ac62adb3632dd975251432fdb36bdacc9e6b2c8"),
+    (0x08143930, 0x08143958, 18,
+     "98ee9793090fcc62c9eae8bf1730f4299be91132d7ebf5e04ad3febed88a6634"),
     (0x08143980, 0x081439C8, 32,
      "acb4499634230b81e5a935184b68ddda30d9c6eb08041a49ceccab21d05f4223"),
     (0x081439C8, 0x08143A84, 86,
      "765c352080a3d1f6c0da8210a214648596a5486760b3cedf7d6648fef32cae32"),
     (0x08144314, 0x0814432C, 11,
      "1c637e4a2eff2aeb108768d7234baa47f3b4a9cfed810ce28603b3bc29cc5d7f"),
+    (0x0814435C, 0x08144378, 14,
+     "c50838aadd193e8e629b4854861c6b675502968522e1baa6aa722e884e7a02a0"),
     (0x08144378, 0x081443AE, 27,
      "a2d91a60b907f40dd3bafc448e79c2c4630ba7000195bb54f0f4b26e4e9d9faa"),
 )
 EDGES = (
+    (0x08142798, 0x0814379C),
+    (0x081427B8, 0x081430F0),
+    (0x081427BC, 0x08142864),
+    (0x081427D0, 0x0814435C),
+    (0x081427DC, 0x081428E4),
+    (0x08142802, 0x081428E4),
+    (0x0814280A, 0x08143080),
+    (0x08142816, 0x081430B4),
+    (0x08142822, 0x0814379C),
+    (0x0814282E, 0x08143930),
+    (0x08142832, 0x08142864),
+    (0x0814284C, 0x08142864),
+
+    (0x0814286E, 0x0814374C),
+    (0x0814287A, 0x081438BC),
+    (0x08142890, 0x08143080),
+    (0x08142894, 0x081438BC),
+    (0x0814375C, 0x08142D34),
+    (0x08143766, 0x08142D34),
+    (0x08143790, 0x08143528),
+    (0x0814393C, 0x08142D34),
+    (0x0814394E, 0x08142BE8),
     (0x81428EE, 0x814383C),
     (0x81428FA, 0x81430F0),
     (0x8142906, 0x81430F0),
@@ -113,6 +150,16 @@ SIGNED_CONVERSION_CLOSURE = (0x08142D34, 0x081438BC, 0x08144378)
 ARITHMETIC_COMPARISON_CLOSURE = (
     0x08142A94, 0x08142BE8, 0x08142D34, 0x08142E10, 0x08143080,
     0x081430B4, 0x0814339C, 0x08143528, 0x0814379C, 0x08144378)
+# The unsigned word conversion uses a private greater-or-equal entry, the
+# already proved signed conversion and addition. Negation uses the pack/unpack
+# records. Signed wide comparison is a complete read-only leaf. The wide
+# integer-to-double caller also receives its own restoring ABI proof here.
+UNSIGNED_CONVERSION_CLOSURE = (
+    UNSIGNED_WIDE_OWNER[0],
+    0x08142864, 0x081428E4, 0x08142A20, 0x08142A94, 0x08142BE8,
+    0x08142D34, 0x08142E10, 0x08143080, 0x081430B4, 0x081430F0,
+    0x08143528, 0x0814374C, 0x0814379C, 0x0814383C, 0x081438BC,
+    0x08143930, 0x0814435C, 0x08144378)
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
@@ -259,6 +306,7 @@ def verify_identity(rom, mapping, index):
     prove_multiplication_closure(rom, entries)
     prove_signed_conversion_closure(rom, entries)
     prove_arithmetic_comparison_closure(rom, entries)
+    prove_unsigned_conversion_closure(rom, entries)
     return entries, rows
 
 
@@ -351,11 +399,12 @@ def prove_signed_conversion_closure(rom, entries):
 
 
 def prove_arithmetic_comparison_closure(rom, entries):
-    """Prove the exact native add/sub/div/less-than closure and ABI.
+    """Prove the exact native add/sub/div/less-than and integer-negation closure and ABI.
 
     The unpacker and arithmetic kernel each write five formal output words,
     respectively through R1 and R2. Public binary64 operations must contain
     those writes in their real local frames and restore all saved registers.
+    The canonical integer-negation entry consumes and returns the R0/R1 pair.
     Numeric inputs remain target-state values, without an IEEE claim.
     """
     from software_float_profile import prove_runtime
@@ -375,8 +424,39 @@ def prove_arithmetic_comparison_closure(rom, entries):
             proofs[start] = prove_runtime(
                 rom, entries, start, end, count, proofs, call_edges=EDGES,
                 scalar_entries=tuple(OPERATIONS[name] for name in
-                                     ("__adddf3", "__subdf3", "__divdf3", "__ltdf2")),
+                                     ("__adddf3", "__subdf3", "__divdf3", "__ltdf2", "__negdi2")),
                 allowed_writes=writes, stack_load_widths=(1, 2, 4),
+                stack_store_widths=(1, 2, 4) if start == 0x08142BE8 else (4,))
+            pending.remove(start)
+    return proofs
+
+
+def prove_unsigned_conversion_closure(rom, entries):
+    """Prove the exact unsigned-word conversion, signed comparison and negation.
+
+    Canonical names retain their original ELF provenance. Numeric operands
+    remain target-state inputs. Every dependency must have a closed native CFG,
+    bounded local/formal writes and restoring register/stack returns; there is
+    no opaque-call exception or unrestricted IEEE conversion claim.
+    """
+    from software_float_profile import prove_runtime
+    identities = {start: (end, count) for start, end, count, _ in IDENTITIES
+                  if start in UNSIGNED_CONVERSION_CLOSURE}
+    pending, proofs = set(UNSIGNED_CONVERSION_CLOSURE), {}
+    while pending:
+        ready = [start for start in sorted(pending)
+                 if all(target in proofs for site, target in EDGES
+                        if start <= site < identities[start][0])]
+        if not ready:
+            raise ValueError("software-double unsigned conversion closure is recursive or incomplete")
+        for start in ready:
+            end, count = identities[start]
+            output = {0x08142D34: 1, 0x08142E10: 2}.get(start)
+            writes = () if output is None else tuple((output, n, 4) for n in range(0, 20, 4))
+            proofs[start] = prove_runtime(
+                rom, entries, start, end, count, proofs, call_edges=EDGES,
+                scalar_entries=tuple(OPERATIONS.values()), allowed_writes=writes,
+                stack_load_widths=(1, 2, 4),
                 stack_store_widths=(1, 2, 4) if start == 0x08142BE8 else (4,))
             pending.remove(start)
     return proofs
@@ -385,7 +465,13 @@ def prove_arithmetic_comparison_closure(rom, entries):
 def validate_span(data, address, rom, mapping, index):
     entries, rows = verify_identity(rom, mapping, index)
     entry = span_record(address, address + len(data), entries, rows, rom)
-    if reserved(address) or not data or len(data) % 2 or \
+    start, end, count, digest = UNSIGNED_WIDE_OWNER
+    # The public helper is also authored C. Its exact pinned owner, body and
+    # dual-index count are mandatory; fresh fixed-compiler ELF/source replay
+    # remains required before any report can credit this reserved owner.
+    authored_owner = address == start and address + len(data) == end and \
+        entry["instrs"] == count and hashlib.sha256(data).hexdigest() == digest
+    if reserved(address) and not authored_owner or not data or len(data) % 2 or \
             data != rom[address - 0x08000000:address - 0x08000000 + len(data)]:
         raise ValueError("software-double complete caller differs from mapped ROM")
     return entries, entry

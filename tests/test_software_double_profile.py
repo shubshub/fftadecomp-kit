@@ -136,7 +136,7 @@ class SoftwareDoubleTests(unittest.TestCase):
 
     def test_native_all_five_operations_and_ordinary_call(self):
         self.fixture()
-        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS)-{"__adddf3", "__fixdfsi", "__muldf3", "__ltdf2"})
+        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS)-{"__adddf3", "__fixdfsi", "__muldf3", "__ltdf2", "__negdi2", "__fixunsdfsi", "__cmpdi2", "__negdf2", "__fixunsdfdi"})
         self.assertIn(0x08000200, self.calls.values())
         self.assertEqual(len(self.verify()), len(self.instructions))
         with self.assertRaises(ValueError):
