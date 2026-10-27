@@ -98,6 +98,8 @@ def saved_profile_arguments(report, root, address):
         arguments += ["--function-address-profile", function_thunk.SELECTOR]
     if software_double.selected(report):
         arguments += ["--software-double-profile", software_double.SELECTOR]
+        if software_double.target_remainder_selected(report):
+            arguments += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
     if inert_spin.selected(report):
         arguments += ["--control-flow-profile", inert_spin.SELECTOR]
     if arguments and not report_matches(report, root, address):

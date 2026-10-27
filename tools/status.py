@@ -236,6 +236,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
         rep = os.path.join(root, "docs", "match", f"{addr}.md")
         spin_profile = False
         double_profile = False
+        target_remainder_profile = False
         thunk_profile = False
         constants_profile = False
         if os.path.exists(rep):
@@ -244,12 +245,17 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
             try:
                 constants_profile = switch_constants.selected_policy(saved_report)
                 double_profile = software_double.selected(saved_report)
+                if double_profile:
+                    target_remainder_profile = software_double.target_remainder_selected(saved_report)
                 thunk_profile = function_thunk.selected(saved_report)
                 spin_profile = inert_spin.selected(saved_report)
             except ValueError as error:
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
         if verify:
+            if target_remainder_profile and not report_matches(saved_report, root, int(addr, 16)):
+                problems.append(f"{addr}: invalid saved target-state remainder report")
+                return 0, 0, problems, []
             if thunk_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved function-thunk report")
                 return 0, 0, problems, []
@@ -261,6 +267,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 command += ["--control-flow-profile", inert_spin.SELECTOR]
             if double_profile:
                 command += ["--software-double-profile", software_double.SELECTOR]
+                if target_remainder_profile:
+                    command += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
             if thunk_profile:
                 command += ["--function-address-profile", function_thunk.SELECTOR]
             if constants_profile:

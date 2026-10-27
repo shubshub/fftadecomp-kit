@@ -28,6 +28,29 @@ OPERATIONS = {"__floatdidf": 0x081428E4, "__floatsidf": 0x0814383C,
               "__ltdf2": 0x0814379C, "__negdi2": 0x08142A94,
               "__fixunsdfsi": 0x08142864, "__cmpdi2": 0x0814435C,
               "__negdf2": 0x08143930, "__fixunsdfdi": 0x0814278C}
+# This optional composition is independent of the positive-constant quotient
+# profile. It proves the exact target machine state, including the zero path;
+# no mathematical quotient contract is inferred for unrestricted C inputs.
+DIVISION_OPERATION = {"__divsi3": 0x081426B8}
+REMAINDER_TARGET_SELECTOR = "target-state-v1"
+REMAINDER_TARGET_RUNTIME = "agbcc-thumb-modsi3-target-state-closure-v1"
+DIVISION_RUNTIME = "agbcc-thumb-divsi3-target-state-closure-v1"
+DIVISION_IDENTITIES = (
+    (0x081426B8, 0x0814274A, 72,
+     "80b13b14c17b297e6c92a50aeddcacdffbe951729bcb1290e205055950655884"),
+    (0x0814274C, 0x0814274E, 1,
+     "abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c"),
+)
+
+
+def call_target(name):
+    return OPERATIONS.get(name, DIVISION_OPERATION.get(name))
+
+
+def shared_division_call(name, target):
+    return name == "__divsi3" and target == DIVISION_OPERATION[name]
+
+
 # The one runtime owner admitted as authored C must retain this complete
 # canonical identity; ordinary runtime owners remain excluded below.
 UNSIGNED_WIDE_OWNER = (0x0814278C, 0x08142862, 80,
@@ -194,6 +217,40 @@ def selected(report):
     if markers != [f"* verification: `{SCHEMA}`"] or any(
             marker_text(line).startswith(FORBIDDEN_MARKERS) for line in lines):
         raise ValueError("mixed or malformed software-double profile selection")
+    return True
+
+
+def target_remainder_selected(report):
+    """Select only an exact saved optional record; callers must replay its report."""
+    if not selected(report):
+        return False
+    records = [line for line in report.splitlines()
+               if marker_text(line).startswith("* software double manifest")]
+    if not records:
+        return False
+    prefix = "* software double manifest: `"
+    if len(records) != 1 or not records[0].startswith(prefix) or not records[0].endswith("`"):
+        raise ValueError("malformed saved software-double manifest selection")
+    encoded = records[0][len(prefix):-1]
+    manifest = json.loads(encoded, object_pairs_hook=unique_members)
+    if type(manifest) is not dict or manifest_text(manifest) != encoded:
+        raise ValueError("noncanonical saved software-double manifest selection")
+    if "target_remainder" not in manifest:
+        return False
+    if manifest.get("runtime") != RUNTIME or manifest.get("abi") != ABI or \
+            manifest.get("semantics") != SEMANTICS or "remainder" in manifest or \
+            type(manifest.get("calls")) is not list:
+        raise ValueError("invalid saved target-state remainder selection")
+    bindings, previous = {}, -4
+    for record in manifest["calls"]:
+        if type(record) is not list or len(record) != 2 or type(record[0]) is not int or \
+                record[0] < previous + 4 or record[0] % 2 or type(record[1]) is not str:
+            raise ValueError("invalid saved target-state remainder calls")
+        previous, name = record
+        bindings[previous] = name
+    expected = target_remainder_record(0, bindings)
+    if expected is None or manifest_text(manifest["target_remainder"]) != manifest_text(expected):
+        raise ValueError("saved target-state remainder evidence differs")
     return True
 
 
@@ -506,6 +563,41 @@ def prove_remainder_closure(rom, mapping, index):
     return proofs
 
 
+def prove_division_closure(rom, mapping, index):
+    """Prove the full canonical target DIV and its real zero-path dependency.
+
+    Original lib1thumb L_divsi3 / L_dvmd_tls objects reproduce both complete
+    identities. The unchanged ABI interpreter proves every reachable sign and
+    zero path, balanced stack, saved registers, exact returns and no writes.
+    Numeric registers are target-state inputs, not positive-constant facts.
+    """
+    from match import divsi3
+    from software_float_profile import prove_runtime
+    divsi3.verify_identity(rom, mapping)
+    entries, rows = indices(mapping, index)
+    for start, end, count, digest in DIVISION_IDENTITIES:
+        if span_record(start, end, entries, rows, rom)["instrs"] != count or \
+                hashlib.sha256(rom[start - 0x08000000:end - 0x08000000]).hexdigest() != digest:
+            raise ValueError("software-double signed division runtime identity/count differs")
+    zero = 0x0814274C
+    proofs = {zero: prove_runtime(
+        rom, entries, zero, 0x0814274E, 1, {}, call_edges=(),
+        scalar_entries=(zero,), allowed_writes=(), thumb_pc_returns=(zero,))}
+    start = DIVISION_OPERATION["__divsi3"]
+    proofs[start] = prove_runtime(
+        rom, entries, start, 0x0814274A, 72, proofs,
+        call_edges=((0x08142742, zero),), scalar_entries=(start,), allowed_writes=(),
+        thumb_pc_returns=(0x0814273E, 0x08142748))
+    return proofs
+
+
+def division_record(address, bindings):
+    sites = sorted(site - address for site, name in bindings.items() if name == "__divsi3")
+    return {"runtime": DIVISION_RUNTIME, "semantics": SEMANTICS,
+            "dependencies": [list(row) for row in DIVISION_IDENTITIES],
+            "calls": sites, "operands": "entry-register-state"} if sites else None
+
+
 def remainder_record(calls, address, bindings):
     from match import modsi3
     sites = sorted(site - address for site, name in bindings.items() if name == "__modsi3")
@@ -513,25 +605,81 @@ def remainder_record(calls, address, bindings):
             "calls": sites, "dividend": "signed16", "divisor": "nonzero"} if sites else None
 
 
+def summary(manifest):
+    if "target_remainder" not in manifest:
+        return SUMMARY
+    return SUMMARY.replace(
+        "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor",
+        "optional canonical signed remainder uses its pinned target-state closure, including sign and zero paths")
+
+
+def target_remainder_context(context):
+    return len(context) == 5 and context[4] is True
+
+
+def target_remainder_record(address, bindings):
+    from match import modsi3
+    sites = sorted(site - address for site, name in bindings.items() if name == "__modsi3")
+    dependencies = [[start, end, 102 if start == modsi3.ADDRESS else 1, digest]
+                    for start, end, digest in modsi3.IDENTITIES]
+    return {"runtime": REMAINDER_TARGET_RUNTIME, "semantics": SEMANTICS,
+            "dependencies": dependencies, "calls": sites,
+            "operands": "entry-register-state"} if sites else None
+
+
 def verify_context(data, address, calls, context):
     from match import modsi3
-    if not isinstance(context, tuple) or len(context) != 4 or \
+    if not isinstance(context, tuple) or len(context) not in (4, 5) or \
+            len(context) == 5 and context[4] is not True or \
             not isinstance(context[3], dict) or not context[3]:
         raise ValueError("software double requires an isolated canonical runtime context")
-    rom, mapping, index, bindings = context
+    rom, mapping, index, bindings = context[:4]
     validate_span(data, address, rom, mapping, index)
-    operations = dict(OPERATIONS, __modsi3=modsi3.ADDRESS)
+    operations = dict(OPERATIONS, **DIVISION_OPERATION, __modsi3=modsi3.ADDRESS)
     if not any(name in OPERATIONS for name in bindings.values()) or \
             any(type(site) is not int or name not in operations or calls.get(site) != operations[name]
                 for site, name in bindings.items()) or \
             set(bindings) != {site for site, target in calls.items()
-                              if reserved(target) or modsi3.reserved(target)}:
+                              if reserved(target) or modsi3.reserved(target) or
+                              target in DIVISION_OPERATION.values()}:
         raise ValueError("software-double runtime call bindings are incomplete or mixed")
     remainder = {site: name for site, name in bindings.items() if name == "__modsi3"}
     if remainder:
         modsi3.verify_context(data, address, calls, (rom, mapping, remainder))
         prove_remainder_closure(rom, mapping, index)
+    if target_remainder_context(context) and not remainder:
+        raise ValueError("target-state remainder opt-in requires a canonical remainder call")
+    if any(name == "__divsi3" for name in bindings.values()):
+        prove_division_closure(rom, mapping, index)
     return remainder
+
+
+def switch_record(data, address, relocations):
+    """Only the existing unsigned-guarded local word-table encoding is admitted."""
+    from match import switch_layout
+    if not relocations:
+        return None
+    return {"schema": "software-double-guarded-word-switch-v1",
+            "layout": switch_layout(data, address, relocations)}
+
+
+def switch_relocations(data, address, record):
+    fields = {"comparison", "guard", "dispatch", "default", "literal", "table", "bound", "relocations"}
+    if type(record) is not dict or set(record) != {"schema", "layout"} or \
+            record["schema"] != "software-double-guarded-word-switch-v1" or \
+            type(record["layout"]) is not dict or set(record["layout"]) != fields or \
+            any(type(record["layout"][field]) is not int for field in fields - {"relocations"}) or \
+            type(record["layout"]["relocations"]) is not list:
+        raise ValueError("invalid software-double guarded switch evidence")
+    words = {}
+    for pair in record["layout"]["relocations"]:
+        if type(pair) is not list or len(pair) != 2 or any(type(value) is not int for value in pair) or \
+                pair[0] in words:
+            raise ValueError("software-double switch requires unique integer local words")
+        words[pair[0]] = pair[1]
+    if switch_record(data, address, words) != record:
+        raise ValueError("software-double switch differs from its guarded local table")
+    return words
 
 
 def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
@@ -539,7 +687,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                        parse_data_symbols, verify_data_literals, modsi3, ARM_OP_MEM, ARM_REG_PC)
     entries, entry = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or \
-            set(manifest) - {"data", "remainder", "inert_spin"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
+            set(manifest) - {"data", "remainder", "signed_division", "switch", "inert_spin", "target_remainder", "local_branches"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
             manifest["runtime"] != RUNTIME or manifest["abi"] != ABI or manifest["semantics"] != SEMANTICS or \
             type(manifest["dependencies"]) is not list or \
             any(type(record) is not list or len(record) != 3 or \
@@ -558,16 +706,24 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
         if type(offset) is not int or not isinstance(name, str) or offset % 2 or \
                 offset < previous + 4 or offset < 0 or offset + 4 > len(data):
             raise ValueError("software-double calls must be ordered nonoverlapping instructions")
-        if name in OPERATIONS or name == "__modsi3":
-            calls[address + offset] = modsi3.ADDRESS if name == "__modsi3" else OPERATIONS[name]
+        if call_target(name) is not None or name == "__modsi3":
+            calls[address + offset] = modsi3.ADDRESS if name == "__modsi3" else call_target(name)
             bindings[address + offset] = name
         else:
             calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
         previous = offset
-    remainder = remainder_record(calls, address, bindings)
+    remainder_target = "target_remainder" in manifest
+    remainder = None if remainder_target else remainder_record(calls, address, bindings)
     if ("remainder" in manifest) != (remainder is not None) or \
             remainder is not None and manifest["remainder"] != remainder:
         raise ValueError("software-double signed remainder evidence differs")
+    target_remainder = target_remainder_record(address, bindings) if remainder_target else None
+    if remainder_target and (target_remainder is None or manifest["target_remainder"] != target_remainder):
+        raise ValueError("software-double target-state remainder evidence differs")
+    division = division_record(address, bindings)
+    if ("signed_division" in manifest) != (division is not None) or \
+            division is not None and manifest["signed_division"] != division:
+        raise ValueError("software-double signed division target-state evidence differs")
     literals, occupied = {}, {byte - address for site in calls for byte in range(site, site + 4)}
     objects = parse_data_symbols(data_mapping) if "data" in manifest else {}
     previous = -1
@@ -600,12 +756,25 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                 record["schema"] != INERT_SPIN_SCHEMA or type(record["spins"]) is not list or \
                 not record["spins"] or any(type(offset) is not int for offset in record["spins"]):
             raise ValueError("invalid software-double inert-spin evidence")
+    words = switch_relocations(data, address, manifest["switch"]) if "switch" in manifest else None
+    if words is not None and any(set(range(offset, offset + 4)) & occupied for offset in words):
+        raise ValueError("software-double switch overlaps call/data bindings")
     instructions = verify_leaf_instructions(data, address, True, calls,
-                                            double_context=(rom, mapping, index, bindings),
-                                            inert_spin_context=spin_context)
+                                            double_context=(rom, mapping, index, bindings) + ((True,) if remainder_target else ()),
+                                            switch_relocations=words, inert_spin_context=spin_context)
+    if words is not None:
+        from switch_constants_profile import complete_partition
+        complete_partition(data, address, instructions, manifest["switch"]["layout"])
     if spin_context is not None and (not spin_context["spins"] or
             manifest["inert_spin"] != {"schema": INERT_SPIN_SCHEMA, "spins": spin_context["spins"]}):
         raise ValueError("software-double inert-spin evidence differs from the converged CFG")
+    from local_long_branch_profile import record as local_branch_record, validate_record as validate_local_record
+    local_branches = local_branch_record(instructions, address)
+    if "local_branches" in manifest:
+        validate_local_record(manifest["local_branches"])
+    if ("local_branches" in manifest) != (local_branches is not None) or \
+            local_branches is not None and manifest["local_branches"] != local_branches:
+        raise ValueError("software-double local long-branch evidence differs")
     if uses_stack_frame(instructions) != manifest["frame"] or len(instructions) != entry["instrs"]:
         raise ValueError("software-double frame/count disagrees with the converged CFG")
     verify_data_literals(instructions, address, literals)
@@ -615,32 +784,49 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
             if instruction.mnemonic == "ldr" and operand.type == ARM_OP_MEM and \
                     operand.mem.base == ARM_REG_PC and not operand.mem.index:
                 offset = ((instruction.address + 4) & ~3) + operand.mem.disp - address
-                if modsi3.address_literal(struct.unpack_from("<I", data, offset)[0]):
+                if (words is None or offset not in words) and modsi3.address_literal(
+                        struct.unpack_from("<I", data, offset)[0]):
                     address_literals.add(offset)
     if address_literals != set(literals):
         raise ValueError("software-double address-domain literals require exact mapped-data coverage")
     return instructions
 
 
-def make_manifest(calls, address, bindings, instructions, *, literals=None, data_mapping=None, spins=None):
+def make_manifest(calls, address, bindings, instructions, *, literals=None, data_mapping=None, switch=None, spins=None, remainder_target=False):
     from match import uses_stack_frame, parse_data_symbols
     manifest = {"runtime": RUNTIME, "abi": ABI, "semantics": SEMANTICS,
             "dependencies": dependency_records(), "frame": uses_stack_frame(instructions),
             "calls": call_records(calls, address, bindings)}
+    if type(remainder_target) is not bool:
+        raise ValueError("software-double target-state remainder opt-in must be Boolean")
+    from local_long_branch_profile import record as local_branch_record
+    local_branches = local_branch_record(instructions, address)
+    if local_branches is not None:
+        manifest["local_branches"] = local_branches
     remainder = remainder_record(calls, address, bindings)
-    if remainder is not None:
+    if remainder_target:
+        record = target_remainder_record(address, bindings)
+        if record is None:
+            raise ValueError("target-state remainder opt-in requires a canonical remainder call")
+        manifest["target_remainder"] = record
+    elif remainder is not None:
         manifest["remainder"] = remainder
+    division = division_record(address, bindings)
+    if division is not None:
+        manifest["signed_division"] = division
     if spins:
         manifest["inert_spin"] = {"schema": INERT_SPIN_SCHEMA, "spins": list(spins)}
     if literals:
         objects = parse_data_symbols(data_mapping)
         manifest["data"] = [[offset, name, value - objects[name]]
                             for offset, (name, value) in sorted(literals.items())]
+    if switch is not None:
+        manifest["switch"] = switch
     return manifest
 
 
 def object_bytes(runner, workspace, args, original, address, mapping, rom, index, *,
-                 data_mapping=None, data_relocations=None):
+                 data_mapping=None, data_relocations=None, switch_relocations=None):
     from match import (allocated_text_only, function_record, function_address_target,
                        link_calls, parse_data_symbols, modsi3)
     fixed_configuration(args)
@@ -658,7 +844,9 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
     entries, _ = verify_identity(rom, mapping, index)
     if data_relocations is not None and (type(data_relocations) is not dict or data_relocations):
         raise ValueError("software-double data provenance requires an empty collection")
-    objects, has_data, has_remainder = None, False, False
+    if switch_relocations is not None and (type(switch_relocations) is not dict or switch_relocations):
+        raise ValueError("software-double switch provenance requires an empty collection")
+    objects, has_data, has_remainder, has_double, has_switch = None, False, False, False, False
     for section_index in original["relocations"]:
         section = original["sections"][section_index]
         if section[1] != 9 or section[7] != original["text_index"] or section[9] != 8 or section[5] % 8:
@@ -670,6 +858,11 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                 raise ValueError("software double excludes unsupported relocations")
             target = symbols[info >> 8]
             if info & 255 == 2:
+                if target["section"]:
+                    if switch_relocations is None:
+                        raise ValueError("software-double local switch requires original-ELF provenance")
+                    has_switch = True
+                    continue
                 if data_relocations is None:
                     raise ValueError("software-double data relocation requires explicit provenance capture")
                 if objects is None:
@@ -680,23 +873,28 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                     raise ValueError("software-double data requires one undefined mapped global object")
                 has_data = True
                 continue
+            if target["name"] in OPERATIONS:
+                has_double = True
             if target["name"] == "__modsi3":
                 has_remainder = True
-            elif target["name"] not in OPERATIONS:
+            elif call_target(target["name"]) is None:
                 function_address_target(target["name"], entries, address, symbol["size"], len(rom))
             if target["section"] or target["bind"] != 1 or target["type"] not in (0, 2) or \
                     target["value"] or sum(item["name"] == target["name"]
                                            for item in original["symbols"]) != 1:
                 raise ValueError("software-double calls require unique undefined global functions")
     if original["relocations"]:
+        if not has_double:
+            raise ValueError("software double requires at least one canonical binary64 runtime call")
         bindings, remainder_bindings = {}, {}
         data, calls, literals = link_calls(runner, workspace, args, original, address, mapping, len(rom), rom,
                                           data_mapping=data_mapping if has_data else None,
                                           double_bindings=bindings, double_index=index,
                                           modsi3_bindings=remainder_bindings if has_remainder else None,
-                                          allow_double_data=has_data)
-        if not bindings:
-            raise ValueError("software double requires at least one canonical runtime call")
+                                          allow_double_data=has_data,
+                                          switch_relocations=switch_relocations if has_switch else None)
+        if not any(name in OPERATIONS for name in bindings.values()):
+            raise ValueError("software double requires at least one canonical binary64 runtime call")
         bindings.update(remainder_bindings)
         if data_relocations is not None:
             data_relocations.update(literals)
@@ -740,13 +938,16 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                  candidates[0].relative_to(root).as_posix())
-                literals = {}
+                literals, words = {}, {}
                 got, calls, bindings = object_bytes(runner, workspace, args, original, address, mapping, rom, index,
-                                                    data_mapping=data_mapping, data_relocations=literals)
+                                                    data_mapping=data_mapping, data_relocations=literals,
+                                                    switch_relocations=words)
                 instructions = verify(got, address, rom, mapping, index, manifest, data_mapping=data_mapping)
                 if got != data or make_manifest(calls, address, bindings, instructions,
                         literals=literals, data_mapping=data_mapping,
-                        spins=manifest.get("inert_spin", {}).get("spins")) != manifest:
+                        switch=switch_record(got, address, words),
+                        spins=manifest.get("inert_spin", {}).get("spins"),
+                        remainder_target="target_remainder" in manifest) != manifest:
                     raise ValueError("software-double report lacks fresh original-ELF provenance")
             checker = Path(__file__).resolve().with_name("plausible.py")
             result = _run_replay_process(
@@ -795,7 +996,6 @@ def report_matches(report, root, address):
         mapping, index = mapping_snapshot(root), index_snapshot(root)
         source_digest = source_fingerprint(root, address)
         if mapping is None or \
-                single("* software double: ") != SUMMARY or \
                 unquote("* software double ABI: ") != ABI or \
                 unquote("* software double runtime: ") != RUNTIME or \
                 unquote("* software double semantics: ") != SEMANTICS or \
@@ -816,7 +1016,7 @@ def report_matches(report, root, address):
         data = bytes.fromhex(encoded)
         encoded_manifest = unquote("* software double manifest: ")
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
-        if manifest_text(manifest) != encoded_manifest:
+        if manifest_text(manifest) != encoded_manifest or single("* software double: ") != summary(manifest):
             return False
         from inert_spin_profile import CONTROL_FLOW as SPIN_CONTROL_FLOW
         if single("* control flow: ") != (SPIN_CONTROL_FLOW if "inert_spin" in manifest else CALL_SUMMARY):

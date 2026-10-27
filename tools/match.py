@@ -445,7 +445,7 @@ def call_bindings(image, name, address, mapping, rom_size,
     if double_bindings is not None:
         if not isinstance(double_bindings, dict) or double_bindings or \
                 data_mapping is not None and not allow_double_data or \
-                function_relocations is not None or switch_relocations is not None or allow_switch_data or \
+                function_relocations is not None or allow_switch_data or \
                 allow_preloaded_switch or udivsi3_bindings is not None or divsi3_bindings is not None or \
                 float_bindings is not None:
             raise ValueError("software double requires isolated empty call bindings")
@@ -552,7 +552,9 @@ def call_bindings(image, name, address, mapping, rom_size,
             unsigned_remainder = target_symbol["name"] == "__umodsi3"
             quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
-            double_operation = target_symbol["name"] in software_double.OPERATIONS
+            double_operation = target_symbol["name"] in software_double.OPERATIONS or (
+                double_bindings is not None and
+                software_double.shared_division_call(target_symbol["name"], divsi3.ADDRESS))
             float_operation = target_symbol["name"] in software_float.OPERATIONS and not (
                 double_operation and double_bindings is not None)
             if float_operation:
@@ -583,7 +585,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                         target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
                         sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
                     raise ValueError("software double requires one undefined global function symbol")
-                target = software_double.OPERATIONS[target_symbol["name"]]
+                target = software_double.call_target(target_symbol["name"])
                 candidates = []
             elif unsigned_remainder:
                 if umodsi3_bindings is None:
@@ -739,7 +741,7 @@ def call_bindings(image, name, address, mapping, rom_size,
         aliases = set(modsi3_bindings.values())
         if aliases not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
                 double_bindings is not None and aliases != {"__modsi3"} or \
-                udivsi3_bindings or function_relocations or switch_relocations or \
+                udivsi3_bindings or function_relocations or switch_relocations and double_bindings is None or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()) or \
                 aliases == {modsi3.ADDRESSED_NAME} and data_relocations:
             raise ValueError("signed remainder excludes mixed aliases, addressed calls with data, and other profiles")
@@ -761,12 +763,13 @@ def call_bindings(image, name, address, mapping, rom_size,
     if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets):
         raise ValueError("function-address evidence does not support runtime call thunks")
     if switch_relocations:
-        if (data_relocations and not allow_switch_data) or function_relocations or \
+        if (data_relocations and not (allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("switch evidence excludes object, callback and runtime-thunk bindings")
         data_names = {binding[0] for binding in data_relocations.values()}
         for target_name in targets:
-            if target_name not in data_names:
+            if target_name not in data_names and not (double_bindings is not None and
+                    (software_double.call_target(target_name) is not None or target_name == "__modsi3")):
                 function_address_target(target_name, entries, address, symbol["size"], rom_size)
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
             if len(definitions) != 1 or definitions[0]["value"]:
@@ -776,10 +779,11 @@ def call_bindings(image, name, address, mapping, rom_size,
             struct.pack_into("<I", relocated, position, address + addend)
         for position, (_, value) in data_relocations.items():
             struct.pack_into("<I", relocated, position, value)
-        layout = selected_switch_layout(bytes(relocated), address, switch_relocations,
-                                        data_relocations if data_relocations else None,
-                                        allow_preloaded_switch,
-                                        allow_switch_constants=allow_switch_constants)
+        layout = (switch_layout(bytes(relocated), address, switch_relocations)
+                  if double_bindings is not None else selected_switch_layout(
+                      bytes(relocated), address, switch_relocations,
+                      data_relocations if data_relocations else None, allow_preloaded_switch,
+                      allow_switch_constants=allow_switch_constants))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
@@ -874,24 +878,28 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     elif umodsi3_bindings:
         raise ValueError("unsigned remainder bindings have no linked runtime")
     double_targets = {name: target for name, target in targets.items()
-                      if software_double.reserved(target) and not (
+                      if (software_double.reserved(target) or
+                          double_bindings is not None and software_double.shared_division_call(name, target)) and not (
                           float_bindings is not None and software_double.shared_float_call(name, target) or
                           ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if double_targets:
         if not isinstance(double_bindings, dict) or not double_bindings or \
-                any(alias not in software_double.OPERATIONS or calls.get(site) != software_double.OPERATIONS[alias]
+                any(software_double.call_target(alias) is None or calls.get(site) != software_double.call_target(alias)
                     for site, alias in double_bindings.items()) or \
-                double_targets != {alias: software_double.OPERATIONS[alias] for alias in double_bindings.values()} or \
-                set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target)} or \
+                double_targets != {alias: software_double.call_target(alias) for alias in double_bindings.values()} or \
+                set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target) or
+                                             target in software_double.DIVISION_OPERATION.values()} or \
                 udivsi3_bindings or divsi3_bindings or \
                 modsi3_bindings is not None and not modsi3_bindings or \
                 data_relocations and not allow_double_data or \
-                function_relocations or switch_relocations or allow_switch_data or allow_preloaded_switch or \
+                function_relocations or allow_switch_data or allow_preloaded_switch or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("linked software-double bindings are incomplete or mixed")
     elif double_bindings is not None:
         raise ValueError("software-double bindings have no linked runtime")
-    quotient_targets = {name: target for name, target in targets.items() if divsi3.reserved(target)}
+    quotient_targets = {name: target for name, target in targets.items()
+                        if divsi3.reserved(target) and not (double_bindings is not None and
+                            software_double.shared_division_call(name, target))}
     if quotient_targets:
         if quotient_targets != {"__divsi3": divsi3.ADDRESS} or \
                 not isinstance(divsi3_bindings, dict) or not divsi3_bindings or \
@@ -912,7 +920,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                 any(calls.get(site) != modsi3.ADDRESS for site in modsi3_bindings) or \
                 set(modsi3_bindings) != {site for site, target in calls.items()
                                          if modsi3.reserved(target)} or \
-                udivsi3_bindings or function_relocations or switch_relocations or \
+                udivsi3_bindings or function_relocations or switch_relocations and double_bindings is None or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()) or \
                 modsi3.ADDRESSED_NAME in remainder_targets and data_relocations:
             raise ValueError("linked signed remainder bindings are incomplete or mixed")
@@ -938,7 +946,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("switch-data binding opt-in must be Boolean")
     if type(allow_preloaded_switch) is not bool:
         raise ValueError("preloaded-switch binding opt-in must be Boolean")
-    if switch_relocations and ((data_relocations and not allow_switch_data) or function_relocations):
+    if switch_relocations and ((data_relocations and not (
+            allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations):
         raise ValueError("switch evidence cannot combine literal binding profiles")
     if switch_relocations:
         section_symbols = [item for item in linked["symbols"]
@@ -985,11 +994,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked switch word does not equal its local section address")
         patched.update(range(relocation, relocation + 4))
     if switch_relocations:
-        layout = selected_switch_layout(linked["text"][:after["size"]], address,
-                                        switch_relocations,
-                                        data_relocations if data_relocations else None,
-                                        allow_preloaded_switch,
-                                        allow_switch_constants=allow_switch_constants)
+        layout = (switch_layout(linked["text"][:after["size"]], address, switch_relocations)
+                  if double_bindings is not None else selected_switch_layout(
+                      linked["text"][:after["size"]], address, switch_relocations,
+                      data_relocations if data_relocations else None, allow_preloaded_switch,
+                      allow_switch_constants=allow_switch_constants))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
@@ -1750,11 +1759,11 @@ def switch_layout(data, address, relocations, data_relocations=None):
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     decoder.detail = True
 
-    def instruction(offset):
+    def instruction(offset, size=2):
         if offset < 0 or offset % 2 or offset + 2 > len(data):
             return None
         decoded = next(decoder.disasm(data[offset:offset + 4], address + offset, count=1), None)
-        return decoded if decoded is not None and decoded.size == 2 else None
+        return decoded if decoded is not None and decoded.size == size else None
 
     def branch_target(decoded, mnemonic):
         if decoded is None or decoded.mnemonic != mnemonic or len(decoded.operands) != 1 or \
@@ -1799,7 +1808,7 @@ def switch_layout(data, address, relocations, data_relocations=None):
         if len(transfer) != 2 or any(operand.type != ARM_OP_REG for operand in transfer) or \
                 tuple(operand.reg for operand in transfer) != (ARM_REG_PC, accumulator):
             continue
-        for guard_size in (4, 6):
+        for guard_size in (4, 6, 8):
             comparison = dispatch - guard_size
             guard = comparison + 2
             compare_instruction = instruction(comparison)
@@ -1815,7 +1824,21 @@ def switch_layout(data, address, relocations, data_relocations=None):
             else:
                 if branch_target(instruction(guard), "bls") != dispatch:
                     continue
-                default = branch_target(instruction(guard + 2), "b")
+                if guard_size == 6:
+                    default = branch_target(instruction(guard + 2), "b")
+                else:
+                    # agbcc uses a local BL when the shared default block
+                    # is beyond a narrow branch. Shape recognition grants
+                    # no call permission: its enclosing CFG must separately
+                    # prove sole ownership, LR overwrite and frame restoration.
+                    jump = instruction(guard + 2, size=4)
+                    if jump is None:
+                        continue
+                    from local_long_branch_profile import target as local_target
+                    try:
+                        default = local_target(jump, address, address + len(data)) - address
+                    except ValueError:
+                        continue
             if default is None or default % 2 or not table_end <= default <= len(data) - 2:
                 continue
             candidates.append({"comparison": comparison, "guard": guard, "dispatch": dispatch,
@@ -2264,16 +2287,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     target not in function_thunk.ALIASES.values() for target in (validated_calls or {}).values()):
             raise ValueError("function thunks require supported canonical calls without other runtimes")
     if double_context is not None:
-        if not thumb or buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
+        if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
                 divsi3_context is not None or preloaded_switch:
             raise ValueError("software double requires an isolated direct-call context")
         remainder_bindings = software_double.verify_context(data, address, validated_calls or {}, double_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
-               (modsi3.reserved(target) and target != modsi3.ADDRESS) or divsi3.reserved(target)
+               (modsi3.reserved(target) and target != modsi3.ADDRESS) or
+               (divsi3.reserved(target) and target != software_double.DIVISION_OPERATION["__divsi3"])
                for target in (validated_calls or {}).values()):
             raise ValueError("software double excludes other runtimes and call thunks")
-        if remainder_bindings:
+        if remainder_bindings and not software_double.target_remainder_context(double_context):
             modsi3_context = (double_context[0], double_context[1], remainder_bindings)
     if inert_spin_context is not None:
         if type(inert_spin_context) is not dict or inert_spin_context or not thumb or \
@@ -2298,7 +2322,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("signed quotient excludes other runtimes and thunks")
     if modsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
-                switch_relocations is not None or switch_data_relocations is not None or \
+                switch_relocations is not None and double_context is None or switch_data_relocations is not None or \
                 udivsi3_context is not None or preloaded_switch:
             raise ValueError("signed remainder requires an isolated direct-call profile")
         signed_numeric = modsi3.verify_context(data, address, validated_calls or {}, modsi3_context)
@@ -2347,6 +2371,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     literals = set()
     calls = dict(validated_calls or {})
     seen_calls = set()
+    local_branches = {}
     while pending:
         current = pending.pop()
         if current % alignment or not address <= current < end:
@@ -2380,6 +2405,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if not stack_operation and adjustment is None and ARM_REG_SP in registers:
                 raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
+        local_branch = (calling and double_context is not None and
+                        len(operands) == 1 and operands[0].type == ARM_OP_IMM and
+                        address <= operands[0].imm < end)
+        if local_branch:
+            from local_long_branch_profile import target as local_target
+            local_branches[current] = local_target(instruction, address, end)
+            calling = False
         if CS_GRP_INT in instruction.groups or calling and not (calls or call_resolver):
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
         if calling:
@@ -2411,10 +2443,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if double_context is None or current not in double_context[3] or \
                         software_double.OPERATIONS.get(double_context[3][current]) != target:
                     raise ValueError("software double requires its canonical runtime proof")
-            if divsi3.reserved(target) and target != 0x0814274C:
+            if divsi3.reserved(target) and target != 0x0814274C and not (
+                    double_context is not None and
+                    software_double.shared_division_call(double_context[3].get(current), target)):
                 if divsi3_context is None or target != divsi3.ADDRESS or current not in divsi3_context[2]:
                     raise ValueError("signed quotient requires its canonical positive-constant proof")
-            if modsi3.reserved(target) and target != 0x0814274C:
+            if modsi3.reserved(target) and target != 0x0814274C and not (
+                    double_context is not None and software_double.target_remainder_context(double_context) and
+                    target == modsi3.ADDRESS and double_context[3].get(current) == "__modsi3"):
                 if modsi3_context is None:
                     if target == modsi3.ADDRESS:
                         raise modsi3.AddressedRemainderRequired(
@@ -2487,6 +2523,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
             successors = ()
+        elif local_branch:
+            # A compiler long jump updates LR but has no call ABI clobbers
+            # or continuation edge. The complete restoring-frame proof below
+            # must recover the entry return independently of this new LR.
+            return_registers.discard(ARM_REG_LR)
+            constants.pop(ARM_REG_LR, None)
+            aliases.pop(ARM_REG_LR, None)
+            successors = (local_branches[current],)
         elif calling:
             if function_thunk_context is not None and operands[0].imm in function_thunk.ALIASES.values():
                 target_number = (operands[0].imm - function_thunk.START) // 4
@@ -2684,7 +2728,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         for successor in successors:
             predecessors[successor].add(current)
     if switch is not None:
-        if (not allow_switch_scalar_frame and uses_stack_frame(instructions.values())) or any(
+        if (not allow_switch_scalar_frame and double_context is None and
+                uses_stack_frame(instructions.values())) or any(
                 target in RUNTIME_HELPERS.values() for target in calls.values()):
             raise ValueError("switch evidence excludes fixed frames and runtime call thunks")
         if allow_switch_scalar_frame and not any(
@@ -2697,7 +2742,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             guard = address + switch["guard"]
             dispatch = address + switch["dispatch"]
             expected = {guard: {comparison}, dispatch: {guard}}
-            if dispatch - guard == 4:
+            if dispatch - guard in (4, 6):
                 expected[guard + 2] = {guard}
             expected.update({dispatch + distance: {dispatch + distance - 2}
                              for distance in range(2, 10, 2)})
@@ -2781,6 +2826,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         modsi3.prove_operands(instructions, edges, address, modsi3_context[2])
     if inert_spin_context is not None:
         inert_spin_context["spins"] = [current - address for current in spins]
+    if local_branches:
+        from local_long_branch_profile import prove_frame
+        prove_frame(instructions, edges, address, local_branches, calls)
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -2884,6 +2932,7 @@ def main():
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
+    ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
     ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1"))
     ap.add_argument("--wsl", default="Ubuntu")
@@ -2938,6 +2987,9 @@ def main():
     empty_profile = False
     spin_profile = args.control_flow_profile == inert_spin.SELECTOR
     double_profile = args.software_double_profile == software_double.SELECTOR
+    remainder_target_profile = args.software_double_remainder_profile == software_double.REMAINDER_TARGET_SELECTOR
+    if remainder_target_profile and not double_profile:
+        sys.exit("target-state remainder requires its explicit software-double profile")
     thunk_profile = args.function_address_profile == function_thunk.SELECTOR
     function_index = inert_spin.index_snapshot(ROOT) if spin_profile or double_profile or thunk_profile else None
     if thunk_profile:
@@ -2995,6 +3047,7 @@ def main():
             preloaded_profile = False
             spin_evidence = None
             double_evidence = None
+            double_switch_relocations = {}
             thunk_evidence = None
             if thunk_profile:
                 got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
@@ -3003,7 +3056,8 @@ def main():
             elif double_profile:
                 got, calls, double_bindings = software_double.object_bytes(
                     runner, workspace, args, original, addr, mapping, rom, function_index,
-                    data_mapping=data_mapping, data_relocations=data_relocations)
+                    data_mapping=data_mapping, data_relocations=data_relocations,
+                    switch_relocations=double_switch_relocations)
                 linked_profile = True
             elif spin_profile:
                 if not thumb:
@@ -3039,17 +3093,21 @@ def main():
                 context = {"spins": []}
                 try:
                     verified_instructions = verify_leaf_instructions(
-                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings))
+                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings) +
+                            ((True,) if remainder_target_profile else ()),
+                        switch_relocations=double_switch_relocations or None)
                 except ValueError as error:
                     if str(error) != "reachable control-flow region has no path to a verified return":
                         raise
                     context = {}
                     verified_instructions = verify_leaf_instructions(
-                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings),
-                        inert_spin_context=context)
+                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings) +
+                            ((True,) if remainder_target_profile else ()),
+                        inert_spin_context=context, switch_relocations=double_switch_relocations or None)
                 double_evidence = software_double.make_manifest(calls, addr, double_bindings, verified_instructions,
                                                                  literals=data_relocations, data_mapping=data_mapping,
-                                                                 spins=context["spins"])
+                                                                 spins=context["spins"], remainder_target=remainder_target_profile,
+                    switch=software_double.switch_record(got, addr, double_switch_relocations))
                 verified_instructions = software_double.verify(
                     got, addr, rom, mapping, function_index, double_evidence, data_mapping=data_mapping)
             elif spin_profile:
@@ -3486,7 +3544,7 @@ def main():
             if double_profile:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
                 f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* software double: {software_double.SUMMARY}\n")
+                f.write(f"* software double: {software_double.summary(double_evidence)}\n")
                 f.write(f"* software double ABI: `{software_double.ABI}`\n")
                 f.write(f"* software double runtime: `{software_double.RUNTIME}`\n")
                 f.write(f"* software double semantics: `{software_double.SEMANTICS}`\n")

@@ -1275,16 +1275,26 @@ PC-relative loads. Each undefined global object must have an evidence-backed
 `config/data_symbols.json` binding; signed addends, indexed code ownership and
 reserved runtime intervals are checked before and after linking. Numeric address
 constants cannot substitute for object relocations, even with a rehashed report.
-Buffers, stack-argument proof contexts, resolvers, switches, function relocations,
-thunks and other integer runtimes cannot compose with this profile.
+Buffers, stack-argument proof contexts, resolvers, function relocations and
+thunks remain excluded. The optional `software-double-guarded-word-switch-v1`
+record admits the existing unsigned-guarded local word-table encoding. Its
+comparison, guard, dispatch, default, table pointer and every local target must
+agree with the complete function and original ELF relocations; table words,
+referenced literals, code and alignment remain disjoint and fully covered.
+The optional `thumb-same-owner-long-bl-restoring-frame-v1` record admits exact
+Thumb BL edges used as local long jumps within the same sole function owner.
+These edges overwrite LR, preserve argument registers and have no continuation
+edge. Every exit must independently restore entry LR, SP and r4-r11; overlapping
+owners, self-entry edges and incomplete frame provenance reject. Original
+single-function ELF provenance and fresh source replay remain required.
 The explicit software-double selector additionally accepts the optional
 `software-double-inert-self-spin-v1` record. Every reachable node without a
 return path must be a listed unconditional two-byte Thumb self-branch; at least
 one balanced verified return is still required. The complete byte, original-ELF,
 runtime, stack, literal and source-replay checks remain in force. Missing, stale
 or altered spin records reject; ordinary no-spin manifests keep their format.
-The only integer-runtime composition is the original compiler `__modsi3`
-symbol. Every remainder site must have a CFG-proven signed16 dividend in r0
+The existing bounded remainder composition uses the original compiler
+`__modsi3` symbol. Every site in that mode must have a CFG-proven signed16 dividend in r0
 and nonzero divisor in r1; loads from unknown memory or locals supply no
 operand facts. Its exact 206-byte/102-instruction runtime and two-byte zero
 hook require both ownership indexes, pinned bytes and native restoring ABI
@@ -1295,8 +1305,21 @@ Balanced fixed frames may compose only after the existing complete double
 caller stack/save/return proof. Standalone numeric MOD remains frameless.
 A versioned remainder manifest records exact dependencies, sites and domain;
 canonical BL relocations, typed data provenance and fresh source replay remain
-mandatory. Addressed MOD aliases, signed/unsigned quotient and unsigned
-remainder combinations still reject.
+mandatory. Addressed integer-runtime aliases and unsigned division/remainder
+combinations still reject.
+
+Canonical `__divsi3` can additionally compose through its separately versioned
+`agbcc-thumb-divsi3-target-state-closure-v1` record. Dynamic signed remainder
+requires the explicit additional
+`--software-double-remainder-profile target-state-v1` selector and its
+`agbcc-thumb-modsi3-target-state-closure-v1` record. These modes pin the complete
+original runtime and zero helper, all sign and zero paths, stack/save/return
+provenance and absence of external writes. Reports describe target machine
+state, including exceptional inputs; they do not assert unrestricted numeric C
+quotient or remainder equivalence. The standalone positive-constant quotient
+and signed16/nonzero remainder policies retain their operand requirements;
+old reports keep their formats. Saved target-state reports retain the explicit
+selector during verification and rebuild replay.
 Ordinary callees retain entry-only binding and ABI assumptions: their complete
 bodies, semantics and return behavior are not proved.
 

@@ -232,14 +232,10 @@ def _original_records(original, address, mapping, rom_size):
     return records
 
 
-def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
-    from capstone.arm import ARM_OP_MEM, ARM_REG_PC, ARM_REG_SP
-    from match import verify_leaf_instructions, thumb_stack_adjustment
-    checked_policy(policy)
-    descriptor = layout(data, address, relocations)
-    instructions = verify_leaf_instructions(data, address, True, calls,
-                                            switch_relocations=relocations, allow_switch_constants=True,
-                                            allow_switch_scalar_frame=policy.scalar_frame)
+def complete_partition(data, address, instructions, descriptor):
+    """Classify every switch byte using reached code/word loads and zero alignment."""
+    from capstone.arm import ARM_OP_MEM, ARM_REG_PC
+    relocations = dict(descriptor["relocations"])
     owned = set(range(descriptor["dispatch"] + 10,
                       descriptor["table"] + 4 * (descriptor["bound"] + 1)))
     loads = {}
@@ -252,11 +248,6 @@ def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
                 literal = ((instruction.address + 4) & ~3) + operand.mem.disp - address
                 loads.setdefault(literal, []).append(instruction.address - address)
                 owned.update(range(literal, literal + 4))
-    constants = []
-    for offset in (descriptor["literal"] - 8, descriptor["literal"] - 4):
-        if not loads.get(offset):
-            raise ValueError("each interposed constant requires a reached word load")
-        constants.append([offset, struct.unpack_from("<I", data, offset)[0], sorted(set(loads[offset]))])
     if any(addend not in starts for offset, addend in relocations.items() if offset != descriptor["literal"]):
         raise ValueError("switch cases must be reached instruction starts")
     missing = set(range(len(data))) - owned
@@ -266,6 +257,23 @@ def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
             if offset - 1 in missing and offset % 2:
                 continue
             raise ValueError("unowned complete-symbol bytes")
+    return loads
+
+
+def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
+    from capstone.arm import ARM_OP_MEM, ARM_REG_PC, ARM_REG_SP
+    from match import verify_leaf_instructions, thumb_stack_adjustment
+    checked_policy(policy)
+    descriptor = layout(data, address, relocations)
+    instructions = verify_leaf_instructions(data, address, True, calls,
+                                            switch_relocations=relocations, allow_switch_constants=True,
+                                            allow_switch_scalar_frame=policy.scalar_frame)
+    loads = complete_partition(data, address, instructions, descriptor)
+    constants = []
+    for offset in (descriptor["literal"] - 8, descriptor["literal"] - 4):
+        if not loads.get(offset):
+            raise ValueError("each interposed constant requires a reached word load")
+        constants.append([offset, struct.unpack_from("<I", data, offset)[0], sorted(set(loads[offset]))])
     manifest = {"calls": [[site - address, f"func_{target:08X}"] for site, target in sorted(calls.items())],
                 "switch": descriptor, "constants": constants}
     if policy.scalar_frame:
