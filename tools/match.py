@@ -395,7 +395,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                    allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                    double_bindings=None, double_index=None, function_thunks=False, *,
                    allow_switch_constants=False, umodsi3_bindings=None,
-                   ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None):
+                   ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
+                   allow_double_data=False):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
@@ -438,8 +439,12 @@ def call_bindings(image, name, address, mapping, rom_size,
         raise ValueError("software-float bindings require an empty collection")
     if float_index is not None and float_bindings is None:
         raise ValueError("software-float index requires its binding context")
+    if type(allow_double_data) is not bool or allow_double_data and \
+            (double_bindings is None or data_mapping is None):
+        raise ValueError("software-double data requires isolated explicit call and object mappings")
     if double_bindings is not None:
-        if not isinstance(double_bindings, dict) or double_bindings or data_mapping is not None or \
+        if not isinstance(double_bindings, dict) or double_bindings or \
+                data_mapping is not None and not allow_double_data or \
                 function_relocations is not None or switch_relocations is not None or allow_switch_data or \
                 allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or \
                 divsi3_bindings is not None:
@@ -707,10 +712,10 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
                 raise ValueError("unsigned remainder calls require unique undefined global functions")
     if double_bindings is not None:
-        if not double_bindings or data_relocations or \
+        if not double_bindings or data_relocations and not allow_double_data or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
-            raise ValueError("software double requires canonical operations without data or thunks")
-        for target_name in targets:
+            raise ValueError("software double requires canonical operations and isolated typed data without thunks")
+        for target_name in set(targets) - {binding[0] for binding in data_relocations.values()}:
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
             if len(definitions) != 1 or definitions[0]["value"] or definitions[0]["section"] or \
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
@@ -783,7 +788,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_switch_data=False, udivsi3_bindings=None,
                           allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                           double_bindings=None, function_thunks=False, *,
-                          allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None):
+                          allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
+                          allow_double_data=False):
     """Validate exact placement and the linker's complete modification surface."""
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_relocations or None,
@@ -801,6 +807,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if len(linked["text"]) != len(original["text"]):
         raise ValueError("linker added text or veneers")
     data_relocations = data_relocations or {}
+    if type(allow_double_data) is not bool or allow_double_data and double_bindings is None:
+        raise ValueError("linked software-double data requires its explicit runtime context")
     function_relocations = function_relocations or {}
     if function_thunks:
         if type(function_thunks) is not bool or \
@@ -860,7 +868,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                     for site, alias in double_bindings.items()) or \
                 double_targets != {alias: software_double.OPERATIONS[alias] for alias in double_bindings.values()} or \
                 set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target)} or \
-                udivsi3_bindings or modsi3_bindings or divsi3_bindings or data_relocations or \
+                udivsi3_bindings or modsi3_bindings or divsi3_bindings or \
+                data_relocations and not allow_double_data or \
                 function_relocations or switch_relocations or allow_switch_data or allow_preloaded_switch or \
                 any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("linked software-double bindings are incomplete or mixed")
@@ -978,7 +987,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False,
                modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
                function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
-               ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None):
+               ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
+               allow_double_data=False):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
@@ -989,7 +999,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     allow_switch_constants=allow_switch_constants,
                                                     umodsi3_bindings=umodsi3_bindings,
                                                     ashldi3_bindings=ashldi3_bindings, ashldi3_index=ashldi3_index,
-                                                    float_bindings=float_bindings, float_index=float_index)
+                                                    float_bindings=float_bindings, float_index=float_index,
+                                                    allow_double_data=allow_double_data)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -1025,7 +1036,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   modsi3_bindings, divsi3_bindings, double_bindings, function_thunks,
                                   allow_switch_constants=allow_switch_constants,
                                   umodsi3_bindings=umodsi3_bindings,
-                                  ashldi3_bindings=ashldi3_bindings, float_bindings=float_bindings),
+                                  ashldi3_bindings=ashldi3_bindings, float_bindings=float_bindings,
+                                  allow_double_data=allow_double_data),
             calls, data_relocations)
 
 
@@ -2946,7 +2958,8 @@ def main():
                 linked_profile = True
             elif double_profile:
                 got, calls, double_bindings = software_double.object_bytes(
-                    runner, workspace, args, original, addr, mapping, rom, function_index)
+                    runner, workspace, args, original, addr, mapping, rom, function_index,
+                    data_mapping=data_mapping, data_relocations=data_relocations)
                 linked_profile = True
             elif spin_profile:
                 if not thumb:
@@ -2981,9 +2994,10 @@ def main():
             elif double_profile:
                 verified_instructions = verify_leaf_instructions(
                     got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings))
-                double_evidence = software_double.make_manifest(calls, addr, double_bindings, verified_instructions)
+                double_evidence = software_double.make_manifest(calls, addr, double_bindings, verified_instructions,
+                                                                 literals=data_relocations, data_mapping=data_mapping)
                 verified_instructions = software_double.verify(
-                    got, addr, rom, mapping, function_index, double_evidence)
+                    got, addr, rom, mapping, function_index, double_evidence, data_mapping=data_mapping)
             elif spin_profile:
                 context = {}
                 verified_instructions = verify_leaf_instructions(got, addr, True, calls,
@@ -3231,7 +3245,7 @@ def main():
             sys.exit("software-double index/ROM selection changed or hand-ASM exception requested")
         try:
             software_double.verify_source(ROOT, addr, got_body, rom, mapping, function_index,
-                                          fingerprint, double_evidence)
+                                          fingerprint, double_evidence, data_mapping=data_mapping)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             sys.exit(f"software-double source replay failed: {error}")
     if float_evidence is not None:
@@ -3423,7 +3437,7 @@ def main():
                 f.write(f"* software double semantics: `{software_double.SEMANTICS}`\n")
                 f.write(f"* software double manifest: `{software_double.manifest_text(double_evidence)}`\n")
                 proof_digest = software_double.fingerprint(addr, got_body, double_evidence, fingerprint,
-                                                           mapping, function_index, rom)
+                                                           mapping, function_index, rom, data_mapping=data_mapping)
                 f.write(f"* software double proof SHA-256: `{proof_digest}`\n")
             if thunk_profile:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")

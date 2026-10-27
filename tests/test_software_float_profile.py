@@ -38,6 +38,10 @@ unsigned func_08000000(float volume, float factor)
     return result;
 }
 """
+EXTENDED_SOURCE = SOURCE.replace(
+    "unsigned result = (unsigned)(volume * factor);",
+    "unsigned result;\n    if (volume < 0.0156) volume = 0.0156f;\n"
+    "    result = (unsigned)(volume * factor);")
 
 
 class SoftwareFloatTests(unittest.TestCase):
@@ -156,7 +160,7 @@ class SoftwareFloatTests(unittest.TestCase):
 
     def test_native_helpers_data_ordinary_calls_and_scalar_frame(self):
         self.fixture()
-        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS))
+        self.assertEqual(set(self.bindings.values()), {"__mulsf3", "__fixunssfsi"})
         self.assertTrue(self.manifest["data"])
         self.assertIn(0x08000200, self.calls.values())
         self.assertEqual(len(self.verify()), len(self.instructions))
@@ -220,7 +224,7 @@ class SoftwareFloatTests(unittest.TestCase):
                 profile.prove_runtime(bytes(altered), json.loads(self.mapping), start, end, count, {})
 
     def test_canonical_helper_names_symbols_addends_and_linked_bytes(self):
-        self.fixture()
+        self.fixture(EXTENDED_SOURCE)
         for a, b, _, _ in profile.IDENTITIES:
             for target in (a, a | 1, a + 2, b - 2):
                 with self.subTest(target=target), self.assertRaises(ValueError):
@@ -243,7 +247,8 @@ class SoftwareFloatTests(unittest.TestCase):
             with self.subTest(helper=helper), self.assertRaisesRegex(ValueError, "noncanonical addend"):
                 self.fixture(assembly=f"push {{lr}}\nbl {helper}+2\npop {{r1}}\nbx r1")
         self.fixture()
-        targets = dict(profile.OPERATIONS, g_enabled=0x02000100, func_08000200=0x08000200)
+        targets = {name: profile.OPERATIONS[name] for name in self.bindings.values()}
+        targets.update(g_enabled=0x02000100, func_08000200=0x08000200)
         altered = copy.deepcopy(self.linked)
         text = bytearray(altered["text"]); text[0] ^= 1; altered["text"] = bytes(text)
         with self.assertRaisesRegex(ValueError, "outside permitted relocations"):
@@ -319,6 +324,107 @@ class SoftwareFloatTests(unittest.TestCase):
                                     self.mapping, self.index, self.objects, self.rom))
             self.assertFalse(evidence.report_matches(report, self.root, BASE))
             self.assertFalse(evidence.report_matches(forged, self.root, BASE))
+
+    def test_extension_comparison_native_report_and_captured_replay(self):
+        self.fixture(EXTENDED_SOURCE)
+        self.assertEqual(set(self.bindings.values()), set(profile.OPERATIONS))
+        proofs = profile.verify_identity(self.rom, self.mapping, self.index)
+        self.assertEqual(len(proofs), 17)
+        self.assertEqual(len(profile.EDGES), 23)
+        for name in profile.OPERATIONS:
+            self.assertFalse(proofs[profile.OPERATIONS[name]]["writes"])
+        self.assertEqual(proofs[0x08143958]["stack_reads"], [(0, 4)])
+        self.assertFalse(proofs[profile.OPERATIONS["__extendsfdf2"]]["stack_reads"])
+        report = self.native_report()
+        opening, reading = self.patched_rom()
+        with opening, reading, redirect_stdout(io.StringIO()):
+            self.assertTrue(evidence.report_matches(report, self.root, BASE))
+            for old in (report.replace(profile.RUNTIME, "agbcc-thumb-sf-mul-fixuns-closure-v1"),
+                        report.replace(profile.ABI, "agbcc-thumb-sf-bits-in-r0-r1-result-r0-v1")):
+                self.assertFalse(evidence.report_matches(old, self.root, BASE))
+        for key, value in (("runtime", "agbcc-thumb-sf-mul-fixuns-closure-v1"),
+                           ("abi", "agbcc-thumb-sf-bits-in-r0-r1-result-r0-v1")):
+            manifest = copy.deepcopy(self.manifest)
+            manifest[key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError): self.verify(manifest)
+
+    def test_extended_runtime_corrected_unique_entry_and_instruction_counts(self):
+        self.fixture(EXTENDED_SOURCE)
+        original = json.loads(self.mapping)
+        for address, changes in ((0x0814379C, ({"instrs": 39},)),
+                                 (0x0814432C, ({"instrs": 24},)),
+                                 (0x08143958, ({"rom": "0x0814395A"},
+                                               {"end": "0x08143980"}, {"instrs": 19}))):
+            for change in changes:
+                entries = copy.deepcopy(original)
+                next(e for e in entries if int(e["rom"], 16) == address).update(change)
+                with self.subTest(address=address, change=change), self.assertRaises(ValueError):
+                    profile.verify_identity(self.rom, json.dumps(entries).encode(), self.index)
+        duplicate = self.index + b"0814395A 0814397E 36 18 return\n"
+        with self.assertRaises(ValueError):
+            profile.verify_identity(self.rom, self.mapping, duplicate)
+        entries = copy.deepcopy(original)
+        entries.append({"rom": "0x08143958", "end": "0x0814395A", "mode": "thumb", "instrs": 1})
+        with self.assertRaises(ValueError):
+            profile.verify_identity(self.rom, json.dumps(entries).encode(), self.index)
+
+    def test_pinned_fifth_argument_return_provenance_and_subword_store_guards(self):
+        self.fixture(EXTENDED_SOURCE)
+        proofs = profile.verify_identity(self.rom, self.mapping, self.index)
+        entries = json.loads(self.mapping)
+        helper, helper_end = 0x08143958, 0x0814397E
+        policy = {"allowed_writes": (), "stack_load_widths": (1, 2, 4),
+                  "stack_input_words": (0,), "stack_adjusted_returns": True}
+        for omitted in ("stack_input_words", "stack_adjusted_returns"):
+            reduced = dict(policy); reduced.pop(omitted)
+            with self.subTest(omitted=omitted), self.assertRaises(ValueError):
+                profile.prove_runtime(self.rom, entries, helper, helper_end, 18, proofs, **reduced)
+        mutations = (("unsaved LR", 0x0814395A, lambda w: (w & ~0x100) | 0x20, helper, helper_end, 18, policy),
+                     ("sixth stack word", 0x08143962, lambda w: w + 1, helper, helper_end, 18, policy),
+                     ("wrong SP adjustment", 0x0814397A, lambda w: w + 1, helper, helper_end, 18, policy),
+                     ("missing fifth word", 0x0814434E, lambda w: 0x1C24, 0x0814432C, 0x0814435C, 22,
+                      {"allowed_writes": (), "stack_load_widths": (1, 2, 4)}),
+                     ("saved-byte overwrite", 0x08142D0A, lambda w: (w & ~(31 << 6)) | (9 << 6),
+                      0x08142BE8, 0x08142D34, 139,
+                      {"allowed_writes": (), "stack_load_widths": (1, 2, 4), "stack_store_widths": (1, 2, 4)}))
+        for label, site, change, start, end, count, options in mutations:
+            altered = bytearray(self.rom)
+            word = struct.unpack_from("<H", altered, site - BASE)[0]
+            struct.pack_into("<H", altered, site - BASE, change(word))
+            expected = {"unsaved LR": "return/register restoration", "sixth stack word": "exceeds its frame",
+                        "wrong SP adjustment": "local CFG/closure", "missing fifth word": "stack argument is not established",
+                        "saved-byte overwrite": "overwrites a saved register"}[label]
+            with self.subTest(label=label), self.assertRaisesRegex(ValueError, expected):
+                profile.prove_runtime(bytes(altered), entries, start, end, count, proofs, **options)
+        with self.assertRaises(ValueError):
+            profile.prove_runtime(self.rom, entries, 0x08142BE8, 0x08142D34, 139, proofs,
+                                  allowed_writes=(), stack_load_widths=(1, 2, 4))
+
+    def test_fifth_stack_argument_requires_full_word_on_every_incoming_path(self):
+        self.fixture(EXTENDED_SOURCE)
+        proofs = profile.verify_identity(self.rom, self.mapping, self.index)
+        start, target = BASE + 0x400, 0x08143958
+        site = start + 10
+        displacement = (target - site - 4) & 0x7FFFFF
+        # Entirely synthetic caller: only one branch initializes the fifth
+        # argument. A CFG join must not invent a written word for the other.
+        words = [0xB500, 0xB081, 0x2800, 0xD000, 0x9000,
+                 0xF000 | (displacement >> 12), 0xF800 | ((displacement >> 1) & 0x7FF),
+                 0xB001, 0xBC02, 0x4708]
+        rom = bytearray(self.rom)
+        rom[start-BASE:start-BASE+len(words)*2] = struct.pack('<' + 'H'*len(words), *words)
+        entries = json.loads(self.mapping)
+        entries.append({"rom": f"0x{start:08X}", "end": f"0x{start+len(words)*2:08X}",
+                        "mode": "thumb", "instrs": 9})
+        with self.assertRaisesRegex(ValueError, "stack argument is not established"):
+            profile.prove_runtime(bytes(rom), entries, start, start + len(words)*2, 9, proofs,
+                                  call_edges=((site, target),), scalar_entries=())
+        # Removing the conditional branch establishes the same real word on
+        # every path, so the otherwise identical caller proves successfully.
+        struct.pack_into('<H', rom, start - BASE + 6, 0x46C0)
+        proof = profile.prove_runtime(bytes(rom), entries, start, start + len(words)*2, 9, proofs,
+                                       call_edges=((site, target),), scalar_entries=())
+        self.assertFalse(proof["writes"])
 
 
 if __name__ == "__main__":

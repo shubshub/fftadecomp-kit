@@ -1,4 +1,4 @@
-"""Pinned agbcc single-precision helpers with local runtime CFG/ABI evidence."""
+"""Pinned agbcc float helpers with local runtime CFG/ABI evidence."""
 
 import argparse
 from contextvars import ContextVar
@@ -11,18 +11,24 @@ import sys
 import tempfile
 
 SCHEMA = "elf-symbol-thumb-sf-mul-fixuns-target-v1"
-RUNTIME = "agbcc-thumb-sf-mul-fixuns-closure-v1"
-ABI = "agbcc-thumb-sf-r0-r1-result-r0-v1"
+RUNTIME = "agbcc-thumb-sf-mul-fixuns-extend-lt-closure-v2"
+ABI = "agbcc-thumb-sf-df-mixed-result-r0-r1-v2"
 SEMANTICS = "target-machine-state-v1"
-SUMMARY = ("pinned returning Thumb single-precision multiply/unsigned conversion closure; "
+SUMMARY = ("pinned returning Thumb float multiply/unsigned conversion/extension/comparison closure; "
            "entry RAM is a state input; unrestricted IEEE semantics not proved")
-OPERATIONS = {"__mulsf3": 0x08143CEC, "__fixunssfsi": 0x081428AC}
+OPERATIONS = {"__mulsf3": 0x08143CEC, "__fixunssfsi": 0x081428AC,
+              "__extendsfdf2": 0x0814432C, "__ltdf2": 0x0814379C}
 ROM_SHA256 = "43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19"
 # Complete bodies include every reachable literal and exclude inter-function fill.
 # Counts are reachable instructions, not a linear decode through literal words.
 IDENTITIES = (
     (0x081428AC, 0x081428E4, 19, "829913a602873567de7f3d182be10fffa86ef45d8ed742b1b4517152402b96a9"),
     (0x08142A20, 0x08142A94, 56, "f642a6a21668da428cbb8304f9710064aca75ff16130add649b86ff4b9e73be3"),
+    (0x08142BE8, 0x08142D34, 139, "38aa6a8e47b81d402a011d733156fc99229f9fdf028aee34f5920b3464a5bb00"),
+    (0x08142D34, 0x08142E10, 97, "8fb09220b22c69e18dc39f19c8645de020c1d658f48894a5dfe3d68e79f0fb25"),
+    (0x08143528, 0x0814362A, 129, "29c2eb0eb1f6a9b824ecfb2bd55d4b006da808992cb6e61f9998057d23c280eb"),
+    (0x0814379C, 0x081437EA, 36, "93610c0c0b2e7dd92aba95bfb314fe742a48924abf71d8658d9c01d118af2360"),
+    (0x08143958, 0x0814397E, 18, "1fee8cea7a0257110504e0c2d041ed07796499458591a61cd941f8475c7f238b"),
     (0x081439C8, 0x08143A84, 86, "765c352080a3d1f6c0da8210a214648596a5486760b3cedf7d6648fef32cae32"),
     (0x08143A84, 0x08143B02, 61, "d5efb6bd7cf27a8941c36f0b5483da598b2a48309bb282e2b431bcc8321dad39"),
     (0x08143B04, 0x08143C82, 186, "199d30f85b753970b05497963d593f1a8eefee6d51fb2ec4df257d7fba44d750"),
@@ -31,6 +37,8 @@ IDENTITIES = (
     (0x08143F44, 0x0814402C, 116, "081dc5f333941e61e9ee2ac24ee67ee5076ed1febd02317dd90aa7e2cd75552a"),
     (0x0814413C, 0x08144188, 35, "4a6dcd1364fa48fe4c6028182009503388ca8e55553366fba6ce0265fb818962"),
     (0x08144280, 0x081442EA, 50, "2014feb21890bddf5d00b8ca3ec17a16ed6c61b5de391b3c23abdd9002b1c9a4"),
+    (0x0814432C, 0x0814435C, 22, "44270ed4d1de25e093330f5bca55b7b74e149968085e7f89bba389b77ed8dd91"),
+    (0x08144378, 0x081443AE, 27, "a2d91a60b907f40dd3bafc448e79c2c4630ba7000195bb54f0f4b26e4e9d9faa"),
 )
 EDGES = (
     (0x081428B2, 0x0814413C), (0x081428BC, 0x08144280),
@@ -41,7 +49,13 @@ EDGES = (
     (0x08143DB4, 0x08142A20), (0x08143E3E, 0x081439C8),
     (0x08144148, 0x08143A84), (0x08144152, 0x08143A84),
     (0x0814417C, 0x08143F44), (0x0814428A, 0x08143A84),
+    (0x08142C64, 0x08144378),
+    (0x081437AC, 0x08142D34), (0x081437B6, 0x08142D34),
+    (0x081437DE, 0x08143528), (0x08143970, 0x08142BE8),
+    (0x08144336, 0x08143A84), (0x08144350, 0x08143958),
 )
+EXTENSION_CLOSURE = (0x08142BE8, 0x08142D34, 0x08143528, 0x0814379C,
+                     0x08143958, 0x0814432C, 0x08144378)
 FORBIDDEN = ("* buffer", "* unsigned division", "* unsigned remainder", "* signed remainder",
              "* signed quotient", "* software double", "* ashldi3", "* inert spin", "* empty body",
              "* switches", "* switch manifest", "* switch proof", "* function address",
@@ -111,15 +125,16 @@ def dependency_records():
 
 
 def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=None,
-                  scalar_entries=None, allowed_writes=None, stack_load_widths=(4,)):
+                  scalar_entries=None, allowed_writes=None, stack_load_widths=(4,),
+                  stack_store_widths=(4,), stack_input_words=(), stack_adjusted_returns=False):
     """Prove this pinned body's local returns and callee-saved/write ABI.
 
     This is deliberately separate from the caller verifier. Loads are target
     machine state inputs, not invented IEEE values. Stores must stay in local
     stack words or a bounded formal output argument. A dependency's output
     footprint is applied only after its own CFG and register restoration pass.
-    Optional policies let another pinned closure reuse the same interpreter;
-    defaults retain the single-precision call graph and four-word write bound.
+    Optional policies let pinned closures reuse the same interpreter;
+    defaults retain word-only stack accesses and the four-word write bound.
     """
     import struct
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL
@@ -129,14 +144,17 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
     from analyze import refine_function
     body = rom[start - 0x08000000:end - 0x08000000]
     layout = refine_function(body, start, entries, max_bytes=end - start,
-                             max_instructions=1024, rom_end=0x08000000 + len(rom))
+                             max_instructions=1024, rom_end=0x08000000 + len(rom),
+                             stack_adjusted_returns=stack_adjusted_returns)
     expected_calls = {site: target for site, target in
                       (EDGES if call_edges is None else call_edges) if start <= site < end}
     public = OPERATIONS.values() if scalar_entries is None else scalar_entries
     permitted_writes = ({(number, offset, 4) for number in range(4) for offset in range(0, 16, 4)}
                         if allowed_writes is None else set(allowed_writes))
-    if not set(stack_load_widths) <= {1, 2, 4} or 4 not in stack_load_widths:
-        raise ValueError("software-float runtime stack-load widths are unsupported")
+    if any(not set(widths) <= {1, 2, 4} or 4 not in widths
+           for widths in (stack_load_widths, stack_store_widths)) or \
+            any(type(offset) is not int or offset != 0 for offset in stack_input_words):
+        raise ValueError("software-float runtime stack-access policy is unsupported")
     if not layout["cfg_closed"] or layout["partial_reasons"] or layout["instrs"] != count or \
             layout["candidate_extent"]["end"] != f"0x{end:08X}" or \
             {int(c["site"], 16): int(c["target"], 16) for c in layout["calls"]} != expected_calls:
@@ -154,6 +172,7 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
     initial[ARM_REG_LR] = ("entry", ARM_REG_LR, 0)
     initial[ARM_REG_SP] = ("stack", 0, 0)
     states, pending, edges, returns, writes = {start: (initial, {}, frozenset())}, [start], {}, set(), set()
+    stack_reads = set()
 
     def adjusted(value, distance):
         if value is None:
@@ -177,14 +196,22 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
         def access(pointer, loading, value=None, width=4):
             if pointer is not None and pointer[0] == "stack":
                 offset = pointer[2]
-                if width not in (stack_load_widths if loading else (4,)) or \
+                if loading and width == 4 and offset in stack_input_words:
+                    stack_reads.add((offset, width))
+                    return unknown
+                if width not in (stack_load_widths if loading else stack_store_widths) or \
                         offset % width or not sp <= offset <= -width:
                     raise ValueError("software-float runtime stack access exceeds its frame")
                 if loading:
                     return memory.get(offset) if width == 4 else unknown
-                if offset in saved:
+                if any(offset < slot + 4 and slot < offset + width for slot in saved):
                     raise ValueError("software-float runtime overwrites a saved register")
-                memory[offset] = value
+                if width == 4:
+                    memory[offset] = value
+                else:
+                    for slot in memory:
+                        if offset < slot + 4 and slot < offset + width:
+                            memory[slot] = unknown
             elif not loading:
                 if pointer is None or pointer[0] != "entry" or \
                         not ARM_REG_R0 <= pointer[1] <= ARM_REG_R3 or \
@@ -222,6 +249,13 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                 raise ValueError("software-float runtime call has no native dependency proof")
             for number, offset, width in dependencies[target]["writes"]:
                 access(adjusted(registers.get(ARM_REG_R0 + number), offset), False, width=width)
+            for offset, width in dependencies[target].get("stack_reads", ()):
+                # A pinned fifth argument must be a fully written local word
+                # in this caller, not its saved registers or incoming stack.
+                slot = sp + offset
+                if width != 4 or slot not in memory or slot in saved:
+                    raise ValueError("software-float runtime stack argument is not established")
+                access(("stack", 0, slot), True, width=width)
             for reg in (*range(ARM_REG_R0, ARM_REG_R3 + 1), ARM_REG_R12, ARM_REG_LR):
                 registers[reg] = unknown
         elif mnemonic.startswith(("ldm", "stm")):
@@ -237,8 +271,10 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
         elif mnemonic.startswith(("ldr", "str")):
             mem = next((op.mem for op in operands if op.type == ARM_OP_MEM), None)
             loads = {4: "ldr", 2: "ldrh", 1: "ldrb"}
+            stores = {4: "str", 2: "strh", 1: "strb"}
             if mem is None or mem.index or instruction.writeback or \
-                    mnemonic not in ("str", *(loads[width] for width in stack_load_widths)):
+                    mnemonic not in (*(stores[width] for width in stack_store_widths),
+                                     *(loads[width] for width in stack_load_widths)):
                 raise ValueError("software-float runtime memory operation is unsupported")
             if mem.base == ARM_REG_PC:
                 if mnemonic != "ldr":
@@ -251,7 +287,8 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                     width = next(width for width, name in loads.items() if name == mnemonic)
                     registers[regs[0]] = access(pointer, True, width=width)
                 else:
-                    access(pointer, False, registers.get(regs[0]))
+                    width = next(width for width, name in stores.items() if name == mnemonic)
+                    access(pointer, False, registers.get(regs[0]), width=width)
         elif mnemonic in ("mov", "movs", "add", "adds", "sub", "subs"):
             dest = regs[0]
             if mnemonic.startswith("mov"):
@@ -290,8 +327,8 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                 if previous[0][ARM_REG_SP] != registers[ARM_REG_SP] or previous[2] != outgoing[2]:
                     raise ValueError("software-float runtime frame differs at a CFG join")
                 merged = ({r: value if value == registers.get(r) else unknown for r, value in previous[0].items()},
-                          {offset: value if value == memory.get(offset) else unknown
-                           for offset, value in previous[1].items()}, previous[2])
+                          {offset: value if value == memory[offset] else unknown
+                           for offset, value in previous[1].items() if offset in memory}, previous[2])
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
@@ -307,7 +344,8 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
         raise ValueError("software-float runtime has a region without a verified return path")
     if start in public and writes:
         raise ValueError("software-float public scalar helper has external writes")
-    return {"writes": sorted(writes), "returns": sorted(returns), "layout": layout}
+    return {"writes": sorted(writes), "stack_reads": sorted(stack_reads),
+            "returns": sorted(returns), "layout": layout}
 
 
 def verify_identity(rom, mapping, index):
@@ -330,7 +368,15 @@ def verify_identity(rom, mapping, index):
             raise ValueError("software-float dependency closure is recursive or incomplete")
         for start in ready:
             end, count = next((end, count) for a, end, count, _ in IDENTITIES if a == start)
-            proofs[start] = prove_runtime(rom, entries, start, end, count, proofs)
+            policy = {}
+            if start in EXTENSION_CLOSURE:
+                policy = {"allowed_writes": tuple((1, offset, 4) for offset in range(0, 20, 4))
+                          if start == 0x08142D34 else (), "stack_load_widths": (1, 2, 4)}
+            if start == 0x08142BE8:
+                policy["stack_store_widths"] = (1, 2, 4)
+            if start == 0x08143958:
+                policy.update(stack_input_words=(0,), stack_adjusted_returns=True)
+            proofs[start] = prove_runtime(rom, entries, start, end, count, proofs, **policy)
             pending.remove(start)
     return proofs
 

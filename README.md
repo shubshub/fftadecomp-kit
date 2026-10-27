@@ -1125,18 +1125,21 @@ aliases, interior/odd runtime addresses, wrong or overlapping owners, modified
 runtime bodies, mixed profiles and stale evidence fail closed. The normal
 matcher, status verification and publication gate use this same automatic path.
 
-## Canonical single-precision multiply and unsigned conversion
+## Canonical float multiply, unsigned conversion and double comparison
 
-Natural C that emits `__mulsf3` or `__fixunssfsi` automatically selects
-`elf-symbol-thumb-sf-mul-fixuns-target-v1`. Only these canonical undefined
-global helper symbols bind to `0x08143CEC` and `0x081428AC`, respectively.
-The fixed agbcc `-mthumb-interwork -O2` toolchain is required. The ABI passes
-single-precision bit patterns in `r0`/`r1` and returns the multiply or unsigned
-integer result in `r0`.
+Natural C that emits `__mulsf3`, `__fixunssfsi`, `__extendsfdf2` or `__ltdf2`
+automatically selects `elf-symbol-thumb-sf-mul-fixuns-target-v1`. Only these
+canonical undefined global symbols bind to `0x08143CEC`, `0x081428AC`,
+`0x0814432C` and `0x0814379C`, respectively. The fixed agbcc
+`-mthumb-interwork -O2` toolchain is required. Multiply consumes float bits in
+`r0`/`r1`; unsigned conversion consumes float bits in `r0`. Both return in
+`r0`. Extension consumes float bits in `r0` and returns double high/low words
+in `r0`/`r1`. Comparison consumes two double high/low pairs in `r0` through
+`r3` and returns the pinned target comparison code in `r0`.
 
 The approved complete ROM SHA-256 is
 `43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19`.
-All ten complete runtime bodies and sixteen native dependency edges in
+All seventeen complete runtime bodies and twenty-three native dependency edges in
 `software_float_profile.py` are pinned. Both indexes must agree on exact,
 unique, nonoverlapping Thumb owners and reachable instruction counts, including
 the helpers' trailing literal pools. Legacy truncated or linearly counted
@@ -1146,9 +1149,18 @@ A runtime-specific check reuses bounded native CFG/body partitioning and then
 tracks actual register saves, local stack words, all return paths and bounded
 formal output writes. Dependency footprints are applied only after the
 dependency itself passes. Every return restores `r4` through `r11`, balances
-`sp`, and transfers through the saved entry return address. Both public scalar
-helpers have no external writes. These checks do not broaden ordinary call
-summaries. The semantics describe the pinned target machine, with RAM reads
+`sp`, and transfers through the saved entry return address. All four public scalar
+helpers have no external writes. The double unpacker may write only its
+five-word formal output record; existing single-precision outputs keep their
+four-word bound. A private double-construction helper reads exactly one formal
+stack word at entry SP. Every call must establish that whole word in its own
+local frame on every incoming path, separate from saved registers. Only this
+pinned helper enables the adjacent pop-register, add-SP-four, branch-register
+return shape, with actual saved-LR provenance and balanced SP independently
+proved. The double packer permits bounded byte and halfword local stack stores;
+any overlap with a saved register rejects and narrow accesses cannot fabricate
+saved-register provenance. Default CFG and runtime stack policies remain
+unchanged. These checks do not broaden ordinary call summaries. The semantics describe the pinned target machine, with RAM reads
 and uninitialized local values as state inputs; they do not establish general
 IEEE arithmetic, C conversion definedness, arbitrary pointer safety or loop
 termination.
@@ -1163,8 +1175,10 @@ relocations; the linker may change only independently checked relocation bytes.
 
 Reports bind both indexes, mapped data, source and headers, the approved ROM,
 complete exact caller bytes, dependency identities and fixed compiler setup.
-Cached validation recompiles captured source, relinks the original ELF and
-reruns CFG, runtime ABI and plausibility checks. A non-exact caller, stale
+The closure uses runtime ID `agbcc-thumb-sf-mul-fixuns-extend-lt-closure-v2`
+and ABI ID `agbcc-thumb-sf-df-mixed-result-r0-r1-v2`; older IDs and dependency
+lists reject. Cached validation recompiles captured source, relinks the original
+ELF and reruns CFG, runtime ABI and plausibility checks. A non-exact caller, stale
 mapping, altered proof, duplicate field or mixed profile fails closed. Focused
 tests create synthetic callers in memory using only the local approved runtime;
 no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
@@ -1194,8 +1208,9 @@ all four bodies, their exact call edges, balanced frames, restored callee-saved
 registers and returns. The unpacker may write only its five-word formal output
 record; transitive writes must fit the actual caller frame and cannot overwrite
 saved registers. Subword stack loads are bounded and supply unknown state,
-never saved-register provenance. The existing software-float proof keeps its
-original call graph, public entries, four-word output bound and word-load policy.
+never saved-register provenance. Each runtime closure supplies its exact call
+edges, public entries and bounded output policy to the shared interpreter;
+word-only stack access remains the default.
 
 The original ELF must contain one complete Thumb function, canonical undefined
 global call symbols and canonical BL addends. Typed linking must preserve all
@@ -1205,10 +1220,16 @@ aliases, numeric literals and inherited aligned scalar SP reads are supported.
 Direct incoming scalar reads have no verifier-proved argument-count or upper
 bound. Compatible C signatures, initialized readable backing, lifetimes and
 capacity remain source-review preconditions. Stores outside the tracked frame
-still reject. Buffers, stack-argument proof contexts, resolvers, switches,
-object/function relocations, thunks, integer runtimes and inert spins cannot
-compose with this profile. Ordinary callees retain entry-only binding and ABI
-assumptions: their complete bodies, semantics and return behavior are not proved.
+still reject. Named data can compose with this profile through original-ELF
+`R_ARM_ABS32` relocations in complete aligned literal words referenced by reachable
+PC-relative loads. Each undefined global object must have an evidence-backed
+`config/data_symbols.json` binding; signed addends, indexed code ownership and
+reserved runtime intervals are checked before and after linking. Numeric address
+constants cannot substitute for object relocations, even with a rehashed report.
+Buffers, stack-argument proof contexts, resolvers, switches, function relocations,
+thunks, integer runtimes and inert spins cannot compose with this profile.
+Ordinary callees retain entry-only binding and ABI assumptions: their complete
+bodies, semantics and return behavior are not proved.
 
 Binary64 values use high-word/low-word register and memory order, with
 little-endian bytes within each word. Signed64 conversion instead consumes
@@ -1225,10 +1246,13 @@ termination, general C definedness or physical stack-capacity proof is claimed.
 The closed helper graph's maximum stack chain is 220 bytes below call-time SP,
 in addition to the caller frame and any separately assumed ordinary callee.
 
-The exact six-key manifest records runtime/ABI/semantics IDs, all dependencies,
-derived frame usage and every reachable call. Reports bind the source and full
-`source_paths` header universe, both maps, whole ROM, fixed configuration and
-complete caller. Every replay freshly captures and compiles those inputs,
+The six-key manifest records runtime/ABI/semantics IDs, all dependencies,
+derived frame usage and every reachable call. Callers with data relocations add
+one ordered `data` list of literal offsets, object names and signed addends;
+zero-data manifests keep their existing format and fingerprint. Reports bind
+the source and full `source_paths` header universe, both function maps, whole
+ROM, fixed configuration and complete caller. Data callers additionally bind
+the exact data mapping. Every replay freshly captures and compiles those inputs,
 checks original ELF provenance, relinks and reruns CFG/plausibility checks.
 Rehashed manifests cannot turn addressed source into canonical provenance.
 Subprocesses are bounded, replay is nonrecursive, and temporary disk-backed

@@ -32,7 +32,7 @@ try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_LR,
-                                    ARM_REG_PC, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
+                                    ARM_REG_PC, ARM_REG_SP, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
 except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
@@ -195,7 +195,7 @@ def refinement_ranges(intervals):
 
 
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
-                    rom_end=CODE_END):
+                    rom_end=CODE_END, *, stack_adjusted_returns=False):
     """Inspect a byte window beginning at an indexed Thumb entry.
 
     Closure is structural, assuming ordinary calls return to their continuation
@@ -363,7 +363,9 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 literal_bytes.update(range(literal, literal + 4))
                 if any(byte in owners for byte in range(literal, literal + 4)):
                     fail("code/literal overlap", literal)
-        popped_return = instruction.mnemonic == "bx" and previous_pop == (info["opreg"],)
+        popped_return = instruction.mnemonic == "bx" and (
+            previous_pop == (info["opreg"],) or stack_adjusted_returns and
+            previous_pop == (info["opreg"], "stack-adjusted"))
         if info["ret"] or popped_return:
             returns.add(position)
             continue
@@ -395,7 +397,19 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                for operand in instruction.operands):
             fail("unsupported PC read", position)
             continue
-        pending.append((position + size, info["pop_regs"]))
+        # One explicit runtime ABI spills an argument before saving LR, then
+        # restores that word after popping the return register. This recognizes
+        # only the adjacent pop/add-SP-4/bx shape; the runtime machine-state
+        # proof must separately establish LR provenance and balanced SP.
+        operands = instruction.operands
+        if stack_adjusted_returns and len(previous_pop) == 1 and \
+                instruction.mnemonic == "add" and len(operands) == 2 and \
+                operands[0].type == ARM_OP_REG and operands[0].reg == ARM_REG_SP and \
+                operands[1].type == ARM_OP_IMM and operands[1].imm == 4:
+            previous_pop = (previous_pop[0], "stack-adjusted")
+        else:
+            previous_pop = info["pop_regs"]
+        pending.append((position + size, previous_pop))
     if not returns:
         fail("no recognized return")
     code_ranges = refinement_ranges((start, start + size)

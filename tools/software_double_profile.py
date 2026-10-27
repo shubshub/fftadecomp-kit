@@ -91,7 +91,7 @@ EDGES = (
 # public conversion is a caller operation; the other three bodies stay private.
 TRUNCATION_CLOSURE = (0x08142D34, 0x08143980, 0x081439C8, 0x08144314)
 REPLAY_TIMEOUT = 120
-FORBIDDEN_MARKERS = ("* buffer", "* data symbols", "* unsigned division", "* signed remainder",
+FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
                      "* function address", "* function buffer", "* inert spin", "* function-address")
 _replay_active = ContextVar("software_double_replay_active", default=False)
@@ -134,7 +134,7 @@ def index_snapshot(root):
     return (Path(root) / "symbols/functions.txt").read_bytes()
 
 
-def fingerprint(address, data, manifest, source_digest, mapping, index, rom):
+def fingerprint(address, data, manifest, source_digest, mapping, index, rom, *, data_mapping=None):
     from match import DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD
     digest = hashlib.sha256()
     configuration = compiler_text() + repr((DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD))
@@ -144,6 +144,12 @@ def fingerprint(address, data, manifest, source_digest, mapping, index, rom):
                     hashlib.sha256(rom).digest(), configuration.encode("ascii")):
         digest.update(len(payload).to_bytes(8, "little"))
         digest.update(payload)
+    if "data" in manifest:
+        if not isinstance(data_mapping, bytes):
+            raise ValueError("software-double data fingerprint requires its exact mapping")
+        for payload in (b"software-double-typed-data-v1", data_mapping):
+            digest.update(len(payload).to_bytes(8, "little"))
+            digest.update(payload)
     return digest.hexdigest()
 
 
@@ -280,18 +286,21 @@ def verify_context(data, address, calls, context):
         raise ValueError("software-double runtime call bindings are incomplete or mixed")
 
 
-def verify(data, address, rom, mapping, index, manifest):
-    from match import function_address_target, uses_stack_frame, verify_leaf_instructions
+def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
+    from match import (function_address_target, uses_stack_frame, verify_leaf_instructions,
+                       parse_data_symbols, verify_data_literals, modsi3, ARM_OP_MEM, ARM_REG_PC)
     entries, entry = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or \
-            set(manifest) != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
+            set(manifest) not in ({"runtime", "abi", "semantics", "dependencies", "frame", "calls"},
+                                 {"runtime", "abi", "semantics", "dependencies", "frame", "calls", "data"}) or \
             manifest["runtime"] != RUNTIME or manifest["abi"] != ABI or manifest["semantics"] != SEMANTICS or \
             type(manifest["dependencies"]) is not list or \
             any(type(record) is not list or len(record) != 3 or \
                 type(record[0]) is not int or type(record[1]) is not int or type(record[2]) is not str
                 for record in manifest["dependencies"]) or \
             manifest["dependencies"] != dependency_records() or type(manifest["frame"]) is not bool or \
-            not isinstance(manifest["calls"], list):
+            not isinstance(manifest["calls"], list) or \
+            "data" in manifest and (type(manifest["data"]) is not list or not manifest["data"]):
         raise ValueError("invalid software-double manifest")
     calls, bindings = {}, {}
     previous = -4
@@ -308,22 +317,65 @@ def verify(data, address, rom, mapping, index, manifest):
         else:
             calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
         previous = offset
+    literals, occupied = {}, {byte - address for site in calls for byte in range(site, site + 4)}
+    objects = parse_data_symbols(data_mapping) if "data" in manifest else {}
+    previous = -1
+    for record in manifest.get("data", []):
+        if type(record) is not list or len(record) != 3:
+            raise ValueError("invalid software-double data binding")
+        offset, name, addend = record
+        if type(offset) is not int or type(name) is not str or offset <= previous or \
+                offset < 0 or offset + 4 > len(data) or (address + offset) % 4 or \
+                type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF or name not in objects:
+            raise ValueError("software-double data bindings require ordered aligned mapped words")
+        previous = offset
+        positions = set(range(offset, offset + 4))
+        if occupied & positions:
+            raise ValueError("software-double call/data bindings overlap")
+        occupied.update(positions)
+        value = objects[name] + addend
+        parse_data_symbols(json.dumps({name: f"0x{value:08X}"}).encode())
+        if not modsi3.supported_data(objects[name], len(rom)) or \
+                not modsi3.supported_data(value, len(rom)) or \
+                any(int(owner["rom"], 16) <= (pointer & ~1) < int(owner["end"], 16)
+                    for owner in entries for pointer in (objects[name], value)) or \
+                struct.unpack_from("<I", data, offset)[0] != value:
+            raise ValueError("software-double data literal differs or aliases indexed code/forbidden memory")
+        literals[offset] = (name, value)
     instructions = verify_leaf_instructions(data, address, True, calls,
                                             double_context=(rom, mapping, index, bindings))
     if uses_stack_frame(instructions) != manifest["frame"] or len(instructions) != entry["instrs"]:
         raise ValueError("software-double frame/count disagrees with the converged CFG")
+    verify_data_literals(instructions, address, literals)
+    address_literals = set()
+    for instruction in instructions:
+        for operand in instruction.operands:
+            if instruction.mnemonic == "ldr" and operand.type == ARM_OP_MEM and \
+                    operand.mem.base == ARM_REG_PC and not operand.mem.index:
+                offset = ((instruction.address + 4) & ~3) + operand.mem.disp - address
+                if modsi3.address_literal(struct.unpack_from("<I", data, offset)[0]):
+                    address_literals.add(offset)
+    if address_literals != set(literals):
+        raise ValueError("software-double address-domain literals require exact mapped-data coverage")
     return instructions
 
 
-def make_manifest(calls, address, bindings, instructions):
-    from match import uses_stack_frame
-    return {"runtime": RUNTIME, "abi": ABI, "semantics": SEMANTICS,
+def make_manifest(calls, address, bindings, instructions, *, literals=None, data_mapping=None):
+    from match import uses_stack_frame, parse_data_symbols
+    manifest = {"runtime": RUNTIME, "abi": ABI, "semantics": SEMANTICS,
             "dependencies": dependency_records(), "frame": uses_stack_frame(instructions),
             "calls": call_records(calls, address, bindings)}
+    if literals:
+        objects = parse_data_symbols(data_mapping)
+        manifest["data"] = [[offset, name, value - objects[name]]
+                            for offset, (name, value) in sorted(literals.items())]
+    return manifest
 
 
-def object_bytes(runner, workspace, args, original, address, mapping, rom, index):
-    from match import allocated_text_only, function_record, function_address_target, link_calls
+def object_bytes(runner, workspace, args, original, address, mapping, rom, index, *,
+                 data_mapping=None, data_relocations=None):
+    from match import (allocated_text_only, function_record, function_address_target,
+                       link_calls, parse_data_symbols)
     fixed_configuration(args)
     if original["type"] != 1:
         raise ValueError("software double requires a relocatable original ELF")
@@ -333,20 +385,34 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
     padding = original["text"][symbol["size"]:]
     if definitions != [symbol] or offset or len(padding) > 3 or \
             any(padding) and not (symbol["size"] % 4 == 2 and padding == b"\xc0\x46") or \
-            any(item["type"] == 1 or re.fullmatch(r"\$a(?:\..*)?", item["name"])
+            any(item["type"] == 1 and item["section"] or re.fullmatch(r"\$a(?:\..*)?", item["name"])
                 for item in original["symbols"]):
         raise ValueError("software double requires sole-function Thumb text ownership")
     entries, _ = verify_identity(rom, mapping, index)
+    if data_relocations is not None and (type(data_relocations) is not dict or data_relocations):
+        raise ValueError("software-double data provenance requires an empty collection")
+    objects, has_data = None, False
     for section_index in original["relocations"]:
         section = original["sections"][section_index]
         if section[1] != 9 or section[7] != original["text_index"] or section[9] != 8 or section[5] % 8:
-            raise ValueError("software double requires ordinary Thumb call relocations only")
+            raise ValueError("software double requires ordinary Thumb call or mapped data relocations")
         symbols = original["symbol_tables"].get(section[6])
         for position in range(0, section[5], 8):
             _, info = struct.unpack_from("<II", original["section_data"][section_index], position)
-            if info & 255 != 10 or symbols is None or info >> 8 >= len(symbols):
-                raise ValueError("software double exclude non-call relocations")
+            if info & 255 not in (2, 10) or symbols is None or info >> 8 >= len(symbols):
+                raise ValueError("software double excludes unsupported relocations")
             target = symbols[info >> 8]
+            if info & 255 == 2:
+                if data_relocations is None:
+                    raise ValueError("software-double data relocation requires explicit provenance capture")
+                if objects is None:
+                    objects = parse_data_symbols(data_mapping)
+                if target["name"] not in objects or target["section"] or target["bind"] != 1 or \
+                        target["type"] not in (0, 1) or target["value"] or \
+                        sum(item["name"] == target["name"] for item in original["symbols"]) != 1:
+                    raise ValueError("software-double data requires one undefined mapped global object")
+                has_data = True
+                continue
             if target["name"] not in OPERATIONS:
                 function_address_target(target["name"], entries, address, symbol["size"], len(rom))
             if target["section"] or target["bind"] != 1 or target["type"] not in (0, 2) or \
@@ -356,20 +422,24 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
     if original["relocations"]:
         bindings = {}
         data, calls, literals = link_calls(runner, workspace, args, original, address, mapping, len(rom), rom,
-                                          double_bindings=bindings, double_index=index)
-        if literals or not bindings:
-            raise ValueError("software double exclude data relocations")
+                                          data_mapping=data_mapping if has_data else None,
+                                          double_bindings=bindings, double_index=index,
+                                          allow_double_data=has_data)
+        if not bindings:
+            raise ValueError("software double requires at least one canonical runtime call")
+        if data_relocations is not None:
+            data_relocations.update(literals)
         return data, calls, bindings
     if any(item["name"] and not item["section"] for item in original["symbols"]):
         raise ValueError("software-double leaf retains undefined symbols")
     raise ValueError("software double requires at least one canonical runtime call")
 
 
-def verify_source(root, address, data, rom, mapping, index, source_digest, manifest):
+def verify_source(root, address, data, rom, mapping, index, source_digest, manifest, *, data_mapping=None):
     from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD,
                        DEFAULT_FLAGS, DEFAULT_WSL_PATH, Runner, compile_object,
                        _run_replay_process, plausibility_result)
-    from match_evidence import source_paths, source_fingerprint, mapping_snapshot, report_rom_path
+    from match_evidence import source_paths, source_fingerprint, mapping_snapshot, data_snapshot, report_rom_path
     if _replay_active.get():
         raise ValueError("recursive software-double replay is unsupported")
     token = _replay_active.set(True)
@@ -377,7 +447,8 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
         root = Path(root)
         candidates = list((root / "src").rglob(f"{address:08X}.c"))
         if len(candidates) != 1 or source_fingerprint(root, address) != source_digest or \
-                mapping_snapshot(root) != mapping or index_snapshot(root) != index:
+                mapping_snapshot(root) != mapping or index_snapshot(root) != index or \
+                "data" in manifest and data_snapshot(root) != data_mapping:
             raise ValueError("software-double replay inputs differ")
         selected_rom = report_rom_path(root)
         if Path(selected_rom).read_bytes() != rom:
@@ -398,10 +469,13 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                  candidates[0].relative_to(root).as_posix())
-                got, calls, bindings = object_bytes(runner, workspace, args, original, address, mapping, rom, index)
-                if got != data or call_records(calls, address, bindings) != manifest.get("calls"):
+                literals = {}
+                got, calls, bindings = object_bytes(runner, workspace, args, original, address, mapping, rom, index,
+                                                    data_mapping=data_mapping, data_relocations=literals)
+                instructions = verify(got, address, rom, mapping, index, manifest, data_mapping=data_mapping)
+                if got != data or make_manifest(calls, address, bindings, instructions,
+                        literals=literals, data_mapping=data_mapping) != manifest:
                     raise ValueError("software-double report lacks fresh original-ELF provenance")
-                instructions = verify(got, address, rom, mapping, index, manifest)
             checker = Path(__file__).resolve().with_name("plausible.py")
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
@@ -410,7 +484,9 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
             if findings or allowed or source_fingerprint(captured, address) != source_digest:
                 raise ValueError("software-double captured source changed or is implausible")
         if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
-                index_snapshot(root) != index or report_rom_path(root) != selected_rom or \
+                index_snapshot(root) != index or \
+                "data" in manifest and data_snapshot(root) != data_mapping or \
+                report_rom_path(root) != selected_rom or \
                 Path(selected_rom).read_bytes() != rom:
             raise ValueError("software-double replay inputs changed")
         return instructions
@@ -419,7 +495,8 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
 
 
 def report_matches(report, root, address):
-    from match_evidence import source_fingerprint, mapping_snapshot, report_rom_path, STACK_SUMMARY, CALL_SUMMARY
+    from match_evidence import (source_fingerprint, mapping_snapshot, data_snapshot,
+                                report_rom_path, STACK_SUMMARY, CALL_SUMMARY)
     lines = report.splitlines()
 
     def single(prefix):
@@ -469,6 +546,11 @@ def report_matches(report, root, address):
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if manifest_text(manifest) != encoded_manifest:
             return False
+        objects = data_snapshot(root) if "data" in manifest else None
+        object_lines = [line for line in lines if marker_text(line).startswith("* data symbols")]
+        if object_lines != ([f"* data symbols SHA-256: `{hashlib.sha256(objects).hexdigest()}`"]
+                            if manifest.get("data") and objects is not None else []):
+            return False
         frames = [line for line in lines if marker_text(line).startswith("* stack frame")]
         if frames != ([f"* stack frame: {STACK_SUMMARY}"] if manifest.get("frame") is True else []):
             return False
@@ -480,9 +562,9 @@ def report_matches(report, root, address):
                 single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
                 verdicts != [f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"] or \
                 unquote("* software double proof SHA-256: ") != \
-                fingerprint(address, data, manifest, source_digest, mapping, index, rom):
+                fingerprint(address, data, manifest, source_digest, mapping, index, rom, data_mapping=objects):
             return False
-        verify_source(root, address, data, rom, mapping, index, source_digest, manifest)
+        verify_source(root, address, data, rom, mapping, index, source_digest, manifest, data_mapping=objects)
         return report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
