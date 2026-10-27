@@ -28,12 +28,15 @@ img.shields.io/endpoint?url=... .
 """
 
 import argparse
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
 import sys
+from threading import Lock
 from match_evidence import report_matches
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
@@ -175,7 +178,9 @@ def late_mapping(root, address, entries):
     return end - address, mode
 
 
-def collect(root, verify, quiet=False, write_reports=False):
+def collect(root, verify, quiet=False, write_reports=False, jobs=1):
+    if not 1 <= jobs <= 6:
+        raise ValueError("jobs must be between 1 and 6")
     cfg = os.path.join(root, "config", "functions.json")
     if not os.path.exists(cfg):
         sys.exit(f"no {cfg} - run analyze first")
@@ -202,11 +207,13 @@ def collect(root, verify, quiet=False, write_reports=False):
     for path in paths:
         identity = path.stem.upper()
         source_counts[identity] = source_counts.get(identity, 0) + 1
-    verified_bodies = []
-    for path in paths:
+
+    def check_source(path):
+        matched_f, matched_b, problems = 0, 0, []
+        verified_bodies = []
         name = path.name
         if not name.endswith(".c"):
-            continue
+            return 0, 0, problems, []
         addr = name[:-2].upper()
         late = bool(re.fullmatch(r"[0-9A-F]{8}", addr)) and int(addr, 16) >= CODE_END
         if late:
@@ -216,13 +223,13 @@ def collect(root, verify, quiet=False, write_reports=False):
                 span, mode = late_mapping(root, int(addr, 16), fns)
             except (OSError, ValueError, KeyError, TypeError, SystemExit) as error:
                 problems.append(f"{addr}: {error}")
-                continue
+                return 0, 0, problems, []
         else:
             span = next((int(f["end"], 16) - int(f["rom"], 16)
                          for f in code if f["rom"][2:].upper() == addr), None)
         if span is None:
             problems.append(f"{addr}: src/{name} does not match a known function")
-            continue
+            return 0, 0, problems, []
 
         ok = False
         report = None
@@ -241,11 +248,11 @@ def collect(root, verify, quiet=False, write_reports=False):
                 spin_profile = inert_spin.selected(saved_report)
             except ValueError as error:
                 problems.append(f"{addr}: {error}")
-                continue
+                return 0, 0, problems, []
         if verify:
             if thunk_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved function-thunk report")
-                continue
+                return 0, 0, problems, []
             here = os.path.dirname(os.path.abspath(__file__))
             command = [sys.executable, os.path.join(here, "match.py"), "--root", root, addr]
             if late:
@@ -282,10 +289,10 @@ def collect(root, verify, quiet=False, write_reports=False):
                     extent_errors.append(str(error))
             if late and extent_errors:
                 problems.append(f"{addr}: {extent_errors[0]}")
-                continue
+                return 0, 0, problems, []
             if late and any(extent != span for extent in extents):
                 problems.append(f"{addr}: complete verified body disagrees with the late indexed extent")
-                continue
+                return 0, 0, problems, []
             body_size = max(extents) if extents else None
             verified_bodies.append((int(addr, 16), body_size, late))
             if not late:
@@ -295,6 +302,25 @@ def collect(root, verify, quiet=False, write_reports=False):
             problems.append(f"{addr}: no current, source-bound MATCH report; re-run match.py")
         else:
             problems.append(f"{addr}: DOES NOT MATCH")
+
+        return matched_f, matched_b, problems, verified_bodies
+
+    # Duplicate addresses share a report path, so never verify them concurrently.
+    report_locks = {identity: Lock() for identity, count in source_counts.items() if count > 1}
+
+    def check_locked_source(path):
+        with report_locks.get(path.stem.upper(), nullcontext()):
+            return check_source(path)
+
+    verified_bodies = []
+    with ThreadPoolExecutor(max_workers=jobs) if verify and jobs > 1 else nullcontext() as executor:
+        results = executor.map(check_locked_source, paths) if executor else map(check_source, paths)
+        # map yields source order even when subprocesses finish out of order.
+        for source_f, source_b, source_problems, source_bodies in results:
+            matched_f += source_f
+            matched_b += source_b
+            problems.extend(source_problems)
+            verified_bodies.extend(source_bodies)
 
     late_f, late_b = 0, 0
     unknown_main_extent = any(size is None and not late for _, size, late in verified_bodies)
@@ -375,6 +401,8 @@ def main():
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"))
     ap.add_argument("--verify", action="store_true",
                     help="recompile every src/*.c instead of trusting the reports")
+    ap.add_argument("--jobs", type=int, choices=range(1, 7), default=1, metavar="N",
+                    help="verify up to N sources concurrently (1..6; default: 1)")
     ap.add_argument("--write", action="store_true",
                     help="update status files; with --verify, regenerate match reports too")
     ap.add_argument("--check", action="store_true")
@@ -392,7 +420,8 @@ def main():
 
     root = repo_root(args.root)
     tf, mf, tb, mb, problems, late_f, late_b = collect(
-        root, args.verify, write_reports=args.verify and args.write and not args.check)
+        root, args.verify, write_reports=args.verify and args.write and not args.check,
+        jobs=args.jobs)
     badge_base = None if args.static_badges else (
         args.badge_base or os.environ.get("FFTA_BADGE_BASE")
         or badge_base_from_remote(root))

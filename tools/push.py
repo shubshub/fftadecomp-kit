@@ -119,12 +119,14 @@ def badge_base(repo):
     return f"https://raw.githubusercontent.com/{m.group(1)}/{m.group(2)}/badges"
 
 
-def check_matches(root, badge=""):
+def check_matches(root, badge="", jobs=1):
     log("[3/5] every function in src/ really matches, and the block agrees")
     cmd = [sys.executable, os.path.join(KIT, "status.py"),
            "--root", root, "--check", "--verify"]
     if badge:
         cmd += ["--badge-base", badge]
+    if jobs != 1:
+        cmd += ["--jobs", str(jobs)]
     code, out = run(cmd, cwd=root)
     if code != 0:
         log("    FAIL  the progress block is stale or a source does not match.")
@@ -437,6 +439,8 @@ def main():
                     help="validate only this toolkit checkout instead of a decompilation")
     ap.add_argument("--remote", default=DEFAULT_REMOTE)
     ap.add_argument("--branch", default=DEFAULT_BRANCH)
+    ap.add_argument("--jobs", type=int, choices=range(1, 7), default=1, metavar="N",
+                    help="forward N concurrent source checks to status (1..6; default: 1)")
     ap.add_argument("--check-only", action="store_true",
                     help="run every check but push nothing")
     ap.add_argument("--working-tree", action="store_true",
@@ -481,7 +485,7 @@ def main():
         os.environ["FFTA_ROM"] = os.path.join(tree, "baserom.bin")
     try:
         checks += (check_kit_tools(repo),) if args.kit else (
-            check_matches(tree, badge_base(repo)),
+            check_matches(tree, badge_base(repo), jobs=args.jobs),
             check_plausible(tree),
             check_reports(tree),
         )
