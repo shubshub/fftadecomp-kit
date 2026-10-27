@@ -80,17 +80,18 @@ CLAIM_QUERY = """query($owner:String!, $name:String!, $after:String) {
     object(expression:"HEAD:src") { __typename ... on Tree { entries { name type } } }
     pullRequests(first:20, states:OPEN, after:$after) {
       nodes {
-        number title body
-        files(first:100) { nodes { path } pageInfo { hasNextPage endCursor } }
+        number title body state headRefOid
+        headRepository { nameWithOwner }
       }
       pageInfo { hasNextPage endCursor }
     }
   }
 }"""
-PR_FILES_QUERY = """query($owner:String!, $name:String!, $number:Int!, $after:String) {
+PR_HEAD_QUERY = """query($owner:String!, $name:String!, $number:Int!) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$number) {
-      files(first:100, after:$after) { nodes { path } pageInfo { hasNextPage endCursor } }
+      number state headRefOid
+      headRepository { nameWithOwner }
     }
   }
 }"""
@@ -142,7 +143,7 @@ def api(method, endpoint, payload=None):
     read_only = (method == "GET" and endpoint != "graphql") or (
         method in ("GET", "POST") and endpoint == "graphql" and
         isinstance(payload, dict) and set(payload) <= {"query", "variables"} and
-        payload.get("query") in (COMMENTS_QUERY, CLAIM_QUERY, PR_FILES_QUERY))
+        payload.get("query") in (COMMENTS_QUERY, CLAIM_QUERY, PR_HEAD_QUERY))
     for attempt in range(len(READ_RETRY_DELAYS) + 1):
         try:
             result = subprocess.run(command, input=data, capture_output=True,
@@ -447,6 +448,71 @@ def connection_page(connection):
     return connection["nodes"], after
 
 
+def pull_head(pull):
+    if not isinstance(pull, dict) or pull.get("state") != "OPEN":
+        raise LedgerError("open PR changed during duplicate check")
+    oid, repository = pull.get("headRefOid"), pull.get("headRepository")
+    if not isinstance(oid, str) or re.fullmatch(r"[0-9a-f]{40}", oid) is None or \
+            not isinstance(repository, dict) or \
+            not isinstance(repository.get("nameWithOwner"), str) or \
+            re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository["nameWithOwner"]) is None:
+        raise LedgerError("open PR head repository or commit is unavailable")
+    return repository["nameWithOwner"], oid
+
+
+def git_tree_entries(repository, oid, recursive=False):
+    suffix = "?recursive=1" if recursive else ""
+    tree = api("GET", f"repos/{repository}/git/trees/{oid}{suffix}")
+    if not isinstance(tree, dict) or tree.get("sha") != oid or \
+            tree.get("truncated") is not False or not isinstance(tree.get("tree"), list):
+        raise LedgerError("PR head source tree is unavailable, malformed or truncated")
+    paths = set()
+    modes = {"blob": {"100644", "100755", "120000"},
+             "tree": {"040000"}, "commit": {"160000"}}
+    for entry in tree["tree"]:
+        if not isinstance(entry, dict):
+            raise LedgerError("invalid PR head source-tree entry")
+        path, kind, sha = entry.get("path"), entry.get("type"), entry.get("sha")
+        if not isinstance(path, str) or not path or "\0" in path or \
+                any(part in ("", ".", "..") for part in path.split("/")) or \
+                (not recursive and "/" in path) or path in paths or \
+                not isinstance(kind, str) or kind not in modes or \
+                not isinstance(entry.get("mode"), str) or entry["mode"] not in modes[kind] or \
+                not isinstance(sha, str) or \
+                re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+            raise LedgerError("invalid PR head source-tree entry")
+        paths.add(path)
+    return tree["tree"]
+
+
+def pr_has_source(pull, filename):
+    """Inspect a pinned fork-aware source tree, never the capped PR file diff."""
+    repository, head = pull_head(pull)
+    commit = api("GET", f"repos/{repository}/git/commits/{head}")
+    if not isinstance(commit, dict) or commit.get("sha") != head or \
+            not isinstance(commit.get("tree"), dict):
+        raise LedgerError("PR head commit is unavailable or changed")
+    tree_oid = commit["tree"].get("sha")
+    if not isinstance(tree_oid, str) or re.fullmatch(r"[0-9a-f]{40}", tree_oid) is None:
+        raise LedgerError("PR head commit has no valid tree")
+    entries = git_tree_entries(repository, tree_oid)
+    source = next((entry for entry in entries if entry["path"] == "src"), None)
+    found = False
+    if source is not None:
+        if source["type"] != "tree":
+            raise LedgerError("PR head src is not a source tree")
+        entries = git_tree_entries(repository, source["sha"], recursive=True)
+        found = any(entry["type"] == "blob" and
+                    entry["path"].rsplit("/", 1)[-1].casefold() == filename.casefold()
+                    for entry in entries)
+    current = decomp_query(PR_HEAD_QUERY, number=pull["number"]).get("pullRequest")
+    if not isinstance(current, dict) or not positive_id(current.get("number")) or \
+            current["number"] != pull["number"] or \
+            pull_head(current) != (repository, head):
+        raise LedgerError("open PR head changed during duplicate check")
+    return found
+
+
 def claim_status(address):
     try:
         address = normalise(address)
@@ -478,24 +544,8 @@ def claim_status(address):
                 message = f"IN PR #{pull['number']}: address is already in review"
                 if token.search(title + "\n" + (body or "")):
                     return 5, message
-                files = pull.get("files")
-                seen_files = set()
-                while True:
-                    paths, file_after = connection_page(files)
-                    for changed in paths:
-                        if not isinstance(changed, dict) or not isinstance(changed.get("path"), str):
-                            raise LedgerError("invalid PR changed-file path")
-                        if changed["path"].lower() == ("src/" + filename).lower():
-                            return 5, message
-                    if file_after is None:
-                        break
-                    if file_after in seen_files:
-                        raise LedgerError("repeated PR file cursor")
-                    seen_files.add(file_after)
-                    current = decomp_query(PR_FILES_QUERY, number=pull["number"], after=file_after).get("pullRequest")
-                    if not isinstance(current, dict):
-                        raise LedgerError("open PR changed during duplicate check")
-                    files = current.get("files")
+                if pr_has_source(pull, filename):
+                    return 5, message
             if after is None:
                 return 0, ""
             if after in seen:

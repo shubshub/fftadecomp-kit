@@ -256,7 +256,7 @@ class ReservationReadRetryTests(unittest.TestCase):
                     sleep.assert_called_once_with(1)
 
     def test_fixed_graphql_queries_retry_without_changing_payload(self):
-        for query in (reserve.COMMENTS_QUERY, reserve.CLAIM_QUERY, reserve.PR_FILES_QUERY):
+        for query in (reserve.COMMENTS_QUERY, reserve.CLAIM_QUERY, reserve.PR_HEAD_QUERY):
             for message in ("gh: HTTP 504", "gh: Gateway Timeout (HTTP 504)"):
                 with self.subTest(query=query.splitlines()[0], message=message):
                     payload = {"query": query, "variables": {"owner": "owner", "name": "repo"}}
@@ -376,6 +376,202 @@ class ReservationReadRetryTests(unittest.TestCase):
                 reserve.decomp_query(reserve.CLAIM_QUERY)
         run.assert_called_once()
         sleep.assert_not_called()
+
+
+class FakePRHeadAPI:
+    HEAD, ROOT, SOURCE, BLOB = (digit * 40 for digit in "1234")
+
+    def __init__(self, repository=None, present=True):
+        self.repository = repository or reserve.DECOMP_REPO
+        self.calls = []
+        self.pull = {"number": 18, "title": "Recovered functions", "body": "",
+                     "state": "OPEN", "headRefOid": self.HEAD,
+                     "headRepository": {"nameWithOwner": self.repository}}
+        self.current = dict(self.pull)
+        self.commit = {"sha": self.HEAD, "tree": {"sha": self.ROOT}}
+        self.root = {"sha": self.ROOT, "truncated": False, "tree": [
+            {"path": "src", "type": "tree", "mode": "040000", "sha": self.SOURCE}]}
+        self.source = {"sha": self.SOURCE, "truncated": False, "tree": [
+            {"path": "08136538.c" if present else "08011040.c", "type": "blob",
+             "mode": "100644", "sha": self.BLOB}]}
+        self.default_entries = []
+        self.unavailable = None
+
+    def __call__(self, method, endpoint, payload=None):
+        self.calls.append((method, endpoint, payload))
+        if endpoint == self.unavailable:
+            raise reserve.LedgerError("source snapshot unavailable")
+        if (method, endpoint) == ("POST", "graphql"):
+            query = payload["query"]
+            if query == reserve.CLAIM_QUERY:
+                repository = {
+                    "defaultBranchRef": {"name": "main"},
+                    "object": {"__typename": "Tree", "entries": self.default_entries},
+                    "pullRequests": {"nodes": [self.pull],
+                                     "pageInfo": {"hasNextPage": False}}}
+            elif query == reserve.PR_HEAD_QUERY:
+                if payload["variables"]["number"] != 18:
+                    raise AssertionError("wrong PR rechecked")
+                repository = {"pullRequest": self.current}
+            else:
+                raise AssertionError("unexpected GraphQL query")
+            return {"data": {"repository": repository}}
+        prefix = f"repos/{self.repository}/git/"
+        objects = {prefix + "commits/" + self.HEAD: self.commit,
+                   prefix + "trees/" + self.ROOT: self.root,
+                   prefix + "trees/" + self.SOURCE + "?recursive=1": self.source}
+        if method == "GET" and endpoint in objects:
+            return objects[endpoint]
+        raise AssertionError(f"unexpected API call: {method} {endpoint}")
+
+
+class ReservationPRHeadTests(unittest.TestCase):
+    TARGET = "0x08136538"
+
+    def check(self, fake):
+        with patch.object(reserve, "api", side_effect=fake):
+            return reserve.claim_status(self.TARGET)
+
+    def test_complete_head_source_detected_beyond_capped_changed_files(self):
+        fake = FakePRHeadAPI()
+        fake.pull["changedFiles"] = 4401
+        fake.pull["files"] = {
+            "nodes": [{"path": f"docs/match/{i:08X}.md"} for i in range(3000)],
+            "pageInfo": {"hasNextPage": False}}
+        code, message = self.check(fake)
+        self.assertEqual(code, 5)
+        self.assertIn("IN PR #18", message)
+        self.assertNotIn("files(", reserve.CLAIM_QUERY)
+        self.assertEqual(len(fake.calls), 5)
+        self.assertEqual(fake.calls[-1][2]["query"], reserve.PR_HEAD_QUERY)
+
+    def test_fork_head_uses_its_pinned_commit_and_source_tree(self):
+        fake = FakePRHeadAPI(repository="contributor/fftadecomp")
+        self.assertEqual(self.check(fake)[0], 5)
+        reads = [endpoint for method, endpoint, _ in fake.calls if method == "GET"]
+        self.assertEqual(reads, [
+            f"repos/{fake.repository}/git/commits/{fake.HEAD}",
+            f"repos/{fake.repository}/git/trees/{fake.ROOT}",
+            f"repos/{fake.repository}/git/trees/{fake.SOURCE}?recursive=1"])
+        self.assertEqual(fake.calls[-1][2]["variables"]["owner"], reserve.DECOMP_REPO.split("/")[0])
+
+    def test_absent_source_is_free_only_after_head_recheck(self):
+        fake = FakePRHeadAPI(present=False)
+        self.assertEqual(self.check(fake), (0, ""))
+        self.assertEqual(fake.calls[-1][2]["query"], reserve.PR_HEAD_QUERY)
+
+    def test_nested_source_is_detected(self):
+        fake = FakePRHeadAPI()
+        fake.source["tree"][0]["path"] = "20101/08136538.c"
+        self.assertEqual(self.check(fake)[0], 5)
+
+    def test_absent_src_directory_is_valid_only_with_unchanged_head(self):
+        fake = FakePRHeadAPI(present=False)
+        fake.root["tree"] = []
+        self.assertEqual(self.check(fake), (0, ""))
+        self.assertEqual(fake.calls[-1][2]["query"], reserve.PR_HEAD_QUERY)
+        self.assertEqual(len(fake.calls), 4)
+
+    def test_default_branch_match_precedes_pr_queries(self):
+        fake = FakePRHeadAPI()
+        fake.default_entries = [{"name": "08136538.c", "type": "blob"}]
+        code, message = self.check(fake)
+        self.assertEqual(code, 4)
+        self.assertIn("MATCHED: src/08136538.c", message)
+        self.assertEqual(len(fake.calls), 1)
+
+    def test_title_and_body_guards_precede_tree_lookup(self):
+        for field, text in (("title", "Recover func_08136538"),
+                            ("body", "Includes 0x08136538.")):
+            with self.subTest(field=field):
+                fake = FakePRHeadAPI()
+                fake.pull[field] = text
+                fake.pull["headRepository"] = None
+                self.assertEqual(self.check(fake)[0], 5)
+                self.assertEqual(len(fake.calls), 1)
+
+    def test_unavailable_commit_root_or_source_fails_closed(self):
+        for suffix in ("commits/" + FakePRHeadAPI.HEAD,
+                       "trees/" + FakePRHeadAPI.ROOT,
+                       "trees/" + FakePRHeadAPI.SOURCE + "?recursive=1"):
+            with self.subTest(suffix=suffix):
+                fake = FakePRHeadAPI()
+                fake.unavailable = f"repos/{fake.repository}/git/{suffix}"
+                with self.assertRaisesRegex(reserve.GuardUnavailable, "snapshot unavailable"):
+                    self.check(fake)
+
+    def test_malformed_or_truncated_trees_fail_closed(self):
+        for location in ("root", "source"):
+            for mutation in ("null", "missing_tree", "missing_truncation", "truncated",
+                             "wrong_sha", "bad_entry", "duplicate_entry", "bad_mode",
+                             "bad_path", "bad_kind", "bad_entry_sha"):
+                with self.subTest(location=location, mutation=mutation):
+                    fake = FakePRHeadAPI()
+                    tree = getattr(fake, location)
+                    if mutation == "null":
+                        setattr(fake, location, None)
+                    elif mutation == "missing_tree":
+                        tree.pop("tree")
+                    elif mutation == "missing_truncation":
+                        tree.pop("truncated")
+                    elif mutation == "truncated":
+                        tree["truncated"] = True
+                    elif mutation == "wrong_sha":
+                        tree["sha"] = "5" * 40
+                    elif mutation == "bad_entry":
+                        tree["tree"] = [None]
+                    elif mutation == "duplicate_entry":
+                        tree["tree"] *= 2
+                    elif mutation == "bad_mode":
+                        tree["tree"][0]["mode"] = []
+                    elif mutation == "bad_path":
+                        tree["tree"][0]["path"] = "../08136538.c"
+                    elif mutation == "bad_kind":
+                        tree["tree"][0]["type"] = "unknown"
+                    else:
+                        tree["tree"][0]["sha"] = "not-a-sha"
+                    with self.assertRaises(reserve.GuardUnavailable):
+                        self.check(fake)
+
+    def test_malformed_commit_and_head_identity_fail_closed(self):
+        for mutation in ("missing_commit", "wrong_commit", "missing_tree", "bad_tree_sha",
+                         "missing_repository", "invalid_repository", "invalid_head"):
+            with self.subTest(mutation=mutation):
+                fake = FakePRHeadAPI()
+                if mutation == "missing_commit":
+                    fake.commit = None
+                elif mutation == "wrong_commit":
+                    fake.commit["sha"] = "5" * 40
+                elif mutation == "missing_tree":
+                    fake.commit.pop("tree")
+                elif mutation == "bad_tree_sha":
+                    fake.commit["tree"]["sha"] = "main"
+                elif mutation == "missing_repository":
+                    fake.pull["headRepository"] = None
+                elif mutation == "invalid_repository":
+                    fake.pull["headRepository"] = {"nameWithOwner": "../other/repo"}
+                else:
+                    fake.pull["headRefOid"] = "main"
+                with self.assertRaises(reserve.GuardUnavailable):
+                    self.check(fake)
+
+    def test_changed_or_closed_head_never_returns_a_snapshot_result(self):
+        for present in (False, True):
+            for mutation in ("commit", "repository", "closed", "missing", "number"):
+                with self.subTest(present=present, mutation=mutation):
+                    fake = FakePRHeadAPI(present=present)
+                    if mutation == "commit":
+                        fake.current["headRefOid"] = "5" * 40
+                    elif mutation == "repository":
+                        fake.current["headRepository"] = {"nameWithOwner": "another/fork"}
+                    elif mutation == "closed":
+                        fake.current["state"] = "CLOSED"
+                    elif mutation == "missing":
+                        fake.current = None
+                    else:
+                        fake.current["number"] = 19
+                    with self.assertRaises(reserve.GuardUnavailable):
+                        self.check(fake)
 
 
 if __name__ == "__main__":
