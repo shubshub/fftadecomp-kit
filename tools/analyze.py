@@ -194,6 +194,54 @@ def refinement_ranges(intervals):
     return ranges
 
 
+def refinement_word_switch(data, address, position, end, engine):
+    """Recognize one adjacent guarded word table within the bounded window.
+
+    This reuses the byte-exact matching parser, without inventing ELF relocation
+    provenance. The enclosing CFG must separately prove the guard predecessors.
+    """
+    dispatch = position - address - 8
+    if dispatch < 0:
+        return None
+
+    def instruction(offset):
+        if offset < 0 or offset % 2 or address + offset + 2 > end:
+            return None
+        decoded = next(engine.disasm(data[offset:offset + 4], address + offset,
+                                     count=1), None)
+        return decoded if decoded is not None and decoded.size == 2 else None
+
+    load = instruction(dispatch + 2)
+    if load is None or load.mnemonic != "ldr" or len(load.operands) != 2 or \
+            load.operands[1].type != ARM_OP_MEM or \
+            load.operands[1].mem.base != ARM_REG_PC:
+        return None
+    literal = (((address + dispatch + 6) & ~3) + load.operands[1].mem.disp) - address
+    candidates = []
+    for guard_size in (4, 6):
+        compare = instruction(dispatch - guard_size)
+        if compare is None or compare.mnemonic != "cmp" or \
+                len(compare.operands) != 2 or compare.operands[1].type != ARM_OP_IMM or \
+                not 0 <= compare.operands[1].imm <= 255:
+            continue
+        count = compare.operands[1].imm + 1
+        table_end = literal + 4 + count * 4
+        if literal < dispatch + 10 or (address + literal) % 4 or \
+                address + table_end > end:
+            continue
+        relocations = {offset: struct.unpack_from("<I", data, offset)[0] - address
+                       for offset in range(literal, table_end, 4)}
+        from match import switch_layout
+        try:
+            descriptor = switch_layout(data[:end - address], address, relocations)
+        except ValueError:
+            continue
+        if descriptor["dispatch"] == dispatch and \
+                descriptor["comparison"] == dispatch - guard_size:
+            candidates.append(descriptor)
+    return candidates[0] if len(candidates) == 1 else None
+
+
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
                     rom_end=CODE_END, *, stack_adjusted_returns=False):
     """Inspect a byte window beginning at an indexed Thumb entry.
@@ -218,6 +266,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         "code_ranges": [],
         "literal_ranges": [],
         "literal_reads": [],
+        "word_switches": [],
         "gaps": [],
         "calls": [],
         "returns": [],
@@ -300,6 +349,13 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     literal_reads = {}
     calls = set()
     returns = set()
+    edges = set()
+    switches = {}
+
+    def follow(source, target, previous_pop=()):
+        edges.add((source, target))
+        pending.append((target, previous_pop))
+
     while pending:
         position, previous_pop = pending.pop()
         state = (position, previous_pop)
@@ -383,15 +439,27 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 fail("unsupported cross-mode call", position)
             else:
                 calls.add((position, target))
-            pending.append((position + size, ()))
+            follow(position, position + size)
             continue
         if info["jump"] or info["writes_pc"]:
             if info["tgt"] is None or instruction.mnemonic == "bx":
-                fail("unresolved jump", position)
+                switch = refinement_word_switch(data, address, position, end, engine)
+                if switch is None:
+                    fail("unresolved jump", position)
+                    continue
+                switches[position] = switch
+                for word, target in switch["relocations"]:
+                    literal = address + word
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
+                    if word != switch["literal"]:
+                        follow(position, address + target)
                 continue
-            pending.append((info["tgt"] + ROM_BASE, ()))
+            follow(position, info["tgt"] + ROM_BASE)
             if info["cond"]:
-                pending.append((position + size, ()))
+                follow(position, position + size)
             continue
         if any(operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC
                for operand in instruction.operands):
@@ -409,7 +477,23 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             previous_pop = (previous_pop[0], "stack-adjusted")
         else:
             previous_pop = info["pop_regs"]
-        pending.append((position + size, previous_pop))
+        follow(position, position + size, previous_pop)
+    for position, switch in sorted(switches.items()):
+        comparison, guard, dispatch = (address + switch[field]
+                                       for field in ("comparison", "guard", "dispatch"))
+        # Every instruction after CMP through MOV PC must have exactly its
+        # guarded predecessor. In particular no branch may enter the lookup,
+        # reuse stale flags, or execute MOV PC with a forged target register.
+        expected = {guard: comparison, dispatch: guard}
+        if dispatch - comparison == 6:
+            expected[guard + 2] = guard
+        expected.update({site: site - 2 for site in range(dispatch + 2, position + 2, 2)})
+        if comparison not in instructions or any(
+                instructions.get(site) != 2 or
+                {source for source, target in edges if target == site} != {predecessor}
+                or site == address for site, predecessor in expected.items()):
+            fail("word-switch guard can be bypassed", position)
+        result["word_switches"].append({"schema": "bounded-guarded-word-switch-v1", **switch})
     if not returns:
         fail("no recognized return")
     code_ranges = refinement_ranges((start, start + size)
