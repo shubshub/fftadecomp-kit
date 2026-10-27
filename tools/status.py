@@ -416,10 +416,16 @@ def main():
     current = open(readme, encoding="utf-8").read() if os.path.exists(readme) else ""
 
     if args.check:
+        if problems:
+            print(f"{len(problems)} item(s) need attention:", file=sys.stderr)
+            for problem in problems:
+                print(f"  {problem}", file=sys.stderr)
         if START not in current or END not in current:
             sys.exit("README has no status markers")
         old = current[current.index(START):current.index(END) + len(END)]
         if old.strip() != block.strip():
+            print(f"Verified status: {mf}/{tf} functions; {mb}/{tb} indexed bytes; "
+                  f"{late_f} late functions, {late_b} late bytes", file=sys.stderr)
             sys.exit("README status is stale - run: python tools/status.py --write")
         status_path = os.path.join(root, "docs", "status.md")
         if os.path.exists(status_path):
