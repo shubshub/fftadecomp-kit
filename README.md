@@ -1276,7 +1276,13 @@ PC-relative loads. Each undefined global object must have an evidence-backed
 reserved runtime intervals are checked before and after linking. Numeric address
 constants cannot substitute for object relocations, even with a rehashed report.
 Buffers, stack-argument proof contexts, resolvers, switches, function relocations,
-thunks, other integer runtimes and inert spins cannot compose with this profile.
+thunks and other integer runtimes cannot compose with this profile.
+The explicit software-double selector additionally accepts the optional
+`software-double-inert-self-spin-v1` record. Every reachable node without a
+return path must be a listed unconditional two-byte Thumb self-branch; at least
+one balanced verified return is still required. The complete byte, original-ELF,
+runtime, stack, literal and source-replay checks remain in force. Missing, stale
+or altered spin records reject; ordinary no-spin manifests keep their format.
 The only integer-runtime composition is the original compiler `__modsi3`
 symbol. Every remainder site must have a CFG-proven signed16 dividend in r0
 and nonzero divisor in r1; loads from unknown memory or locals supply no

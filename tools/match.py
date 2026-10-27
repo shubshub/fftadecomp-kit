@@ -2266,7 +2266,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if double_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
                 switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
-                divsi3_context is not None or inert_spin_context is not None or preloaded_switch:
+                divsi3_context is not None or preloaded_switch:
             raise ValueError("software double requires an isolated direct-call context")
         remainder_bindings = software_double.verify_context(data, address, validated_calls or {}, double_context)
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
@@ -2282,9 +2282,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
             raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
-               modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target) or software_float.reserved(target)
+               modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or
+               (software_double.reserved(target) or software_float.reserved(target)) and not
+               (double_context is not None and target in software_double.OPERATIONS.values())
                for target in (validated_calls or {}).values()):
-            raise ValueError("inert spins exclude arithmetic runtimes and call thunks")
+            raise ValueError("inert spins exclude unproved arithmetic runtimes and call thunks")
     if divsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_relocations is not None or switch_data_relocations is not None or \
@@ -3034,10 +3036,20 @@ def main():
                 verified_instructions = function_thunk.verify(got, addr, rom, mapping, function_index,
                                                                data_mapping, thunk_evidence)
             elif double_profile:
-                verified_instructions = verify_leaf_instructions(
-                    got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings))
+                context = {"spins": []}
+                try:
+                    verified_instructions = verify_leaf_instructions(
+                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings))
+                except ValueError as error:
+                    if str(error) != "reachable control-flow region has no path to a verified return":
+                        raise
+                    context = {}
+                    verified_instructions = verify_leaf_instructions(
+                        got, addr, True, calls, double_context=(rom, mapping, function_index, double_bindings),
+                        inert_spin_context=context)
                 double_evidence = software_double.make_manifest(calls, addr, double_bindings, verified_instructions,
-                                                                 literals=data_relocations, data_mapping=data_mapping)
+                                                                 literals=data_relocations, data_mapping=data_mapping,
+                                                                 spins=context["spins"])
                 verified_instructions = software_double.verify(
                     got, addr, rom, mapping, function_index, double_evidence, data_mapping=data_mapping)
             elif spin_profile:
@@ -3221,7 +3233,7 @@ def main():
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     if preloaded_profile:
         control_flow = PRELOADED_SWITCH_CONTROL_FLOW
-    if spin_profile:
+    if spin_profile or double_profile and "inert_spin" in double_evidence:
         control_flow = inert_spin.CONTROL_FLOW
     if thunk_profile:
         control_flow = function_thunk.CONTROL_FLOW

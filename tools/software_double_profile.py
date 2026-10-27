@@ -17,6 +17,7 @@ SELECTOR = "convert-sub-div-target-v1"
 RUNTIME = "agbcc-thumb-df-convert-add-sub-div-mul-lt-trunc-fix-negdi-fixuns-cmp-negdf-fixunsdi-mod-s16-closure-v9"
 ABI = "agbcc-thumb-df-sf-mixed-integer-v2"
 SEMANTICS = "target-machine-state-v1"
+INERT_SPIN_SCHEMA = "software-double-inert-self-spin-v1"
 SUMMARY = ("pinned target binary64 conversion/add/sub/div/mul/lt/trunc, word/wide conversion, signed-wide comparison and integer/double-negation runtime; entry RAM and stack are state inputs; "
            "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor; "
            "unrestricted IEEE semantics not proved")
@@ -538,7 +539,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                        parse_data_symbols, verify_data_literals, modsi3, ARM_OP_MEM, ARM_REG_PC)
     entries, entry = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or \
-            set(manifest) - {"data", "remainder"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
+            set(manifest) - {"data", "remainder", "inert_spin"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
             manifest["runtime"] != RUNTIME or manifest["abi"] != ABI or manifest["semantics"] != SEMANTICS or \
             type(manifest["dependencies"]) is not list or \
             any(type(record) is not list or len(record) != 3 or \
@@ -592,8 +593,19 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                 struct.unpack_from("<I", data, offset)[0] != value:
             raise ValueError("software-double data literal differs or aliases indexed code/forbidden memory")
         literals[offset] = (name, value)
+    spin_context = {} if "inert_spin" in manifest else None
+    if spin_context is not None:
+        record = manifest["inert_spin"]
+        if type(record) is not dict or set(record) != {"schema", "spins"} or \
+                record["schema"] != INERT_SPIN_SCHEMA or type(record["spins"]) is not list or \
+                not record["spins"] or any(type(offset) is not int for offset in record["spins"]):
+            raise ValueError("invalid software-double inert-spin evidence")
     instructions = verify_leaf_instructions(data, address, True, calls,
-                                            double_context=(rom, mapping, index, bindings))
+                                            double_context=(rom, mapping, index, bindings),
+                                            inert_spin_context=spin_context)
+    if spin_context is not None and (not spin_context["spins"] or
+            manifest["inert_spin"] != {"schema": INERT_SPIN_SCHEMA, "spins": spin_context["spins"]}):
+        raise ValueError("software-double inert-spin evidence differs from the converged CFG")
     if uses_stack_frame(instructions) != manifest["frame"] or len(instructions) != entry["instrs"]:
         raise ValueError("software-double frame/count disagrees with the converged CFG")
     verify_data_literals(instructions, address, literals)
@@ -610,7 +622,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
     return instructions
 
 
-def make_manifest(calls, address, bindings, instructions, *, literals=None, data_mapping=None):
+def make_manifest(calls, address, bindings, instructions, *, literals=None, data_mapping=None, spins=None):
     from match import uses_stack_frame, parse_data_symbols
     manifest = {"runtime": RUNTIME, "abi": ABI, "semantics": SEMANTICS,
             "dependencies": dependency_records(), "frame": uses_stack_frame(instructions),
@@ -618,6 +630,8 @@ def make_manifest(calls, address, bindings, instructions, *, literals=None, data
     remainder = remainder_record(calls, address, bindings)
     if remainder is not None:
         manifest["remainder"] = remainder
+    if spins:
+        manifest["inert_spin"] = {"schema": INERT_SPIN_SCHEMA, "spins": list(spins)}
     if literals:
         objects = parse_data_symbols(data_mapping)
         manifest["data"] = [[offset, name, value - objects[name]]
@@ -731,7 +745,8 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
                                                     data_mapping=data_mapping, data_relocations=literals)
                 instructions = verify(got, address, rom, mapping, index, manifest, data_mapping=data_mapping)
                 if got != data or make_manifest(calls, address, bindings, instructions,
-                        literals=literals, data_mapping=data_mapping) != manifest:
+                        literals=literals, data_mapping=data_mapping,
+                        spins=manifest.get("inert_spin", {}).get("spins")) != manifest:
                     raise ValueError("software-double report lacks fresh original-ELF provenance")
             checker = Path(__file__).resolve().with_name("plausible.py")
             result = _run_replay_process(
@@ -779,7 +794,7 @@ def report_matches(report, root, address):
             return False
         mapping, index = mapping_snapshot(root), index_snapshot(root)
         source_digest = source_fingerprint(root, address)
-        if mapping is None or single("* control flow: ") != CALL_SUMMARY or \
+        if mapping is None or \
                 single("* software double: ") != SUMMARY or \
                 unquote("* software double ABI: ") != ABI or \
                 unquote("* software double runtime: ") != RUNTIME or \
@@ -802,6 +817,9 @@ def report_matches(report, root, address):
         encoded_manifest = unquote("* software double manifest: ")
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if manifest_text(manifest) != encoded_manifest:
+            return False
+        from inert_spin_profile import CONTROL_FLOW as SPIN_CONTROL_FLOW
+        if single("* control flow: ") != (SPIN_CONTROL_FLOW if "inert_spin" in manifest else CALL_SUMMARY):
             return False
         objects = data_snapshot(root) if "data" in manifest else None
         object_lines = [line for line in lines if marker_text(line).startswith("* data symbols")]
