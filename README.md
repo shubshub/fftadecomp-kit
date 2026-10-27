@@ -1174,18 +1174,28 @@ no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
 `match.py --software-double-profile convert-sub-div-target-v1` explicitly
 selects `elf-symbol-thumb-df-convert-sub-div-target-v1`. Only the fixed agbcc
 `-mthumb-interwork -O2` configuration is supported. At least one fresh original
-ELF call relocation must name `__floatdidf`, `__floatsidf`, `__subdf3` or
-`__divdf3`. No add/sub-only option is installed. Direct add, multiply, private
+ELF call relocation must name `__floatdidf`, `__floatsidf`, `__subdf3`,
+`__divdf3` or `__truncdfsf2`. No add/sub-only option is installed. Direct add, multiply, private
 integer helpers and every other floating operation remain unsupported.
 
-All twelve complete runtime identities in `software_double_profile.py` are
-mandatory, including pools, internal alignment and 28 dependency edges.
+All fifteen complete runtime identities in `software_double_profile.py` are
+mandatory, including pools, internal alignment and 31 dependency edges.
 Both function indexes must contain their exact unique, nonoverlapping Thumb
 extents and instruction counts. Legacy truncated metadata cannot substitute
 for these spans. Their entire intervals are reserved against addressed-call,
 data/base/addend, function-literal, raw-literal and older-report bypasses.
-Only the four canonical caller entries are exposed; transitive private calls
+Only the five canonical caller entries are exposed; transitive private calls
 are justified by the pinned closure, not caller-access exceptions.
+
+The truncation closure adds the complete 72-byte/32-instruction conversion,
+188-byte single packer and 24-byte/11-instruction private wrapper, reusing the
+existing double unpacker. Native reachable-CFG and machine-state proofs check
+all four bodies, their exact call edges, balanced frames, restored callee-saved
+registers and returns. The unpacker may write only its five-word formal output
+record; transitive writes must fit the actual caller frame and cannot overwrite
+saved registers. Subword stack loads are bounded and supply unknown state,
+never saved-register provenance. The existing software-float proof keeps its
+original call graph, public entries, four-word output bound and word-load policy.
 
 The original ELF must contain one complete Thumb function, canonical undefined
 global call symbols and canonical BL addends. Typed linking must preserve all
@@ -1202,7 +1212,8 @@ assumptions: their complete bodies, semantics and return behavior are not proved
 
 Binary64 values use high-word/low-word register and memory order, with
 little-endian bytes within each word. Signed64 conversion instead consumes
-integer low/high words; signed32 conversion consumes r0. This is an explicit
+integer low/high words; signed32 conversion consumes r0. Truncation consumes
+binary64 high/low words in r0/r1 and returns single-precision bits in r0. This is an explicit
 target-machine-state contract, not unrestricted IEEE arithmetic or a pure
 function of operand values. Entry RAM and stack bytes are state inputs and
 persist between calls. Exceptional paths read the mutable private record at
@@ -1223,6 +1234,9 @@ Rehashed manifests cannot turn addressed source into canonical provenance.
 Subprocesses are bounded, replay is nonrecursive, and temporary disk-backed
 workspaces are cleaned. Compilation failure or input/universe/ROM-path drift
 fails closed; there is no cache or alternate acceptance fallback.
+The conversion closure uses runtime ID
+`agbcc-thumb-df-convert-sub-div-trunc-closure-v2` and ABI ID
+`agbcc-thumb-df-sf-mixed-integer-v2`; earlier dependency lists and IDs reject.
 
 Status dispatches only the explicit saved schema. Offline checks and fresh
 no-write verification require successful saved-report replay; an independent

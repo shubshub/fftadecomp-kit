@@ -110,13 +110,16 @@ def dependency_records():
     return [[start, end, digest] for start, end, _, digest in IDENTITIES]
 
 
-def prove_runtime(rom, entries, start, end, count, dependencies):
+def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=None,
+                  scalar_entries=None, allowed_writes=None, stack_load_widths=(4,)):
     """Prove this pinned body's local returns and callee-saved/write ABI.
 
     This is deliberately separate from the caller verifier. Loads are target
     machine state inputs, not invented IEEE values. Stores must stay in local
     stack words or a bounded formal output argument. A dependency's output
     footprint is applied only after its own CFG and register restoration pass.
+    Optional policies let another pinned closure reuse the same interpreter;
+    defaults retain the single-precision call graph and four-word write bound.
     """
     import struct
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL
@@ -127,7 +130,13 @@ def prove_runtime(rom, entries, start, end, count, dependencies):
     body = rom[start - 0x08000000:end - 0x08000000]
     layout = refine_function(body, start, entries, max_bytes=end - start,
                              max_instructions=1024, rom_end=0x08000000 + len(rom))
-    expected_calls = {site: target for site, target in EDGES if start <= site < end}
+    expected_calls = {site: target for site, target in
+                      (EDGES if call_edges is None else call_edges) if start <= site < end}
+    public = OPERATIONS.values() if scalar_entries is None else scalar_entries
+    permitted_writes = ({(number, offset, 4) for number in range(4) for offset in range(0, 16, 4)}
+                        if allowed_writes is None else set(allowed_writes))
+    if not set(stack_load_widths) <= {1, 2, 4} or 4 not in stack_load_widths:
+        raise ValueError("software-float runtime stack-load widths are unsupported")
     if not layout["cfg_closed"] or layout["partial_reasons"] or layout["instrs"] != count or \
             layout["candidate_extent"]["end"] != f"0x{end:08X}" or \
             {int(c["site"], 16): int(c["target"], 16) for c in layout["calls"]} != expected_calls:
@@ -168,17 +177,18 @@ def prove_runtime(rom, entries, start, end, count, dependencies):
         def access(pointer, loading, value=None, width=4):
             if pointer is not None and pointer[0] == "stack":
                 offset = pointer[2]
-                if width != 4 or offset % 4 or not sp <= offset <= -width:
+                if width not in (stack_load_widths if loading else (4,)) or \
+                        offset % width or not sp <= offset <= -width:
                     raise ValueError("software-float runtime stack access exceeds its frame")
                 if loading:
-                    return memory.get(offset)
+                    return memory.get(offset) if width == 4 else unknown
                 if offset in saved:
                     raise ValueError("software-float runtime overwrites a saved register")
                 memory[offset] = value
             elif not loading:
                 if pointer is None or pointer[0] != "entry" or \
                         not ARM_REG_R0 <= pointer[1] <= ARM_REG_R3 or \
-                        pointer[2] % 4 or width != 4 or not 0 <= pointer[2] <= 12:
+                        (pointer[1] - ARM_REG_R0, pointer[2], width) not in permitted_writes:
                     raise ValueError("software-float runtime has an unbounded external write")
                 writes.add((pointer[1] - ARM_REG_R0, pointer[2], width))
             return unknown
@@ -226,7 +236,9 @@ def prove_runtime(rom, entries, start, end, count, dependencies):
                 registers[regs[0]] = adjusted(pointer, 4 * (len(regs) - 1))
         elif mnemonic.startswith(("ldr", "str")):
             mem = next((op.mem for op in operands if op.type == ARM_OP_MEM), None)
-            if mem is None or mem.index or instruction.writeback or mnemonic not in ("ldr", "str"):
+            loads = {4: "ldr", 2: "ldrh", 1: "ldrb"}
+            if mem is None or mem.index or instruction.writeback or \
+                    mnemonic not in ("str", *(loads[width] for width in stack_load_widths)):
                 raise ValueError("software-float runtime memory operation is unsupported")
             if mem.base == ARM_REG_PC:
                 if mnemonic != "ldr":
@@ -235,8 +247,9 @@ def prove_runtime(rom, entries, start, end, count, dependencies):
                 registers[regs[0]] = ("constant", struct.unpack_from("<I", body, literal - start)[0], 0)
             else:
                 pointer = adjusted(registers.get(mem.base), mem.disp)
-                if mnemonic == "ldr":
-                    registers[regs[0]] = access(pointer, True)
+                if mnemonic.startswith("ldr"):
+                    width = next(width for width, name in loads.items() if name == mnemonic)
+                    registers[regs[0]] = access(pointer, True, width=width)
                 else:
                     access(pointer, False, registers.get(regs[0]))
         elif mnemonic in ("mov", "movs", "add", "adds", "sub", "subs"):
@@ -292,7 +305,7 @@ def prove_runtime(rom, entries, start, end, count, dependencies):
         reaching = expanded
     if reaching != set(instructions):
         raise ValueError("software-float runtime has a region without a verified return path")
-    if start in OPERATIONS.values() and writes:
+    if start in public and writes:
         raise ValueError("software-float public scalar helper has external writes")
     return {"writes": sorted(writes), "returns": sorted(returns), "layout": layout}
 

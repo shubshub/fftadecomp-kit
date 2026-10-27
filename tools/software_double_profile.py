@@ -1,4 +1,4 @@
-"""Canonical target-state binary64 conversions, subtraction and division."""
+"""Canonical target-state binary64 conversions, truncation, subtraction and division."""
 
 import argparse
 from contextvars import ContextVar
@@ -14,13 +14,14 @@ import tempfile
 
 SCHEMA = "elf-symbol-thumb-df-convert-sub-div-target-v1"
 SELECTOR = "convert-sub-div-target-v1"
-RUNTIME = "agbcc-thumb-df-convert-sub-div-closure-v1"
-ABI = "agbcc-thumb-df-mixed-integer-v1"
+RUNTIME = "agbcc-thumb-df-convert-sub-div-trunc-closure-v2"
+ABI = "agbcc-thumb-df-sf-mixed-integer-v2"
 SEMANTICS = "target-machine-state-v1"
-SUMMARY = ("pinned target binary64 conversion/sub/div runtime; entry RAM and stack are state inputs; "
+SUMMARY = ("pinned target binary64 conversion/sub/div/trunc runtime; entry RAM and stack are state inputs; "
            "unrestricted IEEE semantics not proved")
 OPERATIONS = {"__floatdidf": 0x081428E4, "__floatsidf": 0x0814383C,
-              "__subdf3": 0x081430B4, "__divdf3": 0x0814339C}
+              "__subdf3": 0x081430B4, "__divdf3": 0x0814339C,
+              "__truncdfsf2": 0x08143980}
 IDENTITIES = (
     (0x081428E4, 0x08142950, 40,
      "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
@@ -44,6 +45,12 @@ IDENTITIES = (
      "724ac20cf05719a0fbe4d032862cdc3ba94f1085aa6fbf1d6bc01e598e23adbf"),
     (0x0814383C, 0x081438BC, 56,
      "99b0db82e85f6860b32c8ae93795730b88afaec7134f3ab439db123a7a9f9c0a"),
+    (0x08143980, 0x081439C8, 32,
+     "acb4499634230b81e5a935184b68ddda30d9c6eb08041a49ceccab21d05f4223"),
+    (0x081439C8, 0x08143A84, 86,
+     "765c352080a3d1f6c0da8210a214648596a5486760b3cedf7d6648fef32cae32"),
+    (0x08144314, 0x0814432C, 11,
+     "1c637e4a2eff2aeb108768d7234baa47f3b4a9cfed810ce28603b3bc29cc5d7f"),
     (0x08144378, 0x081443AE, 27,
      "a2d91a60b907f40dd3bafc448e79c2c4630ba7000195bb54f0f4b26e4e9d9faa"),
 )
@@ -76,7 +83,13 @@ EDGES = (
     (0x81433B6, 0x8142D34),
     (0x8143512, 0x8142BE8),
     (0x81438AC, 0x8142BE8),
+    (0x814398C, 0x8142D34),
+    (0x81439B8, 0x8144314),
+    (0x8144322, 0x81439C8),
 )
+# The new conversion reuses the double unpacker and single packer. Only the
+# public conversion is a caller operation; the other three bodies stay private.
+TRUNCATION_CLOSURE = (0x08142D34, 0x08143980, 0x081439C8, 0x08144314)
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* data symbols", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
@@ -208,7 +221,37 @@ def verify_identity(rom, mapping, index):
             displacement -= 0x800000
         if first & 0xF800 != 0xF000 or second & 0xF800 != 0xF800 or site + 4 + displacement != target:
             raise ValueError("software-double dependency edge differs")
+    prove_truncation_closure(rom, entries)
     return entries, rows
+
+
+def prove_truncation_closure(rom, entries):
+    """Prove the conversion's complete CFG, bounded writes and restoring ABI.
+
+    Numeric loads remain target-state inputs. The unpacker may write only its
+    five-word formal output record; transitive writes must fit each caller's
+    real local frame. No unrestricted IEEE conversion semantics are asserted.
+    """
+    from software_float_profile import prove_runtime
+    identities = {start: (end, count) for start, end, count, _ in IDENTITIES
+                  if start in TRUNCATION_CLOSURE}
+    pending, proofs = set(TRUNCATION_CLOSURE), {}
+    while pending:
+        ready = [start for start in sorted(pending)
+                 if all(target in proofs for site, target in EDGES
+                        if start <= site < identities[start][0])]
+        if not ready:
+            raise ValueError("software-double truncation closure is recursive or incomplete")
+        for start in ready:
+            end, count = identities[start]
+            writes = tuple((1, offset, 4) for offset in range(0, 20, 4)) \
+                if start == 0x08142D34 else ()
+            proofs[start] = prove_runtime(
+                rom, entries, start, end, count, proofs, call_edges=EDGES,
+                scalar_entries=(OPERATIONS["__truncdfsf2"],), allowed_writes=writes,
+                stack_load_widths=(1, 2, 4))
+            pending.remove(start)
+    return proofs
 
 
 def validate_span(data, address, rom, mapping, index):
