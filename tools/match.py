@@ -2136,6 +2136,14 @@ class BufferCallProof:
                         if instruction.mnemonic.startswith("str") and registers[0] in aliases:
                             raise ValueError("buffer pointers cannot be stored or spilled")
                         allowed.add(operand.mem.base)
+                    if self.stack_arguments and instruction.size == 2 and \
+                            instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and \
+                            instruction.mnemonic == "cmp" and len(operands) == 2 and \
+                            operands[0].type == ARM_OP_REG and operands[0].reg in aliases and \
+                            operands[1].type == ARM_OP_IMM and operands[1].imm == 0:
+                        # A null test observes the pointer without moving or escaping it.
+                        # Both successors still retain the alias and all access bounds.
+                        allowed.add(operands[0].reg)
                     if (set(read) & aliases.keys()) - allowed:
                         raise ValueError("unsupported buffer pointer use or escape")
                     constant = None
