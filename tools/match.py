@@ -2016,6 +2016,54 @@ def merge_possible_aliases(previous, incoming):
     return tuple(sorted(merged.items()))
 
 
+def stack_alias_overwritten_before_use(data, address, successor, register, decoder):
+    """Prove a differing Thumb join alias is killed on every path before observation."""
+    if not ARM_REG_R0 <= register <= ARM_REG_R12:
+        return False
+    end = address + len(data)
+    pending, edges, safe = [successor], {}, set()
+    while pending:
+        current = pending.pop()
+        if current in edges:
+            continue
+        if current % 2 or not address <= current < end:
+            return False
+        instruction = next(decoder.disasm(data[current - address:current - address + 4],
+                                         current, count=1), None)
+        if instruction is None or current + instruction.size > end or \
+                instruction.id == ARM_INS_IT or any(group in instruction.groups
+                    for group in (CS_GRP_CALL, CS_GRP_INT)):
+            return False
+        read, written = instruction.regs_access()
+        if register in read:
+            return False
+        unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
+        if register in written and unconditional:
+            edges[current] = ()
+            safe.add(current)
+            continue
+        if instruction.id == ARM_INS_B:
+            if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM:
+                return False
+            targets = (instruction.operands[0].imm,)
+            if not unconditional:
+                targets += (current + instruction.size,)
+        elif CS_GRP_JUMP in instruction.groups or ARM_REG_PC in written:
+            # This includes returns: no result/scratch alias is discarded at exit.
+            return False
+        else:
+            targets = (current + instruction.size,)
+        edges[current] = targets
+        pending.extend(targets)
+    # Cycles with an un-killed alias are deliberately not a proof of lifetime end.
+    while True:
+        newly_safe = {current for current, targets in edges.items()
+                      if current not in safe and targets and all(target in safe for target in targets)}
+        if not newly_safe:
+            return successor in safe
+        safe.update(newly_safe)
+
+
 class BufferCallProof:
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2751,10 +2799,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             else:
                 if len(previous[1]) != len(stack):
                     raise ValueError("inconsistent saved stack depth at control-flow join")
-                if previous[2] != outgoing[2] and not stack_arguments:
-                    raise ValueError("inconsistent stack aliases at control-flow join")
+                incoming_aliases = outgoing[2]
+                if previous[2] != incoming_aliases and not stack_arguments:
+                    previous_aliases = dict(previous[2])
+                    incoming = dict(incoming_aliases)
+                    differing = {register for register in previous_aliases.keys() | incoming.keys()
+                                 if previous_aliases.get(register) != incoming.get(register)}
+                    if not thumb or not all(stack_alias_overwritten_before_use(
+                            data, address, successor, register, decoder) for register in differing):
+                        raise ValueError("inconsistent stack aliases at control-flow join")
+                    incoming_aliases = tuple((register, offset) for register, offset in incoming_aliases
+                                             if register not in differing)
                 merged_aliases = (merge_possible_aliases(previous[2], outgoing[2])
-                                  if stack_arguments else outgoing[2])
+                                  if stack_arguments else incoming_aliases)
                 merged_slots = merge_possible_aliases(previous[4], outgoing[4])
                 merged = (previous[0] & outgoing[0],
                           tuple((saved[0] and incoming[0], saved[1] and incoming[1],
