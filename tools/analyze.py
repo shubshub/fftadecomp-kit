@@ -194,7 +194,8 @@ def refinement_ranges(intervals):
     return ranges
 
 
-def refinement_word_switch(data, address, position, end, engine):
+def refinement_word_switch(data, address, position, end, engine, *,
+                           same_owner_long_branches=False):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
@@ -218,7 +219,7 @@ def refinement_word_switch(data, address, position, end, engine):
         return None
     literal = (((address + dispatch + 6) & ~3) + load.operands[1].mem.disp) - address
     candidates = []
-    for guard_size in (4, 6):
+    for guard_size in ((4, 6, 8) if same_owner_long_branches else (4, 6)):
         compare = instruction(dispatch - guard_size)
         if compare is None or compare.mnemonic != "cmp" or \
                 len(compare.operands) != 2 or compare.operands[1].type != ARM_OP_IMM or \
@@ -249,9 +250,12 @@ def refinement_word_switch(data, address, position, end, engine):
 
 
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
-                    rom_end=CODE_END, *, stack_adjusted_returns=False):
+                    rom_end=CODE_END, *, stack_adjusted_returns=False,
+                    same_owner_long_branches=False):
     """Inspect a byte window beginning at an indexed Thumb entry.
 
+    The opt-in local-long-branch discovery still grants no ABI or match admission;
+    its complete CFG must pass the existing restoring-frame proof separately.
     Closure is structural, assuming ordinary calls return to their continuation
     and syntactic ABI return forms terminate the path. It is not a return-value,
     stack-safety, exact-symbol, or exhaustive-inventory proof.
@@ -292,6 +296,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("budgets must be positive integers")
     if type(rom_end) is not int or rom_end < ROM_BASE:
         fail("invalid ROM end")
+    if type(same_owner_long_branches) is not bool:
+        fail("local long-branch inventory opt-in must be Boolean")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -436,6 +442,15 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             if target is None:
                 fail("unresolved call", position)
             elif address <= target < end:
+                if same_owner_long_branches:
+                    from local_long_branch_profile import target as local_target
+                    try:
+                        destination = local_target(instruction, address, end)
+                    except ValueError as error:
+                        fail(f"invalid local long branch: {error}", position)
+                    else:
+                        follow(position, destination)
+                    continue
                 fail("ambiguous local BL", position)
             elif target not in starts:
                 fail("unmapped call target", position)
@@ -449,7 +464,9 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             continue
         if info["jump"] or info["writes_pc"]:
             if info["tgt"] is None or instruction.mnemonic == "bx":
-                switch = refinement_word_switch(data, address, position, end, engine)
+                switch = refinement_word_switch(
+                    data, address, position, end, engine,
+                    same_owner_long_branches=same_owner_long_branches)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue
@@ -498,8 +515,14 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         # guarded predecessor. In particular no branch may enter the lookup,
         # reuse stale flags, or execute MOV PC with a forged target register.
         expected = {guard: comparison, dispatch: guard}
-        if dispatch - comparison == 6:
-            expected[guard + 2] = guard
+        if dispatch - comparison in (6, 8):
+            default_site = guard + 2
+            if dispatch - comparison == 8:
+                if instructions.get(default_site) != 4 or \
+                        {source for source, target in edges if target == default_site} != {guard}:
+                    fail("word-switch long default can be bypassed", position)
+            else:
+                expected[default_site] = guard
         expected.update({site: site - 2 for site in range(dispatch + 2, position + 2, 2)})
         if comparison not in instructions or any(
                 instructions.get(site) != 2 or

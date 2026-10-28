@@ -3055,11 +3055,15 @@ def main():
     ap.add_argument("--emit", help="write verified symbol bytes to a new file under the decomp build/")
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
+    ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.owner_runtime_profile:
+        import owner_admission_profile
+        return owner_admission_profile.issue(Path(ROOT), addr, args)
     if args.switch_profile is not None:
         from switch_constants_profile import issue
         return issue(Path(ROOT), addr, args)

@@ -795,6 +795,9 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        import owner_admission_profile
+        if owner_admission_profile.selected(report):
+            return owner_admission_profile.report_matches(report, root, address)
         if software_float.selected(report):
             return software_float.report_matches(report, root, address)
         if lshrdi3.selected(report):

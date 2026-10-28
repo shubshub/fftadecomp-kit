@@ -238,11 +238,14 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
         double_profile = False
         target_remainder_profile = False
         thunk_profile = False
+        owner_profile = False
         constants_profile = False
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
             try:
+                import owner_admission_profile
+                owner_profile = owner_admission_profile.selected(saved_report)
                 constants_profile = switch_constants.selected_policy(saved_report)
                 double_profile = software_double.selected(saved_report)
                 if double_profile:
@@ -253,6 +256,9 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
         if verify:
+            if owner_profile and not report_matches(saved_report, root, int(addr, 16)):
+                problems.append(f"{addr}: invalid saved complete-owner report")
+                return 0, 0, problems, []
             if target_remainder_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved target-state remainder report")
                 return 0, 0, problems, []
@@ -271,13 +277,15 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                     command += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
             if thunk_profile:
                 command += ["--function-address-profile", function_thunk.SELECTOR]
+            if owner_profile:
+                command += ["--owner-runtime-profile", owner_admission_profile.SELECTOR]
             if constants_profile:
                 command += ["--switch-profile", constants_profile.selector]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
             ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile) and ok:
+        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or owner_profile) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()
