@@ -2527,7 +2527,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if returning:
             if stack:
                 raise ValueError("return does not balance the saved stack frame")
-            if stack_arguments and aliases:
+            # IP is ABI scratch, not a result register. Keep its alias tracked
+            # through calls and later uses, but an unobserved value at return
+            # does not return a pointer. All other escape checks still apply.
+            if stack_arguments and aliases.keys() - {ARM_REG_R12}:
                 raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
             successors = ()
