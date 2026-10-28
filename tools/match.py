@@ -407,7 +407,7 @@ def call_bindings(image, name, address, mapping, rom_size,
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(function_thunks) is not bool or function_thunks and (
-            function_relocations is None or switch_relocations is not None or allow_switch_data or
+            function_relocations is None or allow_switch_data or
             allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or
             divsi3_bindings is not None or double_bindings is not None or double_index is not None):
         raise ValueError("function thunks require isolated typed function bindings")
@@ -763,12 +763,14 @@ def call_bindings(image, name, address, mapping, rom_size,
     if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets):
         raise ValueError("function-address evidence does not support runtime call thunks")
     if switch_relocations:
-        if (data_relocations and not (allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations or \
-                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+        if not function_thunks and ((data_relocations and not (
+                allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values())):
             raise ValueError("switch evidence excludes object, callback and runtime-thunk bindings")
         data_names = {binding[0] for binding in data_relocations.values()}
         for target_name in targets:
-            if target_name not in data_names and not (double_bindings is not None and
+            if target_name not in data_names and not (
+                    function_thunks and target_name in function_thunk.ALIASES) and not (double_bindings is not None and
                     (software_double.call_target(target_name) is not None or target_name == "__modsi3")):
                 function_address_target(target_name, entries, address, symbol["size"], rom_size)
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
@@ -779,11 +781,17 @@ def call_bindings(image, name, address, mapping, rom_size,
             struct.pack_into("<I", relocated, position, address + addend)
         for position, (_, value) in data_relocations.items():
             struct.pack_into("<I", relocated, position, value)
-        layout = (switch_layout(bytes(relocated), address, switch_relocations)
-                  if double_bindings is not None else selected_switch_layout(
-                      bytes(relocated), address, switch_relocations,
-                      data_relocations if data_relocations else None, allow_preloaded_switch,
-                      allow_switch_constants=allow_switch_constants))
+        if function_thunks:
+            from thunk_pool_switch import layout as pool_layout
+            for position, (_, value) in function_relocations.items():
+                struct.pack_into("<I", relocated, position, value)
+            layout = pool_layout(bytes(relocated), address, switch_relocations)
+        else:
+            layout = (switch_layout(bytes(relocated), address, switch_relocations)
+                      if double_bindings is not None else selected_switch_layout(
+                          bytes(relocated), address, switch_relocations,
+                          data_relocations if data_relocations else None, allow_preloaded_switch,
+                          allow_switch_constants=allow_switch_constants))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
@@ -825,7 +833,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     function_relocations = function_relocations or {}
     if function_thunks:
         if type(function_thunks) is not bool or \
-                not any(name in function_thunk.ALIASES for name in targets) or switch_relocations or \
+                not any(name in function_thunk.ALIASES for name in targets) or \
                 allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None or \
                 modsi3_bindings is not None or divsi3_bindings is not None or double_bindings is not None:
             raise ValueError("linked function-thunk bindings are incomplete or mixed")
@@ -946,7 +954,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("switch-data binding opt-in must be Boolean")
     if type(allow_preloaded_switch) is not bool:
         raise ValueError("preloaded-switch binding opt-in must be Boolean")
-    if switch_relocations and ((data_relocations and not (
+    if switch_relocations and not function_thunks and ((data_relocations and not (
             allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations):
         raise ValueError("switch evidence cannot combine literal binding profiles")
     if switch_relocations:
@@ -994,11 +1002,20 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked switch word does not equal its local section address")
         patched.update(range(relocation, relocation + 4))
     if switch_relocations:
-        layout = (switch_layout(linked["text"][:after["size"]], address, switch_relocations)
-                  if double_bindings is not None else selected_switch_layout(
-                      linked["text"][:after["size"]], address, switch_relocations,
-                      data_relocations if data_relocations else None, allow_preloaded_switch,
-                      allow_switch_constants=allow_switch_constants))
+        if function_thunks:
+            from thunk_pool_switch import layout as pool_layout
+            layout = pool_layout(linked["text"][:after["size"]], address, switch_relocations)
+            # The original local section words grant only this finite table.
+            # Prove all case/guard edges, literal roles and frame/return joins
+            # against the fully linked complete symbol, not linear decoding.
+            verify_leaf_instructions(linked["text"][:after["size"]], address, True, calls,
+                                     function_thunk_context={"pool_switch": switch_relocations})
+        else:
+            layout = (switch_layout(linked["text"][:after["size"]], address, switch_relocations)
+                      if double_bindings is not None else selected_switch_layout(
+                          linked["text"][:after["size"]], address, switch_relocations,
+                          data_relocations if data_relocations else None, allow_preloaded_switch,
+                          allow_switch_constants=allow_switch_constants))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
@@ -1727,8 +1744,11 @@ def verify_preloaded_switches(data, address, rom, mapping, data_mapping, manifes
     return instructions, PRELOADED_SWITCH_CONTROL_FLOW
 
 
-def switch_layout(data, address, relocations, data_relocations=None):
-    """Derive the single supported guarded dispatch from its complete local words."""
+def switch_layout(data, address, relocations, data_relocations=None, *, interposed_words=0):
+    """Derive a guarded dispatch; the five-word pool needs separate reached-load proof."""
+    if type(interposed_words) is not int or interposed_words not in (0, 5) or \
+            interposed_words and data_relocations is not None:
+        raise ValueError("unsupported interposed switch pool")
     if not isinstance(relocations, dict) or not 2 <= len(relocations) <= 257:
         raise ValueError("switch evidence requires one pointer and one bounded word table")
     for offset, addend in relocations.items():
@@ -1773,10 +1793,12 @@ def switch_layout(data, address, relocations, data_relocations=None):
 
     candidates = []
     for dispatch in ((literal - 14, literal - 16) if data_relocations is not None
-                     else (literal - 10, literal - 12)):
+                     else (literal - 10 - interposed_words * 4,
+                           literal - 12 - interposed_words * 4)):
         if data_relocations is None:
-            if (address + dispatch + 13) & ~3 != address + literal or \
-                    any(data[dispatch + 10:literal]):
+            pool_start = literal - interposed_words * 4
+            if dispatch < 0 or (address + dispatch + 13) & ~3 != address + pool_start or \
+                    any(data[dispatch + 10:pool_start]):
                 continue
         elif (address + dispatch + 13) & ~3 != address + literal - 4 or \
                 any(data[dispatch + 10:literal - 4]):
@@ -2284,7 +2306,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                for target in (validated_calls or {}).values()):
             raise ValueError("unsigned remainder excludes other runtimes and thunks")
     if function_thunk_context is not None:
-        if type(function_thunk_context) is not dict or function_thunk_context or not thumb or \
+        if type(function_thunk_context) is not dict or set(function_thunk_context) not in (set(), {'pool_switch'}) or not thumb or \
                 buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
                 switch_data_relocations is not None or udivsi3_context is not None or modsi3_context is not None or \
                 divsi3_context is not None or inert_spin_context is not None or double_context is not None or preloaded_switch:
@@ -2366,6 +2388,23 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         reserved.update({address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
                     for position in range(offset, offset + 4)})
+    if function_thunk_context == {}:
+        # This is already an explicit canonical-thunk profile. Discover only the
+        # exact finite five-word shape; failure grants no indirect-jump edge.
+        from thunk_pool_switch import discover as pool_discover
+        try:
+            pool_relocations = pool_discover(data, address, list(decoder.disasm(data, address)))
+        except ValueError:
+            pass
+        else:
+            function_thunk_context = {'pool_switch': pool_relocations}
+    if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
+        from thunk_pool_switch import layout as pool_layout
+        switch_relocations = function_thunk_context['pool_switch']
+        switch = pool_layout(data, address, switch_relocations)
+        reserved.update(range(address + switch['dispatch'] + 10,
+                              address + switch['literal']))
+        reserved.update(address + offset + byte for offset in switch_relocations for byte in range(4))
     end = address + len(data)
     alignment = 2 if thumb else 4
     states = {address: (frozenset({ARM_REG_LR}), (), (), (), ())}
@@ -2739,9 +2778,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         for successor in successors:
             predecessors[successor].add(current)
     if switch is not None:
-        if (not allow_switch_scalar_frame and double_context is None and
+        pool_switch = function_thunk_context is not None and 'pool_switch' in function_thunk_context
+        if (not allow_switch_scalar_frame and double_context is None and not pool_switch and
                 uses_stack_frame(instructions.values())) or any(
-                target in RUNTIME_HELPERS.values() for target in calls.values()):
+                target in RUNTIME_HELPERS.values() and not (pool_switch and target in function_thunk.ALIASES.values())
+                for target in calls.values()):
             raise ValueError("switch evidence excludes fixed frames and runtime call thunks")
         if allow_switch_scalar_frame and not any(
                 (thumb_stack_adjustment(instruction) or 0) < 0 for instruction in instructions.values()):
@@ -2840,6 +2881,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
+    if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
+        from thunk_pool_switch import record as pool_record
+        pool_record(data, address, switch_relocations, instructions.values())
     return [instructions[current] for current in sorted(instructions)]
 
 

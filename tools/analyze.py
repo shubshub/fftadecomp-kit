@@ -232,13 +232,19 @@ def refinement_word_switch(data, address, position, end, engine):
         relocations = {offset: struct.unpack_from("<I", data, offset)[0] - address
                        for offset in range(literal, table_end, 4)}
         from match import switch_layout
-        try:
-            descriptor = switch_layout(data[:end - address], address, relocations)
-        except ValueError:
-            continue
-        if descriptor["dispatch"] == dispatch and \
-                descriptor["comparison"] == dispatch - guard_size:
-            candidates.append(descriptor)
+        for interposed_words in (0, 5):
+            if interposed_words and guard_size != 6:
+                continue
+            try:
+                descriptor = switch_layout(data[:end - address], address, relocations,
+                                           interposed_words=interposed_words)
+            except ValueError:
+                continue
+            if descriptor["dispatch"] == dispatch and \
+                    descriptor["comparison"] == dispatch - guard_size:
+                if interposed_words:
+                    descriptor["interposed_words"] = interposed_words
+                candidates.append(descriptor)
     return candidates[0] if len(candidates) == 1 else None
 
 
@@ -448,6 +454,13 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     fail("unresolved jump", position)
                     continue
                 switches[position] = switch
+                for word in range(switch["literal"] - 4 * switch.get("interposed_words", 0),
+                                  switch["literal"], 4):
+                    literal = address + word
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
                 for word, target in switch["relocations"]:
                     literal = address + word
                     literals.add(literal)
@@ -493,6 +506,12 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 {source for source, target in edges if target == site} != {predecessor}
                 or site == address for site, predecessor in expected.items()):
             fail("word-switch guard can be bypassed", position)
+        if switch.get("interposed_words"):
+            pool = {address + word for word in range(switch["literal"] - 20,
+                                                     switch["literal"], 4)}
+            read_words = {int(read["address"], 16) for read in literal_reads.values()}
+            if not pool <= read_words:
+                fail("interposed switch pool requires every reached word load", position)
         result["word_switches"].append({"schema": "bounded-guarded-word-switch-v1", **switch})
     if not returns:
         fail("no recognized return")
