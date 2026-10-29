@@ -2612,9 +2612,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
                              signed_quotient_profile=None, stack_pointer_compare_profile=None,
                              signed_runtime_context=None, remainder_inventory_context=None,
-                             remainder_ordinary_inventory_context=None):
+                             remainder_ordinary_inventory_context=None,
+                             remainder_shift_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
-    if remainder_ordinary_inventory_context is not None:
+    if remainder_shift_inventory_context is not None:
+        if remainder_inventory_context is not None or remainder_ordinary_inventory_context is not None:
+            raise ValueError('zero-aware remainder inventory contexts cannot be combined')
+        import zero_aware_remainder_shift_inventory as remainder_inventory
+        remainder_inventory_context = remainder_shift_inventory_context
+    elif remainder_ordinary_inventory_context is not None:
         if remainder_inventory_context is not None:
             raise ValueError('zero-aware remainder inventory contexts cannot be combined')
         import zero_aware_remainder_ordinary_inventory as remainder_inventory
@@ -2633,7 +2639,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         runtime_bindings = remainder_inventory.prepare(
             data, address, validated_calls or {}, remainder_inventory_context)
         modsi3_context = (remainder_inventory_context[0], remainder_inventory_context[1],
-                         runtime_bindings if remainder_ordinary_inventory_context is not None else
+                         runtime_bindings if remainder_ordinary_inventory_context is not None or
+                         remainder_shift_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
