@@ -201,12 +201,15 @@ def refinement_ranges(intervals):
 
 def refinement_word_switch(data, address, position, end, engine, *,
                            same_owner_long_branches=False, one_object_word_switch=False,
-                           two_constant_word_switch=False):
+                           two_constant_word_switch=False, one_numeric_word_switch=False):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
     provenance. The enclosing CFG must separately prove the guard predecessors.
     """
+    if type(one_numeric_word_switch) is not bool or one_numeric_word_switch and (
+            one_object_word_switch or two_constant_word_switch):
+        raise ValueError('numeric switch requires an isolated Boolean layout opt-in')
     dispatch = position - address - 8
     if dispatch < 0:
         return None
@@ -262,12 +265,13 @@ def refinement_word_switch(data, address, position, end, engine, *,
                 if descriptor['dispatch'] == dispatch and descriptor['comparison'] == dispatch - guard_size:
                     descriptor['interposed_words'] = 2
                     candidates.append(descriptor)
-        if one_object_word_switch and literal >= 4:
+        if (one_object_word_switch or one_numeric_word_switch) and literal >= 4:
             object_word = literal - 4
             value = struct.unpack_from("<I", data, object_word)[0]
             try:
                 descriptor = switch_layout(data[:end - address], address, relocations,
-                    {object_word: ("inventory_object_word", value)})
+                    {object_word: ("inventory_numeric_word" if one_numeric_word_switch
+                                   else "inventory_object_word", value)})
             except ValueError:
                 continue
             if descriptor["dispatch"] == dispatch and descriptor["comparison"] == dispatch - guard_size:
@@ -359,7 +363,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
                     same_owner_long_branches=False, full_rom_inventory=False,
                     arm_inventory=False, one_object_word_switch=False,
-                    two_constant_word_switch=False):
+                    two_constant_word_switch=False, one_numeric_word_switch=False):
     """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -417,6 +421,10 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("one-object-word switch inventory opt-in must be Boolean")
     if type(two_constant_word_switch) is not bool:
         fail("two-constant-word switch inventory opt-in must be Boolean")
+    if type(one_numeric_word_switch) is not bool:
+        fail("one-numeric-word switch inventory opt-in must be Boolean")
+    if one_numeric_word_switch and (one_object_word_switch or two_constant_word_switch):
+        fail("numeric switch opt-in cannot combine object or two-constant layouts")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -642,7 +650,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     data, address, position, end, engine,
                     same_owner_long_branches=same_owner_long_branches,
                     one_object_word_switch=one_object_word_switch,
-                    two_constant_word_switch=two_constant_word_switch)
+                    two_constant_word_switch=two_constant_word_switch,
+                    one_numeric_word_switch=one_numeric_word_switch)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue
