@@ -153,8 +153,13 @@ class Decoder:
         return d
 
 
-def refinement_boundaries(functions, rom_end=CODE_END):
+def refinement_boundaries(functions, rom_end=CODE_END, *, full_rom_inventory=False):
     """Validate indexed starts, ignoring their provisional end addresses."""
+    if type(full_rom_inventory) is not bool:
+        raise ValueError("full-ROM inventory opt-in must be Boolean")
+    code_end = 0x09000000 if full_rom_inventory else CODE_END
+    if full_rom_inventory:
+        rom_end = min(rom_end, code_end)
     if not isinstance(functions, list):
         raise ValueError("function index must be a list")
     starts = {}
@@ -171,7 +176,7 @@ def refinement_boundaries(functions, rom_end=CODE_END):
         if mode not in ("arm", "thumb"):
             problems.add("invalid mode")
             mode = None
-        if not ROM_BASE + HEADER_LEN <= address < CODE_END:
+        if not ROM_BASE + HEADER_LEN <= address < code_end:
             problems.add("outside code region")
         if not ROM_BASE <= address or address + (4 if mode == "arm" else 2) > rom_end:
             problems.add("outside ROM")
@@ -251,7 +256,7 @@ def refinement_word_switch(data, address, position, end, engine, *,
 
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
-                    same_owner_long_branches=False):
+                    same_owner_long_branches=False, full_rom_inventory=False):
     """Inspect a byte window beginning at an indexed Thumb entry.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -259,6 +264,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     Closure is structural, assuming ordinary calls return to their continuation
     and syntactic ABI return forms terminate the path. It is not a return-value,
     stack-safety, exact-symbol, or exhaustive-inventory proof.
+    Full-ROM inventory only extends the diagnostic address ceiling, bounded by
+    the supplied ROM end and the original 16 MiB image, never its mirrors.
     """
     result = {
         "profile": "bounded-thumb-cfg-inventory-v1",
@@ -287,7 +294,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     def fail(reason, position=None):
         reasons.add(reason if position is None else f"{reason} at 0x{position:08X}")
 
-    if type(address) is not int or address % 2 or not ROM_BASE + HEADER_LEN <= address < CODE_END:
+    code_end = 0x09000000 if full_rom_inventory is True else CODE_END
+    if type(address) is not int or address % 2 or not ROM_BASE + HEADER_LEN <= address < code_end:
         fail("invalid entry address")
     if not isinstance(data, (bytes, bytearray)):
         fail("window must contain bytes")
@@ -298,11 +306,17 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("invalid ROM end")
     if type(same_owner_long_branches) is not bool:
         fail("local long-branch inventory opt-in must be Boolean")
+    if type(full_rom_inventory) is not bool:
+        fail("full-ROM inventory opt-in must be Boolean")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
     try:
-        starts, index_issues = refinement_boundaries(functions, rom_end)
+        if full_rom_inventory:
+            rom_end = min(rom_end, code_end)
+            result["full_rom_inventory"] = True
+        starts, index_issues = refinement_boundaries(
+            functions, rom_end, full_rom_inventory=full_rom_inventory)
     except ValueError as error:
         fail(f"invalid function index: {error}")
         starts = {}
@@ -324,9 +338,9 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         return result
     previous_start = max((start for start in starts if ROM_BASE + HEADER_LEN <= start < address),
                          default=None)
-    next_start = min((start for start in starts if address < start < CODE_END), default=CODE_END)
+    next_start = min((start for start in starts if address < start < code_end), default=code_end)
     limits = {"provided window": address + len(data), "byte budget": address + max_bytes,
-              "indexed boundary": next_start, "code boundary": CODE_END, "ROM boundary": rom_end}
+              "indexed boundary": next_start, "code boundary": code_end, "ROM boundary": rom_end}
     end = min(limits.values())
     result["window"] = {
         "start": f"0x{address:08X}",
@@ -574,10 +588,16 @@ def refinement_main(arguments):
                         action="append", required=True)
     parser.add_argument("--refine-max-bytes", type=lambda value: int(value, 0), default=4096)
     parser.add_argument("--refine-max-instructions", type=lambda value: int(value, 0), default=1024)
+    parser.add_argument("--refine-full-rom-inventory", action="store_true",
+                        help="allow diagnostic entries in the original ROM, up to 0x09000000; "
+                             "grants no function, ABI, match or inventory-completeness proof")
     options = parser.parse_args(arguments)
     here = repo_root(options.root)
     rom_path = options.rom or rom_path_default(here)
     output = {"inventory_complete": False, "results": []}
+    code_end = 0x09000000 if options.refine_full_rom_inventory else CODE_END
+    if options.refine_full_rom_inventory:
+        output["full_rom_inventory"] = True
 
     def unique_object(pairs):
         result = {}
@@ -594,18 +614,22 @@ def refinement_main(arguments):
             functions = json.load(stream, object_pairs_hook=unique_object)
         with open(rom_path, "rb") as stream:
             rom_end = ROM_BASE + os.fstat(stream.fileno()).st_size
-            starts, _ = refinement_boundaries(functions, rom_end)
+            if options.refine_full_rom_inventory:
+                rom_end = min(rom_end, code_end)
+            starts, _ = refinement_boundaries(
+                functions, rom_end, full_rom_inventory=options.refine_full_rom_inventory)
             for address in options.refine_address:
                 data = b""
-                if address in starts and ROM_BASE + HEADER_LEN <= address < min(CODE_END, rom_end):
-                    next_start = min((start for start in starts if address < start < CODE_END),
-                                     default=CODE_END)
-                    end = min(address + options.refine_max_bytes, next_start, CODE_END, rom_end)
+                if address in starts and ROM_BASE + HEADER_LEN <= address < min(code_end, rom_end):
+                    next_start = min((start for start in starts if address < start < code_end),
+                                     default=code_end)
+                    end = min(address + options.refine_max_bytes, next_start, code_end, rom_end)
                     stream.seek(address - ROM_BASE)
                     data = stream.read(end - address)
                 output["results"].append(refine_function(
                     data, address, functions, options.refine_max_bytes,
-                    options.refine_max_instructions, rom_end))
+                    options.refine_max_instructions, rom_end,
+                    full_rom_inventory=options.refine_full_rom_inventory))
     except (OSError, ValueError) as error:
         output["error"] = str(error)
         print(json.dumps(output, indent=2))

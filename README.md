@@ -54,6 +54,15 @@ instructions per entry. The diagnostic reads only bounded ROM windows, stops
 at indexed neighboring starts, and prints JSON to stdout; it never writes
 maps, symbols, segmentation, coverage or source files.
 
+The default diagnostic ceiling remains `0x08150000`. Explicitly add
+`--refine-full-rom-inventory` to inspect late provisional indexed entries in
+`[0x080000C0, min(actual_ROM_end, 0x09000000))`. Mirrors and RAM aliases remain
+excluded. This opt-in changes only diagnostic address bounds; index validation,
+neighbor boundaries, byte/instruction budgets and partial reasons still apply.
+It grants no actual-function, ABI, match or exhaustive-inventory proof and does
+not change matching, status or reservation gates. `complete` and
+`inventory_complete` remain false even when a late entry has `cfg_closed: true`.
+
 Results separate reachable instruction ranges, literal words and unresolved
 gaps. Direct calls contribute their continuation, not the callee's body.
 `literal_reads` records each reached PC-relative word read by `site`, `address`,
