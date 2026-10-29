@@ -33,7 +33,7 @@ def prove_operands(data,address,instructions,edges,sites,observed):
     OPERANDS[observed['operand_selector']].prove_operands(data,address,instructions,edges,sites,observed)
 
 
-def finish(data,address,calls,context,verified,proof):
+def finish(data,address,calls,context,verified,proof,*,zero_index_profile=None):
     import owner_admission_profile as owner
     import owner_graph_profile as graph
     import local_long_branch_profile as frame
@@ -46,7 +46,7 @@ def finish(data,address,calls,context,verified,proof):
     if set(context[6]) != {row[0] for row in proof.call_checks}:
         raise ValueError('bounded output caller did not prove every marked site')
     restored = frame.prove_frame(instructions,edges,address,{},calls,stack_aliases=True,
-        bounded_output_proof=proof)
+        bounded_output_proof=proof,zero_index_profile=zero_index_profile)
     observed = context[4]
     observed.update(frame=restored,partition=graph.partition(data,address,refined,instructions,words),
         calls=[[site-address,name] for site,name in sorted(context[3].items())],

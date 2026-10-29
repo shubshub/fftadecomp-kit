@@ -2616,10 +2616,20 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              remainder_shift_inventory_context=None,
                              remainder_framed_shift_inventory_context=None,
                              remainder_byte_range_inventory_context=None,
-                             bounded_stack_output_inventory_context=None):
+                             bounded_stack_output_inventory_context=None,
+                             bounded_stack_output_zero_index_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     bounded_output_proof = None
-    if bounded_stack_output_inventory_context is not None:
+    if bounded_stack_output_zero_index_inventory_context is not None:
+        if any(value is not None for value in (remainder_inventory_context,
+                remainder_ordinary_inventory_context, remainder_shift_inventory_context,
+                remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context,
+                bounded_stack_output_inventory_context)):
+            raise ValueError('zero-aware remainder inventory contexts cannot be combined')
+        import bounded_output_zero_index_inventory as remainder_inventory
+        bounded_stack_output_inventory_context = bounded_stack_output_zero_index_inventory_context
+        remainder_inventory_context = bounded_stack_output_inventory_context
+    elif bounded_stack_output_inventory_context is not None:
         if any(value is not None for value in (remainder_inventory_context,
                 remainder_ordinary_inventory_context, remainder_shift_inventory_context,
                 remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context)):

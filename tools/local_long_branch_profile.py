@@ -64,7 +64,7 @@ def record(instructions, address):
 
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
-                call_preservation=None, bounded_output_proof=None):
+                call_preservation=None, bounded_output_proof=None, zero_index_profile=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -93,6 +93,14 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     site for site, destination in calls.items()
                     if destination in RUNTIME_HELPERS.values() or is_udivsi3_address(destination)}:
             raise ValueError("runtime frame checks require exact complete canonical call bindings")
+
+    zero_states = None
+    zero_accesses = set()
+    if zero_index_profile is not None:
+        import zero_index_stack_profile as zero_index
+        if type(zero_index_profile) is not str or zero_index_profile != zero_index.SELECTOR or not stack_aliases:
+            raise ValueError("zero index local loads require their explicit native alias policy")
+        zero_states = zero_index.prove_zeros(instructions,edges,address)
 
     def access(offset, width, stack):
         position = offset + 4 * len(stack)
@@ -226,10 +234,16 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 if operand.mem.base in aliases:
                     width = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2,
                              "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}.get(name)
+                    certified_zero = False
+                    if zero_states is not None and operand.mem.index:
+                        decoded = zero_index.signed_load(instruction)
+                        certified_zero = decoded is not None and decoded[1] in zero_states[site] and decoded[1] not in aliases
+                        if certified_zero:
+                            zero_accesses.add((site,decoded[0],decoded[1],decoded[2],tuple(sorted(zero_states[site][decoded[1]]))))
                     if width is None or instruction.size != 2 or \
                             instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
                             len(operands) != 2 or len(regs) != 1 or \
-                            operands[0].type != ARM_OP_REG or operand.mem.index or \
+                            operands[0].type != ARM_OP_REG or operand.mem.index and not certified_zero or \
                             instruction.writeback or operand.shift.type or operand.shift.value or \
                             operand.subtracted or operand.mem.disp < 0:
                         raise ValueError("local alias requires an ordinary constant-offset memory access")
@@ -318,4 +332,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                                   "accesses": sorted(alias_accesses), "buffer_calls": sorted(alias_calls),
                                   "buffer_fingerprint": (bounded_output_proof or buffer_proof).fingerprint()
                                     if bounded_output_proof or buffer_proof else None}
+    if zero_states is not None:
+        proof["zero_index_profile"] = zero_index_profile
+        proof["zero_index_signed_loads"] = [[site,base,index,width,list(origins)]
+            for site,base,index,width,origins in sorted(zero_accesses)]
     return proof
