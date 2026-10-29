@@ -14,6 +14,9 @@ import modsi3_profile as remainder
 
 SELECTOR = 'numeric-divmod-v1'
 SCHEMA = 'elf-symbol-thumb-signed-divmod-numeric-v1'
+SHIFT_SELECTOR = 'numeric-divmod-lsr-v1'
+SHIFT_SCHEMA = 'elf-symbol-thumb-signed-divmod-lsr-v1'
+SCHEMAS = {SELECTOR: SCHEMA, SHIFT_SELECTOR: SHIFT_SCHEMA}
 SUMMARY = 'canonical signed quotient and remainder with existing CFG-proven numeric domains and restoring saves'
 _replay = ContextVar('signed_divmod_replay', default=False)
 
@@ -26,15 +29,22 @@ def sha(data):
     return hashlib.sha256(data).hexdigest()
 
 
+def context_selector(context):
+    if type(context) is not tuple or len(context) not in (5, 6) or \
+            len(context) == 6 and context[5] != SHIFT_SELECTOR:
+        raise ValueError('signed divmod requires an exact versioned numeric context')
+    return SELECTOR if len(context) == 5 else SHIFT_SELECTOR
+
+
 def prepare(data, address, calls, context):
     """Authenticate both exact call sets before the native verifier uses them."""
     import match
     import owner_admission_profile as owner
-    if type(context) is not tuple or len(context) != 5 or \
-            type(context[3]) is not dict or not context[3] or \
+    context_selector(context)
+    if type(context[3]) is not dict or not context[3] or \
             type(context[4]) is not dict or context[4]:
         raise ValueError('signed divmod requires a fresh isolated canonical context')
-    rom, mapping, index, bindings, observed = context
+    rom, mapping, index, bindings, observed = context[:5]
     owner.validate_span(data, address, rom, mapping, index)
     div = {site: name for site, name in bindings.items() if name == '__divsi3'}
     mod = {site: name for site, name in bindings.items() if name == '__modsi3'}
@@ -54,7 +64,7 @@ def prepare(data, address, calls, context):
     return div, mod
 
 
-def finish(data, address, calls, context, verified, divisors):
+def finish(data, address, calls, context, verified, divisors, transfers=None):
     """Retain complete byte partition and all r4-r11/SP/entry-LR restoration."""
     import owner_admission_profile as owner
     import owner_graph_profile as graph
@@ -69,7 +79,7 @@ def finish(data, address, calls, context, verified, divisors):
         raise ValueError('signed divmod excludes unproved address literal provenance')
     restored = frame.prove_frame(instructions, edges, address, {}, calls, stack_aliases=True)
     context[4].update({
-        'schema': SCHEMA,
+        'schema': SCHEMAS[context_selector(context)],
         'calls': [[site - address, context[3].get(site, f'func_{target:08X}')]
                   for site, target in sorted(calls.items())],
         'divisors': [[site - address, value] for site, value in sorted(divisors.items())],
@@ -80,19 +90,28 @@ def finish(data, address, calls, context, verified, divisors):
         'frame': restored, 'partition': partition,
         'ordinary_calls': 'entry-bound structural returning-call ABI premise only',
     })
+    if context_selector(context) == SHIFT_SELECTOR:
+        if not transfers:
+            raise ValueError('signed divmod LSR profile requires an actual bounded logical shift')
+        context[4]['logical_shift_signed16'] = transfers
 
 
-def verify(data, address, rom, mapping, index, calls, bindings, manifest=None):
+def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *, selector=SELECTOR):
     import match
     observed = {}
+    if selector not in SCHEMAS:
+        raise ValueError('unknown signed divmod selector')
+    context = (rom, mapping, index, bindings, observed)
+    if selector == SHIFT_SELECTOR:
+        context += (selector,)
     verified = match.verify_leaf_instructions(data, address, True, calls,
-        signed_runtime_context=(rom, mapping, index, bindings, observed))
+        signed_runtime_context=context)
     if manifest is not None and text(manifest) != text(observed):
         raise ValueError('signed divmod manifest differs from complete fresh native proof')
     return observed, verified
 
 
-def object_bytes(runner, workspace, args, original, address, rom, mapping):
+def object_bytes(runner, workspace, args, original, address, rom, mapping, *, selector=SELECTOR):
     import match
     if original['type'] != 1:
         raise ValueError('signed divmod requires original relocatable ELF')
@@ -105,14 +124,14 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping):
         raise ValueError('signed divmod requires a sole complete original Thumb ELF function')
     div, mod = {}, {}
     body, calls, literals = match.link_calls(runner, workspace, args, original, address, mapping,
-        len(rom), rom, divsi3_bindings=div, modsi3_bindings=mod, signed_runtime_profile=SELECTOR)
+        len(rom), rom, divsi3_bindings=div, modsi3_bindings=mod, signed_runtime_profile=selector)
     if literals or not div or set(div.values()) != {'__divsi3'} or \
             not mod or set(mod.values()) != {'__modsi3'}:
         raise ValueError('signed divmod requires both canonical original ELF relocations without data')
     return body, calls, div | mod
 
 
-def build(root, address, args=None, expected=None):
+def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     """Fresh source and original ELF are mandatory for every saved-report replay."""
     import match
     from match_evidence import (source_fingerprint, source_paths, mapping_snapshot,
@@ -145,8 +164,10 @@ def build(root, address, args=None, expected=None):
             raw, _, original = match.compile_object(runner, workspace, args, captured, address,
                 candidates[0].relative_to(root).as_posix())
             assembly = runner.read_binary(f'{workspace}/f.s')
-            body, calls, bindings = object_bytes(runner, workspace, args, original, address, rom, mapping)
-            manifest, instructions = verify(body, address, rom, mapping, index, calls, bindings, expected)
+            body, calls, bindings = object_bytes(runner, workspace, args, original, address, rom, mapping,
+                                                selector=selector)
+            manifest, instructions = verify(body, address, rom, mapping, index, calls, bindings, expected,
+                                             selector=selector)
             linked = runner.read_binary(f'{workspace}/f.elf')
         check = match._run_replay_process([sys.executable, str(Path(__file__).with_name('plausible.py')),
             '--quiet', '--addr', f'0x{address:08X}', '--json'] +
@@ -173,8 +194,10 @@ def render(result):
                             match.DEFAULT_OBJCOPY, match.DEFAULT_LD, match.DEFAULT_FLAGS]
     evidence['body_sha256'] = sha(result['body'])
     encoded = text(evidence)
-    return '\n'.join([f'# 0x{result["address"]:08X}', '', f'* verification: `{SCHEMA}`',
-        f'* signed runtime: {SELECTOR}', f'* signed runtime evidence: `{encoded}`',
+    schema = result['manifest']['schema']
+    selector = next(key for key, value in SCHEMAS.items() if value == schema)
+    return '\n'.join([f'# 0x{result["address"]:08X}', '', f'* verification: `{schema}`',
+        f'* signed runtime: {selector}', f'* signed runtime evidence: `{encoded}`',
         f'* signed runtime proof SHA-256: `{sha(encoded.encode())}`',
         f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
         '* verified extent: complete ELF function symbol, including literal pools',
@@ -185,13 +208,19 @@ def render(result):
 
 
 def selected(report):
+    return bool(selector_for_report(report))
+
+
+def selector_for_report(report):
     lines = report.splitlines()
-    if SCHEMA not in report and not any(line.lstrip().startswith('* signed runtime') for line in lines):
+    if not any(schema in report for schema in SCHEMAS.values()) and \
+            not any(line.lstrip().startswith('* signed runtime') for line in lines):
         return False
-    if [line for line in lines if line.lstrip().startswith('* verification')] != [f'* verification: `{SCHEMA}`'] or \
-            [line for line in lines if line.lstrip().startswith('* signed runtime:')] != [f'* signed runtime: {SELECTOR}']:
-        raise ValueError('signed divmod requires its isolated versioned report')
-    return True
+    for selector, schema in SCHEMAS.items():
+        if [line for line in lines if line.lstrip().startswith('* verification')] == [f'* verification: `{schema}`'] and \
+                [line for line in lines if line.lstrip().startswith('* signed runtime:')] == [f'* signed runtime: {selector}']:
+            return selector
+    raise ValueError('signed divmod requires its isolated versioned report')
 
 
 def report_matches(report, root, address):
@@ -200,7 +229,8 @@ def report_matches(report, root, address):
         return False
     token = _replay.set(True)
     try:
-        if not valid_match_verdict(report) or not selected(report):
+        selector = selector_for_report(report)
+        if not valid_match_verdict(report) or not selector:
             return False
         lines = [line for line in report.splitlines() if line.startswith('* signed runtime evidence: `')]
         if len(lines) != 1 or not lines[0].endswith('`'):
@@ -216,7 +246,7 @@ def report_matches(report, root, address):
         evidence = json.loads(encoded, object_pairs_hook=unique)
         if text(evidence) != encoded:
             return False
-        return render(build(root, address, expected=evidence['manifest'])) == report
+        return render(build(root, address, expected=evidence['manifest'], selector=selector)) == report
     except (OSError, ValueError, KeyError, TypeError, IndexError, RuntimeError, subprocess.SubprocessError):
         return False
     finally:
@@ -230,7 +260,7 @@ def issue(root, address, args):
             args.switch_profile or args.owner_runtime_profile or args.label or args.wsl != 'Ubuntu' or \
             args.wsl_path != match.DEFAULT_WSL_PATH:
         raise ValueError('signed divmod requires its isolated fixed Thumb selector')
-    result = build(root, address, args)
+    result = build(root, address, args, selector=args.signed_runtime_profile)
     if args.emit:
         output = (Path(root) / args.emit).resolve()
         if (Path(root) / 'build').resolve() not in output.parents or output.exists():

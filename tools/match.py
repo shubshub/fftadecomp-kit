@@ -407,7 +407,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                  double_bindings, double_index, function_thunks, umodsi3_bindings,
                  ashldi3_bindings, ashldi3_index, float_bindings, float_index)
     if signed_runtime_profile is not None and (
-            signed_runtime_profile != signed_divmod.SELECTOR or
+            signed_runtime_profile not in signed_divmod.SCHEMAS or
             type(divsi3_bindings) is not dict or type(modsi3_bindings) is not dict or
             data_mapping is not None or function_relocations is not None or switch_relocations is not None or
             allow_switch_data or allow_preloaded_switch or allow_switch_constants or function_thunks or
@@ -824,7 +824,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_double_data=False, signed_runtime_profile=None):
     """Validate exact placement and the linker's complete modification surface."""
     if signed_runtime_profile is not None and (
-            signed_runtime_profile != signed_divmod.SELECTOR or
+            signed_runtime_profile not in signed_divmod.SCHEMAS or
             not divsi3_bindings or not modsi3_bindings or
             set(divsi3_bindings.values()) != {'__divsi3'} or
             set(modsi3_bindings.values()) != {'__modsi3'} or
@@ -3448,7 +3448,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # Standalone remainder retains its existing frameless boundary.
         if uses_stack_frame(instructions.values()) and double_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
-        modsi3.prove_operands(instructions, edges, address, modsi3_context[2])
+        transfers = modsi3.prove_operands(instructions, edges, address, modsi3_context[2],
+            logical_shift_signed16=signed_runtime_context is not None and
+                signed_divmod.context_selector(signed_runtime_context) == signed_divmod.SHIFT_SELECTOR)
     if inert_spin_context is not None:
         inert_spin_context["spins"] = [current - address for current in spins]
     if local_branches:
@@ -3459,7 +3461,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         pool_record(data, address, switch_relocations, instructions.values())
     if signed_runtime_context is not None:
         signed_divmod.finish(data, address, calls, signed_runtime_context,
-                             instructions.values(), divsi3_context[3])
+                             instructions.values(), divsi3_context[3], transfers)
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -3563,7 +3565,7 @@ def main():
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
-    ap.add_argument("--signed-runtime-profile", choices=(signed_divmod.SELECTOR,))
+    ap.add_argument("--signed-runtime-profile", choices=tuple(signed_divmod.SCHEMAS))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))

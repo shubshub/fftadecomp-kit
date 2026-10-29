@@ -248,7 +248,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 saved_report = report_file.read()
             try:
                 import signed_divmod_profile
-                signed_runtime_profile = signed_divmod_profile.selected(saved_report)
+                signed_runtime_profile = signed_divmod_profile.selector_for_report(saved_report)
                 import owner_admission_profile
                 owner_profile = owner_admission_profile.selected(saved_report)
                 constants_profile = switch_constants.selected_policy(saved_report)
@@ -294,7 +294,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
             if constants_profile:
                 command += ["--switch-profile", constants_profile.selector]
             if signed_runtime_profile:
-                command += ["--signed-runtime-profile", signed_divmod_profile.SELECTOR]
+                command += ["--signed-runtime-profile", signed_runtime_profile]
             if quotient_frame:
                 command += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
             if not write_reports:
