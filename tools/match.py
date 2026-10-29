@@ -40,6 +40,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import empty_body_profile as empty_body
+import stack_pointer_compare_profile as sp_compare
 import signal
 from contextvars import ContextVar
 from rompath import rom_path
@@ -2582,8 +2583,23 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
-                             signed_quotient_profile=None):
+                             signed_quotient_profile=None, stack_pointer_compare_profile=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if stack_pointer_compare_profile is not None:
+        if type(stack_pointer_compare_profile) is not str or \
+                stack_pointer_compare_profile != sp_compare.SELECTOR or not thumb or \
+                buffer_proof is not None or call_resolver is not None or preloaded_switch or \
+                allow_switch_constants or allow_switch_scalar_frame or any(context is not None for context in (
+                    switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
+                    divsi3_context, inert_spin_context, double_context, function_thunk_context,
+                    umodsi3_context, ashldi3_context, float_context, acyclic_state_budget,
+                    ignored_leaf_alias_proof, signed_quotient_profile)):
+            raise ValueError('SP comparison requires its isolated inventory-only Thumb selector')
+        if any(target in RUNTIME_HELPERS.values() or function_thunk.reserved(target) or
+               is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or
+               umodsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target) or
+               software_float.reserved(target) for target in (validated_calls or {}).values()):
+            raise ValueError('SP comparison inventory excludes runtime and thunk calls')
     divsi3.schema(signed_quotient_profile)
     if signed_quotient_profile is not None and (
             not thumb or divsi3_context is None or buffer_proof is not None or
@@ -3055,7 +3071,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         alias_constants = {**constants, literal[0]: literal[1]}
                 assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) if thumb else None
                 if ARM_REG_SP in registers and assignment is None:
-                    raise ValueError("unsupported stack-address materialization")
+                    if stack_pointer_compare_profile is None:
+                        raise ValueError("unsupported stack-address materialization")
+                    sp_compare.verify_instruction(instruction)
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
                 allowed_aliases = {assignment[2]} if assignment is not None else set()
