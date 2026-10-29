@@ -2611,8 +2611,21 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
                              signed_quotient_profile=None, stack_pointer_compare_profile=None,
-                             signed_runtime_context=None):
+                             signed_runtime_context=None, remainder_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if remainder_inventory_context is not None:
+        import zero_aware_remainder_inventory as remainder_inventory
+        if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
+                allow_switch_constants or allow_switch_scalar_frame or any(value is not None for value in (
+                    switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
+                    divsi3_context, inert_spin_context, double_context, function_thunk_context,
+                    umodsi3_context, ashldi3_context, float_context, acyclic_state_budget,
+                    ignored_leaf_alias_proof, signed_quotient_profile, stack_pointer_compare_profile,
+                    signed_runtime_context)):
+            raise ValueError('zero-aware remainder requires its isolated inventory context')
+        remainder_inventory.prepare(data, address, validated_calls or {}, remainder_inventory_context)
+        modsi3_context = (remainder_inventory_context[0], remainder_inventory_context[1],
+                         remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
                 allow_switch_constants or allow_switch_scalar_frame or any(value is not None for value in (
@@ -3448,9 +3461,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # Standalone remainder retains its existing frameless boundary.
         if uses_stack_frame(instructions.values()) and double_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
-        transfers = modsi3.prove_operands(instructions, edges, address, modsi3_context[2],
-            logical_shift_signed16=signed_runtime_context is not None and
-                signed_divmod.context_selector(signed_runtime_context) == signed_divmod.SHIFT_SELECTOR)
+        if remainder_inventory_context is not None:
+            remainder_inventory.prove_operands(data, address, instructions, edges,
+                modsi3_context[2], remainder_inventory_context[4])
+        else:
+            transfers = modsi3.prove_operands(instructions, edges, address, modsi3_context[2],
+                logical_shift_signed16=signed_runtime_context is not None and
+                    signed_divmod.context_selector(signed_runtime_context) == signed_divmod.SHIFT_SELECTOR)
     if inert_spin_context is not None:
         inert_spin_context["spins"] = [current - address for current in spins]
     if local_branches:
@@ -3462,6 +3479,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if signed_runtime_context is not None:
         signed_divmod.finish(data, address, calls, signed_runtime_context,
                              instructions.values(), divsi3_context[3], transfers)
+    if remainder_inventory_context is not None:
+        remainder_inventory.finish(data, address, calls, remainder_inventory_context,
+                                   instructions.values())
     return [instructions[current] for current in sorted(instructions)]
 
 
