@@ -2199,6 +2199,7 @@ class BufferCallProof:
     word_provenance = False
     callee_frames = False
     single_word_stores = False
+    exact_alias_state_budget = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2301,11 +2302,27 @@ class BufferCallProof:
                                 tuple(sorted((words or {}).items())))}
             if self.callee_frames:
                 states[address] += (tuple(stack),)
-            pending = [address]
+            exact_budget = self.exact_alias_state_budget
+            if exact_budget is not None and (type(exact_budget) is not int or
+                    not 1 <= exact_budget <= 4096 or not self.callee_frames):
+                raise ValueError("exact buffer alternatives require bounded callee frame states")
+            path_states = {address: {states[address]}} if exact_budget is not None else None
+            pending = [(address, states[address])] if path_states is not None else [address]
+            path_state_count = 1
+            path_context = None
+            if path_states is not None:
+                path_context = self.alias_path_context(address, arguments, stack, incoming,
+                    protected, constants or {}, words or {}, frame_base, root_frame, watched, site)
+                self.observe_alias_state(path_context, address, states[address])
             returned = ()
+            exact_returns = {}
             returned_words = None
             while pending:
-                current = pending.pop()
+                if path_states is None:
+                    current = pending.pop()
+                else:
+                    current, incoming_state = pending.pop()
+                    states[current] = incoming_state
                 instruction = by_address[current]
                 aliases = dict(states[current][0])
                 depth = states[current][1]
@@ -2313,6 +2330,7 @@ class BufferCallProof:
                 words = dict(states[current][3])
                 if self.callee_frames:
                     stack = list(states[current][4])
+                call_alternatives = None
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
@@ -2350,6 +2368,7 @@ class BufferCallProof:
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
                             tuple(sorted(set(watched) | {register for register in aliases if register not in CALLER_CLOBBERED}))))
+                    call_alternatives = getattr(result, 'alternatives', None)
                     if self.word_provenance:
                         words = dict(result.words)
                     for register in CALLER_CLOBBERED:
@@ -2460,8 +2479,13 @@ class BufferCallProof:
                     if any(register not in CALLER_CLOBBERED or register == ARM_REG_LR
                            for register in aliases):
                         raise ValueError("buffer pointer escapes through an unrestored register")
-                    returned = merge_possible_aliases(returned, aliases.items())
-                    returned_words = words if returned_words is None else {slot:value for slot,value in returned_words.items() if words.get(slot)==value}
+                    if path_states is not None:
+                        result_state = (tuple(sorted(aliases.items())), tuple(sorted(words.items())))
+                        exact_returns[result_state] = self.word_result(aliases, words)
+                        self.observe_alias_return(path_context, current, incoming_state, result_state)
+                    else:
+                        returned = merge_possible_aliases(returned, aliases.items())
+                        returned_words = words if returned_words is None else {slot:value for slot,value in returned_words.items() if words.get(slot)==value}
                     successors = ()
                 elif instruction.id == ARM_INS_B:
                     successors = (operands[0].imm,)
@@ -2476,7 +2500,34 @@ class BufferCallProof:
                 outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())), tuple(sorted(words.items())))
                 if self.callee_frames:
                     outgoing += (tuple(stack),)
-                for successor in successors:
+                if call_alternatives is not None:
+                    if path_states is None:
+                        raise ValueError("disjunctive call results require exact caller alternatives")
+                    outgoings = []
+                    for result in call_alternatives:
+                        result_aliases = dict(aliases)
+                        result_aliases.update(result)
+                        result_words = dict(result.words)
+                        self.prune_words(result_words, stack)
+                        outgoings.append((tuple(sorted(result_aliases.items())), depth,
+                            tuple(sorted(constants.items())), tuple(sorted(result_words.items())), tuple(stack)))
+                else:
+                    outgoings = [outgoing]
+                for successor, outgoing in ((target, state) for target in successors for state in outgoings):
+                    if path_states is not None:
+                        previous_paths = path_states.get(successor, set())
+                        if previous_paths and any(state[1] != depth or state[4] != outgoing[4]
+                                                  for state in previous_paths):
+                            raise ValueError("inconsistent live callee frame at exact alternative join")
+                        self.observe_alias_state(path_context, successor, outgoing,
+                                                 current, incoming_state)
+                        if outgoing not in previous_paths:
+                            if path_state_count >= exact_budget:
+                                raise ValueError("exact buffer alternative state budget exhausted")
+                            path_states.setdefault(successor, set()).add(outgoing)
+                            path_state_count += 1
+                            pending.append((successor, outgoing))
+                        continue
                     if successor not in states:
                         states[successor] = outgoing
                         pending.append(successor)
@@ -2497,6 +2548,8 @@ class BufferCallProof:
                             pending.append(successor)
             if self.callee_frames:
                 self.complete_frame(address, data, instructions)
+            if path_states is not None:
+                return self.alternative_result([exact_returns[key] for key in sorted(exact_returns)])
             return self.word_result(returned, returned_words or {})
         except ValueError as error:
             raise ValueError(f"buffer callee 0x{address:08X}: {error}") from error
@@ -2565,6 +2618,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if type(allow_switch_scalar_frame) is not bool or \
             allow_switch_scalar_frame and not (allow_switch_constants and thumb):
         raise ValueError("scalar switch frames require explicit Boolean two-constant Thumb policy")
+    exact_alias_budget = (buffer_proof.exact_alias_state_budget
+                          if buffer_proof is not None else None)
+    if exact_alias_budget is not None:
+        if type(exact_alias_budget) is not int or not 1 <= exact_alias_budget <= 4096 or \
+                not thumb or acyclic_state_budget is not None or not buffer_proof.callee_frames or \
+                any(context is not None for context in (switch_relocations, switch_data_relocations,
+                    udivsi3_context, modsi3_context, divsi3_context, inert_spin_context,
+                    double_context, function_thunk_context, umodsi3_context, ashldi3_context,
+                    float_context)) or preloaded_switch or allow_switch_constants or allow_switch_scalar_frame:
+            raise ValueError("exact alias frame states require their isolated bounded Thumb buffer context")
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB if thumb else CS_MODE_ARM)
     decoder.detail = True
     switch = None
@@ -2721,7 +2784,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     caller_clobbered = CALLER_CLOBBERED
     pending = [address]
     path_states = None
-    if acyclic_state_budget is not None:
+    state_budget = acyclic_state_budget if acyclic_state_budget is not None else exact_alias_budget
+    if state_budget is not None:
         path_states = {address: {states[address]}}
         pending = [(address, states[address])]
         path_state_count = 1
@@ -2764,6 +2828,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         pointer_slots = dict(states[current][4])
         words = dict(states[current][5])
         word_mode = buffer_proof is not None and buffer_proof.word_provenance
+        call_alternatives = None
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
@@ -2929,6 +2994,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
                                                               pointer_slots, constants=constants,
                                                               site=current, words=words)
+                    call_alternatives = getattr(returned_aliases, 'alternatives', None)
                     if word_mode:
                         words = dict(returned_aliases.words)
             return_registers.difference_update(caller_clobbered)
@@ -3116,14 +3182,28 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         edges[current] = successors
         outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())),
                     tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())), tuple(sorted(words.items())))
-        for successor in successors:
+        if call_alternatives is not None:
+            if exact_alias_budget is None:
+                raise ValueError("disjunctive call results require exact native frame alternatives")
+            outgoings = []
+            for result in call_alternatives:
+                result_aliases = dict(aliases)
+                result_aliases.update(result)
+                result_words = dict(result.words)
+                buffer_proof.prune_words(result_words, stack)
+                outgoings.append((frozenset(return_registers), tuple(stack), tuple(sorted(result_aliases.items())),
+                    tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())), tuple(sorted(result_words.items()))))
+        else:
+            outgoings = [outgoing]
+        for successor, outgoing in ((target, state) for target in successors for state in outgoings):
             if path_states is not None:
                 previous_paths = path_states.get(successor, set())
                 if previous_paths and any(len(state[1]) != len(stack) for state in previous_paths):
                     raise ValueError("inconsistent saved stack depth at control-flow join")
                 if outgoing not in previous_paths:
-                    if path_state_count >= acyclic_state_budget:
-                        raise ValueError("acyclic path-state budget exhausted")
+                    if path_state_count >= state_budget:
+                        raise ValueError("acyclic path-state budget exhausted" if acyclic_state_budget is not None
+                                         else "exact alias frame state budget exhausted")
                     path_states.setdefault(successor, set()).add(outgoing)
                     path_state_count += 1
                     pending.append((successor, outgoing))
@@ -3159,7 +3239,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
-    if path_states is not None:
+    if acyclic_state_budget is not None:
         # Exact states never merge. The complete reached graph must also be a
         # DAG, including cycles whose repeated states needed no new work item.
         incoming_edges = {site: 0 for site in instructions}
@@ -3437,7 +3517,8 @@ def main():
                                                       "protected-descriptor-word-v1",
                                                       "watched-switch-preservation-v1",
                                                       "descriptor-output-alias-v1",
-                                                      "descriptor-single-store-v1"))
+                                                      "descriptor-single-store-v1",
+                                                      "descriptor-disjunctive-alias-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

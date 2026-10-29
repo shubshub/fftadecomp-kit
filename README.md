@@ -1889,3 +1889,23 @@ still refuse. `tests/test_descriptor_single_store.py` uses natural fixed-O2 orig
 compiler output and tests those limits, exact unknown/pointer/constant word writes,
 two contexts, unsupported lists and a successful store followed by a real native
 return-proof failure.
+
+### Exact descriptor alias alternatives
+
+`--owner-runtime-profile descriptor-disjunctive-alias-v1` selects the separate
+`elf-symbol-thumb-descriptor-disjunctive-alias-v1` schema. It extends single-word
+descriptor stores with exact alias, constant, word and frame alternatives at joins.
+Every reached alternative replays accesses, escapes, calls and returns; every exact
+return alternative is expanded in its caller. Context, state, predecessor-edge and
+return records are bound by the existing fresh source/ELF/ROM/map evidence. Complete
+native frame/return checks remain mandatory. Reports require an actual unequal
+alias join as well as the existing stack-origin, pointer-word and STMIA observations.
+
+Each effects or native-frame replay permits at most 4096 exact states. Existing
+owner, stack, dependency and context limits remain in force. Repeated exact states
+close a fixed point; changing loop cursors must pass every real access bound or
+refuse on the state/context limit. No trip count or termination fact is inferred.
+Previous profiles retain their merge behavior and the acyclic profile retains its
+DAG requirement. `tests/test_descriptor_disjunctive_alias.py` covers natural fixed-O2
+ET_REL match/report/status replay, per-arm bounds and escapes, clobbered words,
+saved slots, watched registers, final return proof, budgets and altered evidence.
