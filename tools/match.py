@@ -2618,10 +2618,20 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              remainder_byte_range_inventory_context=None,
                              bounded_stack_output_inventory_context=None,
                              bounded_stack_output_zero_index_inventory_context=None,
-                             zero_aware_mixed_inventory_context=None):
+                             zero_aware_mixed_inventory_context=None,
+                             zero_aware_unsigned_quotient_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     bounded_output_proof = None
-    if zero_aware_mixed_inventory_context is not None:
+    if zero_aware_unsigned_quotient_inventory_context is not None:
+        if any(value is not None for value in (remainder_inventory_context,
+                remainder_ordinary_inventory_context, remainder_shift_inventory_context,
+                remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context,
+                bounded_stack_output_inventory_context, bounded_stack_output_zero_index_inventory_context,
+                zero_aware_mixed_inventory_context)):
+            raise ValueError('unsigned quotient inventory contexts cannot be combined')
+        import zero_aware_unsigned_quotient_inventory as remainder_inventory
+        remainder_inventory_context = zero_aware_unsigned_quotient_inventory_context
+    elif zero_aware_mixed_inventory_context is not None:
         if any(value is not None for value in (remainder_inventory_context,
                 remainder_ordinary_inventory_context,remainder_shift_inventory_context,
                 remainder_framed_shift_inventory_context,remainder_byte_range_inventory_context,
@@ -2687,7 +2697,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                          remainder_framed_shift_inventory_context is not None or
                          remainder_byte_range_inventory_context is not None or
                          bounded_stack_output_inventory_context is not None or
-                         zero_aware_mixed_inventory_context is not None else
+                         zero_aware_mixed_inventory_context is not None or
+                         zero_aware_unsigned_quotient_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
@@ -2864,7 +2875,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 udivsi3_context is not None or preloaded_switch:
             raise ValueError("signed remainder requires an isolated direct-call profile")
         signed_numeric = modsi3.verify_context(data, address, validated_calls or {}, modsi3_context)
-        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target)
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) and not (
+                zero_aware_unsigned_quotient_inventory_context is not None and
+                target == UDIVSI3_ADDRESS)
                for target in (validated_calls or {}).values()):
             raise ValueError("signed remainder excludes other runtimes and thunks")
     if bounded_stack_output_inventory_context is not None:
@@ -3040,12 +3053,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if target != modsi3.ADDRESS or current not in modsi3_context[2]:
                     raise ValueError("signed remainder call lacks a canonical binding")
             if is_udivsi3_address(target):
-                if division_constants is None or target != UDIVSI3_ADDRESS:
-                    raise ValueError("division runtime requires its versioned nonzero-divisor proof")
-                divisor = constants.get(ARM_REG_R1)
-                if type(divisor) is not int or not 1 <= divisor <= 0xFFFFFFFF:
-                    raise ValueError("division requires a CFG-proven nonzero constant in r1")
-                division_constants[current] = divisor
+                if zero_aware_unsigned_quotient_inventory_context is not None and \
+                        target == UDIVSI3_ADDRESS and \
+                        zero_aware_unsigned_quotient_inventory_context[3].get(current) == '__udivsi3':
+                    pass  # prepare proved the complete exact zero/nonzero native closure.
+                else:
+                    if division_constants is None or target != UDIVSI3_ADDRESS:
+                        raise ValueError("division runtime requires its versioned nonzero-divisor proof")
+                    divisor = constants.get(ARM_REG_R1)
+                    if type(divisor) is not int or not 1 <= divisor <= 0xFFFFFFFF:
+                        raise ValueError("division requires a CFG-proven nonzero constant in r1")
+                    division_constants[current] = divisor
             elif division_constants is not None and target in RUNTIME_HELPERS.values():
                 raise ValueError("division evidence excludes runtime call thunks")
             if call_resolver is not None:
