@@ -85,6 +85,46 @@ class ArmInventoryTests(unittest.TestCase):
         self.assertTrue(self.refine([loop, self.bx_lr])["cfg_closed"])
         self.partial([self.branch(self.address, self.address)])
 
+    def test_stm_writeback_accepts_only_defined_base_first_forms(self):
+        # The real refusal at 0x0890ABEC is STMDBNE r4!, {r4,r5,r7,r10,r11}.
+        for word in (0x19240CB0, 0xE92D6000, 0xE8A40030, 0xE9A40030,
+                     0xE8240030, 0xE9240030, 0xE9240010):
+            with self.subTest(word=hex(word)):
+                result = self.refine([word, self.bx_lr])
+                self.assertTrue(result["cfg_closed"], result)
+                self.assertEqual(result["instrs"], 2)
+                self.assertEqual(result["literal_reads"], [])
+                self.assertEqual(result["returns"], [f"0x{self.address + 4:08X}"])
+        # A syntactic save/restore shape still grants no stack or ABI proof.
+        self.assertTrue(self.refine([0xE92D6000, 0xE8BD8001])["cfg_closed"])
+
+    def test_stm_base_first_conditional_instruction_always_requires_fallthrough(self):
+        for condition in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14):
+            word = condition << 28 | 0x09240030
+            with self.subTest(condition=condition):
+                self.assertTrue(self.refine([word, self.bx_lr])["cfg_closed"])
+                self.partial([word])
+                self.partial([word, self.bx_lr], max_bytes=4)
+                self.partial([word, self.bx_lr], max_instructions=1)
+        self.partial([0xF9240030, self.bx_lr])
+
+    def test_stm_base_first_keeps_pc_userbank_and_unpredictable_forms_partial(self):
+        for word in (0xE9240031, 0xE92D4010 | 0x2000, 0xE8B40030, 0xE9340030,
+                     0xE9640030, 0xE9248030, 0xE92F8000, 0xE9240000):
+            with self.subTest(word=hex(word)):
+                self.partial([word, self.bx_lr])
+        # Base excluded from the list continues to use the existing rule.
+        self.assertTrue(self.refine([0xE9240020, self.bx_lr])["cfg_closed"])
+        self.assertTrue(self.refine([0xE8B40020, self.bx_lr])["cfg_closed"])
+
+    def test_stm_base_first_does_not_widen_neighbors_or_literal_roles(self):
+        self.partial([0x19240CB0, self.bx_lr],
+                     functions=[self.entry(), self.entry(self.address + 4)])
+        self.partial([0x19240CB0, self.bx_lr], rom_end=self.address + 4)
+        # A load claiming the STM instruction word as a literal still conflicts.
+        result = self.partial([0x19240CB0, 0xE51F000C, self.bx_lr])
+        self.assertTrue(any("code/literal overlap" in reason for reason in result["partial_reasons"]))
+
     def test_branch_escapes_header_previous_next_rom_and_budget_are_partial(self):
         for target in (0x08000000, self.address - 4, self.address + 8, self.rom_end):
             with self.subTest(target=hex(target)):

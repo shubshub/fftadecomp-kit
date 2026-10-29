@@ -303,9 +303,14 @@ def refinement_arm_instruction(instruction):
         word & 0x0E400000 == 0x08000000
     if not (name in data_names and data_encoding or multiply or transfer or halfword or multiple):
         return reject("unsupported ARM instruction")
-    if multiple and (not word & 0xFFFF or
-                     word & 0x00200000 and word & (1 << ((word >> 16) & 15))):
-        return reject("unsupported ARM register-list writeback")
+    if multiple:
+        registers = word & 0xFFFF
+        base = 1 << ((word >> 16) & 15)
+        # ARMv4T STM stores the original base only when it is the lowest
+        # listed register. LDM/base writeback and other STM overlaps stay out.
+        stores_base_first = not word & 0x00100000 and registers & -registers == base
+        if not registers or word & 0x00200000 and registers & base and not stores_base_first:
+            return reject("unsupported ARM register-list writeback")
     try:
         reads, writes = instruction.regs_access()
     except Exception:

@@ -91,6 +91,18 @@ starts without establishing real functions, ABI safety or match credit. ARM
 results use `bounded-arm-cfg-inventory-v1`; both completeness fields stay false.
 Thumb diagnostic results and matching, status and reservation gates are unchanged.
 
+#### ARM register-list writeback
+
+The opt-in ARM diagnostic permits ordinary ARMv4T STM writeback with the base
+included only when that base is the lowest numbered listed register. This
+defined case stores the original base value, including `stmdb sp!, {sp, lr}`.
+All addressing directions use the same register-list constraint. Conditional
+stores require the following instruction regardless of whether the condition
+holds. Empty lists, ambiguous LDM/base writeback, other STM/base overlaps,
+user-bank transfers and PC sources remain partial. Existing syntactic return,
+window and literal-ownership checks apply unchanged; no stack contents,
+alignment at runtime, balanced frame or ABI contract is proved.
+
 Default ARM entries, unresolved indirect transfers or switches, ambiguous
 boundaries, instruction/literal overlap and exhausted budgets produce explicit
 partial reasons. Invalid indexed starts with parseable addresses are reported;
