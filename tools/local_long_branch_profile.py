@@ -64,7 +64,8 @@ def record(instructions, address):
 
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
-                call_preservation=None, bounded_output_proof=None, zero_index_profile=None):
+                call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
+                entry_stack_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -93,6 +94,11 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     site for site, destination in calls.items()
                     if destination in RUNTIME_HELPERS.values() or is_udivsi3_address(destination)}:
             raise ValueError("runtime frame checks require exact complete canonical call bindings")
+
+    incoming_reads = set()
+    if entry_stack_policy is not None:
+        import readonly_entry_stack_profile as entry_stack
+        entry_stack.validate(entry_stack_policy)
 
     zero_states = None
     zero_accesses = set()
@@ -265,8 +271,12 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     raise ValueError("local branch frame requires direct aligned stack words")
                 slot = operand.mem.disp // 4
                 if slot >= len(stack):
-                    raise ValueError("local branch access leaves its established frame")
-                if name == "str":
+                    if entry_stack_policy is None:
+                        raise ValueError("local branch access leaves its established frame")
+                    offset = entry_stack.read_word(instruction, len(stack), entry_stack_policy)
+                    incoming_reads.add((site, offset, bytes(instruction.bytes).hex()))
+                    assigned = (regs[0], None)
+                elif name == "str":
                     if regs[0] in aliases:
                         raise ValueError("local aliases cannot be stored or spilled")
                     if stack[slot][0] != "local":
@@ -327,6 +337,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         proof["external_calls"] = "complete-native-callee-preservation-v1"
         proof["call_preservation"] = [[site, sorted(registers)]
                                       for site, registers in sorted(call_preservation.items())]
+    if entry_stack_policy is not None:
+        proof["entry_stack"] = {"schema": entry_stack.SCHEMA, "words": [0],
+            "contract": entry_stack.CONTRACT, "loaded_value": "unknown scalar; no provenance facts",
+            "reads": [[site, offset, 4, encoded] for site, offset, encoded in sorted(incoming_reads)]}
     if stack_aliases:
         proof["local_aliases"] = {"schema": ALIAS_SCHEMA, "assignments": sorted(alias_sites),
                                   "accesses": sorted(alias_accesses), "buffer_calls": sorted(alias_calls),
