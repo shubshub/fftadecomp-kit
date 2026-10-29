@@ -349,8 +349,15 @@ caller-clobbered registers, and joins retain only identical constants present
 on every incoming path. Unknown or arithmetic-derived indices are rejected.
 The same exact constants permit the 16-bit `add Rd, sp, Rd` form for low
 registers `r0`–`r7`, producing an alias bounded by the existing frame checks.
-High-register destinations, shifted or wider additions, and register-controlled
-SP writes are not supported by this extension.
+High-register destinations and wider additions are not supported by this
+extension.
+An adjacent narrow `movs Rd, #N; lsls Rd, Rd, #S; add Rd, sp, Rd` sequence
+may additionally form a low-register alias. The shift must be nonzero and the
+exact unsigned result must fit 32 bits; the existing allocated-frame bounds
+then apply. The move and shift must be the unique predecessors of their next
+instructions, preventing a branch from supplying another offset. This local
+proof creates only the stack alias: shifted values still do not establish
+general register-index constants, and other arithmetic-derived offsets fail.
 Alias facts must agree exactly at control-flow joins. Pushing or storing these
 pointers, unsupported pointer arithmetic, and carrying an
 alias across a call in a caller-clobbered register are rejected by these
@@ -370,7 +377,18 @@ the same instruction-derived rule runs during fresh verification and replay.
 The fixed-frame exclusions in division, switch and function-address profiles
 still apply.
 
-Register-controlled SP writes and untracked stack-pointer transformations
+An adjacent 16-bit PC-relative `ldr r0-r7, literal` followed by the exact
+16-bit `add sp, r0-r7` encoding also establishes a fixed adjustment when the
+aligned in-symbol literal contains a nonzero signed multiple of four, at most
+4096 bytes in magnitude. The load must be the addition's sole CFG predecessor;
+no branch may bypass it. A literal allocation cannot grow the tracked frame
+beyond 4096 bytes, including saved registers. The existing depth joins, local
+access bounds, return provenance and balanced-return checks still apply, and
+the literal must not overlap reachable code. This rule introduces no general
+register constant, buffer-index or pointer fact. The incoming-buffer pass uses
+the same proven adjustment. No new report schema or opt-in is required.
+
+Other register-controlled SP writes and untracked stack-pointer transformations
 remain rejected. This is a bounded CFG profile, not a general proof of memory
 safety, pointer lifetime, or callee behavior. In particular, the existing normal
 frame profile can leave a stack alias in a return register after restoring SP;

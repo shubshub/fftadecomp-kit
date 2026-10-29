@@ -1950,6 +1950,57 @@ def thumb_stack_adjustment(instruction):
     return -words if instruction.bytes[0] & 0x80 else words
 
 
+def thumb_literal_stack_adjustment(instruction, data, address):
+    """Recognize only an adjacent literal LDR / ADD SP, low-register pair.
+
+    The caller must also prove that the LDR is the ADD's sole CFG predecessor.
+    Literal ownership is checked with every other reachable PC-relative load.
+    No scalar constant or pointer/index fact is introduced by this rule.
+    """
+    offset = instruction.address - address
+    if instruction.size != 2 or offset < 2 or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID):
+        return None
+    addition = int.from_bytes(instruction.bytes, "little")
+    if (addition & 0xFFC7) != 0x4485:
+        return None
+    load = struct.unpack_from("<H", data, offset - 2)[0]
+    if (load & 0xF800) != 0x4800 or ((load >> 8) & 7) != ((addition >> 3) & 7):
+        return None
+    literal = ((instruction.address + 2) & ~3) + 4 * (load & 0xFF)
+    if not address <= literal or literal + 4 > address + len(data):
+        raise ValueError("stack adjustment literal is outside the function")
+    displacement = struct.unpack_from("<i", data, literal - address)[0]
+    if not displacement or displacement % 4 or abs(displacement) > 4096:
+        raise ValueError("stack adjustment literal is not a bounded aligned displacement")
+    return displacement // 4
+
+
+def thumb_shifted_stack_constant(instruction, data, address):
+    """Recognize MOVS Rd,#N; LSLS Rd,Rd,#S; ADD Rd,SP,Rd only.
+
+    Both intermediate edges must be proved unique by the CFG verifier. This
+    value is solely an input to bounded stack-alias formation, not an index fact.
+    """
+    offset = instruction.address - address
+    if instruction.size != 2 or offset < 4 or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            instruction.bytes[1] != 0x44 or not 0x68 <= instruction.bytes[0] <= 0x6F:
+        return None
+    register = instruction.bytes[0] - 0x68
+    moved, shifted = struct.unpack_from("<HH", data, offset - 4)
+    if (moved & 0xFF00) != (0x2000 | (register << 8)) or (shifted & 0xF800) or \
+            (shifted & 7) != register or ((shifted >> 3) & 7) != register:
+        return None
+    shift = (shifted >> 6) & 31
+    if not shift:
+        return None
+    value = (moved & 255) << shift
+    if value > 0xFFFFFFFF:
+        raise ValueError("shifted stack offset overflows a 32-bit scalar")
+    return ARM_REG_R0 + register, value
+
+
 def uses_stack_frame(instructions):
     return any(thumb_stack_adjustment(instruction) is not None or
                any((operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP) or
@@ -2160,8 +2211,9 @@ class BufferCallProof:
                         aliases.pop(register, None)
                         constants.pop(register, None)
                     depth -= len(registers)
-                elif thumb_stack_adjustment(instruction) is not None:
-                    depth -= thumb_stack_adjustment(instruction)
+                elif (adjustment := thumb_stack_adjustment(instruction)) is not None or \
+                        (adjustment := thumb_literal_stack_adjustment(instruction, data, address)) is not None:
+                    depth -= adjustment
                 elif CS_GRP_CALL in instruction.groups:
                     passed = {register: offset for register, offset in aliases.items()
                               if register in CALLER_CLOBBERED}
@@ -2467,6 +2519,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     calls = dict(validated_calls or {})
     seen_calls = set()
     local_branches = {}
+    literal_adjustments = set()
+    shifted_stack_constants = set()
     while pending:
         current = pending.pop()
         if current % alignment or not address <= current < end:
@@ -2494,6 +2548,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
         stack_operation = instruction.mnemonic in ("push", "pop")
         adjustment = thumb_stack_adjustment(instruction) if thumb else None
+        if thumb and adjustment is None:
+            adjustment = thumb_literal_stack_adjustment(instruction, data, address)
+            if adjustment is not None:
+                literal_adjustments.add(current)
         if allow_switch_scalar_frame:
             if instruction.mnemonic.startswith(("ldm", "stm")):
                 raise ValueError("scalar switch frames exclude block transfers")
@@ -2600,6 +2658,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if not unconditional:
                 raise ValueError("unsupported conditional stack-pointer adjustment")
             if adjustment < 0:
+                if current in literal_adjustments and 4 * (len(stack) - adjustment) > 4096:
+                    raise ValueError("literal stack allocation exceeds the bounded tracked frame")
                 stack[:0] = [(False, False, True)] * -adjustment
             elif adjustment > len(stack):
                 raise ValueError("stack-pointer adjustment leaves the tracked frame")
@@ -2670,7 +2730,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
                     raise ValueError("unsupported stack-pointer adjustment")
-                assignment = stack_alias_assignment(instruction, aliases, len(stack), constants) if thumb else None
+                alias_constants = constants
+                if thumb:
+                    shifted = thumb_shifted_stack_constant(instruction, data, address)
+                    if shifted is not None:
+                        shifted_stack_constants.add(current)
+                        alias_constants = {**constants, shifted[0]: shifted[1]}
+                assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) if thumb else None
                 if ARM_REG_SP in registers and assignment is None:
                     raise ValueError("unsupported stack-address materialization")
                 if ARM_REG_PC in registers:
@@ -2834,6 +2900,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     for current, successors in edges.items():
         for successor in successors:
             predecessors[successor].add(current)
+    if any(current == address or predecessors[current] != {current - 2}
+           for current in literal_adjustments):
+        raise ValueError("stack adjustment literal load is bypassed by a control-flow edge")
+    if any(predecessors.get(current) != {current - 2} or
+           predecessors.get(current - 2) != {current - 4}
+           for current in shifted_stack_constants):
+        raise ValueError("shifted stack constant is bypassed by a control-flow edge")
     if switch is not None:
         pool_switch = function_thunk_context is not None and 'pool_switch' in function_thunk_context
         if (not allow_switch_scalar_frame and double_context is None and not pool_switch and
