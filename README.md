@@ -759,6 +759,17 @@ calls and register PUSH/POP saves may coexist. Explicit frames, stack aliases
 or arguments, buffers, switches, indirect thunks, callbacks, named object
 relocations and other arithmetic runtime profiles remain excluded.
 
+The explicit companion `--signed-quotient-profile positive-constant-frame-v1`
+uses schema `elf-symbol-thumb-divsi3-positive-constant-frame-v1`. It requires
+an allocated caller SP frame and reuses the complete native CFG, balanced
+stack, saved-register/return, stack-alias and literal checks before proving the
+same positive constant divisors. Its exact manifest also requires `frame:true`;
+source/ELF replay and status verification retain this selector. Default and
+standalone quotient behavior stay unchanged. Ordinary calls retain only the
+structural returning-call ABI premise. This diagnostic support supplies no
+whole-callee, C admission, match, or exhaustive inventory proof; an instruction
+count correction alone leaves `inventory_complete` false.
+
 The pinned `agbcc-thumb-divsi3-v1` identity is the complete 146-byte Thumb
 function `[0x081426B8,0x0814274A)`, SHA-256
 `80b13b14c17b297e6c92a50aeddcacdffbe951729bcb1290e205055950655884`, and its

@@ -1153,8 +1153,12 @@ def verify_addressed_modsi3_source(root, address, data, rom, mapping, source_dig
         _addressed_replay_active.reset(token)
 
 
-def verify_divsi3(data, address, rom, mapping, manifest):
-    if not isinstance(manifest, dict) or set(manifest) != {"runtime", "calls", "divisors"} or \
+def verify_divsi3(data, address, rom, mapping, manifest, *, selector=None):
+    divsi3.schema(selector)
+    framed = selector == divsi3.FRAMED_SELECTOR
+    fields = {"runtime", "calls", "divisors"} | ({"frame"} if framed else set())
+    if not isinstance(manifest, dict) or set(manifest) != fields or \
+            framed and manifest.get("frame") is not True or \
             manifest["runtime"] != divsi3.RUNTIME or \
             not isinstance(manifest["calls"], list) or not isinstance(manifest["divisors"], list):
         raise ValueError("invalid signed quotient manifest")
@@ -1190,7 +1194,8 @@ def verify_divsi3(data, address, rom, mapping, manifest):
         raise ValueError("signed quotient divisors must cover every runtime call exactly once")
     observed = {}
     instructions = verify_leaf_instructions(
-        data, address, True, calls, divsi3_context=(rom, mapping, bindings, observed))
+        data, address, True, calls, divsi3_context=(rom, mapping, bindings, observed),
+        signed_quotient_profile=selector)
     if observed != expected:
         raise ValueError("signed quotient divisors disagree with final incoming CFG facts")
     return instructions
@@ -1199,7 +1204,8 @@ def verify_divsi3(data, address, rom, mapping, manifest):
 _signed_replay_active = ContextVar("signed_quotient_replay_active", default=False)
 
 
-def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest):
+def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest, *, selector=None):
+    divsi3.schema(selector)
     if _signed_replay_active.get():
         raise ValueError("recursive signed quotient replay is unsupported")
     token = _signed_replay_active.set(True)
@@ -1236,7 +1242,7 @@ def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manif
                 if not bindings or set(bindings.values()) != {"__divsi3"} or literals or \
                         got != data or fresh_calls != manifest.get("calls"):
                     raise ValueError("signed quotient lacks fresh canonical ELF provenance")
-                instructions = verify_divsi3(got, address, rom, mapping, manifest)
+                instructions = verify_divsi3(got, address, rom, mapping, manifest, selector=selector)
             checker = Path(__file__).resolve().with_name("plausible.py")
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
@@ -2519,8 +2525,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
-                             acyclic_state_budget=None, ignored_leaf_alias_proof=None):
+                             acyclic_state_budget=None, ignored_leaf_alias_proof=None,
+                             signed_quotient_profile=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    divsi3.schema(signed_quotient_profile)
+    if signed_quotient_profile is not None and (
+            not thumb or divsi3_context is None or buffer_proof is not None or
+            call_resolver is not None or preloaded_switch or allow_switch_constants or
+            allow_switch_scalar_frame or acyclic_state_budget is not None or
+            ignored_leaf_alias_proof is not None or any(context is not None for context in (
+                switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
+                inert_spin_context, double_context, function_thunk_context, umodsi3_context,
+                ashldi3_context, float_context))):
+        raise ValueError("framed signed quotient requires its isolated canonical Thumb context")
     if ignored_leaf_alias_proof is not None:
         from ignored_leaf_alias_profile import IgnoredLeafAliasProof
         if type(ignored_leaf_alias_proof) is not IgnoredLeafAliasProof or \
@@ -3262,7 +3279,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch_data_relocations is not None:
         verify_data_literals(instructions.values(), address, switch_data_relocations)
     if divsi3_context is not None:
-        if uses_stack_frame(instructions.values()):
+        if signed_quotient_profile == divsi3.FRAMED_SELECTOR:
+            # Reached only after the complete CFG, stack/save/return, alias and
+            # literal checks above. Positive divisor facts stay register-only;
+            # stack loads and caller-clobbered registers introduce no constants.
+            if not any((thumb_stack_adjustment(item) or
+                        thumb_literal_stack_adjustment(item, data, address) or 0) < 0
+                       for item in instructions.values()):
+                raise ValueError("framed signed quotient requires an allocated caller stack frame")
+            from local_long_branch_profile import prove_frame
+            prove_frame(instructions, edges, address, {}, calls, stack_aliases=True)
+        elif uses_stack_frame(instructions.values()):
             raise ValueError("signed quotient requires a frameless caller")
         divsi3_context[3].update(divsi3.prove_divisors(instructions, edges, address, divsi3_context[2]))
     if umodsi3_context is not None:
@@ -3389,6 +3416,7 @@ def main():
     ap.add_argument("--flags", default=DEFAULT_FLAGS)
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
+    ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
@@ -3415,6 +3443,11 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.signed_quotient_profile is not None and (
+            args.mode != "thumb" or args.control_flow_profile != "ordinary" or
+            args.software_double_profile or args.software_double_remainder_profile or
+            args.function_address_profile or args.switch_profile or args.owner_runtime_profile):
+        sys.exit("framed signed quotient excludes other selectors and requires Thumb mode")
     if args.owner_runtime_profile:
         import owner_admission_profile
         return owner_admission_profile.issue(Path(ROOT), addr, args)
@@ -3627,13 +3660,17 @@ def main():
                     raise ValueError("signed quotient requires the fixed approved toolchain configuration")
                 divisors = {}
                 verify_leaf_instructions(got, addr, True, calls,
-                                         divsi3_context=(rom, mapping, divsi3_bindings, divisors))
+                                         divsi3_context=(rom, mapping, divsi3_bindings, divisors),
+                                         signed_quotient_profile=args.signed_quotient_profile)
                 quotient_evidence = {
                     "runtime": divsi3.RUNTIME,
                     "calls": [[site - addr, divsi3_bindings.get(site, f"func_{target:08X}")]
                               for site, target in sorted(calls.items())],
                     "divisors": [[site - addr, divisor] for site, divisor in sorted(divisors.items())]}
-                verified_instructions = verify_divsi3(got, addr, rom, mapping, quotient_evidence)
+                if args.signed_quotient_profile is not None:
+                    quotient_evidence["frame"] = True
+                verified_instructions = verify_divsi3(got, addr, rom, mapping, quotient_evidence,
+                                                       selector=args.signed_quotient_profile)
             elif modsi3_bindings:
                 verified_instructions = verify_leaf_instructions(
                     got, addr, True, calls, modsi3_context=(rom, mapping, modsi3_bindings))
@@ -3710,6 +3747,8 @@ def main():
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True)
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof)
+            if args.signed_quotient_profile is not None and quotient_evidence is None:
+                raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             verify_data_literals(verified_instructions, addr, data_relocations)
             function_thunk.verify_literal_bindings(got, addr, verified_instructions, calls,
                                                     mapping, function_relocations)
@@ -3745,7 +3784,7 @@ def main():
     if remainder_evidence is not None:
         schema = modsi3.SCHEMA
     if quotient_evidence is not None:
-        schema = divsi3.SCHEMA
+        schema = divsi3.schema(args.signed_quotient_profile)
     if float_evidence is not None:
         schema = software_float.SCHEMA
     if shift_evidence is not None:
@@ -3848,6 +3887,14 @@ def main():
                                   data_mapping, fingerprint, shift_evidence)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             sys.exit(f"ashldi3 source replay failed: {error}")
+    if args.signed_quotient_profile is not None:
+        if hand_asm_allowed or report_rom_path(ROOT) != rom_file:
+            sys.exit("framed signed quotient excludes hand-ASM exceptions and ROM selection changes")
+        try:
+            verify_divsi3_source(ROOT, addr, got_body, rom, mapping, fingerprint,
+                                  quotient_evidence, selector=args.signed_quotient_profile)
+        except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"framed signed quotient source replay failed: {error}")
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
@@ -4000,9 +4047,11 @@ def main():
                 proof_digest = modsi3.fingerprint(addr, got_body, remainder_evidence)
                 f.write(f"* signed remainder proof SHA-256: `{proof_digest}`\n")
             if quotient_evidence is not None:
-                f.write(f"* signed quotient: {divsi3.SUMMARY}\n")
+                summary = (divsi3.FRAMED_SUMMARY if args.signed_quotient_profile else divsi3.SUMMARY)
+                f.write(f"* signed quotient: {summary}\n")
                 f.write(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
-                proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence)
+                proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence,
+                                                   selector=args.signed_quotient_profile)
                 f.write(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
             if spin_profile:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")

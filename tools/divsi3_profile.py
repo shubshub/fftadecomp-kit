@@ -5,6 +5,9 @@ import json
 
 SCHEMA = "elf-symbol-thumb-divsi3-positive-constant-v1"
 SUMMARY = "pinned Thumb signed quotient with CFG-proven positive signed32 constant divisors"
+FRAMED_SELECTOR = "positive-constant-frame-v1"
+FRAMED_SCHEMA = "elf-symbol-thumb-divsi3-positive-constant-frame-v1"
+FRAMED_SUMMARY = SUMMARY + " and a verified caller stack frame"
 RUNTIME = "agbcc-thumb-divsi3-v1"
 ADDRESS = 0x081426B8
 IDENTITIES = (
@@ -23,9 +26,15 @@ def manifest_text(manifest):
     return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
 
 
-def fingerprint(address, data, manifest):
+def schema(selector=None):
+    if selector is not None and selector != FRAMED_SELECTOR:
+        raise ValueError("unsupported signed quotient selector")
+    return FRAMED_SCHEMA if selector == FRAMED_SELECTOR else SCHEMA
+
+
+def fingerprint(address, data, manifest, *, selector=None):
     digest = hashlib.sha256()
-    for payload in (SCHEMA.encode("ascii"), address.to_bytes(4, "little"), data,
+    for payload in (schema(selector).encode("ascii"), address.to_bytes(4, "little"), data,
                     manifest_text(manifest).encode("ascii")):
         digest.update(len(payload).to_bytes(8, "little"))
         digest.update(payload)

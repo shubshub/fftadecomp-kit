@@ -678,19 +678,26 @@ def divsi3_report_matches(lines, root, address):
     try:
         mapping = mapping_snapshot(root)
         source_digest = source_fingerprint(root, address)
-        if single("* verification: ") != f"`{divsi3.SCHEMA}`" or mapping is None or \
+        verification = single("* verification: ")
+        selector = divsi3.FRAMED_SELECTOR if verification == f"`{divsi3.FRAMED_SCHEMA}`" else None
+        if verification != f"`{divsi3.schema(selector)}`" or mapping is None or \
                 unquote("* source SHA-256: ") != source_digest or \
                 unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
-                single("* signed quotient: ") != divsi3.SUMMARY or \
+                single("* signed quotient: ") != (divsi3.FRAMED_SUMMARY if selector else divsi3.SUMMARY) or \
                 single("* control flow: ") != CALL_SUMMARY or \
                 unquote("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                any(line.lstrip().startswith(("* stack frame", "* buffer", "* data symbols",
+                any(line.lstrip().startswith(("* buffer", "* data symbols",
                                               "* unsigned division", "* signed remainder", "* switches",
                                               "* switch manifest", "* switch proof", "* function address",
                                               "* function buffer")) for line in lines):
+            return False
+        if selector:
+            if single("* stack frame: ") != STACK_SUMMARY:
+                return False
+        elif any(line.lstrip().startswith("* stack frame") for line in lines):
             return False
         encoded = unquote("* compiled : ")
         if re.fullmatch(r"(?:[0-9a-f]{2})+", encoded) is None:
@@ -701,11 +708,12 @@ def divsi3_report_matches(lines, root, address):
         if divsi3.manifest_text(manifest) != encoded_manifest or \
                 single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
                 single("**MATCH - byte identical** - ") != f"{len(data)}/{len(data)} bytes" or \
-                unquote("* signed quotient proof SHA-256: ") != divsi3.fingerprint(address, data, manifest):
+                unquote("* signed quotient proof SHA-256: ") != divsi3.fingerprint(
+                    address, data, manifest, selector=selector):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
-        verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest)
+        verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest, selector=selector)
         return (source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == mapping and
                 report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
@@ -825,7 +833,8 @@ def report_matches(report, root, address):
         return umodsi3_report_matches(lines, root, address)
     if any(line.lstrip().startswith("* unsigned remainder") for line in lines):
         return False
-    if profiles == [f"* verification: `{divsi3.SCHEMA}`"]:
+    if profiles in ([f"* verification: `{divsi3.SCHEMA}`"],
+                     [f"* verification: `{divsi3.FRAMED_SCHEMA}`"]):
         return divsi3_report_matches(lines, root, address)
     if any(line.lstrip().startswith("* signed quotient") for line in lines):
         return False

@@ -42,6 +42,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
+import divsi3_profile as divsi3
 from rompath import rom_path
 
 # the status block uses block-drawing characters; Windows consoles are cp1252
@@ -240,6 +241,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
         thunk_profile = False
         owner_profile = False
         constants_profile = False
+        quotient_frame = False
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
@@ -252,10 +254,14 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                     target_remainder_profile = software_double.target_remainder_selected(saved_report)
                 thunk_profile = function_thunk.selected(saved_report)
                 spin_profile = inert_spin.selected(saved_report)
+                quotient_frame = f"* verification: `{divsi3.FRAMED_SCHEMA}`" in saved_report.splitlines()
             except ValueError as error:
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
         if verify:
+            if quotient_frame and not report_matches(saved_report, root, int(addr, 16)):
+                problems.append(f"{addr}: invalid saved framed signed quotient report")
+                return 0, 0, problems, []
             if owner_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved complete-owner report")
                 return 0, 0, problems, []
@@ -281,11 +287,13 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 command += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(saved_report)]
             if constants_profile:
                 command += ["--switch-profile", constants_profile.selector]
+            if quotient_frame:
+                command += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
             ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or owner_profile) and ok:
+        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or owner_profile or quotient_frame) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()
