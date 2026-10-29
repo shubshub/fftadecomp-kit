@@ -1798,3 +1798,31 @@ calls and equal word values on both branches. Negatives cover changed callback
 contexts, possible clobbers, unequal joins, unknown writes, partial/expired words,
 frame reuse and unproved register preservation. No original game C or ROM body is
 embedded in these tests.
+
+### Watched switch preservation
+
+`--owner-runtime-profile watched-switch-preservation-v1` is an explicit isolated
+complete-owner profile, reported as `elf-symbol-thumb-watched-switch-preservation-v1`.
+It extends protected descriptor-word replay only for a single call-free, read-only,
+narrow Thumb switch callee already proved by the existing native guarded word-table
+layout, complete CFG, stack/return verifier and complete byte partition. Every
+finite case and default path is replayed by the existing bounded alias/word engine.
+Caller-held watched aliases must be both unread and unwritten by that switch;
+push/pop control words retain the native frame checks. This does not grant bounds
+to implicit arguments or preservation from an ordinary ABI summary.
+
+The profile retains exact word lifetimes, overlap invalidation, callback targets,
+context budgets and source/ELF/ROM/map fingerprints. Reports include exact watched
+contexts and hash identities for inspected switch tables, without extracted table
+contents. It permits at most fourteen distinct inspected dependency owners of at most
+4096 bytes each, and requires an actual watched switch context. Unknown transfers,
+escaping targets, unknown writes, changed or ambiguous metadata, alias clobbers and
+exhausted budgets remain refusals. All previous selectors keep their behavior.
+
+Run `python -m unittest test_watched_switch_preservation -v` from `tests/` with the
+fixed original compiler and ARM tools on PATH. The tests generate natural C and
+retain original ET_REL objects and compiler assembly in their disk-backed fixture;
+they contain no extracted game body or table.
+
+Set `FFTA_WATCHED_SWITCH_TEST_ROM` to the approved ROM to run the one bounded
+original-switch test; otherwise that test is explicitly skipped.

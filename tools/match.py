@@ -3353,7 +3353,8 @@ def main():
                                                       "restoring-owner-ignored-leaf-alias-v1",
                                                       "named-data-buffer-v1",
                                                       "static-callback-buffer-v1",
-                                                      "protected-descriptor-word-v1"))
+                                                      "protected-descriptor-word-v1",
+                                                      "watched-switch-preservation-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
