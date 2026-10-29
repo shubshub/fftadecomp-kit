@@ -1826,3 +1826,31 @@ they contain no extracted game body or table.
 
 Set `FFTA_WATCHED_SWITCH_TEST_ROM` to the approved ROM to run the one bounded
 original-switch test; otherwise that test is explicitly skipped.
+
+### Descriptor output stack origins
+
+`--owner-runtime-profile descriptor-output-alias-v1` selects the isolated schema
+`elf-symbol-thumb-descriptor-output-alias-v1`. It carries exact SP-derived aliases
+and live allocated/saved-control words through inspected callee frames using the
+existing buffer alias and protected descriptor-word engine. Frame metadata is part
+of every effect state/join, and existing call contexts retain all words, targets,
+origins and watched registers. Only exact aligned full-word stores/reloads restore
+pointer provenance; partial, clobbered, expired and invalid-origin facts refuse.
+
+For this selector, a complete closed CFG and byte partition precede actual-context
+effects. A separate complete native frame/return check must pass before any
+successful callee result is exported. Its structural-only call handling exports no
+word or pointer identity; it cannot admit an owner without actual effect replay.
+Failed effect prefixes can establish a precise next refusal while native ancestor
+frame checks remain pending. Reports require actual callee stack-origin and pointer
+word observations, and bind successful native frame replay counts as well as the
+original ELF, source, ROM and mappings. The limits remain fourteen dependency
+owners of at most 4096 bytes, 128 contexts and 4096 live stack bytes. All prior
+selectors and defaults retain their behavior.
+
+The selector does not add append/block-write semantics or infer an iteration count
+or output capacity from a stack pointer. A known output base at an append store
+still refuses those unproved effects. `tests/test_descriptor_output_alias.py` uses
+natural fixed-O2 source with retained original ET_REL/assembly and tests unsafe
+actual effects after structural inventory, a real final-native return refusal,
+wrong origins, two contexts, partial/clobbered/control words and expired pointers.

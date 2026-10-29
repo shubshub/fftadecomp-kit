@@ -2191,6 +2191,7 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
 
 class BufferCallProof:
     word_provenance = False
+    callee_frames = False
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2282,6 +2283,8 @@ class BufferCallProof:
             raise ValueError("recursive or excessively nested buffer calls are unsupported")
         self.active.add(address)
         try:
+            if self.callee_frames and frame_base != -4 * len(stack):
+                raise ValueError("callee frame origin differs from the exact incoming live stack")
             data = self.span(address)
             instructions, finite_transfers = self.inspect(address, data)
             self.dependencies[address] = data
@@ -2289,6 +2292,8 @@ class BufferCallProof:
             states = {address: (tuple(sorted(arguments.items())), 0,
                                 tuple(sorted((constants or {}).items())),
                                 tuple(sorted((words or {}).items())))}
+            if self.callee_frames:
+                states[address] += (tuple(stack),)
             pending = [address]
             returned = ()
             returned_words = None
@@ -2299,6 +2304,8 @@ class BufferCallProof:
                 depth = states[current][1]
                 constants = dict(states[current][2])
                 words = dict(states[current][3])
+                if self.callee_frames:
+                    stack = list(states[current][4])
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
@@ -2311,14 +2318,23 @@ class BufferCallProof:
                     if set(registers) & aliases.keys():
                         raise ValueError("buffer pointers cannot be pushed or spilled")
                     depth += len(registers)
+                    if self.callee_frames:
+                        stack[:0] = [(False, True, False)] * len(registers)
                 elif instruction.mnemonic == "pop":
                     for register in registers:
                         aliases.pop(register, None)
                         constants.pop(register, None)
                     depth -= len(registers)
+                    if self.callee_frames:
+                        del stack[:len(registers)]
                 elif (adjustment := thumb_stack_adjustment(instruction)) is not None or \
                         (adjustment := thumb_literal_stack_adjustment(instruction, data, address)) is not None:
                     depth -= adjustment
+                    if self.callee_frames:
+                        if adjustment < 0:
+                            stack[:0] = [(False, False, True)] * -adjustment
+                        else:
+                            del stack[:adjustment]
                 elif CS_GRP_CALL in instruction.groups:
                     passed = {register: offset for register, offset in aliases.items()
                               if register in CALLER_CLOBBERED}
@@ -2336,6 +2352,12 @@ class BufferCallProof:
                     aliases.update(result)
                 else:
                     assignment = register_alias_assignment(instruction, aliases)
+                    if self.callee_frames:
+                        assignment = stack_alias_assignment(instruction, aliases, len(stack), constants)
+                        if assignment is not None and assignment[2] == ARM_REG_SP:
+                            self.access(assignment[1], 1, stack)
+                            self.observe_frame_alias(address, instruction.address, assignment, stack, words,
+                                frame_base, root_frame, watched, arguments, incoming, protected, constants)
                     allowed = {assignment[2]} if assignment is not None else set()
                     loaded = None
                     word_constant = None
@@ -2344,6 +2366,8 @@ class BufferCallProof:
                         loaded, word_constant, word_load, pointer_store = self.word_memory(
                             instruction, aliases, constants, stack, words,
                             frame_base-4*depth, protected, root_frame=root_frame)
+                    if self.callee_frames and pointer_store:
+                        allowed.add(operands[0].reg)
                     for operand in operands:
                         if operand.type != ARM_OP_MEM:
                             continue
@@ -2415,6 +2439,9 @@ class BufferCallProof:
                 if current in finite_transfers:
                     successors = finite_transfers[current]
                 elif returning:
+                    if self.callee_frames:
+                        for offset in aliases.values():
+                            self.access(offset, 1, stack)
                     if aliases and not self.stack_arguments:
                         raise ValueError("buffer pointer escapes through a return register")
                     if any(register not in CALLER_CLOBBERED or register == ARM_REG_LR
@@ -2429,7 +2456,13 @@ class BufferCallProof:
                         successors += (current + instruction.size,)
                 else:
                     successors = (current + instruction.size,)
+                if self.callee_frames:
+                    if len(stack) * 4 > 4096 or frame_base - 4 * depth != -4 * len(stack):
+                        raise ValueError("callee live stack exceeds its exact bounded frame")
+                    self.prune_words(words, stack)
                 outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())), tuple(sorted(words.items())))
+                if self.callee_frames:
+                    outgoing += (tuple(stack),)
                 for successor in successors:
                     if successor not in states:
                         states[successor] = outgoing
@@ -2438,13 +2471,19 @@ class BufferCallProof:
                         previous = states[successor]
                         if not self.stack_arguments or previous[1] != depth:
                             raise ValueError("inconsistent buffer aliases at control-flow join")
+                        if self.callee_frames and previous[4] != outgoing[4]:
+                            raise ValueError("inconsistent live callee frame at control-flow join")
                         merged = (merge_possible_aliases(previous[0], outgoing[0]), depth,
                                   tuple((register, value) for register, value in previous[2]
                                         if constants.get(register) == value),
                                   tuple((slot,value) for slot,value in previous[3] if words.get(slot)==value))
+                        if self.callee_frames:
+                            merged += (previous[4],)
                         if merged != previous:
                             states[successor] = merged
                             pending.append(successor)
+            if self.callee_frames:
+                self.complete_frame(address, data, instructions)
             return self.word_result(returned, returned_words or {})
         except ValueError as error:
             raise ValueError(f"buffer callee 0x{address:08X}: {error}") from error
@@ -3354,7 +3393,8 @@ def main():
                                                       "named-data-buffer-v1",
                                                       "static-callback-buffer-v1",
                                                       "protected-descriptor-word-v1",
-                                                      "watched-switch-preservation-v1"))
+                                                      "watched-switch-preservation-v1",
+                                                      "descriptor-output-alias-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
