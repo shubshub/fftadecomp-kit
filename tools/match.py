@@ -2419,8 +2419,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
-                             acyclic_state_budget=None):
+                             acyclic_state_budget=None, ignored_leaf_alias_proof=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if ignored_leaf_alias_proof is not None:
+        from ignored_leaf_alias_profile import IgnoredLeafAliasProof
+        if type(ignored_leaf_alias_proof) is not IgnoredLeafAliasProof or \
+                acyclic_state_budget is None or ignored_leaf_alias_proof.caller != address or \
+                ignored_leaf_alias_proof.size != len(data) or \
+                ignored_leaf_alias_proof.calls != dict(validated_calls or {}):
+            raise ValueError("ignored leaf aliases require their isolated exact acyclic caller context")
     if acyclic_state_budget is not None:
         if type(acyclic_state_budget) is not int or not 1 <= acyclic_state_budget <= 4096:
             raise ValueError("acyclic path-state budget must be an integer in 1..4096")
@@ -2792,10 +2799,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("indirect target carries tracked stack or return provenance")
             returned_aliases = {}
             if pointer_slots or any(register in aliases for register in caller_clobbered):
-                if buffer_proof is None:
+                if ignored_leaf_alias_proof is not None:
+                    returned_aliases = ignored_leaf_alias_proof.check_call(
+                        current, operands[0].imm, aliases, pointer_slots)
+                elif buffer_proof is None:
                     raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
-                returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
-                                                          pointer_slots)
+                else:
+                    returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
+                                                              pointer_slots)
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
@@ -3264,7 +3275,8 @@ def main():
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
     ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",
-                                                      "restoring-owner-acyclic-v1"))
+                                                      "restoring-owner-acyclic-v1",
+                                                      "restoring-owner-ignored-leaf-alias-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

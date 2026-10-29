@@ -1437,6 +1437,34 @@ bindings, fixed compiler flags, plausible source and fresh report replay remain
 required. Status and compiled rebuild forward the saved explicit selector.
 Default matching and `restoring-owner-runtime-v1` retain their existing behavior.
 
+### Explicit ignored incoming leaf aliases
+
+`--owner-runtime-profile restoring-owner-ignored-leaf-alias-v1` selects
+`elf-symbol-thumb-ignored-leaf-alias-v1`. This separate, default-off composition
+retains the acyclic owner's 4096-state budget and every caller frame, alias,
+ELF, typed-binding, fixed-compiler and source-plausibility check. Earlier
+selectors and default matching remain unchanged.
+
+A caller-clobbered stack alias can be discarded only when its exact original
+callee is a complete, noncalling Thumb leaf of at most 256 bytes. Fresh ROM
+replay proves unique ownership, mode, both indexed instruction counts, closed
+CFG, complete byte partition, typed literals and ABI preservation. Every path
+must fully overwrite each incoming alias register before any read and before
+every return. Conditional instructions may observe only condition flags already
+defined inside the callee, including separately tracked N, Z, C and V bits.
+The narrow Thumb-1 instruction-effect policy rejects unsupported effects,
+incoming stack pointer slots, ordinary memory accesses, and indirect,
+forwarding, recursive, unknown or cross-mode calls. C prototypes cannot waive
+an actual register input. Reports retain the complete callee proof and body,
+ROM, mapping, index and object SHA-256 identities, without serializing the raw
+callee body. Fresh source-bound replay, status and compiled rebuild preserve
+these bindings.
+
+For original caller `0801B630`, this proof advances past `0801B690` and the
+second call at `0801B698` to leaf `0801AD1C`. The actual local-buffer argument
+in r0 at `0801B6AA`, calling `0801AF08`, remains refused. This verifier
+capability grants zero game C credit and does not admit the complete caller.
+
 ## Status accounting
 
 The two existing percentage badges and table rows retain their legacy
