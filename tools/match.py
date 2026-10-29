@@ -2617,10 +2617,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              remainder_framed_shift_inventory_context=None,
                              remainder_byte_range_inventory_context=None,
                              bounded_stack_output_inventory_context=None,
-                             bounded_stack_output_zero_index_inventory_context=None):
+                             bounded_stack_output_zero_index_inventory_context=None,
+                             zero_aware_mixed_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     bounded_output_proof = None
-    if bounded_stack_output_zero_index_inventory_context is not None:
+    if zero_aware_mixed_inventory_context is not None:
+        if any(value is not None for value in (remainder_inventory_context,
+                remainder_ordinary_inventory_context,remainder_shift_inventory_context,
+                remainder_framed_shift_inventory_context,remainder_byte_range_inventory_context,
+                bounded_stack_output_inventory_context,bounded_stack_output_zero_index_inventory_context)):
+            raise ValueError('zero-aware mixed inventory contexts cannot be combined')
+        import zero_aware_mixed_runtime_inventory as remainder_inventory
+        remainder_inventory_context = zero_aware_mixed_inventory_context
+    elif bounded_stack_output_zero_index_inventory_context is not None:
         if any(value is not None for value in (remainder_inventory_context,
                 remainder_ordinary_inventory_context, remainder_shift_inventory_context,
                 remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context,
@@ -2677,7 +2686,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                          remainder_shift_inventory_context is not None or
                          remainder_framed_shift_inventory_context is not None or
                          remainder_byte_range_inventory_context is not None or
-                         bounded_stack_output_inventory_context is not None else
+                         bounded_stack_output_inventory_context is not None or
+                         zero_aware_mixed_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
@@ -3014,7 +3024,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("software double requires its canonical runtime proof")
             if divsi3.reserved(target) and target != 0x0814274C and not (
                     double_context is not None and
-                    software_double.shared_division_call(double_context[3].get(current), target)):
+                    software_double.shared_division_call(double_context[3].get(current), target) or
+                    zero_aware_mixed_inventory_context is not None and target == divsi3.ADDRESS and
+                    zero_aware_mixed_inventory_context[3].get(current) == '__divsi3'):
                 if divsi3_context is None or target != divsi3.ADDRESS or current not in divsi3_context[2]:
                     raise ValueError("signed quotient requires its canonical positive-constant proof")
             if modsi3.reserved(target) and target != 0x0814274C and not (
@@ -3524,8 +3536,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 remainder_framed_shift_inventory_context is None and bounded_stack_output_inventory_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         if remainder_inventory_context is not None:
+            operand_sites = zero_aware_mixed_inventory_context[3] if \
+                zero_aware_mixed_inventory_context is not None else modsi3_context[2]
             remainder_inventory.prove_operands(data, address, instructions, edges,
-                modsi3_context[2], remainder_inventory_context[4])
+                operand_sites, remainder_inventory_context[4])
         else:
             transfers = modsi3.prove_operands(instructions, edges, address, modsi3_context[2],
                 logical_shift_signed16=signed_runtime_context is not None and
