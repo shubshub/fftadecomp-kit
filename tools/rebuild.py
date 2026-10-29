@@ -93,7 +93,7 @@ def saved_profile_arguments(report, root, address):
     arguments = []
     import owner_admission_profile
     if owner_admission_profile.selected(report):
-        arguments += ["--owner-runtime-profile", owner_admission_profile.SELECTOR]
+        arguments += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(report)]
     constants_policy = switch_constants.selected_policy(report)
     if constants_policy is not None:
         arguments += ["--switch-profile", constants_policy.selector]

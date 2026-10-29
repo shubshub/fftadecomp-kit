@@ -1405,6 +1405,22 @@ verdict/profile markers reject, including horizontal-whitespace variants.
 The normal status and push-match gates use these same rules; no target-address
 allowlist, source rewrite or progress exception is introduced.
 
+### Explicit acyclic owner frames
+
+`--owner-runtime-profile restoring-owner-acyclic-v1` selects
+`elf-symbol-thumb-acyclic-stack-alias-v1`. It preserves distinct stack, alias,
+constant and return-provenance states at joins, with a fixed limit of 4096
+distinct instruction/state pairs including entry. Every path must pass the
+ordinary native frame, alias-use, escape, call and return checks. Reachable CFG
+cycles and exhausted budgets reject. Only ordinary direct Thumb calls compose;
+buffer profiles, arithmetic runtimes, indirect thunks, local BL and switches
+remain excluded. All syntactic conditional edges are checked.
+
+Complete ownership and instruction counts, original ELF provenance, typed
+bindings, fixed compiler flags, plausible source and fresh report replay remain
+required. Status and compiled rebuild forward the saved explicit selector.
+Default matching and `restoring-owner-runtime-v1` retain their existing behavior.
+
 ## Status accounting
 
 The two existing percentage badges and table rows retain their legacy

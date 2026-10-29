@@ -278,7 +278,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
             if thunk_profile:
                 command += ["--function-address-profile", function_thunk.SELECTOR]
             if owner_profile:
-                command += ["--owner-runtime-profile", owner_admission_profile.SELECTOR]
+                command += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(saved_report)]
             if constants_profile:
                 command += ["--switch-profile", constants_profile.selector]
             if not write_reports:

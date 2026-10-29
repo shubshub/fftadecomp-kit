@@ -2418,8 +2418,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              preloaded_switch=False, modsi3_context=None, divsi3_context=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
-                             umodsi3_context=None, ashldi3_context=None, float_context=None):
+                             umodsi3_context=None, ashldi3_context=None, float_context=None,
+                             acyclic_state_budget=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if acyclic_state_budget is not None:
+        if type(acyclic_state_budget) is not int or not 1 <= acyclic_state_budget <= 4096:
+            raise ValueError("acyclic path-state budget must be an integer in 1..4096")
+        if not thumb or buffer_proof is not None or call_resolver is not None or any(
+                context is not None for context in (switch_relocations, switch_data_relocations,
+                    udivsi3_context, modsi3_context, divsi3_context, inert_spin_context,
+                    double_context, function_thunk_context, umodsi3_context,
+                    ashldi3_context, float_context)) or preloaded_switch or \
+                allow_switch_constants or allow_switch_scalar_frame:
+            raise ValueError("acyclic path states require an ordinary isolated Thumb CFG")
     from switch_constants_profile import check_opt_in, layout as constants_layout
     check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
                  switch_data_relocations, udivsi3_context, preloaded_switch, modsi3_context,
@@ -2585,6 +2596,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     stack_arguments = buffer_proof is not None and buffer_proof.stack_arguments
     caller_clobbered = CALLER_CLOBBERED
     pending = [address]
+    path_states = None
+    if acyclic_state_budget is not None:
+        path_states = {address: {states[address]}}
+        pending = [(address, states[address])]
+        path_state_count = 1
     instructions = {}
     owners = {}
     edges = {}
@@ -2597,7 +2613,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     shifted_stack_constants = set()
     literal_stack_constants = set()
     while pending:
-        current = pending.pop()
+        if path_states is None:
+            current = pending.pop()
+        else:
+            current, incoming_state = pending.pop()
+            states[current] = incoming_state
         if current % alignment or not address <= current < end:
             raise ValueError("function has no verified return: non-leaf control flow leaves the symbol")
         if current not in instructions:
@@ -2943,6 +2963,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())),
                     tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())))
         for successor in successors:
+            if path_states is not None:
+                previous_paths = path_states.get(successor, set())
+                if previous_paths and any(len(state[1]) != len(stack) for state in previous_paths):
+                    raise ValueError("inconsistent saved stack depth at control-flow join")
+                if outgoing not in previous_paths:
+                    if path_state_count >= acyclic_state_budget:
+                        raise ValueError("acyclic path-state budget exhausted")
+                    path_states.setdefault(successor, set()).add(outgoing)
+                    path_state_count += 1
+                    pending.append((successor, outgoing))
+                continue
             previous = states.get(successor)
             if previous is None:
                 merged = outgoing
@@ -2973,6 +3004,24 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
+    if path_states is not None:
+        # Exact states never merge. The complete reached graph must also be a
+        # DAG, including cycles whose repeated states needed no new work item.
+        incoming_edges = {site: 0 for site in instructions}
+        for successors in edges.values():
+            for successor in successors:
+                incoming_edges[successor] += 1
+        ready = [site for site, count in incoming_edges.items() if count == 0]
+        removed = 0
+        while ready:
+            site = ready.pop()
+            removed += 1
+            for successor in edges[site]:
+                incoming_edges[successor] -= 1
+                if incoming_edges[successor] == 0:
+                    ready.append(successor)
+        if removed != len(instructions):
+            raise ValueError("acyclic path states reject reachable CFG cycles")
     if seen_calls != calls.keys():
         raise ValueError("call relocations are not all reachable verified instructions")
     if division_constants is not None and \
@@ -3214,7 +3263,8 @@ def main():
     ap.add_argument("--emit", help="write verified symbol bytes to a new file under the decomp build/")
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
-    ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",))
+    ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",
+                                                      "restoring-owner-acyclic-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

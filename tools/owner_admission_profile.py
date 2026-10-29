@@ -25,6 +25,10 @@ from inert_spin_profile import fixed_configuration, index_snapshot, validate_spa
 SCHEMA = 'elf-symbol-thumb-restoring-owner-runtime-v1'
 SELECTOR = 'restoring-owner-runtime-v1'
 CONTROL_FLOW = 'complete restoring Thumb owner; local BL control, guarded switches, canonical thunks and constant unsigned division'
+ACYCLIC_SELECTOR = 'restoring-owner-acyclic-v1'
+ACYCLIC_SCHEMA = 'elf-symbol-thumb-acyclic-stack-alias-v1'
+ACYCLIC_STATE_BUDGET = 4096
+ACYCLIC_CONTROL_FLOW = 'complete acyclic Thumb owner; exact bounded path states and ordinary direct-call ABI summaries'
 _replay = ContextVar('owner_runtime_replay', default=False)
 
 
@@ -37,12 +41,12 @@ def sha(raw):
 
 
 def selected(report):
-    relevant = SCHEMA in report or any(marker_text(line).startswith('* owner runtime')
+    relevant = SCHEMA in report or ACYCLIC_SCHEMA in report or any(marker_text(line).startswith('* owner runtime')
                                       for line in report.splitlines())
     if not relevant:
         return False
     fields = [line for line in report.splitlines() if marker_text(line).startswith('* verification')]
-    if fields != [f'* verification: `{SCHEMA}`'] or any(marker_text(line).startswith((
+    if fields not in ([f'* verification: `{SCHEMA}`'], [f'* verification: `{ACYCLIC_SCHEMA}`']) or any(marker_text(line).startswith((
             '* function-address', '* unsigned division', '* software double', '* software float',
             '* inert spin', '* switches', '* buffer calls', '* signed quotient', '* signed remainder'))
             for line in report.splitlines()):
@@ -50,22 +54,46 @@ def selected(report):
     return True
 
 
+def selector_for_report(report):
+    if not selected(report):
+        raise ValueError('not a complete-owner report')
+    return ACYCLIC_SELECTOR if f'* verification: `{ACYCLIC_SCHEMA}`' in report.splitlines() else SELECTOR
+
+
 def refine(data, address, mapping):
     return analyze.refine_function(data, address, json.loads(mapping), max_bytes=len(data),
             max_instructions=len(data)//2, rom_end=0x09000000, same_owner_long_branches=True)
 
 
-def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindings=None):
+def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindings=None,
+           selector=SELECTOR):
     """Replay complete structural/frame/runtime proof before typed provenance."""
     import match
+    if selector not in (SELECTOR, ACYCLIC_SELECTOR):
+        raise ValueError('unknown complete-owner selector')
     validate_span(data,address,rom,mapping,index)
     refinement = refine(data,address,mapping)
     selected_rows=[line.split() for line in index.decode().splitlines()
                    if line.split() and line.split()[0]==f'{address:08X}']
     if len(selected_rows)!=1 or len(selected_rows[0])<4 or int(selected_rows[0][3])!=refinement['instrs']:
         raise ValueError('complete-owner text reachable instruction count differs')
-    proof = runtime.verify(data,address,rom,mapping,refinement)
     ins, edges, branches, calls, words = graph.graph(data,address,refinement)
+    if selector == ACYCLIC_SELECTOR:
+        if branches or words:
+            raise ValueError('acyclic owner excludes local BL and word switches')
+        for destination in calls.values():
+            match.function_address_target(f'func_{destination:08X}', json.loads(mapping),
+                                          address, len(data), len(rom))
+        verified = match.verify_leaf_instructions(data,address,True,calls,
+                                                 acyclic_state_budget=ACYCLIC_STATE_BUDGET)
+        if {item.address for item in verified} != set(ins):
+            raise ValueError('acyclic native verification differs from complete owner CFG')
+        proof = {'schema': ACYCLIC_SCHEMA, 'state_budget': ACYCLIC_STATE_BUDGET,
+                 'instructions': len(verified), 'calls': [[site-address, f'func_{target:08X}']
+                    for site,target in sorted(calls.items())], 'runtime_calls': [],
+                 'partition': graph.partition(data,address,refinement,ins,words)}
+    else:
+        proof = runtime.verify(data,address,rom,mapping,refinement)
     ordinary = {'calls':proof['calls'], 'data':[], 'functions':[]}
     if bindings is None:
         if manifest is None:
@@ -93,14 +121,15 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
          0x08000000 <= row['value'] < 0x09000000)}
     if address_words != set(literals):
         raise ValueError('owner address literals require exact typed object/function coverage')
-    observed={'profile':SCHEMA,'proof':proof,'bindings':bindings}
+    observed={'profile':ACYCLIC_SCHEMA if selector == ACYCLIC_SELECTOR else SCHEMA,
+              'proof':proof,'bindings':bindings}
     if manifest is not None and text(observed)!=text(manifest):
         raise ValueError('owner manifest differs from complete fresh native replay')
     return observed, list(ins.values())
 
 
 
-def preflight(data,address,rom,mapping,index,objects):
+def preflight(data,address,rom,mapping,index,objects, *, selector=SELECTOR):
     """Inventory bindings derive only reached words and current named objects.
 
     This record has no source/ELF credit. Later compiler relocations must independently
@@ -129,11 +158,12 @@ def preflight(data,address,rom,mapping,index,objects):
             if not candidates:
                 raise ValueError(f'owner literal requires genuine named object proof at {value:08X}')
             bindings['data'].append([offset,candidates[0],0])
-    observed,verified=verify(data,address,rom,mapping,index,objects,bindings=bindings)
+    observed,verified=verify(data,address,rom,mapping,index,objects,bindings=bindings,
+                             selector=selector)
     return observed,verified,refinement
 
 
-def original_bindings(image,address,rom,mapping,objects):
+def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR):
     """Validate every original relocation, with no rewriting of the input ELF."""
     import match
     if image['type']!=1:
@@ -196,12 +226,18 @@ def original_bindings(image,address,rom,mapping,objects):
            for item in image['symbols']):
         raise ValueError('unresolved owner symbol outside exact binding roles')
     for records in result.values():records.sort()
-    if '__udivsi3' not in targets or not any(name in thunk.ALIASES for name in targets):
+    if selector == ACYCLIC_SELECTOR:
+        if any(destination in thunk.ALIASES.values() or match.is_udivsi3_address(destination)
+               for destination,is_object in targets.values() if not is_object):
+            raise ValueError('acyclic owner excludes arithmetic runtimes and indirect thunks')
+    elif selector != SELECTOR:
+        raise ValueError('unknown complete-owner selector')
+    elif '__udivsi3' not in targets or not any(name in thunk.ALIASES for name in targets):
         raise ValueError('owner profile requires actual compiler UDIV and indirect thunk calls')
     return result,targets
 
 
-def object_bytes(runner,workspace,args,original,address,rom,mapping,objects):
+def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, selector=SELECTOR):
     import match
     fixed_configuration(args)
     preprocessed=runner.read_binary(workspace+'/f.i').decode()
@@ -209,7 +245,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects):
     from plausible import strip_comments_and_strings
     if re.search(r'\b__udivsi3\b',strip_comments_and_strings(preprocessed)):
         raise ValueError('division identifiers are reserved for compiler emission')
-    bindings,targets=original_bindings(original,address,rom,mapping,objects)
+    bindings,targets=original_bindings(original,address,rom,mapping,objects,selector=selector)
     definitions=['.syntax unified','.thumb']
     for name,(value,is_object) in sorted(targets.items()):
         definitions += [f'.global {name}',f'.type {name}, %'+('object' if is_object else 'function'),
@@ -248,14 +284,14 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects):
 
 def fingerprint(address,data,manifest,source,mapping,index,objects,rom):
     import match
-    parts=[SCHEMA.encode(),address.to_bytes(4,'little'),data,text(manifest).encode(),source.encode(),
+    parts=[manifest['profile'].encode(),address.to_bytes(4,'little'),data,text(manifest).encode(),source.encode(),
            mapping,index,b'absent' if objects is None else objects,hashlib.sha256(rom).digest(),
            text([match.DEFAULT_CC,match.DEFAULT_CPP,match.DEFAULT_AS,match.DEFAULT_OBJCOPY,
                  match.DEFAULT_LD,match.DEFAULT_FLAGS]).encode()]
     return sha(b''.join(len(value).to_bytes(8,'little')+value for value in parts))
 
 
-def build(root,address,args=None,expected=None):
+def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     """Fresh fixed-toolchain compilation and complete original-ELF provenance."""
     import match
     from match_evidence import source_paths,source_fingerprint,mapping_snapshot,data_snapshot,report_rom_path
@@ -277,8 +313,10 @@ def build(root,address,args=None,expected=None):
         with runner.workspace() as workspace:
             raw,_,original=match.compile_object(runner,workspace,args,capture,address,
                                                candidates[0].relative_to(root).as_posix())
-            data,bindings=object_bytes(runner,workspace,args,original,address,rom,mapping,objects)
-            manifest,instructions=verify(data,address,rom,mapping,index,objects,expected,bindings=bindings)
+            data,bindings=object_bytes(runner,workspace,args,original,address,rom,mapping,objects,
+                                      selector=selector)
+            manifest,instructions=verify(data,address,rom,mapping,index,objects,expected,
+                                         bindings=bindings,selector=selector)
         check=match._run_replay_process([sys.executable,str(Path(__file__).with_name('plausible.py')),
             '--quiet','--addr',f'0x{address:08X}','--json']+[str(p) for p in source_paths(capture,address)],capture,120)
         findings,allowed=match.plausibility_result(check,address)
@@ -294,12 +332,14 @@ def build(root,address,args=None,expected=None):
 def render(address,result):
     import match
     data,manifest,source,mapping,index,objects,rom,count,_=result
+    acyclic = manifest['profile'] == ACYCLIC_SCHEMA
     evidence={'address':address,'bytes':len(data),'instructions':count,'source_sha256':source,
         'mapping_sha256':sha(mapping),'index_sha256':sha(index),'objects_sha256':None if objects is None else sha(objects),
         'rom_sha256':sha(rom),'compiler':[match.DEFAULT_CC,match.DEFAULT_FLAGS],
         'manifest':manifest,'fingerprint':fingerprint(address,data,manifest,source,mapping,index,objects,rom)}
-    return '\n'.join([f'# 0x{address:08X}','',f'* verification: `{SCHEMA}`',
-        f'* owner runtime: {SELECTOR}',f'* control flow: {CONTROL_FLOW}',
+    return '\n'.join([f'# 0x{address:08X}','',f'* verification: `{manifest["profile"]}`',
+        f'* owner runtime: {ACYCLIC_SELECTOR if acyclic else SELECTOR}',
+        f'* control flow: {ACYCLIC_CONTROL_FLOW if acyclic else CONTROL_FLOW}',
         '* verified extent: complete ELF function symbol, including literal pools',
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
@@ -323,7 +363,7 @@ def report_matches(report,root,address):
             return result
         evidence=json.loads(encoded,object_pairs_hook=unique)
         if text(evidence)!=encoded:return False
-        result=build(root,address,expected=evidence['manifest'])
+        result=build(root,address,expected=evidence['manifest'],selector=selector_for_report(report))
         return render(address,result)==report
     except (OSError,ValueError,KeyError,TypeError,IndexError,RuntimeError,subprocess.SubprocessError):
         return False
@@ -337,7 +377,7 @@ def issue(root,address,args):
             args.function_address_profile or args.switch_profile or args.label or \
             args.wsl!='Ubuntu' or args.wsl_path!=match.DEFAULT_WSL_PATH:
         raise ValueError('owner profile requires its isolated fixed Thumb selector')
-    result=build(root,address,args)
+    result=build(root,address,args,selector=args.owner_runtime_profile)
     report=render(address,result)
     if args.emit:
         output=(Path(root)/args.emit).resolve()
@@ -348,6 +388,7 @@ def issue(root,address,args):
     if not args.no_write:
         path=Path(root)/'docs/match'/f'{address:08X}.md';path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(report)
-    print(f'extent    {len(result[0])} bytes (complete ELF symbol; {CONTROL_FLOW}; no relocations)')
+    control_flow = ACYCLIC_CONTROL_FLOW if args.owner_runtime_profile == ACYCLIC_SELECTOR else CONTROL_FLOW
+    print(f'extent    {len(result[0])} bytes (complete ELF symbol; {control_flow}; no relocations)')
     print('verdict MATCH - byte identical')
     return 0
