@@ -21,6 +21,7 @@ import owner_graph_profile as graph
 import owner_runtime_profile as runtime
 import function_thunk_profile as thunk
 import ignored_leaf_alias_profile as ignored_leaf
+import named_data_buffer_profile as named_buffer
 from inert_spin_profile import fixed_configuration, index_snapshot, validate_span, marker_text
 
 SCHEMA = 'elf-symbol-thumb-restoring-owner-runtime-v1'
@@ -42,13 +43,14 @@ def sha(raw):
 
 
 def selected(report):
-    relevant = SCHEMA in report or ACYCLIC_SCHEMA in report or ignored_leaf.SCHEMA in report or any(marker_text(line).startswith('* owner runtime')
+    relevant = SCHEMA in report or ACYCLIC_SCHEMA in report or ignored_leaf.SCHEMA in report or named_buffer.SCHEMA in report or any(marker_text(line).startswith('* owner runtime')
                                       for line in report.splitlines())
     if not relevant:
         return False
     fields = [line for line in report.splitlines() if marker_text(line).startswith('* verification')]
     if fields not in ([f'* verification: `{SCHEMA}`'], [f'* verification: `{ACYCLIC_SCHEMA}`'],
-                      [f'* verification: `{ignored_leaf.SCHEMA}`']) or any(marker_text(line).startswith((
+                      [f'* verification: `{ignored_leaf.SCHEMA}`'],
+                      [f'* verification: `{named_buffer.SCHEMA}`']) or any(marker_text(line).startswith((
             '* function-address', '* unsigned division', '* software double', '* software float',
             '* inert spin', '* switches', '* buffer calls', '* signed quotient', '* signed remainder'))
             for line in report.splitlines()):
@@ -61,6 +63,8 @@ def selector_for_report(report):
         raise ValueError('not a complete-owner report')
     if f'* verification: `{ignored_leaf.SCHEMA}`' in report.splitlines():
         return ignored_leaf.SELECTOR
+    if f'* verification: `{named_buffer.SCHEMA}`' in report.splitlines():
+        return named_buffer.SELECTOR
     return ACYCLIC_SELECTOR if f'* verification: `{ACYCLIC_SCHEMA}`' in report.splitlines() else SELECTOR
 
 
@@ -73,16 +77,36 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
            selector=SELECTOR):
     """Replay complete structural/frame/runtime proof before typed provenance."""
     import match
-    if selector not in (SELECTOR, ACYCLIC_SELECTOR, ignored_leaf.SELECTOR):
+    if selector not in (SELECTOR, ACYCLIC_SELECTOR, ignored_leaf.SELECTOR, named_buffer.SELECTOR):
         raise ValueError('unknown complete-owner selector')
+    if selector == named_buffer.SELECTOR and len(data) > named_buffer.MAX_BYTES:
+        raise ValueError('named-data buffer caller exceeds bounded owner size')
     validate_span(data,address,rom,mapping,index)
+    if selector == named_buffer.SELECTOR:
+        named_buffer.validate_owner(data,address,rom,mapping,index)
     refinement = refine(data,address,mapping)
     selected_rows=[line.split() for line in index.decode().splitlines()
                    if line.split() and line.split()[0]==f'{address:08X}']
-    if len(selected_rows)!=1 or len(selected_rows[0])<4 or int(selected_rows[0][3])!=refinement['instrs']:
+    if selector != named_buffer.SELECTOR and (len(selected_rows)!=1 or len(selected_rows[0])<4 or int(selected_rows[0][3])!=refinement['instrs']):
         raise ValueError('complete-owner text reachable instruction count differs')
     ins, edges, branches, calls, words = graph.graph(data,address,refinement)
-    if selector in (ACYCLIC_SELECTOR, ignored_leaf.SELECTOR):
+    if selector == named_buffer.SELECTOR:
+        if branches or words:
+            raise ValueError('named-data buffer caller excludes local BL and word switches')
+        for destination in calls.values():
+            match.function_address_target(f'func_{destination:08X}', json.loads(mapping),
+                                          address, len(data), len(rom))
+        buffers = named_buffer.NamedDataBufferProof(rom, mapping, index, objects)
+        verified = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=buffers)
+        if not buffers.dependencies or set(ins) != {item.address for item in verified}:
+            raise ValueError('named-data buffer profile requires exact inspected buffer calls')
+        proof = {'schema': named_buffer.SCHEMA, 'instructions': len(verified),
+                 'calls': [[site-address, f'func_{target:08X}'] for site,target in sorted(calls.items())],
+                 'runtime_calls': [], 'partition': graph.partition(data,address,refinement,ins,words),
+                 'buffers': {'dependency_budget': named_buffer.MAX_DEPENDENCIES,
+                    'owner_byte_budget': named_buffer.MAX_BYTES,
+                    'dependencies': [buffers.records[target] for target in sorted(buffers.records)]}}
+    elif selector in (ACYCLIC_SELECTOR, ignored_leaf.SELECTOR):
         if branches or words:
             raise ValueError('acyclic owner excludes local BL and word switches')
         for destination in calls.values():
@@ -118,6 +142,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             bindings['calls'] != sorted(proof['calls'] + proof['runtime_calls']):
         raise ValueError('owner bindings do not cover every exact reached external call')
     ordinary.update(data=bindings['data'],functions=bindings['functions'])
+    if selector == named_buffer.SELECTOR and (not bindings['data'] or bindings['functions'] or bindings['switches']):
+        raise ValueError('named-data buffers require actual named object relocations and exclude function literals')
     _, literals = match.function_address_bindings(data,address,rom,mapping,objects,ordinary,
                                                  allow_empty_functions=True)
     if bindings['switches'] != [[offset, addend] for offset,addend in sorted(words.items())]:
@@ -136,7 +162,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
          0x08000000 <= row['value'] < 0x09000000)}
     if address_words != set(literals):
         raise ValueError('owner address literals require exact typed object/function coverage')
-    schema = ignored_leaf.SCHEMA if selector == ignored_leaf.SELECTOR else \
+    schema = named_buffer.SCHEMA if selector == named_buffer.SELECTOR else \
+        ignored_leaf.SCHEMA if selector == ignored_leaf.SELECTOR else \
         ACYCLIC_SCHEMA if selector == ACYCLIC_SELECTOR else SCHEMA
     observed={'profile':schema,
               'proof':proof,'bindings':bindings}
@@ -243,7 +270,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR):
            for item in image['symbols']):
         raise ValueError('unresolved owner symbol outside exact binding roles')
     for records in result.values():records.sort()
-    if selector in (ACYCLIC_SELECTOR, ignored_leaf.SELECTOR):
+    if selector in (ACYCLIC_SELECTOR, ignored_leaf.SELECTOR, named_buffer.SELECTOR):
         if any(destination in thunk.ALIASES.values() or match.is_udivsi3_address(destination)
                for destination,is_object in targets.values() if not is_object):
             raise ValueError('acyclic owner excludes arithmetic runtimes and indirect thunks')
@@ -299,12 +326,16 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     return linked['text'],bindings
 
 
-def fingerprint(address,data,manifest,source,mapping,index,objects,rom):
+def fingerprint(address,data,manifest,source,mapping,index,objects,rom,original_elf=None):
     import match
     parts=[manifest['profile'].encode(),address.to_bytes(4,'little'),data,text(manifest).encode(),source.encode(),
            mapping,index,b'absent' if objects is None else objects,hashlib.sha256(rom).digest(),
            text([match.DEFAULT_CC,match.DEFAULT_CPP,match.DEFAULT_AS,match.DEFAULT_OBJCOPY,
                  match.DEFAULT_LD,match.DEFAULT_FLAGS]).encode()]
+    if manifest['profile'] == named_buffer.SCHEMA:
+        if not isinstance(original_elf, bytes):
+            raise ValueError('named-data buffer evidence requires original ELF identity')
+        parts.append(hashlib.sha256(original_elf).digest())
     return sha(b''.join(len(value).to_bytes(8,'little')+value for value in parts))
 
 
@@ -348,16 +379,20 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
 
 def render(address,result):
     import match
-    data,manifest,source,mapping,index,objects,rom,count,_=result
+    data,manifest,source,mapping,index,objects,rom,count,original_elf=result
     acyclic = manifest['profile'] == ACYCLIC_SCHEMA
     ignored = manifest['profile'] == ignored_leaf.SCHEMA
+    buffers = manifest['profile'] == named_buffer.SCHEMA
     evidence={'address':address,'bytes':len(data),'instructions':count,'source_sha256':source,
         'mapping_sha256':sha(mapping),'index_sha256':sha(index),'objects_sha256':None if objects is None else sha(objects),
         'rom_sha256':sha(rom),'compiler':[match.DEFAULT_CC,match.DEFAULT_FLAGS],
-        'manifest':manifest,'fingerprint':fingerprint(address,data,manifest,source,mapping,index,objects,rom)}
+        'manifest':manifest,'fingerprint':fingerprint(address,data,manifest,source,mapping,index,objects,rom,
+                                                     original_elf if buffers else None)}
+    if buffers:
+        evidence['original_elf_sha256'] = sha(original_elf)
     return '\n'.join([f'# 0x{address:08X}','',f'* verification: `{manifest["profile"]}`',
-        f'* owner runtime: {ignored_leaf.SELECTOR if ignored else ACYCLIC_SELECTOR if acyclic else SELECTOR}',
-        f'* control flow: {ignored_leaf.CONTROL_FLOW if ignored else ACYCLIC_CONTROL_FLOW if acyclic else CONTROL_FLOW}',
+        f'* owner runtime: {named_buffer.SELECTOR if buffers else ignored_leaf.SELECTOR if ignored else ACYCLIC_SELECTOR if acyclic else SELECTOR}',
+        f'* control flow: {named_buffer.CONTROL_FLOW if buffers else ignored_leaf.CONTROL_FLOW if ignored else ACYCLIC_CONTROL_FLOW if acyclic else CONTROL_FLOW}',
         '* verified extent: complete ELF function symbol, including literal pools',
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
@@ -406,7 +441,8 @@ def issue(root,address,args):
     if not args.no_write:
         path=Path(root)/'docs/match'/f'{address:08X}.md';path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(report)
-    control_flow = ignored_leaf.CONTROL_FLOW if args.owner_runtime_profile == ignored_leaf.SELECTOR else \
+    control_flow = named_buffer.CONTROL_FLOW if args.owner_runtime_profile == named_buffer.SELECTOR else \
+        ignored_leaf.CONTROL_FLOW if args.owner_runtime_profile == ignored_leaf.SELECTOR else \
         ACYCLIC_CONTROL_FLOW if args.owner_runtime_profile == ACYCLIC_SELECTOR else CONTROL_FLOW
     print(f'extent    {len(result[0])} bytes (complete ELF symbol; {control_flow}; no relocations)')
     print('verdict MATCH - byte identical')

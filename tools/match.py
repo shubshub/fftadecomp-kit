@@ -2244,6 +2244,12 @@ class BufferCallProof:
         incoming = {offset + 4 * len(stack): target for offset, target in slots.items()}
         return self.check_arguments(address, arguments, stack, incoming, frozenset(slots))
 
+    def inspect(self, address, data):
+        instructions = verify_leaf_instructions(data, address, True,
+                                                buffer_proof=self if self.stack_arguments else None,
+                                                call_resolver=self.target)
+        return instructions, {}
+
     def check_arguments(self, address, arguments, stack, incoming, protected):
         if not arguments and not incoming:
             return {}
@@ -2256,9 +2262,7 @@ class BufferCallProof:
         self.active.add(address)
         try:
             data = self.span(address)
-            instructions = verify_leaf_instructions(data, address, True,
-                                                     buffer_proof=self if self.stack_arguments else None,
-                                                     call_resolver=self.target)
+            instructions, finite_transfers = self.inspect(address, data)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
             states = {address: (tuple(sorted(arguments.items())), 0, ())}
@@ -2273,7 +2277,7 @@ class BufferCallProof:
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
-                returning = (instruction.mnemonic == "bx" or
+                returning = current not in finite_transfers and (instruction.mnemonic == "bx" or
                              instruction.mnemonic == "pop" and ARM_REG_PC in registers or
                              instruction.mnemonic == "mov" and registers and registers[0] == ARM_REG_PC)
                 if instruction.mnemonic == "push":
@@ -2362,7 +2366,9 @@ class BufferCallProof:
                         aliases[assignment[0]] = assignment[1]
                     if loaded is not None:
                         aliases[loaded[0]] = loaded[1]
-                if returning:
+                if current in finite_transfers:
+                    successors = finite_transfers[current]
+                elif returning:
                     if aliases and not self.stack_arguments:
                         raise ValueError("buffer pointer escapes through a return register")
                     if any(register not in CALLER_CLOBBERED or register == ARM_REG_LR
@@ -3276,7 +3282,8 @@ def main():
                     help="decomp repo (default: current directory)")
     ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",
                                                       "restoring-owner-acyclic-v1",
-                                                      "restoring-owner-ignored-leaf-alias-v1"))
+                                                      "restoring-owner-ignored-leaf-alias-v1",
+                                                      "named-data-buffer-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

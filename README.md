@@ -1682,3 +1682,46 @@ Natural source positives cover both function origins and dispatch alignment
 classes, short and long unsigned guards, and ordinary typed calls. Late status
 and rebuild fixtures verify function-only output while preserving nonzero
 external prefix bytes. These are finite verifier tests, not game-match credit.
+
+### Explicit named-data buffer composition
+
+`python tools/match.py --root <game> --owner-runtime-profile named-data-buffer-v1 <address>`
+selects `elf-symbol-thumb-named-data-buffer-calls-v1`. Ordinary selection and all
+older report schemas retain their existing behavior. The new selector requires
+actual named object relocations and inspected buffer calls. It excludes caller
+switches, local BL transfers, function literals, arithmetic runtimes and indirect
+calls. Original sole-function Thumb ET_REL validation, exact typed relocation
+linking, complete ROM comparison and fresh fixed-toolchain source/plausibility
+replay use the existing complete-owner lifecycle.
+
+The caller and each inspected dependency are at most 4096 bytes. At most eight
+distinct dependency owners are inspected. Both indexes must identify each exact,
+unique, nonoverlapping complete ROM span. Legacy numeric instruction-count
+annotations may include pool words; the complete native CFG establishes the
+actual reachable count and every byte's role. Malformed count annotations reject.
+
+Buffer effects retain the existing register/stack alias engine. Its bounds,
+alignment, saved-control-word protection, pointer-slot protection, joins,
+constant-index rules, recursive-call limits and escape refusals remain active.
+Inspected ordinary callees additionally require a complete closed graph and
+byte partition. One extra callee form reuses the existing exact preloaded-switch
+encoding, layout and complete read-only leaf CFG proof: an adjacent bounded
+word table, its backward unsigned guard, verified predecessors, two reached
+literal words and every case's complete effect paths. The alias engine follows
+all proved table targets. Other indirect transfers still reject. The backward
+guard can run indefinitely; termination is not proved.
+
+The preloaded callee's object word is identified by exact ROM bytes and its
+literal role. This does not invent a named data symbol or establish nonaliasing
+or lifetime. Compiler-authored caller object words still require complete typed
+named-data provenance. Callee records contain spans, structural descriptors and
+hashes rather than serialized body hex. Reports bind the original caller ELF,
+source/headers, both function indexes, object map, full ROM and every inspected
+dependency. Fresh report replay, status and rebuild retain the explicit selector.
+
+Focused native checks use `tests/test_named_data_buffer.py`, the fixed agbcc
+compiler and `-mthumb-interwork -O2`. Set `FFTA_NAMED_BUFFER_TEST_ROM` to the
+approved ROM and put the ARM tools on `PATH`. Its positive source is synthetic
+C with a retained original ET_REL object; a dependency is the exact read-only
+original switch body. This test proves verifier capability, not authorship or
+admission of any actual game owner.
