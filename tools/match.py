@@ -2613,9 +2613,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              signed_quotient_profile=None, stack_pointer_compare_profile=None,
                              signed_runtime_context=None, remainder_inventory_context=None,
                              remainder_ordinary_inventory_context=None,
-                             remainder_shift_inventory_context=None):
+                             remainder_shift_inventory_context=None,
+                             remainder_framed_shift_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
-    if remainder_shift_inventory_context is not None:
+    if remainder_framed_shift_inventory_context is not None:
+        if any(value is not None for value in (remainder_inventory_context,
+                remainder_ordinary_inventory_context, remainder_shift_inventory_context)):
+            raise ValueError('zero-aware remainder inventory contexts cannot be combined')
+        import zero_aware_remainder_framed_inventory as remainder_inventory
+        remainder_inventory_context = remainder_framed_shift_inventory_context
+    elif remainder_shift_inventory_context is not None:
         if remainder_inventory_context is not None or remainder_ordinary_inventory_context is not None:
             raise ValueError('zero-aware remainder inventory contexts cannot be combined')
         import zero_aware_remainder_shift_inventory as remainder_inventory
@@ -2640,7 +2647,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             data, address, validated_calls or {}, remainder_inventory_context)
         modsi3_context = (remainder_inventory_context[0], remainder_inventory_context[1],
                          runtime_bindings if remainder_ordinary_inventory_context is not None or
-                         remainder_shift_inventory_context is not None else
+                         remainder_shift_inventory_context is not None or
+                         remainder_framed_shift_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
@@ -3471,11 +3479,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if hasattr(shift, "prove_counts"):
             shift.prove_counts(instructions, edges, address, ashldi3_context[3], data)
     if signed_numeric:
-        # Only the canonical double composition may reuse the complete local
-        # stack/save/restore proof above. The operand proof remains register-only:
+        # Canonical double and explicit framed inventory reuse the complete local
+        # stack/save/restore proof. The operand proof remains register-only:
         # frame adjustments kill SP facts and unknown local loads yield no facts.
         # Standalone remainder retains its existing frameless boundary.
-        if uses_stack_frame(instructions.values()) and double_context is None:
+        if uses_stack_frame(instructions.values()) and double_context is None and \
+                remainder_framed_shift_inventory_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         if remainder_inventory_context is not None:
             remainder_inventory.prove_operands(data, address, instructions, edges,
