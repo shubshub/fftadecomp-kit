@@ -63,7 +63,8 @@ def record(instructions, address):
 
 
 def prove_frame(instructions, edges, address, branches, calls, *,
-                stack_aliases=False, buffer_proof=None, runtime_calls=None):
+                stack_aliases=False, buffer_proof=None, runtime_calls=None,
+                call_preservation=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -114,6 +115,11 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 for site, destination in branches.items()):
         raise ValueError("local long branches require exact reachable in-owner edges without fallthrough")
     preserved = tuple(range(ARM_REG_R4, ARM_REG_R11 + 1))
+    if call_preservation is not None and (type(call_preservation) is not dict or
+            set(call_preservation) != set(calls) or any(
+                type(registers) is not frozenset or registers - set(preserved)
+                for registers in call_preservation.values())):
+        raise ValueError("strict frame calls require complete explicit preserved-register sets")
     initial = {register: ("entry", register) for register in preserved}
     initial[ARM_REG_LR] = ("entry-return",)
     states = {address: (tuple(sorted(initial.items())), (), ())}
@@ -183,7 +189,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 # Do not retain a saved-register token in potentially changed bytes.
                 stack = [(kind, None if kind == "local" else value) for kind, value in stack]
                 alias_calls.add(site)
-            for register in clobbered:
+            destroyed = set(clobbered)
+            if call_preservation is not None:
+                destroyed.update(set(preserved) - call_preservation[site])
+            for register in destroyed:
                 registers.pop(register, None)
                 aliases.pop(register, None)
         else:
@@ -294,6 +303,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     proof = {"schema": SCHEMA, "instructions": len(instructions), "maximum_frame_bytes": maximum,
             "returns": sorted(returns), "preserved": "r4-r11,sp,entry-lr",
             "external_calls": "existing-direct-call-ABI-summary"}
+    if call_preservation is not None:
+        proof["external_calls"] = "complete-native-callee-preservation-v1"
+        proof["call_preservation"] = [[site, sorted(registers)]
+                                      for site, registers in sorted(call_preservation.items())]
     if stack_aliases:
         proof["local_aliases"] = {"schema": ALIAS_SCHEMA, "assignments": sorted(alias_sites),
                                   "accesses": sorted(alias_accesses), "buffer_calls": sorted(alias_calls),

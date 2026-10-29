@@ -2253,6 +2253,9 @@ class BufferCallProof:
     def clear_extra_call_constants(self, constants):
         pass
 
+    def finish_call_constants(self, constants, result, *, site=None, target=None):
+        self.clear_extra_call_constants(constants)
+
     def word_context(self, words, frame_base, root_frame, watched=()):
         return {}
 
@@ -2374,7 +2377,7 @@ class BufferCallProof:
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
                         constants.pop(register, None)
-                    self.clear_extra_call_constants(constants)
+                    self.finish_call_constants(constants, result, site=current, target=operands[0].imm)
                     aliases.update(result)
                 elif self.single_word_stores and self.apply_single_store(
                         instruction, aliases, constants, stack, words, root_frame=root_frame,
@@ -3002,7 +3005,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 constants.pop(register, None)
                 aliases.pop(register, None)
             if buffer_proof is not None:
-                buffer_proof.clear_extra_call_constants(constants)
+                buffer_proof.finish_call_constants(constants, returned_aliases,
+                                                   site=current, target=operands[0].imm)
             aliases.update(returned_aliases)
             stack = [(saved_return and saved_slot, saved_slot, local_word)
                      for saved_return, saved_slot, local_word in stack]
@@ -3518,7 +3522,8 @@ def main():
                                                       "watched-switch-preservation-v1",
                                                       "descriptor-output-alias-v1",
                                                       "descriptor-single-store-v1",
-                                                      "descriptor-disjunctive-alias-v1"))
+                                                      "descriptor-disjunctive-alias-v1",
+                                                      "descriptor-callee-constant-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
