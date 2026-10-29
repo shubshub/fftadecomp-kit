@@ -38,6 +38,8 @@ def validate_owner(data, address, rom, mapping, index):
 class NamedDataBufferProof(match.BufferCallProof):
     """Keep existing alias rules; add only an independently proved finite dispatch."""
 
+    dependency_budget = MAX_DEPENDENCIES
+
     def __init__(self, rom, mapping, index, objects):
         super().__init__(rom, mapping, stack_arguments=True)
         self.mapping, self.index, self.objects = mapping, index, objects
@@ -49,7 +51,7 @@ class NamedDataBufferProof(match.BufferCallProof):
                            'objects_sha256': None if objects is None else hashlib.sha256(objects).hexdigest()}
 
     def span(self, address):
-        if address not in self.requested and len(self.requested) >= MAX_DEPENDENCIES:
+        if address not in self.requested and len(self.requested) >= self.dependency_budget:
             raise ValueError('named-data buffer dependency budget exceeded')
         self.requested.add(address)
         entry = self.target(address)

@@ -2233,7 +2233,16 @@ class BufferCallProof:
                     for slot in range(start // 4, (start + width - 1) // 4 + 1)):
             raise ValueError("buffer access is unaligned or outside allocated local words")
 
-    def check_call(self, address, aliases, stack, slots=None):
+    def argument_constants(self, constants):
+        return {}
+
+    def extra_constant(self, instruction, data, address, constants):
+        return None
+
+    def clear_extra_call_constants(self, constants):
+        pass
+
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None):
         arguments = {register: offset for register, offset in aliases.items()
                      if register in CALLER_CLOBBERED}
         slots = slots or {}
@@ -2242,7 +2251,8 @@ class BufferCallProof:
         for offset in slots:
             self.access(offset, 4, stack)
         incoming = {offset + 4 * len(stack): target for offset, target in slots.items()}
-        return self.check_arguments(address, arguments, stack, incoming, frozenset(slots))
+        return self.check_arguments(address, arguments, stack, incoming, frozenset(slots),
+                                    constants=self.argument_constants(constants or {}), site=site)
 
     def inspect(self, address, data):
         instructions = verify_leaf_instructions(data, address, True,
@@ -2250,7 +2260,7 @@ class BufferCallProof:
                                                 call_resolver=self.target)
         return instructions, {}
 
-    def check_arguments(self, address, arguments, stack, incoming, protected):
+    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None):
         if not arguments and not incoming:
             return {}
         if ARM_REG_LR in arguments:
@@ -2265,7 +2275,8 @@ class BufferCallProof:
             instructions, finite_transfers = self.inspect(address, data)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
-            states = {address: (tuple(sorted(arguments.items())), 0, ())}
+            states = {address: (tuple(sorted(arguments.items())), 0,
+                                tuple(sorted((constants or {}).items())))}
             pending = [address]
             returned = ()
             while pending:
@@ -2296,10 +2307,12 @@ class BufferCallProof:
                     passed = {register: offset for register, offset in aliases.items()
                               if register in CALLER_CLOBBERED}
                     nested = {offset + depth * 4: target for offset, target in incoming.items()}
-                    result = self.check_arguments(operands[0].imm, passed, stack, nested, protected)
+                    result = self.check_arguments(operands[0].imm, passed, stack, nested, protected,
+                        constants=self.argument_constants(constants), site=current)
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
                         constants.pop(register, None)
+                    self.clear_extra_call_constants(constants)
                     aliases.update(result)
                 else:
                     assignment = register_alias_assignment(instruction, aliases)
@@ -2355,6 +2368,9 @@ class BufferCallProof:
                             constant = operands[1].imm
                         elif operands[1].type == ARM_OP_REG:
                             constant = constants.get(operands[1].reg)
+                    extra = self.extra_constant(instruction, data, address, constants)
+                    if extra is not None:
+                        constant = extra
                     for register in written:
                         aliases.pop(register, None)
                         constants.pop(register, None)
@@ -2812,11 +2828,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
                 else:
                     returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
-                                                              pointer_slots)
+                                                              pointer_slots, constants=constants,
+                                                              site=current)
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
                 aliases.pop(register, None)
+            if buffer_proof is not None:
+                buffer_proof.clear_extra_call_constants(constants)
             aliases.update(returned_aliases)
             stack = [(saved_return and saved_slot, saved_slot, local_word)
                      for saved_return, saved_slot, local_word in stack]
@@ -2961,6 +2980,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         constant = constants.get(operands[1].reg)
                         if operands[1].reg in return_registers:
                             assigned_return = operands[0].reg
+                if buffer_proof is not None:
+                    extra = buffer_proof.extra_constant(instruction, data, address, constants)
+                    if extra is not None:
+                        constant = extra
                 return_registers.difference_update(written)
                 for register in written:
                     aliases.pop(register, None)
@@ -3283,7 +3306,8 @@ def main():
     ap.add_argument("--owner-runtime-profile", choices=("restoring-owner-runtime-v1",
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
-                                                      "named-data-buffer-v1"))
+                                                      "named-data-buffer-v1",
+                                                      "static-callback-buffer-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

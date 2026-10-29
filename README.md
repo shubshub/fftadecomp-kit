@@ -1725,3 +1725,33 @@ approved ROM and put the ARM tools on `PATH`. Its positive source is synthetic
 C with a retained original ET_REL object; a dependency is the exact read-only
 original switch body. This test proves verifier capability, not authorship or
 admission of any actual game owner.
+
+### Exact register callback buffer composition
+
+`python tools/match.py --root <game> --owner-runtime-profile static-callback-buffer-v1 <address>`
+selects `elf-symbol-thumb-static-callback-buffer-v1`. This separate selector
+retains the complete original ELF, typed relocation, source/plausibility and
+fresh report lifecycle. Default selection and earlier schemas are unchanged.
+It requires an actual buffer callback resolved through an existing canonical
+`_call_via_r0` through `_call_via_r12` identity proof. Exact aligned owner PC
+words, register moves and zero-offset register copies can supply the target.
+The odd Thumb address must identify a unique exact mapped owner; its actual
+buffer effects replay through the existing alias engine. A known target alone
+grants no memory, ABI preservation or termination assumption.
+
+Every call clears all target/scalar facts, including callee-saved registers.
+Branch joins retain only equal facts. Each callback context contains the target,
+register constants, buffer aliases, incoming/protected slots and frame state;
+effects are replayed separately without an effect cache. The explicit limits
+are ten distinct dependency owners of at most 4096 bytes and 128 distinct call
+contexts. Existing frame, alias, recursion and finite-switch limits still apply.
+Reports bind all inspected owner hashes and canonical thunk identities, original
+caller ELF, compiler configuration, source/headers, ROM and mapping inputs.
+
+Unknown or overwritten targets, changed thunks, ambiguous owners, out-of-bounds
+accesses, pointer escapes and protected descriptor-word reads still refuse.
+This selector does not recover function targets from descriptor memory or infer
+that any stored word survived aliasing writes or frame lifetime changes.
+`tests/test_static_callback_buffer.py` uses natural synthetic C compiled with
+original agbcc `-mthumb-interwork -O2`; it needs the fixed compiler and ARM tools
+on `PATH`, and contains no extracted original ROM bodies or tables.
