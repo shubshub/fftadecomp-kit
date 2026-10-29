@@ -200,7 +200,7 @@ def refinement_ranges(intervals):
 
 
 def refinement_word_switch(data, address, position, end, engine, *,
-                           same_owner_long_branches=False):
+                           same_owner_long_branches=False, one_object_word_switch=False):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
@@ -250,6 +250,17 @@ def refinement_word_switch(data, address, position, end, engine, *,
                     descriptor["comparison"] == dispatch - guard_size:
                 if interposed_words:
                     descriptor["interposed_words"] = interposed_words
+                candidates.append(descriptor)
+        if one_object_word_switch and literal >= 4:
+            object_word = literal - 4
+            value = struct.unpack_from("<I", data, object_word)[0]
+            try:
+                descriptor = switch_layout(data[:end - address], address, relocations,
+                    {object_word: ("inventory_object_word", value)})
+            except ValueError:
+                continue
+            if descriptor["dispatch"] == dispatch and descriptor["comparison"] == dispatch - guard_size:
+                descriptor["interposed_words"] = 1
                 candidates.append(descriptor)
     return candidates[0] if len(candidates) == 1 else None
 
@@ -336,7 +347,7 @@ def refinement_arm_instruction(instruction):
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
                     same_owner_long_branches=False, full_rom_inventory=False,
-                    arm_inventory=False):
+                    arm_inventory=False, one_object_word_switch=False):
     """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -390,6 +401,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("full-ROM inventory opt-in must be Boolean")
     if type(arm_inventory) is not bool:
         fail("ARM inventory opt-in must be Boolean")
+    if type(one_object_word_switch) is not bool:
+        fail("one-object-word switch inventory opt-in must be Boolean")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -613,7 +626,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             if info["tgt"] is None or instruction.mnemonic == "bx":
                 switch = refinement_word_switch(
                     data, address, position, end, engine,
-                    same_owner_long_branches=same_owner_long_branches)
+                    same_owner_long_branches=same_owner_long_branches,
+                    one_object_word_switch=one_object_word_switch)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue
@@ -677,7 +691,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 or site == address for site, predecessor in expected.items()):
             fail("word-switch guard can be bypassed", position)
         if switch.get("interposed_words"):
-            pool = {address + word for word in range(switch["literal"] - 20,
+            pool = {address + word for word in range(switch["literal"] - 4 * switch["interposed_words"],
                                                      switch["literal"], 4)}
             read_words = {int(read["address"], 16) for read in literal_reads.values()}
             if not pool <= read_words:
