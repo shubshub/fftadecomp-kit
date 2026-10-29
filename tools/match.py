@@ -2611,10 +2611,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
                              signed_quotient_profile=None, stack_pointer_compare_profile=None,
-                             signed_runtime_context=None, remainder_inventory_context=None):
+                             signed_runtime_context=None, remainder_inventory_context=None,
+                             remainder_ordinary_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
-    if remainder_inventory_context is not None:
+    if remainder_ordinary_inventory_context is not None:
+        if remainder_inventory_context is not None:
+            raise ValueError('zero-aware remainder inventory contexts cannot be combined')
+        import zero_aware_remainder_ordinary_inventory as remainder_inventory
+        remainder_inventory_context = remainder_ordinary_inventory_context
+    elif remainder_inventory_context is not None:
         import zero_aware_remainder_inventory as remainder_inventory
+    if remainder_inventory_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
                 allow_switch_constants or allow_switch_scalar_frame or any(value is not None for value in (
                     switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
@@ -2623,8 +2630,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     ignored_leaf_alias_proof, signed_quotient_profile, stack_pointer_compare_profile,
                     signed_runtime_context)):
             raise ValueError('zero-aware remainder requires its isolated inventory context')
-        remainder_inventory.prepare(data, address, validated_calls or {}, remainder_inventory_context)
+        runtime_bindings = remainder_inventory.prepare(
+            data, address, validated_calls or {}, remainder_inventory_context)
         modsi3_context = (remainder_inventory_context[0], remainder_inventory_context[1],
+                         runtime_bindings if remainder_ordinary_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
