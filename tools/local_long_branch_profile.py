@@ -65,7 +65,7 @@ def record(instructions, address):
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
-                entry_stack_policy=None):
+                entry_stack_policy=None, local_alias_slot_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -108,6 +108,15 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             raise ValueError("zero index local loads require their explicit native alias policy")
         zero_states = zero_index.prove_zeros(instructions,edges,address)
 
+    slot_states = None
+    slot_stores, slot_loads, small_indices, small_additions = set(), set(), set(), set()
+    if local_alias_slot_policy is not None:
+        import local_alias_slot_profile as alias_slots
+        alias_slots.validate(local_alias_slot_policy)
+        if not stack_aliases or buffer_proof is not None or bounded_output_proof is not None or entry_stack_policy is not None:
+            raise ValueError("local alias slots require exclusive local-only stack alias policy")
+        slot_states = alias_slots.prove_constants(instructions, edges, address)
+
     def access(offset, width, stack):
         position = offset + 4 * len(stack)
         if offset % width or position < 0 or offset + width > 0 or \
@@ -140,7 +149,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         raise ValueError("strict frame calls require complete explicit preserved-register sets")
     initial = {register: ("entry", register) for register in preserved}
     initial[ARM_REG_LR] = ("entry-return",)
-    states = {address: (tuple(sorted(initial.items())), (), ())}
+    states = {address: (tuple(sorted(initial.items())), (), (), ())}
     pending, returns, maximum = [address], set(), 0
     alias_sites, alias_accesses, alias_calls = set(), set(), set()
     clobbered = (*range(ARM_REG_R0, ARM_REG_R0 + 4), ARM_REG_R12, ARM_REG_LR)
@@ -149,6 +158,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         instruction = instructions[site]
         registers, stack = dict(states[site][0]), list(states[site][1])
         aliases = {register: frozenset(values) for register, values in states[site][2]}
+        pointer_slots = {word: frozenset(values) for word, values in states[site][3]}
         operands = instruction.operands
         regs = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         adjustment = thumb_stack_adjustment(instruction)
@@ -175,6 +185,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 raise ValueError("local branch SP release leaves the allocated local frame")
             else:
                 del stack[:adjustment]
+                if slot_states is not None:
+                    pointer_slots = alias_slots.release(pointer_slots, len(stack))
                 # Keep dangling values tainted until overwritten. Reallocating
                 # the same offset must not revive a released pointer lifetime.
                 aliases = {register: frozenset((offset, live and offset >= -4 * len(stack))
@@ -218,15 +230,21 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         else:
             read, written = instruction.regs_access()
             assignment = None
+            loaded_alias = None
             if stack_aliases:
                 exact = {register: alias_offset(register, aliases)
                          for register in aliases if register in read}
-                assignment = stack_alias_assignment(instruction, exact, len(stack), {})
+                constants = {} if slot_states is None else {register:value[0] for register,value in slot_states[site].items()}
+                assignment = stack_alias_assignment(instruction, exact, len(stack), constants)
                 if assignment is not None:
                     if assignment[0] in (ARM_REG_SP, ARM_REG_PC, ARM_REG_LR):
                         raise ValueError("local alias cannot overwrite a control register")
                     access(assignment[1], 1, stack)
                     alias_sites.add(site)
+                    if slot_states is not None and instruction.mnemonic == "add" and any(op.type == ARM_OP_REG and op.reg == ARM_REG_SP for op in instruction.operands):
+                        for register, (value, origins) in slot_states[site].items():
+                            if register == assignment[0]:
+                                small_additions.add((site, register, value, tuple(sorted(origins))))
             allowed_aliases = {assignment[2]} if assignment is not None else set()
             assigned = None
             if name in ("mov", "movs") and len(operands) == 2 and \
@@ -241,6 +259,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     width = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2,
                              "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}.get(name)
                     certified_zero = False
+                    index_displacement = 0
+                    if slot_states is not None and operand.mem.index:
+                        decoded = alias_slots.indexed_byte(instruction, slot_states[site], aliases)
+                        if decoded is not None:
+                            certified_zero = True
+                            index_displacement = decoded[2]
+                            small_indices.add((site, *decoded))
                     if zero_states is not None and operand.mem.index:
                         decoded = zero_index.signed_load(instruction)
                         certified_zero = decoded is not None and decoded[1] in zero_states[site] and decoded[1] not in aliases
@@ -253,12 +278,25 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                             instruction.writeback or operand.shift.type or operand.shift.value or \
                             operand.subtracted or operand.mem.disp < 0:
                         raise ValueError("local alias requires an ordinary constant-offset memory access")
-                    slot = access(alias_offset(operand.mem.base, aliases) + operand.mem.disp,
-                                  width, stack)
+                    offset = alias_offset(operand.mem.base, aliases) + operand.mem.disp + index_displacement
+                    slot = access(offset, width, stack)
                     if name.startswith("str"):
                         if regs[0] in aliases:
-                            raise ValueError("local aliases cannot be stored or spilled")
+                            if slot_states is None:
+                                raise ValueError("local aliases cannot be stored or spilled")
+                            alias_slots.word(instruction)
+                            access(alias_offset(regs[0], aliases), 1, stack)
+                            allowed_aliases.add(regs[0])
+                            slot_stores.add((site, offset, alias_offset(regs[0], aliases)))
+                        if slot_states is not None:
+                            alias_slots.store(pointer_slots, offset, width, aliases.get(regs[0]))
                         stack[slot] = ("local", registers.get(regs[0]) if width == 4 else None)
+                    elif offset - offset % 4 in pointer_slots:
+                        if width != 4:
+                            raise ValueError("partial load from a local alias slot")
+                        alias_slots.word(instruction)
+                        loaded_alias = (regs[0], pointer_slots[offset])
+                        slot_loads.add((site, offset))
                     elif width == 4:
                         assigned = (regs[0], stack[slot][1])
                     allowed_aliases.add(operand.mem.base)
@@ -277,13 +315,27 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     incoming_reads.add((site, offset, bytes(instruction.bytes).hex()))
                     assigned = (regs[0], None)
                 elif name == "str":
-                    if regs[0] in aliases:
+                    if regs[0] in aliases and slot_states is None:
                         raise ValueError("local aliases cannot be stored or spilled")
                     if stack[slot][0] != "local":
                         raise ValueError("local branch write overwrites a saved register")
+                    if slot_states is not None:
+                        offset = operand.mem.disp - 4 * len(stack)
+                        if regs[0] in aliases:
+                            alias_slots.word(instruction)
+                            access(alias_offset(regs[0], aliases), 1, stack)
+                            allowed_aliases.add(regs[0])
+                            slot_stores.add((site, offset, alias_offset(regs[0], aliases)))
+                        alias_slots.store(pointer_slots, offset, 4, aliases.get(regs[0]))
                     stack[slot] = ("local", registers.get(regs[0]))
                 else:
-                    assigned = (regs[0], stack[slot][1])
+                    offset = operand.mem.disp - 4 * len(stack)
+                    if offset in pointer_slots:
+                        alias_slots.word(instruction)
+                        loaded_alias = (regs[0], pointer_slots[offset])
+                        slot_loads.add((site, offset))
+                    else:
+                        assigned = (regs[0], stack[slot][1])
             if (ARM_REG_SP in regs and assignment is None) or ARM_REG_SP in written:
                 raise ValueError("local branch frame excludes stack-address materialization")
             if (set(read) & aliases.keys()) - allowed_aliases:
@@ -293,6 +345,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 aliases.pop(register, None)
             if assigned is not None and assigned[1] is not None:
                 registers[assigned[0]] = assigned[1]
+            if loaded_alias is not None:
+                aliases[loaded_alias[0]] = loaded_alias[1]
             if assignment is not None:
                 aliases[assignment[0]] = frozenset(((assignment[1], True),))
         maximum = max(maximum, 4 * len(stack))
@@ -307,7 +361,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 raise ValueError("local alias escapes through an exit register")
             returns.add(site)
         outgoing = (tuple(sorted(registers.items())), tuple(stack),
-                    tuple(sorted((register, tuple(sorted(values))) for register, values in aliases.items())))
+                    tuple(sorted((register, tuple(sorted(values))) for register, values in aliases.items())),
+                    tuple(sorted((word, tuple(sorted(values))) for word, values in pointer_slots.items())))
         for successor in edges[site]:
             if successor not in instructions:
                 raise ValueError("local branch frame escaped its complete CFG")
@@ -324,7 +379,9 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 merged = (tuple((register, value) for register, value in previous[0]
                                 if registers.get(register) == value),
                           tuple((kind, old if old == new else None)
-                                for (kind, old), (_, new) in zip(previous[1], stack)), joined_aliases)
+                                for (kind, old), (_, new) in zip(previous[1], stack)), joined_aliases,
+                          alias_slots.join({word:frozenset(values) for word,values in previous[3]},pointer_slots)
+                            if slot_states is not None else ())
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
@@ -350,4 +407,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         proof["zero_index_profile"] = zero_index_profile
         proof["zero_index_signed_loads"] = [[site,base,index,width,list(origins)]
             for site,base,index,width,origins in sorted(zero_accesses)]
+    if slot_states is not None:
+        proof["local_alias_slots"] = {"schema": alias_slots.SCHEMA, "policy": local_alias_slot_policy,
+            "stores": [list(row) for row in sorted(slot_stores)],
+            "loads": [list(row) for row in sorted(slot_loads)],
+            "small_SP_additions": [[site, register, value, list(origins)] for site,register,value,origins in sorted(small_additions)],
+            "small_index_byte_loads": [[site, base, index, value, list(origins)] for site,base,index,value,origins in sorted(small_indices)],
+            "constant_domain": "exact MOVS 1/2/3 only; all-path intersection; every call kills facts",
+            "slot_domain": "own aligned local words; possible-pointer taint joins; partial overwrite invalidates; release expires provenance",
+            "callee_pointer_arguments": False}
     return proof
