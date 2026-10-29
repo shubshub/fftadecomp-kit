@@ -2192,6 +2192,7 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
 class BufferCallProof:
     word_provenance = False
     callee_frames = False
+    single_word_stores = False
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2350,6 +2351,12 @@ class BufferCallProof:
                         constants.pop(register, None)
                     self.clear_extra_call_constants(constants)
                     aliases.update(result)
+                elif self.single_word_stores and self.apply_single_store(
+                        instruction, aliases, constants, stack, words, root_frame=root_frame,
+                        context={'address':address, 'call_site':site, 'frame_base':frame_base,
+                            'arguments':sorted(arguments.items()), 'incoming':sorted(incoming.items()),
+                            'protected':sorted(protected), 'watched':sorted(watched)}):
+                    pass
                 else:
                     assignment = register_alias_assignment(instruction, aliases)
                     if self.callee_frames:
@@ -2927,6 +2934,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 switch["transfer"] if preloaded_switch else switch["dispatch"] + 8):
             successors = tuple(sorted({address + addend for offset, addend
                                        in switch_relocations.items() if offset != switch["literal"]}))
+        elif buffer_proof is not None and buffer_proof.single_word_stores and \
+                buffer_proof.apply_single_store(instruction, aliases, constants, stack, words,
+                pointer_slots=pointer_slots, root_frame=address,
+                context={'address':address, 'frame_base':-4*len(stack),
+                    'protected':sorted(pointer_slots), 'return_registers':sorted(return_registers)}):
+            return_registers.difference_update(instruction.regs_access()[1])
+            successors = (current + instruction.size,)
         else:
             if CS_GRP_JUMP in instruction.groups:
                 raise ValueError("non-leaf indirect control flow requires linked CFG verification")
@@ -3394,7 +3408,8 @@ def main():
                                                       "static-callback-buffer-v1",
                                                       "protected-descriptor-word-v1",
                                                       "watched-switch-preservation-v1",
-                                                      "descriptor-output-alias-v1"))
+                                                      "descriptor-output-alias-v1",
+                                                      "descriptor-single-store-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

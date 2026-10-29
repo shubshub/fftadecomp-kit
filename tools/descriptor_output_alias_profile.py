@@ -26,6 +26,7 @@ class _StructuralFrameProof(descriptor.ProtectedDescriptorWordProof):
 class DescriptorOutputAliasProof(watched.WatchedSwitchPreservationProof):
     callee_frames = True
     dependency_budget = MAX_DEPENDENCIES
+    structural_frame_type = _StructuralFrameProof
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -56,7 +57,7 @@ class DescriptorOutputAliasProof(watched.WatchedSwitchPreservationProof):
         # frame/return proof passes. Failed prefixes remain diagnostic evidence.
         kind = self.records[address]['structure']['kind']
         if kind == 'complete-closed-CFG-before-actual-effects-and-native-frame-v1':
-            structural = _StructuralFrameProof(self.rom, self.mapping, self.index, self.objects)
+            structural = self.structural_frame_type(self.rom, self.mapping, self.index, self.objects)
             verified = match.verify_leaf_instructions(data, address, True,
                 buffer_proof=structural, call_resolver=self.target)
             if {item.address for item in instructions} != {item.address for item in verified}:

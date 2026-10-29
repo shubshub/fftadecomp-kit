@@ -1854,3 +1854,27 @@ still refuses those unproved effects. `tests/test_descriptor_output_alias.py` us
 natural fixed-O2 source with retained original ET_REL/assembly and tests unsafe
 actual effects after structural inventory, a real final-native return refusal,
 wrong origins, two contexts, partial/clobbered/control words and expired pointers.
+
+### Single-word descriptor output stores
+
+`--owner-runtime-profile descriptor-single-store-v1` selects the separate schema
+`elf-symbol-thumb-descriptor-single-store-v1`. It extends descriptor output aliases
+with exactly one low-register Thumb STMIA word and writeback. The existing native
+STM recognizer validates the encoding, register list and complete aligned four-byte
+frame bounds. The descriptor engine additionally requires a live allocated word,
+tracks stored pointer/constant values, invalidates unknown overwritten values and
+moves the exact base alias by four bytes. Base-in-list and multiple-register forms
+refuse. Every context retains its full word, target, frame and alias facts; reports
+also bind actual store observations and their before/after values.
+
+Complete CFG/partition inspection precedes actual-context effects, and a complete
+native frame/return check remains mandatory before any successful result escapes.
+Its separate structural pass exports no memory identity and cannot admit an owner
+without actual effect replay. The fourteen dependency owners, 4096-byte owner/live
+stack limits and 128 contexts remain unchanged. Previous selectors retain their
+behavior. A proved first word supplies no loop count or output capacity: differing
+pointer offsets at joins, expired/clobbered origins and later out-of-frame accesses
+still refuse. `tests/test_descriptor_single_store.py` uses natural fixed-O2 original
+compiler output and tests those limits, exact unknown/pointer/constant word writes,
+two contexts, unsupported lists and a successful store followed by a real native
+return-proof failure.
