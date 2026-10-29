@@ -2615,9 +2615,18 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              remainder_ordinary_inventory_context=None,
                              remainder_shift_inventory_context=None,
                              remainder_framed_shift_inventory_context=None,
-                             remainder_byte_range_inventory_context=None):
+                             remainder_byte_range_inventory_context=None,
+                             bounded_stack_output_inventory_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
-    if remainder_byte_range_inventory_context is not None:
+    bounded_output_proof = None
+    if bounded_stack_output_inventory_context is not None:
+        if any(value is not None for value in (remainder_inventory_context,
+                remainder_ordinary_inventory_context, remainder_shift_inventory_context,
+                remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context)):
+            raise ValueError('zero-aware remainder inventory contexts cannot be combined')
+        import bounded_stack_output_inventory as remainder_inventory
+        remainder_inventory_context = bounded_stack_output_inventory_context
+    elif remainder_byte_range_inventory_context is not None:
         if any(value is not None for value in (remainder_inventory_context,
                 remainder_ordinary_inventory_context, remainder_shift_inventory_context,
                 remainder_framed_shift_inventory_context)):
@@ -2657,7 +2666,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                          runtime_bindings if remainder_ordinary_inventory_context is not None or
                          remainder_shift_inventory_context is not None or
                          remainder_framed_shift_inventory_context is not None or
-                         remainder_byte_range_inventory_context is not None else
+                         remainder_byte_range_inventory_context is not None or
+                         bounded_stack_output_inventory_context is not None else
                          remainder_inventory_context[3])
     if signed_runtime_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
@@ -2837,6 +2847,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target)
                for target in (validated_calls or {}).values()):
             raise ValueError("signed remainder excludes other runtimes and thunks")
+    if bounded_stack_output_inventory_context is not None:
+        from bounded_stack_output_profile import BoundedOutputProof
+        bounded_output_proof = BoundedOutputProof(*bounded_stack_output_inventory_context[:3],
+            bounded_stack_output_inventory_context[6])
     if type(preloaded_switch) is not bool:
         raise ValueError("preloaded-switch CFG opt-in must be Boolean")
     if preloaded_switch and (not thumb or validated_calls or buffer_proof is not None or
@@ -3090,7 +3104,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if target_register in aliases or target_register in return_registers:
                     raise ValueError("indirect target carries tracked stack or return provenance")
             returned_aliases = {}
-            if pointer_slots or words or word_mode and aliases or any(register in aliases for register in caller_clobbered):
+            if bounded_output_proof is not None and (current in bounded_output_proof.output_calls or
+                    pointer_slots or any(register in aliases for register in caller_clobbered)):
+                returned_aliases = bounded_output_proof.check_call(operands[0].imm,aliases,stack,
+                    pointer_slots,site=current,words=words)
+            elif pointer_slots or words or word_mode and aliases or any(register in aliases for register in caller_clobbered):
                 if ignored_leaf_alias_proof is not None:
                     returned_aliases = ignored_leaf_alias_proof.check_call(
                         current, operands[0].imm, aliases, pointer_slots)
@@ -3493,7 +3511,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # frame adjustments kill SP facts and unknown local loads yield no facts.
         # Standalone remainder retains its existing frameless boundary.
         if uses_stack_frame(instructions.values()) and double_context is None and \
-                remainder_framed_shift_inventory_context is None:
+                remainder_framed_shift_inventory_context is None and bounded_stack_output_inventory_context is None:
             raise ValueError("signed remainder numeric proof requires a frameless caller")
         if remainder_inventory_context is not None:
             remainder_inventory.prove_operands(data, address, instructions, edges,
@@ -3513,7 +3531,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if signed_runtime_context is not None:
         signed_divmod.finish(data, address, calls, signed_runtime_context,
                              instructions.values(), divsi3_context[3], transfers)
-    if remainder_inventory_context is not None:
+    if bounded_stack_output_inventory_context is not None:
+        remainder_inventory.finish(data,address,calls,remainder_inventory_context,
+                                   instructions.values(),bounded_output_proof)
+    elif remainder_inventory_context is not None:
         remainder_inventory.finish(data, address, calls, remainder_inventory_context,
                                    instructions.values())
     return [instructions[current] for current in sorted(instructions)]

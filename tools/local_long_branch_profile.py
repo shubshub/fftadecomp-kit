@@ -64,7 +64,7 @@ def record(instructions, address):
 
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
-                call_preservation=None):
+                call_preservation=None, bounded_output_proof=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -78,6 +78,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             not stack_aliases or type(buffer_proof) is not BufferCallProof or
             buffer_proof.stack_arguments):
         raise ValueError("local aliases require explicit Boolean policy and native buffer proof")
+    if bounded_output_proof is not None:
+        from bounded_stack_output_profile import BoundedOutputProof
+        if type(bounded_output_proof) is not BoundedOutputProof or not stack_aliases or buffer_proof is not None:
+            raise ValueError("bounded output requires its explicit native alias proof")
     if runtime_calls is not None:
         from function_thunk_profile import ALIASES
         from match import UDIVSI3_ADDRESS, RUNTIME_HELPERS, is_udivsi3_address
@@ -177,13 +181,15 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     if target_register in aliases or registers.get(target_register) == ("entry-return",):
                         raise ValueError("indirect runtime target carries stack or entry-return provenance")
             if set(clobbered) & aliases.keys():
-                if buffer_proof is None:
+                if buffer_proof is None and bounded_output_proof is None:
                     raise ValueError("local aliases crossing calls require native buffer proof")
                 offsets = {register: alias_offset(register, aliases)
                            for register in clobbered if register in aliases}
                 native_stack = [(False, kind == "saved", kind == "local")
                                 for kind, _ in stack]
-                if buffer_proof.check_call(calls[site], offsets, native_stack):
+                if (bounded_output_proof.check_call(calls[site],offsets,native_stack,site=site)
+                        if bounded_output_proof is not None else
+                        buffer_proof.check_call(calls[site], offsets, native_stack)):
                     raise ValueError("local alias return requires a separate provenance policy")
                 # A proved callee may write through any passed local buffer.
                 # Do not retain a saved-register token in potentially changed bytes.
@@ -310,5 +316,6 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     if stack_aliases:
         proof["local_aliases"] = {"schema": ALIAS_SCHEMA, "assignments": sorted(alias_sites),
                                   "accesses": sorted(alias_accesses), "buffer_calls": sorted(alias_calls),
-                                  "buffer_fingerprint": buffer_proof.fingerprint() if buffer_proof else None}
+                                  "buffer_fingerprint": (bounded_output_proof or buffer_proof).fingerprint()
+                                    if bounded_output_proof or buffer_proof else None}
     return proof
