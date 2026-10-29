@@ -358,6 +358,14 @@ then apply. The move and shift must be the unique predecessors of their next
 instructions, preventing a branch from supplying another offset. This local
 proof creates only the stack alias: shifted values still do not establish
 general register-index constants, and other arithmetic-derived offsets fail.
+An adjacent 16-bit PC-relative literal load into `r0`–`r7`, followed by the
+exact `add Rd, sp, Rd` encoding for that same register, may also form an alias.
+The in-symbol aligned literal must contain an unsigned, word-aligned offset
+at most 4096 bytes, and the resulting address must pass the existing frame
+bounds. The load must be the addition's sole CFG predecessor, and its literal
+cannot overlap reachable code. This value supplies only the alias formation;
+it does not establish a general register-index constant. Nonadjacent loads,
+different registers, dynamic offsets and other encodings remain unsupported.
 Alias facts must agree exactly at control-flow joins. Pushing or storing these
 pointers, unsupported pointer arithmetic, and carrying an
 alias across a call in a caller-clobbered register are rejected by these
@@ -365,6 +373,14 @@ profiles. The separate buffer-call profile below requires additional ROM
 verification for that last case. Callee-saved
 aliases survive only under the existing ABI assumption and are cleared when
 their registers are restored by a pop.
+
+An exact 16-bit Thumb STMIA may store scalar low registers through a known,
+word-aligned stack alias. Its nonempty register list must exclude the base;
+each word must fit the tracked frame. Each store applies the scalar store's
+saved-return and pointer-word effects, and the base retains its exact incremented
+offset after writeback. Stored stack pointers, other modes and encodings, and
+out-of-frame or misaligned spans remain rejected. Writeback does not relax
+alias joins: a loop with differing live pointer offsets still fails verification.
 
 Canonical 16-bit Thumb `cmp r0-r7, #0` may read an already tracked alias into
 a current, definitely allocated local word. Pushed-save slots, entry-SP and

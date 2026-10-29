@@ -2001,6 +2001,30 @@ def thumb_shifted_stack_constant(instruction, data, address):
     return ARM_REG_R0 + register, value
 
 
+def thumb_literal_stack_constant(instruction, data, address):
+    """Recognize adjacent literal LDR Rd / ADD Rd,SP,Rd only.
+
+    The load must be the addition's sole CFG predecessor, and the literal must
+    remain outside reachable code. This value forms only a bounded stack alias.
+    """
+    offset = instruction.address - address
+    if instruction.size != 2 or offset < 2 or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            instruction.bytes[1] != 0x44 or not 0x68 <= instruction.bytes[0] <= 0x6F:
+        return None
+    register = instruction.bytes[0] - 0x68
+    load = struct.unpack_from("<H", data, offset - 2)[0]
+    if (load & 0xF800) != 0x4800 or ((load >> 8) & 7) != register:
+        return None
+    literal = ((instruction.address + 2) & ~3) + 4 * (load & 255)
+    if not address <= literal or literal + 4 > address + len(data):
+        raise ValueError("stack alias literal is outside the function")
+    value = struct.unpack_from("<I", data, literal - address)[0]
+    if value % 4 or value > 4096:
+        raise ValueError("stack alias literal is not a bounded aligned offset")
+    return ARM_REG_R0 + register, value
+
+
 def uses_stack_frame(instructions):
     return any(thumb_stack_adjustment(instruction) is not None or
                any((operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_SP) or
@@ -2052,6 +2076,56 @@ def stack_alias_assignment(instruction, aliases, depth, constants):
     if not -4 * depth <= offset <= 0:
         raise ValueError("stack alias arithmetic leaves the tracked frame")
     return assignment
+
+
+def stack_alias_store(stack, pointer_slots, aliases, return_registers,
+                      offset, width, register):
+    """Apply an existing scalar store's bounded stack/provenance effects."""
+    if width not in (1, 2, 4) or offset % width or \
+            not -4 * len(stack) <= offset or offset + width > 0:
+        raise ValueError("stack-alias access is unaligned or outside the tracked frame")
+    pointer_word = offset - offset % 4
+    if pointer_word in pointer_slots and width != 4:
+        raise ValueError("partial access to a pointer-bearing local word")
+    if register in aliases:
+        raise ValueError("stack aliases cannot be stored or spilled")
+    slot = (offset + 4 * len(stack)) // 4
+    stack[slot] = (width == 4 and register in return_registers,
+                   stack[slot][1], stack[slot][2])
+    pointer_slots.pop(pointer_word, None)
+
+
+def thumb_stack_alias_stm(instruction, aliases, depth):
+    """Recognize exact Thumb-1 STMIA writeback through a known stack alias.
+
+    Base-in-list forms are deliberately excluded. All source registers must be
+    low scalar registers; callers apply the ordinary store effects to each word
+    and retain the exact one-past writeback alias for later uses and CFG joins.
+    """
+    operands = instruction.operands
+    if not instruction.mnemonic.startswith("stm") or not operands or \
+            operands[0].type != ARM_OP_REG or operands[0].reg not in aliases:
+        return None
+    encoded = int.from_bytes(instruction.bytes, "little")
+    base = ARM_REG_R0 + ((encoded >> 8) & 7)
+    registers = tuple(ARM_REG_R0 + bit for bit in range(8) if encoded & (1 << bit))
+    read, written = instruction.regs_access()
+    if instruction.size != 2 or len(instruction.bytes) != 2 or \
+            encoded & 0xF800 != 0xC000 or \
+            instruction.mnemonic != "stm" or not instruction.writeback or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            not registers or base in registers or \
+            tuple(operand.reg for operand in operands) != (base, *registers) or \
+            any(operand.type != ARM_OP_REG or operand.shift.type or
+                operand.shift.value or operand.subtracted for operand in operands) or \
+            set(read) != {base, *registers} or set(written) != {base}:
+        raise ValueError("unsupported stack-alias STM encoding or register list")
+    offset = aliases[base]
+    if offset % 4 or not -4 * depth <= offset or offset + 4 * len(registers) > 0:
+        raise ValueError("stack-alias STM is unaligned or outside the tracked frame")
+    if any(register in aliases for register in registers):
+        raise ValueError("stack aliases cannot be stored or spilled")
+    return base, offset, registers
 
 
 CALLER_CLOBBERED = (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
@@ -2521,6 +2595,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     local_branches = {}
     literal_adjustments = set()
     shifted_stack_constants = set()
+    literal_stack_constants = set()
     while pending:
         current = pending.pop()
         if current % alignment or not address <= current < end:
@@ -2736,12 +2811,24 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     if shifted is not None:
                         shifted_stack_constants.add(current)
                         alias_constants = {**constants, shifted[0]: shifted[1]}
+                    literal = thumb_literal_stack_constant(instruction, data, address)
+                    if literal is not None:
+                        literal_stack_constants.add(current)
+                        alias_constants = {**constants, literal[0]: literal[1]}
                 assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) if thumb else None
                 if ARM_REG_SP in registers and assignment is None:
                     raise ValueError("unsupported stack-address materialization")
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
                 allowed_aliases = {assignment[2]} if assignment is not None else set()
+                stm = thumb_stack_alias_stm(instruction, aliases, len(stack)) if thumb else None
+                if stm is not None:
+                    base, offset, stored_registers = stm
+                    for index, register in enumerate(stored_registers):
+                        stack_alias_store(stack, pointer_slots, aliases, return_registers,
+                                          offset + 4 * index, 4, register)
+                    allowed_aliases.add(base)
+                    assignment = (base, offset + 4 * len(stored_registers), base)
                 if thumb and unconditional and instruction.id == ARM_INS_CMP and \
                         instruction.size == 2 and not instruction.writeback and \
                         len(operands) == 2 and operands[0].type == ARM_OP_REG and \
@@ -2787,11 +2874,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                             if instruction.mnemonic.startswith("ldr"):
                                 loaded_alias = (registers[0], pointer_slots[pointer_word])
                         if instruction.mnemonic.startswith("str"):
-                            if registers[0] in aliases:
-                                raise ValueError("stack aliases cannot be stored or spilled")
-                            stack[slot] = (width == 4 and registers[0] in return_registers,
-                                           stack[slot][1], stack[slot][2])
-                            pointer_slots.pop(pointer_word, None)
+                            stack_alias_store(stack, pointer_slots, aliases, return_registers,
+                                              offset, width, registers[0])
                         elif width == 4 and stack[slot][0]:
                             assigned_return = registers[0]
                     if operand.mem.base == ARM_REG_PC:
@@ -2907,6 +2991,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
            predecessors.get(current - 2) != {current - 4}
            for current in shifted_stack_constants):
         raise ValueError("shifted stack constant is bypassed by a control-flow edge")
+    if any(predecessors.get(current) != {current - 2} for current in literal_stack_constants):
+        raise ValueError("stack alias literal load is bypassed by a control-flow edge")
     if switch is not None:
         pool_switch = function_thunk_context is not None and 'pool_switch' in function_thunk_context
         if (not allow_switch_scalar_frame and double_context is None and not pool_switch and

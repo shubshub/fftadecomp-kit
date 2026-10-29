@@ -123,11 +123,11 @@ class LiteralStackAdjustmentTests(unittest.TestCase):
 
     def test_shifted_alias_escape_and_general_index_refusals_unchanged(self):
         sequence = "movs r0, #192\nlsls r0, r0, #3\nadd r0, sp"
-        for observed in ("str r0, [r1]", "push {r0}", "stm r0!, {r1}"):
+        for observed in ("str r0, [r1]", "push {r0}", "stm r1!, {r0}"):
             with self.subTest(observed=observed), self.assertRaisesRegex(ValueError, "stored|spilled|escape"):
                 self.verify(self.frame(sequence + "\n" + observed))
         with self.assertRaisesRegex(ValueError, "stack-address materialization"):
-            self.verify(self.frame("ldr r0, release\nadd r0, sp"))
+            self.verify(self.frame("ldr r0, release\nmovs r1, #0\nadd r0, sp"))
         # The same arithmetic still cannot authorize a general memory index.
         with self.assertRaisesRegex(ValueError, "index is not a known constant"):
             self.verify(self.frame("mov r0, sp\nmovs r1, #1\nlsls r1, r1, #2\nldr r2, [r0, r1]"))
