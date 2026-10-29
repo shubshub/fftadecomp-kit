@@ -33,6 +33,7 @@ import sys
 import tempfile
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
+import signed_divmod_profile as signed_divmod
 import umodsi3_profile as umodsi3
 import ashldi3_profile as ashldi3
 import inert_spin_profile as inert_spin
@@ -397,7 +398,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                    double_bindings=None, double_index=None, function_thunks=False, *,
                    allow_switch_constants=False, umodsi3_bindings=None,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
-                   allow_double_data=False):
+                   allow_double_data=False, signed_runtime_profile=None):
     """Bind external Thumb calls and explicitly mapped absolute data words."""
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
@@ -405,6 +406,14 @@ def call_bindings(image, name, address, mapping, rom_size,
                  allow_preloaded_switch, modsi3_bindings, divsi3_bindings,
                  double_bindings, double_index, function_thunks, umodsi3_bindings,
                  ashldi3_bindings, ashldi3_index, float_bindings, float_index)
+    if signed_runtime_profile is not None and (
+            signed_runtime_profile != signed_divmod.SELECTOR or
+            type(divsi3_bindings) is not dict or type(modsi3_bindings) is not dict or
+            data_mapping is not None or function_relocations is not None or switch_relocations is not None or
+            allow_switch_data or allow_preloaded_switch or allow_switch_constants or function_thunks or
+            any(value is not None for value in (udivsi3_bindings, double_bindings, double_index,
+                umodsi3_bindings, ashldi3_bindings, ashldi3_index, float_bindings, float_index)) or allow_double_data):
+        raise ValueError('signed divmod linking requires its isolated canonical selector')
     if image["type"] != 1 or mapping is None:
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(function_thunks) is not bool or function_thunks and (
@@ -688,6 +697,9 @@ def call_bindings(image, name, address, mapping, rom_size,
             occupied.update(positions)
             calls[address + relocation] = target
             targets[target_symbol["name"]] = target
+    if signed_runtime_profile is not None and (not divsi3_bindings or not modsi3_bindings or
+            set(modsi3_bindings.values()) != {'__modsi3'}):
+        raise ValueError('signed divmod requires both canonical original runtime relocations')
     if float_bindings:
         if udivsi3_bindings or modsi3_bindings or divsi3_bindings or umodsi3_bindings or ashldi3_bindings or \
                 double_bindings is not None or function_relocations or switch_relocations or function_thunks or \
@@ -730,7 +742,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
                 raise ValueError("software-double calls require unique undefined global functions")
     if divsi3_bindings:
-        if udivsi3_bindings or modsi3_bindings or data_relocations or function_relocations or \
+        if udivsi3_bindings or modsi3_bindings and signed_runtime_profile is None or data_relocations or function_relocations or \
                 switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("signed quotient excludes other runtime, literal, switch and thunk profiles")
         for target_name in targets:
@@ -809,8 +821,18 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                           double_bindings=None, function_thunks=False, *,
                           allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
-                          allow_double_data=False):
+                          allow_double_data=False, signed_runtime_profile=None):
     """Validate exact placement and the linker's complete modification surface."""
+    if signed_runtime_profile is not None and (
+            signed_runtime_profile != signed_divmod.SELECTOR or
+            not divsi3_bindings or not modsi3_bindings or
+            set(divsi3_bindings.values()) != {'__divsi3'} or
+            set(modsi3_bindings.values()) != {'__modsi3'} or
+            data_relocations or function_relocations or switch_relocations or
+            allow_switch_data or allow_preloaded_switch or allow_switch_constants or function_thunks or
+            any(value is not None for value in (udivsi3_bindings, double_bindings,
+                umodsi3_bindings, ashldi3_bindings, float_bindings)) or allow_double_data):
+        raise ValueError('linked signed divmod requires its isolated canonical selector')
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_relocations or None,
                  function_relocations, allow_switch_data, udivsi3_bindings,
@@ -915,7 +937,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                 any(alias != "__divsi3" or calls.get(site) != divsi3.ADDRESS
                     for site, alias in divsi3_bindings.items()) or \
                 set(divsi3_bindings) != {site for site, target in calls.items() if divsi3.reserved(target)} or \
-                udivsi3_bindings or modsi3_bindings or data_relocations or function_relocations or \
+                udivsi3_bindings or modsi3_bindings and signed_runtime_profile is None or data_relocations or function_relocations or \
                 switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("linked signed quotient bindings are incomplete or mixed")
     elif divsi3_bindings:
@@ -1032,7 +1054,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
                function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
-               allow_double_data=False):
+               allow_double_data=False, signed_runtime_profile=None):
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
@@ -1044,7 +1066,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     umodsi3_bindings=umodsi3_bindings,
                                                     ashldi3_bindings=ashldi3_bindings, ashldi3_index=ashldi3_index,
                                                     float_bindings=float_bindings, float_index=float_index,
-                                                    allow_double_data=allow_double_data)
+                                                    allow_double_data=allow_double_data,
+                                                    signed_runtime_profile=signed_runtime_profile)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -1081,7 +1104,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   allow_switch_constants=allow_switch_constants,
                                   umodsi3_bindings=umodsi3_bindings,
                                   ashldi3_bindings=ashldi3_bindings, float_bindings=float_bindings,
-                                  allow_double_data=allow_double_data),
+                                  allow_double_data=allow_double_data,
+                                  signed_runtime_profile=signed_runtime_profile),
             calls, data_relocations)
 
 
@@ -2586,8 +2610,21 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
-                             signed_quotient_profile=None, stack_pointer_compare_profile=None):
+                             signed_quotient_profile=None, stack_pointer_compare_profile=None,
+                             signed_runtime_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if signed_runtime_context is not None:
+        if not thumb or buffer_proof is not None or call_resolver is not None or preloaded_switch or \
+                allow_switch_constants or allow_switch_scalar_frame or any(value is not None for value in (
+                    switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
+                    divsi3_context, inert_spin_context, double_context, function_thunk_context,
+                    umodsi3_context, ashldi3_context, float_context, acyclic_state_budget,
+                    ignored_leaf_alias_proof, signed_quotient_profile, stack_pointer_compare_profile)):
+            raise ValueError('signed divmod requires its isolated canonical Thumb context')
+        div_bindings, mod_bindings = signed_divmod.prepare(
+            data, address, validated_calls or {}, signed_runtime_context)
+        divsi3_context = (signed_runtime_context[0], signed_runtime_context[1], div_bindings, {})
+        modsi3_context = (signed_runtime_context[0], signed_runtime_context[1], mod_bindings)
     if stack_pointer_compare_profile is not None:
         if type(stack_pointer_compare_profile) is not str or \
                 stack_pointer_compare_profile != sp_compare.SELECTOR or not thumb or \
@@ -2738,10 +2775,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if divsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
                 switch_relocations is not None or switch_data_relocations is not None or \
-                udivsi3_context is not None or modsi3_context is not None or preloaded_switch:
+                udivsi3_context is not None or modsi3_context is not None and signed_runtime_context is None or preloaded_switch:
             raise ValueError("signed quotient requires an isolated direct-call profile")
         divsi3.verify_context(data, address, validated_calls or {}, divsi3_context)
-        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or modsi3.reserved(target)
+        if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
+               modsi3.reserved(target) and not (signed_runtime_context is not None and target == modsi3.ADDRESS)
                for target in (validated_calls or {}).values()):
             raise ValueError("signed quotient excludes other runtimes and thunks")
     if modsi3_context is not None:
@@ -3419,6 +3457,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
         from thunk_pool_switch import record as pool_record
         pool_record(data, address, switch_relocations, instructions.values())
+    if signed_runtime_context is not None:
+        signed_divmod.finish(data, address, calls, signed_runtime_context,
+                             instructions.values(), divsi3_context[3])
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -3522,6 +3563,7 @@ def main():
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
+    ap.add_argument("--signed-runtime-profile", choices=(signed_divmod.SELECTOR,))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
@@ -3551,6 +3593,8 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.signed_runtime_profile is not None:
+        return signed_divmod.issue(Path(ROOT), addr, args)
     if args.signed_quotient_profile is not None and (
             args.mode != "thumb" or args.control_flow_profile != "ordinary" or
             args.software_double_profile or args.software_double_remainder_profile or

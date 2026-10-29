@@ -803,6 +803,9 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        import signed_divmod_profile
+        if signed_divmod_profile.selected(report):
+            return signed_divmod_profile.report_matches(report, root, address)
         import owner_admission_profile
         if owner_admission_profile.selected(report):
             return owner_admission_profile.report_matches(report, root, address)
