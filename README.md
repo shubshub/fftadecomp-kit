@@ -1767,3 +1767,34 @@ that any stored word survived aliasing writes or frame lifetime changes.
 `tests/test_static_callback_buffer.py` uses natural synthetic C compiled with
 original agbcc `-mthumb-interwork -O2`; it needs the fixed compiler and ARM tools
 on `PATH`, and contains no extracted original ROM bodies or tables.
+
+### Exact protected descriptor words
+
+`--owner-runtime-profile protected-descriptor-word-v1` selects
+`elf-symbol-thumb-protected-descriptor-word-v1`. The separate selector extends
+the existing buffer states with exact aligned allocated-word pointer/scalar
+values. Alias-addressed full-word loads can restore a pointer or static callback
+target only from a surviving exact word. Actual verified SP changes translate
+facts across nested calls; joins and all returns retain only identical facts.
+Unknown-base writes clear word facts; overlapping partial writes cannot restore
+them. Partial, unaligned, missing, expired and ambiguous pointer-word loads
+refuse. Deallocation removes facts and allocation after deallocation refuses,
+so recycled frame offsets cannot resurrect old values.
+
+Every live callee-saved buffer alias must remain unwritten throughout the actual
+callee graph, including nested calls. A push/pop restoration of that register is
+conservatively outside this narrower identity proof. Callees are inspected even
+when only word facts or such watched aliases cross the call. No ordinary ABI
+summary supplies descriptor preservation. Register target facts still die at
+calls. Contexts and reports bind word values, root frame, actual SP offset,
+watched registers, aliases, typed literals, original ELF and existing fingerprints.
+The limits are twelve dependency owners of at most 4096 bytes and 128 contexts;
+existing profiles and their conditional ordinary-ABI behavior are unchanged.
+Unknown block-write bases remain refused rather than granting an output bound.
+
+`tests/test_protected_descriptor_word.py` uses natural original agbcc O2 source
+and retained original ET_REL fixtures. Positive cases include nested read-only
+calls and equal word values on both branches. Negatives cover changed callback
+contexts, possible clobbers, unequal joins, unknown writes, partial/expired words,
+frame reuse and unproved register preservation. No original game C or ROM body is
+embedded in these tests.

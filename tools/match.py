@@ -2190,6 +2190,8 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
 
 
 class BufferCallProof:
+    word_provenance = False
+
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
     def __init__(self, rom, mapping, stack_arguments=False):
@@ -2242,7 +2244,13 @@ class BufferCallProof:
     def clear_extra_call_constants(self, constants):
         pass
 
-    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None):
+    def word_context(self, words, frame_base, root_frame, watched=()):
+        return {}
+
+    def word_result(self, aliases, words):
+        return dict(aliases)
+
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
         arguments = {register: offset for register, offset in aliases.items()
                      if register in CALLER_CLOBBERED}
         slots = slots or {}
@@ -2252,7 +2260,9 @@ class BufferCallProof:
             self.access(offset, 4, stack)
         incoming = {offset + 4 * len(stack): target for offset, target in slots.items()}
         return self.check_arguments(address, arguments, stack, incoming, frozenset(slots),
-                                    constants=self.argument_constants(constants or {}), site=site)
+                                    constants=self.argument_constants(constants or {}), site=site,
+                                    **self.word_context(words or {}, -4*len(stack), site,
+                                        tuple(register for register in aliases if register not in CALLER_CLOBBERED)))
 
     def inspect(self, address, data):
         instructions = verify_leaf_instructions(data, address, True,
@@ -2260,9 +2270,10 @@ class BufferCallProof:
                                                 call_resolver=self.target)
         return instructions, {}
 
-    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None):
-        if not arguments and not incoming:
-            return {}
+    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None,
+                        words=None, frame_base=None, root_frame=None, watched=()):
+        if not arguments and not incoming and not words and not watched:
+            return self.word_result({}, {})
         if ARM_REG_LR in arguments:
             raise ValueError("buffer pointer cannot be passed through the link register")
         for offset in (*arguments.values(), *incoming.values()):
@@ -2276,18 +2287,23 @@ class BufferCallProof:
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
             states = {address: (tuple(sorted(arguments.items())), 0,
-                                tuple(sorted((constants or {}).items())))}
+                                tuple(sorted((constants or {}).items())),
+                                tuple(sorted((words or {}).items())))}
             pending = [address]
             returned = ()
+            returned_words = None
             while pending:
                 current = pending.pop()
                 instruction = by_address[current]
                 aliases = dict(states[current][0])
                 depth = states[current][1]
                 constants = dict(states[current][2])
+                words = dict(states[current][3])
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
+                if set(written) & set(watched):
+                    raise ValueError("descriptor call does not prove preservation of a live alias register")
                 returning = current not in finite_transfers and (instruction.mnemonic == "bx" or
                              instruction.mnemonic == "pop" and ARM_REG_PC in registers or
                              instruction.mnemonic == "mov" and registers and registers[0] == ARM_REG_PC)
@@ -2308,7 +2324,11 @@ class BufferCallProof:
                               if register in CALLER_CLOBBERED}
                     nested = {offset + depth * 4: target for offset, target in incoming.items()}
                     result = self.check_arguments(operands[0].imm, passed, stack, nested, protected,
-                        constants=self.argument_constants(constants), site=current)
+                        constants=self.argument_constants(constants), site=current,
+                        **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
+                            tuple(sorted(set(watched) | {register for register in aliases if register not in CALLER_CLOBBERED}))))
+                    if self.word_provenance:
+                        words = dict(result.words)
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
                         constants.pop(register, None)
@@ -2318,10 +2338,16 @@ class BufferCallProof:
                     assignment = register_alias_assignment(instruction, aliases)
                     allowed = {assignment[2]} if assignment is not None else set()
                     loaded = None
+                    word_constant = None
+                    word_load = pointer_store = False
+                    if self.word_provenance:
+                        loaded, word_constant, word_load, pointer_store = self.word_memory(
+                            instruction, aliases, constants, stack, words,
+                            frame_base-4*depth, protected, root_frame=root_frame)
                     for operand in operands:
                         if operand.type != ARM_OP_MEM:
                             continue
-                        if operand.mem.base == ARM_REG_SP and instruction.mnemonic == "ldr":
+                        if not self.word_provenance and operand.mem.base == ARM_REG_SP and instruction.mnemonic == "ldr":
                             position = operand.mem.disp - 4 * depth
                             if position in incoming:
                                 loaded = (registers[0], incoming[position])
@@ -2344,10 +2370,12 @@ class BufferCallProof:
                                 raise ValueError("buffer index is not a known scalar constant")
                             offset += constants[operand.mem.index]
                         self.access(offset, width, stack)
-                        if any(offset < slot + 4 and offset + width > slot for slot in protected):
+                        if any(offset < slot + 4 and offset + width > slot for slot in protected) and not word_load:
                             raise ValueError("buffer access overlaps a pointer-bearing argument slot")
-                        if instruction.mnemonic.startswith("str") and registers[0] in aliases:
+                        if instruction.mnemonic.startswith("str") and registers[0] in aliases and not pointer_store:
                             raise ValueError("buffer pointers cannot be stored or spilled")
+                        if pointer_store:
+                            allowed.add(registers[0])
                         allowed.add(operand.mem.base)
                     if self.stack_arguments and instruction.size == 2 and \
                             instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and \
@@ -2371,6 +2399,8 @@ class BufferCallProof:
                     extra = self.extra_constant(instruction, data, address, constants)
                     if extra is not None:
                         constant = extra
+                    if word_constant is not None:
+                        constant = word_constant
                     for register in written:
                         aliases.pop(register, None)
                         constants.pop(register, None)
@@ -2391,6 +2421,7 @@ class BufferCallProof:
                            for register in aliases):
                         raise ValueError("buffer pointer escapes through an unrestored register")
                     returned = merge_possible_aliases(returned, aliases.items())
+                    returned_words = words if returned_words is None else {slot:value for slot,value in returned_words.items() if words.get(slot)==value}
                     successors = ()
                 elif instruction.id == ARM_INS_B:
                     successors = (operands[0].imm,)
@@ -2398,7 +2429,7 @@ class BufferCallProof:
                         successors += (current + instruction.size,)
                 else:
                     successors = (current + instruction.size,)
-                outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())))
+                outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())), tuple(sorted(words.items())))
                 for successor in successors:
                     if successor not in states:
                         states[successor] = outgoing
@@ -2409,11 +2440,12 @@ class BufferCallProof:
                             raise ValueError("inconsistent buffer aliases at control-flow join")
                         merged = (merge_possible_aliases(previous[0], outgoing[0]), depth,
                                   tuple((register, value) for register, value in previous[2]
-                                        if constants.get(register) == value))
+                                        if constants.get(register) == value),
+                                  tuple((slot,value) for slot,value in previous[3] if words.get(slot)==value))
                         if merged != previous:
                             states[successor] = merged
                             pending.append(successor)
-            return dict(returned)
+            return self.word_result(returned, returned_words or {})
         except ValueError as error:
             raise ValueError(f"buffer callee 0x{address:08X}: {error}") from error
         finally:
@@ -2621,7 +2653,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         reserved.update(address + offset + byte for offset in switch_relocations for byte in range(4))
     end = address + len(data)
     alignment = 2 if thumb else 4
-    states = {address: (frozenset({ARM_REG_LR}), (), (), (), ())}
+    states = {address: (frozenset({ARM_REG_LR}), (), (), (), (), ())}
     stack_arguments = buffer_proof is not None and buffer_proof.stack_arguments
     caller_clobbered = CALLER_CLOBBERED
     pending = [address]
@@ -2667,6 +2699,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         aliases = dict(states[current][2])
         constants = dict(states[current][3])
         pointer_slots = dict(states[current][4])
+        words = dict(states[current][5])
+        word_mode = buffer_proof is not None and buffer_proof.word_provenance
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
@@ -2789,6 +2823,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 raise ValueError("stack-pointer adjustment leaves the tracked frame")
             else:
                 del stack[:adjustment]
+        if word_mode and (stack_operation or adjustment is not None):
+            buffer_proof.prune_words(words, stack)
         returning = unconditional and (
             (instruction.mnemonic == "bx" and len(registers) == 1 and
              registers[0] in return_registers) or
@@ -2820,7 +2856,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if target_register in aliases or target_register in return_registers:
                     raise ValueError("indirect target carries tracked stack or return provenance")
             returned_aliases = {}
-            if pointer_slots or any(register in aliases for register in caller_clobbered):
+            if pointer_slots or words or word_mode and aliases or any(register in aliases for register in caller_clobbered):
                 if ignored_leaf_alias_proof is not None:
                     returned_aliases = ignored_leaf_alias_proof.check_call(
                         current, operands[0].imm, aliases, pointer_slots)
@@ -2829,7 +2865,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 else:
                     returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
                                                               pointer_slots, constants=constants,
-                                                              site=current)
+                                                              site=current, words=words)
+                    if word_mode:
+                        words = dict(returned_aliases.words)
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
@@ -2857,6 +2895,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 read, written = instruction.regs_access()
                 assigned_return = None
                 loaded_alias = None
+                word_constant = None
+                if word_mode:
+                    loaded_alias, word_constant, _, _ = buffer_proof.word_memory(
+                        instruction, aliases, constants, stack, words, -4*len(stack), frozenset(pointer_slots), root_frame=address)
                 if ARM_REG_PC in written:
                     raise ValueError("unresolved program-counter write")
                 if ARM_REG_SP in written:
@@ -2924,7 +2966,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         allowed_aliases.add(operand.mem.base)
                         slot = (offset + 4 * len(stack)) // 4
                         pointer_word = offset - offset % 4
-                        if pointer_word in pointer_slots:
+                        if pointer_word in pointer_slots and not word_mode:
                             if width != 4:
                                 raise ValueError("partial access to a pointer-bearing local word")
                             if instruction.mnemonic.startswith("ldr"):
@@ -2964,7 +3006,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                             else:
                                 if slot < len(stack) and stack[slot][0]:
                                     assigned_return = registers[0]
-                                if offset in pointer_slots:
+                                if offset in pointer_slots and not word_mode:
                                     loaded_alias = (registers[0], pointer_slots[offset])
                         elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
@@ -2984,6 +3026,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     extra = buffer_proof.extra_constant(instruction, data, address, constants)
                     if extra is not None:
                         constant = extra
+                if word_constant is not None:
+                    constant = word_constant
                 return_registers.difference_update(written)
                 for register in written:
                     aliases.pop(register, None)
@@ -3001,7 +3045,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             successors = (current + instruction.size,)
         edges[current] = successors
         outgoing = (frozenset(return_registers), tuple(stack), tuple(sorted(aliases.items())),
-                    tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())))
+                    tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())), tuple(sorted(words.items())))
         for successor in successors:
             if path_states is not None:
                 previous_paths = path_states.get(successor, set())
@@ -3040,7 +3084,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                 for saved, incoming
                                 in zip(previous[1], stack)), merged_aliases,
                           tuple((register, value) for register, value in previous[3]
-                                if constants.get(register) == value), merged_slots)
+                                if constants.get(register) == value), merged_slots,
+                          tuple((slot,value) for slot,value in previous[5] if words.get(slot)==value))
             if previous != merged:
                 states[successor] = merged
                 pending.append(successor)
@@ -3307,7 +3352,8 @@ def main():
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
                                                       "named-data-buffer-v1",
-                                                      "static-callback-buffer-v1"))
+                                                      "static-callback-buffer-v1",
+                                                      "protected-descriptor-word-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)

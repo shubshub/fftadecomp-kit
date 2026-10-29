@@ -47,20 +47,22 @@ class StaticCallbackBufferProof(named.NamedDataBufferProof):
             return constants.get(operands[1].reg)
         return None
 
-    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None):
-        if not arguments and not incoming:
-            return {}
+    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None, **word_context):
+        if not arguments and not incoming and not word_context.get("words") and not word_context.get("watched"):
+            return self.word_result({}, {})
         constants = constants or {}
         context = (address, tuple(sorted(arguments.items())), tuple(stack),
                    tuple(sorted(incoming.items())), tuple(sorted(protected)),
                    tuple(sorted(constants.items())), site)
+        if word_context:
+            context += (tuple(sorted(word_context["words"].items())), word_context["frame_base"], word_context["root_frame"], tuple(word_context.get("watched", ())))
         self.contexts.add(context)
         if len(self.contexts) > MAX_CONTEXTS:
             raise ValueError('static callback context budget exceeded')
         reverse = {value: name for name, value in thunk.ALIASES.items()}
         if address not in reverse:
             return super().check_arguments(address, arguments, stack, incoming, protected,
-                                           constants=constants, site=site)
+                                           constants=constants, site=site, **word_context)
         name = reverse[address]
         canonical = thunk.dependencies([name], self.rom)[0]
         data = self.span(address)
@@ -85,8 +87,12 @@ class StaticCallbackBufferProof(named.NamedDataBufferProof):
             'incoming': [list(pair) for pair in sorted(incoming.items())],
             'protected': sorted(protected), 'stack': [list(word) for word in stack],
             'constants': [list(pair) for pair in sorted(constants.items())]}
+        if word_context:
+            self.callbacks[context].update(words=[[slot,list(value)] for slot,value in sorted(word_context['words'].items())],
+                frame_base=word_context['frame_base'], root_frame=word_context['root_frame'],
+                watched=list(word_context.get('watched', ())))
         return super().check_arguments(target, arguments, stack, incoming, protected,
-                                       constants=constants, site=site)
+                                       constants=constants, site=site, **word_context)
 
     def observations(self):
         return sorted(self.callbacks.values(), key=lambda row: json.dumps(row, sort_keys=True))
