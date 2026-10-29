@@ -254,10 +254,85 @@ def refinement_word_switch(data, address, position, end, engine, *,
     return candidates[0] if len(candidates) == 1 else None
 
 
+def refinement_arm_instruction(instruction):
+    """Classify a conservative ARMv4T subset, without resolving indirect edges.
+
+    Raw encoding checks exclude extension/system instructions even when the
+    decoder recognizes a newer architecture. Return forms are syntactic only.
+    """
+    word = int.from_bytes(instruction.bytes, "little")
+    conditional = word >> 28 != 14
+    result = {"kind": "ordinary", "conditional": conditional, "literal": None}
+
+    def reject(reason):
+        return {**result, "reason": reason}
+
+    if instruction.size != 4 or word >> 28 == 15:
+        return reject("unsupported ARM encoding or cross-mode transfer")
+    if word & 0x0E000000 == 0x0A000000:
+        displacement = (word & 0xFFFFFF) << 2
+        if displacement & 0x02000000:
+            displacement -= 0x04000000
+        return {**result, "kind": "call" if word & 0x01000000 else "branch",
+                "target": instruction.address + 8 + displacement}
+    if word & 0x0FFFFFF0 == 0x012FFF10:
+        if word & 15 == 14:
+            return {**result, "kind": "return"}
+        return reject("unresolved or cross-mode ARM transfer")
+    if word & 0x0FFFFFF0 == 0x012FFF30:
+        return reject("unsupported cross-mode transfer")
+    if word & 0x0FFFFFFF == 0x01A0F00E or (
+            word & 0x0FFF0000 == 0x08BD0000 and word & 0x8000 and not word & 0x2000):
+        return {**result, "kind": "return"}
+
+    name = instruction.insn_name()
+    data_names = {"adc", "add", "and", "asr", "bic", "cmn", "cmp", "eor",
+                  "lsl", "lsr", "mov", "mvn", "orr", "ror", "rrx", "rsb",
+                  "rsc", "sbc", "sub", "teq", "tst"}
+    test_opcode = (word >> 21) & 15 in (8, 9, 10, 11)
+    data_encoding = word & 0x0C000000 == 0 and (
+        word & 0x02000000 or word & 0x90 != 0x90) and (
+        not test_opcode or word & 0x00100000 and not word & 0x0000F000)
+    multiply = name in {"mul", "mla"} and word & 0x0FC000F0 == 0x00000090
+    transfer = name in {"ldr", "ldrb", "str", "strb"} and \
+        word & 0x0C000000 == 0x04000000 and (not word & 0x02000000 or not word & 0x10)
+    halfword = name in {"ldrh", "ldrsb", "ldrsh", "strh"} and \
+        word & 0x0E000090 == 0x00000090
+    multiple = name in {"ldm", "ldmda", "ldmdb", "ldmib", "pop", "push",
+                        "stm", "stmda", "stmdb", "stmib"} and \
+        word & 0x0E400000 == 0x08000000
+    if not (name in data_names and data_encoding or multiply or transfer or halfword or multiple):
+        return reject("unsupported ARM instruction")
+    if multiple and (not word & 0xFFFF or
+                     word & 0x00200000 and word & (1 << ((word >> 16) & 15))):
+        return reject("unsupported ARM register-list writeback")
+    try:
+        reads, writes = instruction.regs_access()
+    except Exception:
+        return reject("unavailable ARM register access")
+    operands = instruction.operands
+    if ARM_REG_PC in writes or any(operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC
+                                   for operand in operands[:1]):
+        return reject("unsupported ARM PC write")
+    # Only an immediate, preindexed word read with no writeback owns a literal.
+    if transfer and name == "ldr" and word & 0x0F7F0000 == 0x051F0000:
+        displacement = word & 0xFFF
+        if not word & 0x00800000:
+            displacement = -displacement
+        return {**result, "literal": instruction.address + 8 + displacement}
+    if ARM_REG_PC in reads or any(
+            operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC or
+            operand.type == ARM_OP_MEM and ARM_REG_PC in (operand.mem.base, operand.mem.index)
+            for operand in operands):
+        return reject("unsupported ARM PC read")
+    return result
+
+
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
-                    same_owner_long_branches=False, full_rom_inventory=False):
-    """Inspect a byte window beginning at an indexed Thumb entry.
+                    same_owner_long_branches=False, full_rom_inventory=False,
+                    arm_inventory=False):
+    """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
     its complete CFG must pass the existing restoring-frame proof separately.
@@ -308,6 +383,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("local long-branch inventory opt-in must be Boolean")
     if type(full_rom_inventory) is not bool:
         fail("full-ROM inventory opt-in must be Boolean")
+    if type(arm_inventory) is not bool:
+        fail("ARM inventory opt-in must be Boolean")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -331,7 +408,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("entry is not indexed")
     elif address in index_issues:
         fail("invalid indexed entry: " + ", ".join(sorted(index_issues[address])))
-    elif starts[address] != "thumb":
+    elif starts[address] != "thumb" and not arm_inventory:
         fail("unsupported ARM entry")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
@@ -355,7 +432,13 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
-    engine = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    arm_mode = starts[address] == "arm"
+    alignment = 4 if arm_mode else 2
+    if arm_mode:
+        result["profile"] = "bounded-arm-cfg-inventory-v1"
+        result["call_policy"] = "indexed direct ARM calls; continuation only"
+        result["return_policy"] = "syntactic ARM bx lr/mov pc,lr/pop pc; no stack-safety proof"
+    engine = Cs(CS_ARCH_ARM, CS_MODE_ARM if arm_mode else CS_MODE_THUMB)
     engine.detail = True
     engine.skipdata = False
     supported = {
@@ -388,7 +471,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         if state in visited:
             continue
         visited.add(state)
-        if position % 2 or not address <= position or position + 2 > end:
+        if position % alignment or not address <= position or position + alignment > end:
             fail("control-flow boundary escape", position)
             continue
         if position in literal_bytes:
@@ -420,6 +503,51 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             continue
         instructions[position] = size
         owners.update((byte, position) for byte in occupied)
+        if arm_mode:
+            arm = refinement_arm_instruction(instruction)
+            if "reason" in arm:
+                fail(arm["reason"], position)
+                continue
+            literal = arm["literal"]
+            if literal is not None:
+                inside = literal % 4 == 0 and address <= literal and literal + 4 <= end
+                literal_reads[position] = {
+                    "site": f"0x{position:08X}", "address": f"0x{literal:08X}",
+                    "size": 4, "inside_window": inside,
+                }
+                if literal % 4:
+                    fail("unaligned ARM literal", position)
+                elif not inside:
+                    fail("literal outside window", position)
+                else:
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
+            if arm["kind"] == "return":
+                returns.add(position)
+                if arm["conditional"]:
+                    follow(position, position + size)
+            elif arm["kind"] == "branch":
+                follow(position, arm["target"])
+                if arm["conditional"]:
+                    follow(position, position + size)
+            elif arm["kind"] == "call":
+                target = arm["target"]
+                if address <= target < end:
+                    fail("ambiguous local ARM BL", position)
+                elif target not in starts:
+                    fail("unmapped ARM call target", position)
+                elif target in index_issues:
+                    fail("ambiguous ARM call target", position)
+                elif starts[target] != "arm":
+                    fail("unsupported cross-mode ARM call", position)
+                else:
+                    calls.add((position, target))
+                follow(position, position + size)
+            else:
+                follow(position, position + size)
+            continue
         if instruction.mnemonic == "blx":
             fail("unsupported cross-mode transfer", position)
             continue
@@ -581,13 +709,16 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
 
 def refinement_main(arguments):
     """Run read-only, bounded diagnostics without entering normal discovery."""
-    parser = argparse.ArgumentParser(description="Bounded provisional Thumb CFG refinement")
+    parser = argparse.ArgumentParser(description="Bounded provisional CFG refinement")
     parser.add_argument("rom", nargs="?")
     parser.add_argument("root", nargs="?")
     parser.add_argument("--refine-address", type=lambda value: int(value, 0),
                         action="append", required=True)
     parser.add_argument("--refine-max-bytes", type=lambda value: int(value, 0), default=4096)
     parser.add_argument("--refine-max-instructions", type=lambda value: int(value, 0), default=1024)
+    parser.add_argument("--refine-arm-inventory", action="store_true",
+                        help="enable bounded ARMv4T CFG diagnostics; grants no function, "
+                             "ABI, match or inventory-completeness proof")
     parser.add_argument("--refine-full-rom-inventory", action="store_true",
                         help="allow diagnostic entries in the original ROM, up to 0x09000000; "
                              "grants no function, ABI, match or inventory-completeness proof")
@@ -598,6 +729,8 @@ def refinement_main(arguments):
     code_end = 0x09000000 if options.refine_full_rom_inventory else CODE_END
     if options.refine_full_rom_inventory:
         output["full_rom_inventory"] = True
+    if options.refine_arm_inventory:
+        output["arm_inventory"] = True
 
     def unique_object(pairs):
         result = {}
@@ -629,7 +762,8 @@ def refinement_main(arguments):
                 output["results"].append(refine_function(
                     data, address, functions, options.refine_max_bytes,
                     options.refine_max_instructions, rom_end,
-                    full_rom_inventory=options.refine_full_rom_inventory))
+                    full_rom_inventory=options.refine_full_rom_inventory,
+                    arm_inventory=options.refine_arm_inventory))
     except (OSError, ValueError) as error:
         output["error"] = str(error)
         print(json.dumps(output, indent=2))

@@ -75,7 +75,23 @@ only valid in-window words contribute to `literal_ranges`.
 return assumptions, not stack safety, a complete ELF symbol or exhaustive
 discovery. `complete` and `inventory_complete` always remain false.
 
-Unsupported ARM entries, unresolved indirect transfers or switches, ambiguous
+ARM entries remain unsupported by default. Explicitly add
+`--refine-arm-inventory` to enable a conservative ARMv4T diagnostic using the
+same finite windows, aligned indexed starts, neighboring boundaries and byte
+ownership checks. Combine it with `--refine-full-rom-inventory` for late entries.
+Supported edges are direct ARM B/BL and conditional fallthrough; direct calls
+require valid unique ARM index targets and assume a returning continuation.
+Recognized returns are syntactic `bx lr`, `mov pc, lr` and ordinary `pop {..., pc}`;
+conditional returns also require their fallthrough path. Only immediate,
+preindexed, aligned PC-relative word loads without writeback can contribute
+literal words, wholly inside the window and disjoint from reached instructions.
+Other PC uses, indirect or cross-mode transfers, system/extension instructions
+and unsupported encodings remain partial. This diagnoses bytes at provisional
+starts without establishing real functions, ABI safety or match credit. ARM
+results use `bounded-arm-cfg-inventory-v1`; both completeness fields stay false.
+Thumb diagnostic results and matching, status and reservation gates are unchanged.
+
+Default ARM entries, unresolved indirect transfers or switches, ambiguous
 boundaries, instruction/literal overlap and exhausted budgets produce explicit
 partial reasons. Invalid indexed starts with parseable addresses are reported;
 affected entry or neighboring boundaries fail closed. Unparseable addresses
