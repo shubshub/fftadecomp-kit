@@ -47,7 +47,7 @@ class _SingleStoreEffects:
         source = registers[0]
         value = None
         if source in aliases:
-            self.access(aliases[source],1,stack)
+            self.validate_pointer_value(aliases[source],stack)
             value = ('pointer',aliases[source])
         elif source in constants:
             value = ('constant',constants[source])

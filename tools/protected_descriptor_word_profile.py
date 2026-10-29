@@ -36,7 +36,7 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
             try:
                 self.access(slot, 4, stack)
                 if kind == 'pointer':
-                    self.access(value, 1, stack)
+                    self.validate_pointer_value(value, stack)
             except ValueError:
                 del words[slot]
 
@@ -119,7 +119,7 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
                 raise ValueError('descriptor reload lacks an exact surviving word value')
             kind, number = value
             if kind == 'pointer':
-                self.access(number, 1, stack)
+                self.validate_pointer_value(number, stack)
             key = (instruction.address, offset, value, tuple(sorted(words.items())), sp_offset,
                    tuple(stack), tuple(sorted(aliases.items())), tuple(sorted(constants.items())),
                    tuple(sorted(protected)), root_frame)
@@ -142,7 +142,7 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
         except ValueError:
             return None, None, False, False
         if register in aliases:
-            self.access(aliases[register], 1, stack)
+            self.validate_pointer_value(aliases[register], stack)
             words[offset] = ('pointer', aliases[register])
             return None, None, False, True
         if register in constants:

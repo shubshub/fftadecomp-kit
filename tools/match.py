@@ -2245,6 +2245,9 @@ class BufferCallProof:
                     for slot in range(start // 4, (start + width - 1) // 4 + 1)):
             raise ValueError("buffer access is unaligned or outside allocated local words")
 
+    def validate_pointer_value(self, offset, stack):
+        self.access(offset, 1, stack)
+
     def argument_constants(self, constants):
         return {}
 
@@ -2290,7 +2293,7 @@ class BufferCallProof:
         if ARM_REG_LR in arguments:
             raise ValueError("buffer pointer cannot be passed through the link register")
         for offset in (*arguments.values(), *incoming.values()):
-            self.access(offset, 1, stack)
+            self.validate_pointer_value(offset, stack)
         if address in self.active or len(self.active) >= 16:
             raise ValueError("recursive or excessively nested buffer calls are unsupported")
         self.active.add(address)
@@ -2477,7 +2480,7 @@ class BufferCallProof:
                 elif returning:
                     if self.callee_frames:
                         for offset in aliases.values():
-                            self.access(offset, 1, stack)
+                            self.validate_pointer_value(offset, stack)
                     if aliases and not self.stack_arguments:
                         raise ValueError("buffer pointer escapes through a return register")
                     if any(register not in CALLER_CLOBBERED or register == ARM_REG_LR
@@ -3154,7 +3157,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                     raise ValueError("stack-frame write is outside the tracked frame")
                                 if registers[0] in aliases and stack_arguments:
                                     buffer_proof.access(offset, 4, stack)
-                                    buffer_proof.access(aliases[registers[0]], 1, stack)
+                                    buffer_proof.validate_pointer_value(aliases[registers[0]], stack)
                                     pointer_slots[offset] = aliases[registers[0]]
                                     allowed_aliases.add(registers[0])
                                 else:
@@ -3541,7 +3544,8 @@ def main():
                                                       "descriptor-output-alias-v1",
                                                       "descriptor-single-store-v1",
                                                       "descriptor-disjunctive-alias-v1",
-                                                      "descriptor-callee-constant-v1"))
+                                                      "descriptor-callee-constant-v1",
+                                                      "descriptor-cursor-value-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
