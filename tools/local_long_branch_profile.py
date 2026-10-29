@@ -65,7 +65,7 @@ def record(instructions, address):
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
-                entry_stack_policy=None, local_alias_slot_policy=None):
+                entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -117,6 +117,17 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             raise ValueError("local alias slots require exclusive local-only stack alias policy")
         slot_states = alias_slots.prove_constants(instructions, edges, address)
 
+    finite_states = None
+    finite_additions, finite_reads = set(), set()
+    if finite_stack_index_policy is not None:
+        import finite_stack_index_profile as finite
+        finite.validate(finite_stack_index_policy)
+        if not stack_aliases or any(value is not None for value in (buffer_proof,
+                bounded_output_proof, runtime_calls, call_preservation, zero_index_profile,
+                entry_stack_policy, local_alias_slot_policy)):
+            raise ValueError("finite indices require exclusive local-only conditional ordinary ABI policy")
+        finite_states = finite.prove_constants(instructions, edges, address)
+
     def access(offset, width, stack):
         position = offset + 4 * len(stack)
         if offset % width or position < 0 or offset + width > 0 or \
@@ -150,7 +161,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     initial = {register: ("entry", register) for register in preserved}
     initial[ARM_REG_LR] = ("entry-return",)
     states = {address: (tuple(sorted(initial.items())), (), (), ())}
+    if finite_states is not None:
+        states[address] += (frozenset(),)
     pending, returns, maximum = [address], set(), 0
+    finite_updates = 0
     alias_sites, alias_accesses, alias_calls = set(), set(), set()
     clobbered = (*range(ARM_REG_R0, ARM_REG_R0 + 4), ARM_REG_R12, ARM_REG_LR)
     while pending:
@@ -159,6 +173,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         registers, stack = dict(states[site][0]), list(states[site][1])
         aliases = {register: frozenset(values) for register, values in states[site][2]}
         pointer_slots = {word: frozenset(values) for word, values in states[site][3]}
+        initialized = set(states[site][4]) if finite_states is not None else set()
         operands = instruction.operands
         regs = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
         adjustment = thumb_stack_adjustment(instruction)
@@ -232,14 +247,23 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             assignment = None
             loaded_alias = None
             if stack_aliases:
-                exact = {register: alias_offset(register, aliases)
-                         for register in aliases if register in read}
-                constants = {} if slot_states is None else {register:value[0] for register,value in slot_states[site].items()}
-                assignment = stack_alias_assignment(instruction, exact, len(stack), constants)
+                if finite_states is not None:
+                    assignment = finite.assignment(instruction, aliases, len(stack), finite_states[site])
+                else:
+                    exact = {register: alias_offset(register, aliases)
+                             for register in aliases if register in read}
+                    constants = {} if slot_states is None else {register:value[0] for register,value in slot_states[site].items()}
+                    assignment = stack_alias_assignment(instruction, exact, len(stack), constants)
                 if assignment is not None:
                     if assignment[0] in (ARM_REG_SP, ARM_REG_PC, ARM_REG_LR):
                         raise ValueError("local alias cannot overwrite a control register")
-                    access(assignment[1], 1, stack)
+                    if finite_states is None:
+                        access(assignment[1], 1, stack)
+                    else:
+                        for offset in finite.offsets(assignment[1]): access(offset, 1, stack)
+                        if instruction.mnemonic == "add" and assignment[2] == ARM_REG_SP and assignment[0] in finite_states[site]:
+                            finite_additions.add((site, assignment[0], tuple(sorted(
+                                (value, tuple(sorted(origins))) for value,origins in finite_states[site][assignment[0]].items()))))
                     alias_sites.add(site)
                     if slot_states is not None and instruction.mnemonic == "add" and any(op.type == ARM_OP_REG and op.reg == ARM_REG_SP for op in instruction.operands):
                         for register, (value, origins) in slot_states[site].items():
@@ -278,6 +302,19 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                             instruction.writeback or operand.shift.type or operand.shift.value or \
                             operand.subtracted or operand.mem.disp < 0:
                         raise ValueError("local alias requires an ordinary constant-offset memory access")
+                    if finite_states is not None:
+                        if name != "ldr" or width != 4 or operand.mem.index:
+                            raise ValueError("finite local aliases permit only aligned read-only local words")
+                        offsets = tuple(offset + operand.mem.disp for offset in finite.offsets(aliases[operand.mem.base]))
+                        slots = [access(offset, width, stack) for offset in offsets]
+                        if any(offset not in initialized for offset in offsets):
+                            raise ValueError("finite local read requires every alternative initialized on every path")
+                        tokens = [stack[position][1] for position in slots]
+                        assigned = (regs[0], tokens[0] if all(value == tokens[0] for value in tokens) else None)
+                        finite_reads.add((site, operand.mem.base, offsets, width))
+                        allowed_aliases.add(operand.mem.base)
+                        alias_accesses.add(site)
+                        continue
                     offset = alias_offset(operand.mem.base, aliases) + operand.mem.disp + index_displacement
                     slot = access(offset, width, stack)
                     if name.startswith("str"):
@@ -328,8 +365,12 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                             slot_stores.add((site, offset, alias_offset(regs[0], aliases)))
                         alias_slots.store(pointer_slots, offset, 4, aliases.get(regs[0]))
                     stack[slot] = ("local", registers.get(regs[0]))
+                    if finite_states is not None:
+                        initialized.add(operand.mem.disp - 4 * len(stack))
                 else:
                     offset = operand.mem.disp - 4 * len(stack)
+                    if finite_states is not None and stack[slot][0] == "local" and offset not in initialized:
+                        raise ValueError("finite local word is not initialized on every path")
                     if offset in pointer_slots:
                         alias_slots.word(instruction)
                         loaded_alias = (regs[0], pointer_slots[offset])
@@ -348,7 +389,10 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             if loaded_alias is not None:
                 aliases[loaded_alias[0]] = loaded_alias[1]
             if assignment is not None:
-                aliases[assignment[0]] = frozenset(((assignment[1], True),))
+                aliases[assignment[0]] = (assignment[1] if finite_states is not None
+                    else frozenset(((assignment[1], True),)))
+        if finite_states is not None:
+            initialized = {offset for offset in initialized if offset >= -4 * len(stack)}
         maximum = max(maximum, 4 * len(stack))
         if not edges[site]:
             return_register = (regs[0] if name == "bx" and len(regs) == 1 else
@@ -363,6 +407,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         outgoing = (tuple(sorted(registers.items())), tuple(stack),
                     tuple(sorted((register, tuple(sorted(values))) for register, values in aliases.items())),
                     tuple(sorted((word, tuple(sorted(values))) for word, values in pointer_slots.items())))
+        if finite_states is not None:
+            outgoing += (frozenset(initialized),)
         for successor in edges[site]:
             if successor not in instructions:
                 raise ValueError("local branch frame escaped its complete CFG")
@@ -382,7 +428,15 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                                 for (kind, old), (_, new) in zip(previous[1], stack)), joined_aliases,
                           alias_slots.join({word:frozenset(values) for word,values in previous[3]},pointer_slots)
                             if slot_states is not None else ())
+                if finite_states is not None:
+                    if any(len(values) > finite.MAX_VALUES for _,values in joined_aliases):
+                        raise ValueError("finite local alias alternative budget exceeded")
+                    merged += (previous[4] & frozenset(initialized),)
             if previous != merged:
+                if finite_states is not None:
+                    finite_updates += 1
+                    if finite_updates > finite.MAX_UPDATES:
+                        raise ValueError("finite local frame proof-state budget exceeded")
                 states[successor] = merged
                 pending.append(successor)
     if set(states) != set(instructions) or not returns:
@@ -416,4 +470,11 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             "constant_domain": "exact MOVS 1/2/3 only; all-path intersection; every call kills facts",
             "slot_domain": "own aligned local words; possible-pointer taint joins; partial overwrite invalidates; release expires provenance",
             "callee_pointer_arguments": False}
+    if finite_states is not None:
+        proof["finite_stack_indices"] = {"schema": finite.SCHEMA, "policy": finite_stack_index_policy,
+            "SP_additions": [[site,register,[[value,list(origins)] for value,origins in alternatives]]
+                for site,register,alternatives in sorted(finite_additions)],
+            "reads": [[site,base,list(offsets),width] for site,base,offsets,width in sorted(finite_reads)],
+            "constant_domain": "MOVS0/1, exact LSL2, all-path union of at most2 known values in0/1/4; missing arms unknown; caller-saved calls kill facts",
+            "alias_domain": "at most2 live allocated offsets; read-only initialized aligned words on every alternative; no spills, buffer or entry-word premise"}
     return proof
