@@ -200,7 +200,8 @@ def refinement_ranges(intervals):
 
 
 def refinement_word_switch(data, address, position, end, engine, *,
-                           same_owner_long_branches=False, one_object_word_switch=False):
+                           same_owner_long_branches=False, one_object_word_switch=False,
+                           two_constant_word_switch=False):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
@@ -251,6 +252,16 @@ def refinement_word_switch(data, address, position, end, engine, *,
                 if interposed_words:
                     descriptor["interposed_words"] = interposed_words
                 candidates.append(descriptor)
+        if two_constant_word_switch:
+            from switch_constants_profile import layout as constants_layout
+            try:
+                descriptor = constants_layout(data[:end - address], address, relocations)
+            except ValueError:
+                pass
+            else:
+                if descriptor['dispatch'] == dispatch and descriptor['comparison'] == dispatch - guard_size:
+                    descriptor['interposed_words'] = 2
+                    candidates.append(descriptor)
         if one_object_word_switch and literal >= 4:
             object_word = literal - 4
             value = struct.unpack_from("<I", data, object_word)[0]
@@ -347,7 +358,8 @@ def refinement_arm_instruction(instruction):
 def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
                     same_owner_long_branches=False, full_rom_inventory=False,
-                    arm_inventory=False, one_object_word_switch=False):
+                    arm_inventory=False, one_object_word_switch=False,
+                    two_constant_word_switch=False):
     """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -403,6 +415,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("ARM inventory opt-in must be Boolean")
     if type(one_object_word_switch) is not bool:
         fail("one-object-word switch inventory opt-in must be Boolean")
+    if type(two_constant_word_switch) is not bool:
+        fail("two-constant-word switch inventory opt-in must be Boolean")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -627,7 +641,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 switch = refinement_word_switch(
                     data, address, position, end, engine,
                     same_owner_long_branches=same_owner_long_branches,
-                    one_object_word_switch=one_object_word_switch)
+                    one_object_word_switch=one_object_word_switch,
+                    two_constant_word_switch=two_constant_word_switch)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue

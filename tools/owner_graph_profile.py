@@ -4,10 +4,13 @@ from capstone import Cs,CS_ARCH_ARM,CS_MODE_THUMB
 import analyze as original_analyze
 import local_long_branch_profile as local
 import match
-def graph(data, address, refinement, *, one_object_word_switch=False):
+def graph(data, address, refinement, *, one_object_word_switch=False,
+          two_constant_word_switch=False):
     """Replay exact decoded boundaries and native switch/local-BL descriptors."""
     if type(one_object_word_switch) is not bool:
         raise ValueError('one-object-word graph opt-in must be Boolean')
+    if type(two_constant_word_switch) is not bool:
+        raise ValueError('two-constant-word graph opt-in must be Boolean')
     if not refinement['cfg_closed'] or refinement['partial_reasons']:
         raise ValueError('structural inventory is not closed')
     end = address + len(data)
@@ -43,7 +46,11 @@ def graph(data, address, refinement, *, one_object_word_switch=False):
             if offset < 0 or offset + 4 > len(data):
                 raise ValueError('one-object-word graph literal escapes owner')
             data_words = {offset: ('inventory_object_word', struct.unpack_from('<I', data, offset)[0])}
-        layout = match.switch_layout(data, address, words, data_words)
+        if two_constant_word_switch and switch.get('interposed_words') == 2:
+            from switch_constants_profile import layout as constants_layout
+            layout = constants_layout(data, address, words)
+        else:
+            layout = match.switch_layout(data, address, words, data_words)
         if any(layout[key] != switch[key] for key in layout):
             raise ValueError('switch layout differs from native byte-exact replay')
         transfer = address + layout['dispatch'] + 8
