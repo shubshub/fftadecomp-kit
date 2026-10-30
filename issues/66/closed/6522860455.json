@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "060154b4d566893e061e34e7431f40d0f05bbdca8de23faea993afccf0637435",
+    "acknowledged_cursor": 6522860455,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "060154b4d566893e061e34e7431f40d0f05bbdca8de23faea993afccf0637435",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080230BC\",\"who\":\"sol-30BC\",\"note\":\"Native C matching, bounded accepted-address executor\"}",
+      "created_at": "2026-10-30T12:28:48Z",
+      "id": 6522860455,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:28:48Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "48f150c35e05cb11d637aa16dea1aed3e196b95a5af5616f6527ada68e0d2ced",
+    "result": {
+      "address": "0x080230BC",
+      "claim_id": 6522860455,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522860455,
+      "status": "accepted",
+      "who": "sol-30BC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e01489a6e1ae16fad6b6f5b978edcf1a4b10d4fba110fb23336bfee95935abde",
+    "acknowledged_cursor": 6522917041,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e01489a6e1ae16fad6b6f5b978edcf1a4b10d4fba110fb23336bfee95935abde",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080230BC\",\"who\":\"sol-30BC\",\"claim_id\":6522860455,\"reason\":\"MATCH: native complete116-byte plausible ELF body,38/38 instructions; first candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:31:23Z",
+      "id": 6522907374,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:31:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b9c431fdb65029950504a784fde80b4a7940c96083040be3d6486086651f777e",
+    "result": {
+      "address": "0x080230BC",
+      "claim_id": 6522860455,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522907374,
+      "status": "accepted",
+      "who": "sol-30BC"
+    }
+  }
+}

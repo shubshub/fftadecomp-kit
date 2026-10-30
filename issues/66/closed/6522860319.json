@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "b189da8ea331b46f4b6e8f02485a257fac4dea2c19be5f3b109084a78a37b453",
+    "acknowledged_cursor": 6522860455,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b189da8ea331b46f4b6e8f02485a257fac4dea2c19be5f3b109084a78a37b453",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B960\",\"who\":\"sol-B960\",\"note\":\"Native C matching, bounded accepted-address executor\"}",
+      "created_at": "2026-10-30T12:28:47Z",
+      "id": 6522860319,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:28:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "48f150c35e05cb11d637aa16dea1aed3e196b95a5af5616f6527ada68e0d2ced",
+    "result": {
+      "address": "0x0802B960",
+      "claim_id": 6522860319,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522860319,
+      "status": "accepted",
+      "who": "sol-B960"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "bd4647f0da9652932c4466e7e01d54beac77d628dd1e5102ce24b4f180421b73",
+    "acknowledged_cursor": 6522917041,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "bd4647f0da9652932c4466e7e01d54beac77d628dd1e5102ce24b4f180421b73",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802B960\",\"who\":\"sol-B960\",\"claim_id\":6522860319,\"reason\":\"MATCH:84 complete bytes,31/31 instructions,plausible,first native candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:31:54Z",
+      "id": 6522917007,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:31:54Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b9c431fdb65029950504a784fde80b4a7940c96083040be3d6486086651f777e",
+    "result": {
+      "address": "0x0802B960",
+      "claim_id": 6522860319,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522917007,
+      "status": "accepted",
+      "who": "sol-B960"
+    }
+  }
+}

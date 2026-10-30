@@ -30,7 +30,35 @@
           "who": "sol-B960"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "bd4647f0da9652932c4466e7e01d54beac77d628dd1e5102ce24b4f180421b73",
+        "acknowledged_cursor": 6522917041,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bd4647f0da9652932c4466e7e01d54beac77d628dd1e5102ce24b4f180421b73",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802B960\",\"who\":\"sol-B960\",\"claim_id\":6522860319,\"reason\":\"MATCH:84 complete bytes,31/31 instructions,plausible,first native candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:31:54Z",
+          "id": 6522917007,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:31:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b9c431fdb65029950504a784fde80b4a7940c96083040be3d6486086651f777e",
+        "result": {
+          "address": "0x0802B960",
+          "claim_id": 6522860319,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522917007,
+          "status": "accepted",
+          "who": "sol-B960"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-47A8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0f335cda4837804dbbb4d6b2138eef35971ccf0edc35ac88ded85fc5af7500b3",
+        "acknowledged_cursor": 6522917041,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0f335cda4837804dbbb4d6b2138eef35971ccf0edc35ac88ded85fc5af7500b3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C47A8\",\"who\":\"sol-47A8\",\"claim_id\":6522860416,\"reason\":\"MATCH:84 complete bytes,29/29 instructions,plausible,first native candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:31:54Z",
+          "id": 6522917041,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:31:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b9c431fdb65029950504a784fde80b4a7940c96083040be3d6486086651f777e",
+        "result": {
+          "address": "0x080C47A8",
+          "claim_id": 6522860416,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522917041,
+          "status": "accepted",
+          "who": "sol-47A8"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +150,35 @@
           "who": "sol-30BC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e01489a6e1ae16fad6b6f5b978edcf1a4b10d4fba110fb23336bfee95935abde",
+        "acknowledged_cursor": 6522917041,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e01489a6e1ae16fad6b6f5b978edcf1a4b10d4fba110fb23336bfee95935abde",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080230BC\",\"who\":\"sol-30BC\",\"claim_id\":6522860455,\"reason\":\"MATCH: native complete116-byte plausible ELF body,38/38 instructions; first candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:31:23Z",
+          "id": 6522907374,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:31:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b9c431fdb65029950504a784fde80b4a7940c96083040be3d6486086651f777e",
+        "result": {
+          "address": "0x080230BC",
+          "claim_id": 6522860455,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522907374,
+          "status": "accepted",
+          "who": "sol-30BC"
+        }
+      }
     },
     {
       "claim": {
