@@ -59,66 +59,6 @@
           "who": "sol-D2C4"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "1615c96ecc6a546480d44b0dd99462cde6cdc3905c4c13ec56c701715ecd0ab9",
-        "acknowledged_cursor": 6529726280,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1615c96ecc6a546480d44b0dd99462cde6cdc3905c4c13ec56c701715ecd0ab9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802C9F4\",\"who\":\"sol-C9F4\",\"note\":\"Complete100B two-transfer wrapper; actual defining helper ABIs and existing hardware-pointer analogue qualified; one Sol executor, no shared edits.\"}",
-          "created_at": "2026-10-30T17:53:46Z",
-          "id": 6529726280,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:53:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "af4e14a697ac1d956257dd127787e18fde646f605f28e41c3c67fd5b3e11f024",
-        "result": {
-          "address": "0x0802C9F4",
-          "claim_id": 6529726280,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6529726280,
-          "status": "accepted",
-          "who": "sol-C9F4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4200c42145adb4a274e4e45be33136ffaf9d79976b87cd722509a49ad1bc40cf",
-        "acknowledged_cursor": 6529785577,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4200c42145adb4a274e4e45be33136ffaf9d79976b87cd722509a49ad1bc40cf",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802C9F4\",\"who\":\"sol-C9F4\",\"claim_id\":6529726280,\"reason\":\"First default native plausible complete100B MATCH; source/report/current-runtime receipt frozen in isolated next batch.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-30T17:56:36Z",
-          "id": 6529785550,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:56:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "05afa0804a02b553af8ebd313aea3f8201caa3439b311c9fe0d853367d092bef",
-        "result": {
-          "address": "0x0802C9F4",
-          "claim_id": 6529726280,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6529785550,
-          "status": "accepted",
-          "who": "sol-C9F4"
-        }
-      }
     }
   ],
   "issue": 66,
