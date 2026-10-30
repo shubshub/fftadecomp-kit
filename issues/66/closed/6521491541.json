@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e669f9311c894419e8856575823abf611762bb8a11d27c1128f402051802ff0e",
+    "acknowledged_cursor": 6521516643,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e669f9311c894419e8856575823abf611762bb8a11d27c1128f402051802ff0e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BC7FC\",\"who\":\"sol-C7FC\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:25:01Z",
+      "id": 6521491541,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:25:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5712380881dad804e7a3dadb6840e7deb5e65a4d1019c7d359676be526e10cbd",
+    "result": {
+      "address": "0x080BC7FC",
+      "claim_id": 6521491541,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521491541,
+      "status": "accepted",
+      "who": "sol-C7FC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "15ce927157335b1a2c8b29a93ab5082ce30dd283e83d062525d15077bb9d4d46",
+    "acknowledged_cursor": 6521553958,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "15ce927157335b1a2c8b29a93ab5082ce30dd283e83d062525d15077bb9d4d46",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BC7FC\",\"who\":\"sol-C7FC\",\"claim_id\":6521491541,\"reason\":\"Complete plausible 20-byte direct-call MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:28:01Z",
+      "id": 6521541528,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:28:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e154fe6f23f9efeefaa27a9017e83440eb7cc50667e99b702a5c1c6702d03229",
+    "result": {
+      "address": "0x080BC7FC",
+      "claim_id": 6521491541,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521541528,
+      "status": "accepted",
+      "who": "sol-C7FC"
+    }
+  }
+}

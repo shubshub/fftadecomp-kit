@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "71c9bbf2fa13ff804421a10ff5c118fde45b563a2714c92aa2cc234f367367e9",
+    "acknowledged_cursor": 6521516643,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "71c9bbf2fa13ff804421a10ff5c118fde45b563a2714c92aa2cc234f367367e9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BC798\",\"who\":\"sol-C798\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:23:32Z",
+      "id": 6521466766,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:23:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5712380881dad804e7a3dadb6840e7deb5e65a4d1019c7d359676be526e10cbd",
+    "result": {
+      "address": "0x080BC798",
+      "claim_id": 6521466766,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521466766,
+      "status": "accepted",
+      "who": "sol-C798"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "84284f36fcd8fb1689e8d64a85dce212bc7e4f12b3c0a4dc0ed10b166fab67c1",
+    "acknowledged_cursor": 6521553958,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "84284f36fcd8fb1689e8d64a85dce212bc7e4f12b3c0a4dc0ed10b166fab67c1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BC798\",\"who\":\"sol-C798\",\"claim_id\":6521466766,\"reason\":\"Complete plausible 20-byte direct-call MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:27:28Z",
+      "id": 6521532707,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:27:28Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e154fe6f23f9efeefaa27a9017e83440eb7cc50667e99b702a5c1c6702d03229",
+    "result": {
+      "address": "0x080BC798",
+      "claim_id": 6521466766,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521532707,
+      "status": "accepted",
+      "who": "sol-C798"
+    }
+  }
+}

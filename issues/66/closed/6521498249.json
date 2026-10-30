@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "7af14a54dadc8bd2bd5b27edf1bfce972103ef3330c18a5817a4dc6592df9a7b",
+    "acknowledged_cursor": 6521516643,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7af14a54dadc8bd2bd5b27edf1bfce972103ef3330c18a5817a4dc6592df9a7b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BC900\",\"who\":\"sol-C900\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:25:25Z",
+      "id": 6521498249,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:25:25Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5712380881dad804e7a3dadb6840e7deb5e65a4d1019c7d359676be526e10cbd",
+    "result": {
+      "address": "0x080BC900",
+      "claim_id": 6521498249,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521498249,
+      "status": "accepted",
+      "who": "sol-C900"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7c3ef35efd398b0122cb00fc13f16928265a0eb8eb08f02543495f61c563f8a3",
+    "acknowledged_cursor": 6521553958,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7c3ef35efd398b0122cb00fc13f16928265a0eb8eb08f02543495f61c563f8a3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BC900\",\"who\":\"sol-C900\",\"claim_id\":6521498249,\"reason\":\"Complete plausible 20-byte direct-call MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:28:12Z",
+      "id": 6521544554,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:28:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e154fe6f23f9efeefaa27a9017e83440eb7cc50667e99b702a5c1c6702d03229",
+    "result": {
+      "address": "0x080BC900",
+      "claim_id": 6521498249,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521544554,
+      "status": "accepted",
+      "who": "sol-C900"
+    }
+  }
+}
