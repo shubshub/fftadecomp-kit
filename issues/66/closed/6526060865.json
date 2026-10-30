@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "3c2eeb2c21324a4890344f358c8aaa7b18300487e0fbe8c25051fa085bc5b5f7",
+    "acknowledged_cursor": 6526077120,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3c2eeb2c21324a4890344f358c8aaa7b18300487e0fbe8c25051fa085bc5b5f7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812EE98\",\"who\":\"sol-EE98\",\"note\":\"Natural scalar wrapper using exact adjacent matched branch shape and actual u32/s32 helper types.\"}",
+      "created_at": "2026-10-30T15:08:35Z",
+      "id": 6526060865,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:08:35Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "780e07aed65436f720c3b530392d4c102b3985b8a3552e4b3623d599696dba52",
+    "result": {
+      "address": "0x0812EE98",
+      "claim_id": 6526060865,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6526060865,
+      "status": "accepted",
+      "who": "sol-EE98"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "6e800f1a6493e7ab09c335399f1a786884c33008c75ca7617e34a171ffb7bdad",
+    "acknowledged_cursor": 6526137947,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6e800f1a6493e7ab09c335399f1a786884c33008c75ca7617e34a171ffb7bdad",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812EE98\",\"who\":\"sol-EE98\",\"claim_id\":6526060865,\"reason\":\"First native run MATCH, plausible complete54-byte wrapper and25 identical instructions; all9headers and actual helper types retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T15:12:07Z",
+      "id": 6526135796,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:12:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c96596f0525d894cc41794223d3eb7d44b1d88ec20ef3e8f15c3c705f2f4e6b6",
+    "result": {
+      "address": "0x0812EE98",
+      "claim_id": 6526060865,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6526135796,
+      "status": "accepted",
+      "who": "sol-EE98"
+    }
+  }
+}
