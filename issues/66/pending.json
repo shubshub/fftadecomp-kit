@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "c4c23ea2f99da9dcf0aa7b564887ab70c061a8d0d9c0b5b0b22de1ac0db77631",
-        "acknowledged_cursor": 6533755196,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c4c23ea2f99da9dcf0aa7b564887ab70c061a8d0d9c0b5b0b22de1ac0db77631",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08040DA4\",\"who\":\"sol-0DA4\",\"note\":\"Complete 112-byte owner, actual helper and caller ABI, and existing conditional addressed runtime selector qualified\"}",
-          "created_at": "2026-10-30T21:23:44Z",
-          "id": 6533755196,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T21:23:44Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c13e10b1d0d43bc1edc56b4de9fd71cef8546e183c3677b911e564d805081a4d",
-        "result": {
-          "address": "0x08040DA4",
-          "claim_id": 6533755196,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6533755196,
-          "status": "accepted",
-          "who": "sol-0DA4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4232e23a3bd880e205b44a6863569890e3876baf7a91f87ef94558e1d408ade6",
-        "acknowledged_cursor": 6533859778,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4232e23a3bd880e205b44a6863569890e3876baf7a91f87ef94558e1d408ade6",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08040DA4\",\"who\":\"sol-0DA4\",\"claim_id\":6533755196,\"reason\":\"One natural source and one unchanged-source diagnostic: emitted 108 of 112 target bytes; target has extra saved high register and duplicate cached width; no grounded operation correction; original artifacts Parked; zero MATCH credit\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-30T21:29:50Z",
-          "id": 6533859778,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T21:29:50Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "01217a5f00f5d1567565f620add16e4296903f361f2e5e71364254eab6630cb0",
-        "result": {
-          "address": "0x08040DA4",
-          "claim_id": 6533755196,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6533859778,
-          "status": "accepted",
-          "who": "sol-0DA4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "3e334d45fad19f30f79e6362269c6cce3a1ec3d5c7afa5b4dbcb486672cbcf0a",
         "acknowledged_cursor": 6534031477,
         "body_provenance": "acceptance-time",
