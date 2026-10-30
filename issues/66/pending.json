@@ -59,6 +59,38 @@
           "who": "sol-50D8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "52ffa9fb94122dfd5a6c134bab8d8476c659419ea0495e051bdf0cc5e05ce880",
+        "acknowledged_cursor": 6535798671,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "52ffa9fb94122dfd5a6c134bab8d8476c659419ea0495e051bdf0cc5e05ce880",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CBC94\",\"who\":\"sol-BC94\",\"note\":\"Match qualified76B mapped halfword-store owner after exactextent repair; isolated source ownership; no sharedheaders\"}",
+          "created_at": "2026-10-30T23:37:13Z",
+          "id": 6535798671,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T23:37:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "027d6b07e62bbf3b729766ff0ab1e0481037e91fc6920005e251172917de8ff5",
+        "result": {
+          "address": "0x080CBC94",
+          "claim_id": 6535798671,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6535798671,
+          "status": "accepted",
+          "who": "sol-BC94"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
