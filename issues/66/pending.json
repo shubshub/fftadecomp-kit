@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "25ab3e092b33e4f6a3a9732762e5f1c41f63d282d32d2b80a14e69184ac0d246",
+        "acknowledged_cursor": 6532671694,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "25ab3e092b33e4f6a3a9732762e5f1c41f63d282d32d2b80a14e69184ac0d246",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803652C\",\"who\":\"sol-652C\",\"note\":\"Complete88-byte packed record update, actual364BC/364FC ABIs and six-byte record layout. Existing named02000000 binding and default route.\"}",
+          "created_at": "2026-10-30T20:20:46Z",
+          "id": 6532671694,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T20:20:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e43e54c22a324fabbd49583c769280006fc8189348f627d2ceb05f00a6ce881f",
+        "result": {
+          "address": "0x0803652C",
+          "claim_id": 6532671694,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6532671694,
+          "status": "accepted",
+          "who": "sol-652C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
