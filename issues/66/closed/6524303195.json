@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "52456a91a7ef986ebd2ca3e4b074818a51bec95843e5a2e02bc3e7bed8cb8f6b",
+    "acknowledged_cursor": 6524303325,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "52456a91a7ef986ebd2ca3e4b074818a51bec95843e5a2e02bc3e7bed8cb8f6b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C4A40\",\"who\":\"sol-4A40\",\"note\":\"Sol executor genuine complete C matching; exact reached span/types/exclusions captured; synchronized proved mappings; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:44:49Z",
+      "id": 6524303195,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:44:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0cd55b3d8ca8d3f89ffa73f1eee1c4e479ceeda6fd8c2498771a2fe18416846e",
+    "result": {
+      "address": "0x080C4A40",
+      "claim_id": 6524303195,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6524303195,
+      "status": "accepted",
+      "who": "sol-4A40"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1cad8323bee6579fecd5171cb3e46819724eb9fe1a8bfa8de7dab9b8f4b32610",
+    "acknowledged_cursor": 6524483959,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1cad8323bee6579fecd5171cb3e46819724eb9fe1a8bfa8de7dab9b8f4b32610",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C4A40\",\"who\":\"sol-4A40\",\"claim_id\":6524303195,\"reason\":\"Three natural complete224B cost forms; plausible best220/224B,106/110 instructions. Four cost-result/score operand instructions use r2 instead of target r1. Candidate and exact native discrepancy preserved in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; direct expression, explicit cost temporary, factored cost form; no steering\"}",
+      "created_at": "2026-10-30T13:53:22Z",
+      "id": 6524483959,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:53:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f03dac43041e1ab09040d87f3caf091b86d4bdd9f5ff4c782208fa090c02f018",
+    "result": {
+      "address": "0x080C4A40",
+      "claim_id": 6524303195,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6524483959,
+      "status": "accepted",
+      "who": "sol-4A40"
+    }
+  }
+}
