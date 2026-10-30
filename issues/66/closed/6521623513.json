@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "be86586cf280fde47762029bfe07cdd666b185959aa71c798f90fc8a701f2fbd",
+    "acknowledged_cursor": 6521623513,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "be86586cf280fde47762029bfe07cdd666b185959aa71c798f90fc8a701f2fbd",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4020\",\"who\":\"sol-4020\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:32:53Z",
+      "id": 6521623513,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:32:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+    "result": {
+      "address": "0x080D4020",
+      "claim_id": 6521623513,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521623513,
+      "status": "accepted",
+      "who": "sol-4020"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "516c1fb43ba9278f53bbe344035c47fe9ecb32a8a62c62622de68e2b4a7c6b47",
+    "acknowledged_cursor": 6521746129,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "516c1fb43ba9278f53bbe344035c47fe9ecb32a8a62c62622de68e2b4a7c6b47",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D4020\",\"who\":\"sol-4020\",\"claim_id\":6521623513,\"reason\":\"Two legitimate bitfield-clear candidates compile to20bytes versus24-byte indexed target. Both stop at complete-symbol extent gate; source and diagnostics preserved in Parked/080D4020.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; byte-wide bitfield clears using u8 and standard u32 storage bases\"}",
+      "created_at": "2026-10-30T11:38:29Z",
+      "id": 6521718442,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:38:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6dee528e2ee8d68666ecf8a11cff63335e1cd7ac23154f2eb7f160119743c5a4",
+    "result": {
+      "address": "0x080D4020",
+      "claim_id": 6521623513,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521718442,
+      "status": "accepted",
+      "who": "sol-4020"
+    }
+  }
+}
