@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "bc52a615587824063046b55eea4e6a59e82c720015d93155642978e67a84262c",
+    "acknowledged_cursor": 6522657924,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "bc52a615587824063046b55eea4e6a59e82c720015d93155642978e67a84262c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08035C48\",\"who\":\"sol-5C48\",\"note\":\"Sol isolated full52-72byte function C matching, evidence-backed local types/call signatures; existing proof profiles only.\"}",
+      "created_at": "2026-10-30T12:17:58Z",
+      "id": 6522657906,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:17:58Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4f2eff9a7076ecf4b600173103f8c599674f0952c265395780a6c4f10b0407f5",
+    "result": {
+      "address": "0x08035C48",
+      "claim_id": 6522657906,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522657906,
+      "status": "accepted",
+      "who": "sol-5C48"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7319626cfb56cd523c8a885ed71581db84d60a5fa5ca63372ec079af56bce018",
+    "acknowledged_cursor": 6522703853,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7319626cfb56cd523c8a885ed71581db84d60a5fa5ca63372ec079af56bce018",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08035C48\",\"who\":\"sol-5C48\",\"claim_id\":6522657906,\"reason\":\"Complete56-byte three-helper wrapper MATCH, first native candidate, plausible source.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:20:18Z",
+      "id": 6522702320,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:20:18Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9c7805514405ea3e730f251361df76439f9602750c7089a781a5401146fa367c",
+    "result": {
+      "address": "0x08035C48",
+      "claim_id": 6522657906,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522702320,
+      "status": "accepted",
+      "who": "sol-5C48"
+    }
+  }
+}
