@@ -90,7 +90,35 @@
           "who": "sol-9D64"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "85a881d76cae13d5e4bbcbc4e8b00bb1cdb90ebb07568849114ef80f8db63315",
+        "acknowledged_cursor": 6521301321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "85a881d76cae13d5e4bbcbc4e8b00bb1cdb90ebb07568849114ef80f8db63315",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08089D64\",\"who\":\"sol-9D64\",\"claim_id\":6521238189,\"reason\":\"Complete plausible 20-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T11:12:55Z",
+          "id": 6521281849,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:12:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6acbc51247bbbd2cda5b47bdb3cf9c43c1cd2033324652b76b5cb8639dfc7e5c",
+        "result": {
+          "address": "0x08089D64",
+          "claim_id": 6521238189,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6521281849,
+          "status": "accepted",
+          "who": "sol-9D64"
+        }
+      }
     },
     {
       "claim": {
@@ -122,7 +150,35 @@
           "who": "sol-925C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b30ac6960ed87c0d03535a187f43977616364c0b5854dd2225d1d4d4ed85663a",
+        "acknowledged_cursor": 6521301321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b30ac6960ed87c0d03535a187f43977616364c0b5854dd2225d1d4d4ed85663a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A925C\",\"who\":\"sol-925C\",\"claim_id\":6521244279,\"reason\":\"Complete plausible 20-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T11:13:46Z",
+          "id": 6521296223,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:13:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6acbc51247bbbd2cda5b47bdb3cf9c43c1cd2033324652b76b5cb8639dfc7e5c",
+        "result": {
+          "address": "0x080A925C",
+          "claim_id": 6521244279,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6521296223,
+          "status": "accepted",
+          "who": "sol-925C"
+        }
+      }
     },
     {
       "claim": {
@@ -154,7 +210,35 @@
           "who": "sol-C9B8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4cd22d14adc3858bce3c5a399e1def4dec089a2d7c1148ef35623c5163b21cf8",
+        "acknowledged_cursor": 6521301321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4cd22d14adc3858bce3c5a399e1def4dec089a2d7c1148ef35623c5163b21cf8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BC9B8\",\"who\":\"sol-C9B8\",\"claim_id\":6521250145,\"reason\":\"Complete plausible 20-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T11:14:04Z",
+          "id": 6521301321,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:14:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6acbc51247bbbd2cda5b47bdb3cf9c43c1cd2033324652b76b5cb8639dfc7e5c",
+        "result": {
+          "address": "0x080BC9B8",
+          "claim_id": 6521250145,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6521301321,
+          "status": "accepted",
+          "who": "sol-C9B8"
+        }
+      }
     },
     {
       "claim": {
