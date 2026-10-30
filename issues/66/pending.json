@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "31b4055aebe78a4b7b90e3439445858834685186fdbfafd43012bb117fd6a9f4",
-        "acknowledged_cursor": 6519972502,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "31b4055aebe78a4b7b90e3439445858834685186fdbfafd43012bb117fd6a9f4",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08025238\",\"who\":\"sol-5238\",\"note\":\"Match the saved 236-byte context and callback body\"}",
-          "created_at": "2026-10-30T09:56:50Z",
-          "id": 6519961974,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T09:56:50Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "164dee5760bc33275b475ca38efe94700060856fea04ddf1e0fb861fa8390058",
-        "result": {
-          "address": "0x08025238",
-          "claim_id": 6519961974,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6519961974,
-          "status": "accepted",
-          "who": "sol-5238"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "269d79dc6e059beafa408d8cd6f7e923d4174d6e8b59e2edfa93efaacd9937a8",
-        "acknowledged_cursor": 6520082606,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "269d79dc6e059beafa408d8cd6f7e923d4174d6e8b59e2edfa93efaacd9937a8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025238\",\"who\":\"sol-5238\",\"claim_id\":6519961974,\"reason\":\"Parked plausible context callback attempt: seven differing bytes in table-base scheduling; native buffer-call and data-relocation composition refusal\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; natural context and callback types; direct table access and local table pointer; both236B target236B; missing typed table mapping\"}",
-          "created_at": "2026-10-30T10:03:48Z",
-          "id": 6520082606,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T10:03:48Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8174d694e7fdd681cc37bc59d3a6cdf3cd76c048850c25489b32746f14bc74eb",
-        "result": {
-          "address": "0x08025238",
-          "claim_id": 6519961974,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6520082606,
-          "status": "accepted",
-          "who": "sol-5238"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "a64455f0155917c5d9a9f7aa67ba8f5f0a1f9e78bd0d8ae758070921d95680e4",
         "acknowledged_cursor": 6520054679,
         "body_provenance": "acceptance-time",
