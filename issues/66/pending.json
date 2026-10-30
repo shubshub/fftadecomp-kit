@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "516f2c125727ed7ee42576d53abf01949be88eab9ed5e00a3fb98dffa909c327",
+        "acknowledged_cursor": 6534471447,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "516f2c125727ed7ee42576d53abf01949be88eab9ed5e00a3fb98dffa909c327",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08053648\",\"who\":\"sol-3648\",\"note\":\"Qualified complete44B analogue with sole exact data083AF710 binding ready for inputtransition and natural matching, GPT6.1Sol executor\"}",
+          "created_at": "2026-10-30T22:04:11Z",
+          "id": 6534471447,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:04:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "142049f7ed21a2eab3048879304361076f48b265a3a78ae9ca672e7d6a2c9adf",
+        "result": {
+          "address": "0x08053648",
+          "claim_id": 6534471447,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6534471447,
+          "status": "accepted",
+          "who": "sol-3648"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
