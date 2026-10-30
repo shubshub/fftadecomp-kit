@@ -59,6 +59,102 @@
           "who": "sol-94F0"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "07e548a3ee2433414b88ac7dd48a080b0c66387d254bd146b34bcb47841eff49",
+        "acknowledged_cursor": 6520321231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "07e548a3ee2433414b88ac7dd48a080b0c66387d254bd146b34bcb47841eff49",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080294FC\",\"who\":\"sol-94FC\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:16:09Z",
+          "id": 6520298965,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:16:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dcdfc916b7291db115b7ed6993ccdc84694809d5bc9cb9388f3f9f3608366e97",
+        "result": {
+          "address": "0x080294FC",
+          "claim_id": 6520298965,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520298965,
+          "status": "accepted",
+          "who": "sol-94FC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fb9d46bef0ed765559942db3b1c393237bbbc771578be6613655377786d8e243",
+        "acknowledged_cursor": 6520321231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fb9d46bef0ed765559942db3b1c393237bbbc771578be6613655377786d8e243",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B548\",\"who\":\"sol-B548\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:17:04Z",
+          "id": 6520315219,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:17:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dcdfc916b7291db115b7ed6993ccdc84694809d5bc9cb9388f3f9f3608366e97",
+        "result": {
+          "address": "0x0802B548",
+          "claim_id": 6520315219,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520315219,
+          "status": "accepted",
+          "who": "sol-B548"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "efe79ccf50c30d1534f43c0d6969f294efe893d18471046c1e10be716e6c24cd",
+        "acknowledged_cursor": 6520321231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "efe79ccf50c30d1534f43c0d6969f294efe893d18471046c1e10be716e6c24cd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B554\",\"who\":\"sol-B554\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:17:24Z",
+          "id": 6520321231,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:17:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dcdfc916b7291db115b7ed6993ccdc84694809d5bc9cb9388f3f9f3608366e97",
+        "result": {
+          "address": "0x0802B554",
+          "claim_id": 6520321231,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520321231,
+          "status": "accepted",
+          "who": "sol-B554"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
