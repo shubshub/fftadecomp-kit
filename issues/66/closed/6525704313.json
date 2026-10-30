@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ee8c8a2299161d445905a3ec58753e709016110a0bec2d24d1ae772fd34de4d1",
+    "acknowledged_cursor": 6525704645,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ee8c8a2299161d445905a3ec58753e709016110a0bec2d24d1ae772fd34de4d1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081480C4\",\"who\":\"sol-80C4\",\"note\":\"Natural clamped constructor wrapper with defining six-argument helper ABI and first-attempt matched neighbor.\"}",
+      "created_at": "2026-10-30T14:52:15Z",
+      "id": 6525704313,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:52:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9517cf249ac7fe26e98de18abff2e6e51efad4fcc3ca4deaf9cd943d622da06f",
+    "result": {
+      "address": "0x081480C4",
+      "claim_id": 6525704313,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6525704313,
+      "status": "accepted",
+      "who": "sol-80C4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7adb661bdf5f9c8608d5a37b301adc529eaa1721fd075ebe869ea2337b74964f",
+    "acknowledged_cursor": 6525774912,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7adb661bdf5f9c8608d5a37b301adc529eaa1721fd075ebe869ea2337b74964f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081480C4\",\"who\":\"sol-80C4\",\"claim_id\":6525704313,\"reason\":\"First native run MATCH, plausible complete64-byte wrapper and28 reached instructions identical. Original source-bound runtime proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T14:55:22Z",
+      "id": 6525774912,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:55:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "57a19950fe1f1381d2acb8e105dc5d42f6f17338e086b4dfecb9666887df4e90",
+    "result": {
+      "address": "0x081480C4",
+      "claim_id": 6525704313,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6525774912,
+      "status": "accepted",
+      "who": "sol-80C4"
+    }
+  }
+}

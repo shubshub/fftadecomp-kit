@@ -30,7 +30,35 @@
           "who": "sol-80C4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7adb661bdf5f9c8608d5a37b301adc529eaa1721fd075ebe869ea2337b74964f",
+        "acknowledged_cursor": 6525774912,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7adb661bdf5f9c8608d5a37b301adc529eaa1721fd075ebe869ea2337b74964f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081480C4\",\"who\":\"sol-80C4\",\"claim_id\":6525704313,\"reason\":\"First native run MATCH, plausible complete64-byte wrapper and28 reached instructions identical. Original source-bound runtime proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T14:55:22Z",
+          "id": 6525774912,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:55:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "57a19950fe1f1381d2acb8e105dc5d42f6f17338e086b4dfecb9666887df4e90",
+        "result": {
+          "address": "0x081480C4",
+          "claim_id": 6525704313,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6525774912,
+          "status": "accepted",
+          "who": "sol-80C4"
+        }
+      }
     },
     {
       "claim": {
