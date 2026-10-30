@@ -59,6 +59,38 @@
           "who": "sol-D2C4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a77e6bde63f53223948d5af394380dca4e9c110f2cc2225e71ac0cf91bc73b3f",
+        "acknowledged_cursor": 6529823096,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a77e6bde63f53223948d5af394380dca4e9c110f2cc2225e71ac0cf91bc73b3f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802C008\",\"who\":\"sol-C008\",\"note\":\"Complete44B transfer wrapper; actual defining BA08/ADC helper ABIs and real VRAM pointer qualified; one Sol executor, no shared edits.\"}",
+          "created_at": "2026-10-30T17:58:24Z",
+          "id": 6529823096,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:58:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2b3bcecaad9d4073c22d54c3afa87858cd0211b47c83d177df0a730d52ac58e5",
+        "result": {
+          "address": "0x0802C008",
+          "claim_id": 6529823096,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529823096,
+          "status": "accepted",
+          "who": "sol-C008"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
