@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "84026765b49a1beb7fe2588fef8a459fbd360295244ca57ef2af028127b300aa",
+    "acknowledged_cursor": 6530437252,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "84026765b49a1beb7fe2588fef8a459fbd360295244ca57ef2af028127b300aa",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804D86C\",\"who\":\"sol-D86C\",\"note\":\"Complete176B statecallback; actualordinaryhelperABIs and onepost-tableobject word, newlytrustedtestedplacement support; oneSol executor.\"}",
+      "created_at": "2026-10-30T18:26:44Z",
+      "id": 6530437082,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:26:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6ebddad79aaa8ce6f22de30fe89778344e7c9ab1367494b1a8e4c1723443579e",
+    "result": {
+      "address": "0x0804D86C",
+      "claim_id": 6530437082,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6530437082,
+      "status": "accepted",
+      "who": "sol-D86C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "90b999e5bef4afc721eb5c8d79ddda61cc32c88ec5a8dfe938392bbc9f87186c",
+    "acknowledged_cursor": 6530718056,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "90b999e5bef4afc721eb5c8d79ddda61cc32c88ec5a8dfe938392bbc9f87186c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804D86C\",\"who\":\"sol-D86C\",\"claim_id\":6530437082,\"reason\":\"Bounded ordinary byte mismatch, two forms; first diagnostic full176B differs2bytes; final evidence frozen d699c15e; zeroMATCH\",\"unmatchable\":true,\"tried\":\"2 ordinary default native forms: compound global OR then mask-first OR; 1 authorized unchanged first-source compiler diagnostic, exact default flags; no third form or replay\"}",
+      "created_at": "2026-10-30T18:39:10Z",
+      "id": 6530718056,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:39:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4c0e6e7bbe80c3c46b28ed14805367954f4b1283027146d2f7c3ace951765940",
+    "result": {
+      "address": "0x0804D86C",
+      "claim_id": 6530437082,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6530718056,
+      "status": "accepted",
+      "who": "sol-D86C"
+    }
+  }
+}
