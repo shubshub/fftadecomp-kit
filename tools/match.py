@@ -1796,17 +1796,20 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
             relocations[literal] != table or \
             any(relocations[offset] < table_end for offset in range(table, table_end, 4)):
         raise ValueError("switch words must describe an adjacent table and forward local cases")
+    object_before_table = False
     if data_relocations is not None:
         if not isinstance(data_relocations, dict) or len(data_relocations) != 1:
             raise ValueError("switch-data requires exactly one interposed object word")
         offset, binding = next(iter(data_relocations.items()))
-        if type(offset) is not int or offset != literal - 4 or offset < 0 or \
+        if type(offset) is not int or offset < 0 or offset + 4 > len(data) or \
+                (offset != literal - 4 and offset < table_end) or \
                 (address + offset) % 4 or not isinstance(binding, (tuple, list)) or \
                 len(binding) != 2 or not isinstance(binding[0], str) or \
                 type(binding[1]) is not int or not 0 <= binding[1] <= 0xFFFFFFFF or \
                 address <= binding[1] < address + len(data) or \
                 struct.unpack_from("<I", data, offset)[0] != binding[1]:
             raise ValueError("invalid interposed switch-data object word")
+        object_before_table = offset == literal - 4
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     decoder.detail = True
 
@@ -1823,10 +1826,10 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
         return decoded.operands[0].imm - address
 
     candidates = []
-    for dispatch in ((literal - 14, literal - 16) if data_relocations is not None
+    for dispatch in ((literal - 14, literal - 16) if object_before_table
                      else (literal - 10 - interposed_words * 4,
                            literal - 12 - interposed_words * 4)):
-        if data_relocations is None:
+        if not object_before_table:
             pool_start = literal - interposed_words * 4
             if dispatch < 0 or (address + dispatch + 13) & ~3 != address + pool_start or \
                     any(data[dispatch + 10:pool_start]):
