@@ -62,10 +62,24 @@ def record(instructions, address):
     return {"schema": SCHEMA, "edges": branches} if branches else None
 
 
+DISCARDED_SCRATCH_SCHEMA = 'thumb-discarded-exit-scratch-v1'
+DISCARDED_SCRATCH_CONTRACT = 'r2/r3 are discarded scratch at external returns; no result values are returned through them'
+
+
+def validate_discarded_exit_scratch(policy):
+    if type(policy) is not dict or set(policy) != {'schema', 'registers'} or \
+            type(policy['schema']) is not str or policy['schema'] != DISCARDED_SCRATCH_SCHEMA or \
+            type(policy['registers']) is not list or policy['registers'] != [2, 3] or \
+            any(type(register) is not int for register in policy['registers']):
+        raise ValueError('discarded exit scratch requires its exact versioned r2/r3 policy')
+    return policy
+
+
 def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
-                entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None):
+                entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None,
+                discarded_exit_scratch=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -83,6 +97,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         from bounded_stack_output_profile import BoundedOutputProof
         if type(bounded_output_proof) is not BoundedOutputProof or not stack_aliases or buffer_proof is not None:
             raise ValueError("bounded output requires its explicit native alias proof")
+    discarded_aliases = set()
+    if discarded_exit_scratch is not None:
+        validate_discarded_exit_scratch(discarded_exit_scratch)
+        if not stack_aliases or any(value is not None for value in (buffer_proof,
+                bounded_output_proof, runtime_calls, call_preservation, entry_stack_policy,
+                local_alias_slot_policy, finite_stack_index_policy)):
+            raise ValueError('discarded exit scratch requires exclusive local-only alias policy')
     if runtime_calls is not None:
         from function_thunk_profile import ALIASES
         from match import UDIVSI3_ADDRESS, RUNTIME_HELPERS, is_udivsi3_address
@@ -218,6 +239,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             registers.pop(ARM_REG_LR, None)
             aliases.pop(ARM_REG_LR, None)
         elif site in calls:
+            if discarded_exit_scratch is not None and aliases:
+                raise ValueError('discarded scratch local aliases cannot cross calls')
             if runtime_calls is not None and site in runtime_calls:
                 if set(clobbered) & aliases.keys():
                     raise ValueError("canonical runtime arguments carry local stack provenance")
@@ -407,7 +430,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     stack or any(registers.get(register) != initial[register] for register in preserved):
                 raise ValueError("local branch exit must restore SP, r4-r11 and the original entry LR")
             if aliases:
-                raise ValueError("local alias escapes through an exit register")
+                if discarded_exit_scratch is None or set(aliases) - {ARM_REG_R0+2, ARM_REG_R0+3}:
+                    raise ValueError("local alias escapes through an exit register")
+                for register, alternatives in aliases.items():
+                    if len(alternatives) != 1 or any(offset >= 0 for offset, _ in alternatives):
+                        raise ValueError('discarded exit scratch requires exact local-offset provenance')
+                    for offset, live in alternatives:
+                        discarded_aliases.add((site, register-ARM_REG_R0, offset, live))
             returns.add(site)
         outgoing = (tuple(sorted(registers.items())), tuple(stack),
                     tuple(sorted((register, tuple(sorted(values))) for register, values in aliases.items())),
@@ -464,6 +493,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                                   "accesses": sorted(alias_accesses), "buffer_calls": sorted(alias_calls),
                                   "buffer_fingerprint": (bounded_output_proof or buffer_proof).fingerprint()
                                     if bounded_output_proof or buffer_proof else None}
+    if discarded_exit_scratch is not None:
+        proof['discarded_exit_scratch'] = {'schema': DISCARDED_SCRATCH_SCHEMA,
+            'registers': list(discarded_exit_scratch['registers']),
+            'contract': DISCARDED_SCRATCH_CONTRACT,
+            'residual_aliases': [[site, register, offset, live]
+                for site, register, offset, live in sorted(discarded_aliases)],
+            'native_nonescape_proof': False}
     if zero_states is not None:
         proof["zero_index_profile"] = zero_index_profile
         proof["zero_index_signed_loads"] = [[site,base,index,width,list(origins)]
