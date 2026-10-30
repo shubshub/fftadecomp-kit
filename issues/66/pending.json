@@ -62,6 +62,66 @@
           "who": "sol-15B0"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "4545296c549d58b55ad916872048cb29e46a05c4b3af40926687d84871dd63fa",
+        "acknowledged_cursor": 6528672016,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4545296c549d58b55ad916872048cb29e46a05c4b3af40926687d84871dd63fa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080615B0\",\"who\":\"sol-15B0\",\"claim_id\":6528610539,\"reason\":\"First default native attempt complete plausible MATCH24/24B function-address wrapper; frozen first success, no replay.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T17:08:09Z",
+          "id": 6528670141,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:08:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8dbfaf5c7fa38d2008fd9d5f426c1acdc99e19a93fd61423be1da44f85d03d33",
+        "result": {
+          "address": "0x080615B0",
+          "claim_id": 6528610539,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6528670141,
+          "status": "accepted",
+          "who": "sol-15B0"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d9bf3e21de0fdc7f6ce570f5ef2cb6594a01de0e7ac3736bfd2a8945cb90d175",
+        "acknowledged_cursor": 6528672016,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d9bf3e21de0fdc7f6ce570f5ef2cb6594a01de0e7ac3736bfd2a8945cb90d175",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812F914\",\"who\":\"sol-F914\",\"note\":\"Bounded pureleaf numeric-range selector returning unsigned minimum; actual span380B, realu16input narrowing, guarded localtable; fixedinputs.\"}",
+          "created_at": "2026-10-30T17:08:15Z",
+          "id": 6528672016,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8dbfaf5c7fa38d2008fd9d5f426c1acdc99e19a93fd61423be1da44f85d03d33",
+        "result": {
+          "address": "0x0812F914",
+          "claim_id": 6528672016,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6528672016,
+          "status": "accepted",
+          "who": "sol-F914"
+        }
+      },
       "release": null
     }
   ],
