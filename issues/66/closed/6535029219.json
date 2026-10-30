@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "288d5464bb384c86040588fffa72cca22233efa2c8eae6c9101935ff22016928",
+    "acknowledged_cursor": 6535029219,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "288d5464bb384c86040588fffa72cca22233efa2c8eae6c9101935ff22016928",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809FD28\",\"who\":\"sol-FD28\",\"note\":\"Qualified complete94B scalar lane-difference accumulator, actual signed runtime call ABI and existing addressed-signed-runtime-v1, isolated GPT6.1Sol matching\"}",
+      "created_at": "2026-10-30T22:41:16Z",
+      "id": 6535029219,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T22:41:16Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "848e12c7746559a1b1597bb583da4d64d9747bc75c8fbcc125be36163eb48bb3",
+    "result": {
+      "address": "0x0809FD28",
+      "claim_id": 6535029219,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6535029219,
+      "status": "accepted",
+      "who": "sol-FD28"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a13c7a0c58cb9aa34f89cc3cd17524bb4f544e84bbc192efa273ac3049e4c374",
+    "acknowledged_cursor": 6535100722,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a13c7a0c58cb9aa34f89cc3cd17524bb4f544e84bbc192efa273ac3049e4c374",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809FD28\",\"who\":\"sol-FD28\",\"claim_id\":6535029219,\"reason\":\"Firstnaturalform92B versus94B, unchanged-source diagnostic confirms sameoperations but highregister accumulator/count/index allocation differs; no groundedoperation correction, honestParked\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural form, one unchanged-source diagnostic\"}",
+      "created_at": "2026-10-30T22:46:07Z",
+      "id": 6535100722,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T22:46:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e71d7a42ad3c59bcb392952271ec7d4c56e36895555fdd06aae193201fd9a041",
+    "result": {
+      "address": "0x0809FD28",
+      "claim_id": 6535029219,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6535100722,
+      "status": "accepted",
+      "who": "sol-FD28"
+    }
+  }
+}

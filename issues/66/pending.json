@@ -30,6 +30,66 @@
           "who": "sol-FD28"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "a13c7a0c58cb9aa34f89cc3cd17524bb4f544e84bbc192efa273ac3049e4c374",
+        "acknowledged_cursor": 6535100722,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a13c7a0c58cb9aa34f89cc3cd17524bb4f544e84bbc192efa273ac3049e4c374",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809FD28\",\"who\":\"sol-FD28\",\"claim_id\":6535029219,\"reason\":\"Firstnaturalform92B versus94B, unchanged-source diagnostic confirms sameoperations but highregister accumulator/count/index allocation differs; no groundedoperation correction, honestParked\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural form, one unchanged-source diagnostic\"}",
+          "created_at": "2026-10-30T22:46:07Z",
+          "id": 6535100722,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:46:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e71d7a42ad3c59bcb392952271ec7d4c56e36895555fdd06aae193201fd9a041",
+        "result": {
+          "address": "0x0809FD28",
+          "claim_id": 6535029219,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6535100722,
+          "status": "accepted",
+          "who": "sol-FD28"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e03b28aa8ba7aebbeb73ec0e1eddde821a552dcb464548cfc6a7aa46827b6b91",
+        "acknowledged_cursor": 6535100722,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e03b28aa8ba7aebbeb73ec0e1eddde821a552dcb464548cfc6a7aa46827b6b91",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CA078\",\"who\":\"sol-A078\",\"note\":\"Qualified complete68B observed record scan and signed runtime call, current typeddata and addressed-signed-runtime-data-v1, GPT6.1Sol isolated natural matching\"}",
+          "created_at": "2026-10-30T22:45:46Z",
+          "id": 6535095212,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:45:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e71d7a42ad3c59bcb392952271ec7d4c56e36895555fdd06aae193201fd9a041",
+        "result": {
+          "address": "0x080CA078",
+          "claim_id": 6535095212,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6535095212,
+          "status": "accepted",
+          "who": "sol-A078"
+        }
+      },
       "release": null
     }
   ],
