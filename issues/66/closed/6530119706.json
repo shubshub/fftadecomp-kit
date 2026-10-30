@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "231f53dd99762bf6cb601d414801bf9da035c1b7b00f5e45d4b11b4354820af8",
+    "acknowledged_cursor": 6530119706,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "231f53dd99762bf6cb601d414801bf9da035c1b7b00f5e45d4b11b4354820af8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FB68\",\"who\":\"sol-FB68\",\"note\":\"Complete156B radius constructor; actual scalarhelper/callback ABI evidence and explicit opaque allocator/ordinarycall caveats; oneSol executor, no sharededits.\"}",
+      "created_at": "2026-10-30T18:12:31Z",
+      "id": 6530119706,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:12:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f5d933b315ce26bc4262d2727c063fa8bf3c12c6aa0437f537d8245bdb0e7937",
+    "result": {
+      "address": "0x0800FB68",
+      "claim_id": 6530119706,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6530119706,
+      "status": "accepted",
+      "who": "sol-FB68"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "180642e058dc243baafe3f33b4389cd8c3240e0a81489d1d5a895ccc8b1c4613",
+    "acknowledged_cursor": 6530290344,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "180642e058dc243baafe3f33b4389cd8c3240e0a81489d1d5a895ccc8b1c4613",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800FB68\",\"who\":\"sol-FB68\",\"claim_id\":6530119706,\"reason\":\"Three grounded natural constructor forms differ from ROM after exact156B mapped span guard. Zero MATCH; one unchanged-first diagnostic found register-allocation differences; owned recovered C/failures parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural forms, one unchanged-first compiler-only diagnostic156B; ordinary byte mismatches, no unsupported-model or impossibility claim\"}",
+      "created_at": "2026-10-30T18:20:14Z",
+      "id": 6530290344,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:20:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d5da8f789a3899433102be7ccf45af9ca1706bf56dcb0a0a4736ad77c1cdc765",
+    "result": {
+      "address": "0x0800FB68",
+      "claim_id": 6530119706,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6530290344,
+      "status": "accepted",
+      "who": "sol-FB68"
+    }
+  }
+}
