@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "26a0f039f786e7631468c5be31a80fb94d0c5fd13438d8787b4f53e85b94ba78",
+    "acknowledged_cursor": 6526807231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "26a0f039f786e7631468c5be31a80fb94d0c5fd13438d8787b4f53e85b94ba78",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CCCF0\",\"who\":\"sol-CCF0\",\"note\":\"Batch38 complete94B pointer switch, existing matched caller ABI and directly observed ROM pointers, no invented mapping.\"}",
+      "created_at": "2026-10-30T15:40:30Z",
+      "id": 6526807024,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:40:30Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "aa51ef709f9041967ed01627ec67e1c33b11b4c50915d907ce23df1b494cd068",
+    "result": {
+      "address": "0x080CCCF0",
+      "claim_id": 6526807024,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6526807024,
+      "status": "accepted",
+      "who": "sol-CCF0"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5c55fb76cf030505aa30ebabc062b72538ee7cd6bf87748f53e5825a09570159",
+    "acknowledged_cursor": 6526863547,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5c55fb76cf030505aa30ebabc062b72538ee7cd6bf87748f53e5825a09570159",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CCCF0\",\"who\":\"sol-CCF0\",\"claim_id\":6526807024,\"reason\":\"First natural switch produced94/94byte identity but native source plausibility rejected five actual ROM-address pointer literals; native exit1, no MATCH credit. Exact C/report/error preserved.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; one natural pointer switch; first native byte identity but five SUSPECT rom-address findings; no retries or mapping/profile workaround\"}",
+      "created_at": "2026-10-30T15:43:11Z",
+      "id": 6526863547,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:43:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8d64e2991a94c48476caec168ab71121a60e94b3325fd0df9284206576ba2eae",
+    "result": {
+      "address": "0x080CCCF0",
+      "claim_id": 6526807024,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6526863547,
+      "status": "accepted",
+      "who": "sol-CCF0"
+    }
+  }
+}
