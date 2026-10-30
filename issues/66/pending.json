@@ -59,6 +59,38 @@
           "who": "sol-3648"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1d26c67cadd582c251d769620409675ebbf5fe18f49678909377b8cf826b48ec",
+        "acknowledged_cursor": 6534559056,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1d26c67cadd582c251d769620409675ebbf5fe18f49678909377b8cf826b48ec",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080614C4\",\"who\":\"sol-14C4\",\"note\":\"Qualified complete82B scalar switch with one genuine mappeddata object and actualCF310 threeformalABI, natural matching GPT6.1Sol executor\"}",
+          "created_at": "2026-10-30T22:09:59Z",
+          "id": 6534559056,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:09:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8fb9d6cf697411c08b55fd326d7f8f3ad300dd5758d78baed3c54c279c9d17d4",
+        "result": {
+          "address": "0x080614C4",
+          "claim_id": 6534559056,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6534559056,
+          "status": "accepted",
+          "who": "sol-14C4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
