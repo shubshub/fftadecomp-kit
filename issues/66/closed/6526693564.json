@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "770c70d26d9e5efbafea3c3b7f978f89c988af525490423aafb930daae2df54d",
+    "acknowledged_cursor": 6526705478,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "770c70d26d9e5efbafea3c3b7f978f89c988af525490423aafb930daae2df54d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB388\",\"who\":\"sol-B388\",\"note\":\"Batch37 complete198B guarded constant-return switch, existing native switch profile and matched source analogues.\"}",
+      "created_at": "2026-10-30T15:35:20Z",
+      "id": 6526693564,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:35:20Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bb731c9ec35f4c7053175559d389ad6d9b11c596837fe692ccb48b505cbca575",
+    "result": {
+      "address": "0x080CB388",
+      "claim_id": 6526693564,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6526693564,
+      "status": "accepted",
+      "who": "sol-B388"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ad9a971b46acd34bd31df8c3401c053b7afe9d134e44cbd22c8049b4a19cf8b2",
+    "acknowledged_cursor": 6526729328,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ad9a971b46acd34bd31df8c3401c053b7afe9d134e44cbd22c8049b4a19cf8b2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CB388\",\"who\":\"sol-B388\",\"claim_id\":6526693564,\"reason\":\"Complete plausible first-native MATCH, 198 bytes and 49 instructions; current source-bound report frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T15:37:00Z",
+      "id": 6526729328,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:37:00Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f7d112502f88c37f7557ddb9fa014a48e1b949a738d9877a64c2d4fd31b70362",
+    "result": {
+      "address": "0x080CB388",
+      "claim_id": 6526693564,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6526729328,
+      "status": "accepted",
+      "who": "sol-B388"
+    }
+  }
+}
