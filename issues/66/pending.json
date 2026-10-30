@@ -59,6 +59,254 @@
           "who": "sol-E9D0"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "204e8e11d084da0c4c2a2f4a75903898b736b98966f212687bb2380039c4c340",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "204e8e11d084da0c4c2a2f4a75903898b736b98966f212687bb2380039c4c340",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804ED60\",\"who\":\"sol-ED60\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:34:14Z",
+          "id": 6520609961,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:34:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x0804ED60",
+          "claim_id": 6520609961,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520609961,
+          "status": "accepted",
+          "who": "sol-ED60"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "b0a09c7591cbf540921bc6b82b3fa92acc9669257dc2ac45508a014fe11c64e9",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b0a09c7591cbf540921bc6b82b3fa92acc9669257dc2ac45508a014fe11c64e9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804ED60\",\"who\":\"sol-ED60\",\"claim_id\":6520609961,\"reason\":\"Matched complete 12-byte pointer-field byte getter at offset 3; isolated source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T10:36:22Z",
+          "id": 6520646660,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:36:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x0804ED60",
+          "claim_id": 6520609961,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520646660,
+          "status": "accepted",
+          "who": "sol-ED60"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0f8359f270b9bee6a878cfaeb6dc332b92972a00237c7237826c1d3372bbe628",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0f8359f270b9bee6a878cfaeb6dc332b92972a00237c7237826c1d3372bbe628",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060DB8\",\"who\":\"sol-0DB8\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:35:00Z",
+          "id": 6520623160,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:35:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08060DB8",
+          "claim_id": 6520623160,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520623160,
+          "status": "accepted",
+          "who": "sol-0DB8"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "8061e2d168aab232d9b31586171ab1471a2f07913e55c54279d137eba721df90",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8061e2d168aab232d9b31586171ab1471a2f07913e55c54279d137eba721df90",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08060DB8\",\"who\":\"sol-0DB8\",\"claim_id\":6520623160,\"reason\":\"Matched complete 12-byte named pointer reset; isolated source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T10:36:23Z",
+          "id": 6520646980,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:36:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08060DB8",
+          "claim_id": 6520623160,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520646980,
+          "status": "accepted",
+          "who": "sol-0DB8"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "47c3af3095755f8848758c825c65bbcc04c67f3020d48dead9a2abb699aa21d7",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "47c3af3095755f8848758c825c65bbcc04c67f3020d48dead9a2abb699aa21d7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060DD4\",\"who\":\"sol-0DD4\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:35:18Z",
+          "id": 6520628045,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:35:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08060DD4",
+          "claim_id": 6520628045,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520628045,
+          "status": "accepted",
+          "who": "sol-0DD4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3564aa0ac285235e2a81d4bb0387c680140f26482c843fb3a01b5596147f1a28",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3564aa0ac285235e2a81d4bb0387c680140f26482c843fb3a01b5596147f1a28",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060DE0\",\"who\":\"sol-0DE0\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:35:32Z",
+          "id": 6520632114,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:35:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08060DE0",
+          "claim_id": 6520632114,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520632114,
+          "status": "accepted",
+          "who": "sol-0DE0"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2348e869ff99a3603140220ca688a659e5aee5d3238613e2f41c14c2508921f3",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2348e869ff99a3603140220ca688a659e5aee5d3238613e2f41c14c2508921f3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060E24\",\"who\":\"sol-0E24\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:35:49Z",
+          "id": 6520637003,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:35:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08060E24",
+          "claim_id": 6520637003,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520637003,
+          "status": "accepted",
+          "who": "sol-0E24"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f31cc706f89d38f7fd0068b84c4410d3c896ff734d3fb55cc4b763e5a6ca85ae",
+        "acknowledged_cursor": 6520646980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f31cc706f89d38f7fd0068b84c4410d3c896ff734d3fb55cc4b763e5a6ca85ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08066114\",\"who\":\"sol-6114\",\"note\":\"Match one complete small state accessor in isolated Sol worktree\"}",
+          "created_at": "2026-10-30T10:36:06Z",
+          "id": 6520641887,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:36:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3580d5603bc0401a9b755659e5e179da3b6ab3d367398d2d7c91a73f744ebdc",
+        "result": {
+          "address": "0x08066114",
+          "claim_id": 6520641887,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520641887,
+          "status": "accepted",
+          "who": "sol-6114"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
