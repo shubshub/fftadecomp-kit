@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "11daaf6d8fa98a244c2919296870249932d40ea0d9bbc0a916a7004909a3cfb0",
-        "acknowledged_cursor": 6527582040,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "11daaf6d8fa98a244c2919296870249932d40ea0d9bbc0a916a7004909a3cfb0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800337C\",\"who\":\"sol-337C\",\"note\":\"Complete 28B three-store initializer with observed hardware addresses and mapped control shadow; candidate-match39\"}",
-          "created_at": "2026-10-30T16:15:58Z",
-          "id": 6527582040,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T16:15:58Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2ffdf19c2e25f57394626c041cc779b67ba0ab7c3a62cfc4b3cead877f250f9c",
-        "result": {
-          "address": "0x0800337C",
-          "claim_id": 6527582040,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6527582040,
-          "status": "accepted",
-          "who": "sol-337C"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "993d6f6fd01bf821b6a64062ae57595f0914014550ccf12702f83407fc65dc26",
-        "acknowledged_cursor": 6527699180,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "993d6f6fd01bf821b6a64062ae57595f0914014550ccf12702f83407fc65dc26",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800337C\",\"who\":\"sol-337C\",\"claim_id\":6527582040,\"reason\":\"Three plausible natural forms fail byte identity; final complete28B differs two bytes due to constant/address scheduling.\",\"unmatchable\":true,\"tried\":\"three natural default -O2 initializer/control-value forms;32B then28B; final26/28bytes\"}",
-          "created_at": "2026-10-30T16:21:28Z",
-          "id": 6527697161,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T16:21:28Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "41de891a5a1b1d53430e555471d07ccf2b0485f25760e8f2f4abf7623bd41a72",
-        "result": {
-          "address": "0x0800337C",
-          "claim_id": 6527582040,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6527697161,
-          "status": "accepted",
-          "who": "sol-337C"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "bb3f5fe4f499b3e673bb14041ecfdec8d1b7a16c7328c208ea4c75e5d2c4b09f",
         "acknowledged_cursor": 6527638603,
         "body_provenance": "acceptance-time",
