@@ -30,6 +30,98 @@
           "who": "sol-C008"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "7bf36c7efabcaa80616469733330a13e405d5ea9605ce34457d8e3761615a488",
+        "acknowledged_cursor": 6529884893,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7bf36c7efabcaa80616469733330a13e405d5ea9605ce34457d8e3761615a488",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802C008\",\"who\":\"sol-C008\",\"claim_id\":6529823096,\"reason\":\"First normal native plausible complete44B MATCH; exact source/report/body/current-runtime receipt frozen in isolated future batch.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T18:00:42Z",
+          "id": 6529868859,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T18:00:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "30d0d185920177db647594acf3fc598996092b337570496891637131dbd6a3a6",
+        "result": {
+          "address": "0x0802C008",
+          "claim_id": 6529823096,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6529868859,
+          "status": "accepted",
+          "who": "sol-C008"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f2a625e3a5f1be43145dc5c61b32a882adcd698cac9df74e64980809fb68cb1f",
+        "acknowledged_cursor": 6529884893,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f2a625e3a5f1be43145dc5c61b32a882adcd698cac9df74e64980809fb68cb1f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FC04\",\"who\":\"sol-FC04\",\"note\":\"Complete136B constructor; actual defining scalarhelper ABI and explicit callback/helper limits, retained same-family native analogue; one Sol executor.\"}",
+          "created_at": "2026-10-30T18:00:48Z",
+          "id": 6529870664,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T18:00:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "30d0d185920177db647594acf3fc598996092b337570496891637131dbd6a3a6",
+        "result": {
+          "address": "0x0800FC04",
+          "claim_id": 6529870664,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529870664,
+          "status": "accepted",
+          "who": "sol-FC04"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e1df531f0a51e031527da9f8dca5d7f0bccf633bd6af4c450de4ba912db22d29",
+        "acknowledged_cursor": 6529884893,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e1df531f0a51e031527da9f8dca5d7f0bccf633bd6af4c450de4ba912db22d29",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C5320\",\"who\":\"sol-5320\",\"note\":\"Complete118B mode-byte switch wrapper; full CFG/local-table and actual scalar/helper ABI evidence qualified; one Sol executor, no shared edits.\"}",
+          "created_at": "2026-10-30T18:01:31Z",
+          "id": 6529884893,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T18:01:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "30d0d185920177db647594acf3fc598996092b337570496891637131dbd6a3a6",
+        "result": {
+          "address": "0x080C5320",
+          "claim_id": 6529884893,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529884893,
+          "status": "accepted",
+          "who": "sol-5320"
+        }
+      },
       "release": null
     }
   ],
