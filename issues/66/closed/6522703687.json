@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "7d4b72d634281977f97c6b396833de66bdf3304e0c30569037174cc1ea31a36e",
+    "acknowledged_cursor": 6522703853,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7d4b72d634281977f97c6b396833de66bdf3304e0c30569037174cc1ea31a36e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A929C\",\"who\":\"sol-929C\",\"note\":\"Sol isolated complete52-72byte function matching with observed layouts and callee prototypes, existing native profiles only.\"}",
+      "created_at": "2026-10-30T12:20:22Z",
+      "id": 6522703687,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:20:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9c7805514405ea3e730f251361df76439f9602750c7089a781a5401146fa367c",
+    "result": {
+      "address": "0x080A929C",
+      "claim_id": 6522703687,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522703687,
+      "status": "accepted",
+      "who": "sol-929C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "82f4bf0f30645c2919688a36c2e06038b2599ce5ee45d0cd9d0a027c2de04ac7",
+    "acknowledged_cursor": 6522774820,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "82f4bf0f30645c2919688a36c2e06038b2599ce5ee45d0cd9d0a027c2de04ac7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A929C\",\"who\":\"sol-929C\",\"claim_id\":6522703687,\"reason\":\"Complete72-byte seven-helper sequence MATCH first native compile, plausible source, actual callee signatures inspected.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:24:21Z",
+      "id": 6522774814,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:24:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "98f37a97d30ffb43eccea2c5df13bc732454d14135c9b97dc38cf577368064de",
+    "result": {
+      "address": "0x080A929C",
+      "claim_id": 6522703687,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522774814,
+      "status": "accepted",
+      "who": "sol-929C"
+    }
+  }
+}

@@ -30,7 +30,35 @@
           "who": "sol-7DF0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "427045a9d3a676a3066f501dfc6e4d47b5fd0c7abda3b38cbd68bd7e07100090",
+        "acknowledged_cursor": 6522774820,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "427045a9d3a676a3066f501dfc6e4d47b5fd0c7abda3b38cbd68bd7e07100090",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08037DF0\",\"who\":\"sol-7DF0\",\"claim_id\":6522657924,\"reason\":\"Best genuine source plausible and complete56bytes but54/56bytes and19/20instructions match: adds r0,r0,r4 versus adds r0,r4,r0 at08037DFC. Other natural forms changed aggregate stride or shrank symbol52<56. Exact best source/report and failures preserved in Parked/08037DF0.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; typed aggregate layout, observed byte offsets, global pointer slot and local record formulations\"}",
+          "created_at": "2026-10-30T12:24:21Z",
+          "id": 6522774820,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:24:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "98f37a97d30ffb43eccea2c5df13bc732454d14135c9b97dc38cf577368064de",
+        "result": {
+          "address": "0x08037DF0",
+          "claim_id": 6522657924,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522774820,
+          "status": "accepted",
+          "who": "sol-7DF0"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-929C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "82f4bf0f30645c2919688a36c2e06038b2599ce5ee45d0cd9d0a027c2de04ac7",
+        "acknowledged_cursor": 6522774820,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "82f4bf0f30645c2919688a36c2e06038b2599ce5ee45d0cd9d0a027c2de04ac7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A929C\",\"who\":\"sol-929C\",\"claim_id\":6522703687,\"reason\":\"Complete72-byte seven-helper sequence MATCH first native compile, plausible source, actual callee signatures inspected.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:24:21Z",
+          "id": 6522774814,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:24:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "98f37a97d30ffb43eccea2c5df13bc732454d14135c9b97dc38cf577368064de",
+        "result": {
+          "address": "0x080A929C",
+          "claim_id": 6522703687,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522774814,
+          "status": "accepted",
+          "who": "sol-929C"
+        }
+      }
     },
     {
       "claim": {
