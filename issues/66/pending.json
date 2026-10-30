@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "UNPROVEN",
-        "acknowledged_cursor": 6489896965,
-        "body_provenance": "snapshot-at-archive",
-        "body_sha256": "38034fb3c3ec5d3822bcd9e7e350e57c4fee310c25196089781204b59d5b12ab",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08051DB4\",\"who\":\"codex-sol61-v893-08051db4\",\"note\":\"Complete indexed function; Sol6.1 natural C matching\"}",
-          "created_at": "2026-10-29T06:29:52Z",
-          "id": 6489673345,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-29T06:29:52Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "587c280babcaf490a5f66fbcabbf7eccb24482b69a51a30aebfc93179ff058a8",
-        "result": {
-          "address": "0x08051DB4",
-          "claim_id": 6489673345,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6489673345,
-          "status": "accepted",
-          "who": "codex-sol61-v893-08051db4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "UNPROVEN",
-        "acknowledged_cursor": 6489896965,
-        "body_provenance": "snapshot-at-archive",
-        "body_sha256": "ab82dedc4a3c8d3332ac058548220fa910c8ed8ca90b672ea11f9d0c296545fc",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08051DB4\",\"who\":\"codex-sol61-v893-08051db4\",\"claim_id\":6489673345,\"reason\":\"Bounded natural C attempt parked; exact extent or scheduling gap documented.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-29T06:43:55Z",
-          "id": 6489896965,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-29T06:43:55Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "587c280babcaf490a5f66fbcabbf7eccb24482b69a51a30aebfc93179ff058a8",
-        "result": {
-          "address": "0x08051DB4",
-          "claim_id": 6489673345,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6489896965,
-          "status": "accepted",
-          "who": "codex-sol61-v893-08051db4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e21a91f35f94b7cbca240e18f0358054ab5f5c2c27d1dbdcda8cfaa26bb1c7f5",
         "acknowledged_cursor": 6519914443,
         "body_provenance": "acceptance-time",
