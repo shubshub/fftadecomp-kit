@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "25bcb85527727a7e2078b58d69d0e0ec1c36cd2672ac1c13239ce22305d3227e",
+    "acknowledged_cursor": 6521869937,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "25bcb85527727a7e2078b58d69d0e0ec1c36cd2672ac1c13239ce22305d3227e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803865C\",\"who\":\"sol-865C\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+      "created_at": "2026-10-30T11:45:49Z",
+      "id": 6521863564,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:45:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+    "result": {
+      "address": "0x0803865C",
+      "claim_id": 6521863564,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521863564,
+      "status": "accepted",
+      "who": "sol-865C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8b4b31f5dbb638b9df5f1081be7be302fd2938424dbaa8182ac7607f00b72842",
+    "acknowledged_cursor": 6521978402,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8b4b31f5dbb638b9df5f1081be7be302fd2938424dbaa8182ac7607f00b72842",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803865C\",\"who\":\"sol-865C\",\"claim_id\":6521863564,\"reason\":\"Complete function MATCH on first native candidate, plausible source; exact source/report and runtime receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:50:44Z",
+      "id": 6521966485,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:50:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e5516628ebcf6130a0f9bdc46afdbdced823b2fda8afb7853bb0cb5c641a16b9",
+    "result": {
+      "address": "0x0803865C",
+      "claim_id": 6521863564,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521966485,
+      "status": "accepted",
+      "who": "sol-865C"
+    }
+  }
+}
