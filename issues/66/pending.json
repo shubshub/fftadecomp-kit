@@ -30,7 +30,35 @@
           "who": "sol-7668"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3dcb3ab437a86d7f483482558624866f3455f2255ae8e3e16fe740a040c45ff6",
+        "acknowledged_cursor": 6531618453,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3dcb3ab437a86d7f483482558624866f3455f2255ae8e3e16fe740a040c45ff6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C7668\",\"who\":\"sol-7668\",\"claim_id\":6531355744,\"reason\":\"First complete plausible native MATCH: 92 bytes and 32 instructions. Third grounded form frozen; one authorized first-form diagnostic and zero successful replay.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T19:22:14Z",
+          "id": 6531618453,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T19:22:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c9173de21f8c4231d905703c3f40e88443ff5fa0c671f33920bb97005605abbb",
+        "result": {
+          "address": "0x080C7668",
+          "claim_id": 6531355744,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6531618453,
+          "status": "accepted",
+          "who": "sol-7668"
+        }
+      }
     },
     {
       "claim": {
