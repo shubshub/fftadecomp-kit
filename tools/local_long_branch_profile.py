@@ -96,8 +96,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             raise ValueError("runtime frame checks require exact complete canonical call bindings")
 
     incoming_reads = set()
+    incoming_words_policy = False
     if entry_stack_policy is not None:
-        import readonly_entry_stack_profile as entry_stack
+        if type(entry_stack_policy) is dict and entry_stack_policy.get('schema') == 'thumb-readonly-entry-stack-words-v1':
+            import readonly_entry_stack_words_profile as entry_stack
+            incoming_words_policy = True
+        else:
+            import readonly_entry_stack_profile as entry_stack
         entry_stack.validate(entry_stack_policy)
 
     zero_states = None
@@ -449,7 +454,9 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         proof["call_preservation"] = [[site, sorted(registers)]
                                       for site, registers in sorted(call_preservation.items())]
     if entry_stack_policy is not None:
-        proof["entry_stack"] = {"schema": entry_stack.SCHEMA, "words": [0],
+        if incoming_words_policy:
+            entry_stack.validate_reads((offset for _, offset, _ in incoming_reads), entry_stack_policy)
+        proof["entry_stack"] = {"schema": entry_stack.SCHEMA, "words": list(entry_stack_policy['words']),
             "contract": entry_stack.CONTRACT, "loaded_value": "unknown scalar; no provenance facts",
             "reads": [[site, offset, 4, encoded] for site, offset, encoded in sorted(incoming_reads)]}
     if stack_aliases:
