@@ -91,6 +91,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8c2e706bcff62a098800a3b45171fa28028def2f3062a943fa17d15d0772e42f",
+        "acknowledged_cursor": 6525586831,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8c2e706bcff62a098800a3b45171fa28028def2f3062a943fa17d15d0772e42f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08148084\",\"who\":\"sol-8084\",\"note\":\"Natural clamped range wrapper using defining recently matched six-argument constructor ABI.\"}",
+          "created_at": "2026-10-30T14:46:44Z",
+          "id": 6525586831,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:46:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b9202c72f2d518b3b29124d6f96a5a1b3f4aba8c345020940b57bdd024bac70f",
+        "result": {
+          "address": "0x08148084",
+          "claim_id": 6525586831,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525586831,
+          "status": "accepted",
+          "who": "sol-8084"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
