@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "cb8439938bb0193ae49a0b2ccabf5370c088746f1ef036dc34da934518a441f6",
+    "acknowledged_cursor": 6520864991,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cb8439938bb0193ae49a0b2ccabf5370c088746f1ef036dc34da934518a441f6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060DC4\",\"who\":\"sol-0DC4\",\"note\":\"Match one complete plausible accessor with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T10:49:06Z",
+      "id": 6520864991,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:49:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "272b17ce7d4d84f2e9ee86c7e6b5605131edd47b2ddc90ea18095f663d447b85",
+    "result": {
+      "address": "0x08060DC4",
+      "claim_id": 6520864991,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6520864991,
+      "status": "accepted",
+      "who": "sol-0DC4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5cf82fc78c36fc0ce4ca1235df3a2c29f6839a3666159b12d73612dfdae807a1",
+    "acknowledged_cursor": 6520894801,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5cf82fc78c36fc0ce4ca1235df3a2c29f6839a3666159b12d73612dfdae807a1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08060DC4\",\"who\":\"sol-0DC4\",\"claim_id\":6520864991,\"reason\":\"Complete plausible 16-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:50:40Z",
+      "id": 6520891953,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:50:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "245a6cc5d7b85689671d56de969627b0fc05ba8fc87bf81714926b643a26486c",
+    "result": {
+      "address": "0x08060DC4",
+      "claim_id": 6520864991,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520891953,
+      "status": "accepted",
+      "who": "sol-0DC4"
+    }
+  }
+}

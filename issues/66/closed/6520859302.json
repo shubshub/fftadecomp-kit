@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5929a5fc64922b6d273198d7deb25859521071f8a671eb122c348745cbe22279",
+    "acknowledged_cursor": 6520864991,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5929a5fc64922b6d273198d7deb25859521071f8a671eb122c348745cbe22279",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804E990\",\"who\":\"sol-E990\",\"note\":\"Match one complete plausible accessor with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T10:48:46Z",
+      "id": 6520859302,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:48:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "272b17ce7d4d84f2e9ee86c7e6b5605131edd47b2ddc90ea18095f663d447b85",
+    "result": {
+      "address": "0x0804E990",
+      "claim_id": 6520859302,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6520859302,
+      "status": "accepted",
+      "who": "sol-E990"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "fab31ba2371d7fbac101d1d89914e26ec3d33236ad68ff983f439bd773f09a29",
+    "acknowledged_cursor": 6520894801,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fab31ba2371d7fbac101d1d89914e26ec3d33236ad68ff983f439bd773f09a29",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804E990\",\"who\":\"sol-E990\",\"claim_id\":6520859302,\"reason\":\"Complete plausible MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:50:50Z",
+      "id": 6520894732,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:50:50Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "245a6cc5d7b85689671d56de969627b0fc05ba8fc87bf81714926b643a26486c",
+    "result": {
+      "address": "0x0804E990",
+      "claim_id": 6520859302,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520894732,
+      "status": "accepted",
+      "who": "sol-E990"
+    }
+  }
+}
