@@ -79,7 +79,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
                 entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None,
-                discarded_exit_scratch=None):
+                discarded_exit_scratch=None, formal_stack_callee_proof=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -97,6 +97,14 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         from bounded_stack_output_profile import BoundedOutputProof
         if type(bounded_output_proof) is not BoundedOutputProof or not stack_aliases or buffer_proof is not None:
             raise ValueError("bounded output requires its explicit native alias proof")
+    if formal_stack_callee_proof is not None:
+        from ordinary_formal_stack_callee_inventory import FormalStackCalleeProof
+        if type(formal_stack_callee_proof) is not FormalStackCalleeProof or not stack_aliases or \
+                local_alias_slot_policy is None or any(value is not None for value in (
+                    buffer_proof, bounded_output_proof, runtime_calls, call_preservation,
+                    entry_stack_policy, finite_stack_index_policy, discarded_exit_scratch)):
+            raise ValueError('formal stack callees require their exclusive fresh native proof and local slots')
+        formal_stack_callee_proof.validate_calls(calls)
     discarded_aliases = set()
     if discarded_exit_scratch is not None:
         validate_discarded_exit_scratch(discarded_exit_scratch)
@@ -249,7 +257,17 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     target_register = ARM_REG_R0 + int(runtime_name.removeprefix("_call_via_r"))
                     if target_register in aliases or registers.get(target_register) == ("entry-return",):
                         raise ValueError("indirect runtime target carries stack or entry-return provenance")
-            if set(clobbered) & aliases.keys():
+            formal_call = formal_stack_callee_proof is not None and site in formal_stack_callee_proof.sites
+            if formal_call:
+                writes = formal_stack_callee_proof.check_call(site, calls[site], aliases, stack, pointer_slots)
+                for offset, width in writes:
+                    first = access(offset, width, stack)
+                    last = (offset + width - 1 + 4 * len(stack)) // 4
+                    for slot in range(first, last + 1):
+                        stack[slot] = ('local', None)
+                    alias_slots.store(pointer_slots, offset, width)
+                alias_calls.add(site)
+            if set(clobbered) & aliases.keys() and not formal_call:
                 if buffer_proof is None and bounded_output_proof is None:
                     raise ValueError("local aliases crossing calls require native buffer proof")
                 offsets = {register: alias_offset(register, aliases)
@@ -500,6 +518,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             'residual_aliases': [[site, register, offset, live]
                 for site, register, offset, live in sorted(discarded_aliases)],
             'native_nonescape_proof': False}
+    if formal_stack_callee_proof is not None:
+        proof['formal_stack_callee'] = formal_stack_callee_proof.fingerprint()
     if zero_states is not None:
         proof["zero_index_profile"] = zero_index_profile
         proof["zero_index_signed_loads"] = [[site,base,index,width,list(origins)]
@@ -512,7 +532,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             "small_index_byte_loads": [[site, base, index, value, list(origins)] for site,base,index,value,origins in sorted(small_indices)],
             "constant_domain": "exact MOVS 1/2/3 only; all-path intersection; every call kills facts",
             "slot_domain": "own aligned local words; possible-pointer taint joins; partial overwrite invalidates; release expires provenance",
-            "callee_pointer_arguments": False}
+            "callee_pointer_arguments": formal_stack_callee_proof is not None}
     if finite_states is not None:
         proof["finite_stack_indices"] = {"schema": finite.SCHEMA, "policy": finite_stack_index_policy,
             "SP_additions": [[site,register,[[value,list(origins)] for value,origins in alternatives]]
