@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "1c775fc75a49a19cb105b66efffadfa9e041690cb75af626f91f8a335ffb8486",
+    "acknowledged_cursor": 6524113690,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1c775fc75a49a19cb105b66efffadfa9e041690cb75af626f91f8a335ffb8486",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080640D4\",\"who\":\"sol-40D4\",\"note\":\"Sol executor genuine C matching; complete reached body and helper types captured; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:34:54Z",
+      "id": 6524107485,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:34:54Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2cb5d5be26c11be684ed8593ffc7f51daf60fc5a5026f1174d6e70d8db9d36ac",
+    "result": {
+      "address": "0x080640D4",
+      "claim_id": 6524107485,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6524107485,
+      "status": "accepted",
+      "who": "sol-40D4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7cb08d89c1bda9c375022f8116e18199c65496d116efd9c7bc47a3a7152db4f4",
+    "acknowledged_cursor": 6524178677,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7cb08d89c1bda9c375022f8116e18199c65496d116efd9c7bc47a3a7152db4f4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080640D4\",\"who\":\"sol-40D4\",\"claim_id\":6524107485,\"reason\":\"Native plausible complete MATCH:52/52bytes,20/20instructions; source-bound actual current-runtime/mapping receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T13:38:22Z",
+      "id": 6524178640,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:38:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "04cd9ea9d4ed735b69c61ff339c2bbe115ae3fe2170f66b7b0d4d15e65943239",
+    "result": {
+      "address": "0x080640D4",
+      "claim_id": 6524107485,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6524178640,
+      "status": "accepted",
+      "who": "sol-40D4"
+    }
+  }
+}
