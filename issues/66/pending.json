@@ -59,6 +59,38 @@
           "who": "sol-14C4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ebfc22e957f229f614efbdc74cbb9f178ae5b7300f9cd2cfcca45586850af185",
+        "acknowledged_cursor": 6534818824,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ebfc22e957f229f614efbdc74cbb9f178ae5b7300f9cd2cfcca45586850af185",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08089C4C\",\"who\":\"sol-9C4C\",\"note\":\"Qualified complete56B natural source and sole direct03000E50 typedhalfwordbinding proposal, isolated nextcheckpoint matching GPT6.1Sol\"}",
+          "created_at": "2026-10-30T22:27:10Z",
+          "id": 6534818824,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:27:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6bbc084046a38c6823799f95d3a57d89bcab2e68631f74663930fa82ab409cda",
+        "result": {
+          "address": "0x08089C4C",
+          "claim_id": 6534818824,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6534818824,
+          "status": "accepted",
+          "who": "sol-9C4C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
