@@ -127,6 +127,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e68a4d9e6127ea714cb591365f904e843b3653f438e3e62eaf0d9286c1ccd66d",
+        "acknowledged_cursor": 6525824034,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e68a4d9e6127ea714cb591365f904e843b3653f438e3e62eaf0d9286c1ccd66d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C7E38\",\"who\":\"sol-7E38\",\"note\":\"Natural selection predicate with actual tiny defining helper ABI and fixed two-word output buffer frame.\"}",
+          "created_at": "2026-10-30T14:57:41Z",
+          "id": 6525824034,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:57:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fea2c4177001c29654f831bcade560e6e24e179b1cb24ed472f354a66bdd0ab4",
+        "result": {
+          "address": "0x080C7E38",
+          "claim_id": 6525824034,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525824034,
+          "status": "accepted",
+          "who": "sol-7E38"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
