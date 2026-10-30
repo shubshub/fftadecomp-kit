@@ -30,7 +30,35 @@
           "who": "sol-4314"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4fbb155219e0745639c91e710d6629ff4f8d293435910d728b231c213ab9a6b4",
+        "acknowledged_cursor": 6528823315,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4fbb155219e0745639c91e710d6629ff4f8d293435910d728b231c213ab9a6b4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08144314\",\"who\":\"sol-4314\",\"claim_id\":6528757802,\"reason\":\"First default native run refused addressed software-float runtime call: division runtime requires its canonical compiler alias. No comparison/MATCH, no alias workaround.\",\"unmatchable\":true,\"tried\":\"default -mthumb-interwork -O2; one natural source and one native failure; no diagnostic/retry\"}",
+          "created_at": "2026-10-30T17:15:47Z",
+          "id": 6528823315,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:15:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e59076d3085da2014c86d77fec0c7fa1f2691d46e031f2faeee7402a4f390c76",
+        "result": {
+          "address": "0x08144314",
+          "claim_id": 6528757802,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6528823315,
+          "status": "accepted",
+          "who": "sol-4314"
+        }
+      }
     },
     {
       "claim": {
