@@ -59,6 +59,38 @@
           "who": "sol-91C0"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9b14a0032ed1578863904df9e8b39c72cb2f17fca2ee5b157b7fb879a4289d0a",
+        "acknowledged_cursor": 6535674223,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9b14a0032ed1578863904df9e8b39c72cb2f17fca2ee5b157b7fb879a4289d0a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080750D8\",\"who\":\"sol-50D8\",\"note\":\"Match complete212B owner with grounded scalar ABI and exact0600BA60 data identity; isolated source ownership; no shared headers\"}",
+          "created_at": "2026-10-30T23:27:34Z",
+          "id": 6535674223,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T23:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "12d4011605509044c1df17a804b2b7b7c1612b085f875d79b1dbd61b614fe95c",
+        "result": {
+          "address": "0x080750D8",
+          "claim_id": 6535674223,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6535674223,
+          "status": "accepted",
+          "who": "sol-50D8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
