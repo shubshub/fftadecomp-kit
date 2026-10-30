@@ -63,6 +63,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "78922e80b93e570128ea4d283d034f888640e67d6657b303dfeb7b158e3532f0",
+        "acknowledged_cursor": 6529354415,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "78922e80b93e570128ea4d283d034f888640e67d6657b303dfeb7b158e3532f0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD364\",\"who\":\"sol-D364\",\"note\":\"Bounded194B naturalrange/flagsetter; realtypedhelperABI/currentguardedswitchanalogue; freshfinal2700datapin.\"}",
+          "created_at": "2026-10-30T17:39:42Z",
+          "id": 6529354415,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:39:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0b331c1a16c7021f7b1dd2443b7f75c2518606b5435f14c7cda98e4a1a9d8c53",
+        "result": {
+          "address": "0x080CD364",
+          "claim_id": 6529354415,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529354415,
+          "status": "accepted",
+          "who": "sol-D364"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
