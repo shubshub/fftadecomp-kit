@@ -62,7 +62,35 @@
           "who": "sol-6854"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c888a2606adac256f4e30878486e05b32d805d442115fa8c036fbb70cb85245a",
+        "acknowledged_cursor": 6534219766,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c888a2606adac256f4e30878486e05b32d805d442115fa8c036fbb70cb85245a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08046854\",\"who\":\"sol-6854\",\"claim_id\":6534031477,\"reason\":\"Two native source forms, first old-compiler declaration error; one unchanged compiling-form diagnostic measured192 versus188 bytes; ordinary address grouping and allocation mismatch, honest Parked, zero MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-30T21:49:52Z",
+          "id": 6534219766,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:49:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "59fa3028bfd84514964203fa0f7491aa659211a7303ed49cdd1921ac6b67ab34",
+        "result": {
+          "address": "0x08046854",
+          "claim_id": 6534031477,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6534219766,
+          "status": "accepted",
+          "who": "sol-6854"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +122,35 @@
           "who": "sol-FD24"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0e5e00edf04910e079f9cace9e9dbe705ff83e3b5e39fc9a57a39add2ecd05e0",
+        "acknowledged_cursor": 6534219766,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0e5e00edf04910e079f9cace9e9dbe705ff83e3b5e39fc9a57a39add2ecd05e0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804FD24\",\"who\":\"sol-FD24\",\"claim_id\":6534074275,\"reason\":\"One natural source and one unchanged-source diagnostic: complete60-byte ordinary mismatch, signed conversion lifetime and saved-register allocation differ; no grounded operation correction, honest Parked, zero MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-30T21:49:11Z",
+          "id": 6534208620,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:49:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "59fa3028bfd84514964203fa0f7491aa659211a7303ed49cdd1921ac6b67ab34",
+        "result": {
+          "address": "0x0804FD24",
+          "claim_id": 6534074275,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6534208620,
+          "status": "accepted",
+          "who": "sol-FD24"
+        }
+      }
     }
   ],
   "issue": 66,
