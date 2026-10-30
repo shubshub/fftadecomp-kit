@@ -63,6 +63,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "50067d19780ebea0e8ec01c4652381b21588c5384aa75644f86f1aecebfeb7ea",
+        "acknowledged_cursor": 6524303325,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "50067d19780ebea0e8ec01c4652381b21588c5384aa75644f86f1aecebfeb7ea",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08029CD8\",\"who\":\"sol-9CD8\",\"note\":\"Sol executor genuine complete C matching; exact reached span/types/exclusions captured; synchronized proved mappings; bounded native proof and release.\"}",
+          "created_at": "2026-10-30T13:44:49Z",
+          "id": 6524303190,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:44:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0cd55b3d8ca8d3f89ffa73f1eee1c4e479ceeda6fd8c2498771a2fe18416846e",
+        "result": {
+          "address": "0x08029CD8",
+          "claim_id": 6524303190,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524303190,
+          "status": "accepted",
+          "who": "sol-9CD8"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "52456a91a7ef986ebd2ca3e4b074818a51bec95843e5a2e02bc3e7bed8cb8f6b",
+        "acknowledged_cursor": 6524303325,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "52456a91a7ef986ebd2ca3e4b074818a51bec95843e5a2e02bc3e7bed8cb8f6b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C4A40\",\"who\":\"sol-4A40\",\"note\":\"Sol executor genuine complete C matching; exact reached span/types/exclusions captured; synchronized proved mappings; bounded native proof and release.\"}",
+          "created_at": "2026-10-30T13:44:49Z",
+          "id": 6524303195,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:44:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0cd55b3d8ca8d3f89ffa73f1eee1c4e479ceeda6fd8c2498771a2fe18416846e",
+        "result": {
+          "address": "0x080C4A40",
+          "claim_id": 6524303195,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524303195,
+          "status": "accepted",
+          "who": "sol-4A40"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f2c68643c14e98b0c60b53068ebf7376dbe26dcc4d003b58372b67e598388add",
+        "acknowledged_cursor": 6524303325,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f2c68643c14e98b0c60b53068ebf7376dbe26dcc4d003b58372b67e598388add",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081258CC\",\"who\":\"sol-58CC\",\"note\":\"Sol executor genuine complete C matching; exact reached span/types/exclusions captured; synchronized proved mappings; bounded native proof and release.\"}",
+          "created_at": "2026-10-30T13:44:49Z",
+          "id": 6524303325,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:44:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0cd55b3d8ca8d3f89ffa73f1eee1c4e479ceeda6fd8c2498771a2fe18416846e",
+        "result": {
+          "address": "0x081258CC",
+          "claim_id": 6524303325,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524303325,
+          "status": "accepted",
+          "who": "sol-58CC"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
