@@ -100,7 +100,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             raise ValueError("bounded output requires its explicit native alias proof")
     if formal_stack_callee_proof is not None:
         from ordinary_formal_stack_callee_inventory import FormalStackCalleeProof
-        if type(formal_stack_callee_proof) is not FormalStackCalleeProof or not stack_aliases or \
+        from ordinary_two_output_callees_inventory import TwoOutputCalleesProof
+        if type(formal_stack_callee_proof) not in (FormalStackCalleeProof, TwoOutputCalleesProof) or not stack_aliases or \
                 local_alias_slot_policy is None or any(value is not None for value in (
                     buffer_proof, bounded_output_proof, runtime_calls, call_preservation,
                     entry_stack_policy, finite_stack_index_policy, discarded_exit_scratch)):
