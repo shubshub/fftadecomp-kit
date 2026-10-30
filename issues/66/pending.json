@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "b9bca61f1758786b75273814d5c87874f6c8a9e9ce337781d1288213505536ae",
-        "acknowledged_cursor": 6524556835,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b9bca61f1758786b75273814d5c87874f6c8a9e9ce337781d1288213505536ae",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FA0C\",\"who\":\"sol-FA0C\",\"note\":\"Batch29 bounded plausible matching using complete body and defining helper types; existing concrete native C analogue retained.\"}",
-          "created_at": "2026-10-30T13:56:35Z",
-          "id": 6524556666,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T13:56:35Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c4722eb29a5716f921c26220d7de8cc1b0f23e78d6b0d2c0d37322956e860501",
-        "result": {
-          "address": "0x0800FA0C",
-          "claim_id": 6524556666,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6524556666,
-          "status": "accepted",
-          "who": "sol-FA0C"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f23d21ed59b9c956e442051957b8531fd504d75fad342ff82c68bfa58e9ed493",
-        "acknowledged_cursor": 6524731834,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f23d21ed59b9c956e442051957b8531fd504d75fad342ff82c68bfa58e9ed493",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800FA0C\",\"who\":\"sol-FA0C\",\"claim_id\":6524556666,\"reason\":\"Three natural forms refused by native function-address exactness gate. Closest156B form differs9 bytes in temporary/signed-load registers; all actual call and literal bindings agree. Source, current-machine refusals and precise differences retained in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; existing inline renderer, direct render calls, unsigned storage with signed conversion; no steering\"}",
-          "created_at": "2026-10-30T14:04:49Z",
-          "id": 6524729523,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T14:04:49Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f8224aa5cfb662ded6ae7ecb76c1b10cc96b5523fcd29769fc5cb7ed6a734f87",
-        "result": {
-          "address": "0x0800FA0C",
-          "claim_id": 6524556666,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6524729523,
-          "status": "accepted",
-          "who": "sol-FA0C"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "a873069c7d0ce1a7a5224dd4a552f5204b9262fc7362d57fc69aa3edbe592502",
         "acknowledged_cursor": 6524624654,
         "body_provenance": "acceptance-time",
