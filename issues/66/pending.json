@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "1e6cc271fc775f6fd79924ac8c1d73ab4667723d4e8a8c8174ac4e6603b64981",
-        "acknowledged_cursor": 6522986350,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1e6cc271fc775f6fd79924ac8c1d73ab4667723d4e8a8c8174ac4e6603b64981",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805CF00\",\"who\":\"sol-CF00\",\"note\":\"Native plausible C matching of bounded interpolation operation\"}",
-          "created_at": "2026-10-30T12:35:44Z",
-          "id": 6522986350,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T12:35:44Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5490bfec17ace956bdd82b9b4ee958f3ab079e47c2ec5c80a96d3a16c0b02f4b",
-        "result": {
-          "address": "0x0805CF00",
-          "claim_id": 6522986350,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6522986350,
-          "status": "accepted",
-          "who": "sol-CF00"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "352aad2ecb0ee66ef8b23ebc3d8a7a195e99d40a2ff4930e02355b85c6bb8db1",
-        "acknowledged_cursor": 6523089696,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "352aad2ecb0ee66ef8b23ebc3d8a7a195e99d40a2ff4930e02355b85c6bb8db1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805CF00\",\"who\":\"sol-CF00\",\"claim_id\":6522986350,\"reason\":\"Three bounded plausible forms;60B candidate block order differs; native signed quotient caller refuses absent exact full mapped body\",\"unmatchable\":true,\"tried\":\"default -mthumb-interwork -O2; signed endpoint forms,local s16 accumulator,three natural candidates; remaining block order mismatch; native quotient gate retained\"}",
-          "created_at": "2026-10-30T12:41:27Z",
-          "id": 6523089696,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T12:41:27Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6a0f3524179da328b3cc1c76bb6d6ba20e3246256df93a87a91ddf1cd1ea1b13",
-        "result": {
-          "address": "0x0805CF00",
-          "claim_id": 6522986350,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6523089696,
-          "status": "accepted",
-          "who": "sol-CF00"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "c3e441e31d9e760451fd9c34437ab9c29ce42c7aa8532a4cdabe2d232af39c8c",
         "acknowledged_cursor": 6523046013,
         "body_provenance": "acceptance-time",
