@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "fba18c3a5b246ae6657227d2dc9507e8103340985e0da1a33e8735c8f7bcdfac",
-        "acknowledged_cursor": 6529726280,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "fba18c3a5b246ae6657227d2dc9507e8103340985e0da1a33e8735c8f7bcdfac",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD2C4\",\"who\":\"sol-D2C4\",\"note\":\"Complete158B bounds/table routine with actual defining mapped helper ABI and full CFG/literal/frame qualification; one Sol executor, no shared edits.\"}",
-          "created_at": "2026-10-30T17:53:02Z",
-          "id": 6529709839,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:53:02Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "af4e14a697ac1d956257dd127787e18fde646f605f28e41c3c67fd5b3e11f024",
-        "result": {
-          "address": "0x080CD2C4",
-          "claim_id": 6529709839,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6529709839,
-          "status": "accepted",
-          "who": "sol-D2C4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "63f70b3ac8ed0204bfcdf799da12dfb0dc04bd255e86998730e920ec3a8f392d",
-        "acknowledged_cursor": 6529785577,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "63f70b3ac8ed0204bfcdf799da12dfb0dc04bd255e86998730e920ec3a8f392d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CD2C4\",\"who\":\"sol-D2C4\",\"claim_id\":6529709839,\"reason\":\"Default native buffer evidence refused: requires an inspected buffer call. One attempt; no comparison or MATCH; exact recovered source and refusal parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural form; native inspected-buffer-call refusal, no diagnostic or replay\"}",
-          "created_at": "2026-10-30T17:56:36Z",
-          "id": 6529785577,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:56:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "05afa0804a02b553af8ebd313aea3f8201caa3439b311c9fe0d853367d092bef",
-        "result": {
-          "address": "0x080CD2C4",
-          "claim_id": 6529709839,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6529785577,
-          "status": "accepted",
-          "who": "sol-D2C4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "a77e6bde63f53223948d5af394380dca4e9c110f2cc2225e71ac0cf91bc73b3f",
         "acknowledged_cursor": 6529823096,
         "body_provenance": "acceptance-time",
