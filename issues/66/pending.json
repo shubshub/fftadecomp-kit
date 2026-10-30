@@ -30,7 +30,35 @@
           "who": "sol-7574"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f22218644f333f5a9277418d339a910c6c5e1a87fde6dbcbac01f0a6cd705a85",
+        "acknowledged_cursor": 6522503051,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f22218644f333f5a9277418d339a910c6c5e1a87fde6dbcbac01f0a6cd705a85",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08067574\",\"who\":\"sol-7574\",\"claim_id\":6522398481,\"reason\":\"Complete44-byte conditional table getter MATCH on third natural candidate; plausible source, all failed candidates retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:11:48Z",
+          "id": 6522502976,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:11:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ee05c6d2508a618060be7cca153e184613dde3ae5773bb15beefa3e01e06a0df",
+        "result": {
+          "address": "0x08067574",
+          "claim_id": 6522398481,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522502976,
+          "status": "accepted",
+          "who": "sol-7574"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-FB84"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5e4baea49c9d8309feae147d86cbedc9db402e5fd20083f63662a54388486245",
+        "acknowledged_cursor": 6522503051,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5e4baea49c9d8309feae147d86cbedc9db402e5fd20083f63662a54388486245",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804FB84\",\"who\":\"sol-FB84\",\"claim_id\":6522398609,\"reason\":\"Complete44-byte conditional table getter MATCH on third natural candidate; plausible source, all failed candidates retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T12:11:48Z",
+          "id": 6522503051,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:11:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ee05c6d2508a618060be7cca153e184613dde3ae5773bb15beefa3e01e06a0df",
+        "result": {
+          "address": "0x0804FB84",
+          "claim_id": 6522398609,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6522503051,
+          "status": "accepted",
+          "who": "sol-FB84"
+        }
+      }
     },
     {
       "claim": {
