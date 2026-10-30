@@ -59,6 +59,70 @@
           "who": "sol-0DA4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3e334d45fad19f30f79e6362269c6cce3a1ec3d5c7afa5b4dbcb486672cbcf0a",
+        "acknowledged_cursor": 6534031477,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3e334d45fad19f30f79e6362269c6cce3a1ec3d5c7afa5b4dbcb486672cbcf0a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08043468\",\"who\":\"sol-3468\",\"note\":\"Complete 1236-byte owner and 15 actual helper interfaces qualified under sole proposed observed byte data identity\"}",
+          "created_at": "2026-10-30T21:39:00Z",
+          "id": 6534014795,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:39:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d99b2e130bd8666945abcd98a184c65f4585e34dc792cbd728abfa875c3cd19d",
+        "result": {
+          "address": "0x08043468",
+          "claim_id": 6534014795,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6534014795,
+          "status": "accepted",
+          "who": "sol-3468"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "32da2c3a13f186c03cbcc688c027921645e09430926354f82fd0bff716fada8e",
+        "acknowledged_cursor": 6534031477,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "32da2c3a13f186c03cbcc688c027921645e09430926354f82fd0bff716fada8e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08046854\",\"who\":\"sol-6854\",\"note\":\"Complete 188-byte owner and actual five-slot ABI qualified under default unsigned remainder constant100 scalar frame and mapped data route\"}",
+          "created_at": "2026-10-30T21:39:50Z",
+          "id": 6534031477,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:39:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d99b2e130bd8666945abcd98a184c65f4585e34dc792cbd728abfa875c3cd19d",
+        "result": {
+          "address": "0x08046854",
+          "claim_id": 6534031477,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6534031477,
+          "status": "accepted",
+          "who": "sol-6854"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
