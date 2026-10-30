@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "768b305c333bf0e5e379b600d813fea737f199eb81805b6d02397cd2f567c11d",
+    "acknowledged_cursor": 6522703853,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "768b305c333bf0e5e379b600d813fea737f199eb81805b6d02397cd2f567c11d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08089CAC\",\"who\":\"sol-9CAC\",\"note\":\"Sol isolated complete52-72byte function matching with observed layouts and callee prototypes, existing native profiles only.\"}",
+      "created_at": "2026-10-30T12:20:23Z",
+      "id": 6522703827,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:20:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9c7805514405ea3e730f251361df76439f9602750c7089a781a5401146fa367c",
+    "result": {
+      "address": "0x08089CAC",
+      "claim_id": 6522703827,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522703827,
+      "status": "accepted",
+      "who": "sol-9CAC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "eb448a352d3eb711bb72da4c998d434acf79bb1b86b85c81ff4a1e297492a64f",
+    "acknowledged_cursor": 6522749731,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "eb448a352d3eb711bb72da4c998d434acf79bb1b86b85c81ff4a1e297492a64f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08089CAC\",\"who\":\"sol-9CAC\",\"claim_id\":6522703827,\"reason\":\"Complete function MATCH from plausible natural source; exact source/report/current-machine receipt and any failed candidates retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:22:55Z",
+      "id": 6522749728,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:22:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "deeb4ecca99223343a74c2bbd1929666bbb46f9a366d0abcd6f4f57690a35c13",
+    "result": {
+      "address": "0x08089CAC",
+      "claim_id": 6522703827,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522749728,
+      "status": "accepted",
+      "who": "sol-9CAC"
+    }
+  }
+}
