@@ -90,7 +90,35 @@
           "who": "sol-D19C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d183900ed0d9b5b494b4b9ac9755348e06fc4d2e6e0b7e4866ed6939c2c3def4",
+        "acknowledged_cursor": 6525505502,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d183900ed0d9b5b494b4b9ac9755348e06fc4d2e6e0b7e4866ed6939c2c3def4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811D19C\",\"who\":\"sol-D19C\",\"claim_id\":6525385359,\"reason\":\"Natural complete descriptor constructor source parked with exact nested buffer dependency refusal. No byte-match or plausibility claim.\",\"unmatchable\":true,\"tried\":\"One default native attempt: stack aliases across caller-clobbered registers; nested05B6C->05954 function-buffer evidence excludes runtime call thunks. No alternate-selector workaround or successful replay.\"}",
+          "created_at": "2026-10-30T14:41:50Z",
+          "id": 6525482804,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:41:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f202eac03c18246e5aa17681e1483d97ce1f682add2969d5875848f43d18454",
+        "result": {
+          "address": "0x0811D19C",
+          "claim_id": 6525385359,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6525482804,
+          "status": "accepted",
+          "who": "sol-D19C"
+        }
+      }
     },
     {
       "claim": {
@@ -120,6 +148,66 @@
           "request_id": 6525417395,
           "status": "accepted",
           "who": "sol-7FD8"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "c74214f06253fd0d42a76f6ff987b68815035ca1e2a1a8ab0db2386223a2bbfd",
+        "acknowledged_cursor": 6525505502,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c74214f06253fd0d42a76f6ff987b68815035ca1e2a1a8ab0db2386223a2bbfd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08147FD8\",\"who\":\"sol-7FD8\",\"claim_id\":6525417395,\"reason\":\"Three natural clamped-constructor forms parked. Plausible compiled96B exceeds actual92B owner; amount narrowing/liveness and register allocation remain different.\",\"unmatchable\":true,\"tried\":\"Three natural forms using actual u16 helper ABI and original or named signed amount view; all default native runs plausible96B vs92B target. No whole-function byte match.\"}",
+          "created_at": "2026-10-30T14:42:49Z",
+          "id": 6525503340,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:42:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f202eac03c18246e5aa17681e1483d97ce1f682add2969d5875848f43d18454",
+        "result": {
+          "address": "0x08147FD8",
+          "claim_id": 6525417395,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6525503340,
+          "status": "accepted",
+          "who": "sol-7FD8"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "165028412b14dd652663d2a503df8d0759d7eaae9f6050a7015b0ca59042d691",
+        "acknowledged_cursor": 6525505502,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "165028412b14dd652663d2a503df8d0759d7eaae9f6050a7015b0ca59042d691",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806D5F4\",\"who\":\"sol-D5F4\",\"note\":\"Natural inventory scan using defining record helper and supported fixed word output; isolated one owner.\"}",
+          "created_at": "2026-10-30T14:42:55Z",
+          "id": 6525505502,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:42:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f202eac03c18246e5aa17681e1483d97ce1f682add2969d5875848f43d18454",
+        "result": {
+          "address": "0x0806D5F4",
+          "claim_id": 6525505502,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525505502,
+          "status": "accepted",
+          "who": "sol-D5F4"
         }
       },
       "release": null

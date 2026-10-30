@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "d50a7b4ffaf528b9cf351e4234946ed6c1667174923e946a21bae21aaf71a5ed",
+    "acknowledged_cursor": 6525417395,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d50a7b4ffaf528b9cf351e4234946ed6c1667174923e946a21bae21aaf71a5ed",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08147FD8\",\"who\":\"sol-7FD8\",\"note\":\"Natural bounded clamped-range constructor matching, defining helper ABI and recent matched analogue.\"}",
+      "created_at": "2026-10-30T14:38:49Z",
+      "id": 6525417395,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:38:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "85074cfbef6c7317ee262d185b7025a24fea05c3e99782a5f4130a127a16617e",
+    "result": {
+      "address": "0x08147FD8",
+      "claim_id": 6525417395,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6525417395,
+      "status": "accepted",
+      "who": "sol-7FD8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c74214f06253fd0d42a76f6ff987b68815035ca1e2a1a8ab0db2386223a2bbfd",
+    "acknowledged_cursor": 6525505502,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c74214f06253fd0d42a76f6ff987b68815035ca1e2a1a8ab0db2386223a2bbfd",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08147FD8\",\"who\":\"sol-7FD8\",\"claim_id\":6525417395,\"reason\":\"Three natural clamped-constructor forms parked. Plausible compiled96B exceeds actual92B owner; amount narrowing/liveness and register allocation remain different.\",\"unmatchable\":true,\"tried\":\"Three natural forms using actual u16 helper ABI and original or named signed amount view; all default native runs plausible96B vs92B target. No whole-function byte match.\"}",
+      "created_at": "2026-10-30T14:42:49Z",
+      "id": 6525503340,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:42:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6f202eac03c18246e5aa17681e1483d97ce1f682add2969d5875848f43d18454",
+    "result": {
+      "address": "0x08147FD8",
+      "claim_id": 6525417395,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6525503340,
+      "status": "accepted",
+      "who": "sol-7FD8"
+    }
+  }
+}
