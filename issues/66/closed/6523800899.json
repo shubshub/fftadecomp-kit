@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dfaf305fdad60735b44a7bd3c5274d45cf9478c79d27deab799a138174cf6d6d",
+    "acknowledged_cursor": 6523800941,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dfaf305fdad60735b44a7bd3c5274d45cf9478c79d27deab799a138174cf6d6d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805E924\",\"who\":\"sol-E924\",\"note\":\"Sol executor matching genuine full C function in isolated worktree; whole body/literals checked; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:19:19Z",
+      "id": 6523800899,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:19:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0d599325b0eeaba4199663113df193edffbc11cb780777099e5429f761429374",
+    "result": {
+      "address": "0x0805E924",
+      "claim_id": 6523800899,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523800899,
+      "status": "accepted",
+      "who": "sol-E924"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "751c6f8a0bd9135e07d3c78e87a522b1b2d3cd5ddd1a6e2506ae68737e5a775a",
+    "acknowledged_cursor": 6523908232,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "751c6f8a0bd9135e07d3c78e87a522b1b2d3cd5ddd1a6e2506ae68737e5a775a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805E924\",\"who\":\"sol-E924\",\"claim_id\":6523800899,\"reason\":\"Native complete plausible MATCH:232/232bytes,83/83instructions; exact source-bound current-runtime receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T13:24:51Z",
+      "id": 6523908115,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:24:51Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b490f83f2eeac9f0e01ce7cadbf847ed0855ff41aeb0df4e9bf06035effe7691",
+    "result": {
+      "address": "0x0805E924",
+      "claim_id": 6523800899,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523908115,
+      "status": "accepted",
+      "who": "sol-E924"
+    }
+  }
+}
