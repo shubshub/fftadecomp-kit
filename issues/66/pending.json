@@ -59,6 +59,70 @@
           "who": "sol-0618"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bf59eb99f512b97c17a991af88b9dbbde39530199e1590c05da07494a5304314",
+        "acknowledged_cursor": 6533100036,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bf59eb99f512b97c17a991af88b9dbbde39530199e1590c05da07494a5304314",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C9B8C\",\"who\":\"sol-9B8C\",\"note\":\"Complete628-byte saved CFG and actual ABI qualified; published addressed-signed-runtime-v1 conditional ABI selector; one isolated matching executor\"}",
+          "created_at": "2026-10-30T20:44:22Z",
+          "id": 6533083996,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T20:44:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eaa9cd1b81dc20ea6d9f02f331d88fc5715bbce94a28990786213d306c293b3c",
+        "result": {
+          "address": "0x080C9B8C",
+          "claim_id": 6533083996,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6533083996,
+          "status": "accepted",
+          "who": "sol-9B8C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "28fcdd1bf3cefbc423b2c44030e26e0561f9f619a66c2933ef26f308507790fb",
+        "acknowledged_cursor": 6533100036,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "28fcdd1bf3cefbc423b2c44030e26e0561f9f619a66c2933ef26f308507790fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A0468\",\"who\":\"sol-0468\",\"note\":\"Complete128-byte saved CFG and five-formal ABI; published explicit addressed-signed-runtime-readonly-word0-v1 selector; incoming word0 readability premise retained\"}",
+          "created_at": "2026-10-30T20:45:16Z",
+          "id": 6533100036,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T20:45:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eaa9cd1b81dc20ea6d9f02f331d88fc5715bbce94a28990786213d306c293b3c",
+        "result": {
+          "address": "0x080A0468",
+          "claim_id": 6533100036,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6533100036,
+          "status": "accepted",
+          "who": "sol-0468"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
