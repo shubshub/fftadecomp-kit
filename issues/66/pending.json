@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "a873069c7d0ce1a7a5224dd4a552f5204b9262fc7362d57fc69aa3edbe592502",
-        "acknowledged_cursor": 6524624654,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a873069c7d0ce1a7a5224dd4a552f5204b9262fc7362d57fc69aa3edbe592502",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D2380\",\"who\":\"sol-2380\",\"note\":\"Batch29 bounded plausible matching with complete154B span, actual RNG helper and concrete record/layout analogues retained.\"}",
-          "created_at": "2026-10-30T13:59:49Z",
-          "id": 6524624654,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T13:59:49Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "23045d872ed6239faa7cdf0508bf2eafe9763518a85d20cbf620f74eb5c53792",
-        "result": {
-          "address": "0x080D2380",
-          "claim_id": 6524624654,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6524624654,
-          "status": "accepted",
-          "who": "sol-2380"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0decd0c2fa9ae2535b68d05e884880f7ae805d62b40520c5a07b4fd2e843a169",
-        "acknowledged_cursor": 6524806185,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0decd0c2fa9ae2535b68d05e884880f7ae805d62b40520c5a07b4fd2e843a169",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D2380\",\"who\":\"sol-2380\",\"claim_id\":6524624654,\"reason\":\"Three natural forms152,152,148B vs154B owner; native complete symbol refusals, no comparison/plausibility verdict. Actual RNG u32 signature and observed u16 narrowing retained; scheduling, register and branch/pool placement differ. Precise source and diagnostics preserved in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; direct conditional, explicit narrowed modulo-two value, factored lookup; no filler or steering\"}",
-          "created_at": "2026-10-30T14:08:19Z",
-          "id": 6524804245,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T14:08:19Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b96e0b16b9b757c754e1fa2eac35f9f76b922693d4fb2b04afd455c629f1cc04",
-        "result": {
-          "address": "0x080D2380",
-          "claim_id": 6524624654,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6524804245,
-          "status": "accepted",
-          "who": "sol-2380"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e7f7aa135eeb8f7484c3543b13ddf5bc4282ac0d0f282a0970a5fc6e6b9c194f",
         "acknowledged_cursor": 6524707462,
         "body_provenance": "acceptance-time",
