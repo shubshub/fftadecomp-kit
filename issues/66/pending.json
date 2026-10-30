@@ -59,6 +59,38 @@
           "who": "sol-FAA4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3698aa6fa689e67b014171fcbe3ab2202dcd43c8b54f435c10c1f567df94cfcd",
+        "acknowledged_cursor": 6533589403,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3698aa6fa689e67b014171fcbe3ab2202dcd43c8b54f435c10c1f567df94cfcd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08037E28\",\"who\":\"sol-7E28\",\"note\":\"Complete228-byte saved CFG, actual ABI and both mapped data bindings qualified; published explicit addressed-signed-runtime-data-v1 conditional ABI selector\"}",
+          "created_at": "2026-10-30T21:13:54Z",
+          "id": 6533589403,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:13:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4094a92d4fd9ec0a97eee86f6095f90a820a47f2fead520f058cb0fe56214919",
+        "result": {
+          "address": "0x08037E28",
+          "claim_id": 6533589403,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6533589403,
+          "status": "accepted",
+          "who": "sol-7E28"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
