@@ -59,6 +59,102 @@
           "who": "sol-64F8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1669a13744be3e099fd7493d0784329ea65fb17e4ef9138077082b4c1b4a42a9",
+        "acknowledged_cursor": 6526705478,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1669a13744be3e099fd7493d0784329ea65fb17e4ef9138077082b4c1b4a42a9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08121DE4\",\"who\":\"sol-1DE4\",\"note\":\"Batch35 complete20B getter, exact matched1DBC analogue and inverse1DD0 actual u32 field.\"}",
+          "created_at": "2026-10-30T15:34:54Z",
+          "id": 6526683922,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:34:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bb731c9ec35f4c7053175559d389ad6d9b11c596837fe692ccb48b505cbca575",
+        "result": {
+          "address": "0x08121DE4",
+          "claim_id": 6526683922,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526683922,
+          "status": "accepted",
+          "who": "sol-1DE4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "770c70d26d9e5efbafea3c3b7f978f89c988af525490423aafb930daae2df54d",
+        "acknowledged_cursor": 6526705478,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "770c70d26d9e5efbafea3c3b7f978f89c988af525490423aafb930daae2df54d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB388\",\"who\":\"sol-B388\",\"note\":\"Batch37 complete198B guarded constant-return switch, existing native switch profile and matched source analogues.\"}",
+          "created_at": "2026-10-30T15:35:20Z",
+          "id": 6526693564,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:35:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bb731c9ec35f4c7053175559d389ad6d9b11c596837fe692ccb48b505cbca575",
+        "result": {
+          "address": "0x080CB388",
+          "claim_id": 6526693564,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526693564,
+          "status": "accepted",
+          "who": "sol-B388"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a7c8b8d2de946c1fab244ae5607522063f52653e1260ab53be96bda96de54450",
+        "acknowledged_cursor": 6526705478,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a7c8b8d2de946c1fab244ae5607522063f52653e1260ab53be96bda96de54450",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812B340\",\"who\":\"sol-B340\",\"note\":\"Batch35 complete68B two-call wrapper, exact matched22874 analogue, defining seven-argument E458 ABI and mapped pointers.\"}",
+          "created_at": "2026-10-30T15:35:53Z",
+          "id": 6526705478,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:35:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bb731c9ec35f4c7053175559d389ad6d9b11c596837fe692ccb48b505cbca575",
+        "result": {
+          "address": "0x0812B340",
+          "claim_id": 6526705478,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526705478,
+          "status": "accepted",
+          "who": "sol-B340"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
