@@ -30,7 +30,35 @@
           "who": "sol-EE74"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "719922e93d71b622f7d8542dda2b62320fc3b31c846fa834b5ff2f78e70fecbf",
+        "acknowledged_cursor": 6535000869,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "719922e93d71b622f7d8542dda2b62320fc3b31c846fa834b5ff2f78e70fecbf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0808EE74\",\"who\":\"sol-EE74\",\"claim_id\":6534943825,\"reason\":\"One naturalform compiled60B versus64B owner; observed42iteration loop equivalent, remaining bound register/literal allocation lacks grounded operation correction; honestParked\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural form and one unchanged-source diagnostic\"}",
+          "created_at": "2026-10-30T22:39:22Z",
+          "id": 6535000869,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T22:39:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "15866bad3de0c87ebd2f31f978a1f5ecacea55ca95230b6d25d8e34f89c39d32",
+        "result": {
+          "address": "0x0808EE74",
+          "claim_id": 6534943825,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6535000869,
+          "status": "accepted",
+          "who": "sol-EE74"
+        }
+      }
     }
   ],
   "issue": 66,
