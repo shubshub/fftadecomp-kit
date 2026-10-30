@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "0552ae92566d94e77b6e63a0820767e836226d0a8fd7cdb1c8ae0ef40aa28027",
-        "acknowledged_cursor": 6524525487,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0552ae92566d94e77b6e63a0820767e836226d0a8fd7cdb1c8ae0ef40aa28027",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809B6D0\",\"who\":\"sol-B6D0\",\"note\":\"Batch29 bounded plausible matching; complete span, natural C analogue and actual types captured before claim.\"}",
-          "created_at": "2026-10-30T13:55:16Z",
-          "id": 6524525487,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T13:55:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d7294e0a96c67cf07a3f6dcd180670fa4addce73a7f4b9847842136a46bc19e7",
-        "result": {
-          "address": "0x0809B6D0",
-          "claim_id": 6524525487,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6524525487,
-          "status": "accepted",
-          "who": "sol-B6D0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "b7011d41b3b8a6a84019c3f1f28250a4d807f4e813154a7c7a6cf099f4608956",
-        "acknowledged_cursor": 6524707462,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b7011d41b3b8a6a84019c3f1f28250a4d807f4e813154a7c7a6cf099f4608956",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809B6D0\",\"who\":\"sol-B6D0\",\"claim_id\":6524525487,\"reason\":\"Three bounded natural clamp forms228,234,246B vs238B owner. Final mismatch starts0809B744 and clamp/register transfers differ; last report spans8B beyond owner, no matching-owner claim. Exact238B body, source and diagnostics retained in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; nested clamp, factored clamp and pointer-loop natural forms; no steering\"}",
-          "created_at": "2026-10-30T14:03:40Z",
-          "id": 6524704992,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T14:03:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bb60611696e9e0a205471f06a89efce7867e1719b63ff0f207637cace7d379d7",
-        "result": {
-          "address": "0x0809B6D0",
-          "claim_id": 6524525487,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6524704992,
-          "status": "accepted",
-          "who": "sol-B6D0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "b9bca61f1758786b75273814d5c87874f6c8a9e9ce337781d1288213505536ae",
         "acknowledged_cursor": 6524556835,
         "body_provenance": "acceptance-time",
