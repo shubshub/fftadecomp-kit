@@ -90,6 +90,66 @@
           "who": "sol-5CC0"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "7e92e143d238b69373c1511fca7f0147ecbf6132cc2e84b79c23eb22a86683c1",
+        "acknowledged_cursor": 6526883447,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7e92e143d238b69373c1511fca7f0147ecbf6132cc2e84b79c23eb22a86683c1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D5CC0\",\"who\":\"sol-5CC0\",\"claim_id\":6526807231,\"reason\":\"First native attempt stopped at buffer caller requires exact complete mapped span; no compiled extent or comparison report emitted. Exact C/error preserved.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; one natural274B packed wrapper with actual10argument helper and fixedu16 outputs; exact span gate, no retries\"}",
+          "created_at": "2026-10-30T15:44:00Z",
+          "id": 6526880979,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:44:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c031fec696491f821ee9f13748bacaf2c0badb923b026d364c167e6d4e2a8adb",
+        "result": {
+          "address": "0x080D5CC0",
+          "claim_id": 6526807231,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6526880979,
+          "status": "accepted",
+          "who": "sol-5CC0"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "33a44c91e7742f69442ea5c9831dd9ab0bf877aada7b188bf83f9bd6cc9e4250",
+        "acknowledged_cursor": 6526883447,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "33a44c91e7742f69442ea5c9831dd9ab0bf877aada7b188bf83f9bd6cc9e4250",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08121E1C\",\"who\":\"sol-1E1C\",\"note\":\"Batch37 complete20B getter, newly matched1DE4 getter and inverse1E08 actual u32field8D4.\"}",
+          "created_at": "2026-10-30T15:44:08Z",
+          "id": 6526883447,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:44:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c031fec696491f821ee9f13748bacaf2c0badb923b026d364c167e6d4e2a8adb",
+        "result": {
+          "address": "0x08121E1C",
+          "claim_id": 6526883447,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526883447,
+          "status": "accepted",
+          "who": "sol-1E1C"
+        }
+      },
       "release": null
     }
   ],

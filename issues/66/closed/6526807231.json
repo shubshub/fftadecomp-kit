@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "bbeab3c402415cb4e008e3603b3b0578cdf9c508b60895c14a9e87f930b6b091",
+    "acknowledged_cursor": 6526807231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "bbeab3c402415cb4e008e3603b3b0578cdf9c508b60895c14a9e87f930b6b091",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D5CC0\",\"who\":\"sol-5CC0\",\"note\":\"Batch37 complete274B packed header wrapper, matchedD5E80 analogue and actual defining10arg helper with fixedu16 outputs.\"}",
+      "created_at": "2026-10-30T15:40:31Z",
+      "id": 6526807231,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:40:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "aa51ef709f9041967ed01627ec67e1c33b11b4c50915d907ce23df1b494cd068",
+    "result": {
+      "address": "0x080D5CC0",
+      "claim_id": 6526807231,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6526807231,
+      "status": "accepted",
+      "who": "sol-5CC0"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7e92e143d238b69373c1511fca7f0147ecbf6132cc2e84b79c23eb22a86683c1",
+    "acknowledged_cursor": 6526883447,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7e92e143d238b69373c1511fca7f0147ecbf6132cc2e84b79c23eb22a86683c1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D5CC0\",\"who\":\"sol-5CC0\",\"claim_id\":6526807231,\"reason\":\"First native attempt stopped at buffer caller requires exact complete mapped span; no compiled extent or comparison report emitted. Exact C/error preserved.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; one natural274B packed wrapper with actual10argument helper and fixedu16 outputs; exact span gate, no retries\"}",
+      "created_at": "2026-10-30T15:44:00Z",
+      "id": 6526880979,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T15:44:00Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c031fec696491f821ee9f13748bacaf2c0badb923b026d364c167e6d4e2a8adb",
+    "result": {
+      "address": "0x080D5CC0",
+      "claim_id": 6526807231,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6526880979,
+      "status": "accepted",
+      "who": "sol-5CC0"
+    }
+  }
+}
