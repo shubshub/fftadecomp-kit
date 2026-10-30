@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9ad4a82980ffaa4674615bfa8587711c78e213e1ed41c2b9fea741bd74831fbb",
+    "acknowledged_cursor": 6522440878,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9ad4a82980ffaa4674615bfa8587711c78e213e1ed41c2b9fea741bd74831fbb",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DD50C\",\"who\":\"sol-D50C\",\"note\":\"Sol isolated complete-function matching, evidence-backed conditional getter, existing CFG profile only.\"}",
+      "created_at": "2026-10-30T12:09:27Z",
+      "id": 6522440878,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:09:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "104c89ae7ce9491e38284ae92c4602b40c0e34048e072647ab34a85db7707f66",
+    "result": {
+      "address": "0x080DD50C",
+      "claim_id": 6522440878,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522440878,
+      "status": "accepted",
+      "who": "sol-D50C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7e07f6c52b4d2ac5fd81ecf4639ca4502bfc7ce1139e79ec336c0bed67d48b74",
+    "acknowledged_cursor": 6522535283,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7e07f6c52b4d2ac5fd81ecf4639ca4502bfc7ce1139e79ec336c0bed67d48b74",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DD50C\",\"who\":\"sol-D50C\",\"claim_id\":6522440878,\"reason\":\"Complete32-byte signed conditional getter MATCH on third natural candidate, plausible source; failed candidates retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:13:02Z",
+      "id": 6522535283,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:13:02Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8ea9de5f1fa94f5177aa56792de4654f2a4918423fe35993f0bd26d026a4daeb",
+    "result": {
+      "address": "0x080DD50C",
+      "claim_id": 6522440878,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522535283,
+      "status": "accepted",
+      "who": "sol-D50C"
+    }
+  }
+}
