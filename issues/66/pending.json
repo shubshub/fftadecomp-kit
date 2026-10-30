@@ -91,6 +91,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b45fa23db88a018fff829c495e640a57ec0b23f58fe3ed9de6630c6d47d17f5b",
+        "acknowledged_cursor": 6523256306,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b45fa23db88a018fff829c495e640a57ec0b23f58fe3ed9de6630c6d47d17f5b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080131A4\",\"who\":\"sol-31A4\",\"note\":\"Native plausible C matching of larger mapped state/record operation\"}",
+          "created_at": "2026-10-30T12:50:29Z",
+          "id": 6523256140,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:50:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4b4b04e4e4103ac2c68dfb8bcdf4e8ece70f86593ae176565a4e2f3ec80a5748",
+        "result": {
+          "address": "0x080131A4",
+          "claim_id": 6523256140,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6523256140,
+          "status": "accepted",
+          "who": "sol-31A4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "96eb1395f4d93bcd496f2edf1afcc5b5cc98c5d060773588141c9a2eb02e3a02",
+        "acknowledged_cursor": 6523256306,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "96eb1395f4d93bcd496f2edf1afcc5b5cc98c5d060773588141c9a2eb02e3a02",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C15DC\",\"who\":\"sol-15DC\",\"note\":\"Native plausible C matching of larger mapped state/record operation\"}",
+          "created_at": "2026-10-30T12:50:29Z",
+          "id": 6523256232,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:50:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4b4b04e4e4103ac2c68dfb8bcdf4e8ece70f86593ae176565a4e2f3ec80a5748",
+        "result": {
+          "address": "0x080C15DC",
+          "claim_id": 6523256232,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6523256232,
+          "status": "accepted",
+          "who": "sol-15DC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "50ecf0f1d71880cdaf3cda99680e8f4210b2bf50e54b6df8411e0e88df7d3186",
+        "acknowledged_cursor": 6523256306,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "50ecf0f1d71880cdaf3cda99680e8f4210b2bf50e54b6df8411e0e88df7d3186",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080376F4\",\"who\":\"sol-76F4\",\"note\":\"Native plausible C matching of larger mapped state/record operation\"}",
+          "created_at": "2026-10-30T12:50:29Z",
+          "id": 6523256306,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:50:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4b4b04e4e4103ac2c68dfb8bcdf4e8ece70f86593ae176565a4e2f3ec80a5748",
+        "result": {
+          "address": "0x080376F4",
+          "claim_id": 6523256306,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6523256306,
+          "status": "accepted",
+          "who": "sol-76F4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
