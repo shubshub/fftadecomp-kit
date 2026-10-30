@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e9a2477e831ac9172f9bae5a8acb8e96ad0d1c8f39fb05b30b822b5dcbe8786d",
+    "acknowledged_cursor": 6522398718,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e9a2477e831ac9172f9bae5a8acb8e96ad0d1c8f39fb05b30b822b5dcbe8786d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CCBFC\",\"who\":\"sol-CBFC\",\"note\":\"Sol isolated complete-function C matching; existing conditional CFG/direct-call profiles, no compiler steering.\"}",
+      "created_at": "2026-10-30T12:07:56Z",
+      "id": 6522398718,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:07:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c88872b4de9f4c16320b3a16dd740cc5df81536d7e823fbec30b7892f0e5d1ab",
+    "result": {
+      "address": "0x080CCBFC",
+      "claim_id": 6522398718,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522398718,
+      "status": "accepted",
+      "who": "sol-CBFC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "771cb1fbeae4bbb51f44ae5f91a3533beb38a1cc01be567aa950691553446bd4",
+    "acknowledged_cursor": 6522581767,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "771cb1fbeae4bbb51f44ae5f91a3533beb38a1cc01be567aa950691553446bd4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CCBFC\",\"who\":\"sol-CBFC\",\"claim_id\":6522398718,\"reason\":\"Complete32-byte conditional function MATCH, plausible source; all natural candidates and exact successful source/report/runtime receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:14:53Z",
+      "id": 6522581717,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:14:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e53fc1e2f595b8f86a2bd167c21a3765b1c6ca303b9c7a2b000484495f7e95d0",
+    "result": {
+      "address": "0x080CCBFC",
+      "claim_id": 6522398718,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522581717,
+      "status": "accepted",
+      "who": "sol-CBFC"
+    }
+  }
+}
