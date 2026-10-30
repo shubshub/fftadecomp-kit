@@ -59,6 +59,102 @@
           "who": "sol-1C98"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "216df43e2a6c9313e0eb70ac60eb047ced4f577c0704e5a0221e77f3360c037a",
+        "acknowledged_cursor": 6521992487,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "216df43e2a6c9313e0eb70ac60eb047ced4f577c0704e5a0221e77f3360c037a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDBAC\",\"who\":\"sol-DBAC\",\"note\":\"Sol isolated complete-function matching under existing typed data and direct call profiles.\"}",
+          "created_at": "2026-10-30T11:52:00Z",
+          "id": 6521992432,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:52:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "50a27ee035ed70c5addfc3c7838416854b94f8d7294c0e89a897a504cffae67f",
+        "result": {
+          "address": "0x080BDBAC",
+          "claim_id": 6521992432,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521992432,
+          "status": "accepted",
+          "who": "sol-DBAC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0e6a39cff88818034ca302174f734dc2c237ff584c6e6acd4cb8673ecb9cb00b",
+        "acknowledged_cursor": 6521992487,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0e6a39cff88818034ca302174f734dc2c237ff584c6e6acd4cb8673ecb9cb00b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08133988\",\"who\":\"sol-3988\",\"note\":\"Sol isolated complete-function matching under existing typed data and direct call profiles.\"}",
+          "created_at": "2026-10-30T11:52:01Z",
+          "id": 6521992464,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:52:01Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "50a27ee035ed70c5addfc3c7838416854b94f8d7294c0e89a897a504cffae67f",
+        "result": {
+          "address": "0x08133988",
+          "claim_id": 6521992464,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521992464,
+          "status": "accepted",
+          "who": "sol-3988"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d1e659ad9e9ccafa5b39b0d0a54b8d8012194b9f1ba18d7eaef5d7c9e1c94a9d",
+        "acknowledged_cursor": 6521992487,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d1e659ad9e9ccafa5b39b0d0a54b8d8012194b9f1ba18d7eaef5d7c9e1c94a9d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804C9E4\",\"who\":\"sol-C9E4\",\"note\":\"Sol isolated complete-function matching under existing typed data and direct call profiles.\"}",
+          "created_at": "2026-10-30T11:52:01Z",
+          "id": 6521992487,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:52:01Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "50a27ee035ed70c5addfc3c7838416854b94f8d7294c0e89a897a504cffae67f",
+        "result": {
+          "address": "0x0804C9E4",
+          "claim_id": 6521992487,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521992487,
+          "status": "accepted",
+          "who": "sol-C9E4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
