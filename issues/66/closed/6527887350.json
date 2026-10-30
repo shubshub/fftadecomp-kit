@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e0619b2cedcd06619128fd5826e0c7d92060abd0e194602e41aeeb1fd79a67ba",
+    "acknowledged_cursor": 6527887350,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e0619b2cedcd06619128fd5826e0c7d92060abd0e194602e41aeeb1fd79a67ba",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813347C\",\"who\":\"sol-347C\",\"note\":\"Complete80B conditionalflags typedhelper wrapper candidate-reservation45\"}",
+      "created_at": "2026-10-30T16:30:21Z",
+      "id": 6527887350,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:30:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6b93d2db519f4b83f07e9f79d756411aa7fd640c5cdc323153ec0c1dc07475b2",
+    "result": {
+      "address": "0x0813347C",
+      "claim_id": 6527887350,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6527887350,
+      "status": "accepted",
+      "who": "sol-347C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4054f7a431268891d0058d37a48144873d88c86f22b0d98f1a62d5a4fa6696ea",
+    "acknowledged_cursor": 6527943501,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4054f7a431268891d0058d37a48144873d88c86f22b0d98f1a62d5a4fa6696ea",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813347C\",\"who\":\"sol-347C\",\"claim_id\":6527887350,\"reason\":\"First native plausible complete80B/31instruction MATCH, naturalflags wrapper; proof frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T16:33:00Z",
+      "id": 6527943501,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:33:00Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3a7f19ccce1a312e735d2054949e99e5739bc84fcfde6fe2b7d1268e42c0ae05",
+    "result": {
+      "address": "0x0813347C",
+      "claim_id": 6527887350,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6527943501,
+      "status": "accepted",
+      "who": "sol-347C"
+    }
+  }
+}
