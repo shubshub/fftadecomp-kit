@@ -30,7 +30,35 @@
           "who": "sol-1920"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a10064e0741b2f5957311c5167f330bb2f7edafed039aaccdc8b362c38aedbac",
+        "acknowledged_cursor": 6525704645,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a10064e0741b2f5957311c5167f330bb2f7edafed039aaccdc8b362c38aedbac",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C1920\",\"who\":\"sol-1920\",\"claim_id\":6525547585,\"reason\":\"Three natural predicate forms parked. Plausible96-byte candidate differs in real branch joins and literal placement;104-byte result form exceeds actual96-byte owner.\",\"unmatchable\":true,\"tried\":\"Actual s32 helper ABI with explicit low-u8 conversion; early-return, nested-positive and explicit-result forms, default native profile. No exact byte match; best full96B candidate retained with native evidence.\"}",
+          "created_at": "2026-10-30T14:51:20Z",
+          "id": 6525684464,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:51:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9517cf249ac7fe26e98de18abff2e6e51efad4fcc3ca4deaf9cd943d622da06f",
+        "result": {
+          "address": "0x080C1920",
+          "claim_id": 6525547585,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6525684464,
+          "status": "accepted",
+          "who": "sol-1920"
+        }
+      }
     },
     {
       "claim": {
@@ -91,6 +119,70 @@
           "who": "sol-8084"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ee8c8a2299161d445905a3ec58753e709016110a0bec2d24d1ae772fd34de4d1",
+        "acknowledged_cursor": 6525704645,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ee8c8a2299161d445905a3ec58753e709016110a0bec2d24d1ae772fd34de4d1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081480C4\",\"who\":\"sol-80C4\",\"note\":\"Natural clamped constructor wrapper with defining six-argument helper ABI and first-attempt matched neighbor.\"}",
+          "created_at": "2026-10-30T14:52:15Z",
+          "id": 6525704313,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:52:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9517cf249ac7fe26e98de18abff2e6e51efad4fcc3ca4deaf9cd943d622da06f",
+        "result": {
+          "address": "0x081480C4",
+          "claim_id": 6525704313,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525704313,
+          "status": "accepted",
+          "who": "sol-80C4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "90d6e8addaf8b3c65545111e21ccc8ab6ee8afd586c1d5b645e30a99b912db81",
+        "acknowledged_cursor": 6525704645,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "90d6e8addaf8b3c65545111e21ccc8ab6ee8afd586c1d5b645e30a99b912db81",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08088FEC\",\"who\":\"sol-8FEC\",\"note\":\"Natural finite record navigation with defining writer ABI and concrete adjacent same-layout matches.\"}",
+          "created_at": "2026-10-30T14:52:16Z",
+          "id": 6525704645,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:52:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9517cf249ac7fe26e98de18abff2e6e51efad4fcc3ca4deaf9cd943d622da06f",
+        "result": {
+          "address": "0x08088FEC",
+          "claim_id": 6525704645,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525704645,
+          "status": "accepted",
+          "who": "sol-8FEC"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
