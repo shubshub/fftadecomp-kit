@@ -59,6 +59,38 @@
           "who": "sol-69D8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "UNPROVEN",
+        "acknowledged_cursor": 6525122997,
+        "body_provenance": "snapshot-at-archive",
+        "body_sha256": "beaf5543826269184e43f6cbbddb4d88f89755d39a396d720cfb73373c630ab7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813BB04\",\"who\":\"sol-BB04\",\"note\":\"Batch31 bounded plausible matching; complete180B copy/metadata routine with actual defining caller signature and full helper ABI evidence retained.\"}",
+          "created_at": "2026-10-30T14:24:11Z",
+          "id": 6525122997,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:24:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "72f9490196d4fd29cbd1669df327808fc66d1b78843ee151b437712fa41fd5e4",
+        "result": {
+          "address": "0x0813BB04",
+          "claim_id": 6525122997,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525122997,
+          "status": "accepted",
+          "who": "sol-BB04"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
