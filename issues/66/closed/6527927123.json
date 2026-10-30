@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "798b589a76afe134e79829bdeb989f278d440875cce821d54a1f8a9d06f9d607",
+    "acknowledged_cursor": 6527943501,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "798b589a76afe134e79829bdeb989f278d440875cce821d54a1f8a9d06f9d607",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CC788\",\"who\":\"sol-C788\",\"note\":\"Complete68B naturalC target with grounded true ABI and retained native analogue candidate-next.json\"}",
+      "created_at": "2026-10-30T16:32:12Z",
+      "id": 6527927123,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:32:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3a7f19ccce1a312e735d2054949e99e5739bc84fcfde6fe2b7d1268e42c0ae05",
+    "result": {
+      "address": "0x080CC788",
+      "claim_id": 6527927123,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6527927123,
+      "status": "accepted",
+      "who": "sol-C788"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4299c7d3cd5651cb708b43620d44785d8fbc72cf08147e03b99944b97a4427e7",
+    "acknowledged_cursor": 6527990237,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4299c7d3cd5651cb708b43620d44785d8fbc72cf08147e03b99944b97a4427e7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CC788\",\"who\":\"sol-C788\",\"claim_id\":6527927123,\"reason\":\"Native signed remainder caller exact complete mapped ROM bytes refusal before comparison; no retry.\",\"unmatchable\":true,\"tried\":\"one natural five-u16 initializer trueu32 RNG signed16 remainder376; default -O2; precise native refusal\"}",
+      "created_at": "2026-10-30T16:34:46Z",
+      "id": 6527979910,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:34:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d2771feab5dde22b0d96c93f0bc984c3a9364bb5a393fd85692587dba2756280",
+    "result": {
+      "address": "0x080CC788",
+      "claim_id": 6527927123,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6527979910,
+      "status": "accepted",
+      "who": "sol-C788"
+    }
+  }
+}

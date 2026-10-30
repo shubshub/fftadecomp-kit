@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "4cba19a8ca9ab96377f85b4c1f6c26dd64ef305f01eee0a865d560330e8b0a00",
+    "acknowledged_cursor": 6527943501,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4cba19a8ca9ab96377f85b4c1f6c26dd64ef305f01eee0a865d560330e8b0a00",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A340\",\"who\":\"sol-A340\",\"note\":\"Complete44B naturalC target with grounded true ABI and retained native analogue candidate-checkpoint.json\"}",
+      "created_at": "2026-10-30T16:32:11Z",
+      "id": 6527926971,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:32:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3a7f19ccce1a312e735d2054949e99e5739bc84fcfde6fe2b7d1268e42c0ae05",
+    "result": {
+      "address": "0x0809A340",
+      "claim_id": 6527926971,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6527926971,
+      "status": "accepted",
+      "who": "sol-A340"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b8836b4a49cc19ad9136d3eb014b10d9017e6e2ef88ef9eb11decdf74795e125",
+    "acknowledged_cursor": 6527990237,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b8836b4a49cc19ad9136d3eb014b10d9017e6e2ef88ef9eb11decdf74795e125",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A340\",\"who\":\"sol-A340\",\"claim_id\":6527926971,\"reason\":\"Firstnative plausible complete44B/21instruction localbyte output wrapperMATCH, proof frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T16:34:46Z",
+      "id": 6527979977,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:34:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d2771feab5dde22b0d96c93f0bc984c3a9364bb5a393fd85692587dba2756280",
+    "result": {
+      "address": "0x0809A340",
+      "claim_id": 6527926971,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6527979977,
+      "status": "accepted",
+      "who": "sol-A340"
+    }
+  }
+}
