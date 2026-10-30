@@ -32,7 +32,7 @@ try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
                           CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_LR,
-                                    ARM_REG_PC, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
+                                    ARM_REG_PC, ARM_REG_SP, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG)
 except ImportError:
     sys.exit("analyze.py needs capstone:  python -m pip install capstone")
 
@@ -153,8 +153,13 @@ class Decoder:
         return d
 
 
-def refinement_boundaries(functions, rom_end=CODE_END):
+def refinement_boundaries(functions, rom_end=CODE_END, *, full_rom_inventory=False):
     """Validate indexed starts, ignoring their provisional end addresses."""
+    if type(full_rom_inventory) is not bool:
+        raise ValueError("full-ROM inventory opt-in must be Boolean")
+    code_end = 0x09000000 if full_rom_inventory else CODE_END
+    if full_rom_inventory:
+        rom_end = min(rom_end, code_end)
     if not isinstance(functions, list):
         raise ValueError("function index must be a list")
     starts = {}
@@ -171,7 +176,7 @@ def refinement_boundaries(functions, rom_end=CODE_END):
         if mode not in ("arm", "thumb"):
             problems.add("invalid mode")
             mode = None
-        if not ROM_BASE + HEADER_LEN <= address < CODE_END:
+        if not ROM_BASE + HEADER_LEN <= address < code_end:
             problems.add("outside code region")
         if not ROM_BASE <= address or address + (4 if mode == "arm" else 2) > rom_end:
             problems.add("outside ROM")
@@ -194,13 +199,180 @@ def refinement_ranges(intervals):
     return ranges
 
 
-def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
-                    rom_end=CODE_END):
-    """Inspect a byte window beginning at an indexed Thumb entry.
+def refinement_word_switch(data, address, position, end, engine, *,
+                           same_owner_long_branches=False, one_object_word_switch=False,
+                           two_constant_word_switch=False, one_numeric_word_switch=False):
+    """Recognize one adjacent guarded word table within the bounded window.
 
+    This reuses the byte-exact matching parser, without inventing ELF relocation
+    provenance. The enclosing CFG must separately prove the guard predecessors.
+    """
+    if type(one_numeric_word_switch) is not bool or one_numeric_word_switch and (
+            one_object_word_switch or two_constant_word_switch):
+        raise ValueError('numeric switch requires an isolated Boolean layout opt-in')
+    dispatch = position - address - 8
+    if dispatch < 0:
+        return None
+
+    def instruction(offset):
+        if offset < 0 or offset % 2 or address + offset + 2 > end:
+            return None
+        decoded = next(engine.disasm(data[offset:offset + 4], address + offset,
+                                     count=1), None)
+        return decoded if decoded is not None and decoded.size == 2 else None
+
+    load = instruction(dispatch + 2)
+    if load is None or load.mnemonic != "ldr" or len(load.operands) != 2 or \
+            load.operands[1].type != ARM_OP_MEM or \
+            load.operands[1].mem.base != ARM_REG_PC:
+        return None
+    literal = (((address + dispatch + 6) & ~3) + load.operands[1].mem.disp) - address
+    candidates = []
+    for guard_size in ((4, 6, 8) if same_owner_long_branches else (4, 6)):
+        compare = instruction(dispatch - guard_size)
+        if compare is None or compare.mnemonic != "cmp" or \
+                len(compare.operands) != 2 or compare.operands[1].type != ARM_OP_IMM or \
+                not 0 <= compare.operands[1].imm <= 255:
+            continue
+        count = compare.operands[1].imm + 1
+        table_end = literal + 4 + count * 4
+        if literal < dispatch + 10 or (address + literal) % 4 or \
+                address + table_end > end:
+            continue
+        relocations = {offset: struct.unpack_from("<I", data, offset)[0] - address
+                       for offset in range(literal, table_end, 4)}
+        from match import switch_layout
+        for interposed_words in (0, 5):
+            if interposed_words and guard_size != 6:
+                continue
+            try:
+                descriptor = switch_layout(data[:end - address], address, relocations,
+                                           interposed_words=interposed_words)
+            except ValueError:
+                continue
+            if descriptor["dispatch"] == dispatch and \
+                    descriptor["comparison"] == dispatch - guard_size:
+                if interposed_words:
+                    descriptor["interposed_words"] = interposed_words
+                candidates.append(descriptor)
+        if two_constant_word_switch:
+            from switch_constants_profile import layout as constants_layout
+            try:
+                descriptor = constants_layout(data[:end - address], address, relocations)
+            except ValueError:
+                pass
+            else:
+                if descriptor['dispatch'] == dispatch and descriptor['comparison'] == dispatch - guard_size:
+                    descriptor['interposed_words'] = 2
+                    candidates.append(descriptor)
+        if (one_object_word_switch or one_numeric_word_switch) and literal >= 4:
+            object_word = literal - 4
+            value = struct.unpack_from("<I", data, object_word)[0]
+            try:
+                descriptor = switch_layout(data[:end - address], address, relocations,
+                    {object_word: ("inventory_numeric_word" if one_numeric_word_switch
+                                   else "inventory_object_word", value)})
+            except ValueError:
+                continue
+            if descriptor["dispatch"] == dispatch and descriptor["comparison"] == dispatch - guard_size:
+                descriptor["interposed_words"] = 1
+                candidates.append(descriptor)
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def refinement_arm_instruction(instruction):
+    """Classify a conservative ARMv4T subset, without resolving indirect edges.
+
+    Raw encoding checks exclude extension/system instructions even when the
+    decoder recognizes a newer architecture. Return forms are syntactic only.
+    """
+    word = int.from_bytes(instruction.bytes, "little")
+    conditional = word >> 28 != 14
+    result = {"kind": "ordinary", "conditional": conditional, "literal": None}
+
+    def reject(reason):
+        return {**result, "reason": reason}
+
+    if instruction.size != 4 or word >> 28 == 15:
+        return reject("unsupported ARM encoding or cross-mode transfer")
+    if word & 0x0E000000 == 0x0A000000:
+        displacement = (word & 0xFFFFFF) << 2
+        if displacement & 0x02000000:
+            displacement -= 0x04000000
+        return {**result, "kind": "call" if word & 0x01000000 else "branch",
+                "target": instruction.address + 8 + displacement}
+    if word & 0x0FFFFFF0 == 0x012FFF10:
+        if word & 15 == 14:
+            return {**result, "kind": "return"}
+        return reject("unresolved or cross-mode ARM transfer")
+    if word & 0x0FFFFFF0 == 0x012FFF30:
+        return reject("unsupported cross-mode transfer")
+    if word & 0x0FFFFFFF == 0x01A0F00E or (
+            word & 0x0FFF0000 == 0x08BD0000 and word & 0x8000 and not word & 0x2000):
+        return {**result, "kind": "return"}
+
+    name = instruction.insn_name()
+    data_names = {"adc", "add", "and", "asr", "bic", "cmn", "cmp", "eor",
+                  "lsl", "lsr", "mov", "mvn", "orr", "ror", "rrx", "rsb",
+                  "rsc", "sbc", "sub", "teq", "tst"}
+    test_opcode = (word >> 21) & 15 in (8, 9, 10, 11)
+    data_encoding = word & 0x0C000000 == 0 and (
+        word & 0x02000000 or word & 0x90 != 0x90) and (
+        not test_opcode or word & 0x00100000 and not word & 0x0000F000)
+    multiply = name in {"mul", "mla"} and word & 0x0FC000F0 == 0x00000090
+    transfer = name in {"ldr", "ldrb", "str", "strb"} and \
+        word & 0x0C000000 == 0x04000000 and (not word & 0x02000000 or not word & 0x10)
+    halfword = name in {"ldrh", "ldrsb", "ldrsh", "strh"} and \
+        word & 0x0E000090 == 0x00000090
+    multiple = name in {"ldm", "ldmda", "ldmdb", "ldmib", "pop", "push",
+                        "stm", "stmda", "stmdb", "stmib"} and \
+        word & 0x0E400000 == 0x08000000
+    if not (name in data_names and data_encoding or multiply or transfer or halfword or multiple):
+        return reject("unsupported ARM instruction")
+    if multiple:
+        registers = word & 0xFFFF
+        base = 1 << ((word >> 16) & 15)
+        # ARMv4T STM stores the original base only when it is the lowest
+        # listed register. LDM/base writeback and other STM overlaps stay out.
+        stores_base_first = not word & 0x00100000 and registers & -registers == base
+        if not registers or word & 0x00200000 and registers & base and not stores_base_first:
+            return reject("unsupported ARM register-list writeback")
+    try:
+        reads, writes = instruction.regs_access()
+    except Exception:
+        return reject("unavailable ARM register access")
+    operands = instruction.operands
+    if ARM_REG_PC in writes or any(operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC
+                                   for operand in operands[:1]):
+        return reject("unsupported ARM PC write")
+    # Only an immediate, preindexed word read with no writeback owns a literal.
+    if transfer and name == "ldr" and word & 0x0F7F0000 == 0x051F0000:
+        displacement = word & 0xFFF
+        if not word & 0x00800000:
+            displacement = -displacement
+        return {**result, "literal": instruction.address + 8 + displacement}
+    if ARM_REG_PC in reads or any(
+            operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC or
+            operand.type == ARM_OP_MEM and ARM_REG_PC in (operand.mem.base, operand.mem.index)
+            for operand in operands):
+        return reject("unsupported ARM PC read")
+    return result
+
+
+def refine_function(data, address, functions, max_bytes=4096, max_instructions=1024,
+                    rom_end=CODE_END, *, stack_adjusted_returns=False,
+                    same_owner_long_branches=False, full_rom_inventory=False,
+                    arm_inventory=False, one_object_word_switch=False,
+                    two_constant_word_switch=False, one_numeric_word_switch=False):
+    """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
+
+    The opt-in local-long-branch discovery still grants no ABI or match admission;
+    its complete CFG must pass the existing restoring-frame proof separately.
     Closure is structural, assuming ordinary calls return to their continuation
     and syntactic ABI return forms terminate the path. It is not a return-value,
     stack-safety, exact-symbol, or exhaustive-inventory proof.
+    Full-ROM inventory only extends the diagnostic address ceiling, bounded by
+    the supplied ROM end and the original 16 MiB image, never its mirrors.
     """
     result = {
         "profile": "bounded-thumb-cfg-inventory-v1",
@@ -217,6 +389,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         "instrs": 0,
         "code_ranges": [],
         "literal_ranges": [],
+        "literal_reads": [],
+        "word_switches": [],
         "gaps": [],
         "calls": [],
         "returns": [],
@@ -227,7 +401,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     def fail(reason, position=None):
         reasons.add(reason if position is None else f"{reason} at 0x{position:08X}")
 
-    if type(address) is not int or address % 2 or not ROM_BASE + HEADER_LEN <= address < CODE_END:
+    code_end = 0x09000000 if full_rom_inventory is True else CODE_END
+    if type(address) is not int or address % 2 or not ROM_BASE + HEADER_LEN <= address < code_end:
         fail("invalid entry address")
     if not isinstance(data, (bytes, bytearray)):
         fail("window must contain bytes")
@@ -236,11 +411,29 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("budgets must be positive integers")
     if type(rom_end) is not int or rom_end < ROM_BASE:
         fail("invalid ROM end")
+    if type(same_owner_long_branches) is not bool:
+        fail("local long-branch inventory opt-in must be Boolean")
+    if type(full_rom_inventory) is not bool:
+        fail("full-ROM inventory opt-in must be Boolean")
+    if type(arm_inventory) is not bool:
+        fail("ARM inventory opt-in must be Boolean")
+    if type(one_object_word_switch) is not bool:
+        fail("one-object-word switch inventory opt-in must be Boolean")
+    if type(two_constant_word_switch) is not bool:
+        fail("two-constant-word switch inventory opt-in must be Boolean")
+    if type(one_numeric_word_switch) is not bool:
+        fail("one-numeric-word switch inventory opt-in must be Boolean")
+    if one_numeric_word_switch and (one_object_word_switch or two_constant_word_switch):
+        fail("numeric switch opt-in cannot combine object or two-constant layouts")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
     try:
-        starts, index_issues = refinement_boundaries(functions, rom_end)
+        if full_rom_inventory:
+            rom_end = min(rom_end, code_end)
+            result["full_rom_inventory"] = True
+        starts, index_issues = refinement_boundaries(
+            functions, rom_end, full_rom_inventory=full_rom_inventory)
     except ValueError as error:
         fail(f"invalid function index: {error}")
         starts = {}
@@ -255,16 +448,16 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("entry is not indexed")
     elif address in index_issues:
         fail("invalid indexed entry: " + ", ".join(sorted(index_issues[address])))
-    elif starts[address] != "thumb":
+    elif starts[address] != "thumb" and not arm_inventory:
         fail("unsupported ARM entry")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
     previous_start = max((start for start in starts if ROM_BASE + HEADER_LEN <= start < address),
                          default=None)
-    next_start = min((start for start in starts if address < start < CODE_END), default=CODE_END)
+    next_start = min((start for start in starts if address < start < code_end), default=code_end)
     limits = {"provided window": address + len(data), "byte budget": address + max_bytes,
-              "indexed boundary": next_start, "code boundary": CODE_END, "ROM boundary": rom_end}
+              "indexed boundary": next_start, "code boundary": code_end, "ROM boundary": rom_end}
     end = min(limits.values())
     result["window"] = {
         "start": f"0x{address:08X}",
@@ -279,7 +472,13 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
-    engine = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    arm_mode = starts[address] == "arm"
+    alignment = 4 if arm_mode else 2
+    if arm_mode:
+        result["profile"] = "bounded-arm-cfg-inventory-v1"
+        result["call_policy"] = "indexed direct ARM calls; continuation only"
+        result["return_policy"] = "syntactic ARM bx lr/mov pc,lr/pop pc; no stack-safety proof"
+    engine = Cs(CS_ARCH_ARM, CS_MODE_ARM if arm_mode else CS_MODE_THUMB)
     engine.detail = True
     engine.skipdata = False
     supported = {
@@ -296,15 +495,23 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     owners = {}
     literals = set()
     literal_bytes = set()
+    literal_reads = {}
     calls = set()
     returns = set()
+    edges = set()
+    switches = {}
+
+    def follow(source, target, previous_pop=()):
+        edges.add((source, target))
+        pending.append((target, previous_pop))
+
     while pending:
         position, previous_pop = pending.pop()
         state = (position, previous_pop)
         if state in visited:
             continue
         visited.add(state)
-        if position % 2 or not address <= position or position + 2 > end:
+        if position % alignment or not address <= position or position + alignment > end:
             fail("control-flow boundary escape", position)
             continue
         if position in literal_bytes:
@@ -336,6 +543,51 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             continue
         instructions[position] = size
         owners.update((byte, position) for byte in occupied)
+        if arm_mode:
+            arm = refinement_arm_instruction(instruction)
+            if "reason" in arm:
+                fail(arm["reason"], position)
+                continue
+            literal = arm["literal"]
+            if literal is not None:
+                inside = literal % 4 == 0 and address <= literal and literal + 4 <= end
+                literal_reads[position] = {
+                    "site": f"0x{position:08X}", "address": f"0x{literal:08X}",
+                    "size": 4, "inside_window": inside,
+                }
+                if literal % 4:
+                    fail("unaligned ARM literal", position)
+                elif not inside:
+                    fail("literal outside window", position)
+                else:
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
+            if arm["kind"] == "return":
+                returns.add(position)
+                if arm["conditional"]:
+                    follow(position, position + size)
+            elif arm["kind"] == "branch":
+                follow(position, arm["target"])
+                if arm["conditional"]:
+                    follow(position, position + size)
+            elif arm["kind"] == "call":
+                target = arm["target"]
+                if address <= target < end:
+                    fail("ambiguous local ARM BL", position)
+                elif target not in starts:
+                    fail("unmapped ARM call target", position)
+                elif target in index_issues:
+                    fail("ambiguous ARM call target", position)
+                elif starts[target] != "arm":
+                    fail("unsupported cross-mode ARM call", position)
+                else:
+                    calls.add((position, target))
+                follow(position, position + size)
+            else:
+                follow(position, position + size)
+            continue
         if instruction.mnemonic == "blx":
             fail("unsupported cross-mode transfer", position)
             continue
@@ -350,6 +602,10 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 continue
         if info["pcldr"] is not None:
             literal = ((position + 4) & ~3) + info["pcldr"][1]
+            literal_reads[position] = {
+                "site": f"0x{position:08X}", "address": f"0x{literal:08X}",
+                "size": 4, "inside_window": address <= literal and literal + 4 <= end,
+            }
             if literal % 4 or not address <= literal or literal + 4 > end:
                 fail("literal outside window", position)
             else:
@@ -357,7 +613,9 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 literal_bytes.update(range(literal, literal + 4))
                 if any(byte in owners for byte in range(literal, literal + 4)):
                     fail("code/literal overlap", literal)
-        popped_return = instruction.mnemonic == "bx" and previous_pop == (info["opreg"],)
+        popped_return = instruction.mnemonic == "bx" and (
+            previous_pop == (info["opreg"],) or stack_adjusted_returns and
+            previous_pop == (info["opreg"], "stack-adjusted"))
         if info["ret"] or popped_return:
             returns.add(position)
             continue
@@ -366,6 +624,15 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
             if target is None:
                 fail("unresolved call", position)
             elif address <= target < end:
+                if same_owner_long_branches:
+                    from local_long_branch_profile import target as local_target
+                    try:
+                        destination = local_target(instruction, address, end)
+                    except ValueError as error:
+                        fail(f"invalid local long branch: {error}", position)
+                    else:
+                        follow(position, destination)
+                    continue
                 fail("ambiguous local BL", position)
             elif target not in starts:
                 fail("unmapped call target", position)
@@ -375,21 +642,85 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                 fail("unsupported cross-mode call", position)
             else:
                 calls.add((position, target))
-            pending.append((position + size, ()))
+            follow(position, position + size)
             continue
         if info["jump"] or info["writes_pc"]:
             if info["tgt"] is None or instruction.mnemonic == "bx":
-                fail("unresolved jump", position)
+                switch = refinement_word_switch(
+                    data, address, position, end, engine,
+                    same_owner_long_branches=same_owner_long_branches,
+                    one_object_word_switch=one_object_word_switch,
+                    two_constant_word_switch=two_constant_word_switch,
+                    one_numeric_word_switch=one_numeric_word_switch)
+                if switch is None:
+                    fail("unresolved jump", position)
+                    continue
+                switches[position] = switch
+                for word in range(switch["literal"] - 4 * switch.get("interposed_words", 0),
+                                  switch["literal"], 4):
+                    literal = address + word
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
+                for word, target in switch["relocations"]:
+                    literal = address + word
+                    literals.add(literal)
+                    literal_bytes.update(range(literal, literal + 4))
+                    if any(byte in owners for byte in range(literal, literal + 4)):
+                        fail("code/literal overlap", literal)
+                    if word != switch["literal"]:
+                        follow(position, address + target)
                 continue
-            pending.append((info["tgt"] + ROM_BASE, ()))
+            follow(position, info["tgt"] + ROM_BASE)
             if info["cond"]:
-                pending.append((position + size, ()))
+                follow(position, position + size)
             continue
         if any(operand.type == ARM_OP_REG and operand.reg == ARM_REG_PC
                for operand in instruction.operands):
             fail("unsupported PC read", position)
             continue
-        pending.append((position + size, info["pop_regs"]))
+        # One explicit runtime ABI spills an argument before saving LR, then
+        # restores that word after popping the return register. This recognizes
+        # only the adjacent pop/add-SP-4/bx shape; the runtime machine-state
+        # proof must separately establish LR provenance and balanced SP.
+        operands = instruction.operands
+        if stack_adjusted_returns and len(previous_pop) == 1 and \
+                instruction.mnemonic == "add" and len(operands) == 2 and \
+                operands[0].type == ARM_OP_REG and operands[0].reg == ARM_REG_SP and \
+                operands[1].type == ARM_OP_IMM and operands[1].imm == 4:
+            previous_pop = (previous_pop[0], "stack-adjusted")
+        else:
+            previous_pop = info["pop_regs"]
+        follow(position, position + size, previous_pop)
+    for position, switch in sorted(switches.items()):
+        comparison, guard, dispatch = (address + switch[field]
+                                       for field in ("comparison", "guard", "dispatch"))
+        # Every instruction after CMP through MOV PC must have exactly its
+        # guarded predecessor. In particular no branch may enter the lookup,
+        # reuse stale flags, or execute MOV PC with a forged target register.
+        expected = {guard: comparison, dispatch: guard}
+        if dispatch - comparison in (6, 8):
+            default_site = guard + 2
+            if dispatch - comparison == 8:
+                if instructions.get(default_site) != 4 or \
+                        {source for source, target in edges if target == default_site} != {guard}:
+                    fail("word-switch long default can be bypassed", position)
+            else:
+                expected[default_site] = guard
+        expected.update({site: site - 2 for site in range(dispatch + 2, position + 2, 2)})
+        if comparison not in instructions or any(
+                instructions.get(site) != 2 or
+                {source for source, target in edges if target == site} != {predecessor}
+                or site == address for site, predecessor in expected.items()):
+            fail("word-switch guard can be bypassed", position)
+        if switch.get("interposed_words"):
+            pool = {address + word for word in range(switch["literal"] - 4 * switch["interposed_words"],
+                                                     switch["literal"], 4)}
+            read_words = {int(read["address"], 16) for read in literal_reads.values()}
+            if not pool <= read_words:
+                fail("interposed switch pool requires every reached word load", position)
+        result["word_switches"].append({"schema": "bounded-guarded-word-switch-v1", **switch})
     if not returns:
         fail("no recognized return")
     code_ranges = refinement_ranges((start, start + size)
@@ -410,6 +741,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                          ("gaps", gaps)):
         result[name] = [[f"0x{start:08X}", f"0x{stop:08X}"] for start, stop in ranges]
     result["instrs"] = len(instructions)
+    result["literal_reads"] = [literal_reads[site] for site in sorted(literal_reads)]
     result["calls"] = [{"site": f"0x{site:08X}", "target": f"0x{target:08X}"}
                        for site, target in sorted(calls)]
     result["returns"] = [f"0x{site:08X}" for site in sorted(returns)]
@@ -420,17 +752,28 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
 
 def refinement_main(arguments):
     """Run read-only, bounded diagnostics without entering normal discovery."""
-    parser = argparse.ArgumentParser(description="Bounded provisional Thumb CFG refinement")
+    parser = argparse.ArgumentParser(description="Bounded provisional CFG refinement")
     parser.add_argument("rom", nargs="?")
     parser.add_argument("root", nargs="?")
     parser.add_argument("--refine-address", type=lambda value: int(value, 0),
                         action="append", required=True)
     parser.add_argument("--refine-max-bytes", type=lambda value: int(value, 0), default=4096)
     parser.add_argument("--refine-max-instructions", type=lambda value: int(value, 0), default=1024)
+    parser.add_argument("--refine-arm-inventory", action="store_true",
+                        help="enable bounded ARMv4T CFG diagnostics; grants no function, "
+                             "ABI, match or inventory-completeness proof")
+    parser.add_argument("--refine-full-rom-inventory", action="store_true",
+                        help="allow diagnostic entries in the original ROM, up to 0x09000000; "
+                             "grants no function, ABI, match or inventory-completeness proof")
     options = parser.parse_args(arguments)
     here = repo_root(options.root)
     rom_path = options.rom or rom_path_default(here)
     output = {"inventory_complete": False, "results": []}
+    code_end = 0x09000000 if options.refine_full_rom_inventory else CODE_END
+    if options.refine_full_rom_inventory:
+        output["full_rom_inventory"] = True
+    if options.refine_arm_inventory:
+        output["arm_inventory"] = True
 
     def unique_object(pairs):
         result = {}
@@ -447,18 +790,23 @@ def refinement_main(arguments):
             functions = json.load(stream, object_pairs_hook=unique_object)
         with open(rom_path, "rb") as stream:
             rom_end = ROM_BASE + os.fstat(stream.fileno()).st_size
-            starts, _ = refinement_boundaries(functions, rom_end)
+            if options.refine_full_rom_inventory:
+                rom_end = min(rom_end, code_end)
+            starts, _ = refinement_boundaries(
+                functions, rom_end, full_rom_inventory=options.refine_full_rom_inventory)
             for address in options.refine_address:
                 data = b""
-                if address in starts and ROM_BASE + HEADER_LEN <= address < min(CODE_END, rom_end):
-                    next_start = min((start for start in starts if address < start < CODE_END),
-                                     default=CODE_END)
-                    end = min(address + options.refine_max_bytes, next_start, CODE_END, rom_end)
+                if address in starts and ROM_BASE + HEADER_LEN <= address < min(code_end, rom_end):
+                    next_start = min((start for start in starts if address < start < code_end),
+                                     default=code_end)
+                    end = min(address + options.refine_max_bytes, next_start, code_end, rom_end)
                     stream.seek(address - ROM_BASE)
                     data = stream.read(end - address)
                 output["results"].append(refine_function(
                     data, address, functions, options.refine_max_bytes,
-                    options.refine_max_instructions, rom_end))
+                    options.refine_max_instructions, rom_end,
+                    full_rom_inventory=options.refine_full_rom_inventory,
+                    arm_inventory=options.refine_arm_inventory))
     except (OSError, ValueError) as error:
         output["error"] = str(error)
         print(json.dumps(output, indent=2))

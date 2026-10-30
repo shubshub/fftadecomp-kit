@@ -44,6 +44,9 @@ MAX_RESULTS = 64
 MAX_ROWS = 256
 MAX_REQUEST_BYTES = 2048
 MAX_BODY_BYTES = 60000
+MAX_ISSUE_COMMENTS = 2500
+COMMENT_CAPACITY_MESSAGE = "Commenting is disabled on issues with more than 2500 comments"
+READ_RETRY_DELAYS = (1, 2)
 HERE = os.path.dirname(os.path.abspath(__file__))
 UNMATCHABLE_DB = os.path.join(HERE, "..", "known-unmatchable.json")
 ROW_FIELDS = {"address", "who", "claimed_at", "last_seen", "note",
@@ -77,17 +80,18 @@ CLAIM_QUERY = """query($owner:String!, $name:String!, $after:String) {
     object(expression:"HEAD:src") { __typename ... on Tree { entries { name type } } }
     pullRequests(first:20, states:OPEN, after:$after) {
       nodes {
-        number title body
-        files(first:100) { nodes { path } pageInfo { hasNextPage endCursor } }
+        number title body state headRefOid
+        headRepository { nameWithOwner }
       }
       pageInfo { hasNextPage endCursor }
     }
   }
 }"""
-PR_FILES_QUERY = """query($owner:String!, $name:String!, $number:Int!, $after:String) {
+PR_HEAD_QUERY = """query($owner:String!, $name:String!, $number:Int!) {
   repository(owner:$owner, name:$name) {
     pullRequest(number:$number) {
-      files(first:100, after:$after) { nodes { path } pageInfo { hasNextPage endCursor } }
+      number state headRefOid
+      headRepository { nameWithOwner }
     }
   }
 }"""
@@ -102,6 +106,10 @@ class Unconfirmed(LedgerError):
 
 
 class GuardUnavailable(LedgerError):
+    pass
+
+
+class CommentCapacityReached(LedgerError):
     pass
 
 
@@ -131,14 +139,34 @@ def api(method, endpoint, payload=None):
     if payload is not None:
         command += ["--input", "-"]
         data = json.dumps(payload)
-    try:
-        result = subprocess.run(command, input=data, capture_output=True,
-                                text=True, timeout=60)
-    except (OSError, subprocess.TimeoutExpired) as error:
-        raise LedgerError(f"GitHub request failed: {error}") from error
-    if result.returncode:
-        raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
-    return decode_json(result.stdout)
+    # Only fixed queries are proven read-only; a GraphQL POST may also mutate.
+    read_only = (method == "GET" and endpoint != "graphql") or (
+        method in ("GET", "POST") and endpoint == "graphql" and
+        isinstance(payload, dict) and set(payload) <= {"query", "variables"} and
+        payload.get("query") in (COMMENTS_QUERY, CLAIM_QUERY, PR_HEAD_QUERY))
+    for attempt in range(len(READ_RETRY_DELAYS) + 1):
+        try:
+            result = subprocess.run(command, input=data, capture_output=True,
+                                    text=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            if read_only and isinstance(error, subprocess.TimeoutExpired) and \
+                    attempt < len(READ_RETRY_DELAYS):
+                time.sleep(READ_RETRY_DELAYS[attempt])
+                continue
+            raise LedgerError(f"GitHub request failed: {error}") from error
+        if result.returncode:
+            if method == "POST" and positive_id(LEDGER_NUMBER) and \
+                    endpoint == f"repos/{KIT_REPO}/issues/{LEDGER_NUMBER}/comments" and \
+                    result.stderr.strip() == f"gh: {COMMENT_CAPACITY_MESSAGE} (HTTP 403)":
+                raise CommentCapacityReached(
+                    "ledger comment capacity reached; no request submitted; maintainer action required")
+            if read_only and attempt < len(READ_RETRY_DELAYS) and re.fullmatch(
+                    r"gh: (?:HTTP (?:502|503|504)|[^\r\n]+ \(HTTP (?:502|503|504)\))",
+                    result.stderr.strip()):
+                time.sleep(READ_RETRY_DELAYS[attempt])
+                continue
+            raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
+        return decode_json(result.stdout)
 
 
 def endpoint(suffix=""):
@@ -224,8 +252,8 @@ def normalise(address):
     if not isinstance(address, str) or not re.fullmatch(r"0[xX][0-9A-Fa-f]{8}", address):
         raise LedgerError("address must be 0x followed by eight hex digits")
     value = int(address, 16)
-    if not 0x08000000 <= value < 0x08150000 or value % 2:
-        raise LedgerError("address must be aligned inside the ROM code region")
+    if not 0x08000000 <= value < 0x09000000 or value % 2:
+        raise LedgerError("address must be halfword-aligned inside the 16 MiB ROM image [0x08000000, 0x09000000)")
     return f"0x{value:08X}"
 
 
@@ -420,6 +448,71 @@ def connection_page(connection):
     return connection["nodes"], after
 
 
+def pull_head(pull):
+    if not isinstance(pull, dict) or pull.get("state") != "OPEN":
+        raise LedgerError("open PR changed during duplicate check")
+    oid, repository = pull.get("headRefOid"), pull.get("headRepository")
+    if not isinstance(oid, str) or re.fullmatch(r"[0-9a-f]{40}", oid) is None or \
+            not isinstance(repository, dict) or \
+            not isinstance(repository.get("nameWithOwner"), str) or \
+            re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository["nameWithOwner"]) is None:
+        raise LedgerError("open PR head repository or commit is unavailable")
+    return repository["nameWithOwner"], oid
+
+
+def git_tree_entries(repository, oid, recursive=False):
+    suffix = "?recursive=1" if recursive else ""
+    tree = api("GET", f"repos/{repository}/git/trees/{oid}{suffix}")
+    if not isinstance(tree, dict) or tree.get("sha") != oid or \
+            tree.get("truncated") is not False or not isinstance(tree.get("tree"), list):
+        raise LedgerError("PR head source tree is unavailable, malformed or truncated")
+    paths = set()
+    modes = {"blob": {"100644", "100755", "120000"},
+             "tree": {"040000"}, "commit": {"160000"}}
+    for entry in tree["tree"]:
+        if not isinstance(entry, dict):
+            raise LedgerError("invalid PR head source-tree entry")
+        path, kind, sha = entry.get("path"), entry.get("type"), entry.get("sha")
+        if not isinstance(path, str) or not path or "\0" in path or \
+                any(part in ("", ".", "..") for part in path.split("/")) or \
+                (not recursive and "/" in path) or path in paths or \
+                not isinstance(kind, str) or kind not in modes or \
+                not isinstance(entry.get("mode"), str) or entry["mode"] not in modes[kind] or \
+                not isinstance(sha, str) or \
+                re.fullmatch(r"[0-9a-f]{40}", sha) is None:
+            raise LedgerError("invalid PR head source-tree entry")
+        paths.add(path)
+    return tree["tree"]
+
+
+def pr_has_source(pull, filename):
+    """Inspect a pinned fork-aware source tree, never the capped PR file diff."""
+    repository, head = pull_head(pull)
+    commit = api("GET", f"repos/{repository}/git/commits/{head}")
+    if not isinstance(commit, dict) or commit.get("sha") != head or \
+            not isinstance(commit.get("tree"), dict):
+        raise LedgerError("PR head commit is unavailable or changed")
+    tree_oid = commit["tree"].get("sha")
+    if not isinstance(tree_oid, str) or re.fullmatch(r"[0-9a-f]{40}", tree_oid) is None:
+        raise LedgerError("PR head commit has no valid tree")
+    entries = git_tree_entries(repository, tree_oid)
+    source = next((entry for entry in entries if entry["path"] == "src"), None)
+    found = False
+    if source is not None:
+        if source["type"] != "tree":
+            raise LedgerError("PR head src is not a source tree")
+        entries = git_tree_entries(repository, source["sha"], recursive=True)
+        found = any(entry["type"] == "blob" and
+                    entry["path"].rsplit("/", 1)[-1].casefold() == filename.casefold()
+                    for entry in entries)
+    current = decomp_query(PR_HEAD_QUERY, number=pull["number"]).get("pullRequest")
+    if not isinstance(current, dict) or not positive_id(current.get("number")) or \
+            current["number"] != pull["number"] or \
+            pull_head(current) != (repository, head):
+        raise LedgerError("open PR head changed during duplicate check")
+    return found
+
+
 def claim_status(address):
     try:
         address = normalise(address)
@@ -451,24 +544,8 @@ def claim_status(address):
                 message = f"IN PR #{pull['number']}: address is already in review"
                 if token.search(title + "\n" + (body or "")):
                     return 5, message
-                files = pull.get("files")
-                seen_files = set()
-                while True:
-                    paths, file_after = connection_page(files)
-                    for changed in paths:
-                        if not isinstance(changed, dict) or not isinstance(changed.get("path"), str):
-                            raise LedgerError("invalid PR changed-file path")
-                        if changed["path"].lower() == ("src/" + filename).lower():
-                            return 5, message
-                    if file_after is None:
-                        break
-                    if file_after in seen_files:
-                        raise LedgerError("repeated PR file cursor")
-                    seen_files.add(file_after)
-                    current = decomp_query(PR_FILES_QUERY, number=pull["number"], after=file_after).get("pullRequest")
-                    if not isinstance(current, dict):
-                        raise LedgerError("open PR changed during duplicate check")
-                    files = current.get("files")
+                if pr_has_source(pull, filename):
+                    return 5, message
             if after is None:
                 return 0, ""
             if after in seen:
@@ -750,6 +827,11 @@ def acknowledged(state, request, request_id, owner_id):
 def submit(args):
     address = normalise(args.addr)
     issue, state = ledger()
+    comments = issue.get("comments")
+    if type(comments) is int and comments >= MAX_ISSUE_COMMENTS:
+        raise CommentCapacityReached(
+            f"ledger comment capacity reached ({comments}/{MAX_ISSUE_COMMENTS}); "
+            "no request submitted; maintainer action required")
     row = held_by(state, address)
     if args.cmd == "claim":
         if row:
@@ -785,6 +867,8 @@ def submit(args):
     try:
         comment = api("POST", endpoint("/comments"), {"body": body})
         request_id, author_id = comment_identity(comment)
+    except CommentCapacityReached:
+        raise
     except LedgerError as error:
         raise Unconfirmed(f"request submission could not be confirmed; inspect the ledger before retrying: {error}") from error
     if author_id != owner_id:

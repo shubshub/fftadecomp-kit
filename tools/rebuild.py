@@ -24,7 +24,11 @@ import subprocess
 import sys
 import tempfile
 
-from match_evidence import data_snapshot, mapping_snapshot, source_fingerprint
+from match_evidence import data_snapshot, mapping_snapshot, report_matches, source_fingerprint
+import inert_spin_profile as inert_spin
+import software_double_profile as software_double
+import function_thunk_profile as function_thunk
+import switch_constants_profile as switch_constants
 
 ROM_BASE = 0x08000000
 
@@ -85,6 +89,27 @@ def output_path(root, requested):
     return output
 
 
+def saved_profile_arguments(report, root, address):
+    arguments = []
+    import owner_admission_profile
+    if owner_admission_profile.selected(report):
+        arguments += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(report)]
+    constants_policy = switch_constants.selected_policy(report)
+    if constants_policy is not None:
+        arguments += ["--switch-profile", constants_policy.selector]
+    if function_thunk.selected(report):
+        arguments += ["--function-address-profile", function_thunk.SELECTOR]
+    if software_double.selected(report):
+        arguments += ["--software-double-profile", software_double.SELECTOR]
+        if software_double.target_remainder_selected(report):
+            arguments += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
+    if inert_spin.selected(report):
+        arguments += ["--control-flow-profile", inert_spin.SELECTOR]
+    if arguments and not report_matches(report, root, address):
+        raise ValueError(f"0x{address:08X}: invalid saved profile report")
+    return arguments
+
+
 def compiled_rebuild(root, requested_output=None):
     root = Path(root)
     output = output_path(root, requested_output)
@@ -94,6 +119,14 @@ def compiled_rebuild(root, requested_output=None):
     inventory = source_inventory(root)
     mapping = mapping_snapshot(root)
     data_mapping = data_snapshot(root)
+    index_path = root / "symbols/functions.txt"
+    function_index = index_path.read_bytes() if index_path.is_file() else None
+    profile_reports = {}
+
+    def profile_inputs_unchanged():
+        return not profile_reports or (index_path.read_bytes() == function_index and
+               all(path.read_bytes() == report for path, report in profile_reports.items()))
+
     matcher = Path(__file__).with_name("match.py")
     build = root / "build"
     build.mkdir(exist_ok=True)
@@ -104,9 +137,14 @@ def compiled_rebuild(root, requested_output=None):
     with tempfile.TemporaryDirectory(prefix="ffta_rebuild_", dir=build) as directory:
         for address in inventory:
             emitted = Path(directory) / f"{address:08X}.bin"
+            report_path = root / "docs/match" / f"{address:08X}.md"
+            report = report_path.read_bytes() if report_path.is_file() else b""
+            arguments = saved_profile_arguments(report.decode("utf-8"), root, address)
+            if arguments:
+                profile_reports[report_path] = report
             result = subprocess.run(
                 [sys.executable, str(matcher), "--root", str(root),
-                 f"{address:08X}", "--no-write", "--emit", str(emitted)],
+                 f"{address:08X}", "--no-write", "--emit", str(emitted), *arguments],
                 capture_output=True, text=True)
             if result.returncode:
                 detail = (result.stderr or result.stdout).strip()
@@ -114,6 +152,10 @@ def compiled_rebuild(root, requested_output=None):
             if not emitted.is_file() or emitted.is_symlink():
                 raise ValueError(f"0x{address:08X}: matcher emitted no regular payload")
             size = emitted.stat().st_size
+            if switch_constants.selected_policy(report.decode("utf-8")) is switch_constants.FRAME_POLICY:
+                from status import matcher_extent, report_extent
+                if size != matcher_extent(result.stdout) or size != report_extent(report.decode("utf-8")):
+                    raise ValueError(f"0x{address:08X}: compiled byte mismatch with scalar-frame extent")
             if not size or address < ROM_BASE or address + size > ROM_BASE + baseline_state[0]:
                 raise ValueError(f"0x{address:08X}: compiled extent is empty or outside the ROM")
             if address < previous_end:
@@ -126,8 +168,8 @@ def compiled_rebuild(root, requested_output=None):
             emitted.unlink()
             print(f"verified  0x{address:08X}: {size} compiled bytes", flush=True)
     if source_inventory(root) != inventory or file_state(baseline) != baseline_state or \
-            mapping_snapshot(root) != mapping or data_snapshot(root) != data_mapping:
-        raise ValueError("source inventory, dependencies, mapping, or base ROM changed during compilation")
+            mapping_snapshot(root) != mapping or data_snapshot(root) != data_mapping or not profile_inputs_unchanged():
+        raise ValueError("source inventory, dependencies, mapping, profile evidence, or base ROM changed during compilation")
 
     stream = None
     output_created = False
@@ -180,8 +222,8 @@ def compiled_rebuild(root, requested_output=None):
             if file_state(output) != rebuilt_state:
                 raise ValueError("written mixed rebuild failed its read-back check")
         if source_inventory(root) != inventory or file_state(baseline) != baseline_state or \
-                mapping_snapshot(root) != mapping or data_snapshot(root) != data_mapping:
-            raise ValueError("source inventory, dependencies, mapping, or base ROM changed during rebuild")
+                mapping_snapshot(root) != mapping or data_snapshot(root) != data_mapping or not profile_inputs_unchanged():
+            raise ValueError("source inventory, dependencies, mapping, profile evidence, or base ROM changed during rebuild")
         compiled_bytes = sum(len(payload) for _, payload in payloads)
         print(f"\nrebuilt  : {position:,} bytes (partial mixed C/ROM build)\n"
               f"  compiled functions : {len(payloads):,}\n"

@@ -97,10 +97,10 @@ def verify_context(data, address, calls, context):
     return names == {"__modsi3"}
 
 
-def prove_operands(instructions, edges, address, sites):
+def prove_operands(instructions, edges, address, sites, *, logical_shift_signed16=False):
     from capstone import CS_GRP_CALL
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_CC_EQ, ARM_CC_NE,
-                                   ARM_INS_ASR, ARM_INS_B, ARM_INS_CMP,
+                                   ARM_INS_ASR, ARM_INS_LSR, ARM_INS_B, ARM_INS_CMP,
                                    ARM_OP_IMM, ARM_OP_REG, ARM_REG_R0, ARM_REG_R1,
                                    ARM_REG_R2, ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
 
@@ -146,6 +146,13 @@ def prove_operands(instructions, edges, address, sites):
                         operands[1].type == ARM_OP_REG and operands[2].type == ARM_OP_IMM and \
                         operands[2].imm == 16:
                     outgoing.add((destination, "s16"))
+                elif logical_shift_signed16 and instruction.id == ARM_INS_LSR and \
+                        int.from_bytes(instruction.bytes, 'little') & 0xF800 == 0x0800 and \
+                        len(operands) == 3 and operands[1].type == ARM_OP_REG and \
+                        operands[2].type == ARM_OP_IMM and 17 <= operands[2].imm <= 32:
+                    # Logical right shift of any uint32 by at least 17 is in
+                    # 0..32767. No input, memory or call-return fact is needed.
+                    outgoing.add((destination, "s16"))
                 if source is not None:
                     outgoing.update((destination, kind) for register, kind in incoming
                                     if register == source)
@@ -180,3 +187,11 @@ def prove_operands(instructions, edges, address, sites):
     for site in sites:
         if not {(ARM_REG_R0, "s16"), (ARM_REG_R1, "nz")} <= states.get(site, frozenset()):
             raise ValueError("signed remainder requires proven signed16 r0 and nonzero r1")
+    if logical_shift_signed16:
+        return [[current - address, instruction.reg_name(instruction.operands[0].reg),
+                 instruction.reg_name(instruction.operands[1].reg), instruction.operands[2].imm]
+                for current, instruction in sorted(instructions.items())
+                if instruction.size == 2 and instruction.id == ARM_INS_LSR and
+                int.from_bytes(instruction.bytes, 'little') & 0xF800 == 0x0800 and
+                len(instruction.operands) == 3 and instruction.operands[2].type == ARM_OP_IMM and
+                17 <= instruction.operands[2].imm <= 32]
