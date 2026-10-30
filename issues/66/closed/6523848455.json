@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "d83106501f0cd4c2dda560707c9d0aa1d76c5a6f8027a1d2ecbe7cfd0678c0e2",
+    "acknowledged_cursor": 6523856329,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d83106501f0cd4c2dda560707c9d0aa1d76c5a6f8027a1d2ecbe7cfd0678c0e2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A22F0\",\"who\":\"sol-22F0\",\"note\":\"Sol executor genuine exact C matching in isolated worktree; complete body/literals checked; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:21:46Z",
+      "id": 6523848455,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:21:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+    "result": {
+      "address": "0x080A22F0",
+      "claim_id": 6523848455,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523848455,
+      "status": "accepted",
+      "who": "sol-22F0"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a4f3cb6714e4343fafa2bfc791c3b2559c001ff8c4341f5c4a6452af7125eb3f",
+    "acknowledged_cursor": 6523963546,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a4f3cb6714e4343fafa2bfc791c3b2559c001ff8c4341f5c4a6452af7125eb3f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A22F0\",\"who\":\"sol-22F0\",\"claim_id\":6523848455,\"reason\":\"Bounded genuine C attempts exhausted without scheduling tricks; source/report/receipts preserved honestly outside active source.\",\"unmatchable\":true,\"tried\":\"-O2; three natural actual-s32 getter forms with explicit signed16 narrowing, pointer snapshots and direct global/counter accesses; closest plausible200B has one LDRH scheduling mismatch, fixed-offset195/200 bytes; all evidence Parked.\"}",
+      "created_at": "2026-10-30T13:27:42Z",
+      "id": 6523963546,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:27:42Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2bf0fc5a7ddf70bd4d564fb25a171d54625e92e1c0a24780bbfcbd2b0325f63c",
+    "result": {
+      "address": "0x080A22F0",
+      "claim_id": 6523848455,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523963546,
+      "status": "accepted",
+      "who": "sol-22F0"
+    }
+  }
+}
