@@ -79,7 +79,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 stack_aliases=False, buffer_proof=None, runtime_calls=None,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
                 entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None,
-                discarded_exit_scratch=None, formal_stack_callee_proof=None):
+                discarded_exit_scratch=None, formal_stack_callee_proof=None,
+                formal_stack_alias_constant_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -124,6 +125,13 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                     if destination in RUNTIME_HELPERS.values() or is_udivsi3_address(destination)}:
             raise ValueError("runtime frame checks require exact complete canonical call bindings")
 
+    if formal_stack_alias_constant_policy is not None:
+        import local_alias_slot_profile as alias_slots
+        if type(formal_stack_alias_constant_policy) is not str or \
+                formal_stack_alias_constant_policy != alias_slots.FORMAL_MOVS10_POLICY or \
+                formal_stack_callee_proof is None or local_alias_slot_policy != alias_slots.SELECTOR:
+            raise ValueError('formal MOVS10 aliases require their explicit policy and fresh formal leaf proof')
+
     incoming_reads = set()
     incoming_words_policy = False
     if entry_stack_policy is not None:
@@ -149,7 +157,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         alias_slots.validate(local_alias_slot_policy)
         if not stack_aliases or buffer_proof is not None or bounded_output_proof is not None or entry_stack_policy is not None:
             raise ValueError("local alias slots require exclusive local-only stack alias policy")
-        slot_states = alias_slots.prove_constants(instructions, edges, address)
+        slot_states = alias_slots.prove_constants(instructions, edges, address,
+            constant_domain=None if formal_stack_alias_constant_policy is None else alias_slots.FORMAL_MOVS10_DOMAIN)
 
     finite_states = None
     finite_additions, finite_reads = set(), set()
@@ -533,6 +542,11 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             "constant_domain": "exact MOVS 1/2/3 only; all-path intersection; every call kills facts",
             "slot_domain": "own aligned local words; possible-pointer taint joins; partial overwrite invalidates; release expires provenance",
             "callee_pointer_arguments": formal_stack_callee_proof is not None}
+        if formal_stack_alias_constant_policy is not None:
+            proof["local_alias_slots"].update(
+                constant_policy=formal_stack_alias_constant_policy,
+                constant_domain="exact MOVS 1/2/3/10 only; all-path intersection; every call kills facts",
+                allowed_MOVS_constants=list(alias_slots.FORMAL_MOVS10_DOMAIN))
     if finite_states is not None:
         proof["finite_stack_indices"] = {"schema": finite.SCHEMA, "policy": finite_stack_index_policy,
             "SP_additions": [[site,register,[[value,list(origins)] for value,origins in alternatives]]

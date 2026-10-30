@@ -8,6 +8,8 @@ SELECTOR = 'local-alias-word-slots-small-index-v1'
 SCHEMA = 'thumb-local-alias-word-slots-small-index-v1'
 UNKNOWN = frozenset(((0, False),))
 MAX_UPDATES = 4096
+FORMAL_MOVS10_POLICY = 'formal-stack-leaf-movs10-local-alias-v1'
+FORMAL_MOVS10_DOMAIN = (1, 2, 3, 10)
 
 
 def validate(policy):
@@ -15,10 +17,15 @@ def validate(policy):
         raise ValueError('local alias slots require their explicit versioned policy')
 
 
-def prove_constants(instructions, edges, address):
+def prove_constants(instructions, edges, address, *, constant_domain=None):
     """Intersect exact reaching MOVS facts; every call erases these facts."""
     if address not in instructions or set(edges) != set(instructions):
         raise ValueError('small local indices require their exact complete CFG')
+    if constant_domain is not None and (type(constant_domain) is not tuple or
+            constant_domain != FORMAL_MOVS10_DOMAIN or
+            any(type(value) is not int for value in constant_domain)):
+        raise ValueError('formal MOVS10 constants require their exact finite domain')
+    allowed = (1, 2, 3) if constant_domain is None else constant_domain
     states, pending, updates = {address: {}}, [address], 0
     while pending:
         site = pending.pop(); instruction = instructions[site]
@@ -31,7 +38,7 @@ def prove_constants(instructions, edges, address):
             operands = instruction.operands
             encoded = int.from_bytes(instruction.bytes, 'little')
             if instruction.size == 2 and encoded & 0xF800 == 0x2000 and \
-                    encoded & 255 in (1, 2, 3) and instruction.mnemonic == 'movs' and \
+                    encoded & 255 in allowed and instruction.mnemonic == 'movs' and \
                     instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and len(operands) == 2 and \
                     operands[0].type == ARM_OP_REG and operands[0].reg == ARM_REG_R0 + ((encoded >> 8) & 7) and \
                     operands[1].type == ARM_OP_IMM and operands[1].imm == encoded & 255:
