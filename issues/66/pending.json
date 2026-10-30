@@ -90,7 +90,35 @@
           "who": "sol-0468"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7b59c096c27b222534b82601918080d7f73f16582331e5f7a6ca54368e83d84b",
+        "acknowledged_cursor": 6533209814,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7b59c096c27b222534b82601918080d7f73f16582331e5f7a6ca54368e83d84b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A0468\",\"who\":\"sol-0468\",\"claim_id\":6533100036,\"reason\":\"One plausible natural128-byte form has ordinary register allocation and prologue byte mismatch; exact one unchanged-form compiler diagnostic retained. No grounded second source form, no MATCH. Parked with current explicit readonly-word0 route; no unsupported-profile or impossibility claim\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; addressed-signed-runtime-readonly-word0-v1; one natural form and one compiler-only diagnostic\"}",
+          "created_at": "2026-10-30T20:51:42Z",
+          "id": 6533209814,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T20:51:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b0bc9f76095c01b78f363b91e6af64213b96426875e9ca0095b6c976c3d4c86c",
+        "result": {
+          "address": "0x080A0468",
+          "claim_id": 6533100036,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6533209814,
+          "status": "accepted",
+          "who": "sol-0468"
+        }
+      }
     }
   ],
   "issue": 66,
