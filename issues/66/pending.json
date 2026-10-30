@@ -95,6 +95,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "11daaf6d8fa98a244c2919296870249932d40ea0d9bbc0a916a7004909a3cfb0",
+        "acknowledged_cursor": 6527582040,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "11daaf6d8fa98a244c2919296870249932d40ea0d9bbc0a916a7004909a3cfb0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800337C\",\"who\":\"sol-337C\",\"note\":\"Complete 28B three-store initializer with observed hardware addresses and mapped control shadow; candidate-match39\"}",
+          "created_at": "2026-10-30T16:15:58Z",
+          "id": 6527582040,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:15:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2ffdf19c2e25f57394626c041cc779b67ba0ab7c3a62cfc4b3cead877f250f9c",
+        "result": {
+          "address": "0x0800337C",
+          "claim_id": 6527582040,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6527582040,
+          "status": "accepted",
+          "who": "sol-337C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
