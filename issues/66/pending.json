@@ -59,6 +59,198 @@
           "who": "sol-D054"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "479ddcf8e288f7a6212d1b848324b7806cdeb349a34d7edc97b86de157085c88",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "479ddcf8e288f7a6212d1b848324b7806cdeb349a34d7edc97b86de157085c88",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C7638\",\"who\":\"sol-7638\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:30:41Z",
+          "id": 6521585913,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:30:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x080C7638",
+          "claim_id": 6521585913,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521585913,
+          "status": "accepted",
+          "who": "sol-7638"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8b12af41e021ee02968f8251634122c4e8d470964ea08d49c647be8763c4ddb2",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8b12af41e021ee02968f8251634122c4e8d470964ea08d49c647be8763c4ddb2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C7650\",\"who\":\"sol-7650\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:31:35Z",
+          "id": 6521601429,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:31:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x080C7650",
+          "claim_id": 6521601429,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521601429,
+          "status": "accepted",
+          "who": "sol-7650"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d7ff8a156ee88502900e6695ae625479ec6175c9ecb370f5b958f6bb53294013",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d7ff8a156ee88502900e6695ae625479ec6175c9ecb370f5b958f6bb53294013",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801DC04\",\"who\":\"sol-DC04\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:31:54Z",
+          "id": 6521606809,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:31:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x0801DC04",
+          "claim_id": 6521606809,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521606809,
+          "status": "accepted",
+          "who": "sol-DC04"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0a10fa5c64ad654baff94bcb3a6153a5fa95111f3d152ed9d35e9e89058d1c9a",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0a10fa5c64ad654baff94bcb3a6153a5fa95111f3d152ed9d35e9e89058d1c9a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D3904\",\"who\":\"sol-3904\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:32:16Z",
+          "id": 6521613112,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:32:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x080D3904",
+          "claim_id": 6521613112,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521613112,
+          "status": "accepted",
+          "who": "sol-3904"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dc82aaff94f45efbad6db3f064c371de72edd301a5c5e98c1037507f3328e1a9",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dc82aaff94f45efbad6db3f064c371de72edd301a5c5e98c1037507f3328e1a9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08125560\",\"who\":\"sol-5560\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:32:33Z",
+          "id": 6521617994,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:32:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x08125560",
+          "claim_id": 6521617994,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521617994,
+          "status": "accepted",
+          "who": "sol-5560"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "be86586cf280fde47762029bfe07cdd666b185959aa71c798f90fc8a701f2fbd",
+        "acknowledged_cursor": 6521623513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "be86586cf280fde47762029bfe07cdd666b185959aa71c798f90fc8a701f2fbd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4020\",\"who\":\"sol-4020\",\"note\":\"Match one complete plausible state function with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:32:53Z",
+          "id": 6521623513,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:32:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5be6721eb5a11aba92469bf44e81fc3ce67a6c2dffa5dd7158931acf9127066",
+        "result": {
+          "address": "0x080D4020",
+          "claim_id": 6521623513,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521623513,
+          "status": "accepted",
+          "who": "sol-4020"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
