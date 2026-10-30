@@ -91,66 +91,6 @@
           "who": "sol-6854"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "f89ca43c82935d574e0b0ee5e71b6d1cd64446651b63dc3e5bb0025d6948ecc5",
-        "acknowledged_cursor": 6534074275,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f89ca43c82935d574e0b0ee5e71b6d1cd64446651b63dc3e5bb0025d6948ecc5",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804FD24\",\"who\":\"sol-FD24\",\"note\":\"Complete 60-byte owner, actual caller and explicit signed word conversions qualified under existing conditional addressed runtime selector\"}",
-          "created_at": "2026-10-30T21:42:09Z",
-          "id": 6534074275,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T21:42:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "18d6057f72f4b35941e8233480ef85ad50687f6e04746352969a4072aeb739ec",
-        "result": {
-          "address": "0x0804FD24",
-          "claim_id": 6534074275,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6534074275,
-          "status": "accepted",
-          "who": "sol-FD24"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0e5e00edf04910e079f9cace9e9dbe705ff83e3b5e39fc9a57a39add2ecd05e0",
-        "acknowledged_cursor": 6534219766,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0e5e00edf04910e079f9cace9e9dbe705ff83e3b5e39fc9a57a39add2ecd05e0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804FD24\",\"who\":\"sol-FD24\",\"claim_id\":6534074275,\"reason\":\"One natural source and one unchanged-source diagnostic: complete60-byte ordinary mismatch, signed conversion lifetime and saved-register allocation differ; no grounded operation correction, honest Parked, zero MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-30T21:49:11Z",
-          "id": 6534208620,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T21:49:11Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "59fa3028bfd84514964203fa0f7491aa659211a7303ed49cdd1921ac6b67ab34",
-        "result": {
-          "address": "0x0804FD24",
-          "claim_id": 6534074275,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6534208620,
-          "status": "accepted",
-          "who": "sol-FD24"
-        }
-      }
     }
   ],
   "issue": 66,
