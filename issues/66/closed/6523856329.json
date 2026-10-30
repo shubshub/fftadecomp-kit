@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c7a746970985a3cbca2a2a7d181ed47b690979a9f6ccc63ddc145045664d7463",
+    "acknowledged_cursor": 6523856329,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c7a746970985a3cbca2a2a7d181ed47b690979a9f6ccc63ddc145045664d7463",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081276D8\",\"who\":\"sol-76D8\",\"note\":\"Sol executor genuine complete C matching in isolated worktree; full body and literal extent checked; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:22:10Z",
+      "id": 6523856329,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:22:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+    "result": {
+      "address": "0x081276D8",
+      "claim_id": 6523856329,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523856329,
+      "status": "accepted",
+      "who": "sol-76D8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "346cbf8c2137708ad955074118eb761a17347ede7492ee193a5f8e964c5978a1",
+    "acknowledged_cursor": 6524113690,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "346cbf8c2137708ad955074118eb761a17347ede7492ee193a5f8e964c5978a1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081276D8\",\"who\":\"sol-76D8\",\"claim_id\":6523856329,\"reason\":\"Bounded natural failure preserved with exact boolean-materialization deficit and runtime evidence in Parked.\",\"unmatchable\":true,\"tried\":\"-O2; genuine change-flag source; u32 and u8 local flag forms optimize materialization away; compiled228B100instructions vs target240B105; no fabricated helper boundary or dead work.\"}",
+      "created_at": "2026-10-30T13:34:09Z",
+      "id": 6524091015,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:34:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2cb5d5be26c11be684ed8593ffc7f51daf60fc5a5026f1174d6e70d8db9d36ac",
+    "result": {
+      "address": "0x081276D8",
+      "claim_id": 6523856329,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6524091015,
+      "status": "accepted",
+      "who": "sol-76D8"
+    }
+  }
+}
