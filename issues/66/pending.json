@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "ffbabd2edf1fa104b0627316251ecc17fff9585d01cd95f727af24666437258f",
-        "acknowledged_cursor": 6531773049,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ffbabd2edf1fa104b0627316251ecc17fff9585d01cd95f727af24666437258f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C76C4\",\"who\":\"sol-76C4\",\"note\":\"Actual scalar queue status and snapshot restore; exact complete 216-byte span, canonical-thunks-v1 conditional copy callback and bounded helper ABI; no new inputs.\"}",
-          "created_at": "2026-10-30T19:30:20Z",
-          "id": 6531773007,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T19:30:20Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "413bfb99bcb927e0d9b80ff6b4b67178df58f9cdb64eef0cc768fbba32b61b88",
-        "result": {
-          "address": "0x080C76C4",
-          "claim_id": 6531773007,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6531773007,
-          "status": "accepted",
-          "who": "sol-76C4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "37ecb228d64d810f5f6504a3ed8ba5d5c4d2d748af552004e6a44cbd36654932",
-        "acknowledged_cursor": 6531975841,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "37ecb228d64d810f5f6504a3ed8ba5d5c4d2d748af552004e6a44cbd36654932",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C76C4\",\"who\":\"sol-76C4\",\"claim_id\":6531773007,\"reason\":\"Three bounded natural forms remain nonidentical. Frozen receipt d6952e88. Zero MATCH credit.\",\"unmatchable\":true,\"tried\":\"Three grounded canonical-thunk forms; first diagnostic 220 bytes versus target216, second extent unmeasured, final complete216 byte comparison failed; compatible actual full-word helper caller view preserved. One authorized unchanged-first-source compiler diagnostic; no further diagnostic or successful replay.\"}",
-          "created_at": "2026-10-30T19:41:23Z",
-          "id": 6531975829,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T19:41:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "026ebc975d6cfe358f58fd15aaf7063a0bd7a99b666e60e7c0ebc83e303366b1",
-        "result": {
-          "address": "0x080C76C4",
-          "claim_id": 6531773007,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6531975829,
-          "status": "accepted",
-          "who": "sol-76C4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "68ef77a42a5e70fa558c9eee2190d0ca97c79028099237a8edacb7c662a0c009",
         "acknowledged_cursor": 6531773049,
         "body_provenance": "acceptance-time",
