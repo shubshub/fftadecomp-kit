@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "6543eba91c83e09a57136a6ff78eb5eb635eac4e99c70f8af40ba266ecac7e82",
+    "acknowledged_cursor": 6522147037,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6543eba91c83e09a57136a6ff78eb5eb635eac4e99c70f8af40ba266ecac7e82",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802317C\",\"who\":\"sol-317C\",\"note\":\"Sol isolated complete-function matching; source and native proof within existing typed linking profiles.\"}",
+      "created_at": "2026-10-30T11:58:09Z",
+      "id": 6522135845,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:58:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e4768fe7b8ea04f82ad66f1a0d39d060c6ae557f588ef51b3be42e0b4f8c567d",
+    "result": {
+      "address": "0x0802317C",
+      "claim_id": 6522135845,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6522135845,
+      "status": "accepted",
+      "who": "sol-317C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1d43139e2dfe8f47fd67367f32137a25e3f898a62ea326cb2fe3a3ffcaf8ccdd",
+    "acknowledged_cursor": 6522260280,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1d43139e2dfe8f47fd67367f32137a25e3f898a62ea326cb2fe3a3ffcaf8ccdd",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802317C\",\"who\":\"sol-317C\",\"claim_id\":6522135845,\"reason\":\"Complete48-byte two-helper mapped-object wrapper MATCH, second natural candidate, plausible source.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:01:37Z",
+      "id": 6522225813,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:01:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cfab9d505ef5206d46e3e88f525d64af44205d169c07e18c48479c0f3fd4053f",
+    "result": {
+      "address": "0x0802317C",
+      "claim_id": 6522135845,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6522225813,
+      "status": "accepted",
+      "who": "sol-317C"
+    }
+  }
+}
