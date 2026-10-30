@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "07e548a3ee2433414b88ac7dd48a080b0c66387d254bd146b34bcb47841eff49",
+    "acknowledged_cursor": 6520321231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "07e548a3ee2433414b88ac7dd48a080b0c66387d254bd146b34bcb47841eff49",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080294FC\",\"who\":\"sol-94FC\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+      "created_at": "2026-10-30T10:16:09Z",
+      "id": 6520298965,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:16:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dcdfc916b7291db115b7ed6993ccdc84694809d5bc9cb9388f3f9f3608366e97",
+    "result": {
+      "address": "0x080294FC",
+      "claim_id": 6520298965,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6520298965,
+      "status": "accepted",
+      "who": "sol-94FC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d74618c3334badb2c9a6e36dfc097690a60159f910dbf4a86a5ac5b79ababc5b",
+    "acknowledged_cursor": 6520352549,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d74618c3334badb2c9a6e36dfc097690a60159f910dbf4a86a5ac5b79ababc5b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080294FC\",\"who\":\"sol-94FC\",\"claim_id\":6520298965,\"reason\":\"Matched complete12-byte object word getter; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:18:20Z",
+      "id": 6520336839,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:18:20Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+    "result": {
+      "address": "0x080294FC",
+      "claim_id": 6520298965,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520336839,
+      "status": "accepted",
+      "who": "sol-94FC"
+    }
+  }
+}

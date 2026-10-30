@@ -30,7 +30,35 @@
           "who": "sol-94FC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d74618c3334badb2c9a6e36dfc097690a60159f910dbf4a86a5ac5b79ababc5b",
+        "acknowledged_cursor": 6520352549,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d74618c3334badb2c9a6e36dfc097690a60159f910dbf4a86a5ac5b79ababc5b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080294FC\",\"who\":\"sol-94FC\",\"claim_id\":6520298965,\"reason\":\"Matched complete12-byte object word getter; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T10:18:20Z",
+          "id": 6520336839,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:18:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+        "result": {
+          "address": "0x080294FC",
+          "claim_id": 6520298965,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520336839,
+          "status": "accepted",
+          "who": "sol-94FC"
+        }
+      }
     },
     {
       "claim": {
@@ -92,6 +120,130 @@
           "request_id": 6520321231,
           "status": "accepted",
           "who": "sol-B554"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "32ca586302e8c66374b4dc6194095dc48e9f6992a701c2441d0123d0b1f6c074",
+        "acknowledged_cursor": 6520352549,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "32ca586302e8c66374b4dc6194095dc48e9f6992a701c2441d0123d0b1f6c074",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802B554\",\"who\":\"sol-B554\",\"claim_id\":6520321231,\"reason\":\"Matched complete12-byte input-object byte setter at field079A; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T10:19:10Z",
+          "id": 6520351236,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:19:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+        "result": {
+          "address": "0x0802B554",
+          "claim_id": 6520321231,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520351236,
+          "status": "accepted",
+          "who": "sol-B554"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3d07d49b4cab78e958e3448c0ab1947603893a163250e51401efe86ccc4e26ce",
+        "acknowledged_cursor": 6520352549,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3d07d49b4cab78e958e3448c0ab1947603893a163250e51401efe86ccc4e26ce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B584\",\"who\":\"sol-B584\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:17:57Z",
+          "id": 6520330285,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:17:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+        "result": {
+          "address": "0x0802B584",
+          "claim_id": 6520330285,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520330285,
+          "status": "accepted",
+          "who": "sol-B584"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f0d629681578bc4d72821c1b05a936edc8416c32d34f8e9c3c90ed9ef2f6b6f7",
+        "acknowledged_cursor": 6520352549,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f0d629681578bc4d72821c1b05a936edc8416c32d34f8e9c3c90ed9ef2f6b6f7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B590\",\"who\":\"sol-B590\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:19:00Z",
+          "id": 6520348449,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:19:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+        "result": {
+          "address": "0x0802B590",
+          "claim_id": 6520348449,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520348449,
+          "status": "accepted",
+          "who": "sol-B590"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "20ce9951ab7b00b9d2352412c4f87b959467d6192fe255326de1def546616a54",
+        "acknowledged_cursor": 6520352549,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "20ce9951ab7b00b9d2352412c4f87b959467d6192fe255326de1def546616a54",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B59C\",\"who\":\"sol-B59C\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+          "created_at": "2026-10-30T10:19:14Z",
+          "id": 6520352549,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:19:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c40b4f4c22f9ac17a56c78ded8e8119e7284401c5257a675f17910a0fb8f8da2",
+        "result": {
+          "address": "0x0802B59C",
+          "claim_id": 6520352549,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6520352549,
+          "status": "accepted",
+          "who": "sol-B59C"
         }
       },
       "release": null
