@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "d19bfe83a49bc0a141facd68453f984cc6cd8665b9f2a09ae5864b62dd6f6f00",
+    "acknowledged_cursor": 6523089696,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d19bfe83a49bc0a141facd68453f984cc6cd8665b9f2a09ae5864b62dd6f6f00",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809FD88\",\"who\":\"sol-FD88\",\"note\":\"Native plausible C matching on accepted address; bounded source forms\"}",
+      "created_at": "2026-10-30T12:40:35Z",
+      "id": 6523074205,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:40:35Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6a0f3524179da328b3cc1c76bb6d6ba20e3246256df93a87a91ddf1cd1ea1b13",
+    "result": {
+      "address": "0x0809FD88",
+      "claim_id": 6523074205,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523074205,
+      "status": "accepted",
+      "who": "sol-FD88"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0cabfdd36ea388f81ac705268279e3c981938b6ca718462ade29c80699cb1adf",
+    "acknowledged_cursor": 6523150141,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0cabfdd36ea388f81ac705268279e3c981938b6ca718462ade29c80699cb1adf",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809FD88\",\"who\":\"sol-FD88\",\"claim_id\":6523074205,\"reason\":\"Native signed quotient gate requires CFG-proven positive constant divisor; actual third argument dynamic; exact source and refusal parked\",\"unmatchable\":true,\"tried\":\"default -mthumb-interwork -O2; natural signed-halfword abs/max then real dynamic-divisor helper; native CFG-positive-constant gate retained; one run, no byte verdict\"}",
+      "created_at": "2026-10-30T12:44:27Z",
+      "id": 6523145871,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:44:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e5038ab9fd4e67ce70cf0279010aebacda7d8e88ac8ccca554438441da5443e9",
+    "result": {
+      "address": "0x0809FD88",
+      "claim_id": 6523074205,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523145871,
+      "status": "accepted",
+      "who": "sol-FD88"
+    }
+  }
+}

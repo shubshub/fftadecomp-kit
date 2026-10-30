@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "fc550350c2ba5039e0fe86a68381dabaa3c194d980fe93545e6b645a4320c7db",
+    "acknowledged_cursor": 6523089696,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fc550350c2ba5039e0fe86a68381dabaa3c194d980fe93545e6b645a4320c7db",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB750\",\"who\":\"sol-B750\",\"note\":\"Native plausible C matching on accepted address; bounded source forms\"}",
+      "created_at": "2026-10-30T12:40:35Z",
+      "id": 6523074234,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:40:35Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6a0f3524179da328b3cc1c76bb6d6ba20e3246256df93a87a91ddf1cd1ea1b13",
+    "result": {
+      "address": "0x080CB750",
+      "claim_id": 6523074234,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523074234,
+      "status": "accepted",
+      "who": "sol-B750"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0d64dea6e0a0d28960327473fa2fd9a01f2a61065484859cc94dc4b58a50c90f",
+    "acknowledged_cursor": 6523150141,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0d64dea6e0a0d28960327473fa2fd9a01f2a61065484859cc94dc4b58a50c90f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CB750\",\"who\":\"sol-B750\",\"claim_id\":6523074234,\"reason\":\"MATCH:60 complete bytes,25/25instructions,plausible,first candidate\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:44:27Z",
+      "id": 6523145843,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:44:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e5038ab9fd4e67ce70cf0279010aebacda7d8e88ac8ccca554438441da5443e9",
+    "result": {
+      "address": "0x080CB750",
+      "claim_id": 6523074234,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523145843,
+      "status": "accepted",
+      "who": "sol-B750"
+    }
+  }
+}
