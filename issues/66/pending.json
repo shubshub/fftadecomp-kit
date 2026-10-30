@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "28fcdd1bf3cefbc423b2c44030e26e0561f9f619a66c2933ef26f308507790fb",
-        "acknowledged_cursor": 6533100036,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "28fcdd1bf3cefbc423b2c44030e26e0561f9f619a66c2933ef26f308507790fb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A0468\",\"who\":\"sol-0468\",\"note\":\"Complete128-byte saved CFG and five-formal ABI; published explicit addressed-signed-runtime-readonly-word0-v1 selector; incoming word0 readability premise retained\"}",
-          "created_at": "2026-10-30T20:45:16Z",
-          "id": 6533100036,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T20:45:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "eaa9cd1b81dc20ea6d9f02f331d88fc5715bbce94a28990786213d306c293b3c",
-        "result": {
-          "address": "0x080A0468",
-          "claim_id": 6533100036,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6533100036,
-          "status": "accepted",
-          "who": "sol-0468"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "7b59c096c27b222534b82601918080d7f73f16582331e5f7a6ca54368e83d84b",
-        "acknowledged_cursor": 6533209814,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7b59c096c27b222534b82601918080d7f73f16582331e5f7a6ca54368e83d84b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A0468\",\"who\":\"sol-0468\",\"claim_id\":6533100036,\"reason\":\"One plausible natural128-byte form has ordinary register allocation and prologue byte mismatch; exact one unchanged-form compiler diagnostic retained. No grounded second source form, no MATCH. Parked with current explicit readonly-word0 route; no unsupported-profile or impossibility claim\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; addressed-signed-runtime-readonly-word0-v1; one natural form and one compiler-only diagnostic\"}",
-          "created_at": "2026-10-30T20:51:42Z",
-          "id": 6533209814,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T20:51:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b0bc9f76095c01b78f363b91e6af64213b96426875e9ca0095b6c976c3d4c86c",
-        "result": {
-          "address": "0x080A0468",
-          "claim_id": 6533100036,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6533209814,
-          "status": "accepted",
-          "who": "sol-0468"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "8f7f0de4617032dc0bd622f4aa11b5b7c0585344a70345b4baffb620b8d45823",
         "acknowledged_cursor": 6533346176,
         "body_provenance": "acceptance-time",
