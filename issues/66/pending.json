@@ -123,6 +123,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b8dcc534b68a520482b3801aa589c39988ae7aa959d03d3078ddb214578fc327",
+        "acknowledged_cursor": 6526955035,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b8dcc534b68a520482b3801aa589c39988ae7aa959d03d3078ddb214578fc327",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131024\",\"who\":\"sol-1024\",\"note\":\"Batch38 complete12B scalar getter, actual matched30FBC layout and realA3778u8caller ABI.\"}",
+          "created_at": "2026-10-30T15:46:46Z",
+          "id": 6526940920,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:46:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "59093e05764f9001927ad78f12c96e249190dc7e08b66f9a972e8e6cef277b4c",
+        "result": {
+          "address": "0x08131024",
+          "claim_id": 6526940920,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526940920,
+          "status": "accepted",
+          "who": "sol-1024"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d882e3db44b68e66dd930dd4f9465d6a19bb2174133fc6c9fb95794efb7ff894",
+        "acknowledged_cursor": 6526955035,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d882e3db44b68e66dd930dd4f9465d6a19bb2174133fc6c9fb95794efb7ff894",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CAB24\",\"who\":\"sol-AB24\",\"note\":\"Batch39 complete130B inventory updater, mapped global and exact B320/B2B4 actual record selector analogues.\"}",
+          "created_at": "2026-10-30T15:46:46Z",
+          "id": 6526941085,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:46:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "59093e05764f9001927ad78f12c96e249190dc7e08b66f9a972e8e6cef277b4c",
+        "result": {
+          "address": "0x080CAB24",
+          "claim_id": 6526941085,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526941085,
+          "status": "accepted",
+          "who": "sol-AB24"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3fb2813fa4d1bd9e9e04b550295e6325dbc5a056f55dffac41f3ff1c69921d46",
+        "acknowledged_cursor": 6526955035,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3fb2813fa4d1bd9e9e04b550295e6325dbc5a056f55dffac41f3ff1c69921d46",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08121E3C\",\"who\":\"sol-1E3C\",\"note\":\"Batch40 complete12B byte getter, exact mapped pointer and newly reserved inverse setter1E30 field0E.\"}",
+          "created_at": "2026-10-30T15:47:26Z",
+          "id": 6526955035,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:47:26Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "59093e05764f9001927ad78f12c96e249190dc7e08b66f9a972e8e6cef277b4c",
+        "result": {
+          "address": "0x08121E3C",
+          "claim_id": 6526955035,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526955035,
+          "status": "accepted",
+          "who": "sol-1E3C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
