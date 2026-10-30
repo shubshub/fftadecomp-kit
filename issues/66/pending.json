@@ -63,6 +63,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2fd2ef4a37a1da491dee670b4827724bd3b9596d1bba878ee56891b4e8aa08d7",
+        "acknowledged_cursor": 6532714988,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2fd2ef4a37a1da491dee670b4827724bd3b9596d1bba878ee56891b4e8aa08d7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060618\",\"who\":\"sol-0618\",\"note\":\"Complete528-byte object-input handler; actual60468 byte output dependency. Existing named-data-buffer-v1 and mapped0200F44C/03000000 data. Actual helper ABI and pool ownership qualified.\"}",
+          "created_at": "2026-10-30T20:23:16Z",
+          "id": 6532714988,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T20:23:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4a6f451ca4327d20de8fc3ddf78d116845a1936611b956acd5135626ac028940",
+        "result": {
+          "address": "0x08060618",
+          "claim_id": 6532714988,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6532714988,
+          "status": "accepted",
+          "who": "sol-0618"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
