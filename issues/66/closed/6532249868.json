@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "28504f083bf535bc57f1adc87b6c7ad8b47c22170d80461acd441ecaee143aca",
+    "acknowledged_cursor": 6532249868,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "28504f083bf535bc57f1adc87b6c7ad8b47c22170d80461acd441ecaee143aca",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08041FB4\",\"who\":\"sol-1FB4\",\"note\":\"Complete112-byte scalar caller, actual defining17B50 and CpuSet ABIs, exact existing addressed func_08142950(s32,s32) conditional call route; no numeric percent-zero claim.\"}",
+      "created_at": "2026-10-30T19:56:40Z",
+      "id": 6532249868,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T19:56:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7b4108010f54c338432c89161eddfed6f69f70c8751b2ea79dc9c2fe5d42241d",
+    "result": {
+      "address": "0x08041FB4",
+      "claim_id": 6532249868,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6532249868,
+      "status": "accepted",
+      "who": "sol-1FB4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "9ddcfe1cbb470bffc6653aaff2c6ad4958abbe3957a8fe7c32e11b2831088187",
+    "acknowledged_cursor": 6532510658,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9ddcfe1cbb470bffc6653aaff2c6ad4958abbe3957a8fe7c32e11b2831088187",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08041FB4\",\"who\":\"sol-1FB4\",\"claim_id\":6532249868,\"reason\":\"Three grounded natural forms exhausted. Sole first-source compiler diagnostic108 bytes versus112 target; later extents unmeasured. Default addressed-call exact-byte guard fails. No MATCH; final source and diagnosis Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural forms; actual addressed remainder call\"}",
+      "created_at": "2026-10-30T20:11:49Z",
+      "id": 6532510658,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T20:11:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f09354c51279e2d208c0b0a9394158ff967f8e42b23940e4f45d7256b2631957",
+    "result": {
+      "address": "0x08041FB4",
+      "claim_id": 6532249868,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6532510658,
+      "status": "accepted",
+      "who": "sol-1FB4"
+    }
+  }
+}
