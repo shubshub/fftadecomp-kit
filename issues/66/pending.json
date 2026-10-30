@@ -95,6 +95,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a048410660a136bcac62237f059427a13dc536b1d921471a9dba2630897d4cd8",
+        "acknowledged_cursor": 6522071823,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a048410660a136bcac62237f059427a13dc536b1d921471a9dba2630897d4cd8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08133970\",\"who\":\"sol-3970\",\"note\":\"Sol isolated complete-function matching, after inspected no-submission capacity failure.\"}",
+          "created_at": "2026-10-30T11:55:29Z",
+          "id": 6522071594,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:55:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ff20e0a0aac0fc4c940e5d2e18db4ac39bbe9357836f785358092eea29791659",
+        "result": {
+          "address": "0x08133970",
+          "claim_id": 6522071594,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522071594,
+          "status": "accepted",
+          "who": "sol-3970"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4889c914055ac8d3735731cc6e987a0a92248133549d18f91f188fc803d64aa6",
+        "acknowledged_cursor": 6522071823,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4889c914055ac8d3735731cc6e987a0a92248133549d18f91f188fc803d64aa6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDAFC\",\"who\":\"sol-DAFC\",\"note\":\"Sol isolated complete-function matching, after inspected no-submission capacity failure.\"}",
+          "created_at": "2026-10-30T11:55:29Z",
+          "id": 6522071715,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:55:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ff20e0a0aac0fc4c940e5d2e18db4ac39bbe9357836f785358092eea29791659",
+        "result": {
+          "address": "0x080BDAFC",
+          "claim_id": 6522071715,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522071715,
+          "status": "accepted",
+          "who": "sol-DAFC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "aa734daa20b0413d819a48796b4fd6a78eda818d0e6501b83e660d3b7d2620a4",
+        "acknowledged_cursor": 6522071823,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aa734daa20b0413d819a48796b4fd6a78eda818d0e6501b83e660d3b7d2620a4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D2F0C\",\"who\":\"sol-2F0C\",\"note\":\"Sol isolated complete-function matching, after inspected no-submission capacity failure.\"}",
+          "created_at": "2026-10-30T11:55:29Z",
+          "id": 6522071823,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:55:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ff20e0a0aac0fc4c940e5d2e18db4ac39bbe9357836f785358092eea29791659",
+        "result": {
+          "address": "0x080D2F0C",
+          "claim_id": 6522071823,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522071823,
+          "status": "accepted",
+          "who": "sol-2F0C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
