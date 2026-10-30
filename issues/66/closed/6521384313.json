@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dd579d0235088091e00deb8da62465fe11790000eb60fb50d112c2ed47195d82",
+    "acknowledged_cursor": 6521417602,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dd579d0235088091e00deb8da62465fe11790000eb60fb50d112c2ed47195d82",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802D704\",\"who\":\"sol-D704\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:18:39Z",
+      "id": 6521384313,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:18:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+    "result": {
+      "address": "0x0802D704",
+      "claim_id": 6521384313,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521384313,
+      "status": "accepted",
+      "who": "sol-D704"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ba3d835738149a485e8a4dde564dc35945cd82c9a569a36ae3e5e1b562ad5bf4",
+    "acknowledged_cursor": 6521417602,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ba3d835738149a485e8a4dde564dc35945cd82c9a569a36ae3e5e1b562ad5bf4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802D704\",\"who\":\"sol-D704\",\"claim_id\":6521384313,\"reason\":\"Complete plausible 16-byte direct-call MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:20:37Z",
+      "id": 6521417602,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:20:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+    "result": {
+      "address": "0x0802D704",
+      "claim_id": 6521384313,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521417602,
+      "status": "accepted",
+      "who": "sol-D704"
+    }
+  }
+}

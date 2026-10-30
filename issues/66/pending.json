@@ -59,6 +59,226 @@
           "who": "sol-FEB8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dd579d0235088091e00deb8da62465fe11790000eb60fb50d112c2ed47195d82",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dd579d0235088091e00deb8da62465fe11790000eb60fb50d112c2ed47195d82",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802D704\",\"who\":\"sol-D704\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:18:39Z",
+          "id": 6521384313,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:18:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x0802D704",
+          "claim_id": 6521384313,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521384313,
+          "status": "accepted",
+          "who": "sol-D704"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "ba3d835738149a485e8a4dde564dc35945cd82c9a569a36ae3e5e1b562ad5bf4",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ba3d835738149a485e8a4dde564dc35945cd82c9a569a36ae3e5e1b562ad5bf4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802D704\",\"who\":\"sol-D704\",\"claim_id\":6521384313,\"reason\":\"Complete plausible 16-byte direct-call MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T11:20:37Z",
+          "id": 6521417602,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:20:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x0802D704",
+          "claim_id": 6521384313,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6521417602,
+          "status": "accepted",
+          "who": "sol-D704"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f3fb6d87221d153c6878e6c58f28d3351ecf2fb8fab1c9fdfc69153c4d485a9d",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f3fb6d87221d153c6878e6c58f28d3351ecf2fb8fab1c9fdfc69153c4d485a9d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A83DC\",\"who\":\"sol-83DC\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:19:01Z",
+          "id": 6521390274,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:19:01Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x080A83DC",
+          "claim_id": 6521390274,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521390274,
+          "status": "accepted",
+          "who": "sol-83DC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ba96172e7efffb1a3a57718fb684c7d8328962ee5fdb76759fd416812cda906c",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ba96172e7efffb1a3a57718fb684c7d8328962ee5fdb76759fd416812cda906c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A9528\",\"who\":\"sol-9528\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:19:22Z",
+          "id": 6521396318,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:19:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x080A9528",
+          "claim_id": 6521396318,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521396318,
+          "status": "accepted",
+          "who": "sol-9528"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8e77a340fb6bc3baa0317b2ae3bd2b51004c5b145aeb3e3b8328cc1b258a3708",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8e77a340fb6bc3baa0317b2ae3bd2b51004c5b145aeb3e3b8328cc1b258a3708",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A9538\",\"who\":\"sol-9538\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:19:38Z",
+          "id": 6521400931,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:19:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x080A9538",
+          "claim_id": 6521400931,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521400931,
+          "status": "accepted",
+          "who": "sol-9538"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f655a5b36ad990e3d89ef8e82e7ec09db078e3557684a6ec513f8de3fe7c2f87",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f655a5b36ad990e3d89ef8e82e7ec09db078e3557684a6ec513f8de3fe7c2f87",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C17B8\",\"who\":\"sol-17B8\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:19:57Z",
+          "id": 6521406242,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:19:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x080C17B8",
+          "claim_id": 6521406242,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521406242,
+          "status": "accepted",
+          "who": "sol-17B8"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1ca0a057062c4ca149d0b9669283920cf4a13ea5ee9b95404a7c903eb77cf3ad",
+        "acknowledged_cursor": 6521417602,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1ca0a057062c4ca149d0b9669283920cf4a13ea5ee9b95404a7c903eb77cf3ad",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DF790\",\"who\":\"sol-F790\",\"note\":\"Match one complete plausible direct-call wrapper with an isolated gpt-6.1-sol executor\"}",
+          "created_at": "2026-10-30T11:20:16Z",
+          "id": 6521411703,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:20:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c618573b1d3f4c537a42ad4cb4c4085e21bd55be057e4795157cb03b93c80452",
+        "result": {
+          "address": "0x080DF790",
+          "claim_id": 6521411703,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521411703,
+          "status": "accepted",
+          "who": "sol-F790"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
