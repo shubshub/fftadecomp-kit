@@ -187,6 +187,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ab96998f4f0b8d6385bcb009a6d6a3a716af49d2511e74e52f185a6ed5e06ca6",
+        "acknowledged_cursor": 6525874401,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ab96998f4f0b8d6385bcb009a6d6a3a716af49d2511e74e52f185a6ed5e06ca6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08148034\",\"who\":\"sol-8034\",\"note\":\"Natural clamped constructor wrapper with defining six-argument ABI and complete matched neighboring frame analogues.\"}",
+          "created_at": "2026-10-30T15:00:04Z",
+          "id": 6525874401,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:00:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "15a7127791430452390b12c88b892d209b704e9130e18d686ee722d0c2d3e60c",
+        "result": {
+          "address": "0x08148034",
+          "claim_id": 6525874401,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525874401,
+          "status": "accepted",
+          "who": "sol-8034"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
