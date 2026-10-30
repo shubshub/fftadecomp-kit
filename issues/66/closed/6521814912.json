@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5cf51c33cd496ad645a2a970de7128fbbf2af7ba4a95ddf6714a439c3ebc2903",
+    "acknowledged_cursor": 6521843679,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5cf51c33cd496ad645a2a970de7128fbbf2af7ba4a95ddf6714a439c3ebc2903",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB524\",\"who\":\"sol-B524\",\"note\":\"Sol isolated complete-function matching under existing typed named-data profile.\"}",
+      "created_at": "2026-10-30T11:43:24Z",
+      "id": 6521814912,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:43:24Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c5347f3edf2226070de517233bbfeac310341c548eef8ed54591ab7609f0dcb8",
+    "result": {
+      "address": "0x080CB524",
+      "claim_id": 6521814912,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521814912,
+      "status": "accepted",
+      "who": "sol-B524"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "31fa612daea32fc49a6eb9ae418868fb3baa64cb1c8ec5aa8828a2ca64e22579",
+    "acknowledged_cursor": 6521869937,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "31fa612daea32fc49a6eb9ae418868fb3baa64cb1c8ec5aa8828a2ca64e22579",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CB524\",\"who\":\"sol-B524\",\"claim_id\":6521814912,\"reason\":\"Complete24-byte typed pointer-table getter MATCH on first native compile, plausible source.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:46:07Z",
+      "id": 6521869937,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:46:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+    "result": {
+      "address": "0x080CB524",
+      "claim_id": 6521814912,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521869937,
+      "status": "accepted",
+      "who": "sol-B524"
+    }
+  }
+}

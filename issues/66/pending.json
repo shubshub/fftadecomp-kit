@@ -90,6 +90,194 @@
           "who": "sol-B524"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "31fa612daea32fc49a6eb9ae418868fb3baa64cb1c8ec5aa8828a2ca64e22579",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "31fa612daea32fc49a6eb9ae418868fb3baa64cb1c8ec5aa8828a2ca64e22579",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CB524\",\"who\":\"sol-B524\",\"claim_id\":6521814912,\"reason\":\"Complete24-byte typed pointer-table getter MATCH on first native compile, plausible source.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T11:46:07Z",
+          "id": 6521869937,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:46:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x080CB524",
+          "claim_id": 6521814912,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6521869937,
+          "status": "accepted",
+          "who": "sol-B524"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "25bcb85527727a7e2078b58d69d0e0ec1c36cd2672ac1c13239ce22305d3227e",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "25bcb85527727a7e2078b58d69d0e0ec1c36cd2672ac1c13239ce22305d3227e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803865C\",\"who\":\"sol-865C\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+          "created_at": "2026-10-30T11:45:49Z",
+          "id": 6521863564,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:45:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x0803865C",
+          "claim_id": 6521863564,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521863564,
+          "status": "accepted",
+          "who": "sol-865C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "837fc163e4d59367b2c60749fbc38a61dfbef1c76eaaf9f6f8547f005a49710b",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "837fc163e4d59367b2c60749fbc38a61dfbef1c76eaaf9f6f8547f005a49710b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080038C8\",\"who\":\"sol-38C8\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+          "created_at": "2026-10-30T11:45:49Z",
+          "id": 6521863655,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:45:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x080038C8",
+          "claim_id": 6521863655,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521863655,
+          "status": "accepted",
+          "who": "sol-38C8"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "31f18e7ab43c8f3f7a9944fb9ba64d94c33dfb0f8f77695e0fd30da5558024c7",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "31f18e7ab43c8f3f7a9944fb9ba64d94c33dfb0f8f77695e0fd30da5558024c7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08038524\",\"who\":\"sol-8524\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+          "created_at": "2026-10-30T11:45:49Z",
+          "id": 6521863685,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:45:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x08038524",
+          "claim_id": 6521863685,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521863685,
+          "status": "accepted",
+          "who": "sol-8524"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8149b2a9bdac4d3970d74263ca62c94f88de418a1304c46c010f0138ca2b0a1a",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8149b2a9bdac4d3970d74263ca62c94f88de418a1304c46c010f0138ca2b0a1a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C19BC\",\"who\":\"sol-19BC\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+          "created_at": "2026-10-30T11:45:49Z",
+          "id": 6521863709,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:45:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x080C19BC",
+          "claim_id": 6521863709,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521863709,
+          "status": "accepted",
+          "who": "sol-19BC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "477fd559791d7c8470aa2a79ecdec90541668c472d9b3b07bee1ef24a7028444",
+        "acknowledged_cursor": 6521869937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "477fd559791d7c8470aa2a79ecdec90541668c472d9b3b07bee1ef24a7028444",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08038678\",\"who\":\"sol-8678\",\"note\":\"Sol isolated complete-function C matching; existing proof profiles and mapped symbols only.\"}",
+          "created_at": "2026-10-30T11:45:49Z",
+          "id": 6521863780,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T11:45:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e4dc4d3424bfabb2ab3b736b45d81e818452f02206539b93116626e42dfbf4d9",
+        "result": {
+          "address": "0x08038678",
+          "claim_id": 6521863780,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6521863780,
+          "status": "accepted",
+          "who": "sol-8678"
+        }
+      },
       "release": null
     }
   ],
