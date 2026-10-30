@@ -59,6 +59,102 @@
           "who": "sol-D90C"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f88c7fd1ea5c4c45125c65afe3bf9c42624c73e7c68ef83b762179ce8011e642",
+        "acknowledged_cursor": 6522398718,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f88c7fd1ea5c4c45125c65afe3bf9c42624c73e7c68ef83b762179ce8011e642",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08067574\",\"who\":\"sol-7574\",\"note\":\"Sol isolated complete-function C matching; existing conditional CFG/direct-call profiles, no compiler steering.\"}",
+          "created_at": "2026-10-30T12:07:56Z",
+          "id": 6522398481,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:07:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c88872b4de9f4c16320b3a16dd740cc5df81536d7e823fbec30b7892f0e5d1ab",
+        "result": {
+          "address": "0x08067574",
+          "claim_id": 6522398481,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522398481,
+          "status": "accepted",
+          "who": "sol-7574"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4b2898612eb157ee753cff3c722620cb634e88f4421fd57e5f81ed7d6d06d5d7",
+        "acknowledged_cursor": 6522398718,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4b2898612eb157ee753cff3c722620cb634e88f4421fd57e5f81ed7d6d06d5d7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804FB84\",\"who\":\"sol-FB84\",\"note\":\"Sol isolated complete-function C matching; existing conditional CFG/direct-call profiles, no compiler steering.\"}",
+          "created_at": "2026-10-30T12:07:56Z",
+          "id": 6522398609,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:07:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c88872b4de9f4c16320b3a16dd740cc5df81536d7e823fbec30b7892f0e5d1ab",
+        "result": {
+          "address": "0x0804FB84",
+          "claim_id": 6522398609,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522398609,
+          "status": "accepted",
+          "who": "sol-FB84"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e9a2477e831ac9172f9bae5a8acb8e96ad0d1c8f39fb05b30b822b5dcbe8786d",
+        "acknowledged_cursor": 6522398718,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e9a2477e831ac9172f9bae5a8acb8e96ad0d1c8f39fb05b30b822b5dcbe8786d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CCBFC\",\"who\":\"sol-CBFC\",\"note\":\"Sol isolated complete-function C matching; existing conditional CFG/direct-call profiles, no compiler steering.\"}",
+          "created_at": "2026-10-30T12:07:56Z",
+          "id": 6522398718,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:07:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c88872b4de9f4c16320b3a16dd740cc5df81536d7e823fbec30b7892f0e5d1ab",
+        "result": {
+          "address": "0x080CCBFC",
+          "claim_id": 6522398718,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522398718,
+          "status": "accepted",
+          "who": "sol-CBFC"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
