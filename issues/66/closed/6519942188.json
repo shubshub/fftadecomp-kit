@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ffa0509b22a2bf0c0be76956ff539afe4cdb46d8e12440cecda041ee44bf9707",
+    "acknowledged_cursor": 6519972502,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ffa0509b22a2bf0c0be76956ff539afe4cdb46d8e12440cecda041ee44bf9707",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801C984\",\"who\":\"sol-C984\",\"note\":\"Resume saved 108-byte coordinate-helper matching\"}",
+      "created_at": "2026-10-30T09:55:40Z",
+      "id": 6519942188,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T09:55:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "164dee5760bc33275b475ca38efe94700060856fea04ddf1e0fb861fa8390058",
+    "result": {
+      "address": "0x0801C984",
+      "claim_id": 6519942188,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6519942188,
+      "status": "accepted",
+      "who": "sol-C984"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8ac63e8b8dfcdb38a01055813dd3100c42c24fa7082c915c519db4a9d2986b65",
+    "acknowledged_cursor": 6520082606,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8ac63e8b8dfcdb38a01055813dd3100c42c24fa7082c915c519db4a9d2986b65",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801C984\",\"who\":\"sol-C984\",\"claim_id\":6519942188,\"reason\":\"Matched complete108-byte coordinate helper with named state and natural signed readbacks; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:02:39Z",
+      "id": 6520063391,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:02:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8174d694e7fdd681cc37bc59d3a6cdf3cd76c048850c25489b32746f14bc74eb",
+    "result": {
+      "address": "0x0801C984",
+      "claim_id": 6519942188,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520063391,
+      "status": "accepted",
+      "who": "sol-C984"
+    }
+  }
+}
