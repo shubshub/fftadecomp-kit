@@ -155,6 +155,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b7d15e4c0e3da5e6899bda4ca76cbe9f33d7058c2946a3328ee9fdaedcdb69fb",
+        "acknowledged_cursor": 6525796673,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b7d15e4c0e3da5e6899bda4ca76cbe9f33d7058c2946a3328ee9fdaedcdb69fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08051048\",\"who\":\"sol-1048\",\"note\":\"Natural fixed twenty-element leaf loop with actual mapped state and u16 output, concrete matched layout analogues.\"}",
+          "created_at": "2026-10-30T14:56:23Z",
+          "id": 6525796673,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:56:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3ec5b9cc47c7d8a071d8be326eb144f0989a62c2a25d0e00178dd531cee0a68a",
+        "result": {
+          "address": "0x08051048",
+          "claim_id": 6525796673,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525796673,
+          "status": "accepted",
+          "who": "sol-1048"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
