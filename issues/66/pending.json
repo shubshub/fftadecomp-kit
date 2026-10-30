@@ -62,6 +62,98 @@
           "who": "sol-83EC"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "95b8229238eb9f7227e80549261f835dab186eec7011b4abfd2c00225fa37c86",
+        "acknowledged_cursor": 6526581522,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "95b8229238eb9f7227e80549261f835dab186eec7011b4abfd2c00225fa37c86",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081483EC\",\"who\":\"sol-83EC\",\"claim_id\":6526516066,\"reason\":\"First natural RGB average source reached exact native division caller requires exact nonoverlapping mapped Thumb span refusal; no comparison or report.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; one natural constant3 unsigned division form; precise profile span gate; no retries\"}",
+          "created_at": "2026-10-30T15:30:36Z",
+          "id": 6526581522,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:30:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cc8a81ea19304512b68e1992b16dfe82d725dc134465ef5167b4a9b2cd08923b",
+        "result": {
+          "address": "0x081483EC",
+          "claim_id": 6526516066,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6526581522,
+          "status": "accepted",
+          "who": "sol-83EC"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "01f01a0b923c4968a4a1fc7aa21fe10b0d614eb2036567907ccb5f8877d82c76",
+        "acknowledged_cursor": 6526581522,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "01f01a0b923c4968a4a1fc7aa21fe10b0d614eb2036567907ccb5f8877d82c76",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB2B4\",\"who\":\"sol-B2B4\",\"note\":\"Batch36 complete inventory quantity-difference leaf, exact adjacent successful B320 source and record-selector evidence.\"}",
+          "created_at": "2026-10-30T15:29:34Z",
+          "id": 6526553278,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:29:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cc8a81ea19304512b68e1992b16dfe82d725dc134465ef5167b4a9b2cd08923b",
+        "result": {
+          "address": "0x080CB2B4",
+          "claim_id": 6526553278,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526553278,
+          "status": "accepted",
+          "who": "sol-B2B4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e94bed9469a515e69564772f9544f5f9b864184445e294444accbb77c2437e9f",
+        "acknowledged_cursor": 6526581522,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e94bed9469a515e69564772f9544f5f9b864184445e294444accbb77c2437e9f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813EDA0\",\"who\":\"sol-EDA0\",\"note\":\"Batch36 complete DMA two-fill wrapper, concrete matched 57B90 analogue and actual D48 ABI.\"}",
+          "created_at": "2026-10-30T15:30:11Z",
+          "id": 6526570092,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:30:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cc8a81ea19304512b68e1992b16dfe82d725dc134465ef5167b4a9b2cd08923b",
+        "result": {
+          "address": "0x0813EDA0",
+          "claim_id": 6526570092,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526570092,
+          "status": "accepted",
+          "who": "sol-EDA0"
+        }
+      },
       "release": null
     }
   ],
