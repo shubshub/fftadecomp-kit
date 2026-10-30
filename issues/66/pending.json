@@ -30,7 +30,35 @@
           "who": "sol-30B8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "86f599a7cdf4c683e26f63431148fe254f55b6c298e14fdd38eda5c8694ca89f",
+        "acknowledged_cursor": 6524592570,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "86f599a7cdf4c683e26f63431148fe254f55b6c298e14fdd38eda5c8694ca89f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081130B8\",\"who\":\"sol-30B8\",\"claim_id\":6524422008,\"reason\":\"One bounded faithful source: native complete buffer-caller span refusal372B vs360B, correct8B frame. Defining u16 position helper causes required conversion differences; additional record address recomputation differs. Full source/runtime/refusal retained in Parked; no native comparison or plausibility verdict.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; actual defining helper prototypes and natural paired-interpolation record loop; no steering\"}",
+          "created_at": "2026-10-30T13:58:15Z",
+          "id": 6524592570,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:58:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f0aa3e0fd440cae67a40020e473e79422f829a048d3cfbef0961b89f090fbfed",
+        "result": {
+          "address": "0x081130B8",
+          "claim_id": 6524422008,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6524592570,
+          "status": "accepted",
+          "who": "sol-30B8"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-B274"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "53c4777a3be7ad9d674c57f0baedb043c7d31c66f6f67d140d70a38693f4611f",
+        "acknowledged_cursor": 6524592570,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "53c4777a3be7ad9d674c57f0baedb043c7d31c66f6f67d140d70a38693f4611f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806B274\",\"who\":\"sol-B274\",\"claim_id\":6524525095,\"reason\":\"First native attempt complete196B plausible byte-identical match; exact source-bound proof and current runtime retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T13:57:38Z",
+          "id": 6524579398,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:57:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f0aa3e0fd440cae67a40020e473e79422f829a048d3cfbef0961b89f090fbfed",
+        "result": {
+          "address": "0x0806B274",
+          "claim_id": 6524525095,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6524579398,
+          "status": "accepted",
+          "who": "sol-B274"
+        }
+      }
     },
     {
       "claim": {

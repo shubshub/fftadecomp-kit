@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "26be678142b52a913a3f7e5aac3ed85e79fc36252e05c8d74e354f32458270c6",
+    "acknowledged_cursor": 6524431396,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "26be678142b52a913a3f7e5aac3ed85e79fc36252e05c8d74e354f32458270c6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081130B8\",\"who\":\"sol-30B8\",\"note\":\"Batch28 bounded plausible matching: paired interpolation record update and position bounds. Candidate complete span and actual helper contracts retained.\"}",
+      "created_at": "2026-10-30T13:50:21Z",
+      "id": 6524422008,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:50:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a17bcfb89ec75ed6a31a422bb68db09c4caf5ffa9ee0cacfba61f0fcd3313b1b",
+    "result": {
+      "address": "0x081130B8",
+      "claim_id": 6524422008,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6524422008,
+      "status": "accepted",
+      "who": "sol-30B8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "86f599a7cdf4c683e26f63431148fe254f55b6c298e14fdd38eda5c8694ca89f",
+    "acknowledged_cursor": 6524592570,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "86f599a7cdf4c683e26f63431148fe254f55b6c298e14fdd38eda5c8694ca89f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081130B8\",\"who\":\"sol-30B8\",\"claim_id\":6524422008,\"reason\":\"One bounded faithful source: native complete buffer-caller span refusal372B vs360B, correct8B frame. Defining u16 position helper causes required conversion differences; additional record address recomputation differs. Full source/runtime/refusal retained in Parked; no native comparison or plausibility verdict.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; actual defining helper prototypes and natural paired-interpolation record loop; no steering\"}",
+      "created_at": "2026-10-30T13:58:15Z",
+      "id": 6524592570,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:58:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f0aa3e0fd440cae67a40020e473e79422f829a048d3cfbef0961b89f090fbfed",
+    "result": {
+      "address": "0x081130B8",
+      "claim_id": 6524422008,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6524592570,
+      "status": "accepted",
+      "who": "sol-30B8"
+    }
+  }
+}
