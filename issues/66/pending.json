@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "8b36ab4dc3c676e0bc71d45960b5719e0582615ab7f6c298175dc57d38d37bdd",
-        "acknowledged_cursor": 6522657924,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8b36ab4dc3c676e0bc71d45960b5719e0582615ab7f6c298175dc57d38d37bdd",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08037DF0\",\"who\":\"sol-7DF0\",\"note\":\"Sol isolated full52-72byte function C matching, evidence-backed local types/call signatures; existing proof profiles only.\"}",
-          "created_at": "2026-10-30T12:17:58Z",
-          "id": 6522657924,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T12:17:58Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4f2eff9a7076ecf4b600173103f8c599674f0952c265395780a6c4f10b0407f5",
-        "result": {
-          "address": "0x08037DF0",
-          "claim_id": 6522657924,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6522657924,
-          "status": "accepted",
-          "who": "sol-7DF0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "427045a9d3a676a3066f501dfc6e4d47b5fd0c7abda3b38cbd68bd7e07100090",
-        "acknowledged_cursor": 6522774820,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "427045a9d3a676a3066f501dfc6e4d47b5fd0c7abda3b38cbd68bd7e07100090",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08037DF0\",\"who\":\"sol-7DF0\",\"claim_id\":6522657924,\"reason\":\"Best genuine source plausible and complete56bytes but54/56bytes and19/20instructions match: adds r0,r0,r4 versus adds r0,r4,r0 at08037DFC. Other natural forms changed aggregate stride or shrank symbol52<56. Exact best source/report and failures preserved in Parked/08037DF0.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; typed aggregate layout, observed byte offsets, global pointer slot and local record formulations\"}",
-          "created_at": "2026-10-30T12:24:21Z",
-          "id": 6522774820,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T12:24:21Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "98f37a97d30ffb43eccea2c5df13bc732454d14135c9b97dc38cf577368064de",
-        "result": {
-          "address": "0x08037DF0",
-          "claim_id": 6522657924,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6522774820,
-          "status": "accepted",
-          "who": "sol-7DF0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "b189da8ea331b46f4b6e8f02485a257fac4dea2c19be5f3b109084a78a37b453",
         "acknowledged_cursor": 6522860455,
         "body_provenance": "acceptance-time",
