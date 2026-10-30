@@ -80,7 +80,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 call_preservation=None, bounded_output_proof=None, zero_index_profile=None,
                 entry_stack_policy=None, local_alias_slot_policy=None, finite_stack_index_policy=None,
                 discarded_exit_scratch=None, formal_stack_callee_proof=None,
-                formal_stack_alias_constant_policy=None):
+                formal_stack_alias_constant_policy=None, formal_stack_entry_word_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -98,6 +98,15 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         from bounded_stack_output_profile import BoundedOutputProof
         if type(bounded_output_proof) is not BoundedOutputProof or not stack_aliases or buffer_proof is not None:
             raise ValueError("bounded output requires its explicit native alias proof")
+    named_entry_word = formal_stack_entry_word_policy is not None
+    if named_entry_word:
+        from ordinary_named_output_entry_word_inventory import SELECTOR as NAMED_ENTRY_WORD
+        from ordinary_two_output_callees_inventory import NamedReadonlyFormalLeafProof
+        import readonly_entry_stack_profile as named_entry
+        if type(formal_stack_entry_word_policy) is not str or formal_stack_entry_word_policy != NAMED_ENTRY_WORD or \
+                type(formal_stack_callee_proof) is not NamedReadonlyFormalLeafProof:
+            raise ValueError('named entry word requires its exact explicit composition and fresh named helper')
+        named_entry.validate(entry_stack_policy)
     if formal_stack_callee_proof is not None:
         from ordinary_formal_stack_callee_inventory import FormalStackCalleeProof
         from ordinary_two_output_callees_inventory import TwoOutputCalleesProof, NamedReadonlyFormalLeafProof
@@ -106,7 +115,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         if type(formal_stack_callee_proof) not in (FormalStackCalleeProof, TwoOutputCalleesProof, NamedReadonlyFormalLeafProof, SecondFormalOutputCalleesProof, ThirdFormalOutputCalleesProof) or not stack_aliases or \
                 local_alias_slot_policy is None or any(value is not None for value in (
                     buffer_proof, bounded_output_proof, runtime_calls, call_preservation,
-                    entry_stack_policy, finite_stack_index_policy, discarded_exit_scratch)):
+                    entry_stack_policy if not named_entry_word else None,
+                    finite_stack_index_policy, discarded_exit_scratch)):
             raise ValueError('formal stack callees require their exclusive fresh native proof and local slots')
         formal_stack_callee_proof.validate_calls(calls)
     discarded_aliases = set()
@@ -158,7 +168,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     if local_alias_slot_policy is not None:
         import local_alias_slot_profile as alias_slots
         alias_slots.validate(local_alias_slot_policy)
-        if not stack_aliases or buffer_proof is not None or bounded_output_proof is not None or entry_stack_policy is not None:
+        if not stack_aliases or buffer_proof is not None or bounded_output_proof is not None or \
+                entry_stack_policy is not None and not named_entry_word:
             raise ValueError("local alias slots require exclusive local-only stack alias policy")
         slot_states = alias_slots.prove_constants(instructions, edges, address,
             constant_domain=None if formal_stack_alias_constant_policy is None else alias_slots.FORMAL_MOVS10_DOMAIN)
@@ -532,6 +543,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             'native_nonescape_proof': False}
     if formal_stack_callee_proof is not None:
         proof['formal_stack_callee'] = formal_stack_callee_proof.fingerprint()
+    if named_entry_word:
+        proof['formal_stack_entry_word_policy'] = formal_stack_entry_word_policy
     if zero_states is not None:
         proof["zero_index_profile"] = zero_index_profile
         proof["zero_index_signed_loads"] = [[site,base,index,width,list(origins)]
