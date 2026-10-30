@@ -63,6 +63,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d50a7b4ffaf528b9cf351e4234946ed6c1667174923e946a21bae21aaf71a5ed",
+        "acknowledged_cursor": 6525417395,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d50a7b4ffaf528b9cf351e4234946ed6c1667174923e946a21bae21aaf71a5ed",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08147FD8\",\"who\":\"sol-7FD8\",\"note\":\"Natural bounded clamped-range constructor matching, defining helper ABI and recent matched analogue.\"}",
+          "created_at": "2026-10-30T14:38:49Z",
+          "id": 6525417395,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:38:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "85074cfbef6c7317ee262d185b7025a24fea05c3e99782a5f4130a127a16617e",
+        "result": {
+          "address": "0x08147FD8",
+          "claim_id": 6525417395,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525417395,
+          "status": "accepted",
+          "who": "sol-7FD8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
