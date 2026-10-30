@@ -126,7 +126,8 @@ def dependency_records():
 
 def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=None,
                   scalar_entries=None, allowed_writes=None, stack_load_widths=(4,),
-                  stack_store_widths=(4,), stack_input_words=(), stack_adjusted_returns=False, thumb_pc_returns=()):
+                  stack_store_widths=(4,), stack_input_words=(), stack_adjusted_returns=False, thumb_pc_returns=(),
+                  argument_effect_policy=None):
     """Prove this pinned body's local returns and callee-saved/write ABI.
 
     This is deliberately separate from the caller verifier. Loads are target
@@ -142,6 +143,29 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                                    ARM_REG_R0, ARM_REG_R3, ARM_REG_R4, ARM_REG_R11,
                                    ARM_REG_R12, ARM_REG_SP, ARM_REG_LR, ARM_REG_PC)
     from analyze import refine_function
+    effect_schema = "thumb-formal-argument-effects-v1"
+
+    def footprints(value):
+        if type(value) is not list or any(type(item) is not list or len(item) != 3 or
+                any(type(part) is not int for part in item) or not 0 <= item[0] <= 3 or
+                item[2] not in (1, 2, 4) or not 0 <= item[1] <= 0x7FFFFFFF-item[2] or
+                item[1] % item[2] for item in value) or value != sorted(value) or \
+                len({tuple(item) for item in value}) != len(value):
+            raise ValueError("software-float argument effects require exact ordered aligned finite formal footprints")
+        return {tuple(item) for item in value}
+
+    def effect_policy(value):
+        if type(value) is not dict or set(value) != {"schema", "reads", "writes"} or \
+                type(value["schema"]) is not str or value["schema"] != effect_schema:
+            raise ValueError("software-float argument effect policy schema is invalid")
+        return footprints(value["reads"]), footprints(value["writes"])
+
+    permitted_reads = None
+    if argument_effect_policy is not None:
+        permitted_reads, effect_writes = effect_policy(argument_effect_policy)
+        if allowed_writes is not None and set(allowed_writes) != effect_writes:
+            raise ValueError("software-float argument effect and write policies differ")
+        allowed_writes = effect_writes
     body = rom[start - 0x08000000:end - 0x08000000]
     layout = refine_function(body, start, entries, max_bytes=end - start,
                              max_instructions=1024, rom_end=0x08000000 + len(rom),
@@ -176,6 +200,7 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
     initial[ARM_REG_SP] = ("stack", 0, 0)
     states, pending, edges, returns, writes = {start: (initial, {}, frozenset())}, [start], {}, set(), set()
     stack_reads = set()
+    argument_reads, argument_accesses = set(), set()
 
     def adjusted(value, distance):
         if value is None:
@@ -196,10 +221,12 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
         operands = instruction.operands
         regs = [op.reg for op in operands if op.type == ARM_OP_REG]
 
-        def access(pointer, loading, value=None, width=4):
+        def access(pointer, loading, value=None, width=4, argument_read=False):
             if pointer is not None and pointer[0] == "stack":
                 offset = pointer[2]
-                if loading and width == 4 and offset in stack_input_words:
+                if argument_read and any(offset < slot + 4 and slot < offset + width for slot in saved):
+                    raise ValueError("software-float child argument read overlaps a saved register")
+                if loading and not argument_read and width == 4 and offset in stack_input_words:
                     stack_reads.add((offset, width))
                     return unknown
                 if width not in (stack_load_widths if loading else stack_store_widths) or \
@@ -215,6 +242,12 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
                     for slot in memory:
                         if offset < slot + 4 and slot < offset + width:
                             memory[slot] = unknown
+            elif loading and argument_effect_policy is not None:
+                if pointer is None or pointer[0] != "entry" or \
+                        not ARM_REG_R0 <= pointer[1] <= ARM_REG_R3 or pointer[2] % width or \
+                        (pointer[1] - ARM_REG_R0, pointer[2], width) not in permitted_reads:
+                    raise ValueError("software-float runtime has an unbounded external read")
+                argument_reads.add((pointer[1] - ARM_REG_R0, pointer[2], width))
             elif not loading:
                 if pointer is None or pointer[0] != "entry" or \
                         not ARM_REG_R0 <= pointer[1] <= ARM_REG_R3 or \
@@ -264,8 +297,33 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
             target = expected_calls.get(site)
             if target not in dependencies or operands[0].imm != target:
                 raise ValueError("software-float runtime call has no native dependency proof")
-            for number, offset, width in dependencies[target]["writes"]:
-                access(adjusted(registers.get(ARM_REG_R0 + number), offset), False, width=width)
+            child = dependencies[target]
+            if argument_effect_policy is not None:
+                effect = child.get("argument_effects") if type(child) is dict else None
+                keys = {"schema", "complete", "address", "end", "body_sha256", "policy",
+                        "reads", "writes", "loaded_values"}
+                if type(effect) is not dict or set(effect) != keys or effect["schema"] != effect_schema or \
+                        effect["complete"] is not True or type(effect["address"]) is not int or \
+                        effect["address"] != target or type(effect["end"]) is not int or \
+                        not 0x08000000 <= target < effect["end"] <= 0x08000000+len(rom) or \
+                        effect["loaded_values"] != "unknown scalars; no numeric facts" or \
+                        effect["body_sha256"] != hashlib.sha256(rom[target-0x08000000:effect["end"]-0x08000000]).hexdigest() or \
+                        child["layout"]["candidate_extent"]["end"] != f'0x{effect["end"]:08X}':
+                    raise ValueError("software-float child lacks a complete bound argument-read/effect receipt")
+                child_reads, child_writes = footprints(effect["reads"]), footprints(effect["writes"])
+                bounds = effect_policy(effect["policy"])
+                if not child_reads <= bounds[0] or not child_writes <= bounds[1] or \
+                        child_writes != {tuple(item) for item in child["writes"]}:
+                    raise ValueError("software-float child actual effects differ from its bound receipt")
+                for number, offset, width in sorted(child_reads):
+                    pointer = adjusted(registers.get(ARM_REG_R0 + number), offset)
+                    access(pointer, True, width=width, argument_read=True)
+                    argument_accesses.add((site, target, "read", number, offset, width, pointer))
+            for number, offset, width in child["writes"]:
+                pointer = adjusted(registers.get(ARM_REG_R0 + number), offset)
+                access(pointer, False, width=width)
+                if argument_effect_policy is not None:
+                    argument_accesses.add((site, target, "write", number, offset, width, pointer))
             for offset, width in dependencies[target].get("stack_reads", ()):
                 # A pinned fifth argument must be a fully written local word
                 # in this caller, not its saved registers or incoming stack.
@@ -362,8 +420,20 @@ def prove_runtime(rom, entries, start, end, count, dependencies, *, call_edges=N
         raise ValueError("software-float runtime has a region without a verified return path")
     if start in public and writes:
         raise ValueError("software-float public scalar helper has external writes")
-    return {"writes": sorted(writes), "stack_reads": sorted(stack_reads),
-            "returns": sorted(returns), "layout": layout}
+    proof = {"writes": sorted(writes), "stack_reads": sorted(stack_reads),
+             "returns": sorted(returns), "layout": layout}
+    if argument_effect_policy is not None:
+        proof["native_edges"] = [[site, list(targets)] for site, targets in sorted(edges.items())]
+        proof["argument_effects"] = {"schema": effect_schema, "complete": True,
+            "address": start, "end": end, "body_sha256": hashlib.sha256(body).hexdigest(),
+            "policy": {"schema": effect_schema,
+                "reads": [list(item) for item in sorted(permitted_reads)],
+                "writes": [list(item) for item in sorted(permitted_writes)]},
+            "reads": [list(item) for item in sorted(argument_reads)],
+            "writes": [list(item) for item in sorted(writes)],
+            "loaded_values": "unknown scalars; no numeric facts"}
+        proof["argument_accesses"] = [list(item[:-1])+[list(item[-1])] for item in sorted(argument_accesses)]
+    return proof
 
 
 def verify_identity(rom, mapping, index):
