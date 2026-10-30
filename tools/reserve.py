@@ -14,14 +14,17 @@ Operational bounds: 64 recent results, 256 rows, 2 KiB requests, and a conservat
 60,000-byte UTF-8 issue body. If even a rejection result cannot fit, neither rows
 nor cursor change. An expired result or timeout is unconfirmed, not
 success. Legacy rows remain ownerless until expiry or maintainer reconciliation.
-Unmatchable evidence stays in the request comment for maintainer review; this
-tool never writes repository contents or creates issues.
+Unmatchable evidence stays in the request comment unless the deployed trusted
+broker archives a proved closed pair to Git before deletion. Clients never
+write repository contents, delete comments, or create issues.
 """
 
 import argparse
+import base64
 import copy
 import datetime
 import html
+import hashlib
 import json
 import os
 import re
@@ -39,6 +42,9 @@ END = "<!-- ffta-ledger:end -->"
 STATE_START = "<!-- ffta-ledger-state\n"
 STATE_END = "\nffta-ledger-state -->"
 REQUEST_PREFIX = "<!-- ffta-reservation-request:v1 -->\n"
+ARCHIVE_REF = "refs/heads/ledger-receipts-v1"
+ARCHIVE_FORMAT = {"version": 1, "purpose": "authenticated-reservation-receipts"}
+ARCHIVE_BATCH = 16
 STALE_DAYS = 3
 MAX_RESULTS = 64
 MAX_ROWS = 256
@@ -134,6 +140,8 @@ def decode_json(value):
 
 
 def api(method, endpoint, payload=None):
+    if method == "DELETE":
+        return delete_api(endpoint, payload)
     command = ["gh", "api", "--method", method, endpoint]
     data = None
     if payload is not None:
@@ -731,11 +739,358 @@ def persist(state, previous_body):
     return body
 
 
-def drain(days=STALE_DAYS):
+def delete_api(endpoint, payload=None):
+    """Archive deletion is a single mutation; an empty HTTP 204 body succeeds."""
+    command = ["gh", "api", "--method", "DELETE", endpoint]
+    data = None
+    if payload is not None:
+        command += ["--input", "-"]
+        data = json.dumps(payload)
+    try:
+        result = subprocess.run(command, input=data, capture_output=True,
+                                text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise LedgerError(f"GitHub request failed: {error}") from error
+    if result.returncode:
+        raise LedgerError(f"GitHub request failed: {result.stderr.strip() or result.stdout.strip()}")
+    return decode_json(result.stdout) if result.stdout.strip() else None
+
+
+def archive_json(value):
+    return json.dumps(value, sort_keys=True, ensure_ascii=False, indent=2) + "\n"
+
+
+def body_hash(body):
+    return hashlib.sha256(body.encode("utf-8")).hexdigest()
+
+
+def archive_oid(value):
+    if not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{40}", value) is None:
+        raise LedgerError("invalid archive Git object identity")
+    return value
+
+
+def receipt_comment(request_id):
+    try:
+        comment = api("GET", f"repos/{KIT_REPO}/issues/comments/{request_id}")
+    except LedgerError as error:
+        if re.fullmatch(r"GitHub request failed: gh: [^\r\n]+ \(HTTP 404\)", str(error)):
+            return None
+        raise
+    if not isinstance(comment, dict) or comment_identity(comment)[0] != request_id or \
+            comment.get("issue_url") != f"https://api.github.com/repos/{KIT_REPO}/issues/{LEDGER_NUMBER}":
+        raise LedgerError("archive comment does not belong to the ledger")
+    snapshot = {key: comment.get(key) for key in
+                ("id", "body", "created_at", "updated_at", "issue_url")}
+    snapshot["user"] = {key: comment["user"].get(key) for key in ("id", "type")}
+    if not isinstance(snapshot["body"], str) or \
+            parse_ts(snapshot["updated_at"]) < parse_ts(snapshot["created_at"]):
+        raise LedgerError("invalid archive comment snapshot")
+    return snapshot
+
+
+def validate_receipt(receipt, operation):
+    if not isinstance(receipt, dict) or set(receipt) != {
+            "comment", "result", "body_sha256", "body_provenance",
+            "acceptance_body_sha256", "acknowledged_cursor", "ledger_body_sha256"}:
+        raise LedgerError("invalid archived receipt fields")
+    comment, result = receipt["comment"], receipt["result"]
+    if not isinstance(comment, dict) or set(comment) != {
+            "id", "body", "created_at", "updated_at", "issue_url", "user"}:
+        raise LedgerError("invalid archived comment fields")
+    request_id, owner_id = comment_identity(comment)
+    request = parse_request(comment["body"])
+    validate_state({"version": 1, "cursor": receipt["acknowledged_cursor"],
+                    "rows": [], "results": [result]})
+    if request is None or request["operation"] != operation or \
+            comment["issue_url"] != f"https://api.github.com/repos/{KIT_REPO}/issues/{LEDGER_NUMBER}" or \
+            parse_ts(comment["updated_at"]) < parse_ts(comment["created_at"]) or \
+            receipt["body_sha256"] != body_hash(comment["body"]):
+        raise LedgerError("archived comment identity or body differs")
+    claim_id = request_id if operation == "claim" else request["claim_id"]
+    expected = {"request_id": request_id, "owner_id": owner_id,
+                "operation": operation, "address": request["address"],
+                "who": request["who"], "claim_id": claim_id,
+                "status": "accepted", "code": 0}
+    expected_message = operation + " accepted"
+    if operation == "release" and request["unmatchable"]:
+        expected_message += "; unmatchable evidence requires maintainer review"
+    if any(result[key] != value for key, value in expected.items()) or result["message"] != expected_message:
+        raise LedgerError("archived request disagrees with authenticated acceptance")
+    if not isinstance(receipt["ledger_body_sha256"], str) or \
+            re.fullmatch(r"[0-9a-f]{64}", receipt["ledger_body_sha256"]) is None:
+        raise LedgerError("invalid archived ledger snapshot hash")
+    if receipt["body_provenance"] == "acceptance-time":
+        if receipt["acceptance_body_sha256"] != receipt["body_sha256"]:
+            raise LedgerError("acceptance-time body hash differs")
+    elif receipt["body_provenance"] != "snapshot-at-archive" or \
+            receipt["acceptance_body_sha256"] != "UNPROVEN":
+        raise LedgerError("invalid legacy snapshot provenance")
+    return request
+
+
+def validate_generation(generation):
+    if not isinstance(generation, dict) or set(generation) != {"claim", "release"}:
+        raise LedgerError("invalid archived claim generation")
+    claim = validate_receipt(generation["claim"], "claim")
+    release = generation["release"]
+    if release is not None:
+        request = validate_receipt(release, "release")
+        before, after = generation["claim"]["result"], release["result"]
+        if after["request_id"] <= before["request_id"] or any(
+                after[key] != before[key] for key in ("claim_id", "owner_id", "who", "address")):
+            raise LedgerError("archived release is not the same authenticated generation")
+        # Keep complete request bodies, including reason/tried/unmatchable, verbatim.
+        if request["claim_id"] != before["request_id"]:
+            raise LedgerError("archived release points at a different claim")
+    return claim
+
+
+class ReceiptArchive:
+    """Trusted broker only. Git publication and readback precede every DELETE.
+
+    pending.json journals accepted claims across the bounded ledger result window.
+    Closed pairs are immutable per-generation files; pending entries remain until
+    both comments are gone, so partial deletion and failed final writes can retry.
+    """
+
+    def __init__(self):
+        endpoint()
+        self.prefix = f"repos/{KIT_REPO}/git/"
+        self.index_path = f"issues/{LEDGER_NUMBER}/pending.json"
+        self.head = self.remote_head()
+        if self.head is None:
+            marker = self.write_blob(ARCHIVE_FORMAT)
+            tree = api("POST", self.prefix + "trees", {"tree": [
+                {"path": "archive.json", "type": "blob", "mode": "100644", "sha": marker}]})
+            tree = archive_oid(tree.get("sha") if isinstance(tree, dict) else None)
+            commit = api("POST", self.prefix + "commits", {
+                "message": "Initialize trusted reservation receipt archive", "tree": tree, "parents": []})
+            self.head = archive_oid(commit.get("sha") if isinstance(commit, dict) else None)
+            api("POST", self.prefix + "refs", {"ref": ARCHIVE_REF, "sha": self.head})
+            if self.remote_head() != self.head:
+                raise LedgerError("archive initialization was not durably confirmed")
+        commit = api("GET", self.prefix + "commits/" + self.head)
+        if not isinstance(commit, dict) or commit.get("sha") != self.head:
+            raise LedgerError("archive commit is unavailable")
+        tree = commit.get("tree")
+        self.tree = archive_oid(tree.get("sha") if isinstance(tree, dict) else None)
+        self.files = self.read_tree(self.tree)
+        if self.read("archive.json") != ARCHIVE_FORMAT:
+            raise LedgerError("archive branch format is not recognized")
+        self.index = self.read(self.index_path)
+        if self.index is None:
+            if self.index_path in self.files:
+                raise LedgerError("archive pending index is not an object")
+            self.index = {"version": 1, "repository": KIT_REPO, "issue": LEDGER_NUMBER, "generations": []}
+        if not isinstance(self.index, dict) or set(self.index) != {
+                "version", "repository", "issue", "generations"} or \
+                self.index["version"] != 1 or self.index["repository"] != KIT_REPO or \
+                self.index["issue"] != LEDGER_NUMBER or not isinstance(self.index["generations"], list) or \
+                len(self.index["generations"]) > MAX_ROWS + MAX_RESULTS:
+            raise LedgerError("invalid archive pending index")
+        seen = set()
+        for generation in self.index["generations"]:
+            validate_generation(generation)
+            claim_id = generation["claim"]["result"]["claim_id"]
+            if claim_id in seen:
+                raise LedgerError("duplicate archived claim generation")
+            seen.add(claim_id)
+
+    def remote_head(self):
+        refs = api("GET", self.prefix + "matching-refs/" + ARCHIVE_REF.removeprefix("refs/"))
+        if not isinstance(refs, list):
+            raise LedgerError("archive ref listing is unavailable")
+        matches = [item for item in refs if isinstance(item, dict) and item.get("ref") == ARCHIVE_REF]
+        if len(matches) > 1:
+            raise LedgerError("ambiguous archive ref")
+        if not matches:
+            return None
+        target = matches[0].get("object", {})
+        if not isinstance(target, dict) or target.get("type") != "commit":
+            raise LedgerError("archive ref is not a commit")
+        return archive_oid(target.get("sha"))
+
+    def read_tree(self, oid):
+        tree = api("GET", self.prefix + "trees/" + oid + "?recursive=1")
+        if not isinstance(tree, dict) or tree.get("sha") != oid or \
+                tree.get("truncated") is not False or not isinstance(tree.get("tree"), list):
+            raise LedgerError("archive tree is unavailable or truncated")
+        entries = {}
+        for item in tree["tree"]:
+            if not isinstance(item, dict) or not isinstance(item.get("path"), str):
+                raise LedgerError("invalid archive tree entry")
+            path = item["path"]
+            if not path or "\0" in path or path in entries or \
+                    any(part in ("", ".", "..") for part in path.split("/")) or \
+                    (item.get("type"), item.get("mode")) not in (("blob", "100644"), ("tree", "040000")):
+                raise LedgerError("invalid archive tree path or mode")
+            archive_oid(item.get("sha"))
+            entries[path] = {key: item[key] for key in ("path", "type", "mode", "sha")}
+        return entries
+
+    def read(self, path):
+        entry = self.files.get(path)
+        if entry is None:
+            return None
+        if entry["type"] != "blob" or entry["mode"] != "100644":
+            raise LedgerError("archive receipt is not an ordinary Git blob")
+        blob = api("GET", self.prefix + "blobs/" + entry["sha"])
+        if not isinstance(blob, dict) or blob.get("sha") != entry["sha"] or blob.get("encoding") != "base64":
+            raise LedgerError("archive blob readback is unavailable")
+        try:
+            data = base64.b64decode("".join(blob["content"].split()), validate=True)
+            oid = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+            if oid != entry["sha"]:
+                raise LedgerError("archive blob identity differs")
+            return decode_json(data.decode("utf-8"))
+        except (ValueError, KeyError, UnicodeError, TypeError) as error:
+            raise LedgerError("invalid archive blob content") from error
+
+    def closed_path(self, generation):
+        return f"issues/{LEDGER_NUMBER}/closed/{generation['claim']['result']['claim_id']}.json"
+
+    def write_blob(self, value):
+        content = archive_json(value)
+        oid = hashlib.sha1(b"blob " + str(len(content.encode())).encode() + b"\0" + content.encode()).hexdigest()
+        blob = api("POST", self.prefix + "blobs", {"content": content, "encoding": "utf-8"})
+        if not isinstance(blob, dict) or blob.get("sha") != oid:
+            raise LedgerError("archive blob publication was not confirmed")
+        return oid
+
+    def publish(self, changes):
+        changes = {path: value for path, value in changes.items() if self.read(path) != value}
+        if not changes:
+            if self.remote_head() != self.head:
+                raise LedgerError("archive ref changed outside the serialized broker")
+            return
+        entries = []
+        for path, value in changes.items():
+            oid = self.write_blob(value)
+            entries.append({"path": path, "mode": "100644", "type": "blob", "sha": oid})
+        tree = api("POST", self.prefix + "trees", {"base_tree": self.tree, "tree": entries})
+        tree = archive_oid(tree.get("sha") if isinstance(tree, dict) else None)
+        commit = api("POST", self.prefix + "commits", {
+            "message": f"Preserve authenticated ledger #{LEDGER_NUMBER} receipts", "tree": tree, "parents": [self.head]})
+        commit = archive_oid(commit.get("sha") if isinstance(commit, dict) else None)
+        if self.remote_head() != self.head:
+            raise LedgerError("archive ref conflict; no comments deleted")
+        api("PATCH", self.prefix + "refs/" + ARCHIVE_REF.removeprefix("refs/"), {"sha": commit, "force": False})
+        if self.remote_head() != commit:
+            raise LedgerError("archive publication is uncertain; no comments deleted")
+        published = api("GET", self.prefix + "commits/" + commit)
+        parents = published.get("parents") if isinstance(published, dict) else None
+        if not isinstance(published, dict) or published.get("sha") != commit or \
+                not isinstance(published.get("tree"), dict) or published["tree"].get("sha") != tree or \
+                not isinstance(parents, list) or len(parents) != 1 or \
+                not isinstance(parents[0], dict) or parents[0].get("sha") != self.head:
+            raise LedgerError("archive commit readback differs; no comments deleted")
+        files = self.read_tree(tree)
+        expected = {path: entry for path, entry in self.files.items()
+                    if entry["type"] == "blob" and path not in changes}
+        expected.update({entry["path"]: entry for entry in entries})
+        if any(files.get(path) != entry for path, entry in expected.items()):
+            raise LedgerError("published archive tree differs; no comments deleted")
+        self.head, self.tree, self.files = commit, tree, files
+        for path, value in changes.items():
+            if self.read(path) != value:
+                raise LedgerError("archive receipt readback differs; no comments deleted")
+
+    def capture(self, state, acceptance_bodies=None):
+        validate_state(state)
+        acceptance_bodies = acceptance_bodies or {}
+        updated = copy.deepcopy(self.index)
+        generations = {item["claim"]["result"]["claim_id"]: item for item in updated["generations"]}
+        for result in state["results"]:
+            if result["status"] != "accepted" or result["code"] != 0 or result["operation"] not in ("claim", "release"):
+                continue
+            claim_id, operation = result["claim_id"], result["operation"]
+            generation = generations.get(claim_id)
+            if (operation == "claim" and generation) or (operation == "release" and
+                    (generation is None or generation["release"] is not None)):
+                continue
+            snapshot = receipt_comment(result["request_id"])
+            if snapshot is None:
+                continue
+            applied_body = acceptance_bodies.get(result["request_id"])
+            if applied_body is not None and applied_body != snapshot["body"]:
+                raise LedgerError("request body changed after broker acceptance")
+            receipt = {"comment": snapshot, "result": copy.deepcopy(result),
+                       "body_sha256": body_hash(snapshot["body"]),
+                       "body_provenance": "acceptance-time" if applied_body is not None else "snapshot-at-archive",
+                       "acceptance_body_sha256": body_hash(applied_body) if applied_body is not None else "UNPROVEN",
+                       "acknowledged_cursor": state["cursor"], "ledger_body_sha256": body_hash(render(state))}
+            # Mismatched/edited control fields cannot authorize archival.
+            validate_receipt(receipt, operation)
+            if operation == "claim":
+                generations[claim_id] = {"claim": receipt, "release": None}
+            else:
+                generation["release"] = receipt
+                validate_generation(generation)
+        active_claims = {row["claim_id"] for row in state["rows"]}
+        updated["generations"] = [item for key, item in sorted(generations.items())
+                                  if item["release"] is not None or key in active_claims]
+        if len(updated["generations"]) > MAX_ROWS + MAX_RESULTS:
+            raise LedgerError("archive pending index bound exceeded; no comments deleted")
+        changes = {self.index_path: updated}
+        for generation in updated["generations"]:
+            if generation["release"] is not None:
+                path = self.closed_path(generation)
+                old = self.read(path)
+                if path in self.files and old != generation:
+                    raise LedgerError("immutable closed receipt differs")
+                changes[path] = generation
+        self.publish(changes)
+        self.index = updated
+
+    def retire(self, state):
+        validate_state(state)
+        selected = [item for item in self.index["generations"] if item["release"] is not None
+                    and item["release"]["result"]["request_id"] < state["cursor"]
+                    and not held_by(state, item["claim"]["result"]["address"])][:ARCHIVE_BATCH]
+        completed = []
+        for generation in selected:
+            validate_generation(generation)
+            if any(generation[key]["acknowledged_cursor"] > state["cursor"] for key in ("claim", "release")):
+                raise LedgerError("ledger cursor predates archived acceptance; no comments deleted")
+            if self.read(self.closed_path(generation)) != generation or self.remote_head() != self.head:
+                raise LedgerError("closed receipt publication no longer confirmed; no comments deleted")
+            issue, current = ledger()
+            if current != state:
+                raise LedgerError("ledger changed before archive deletion; no comments deleted")
+            snapshots = [receipt_comment(generation[key]["comment"]["id"]) for key in ("claim", "release")]
+            if any(snapshot is not None and snapshot != generation[key]["comment"]
+                   for key, snapshot in zip(("claim", "release"), snapshots)):
+                raise LedgerError("comment changed since archive snapshot; no comments deleted")
+            if self.remote_head() != self.head or ledger()[1] != state:
+                raise LedgerError("archive or ledger changed before deletion; no comments deleted")
+            # A missing member is allowed only here, after the complete pair was
+            # published and read back: a previous deletion may have succeeded.
+            for snapshot in reversed(snapshots):
+                if snapshot is not None:
+                    api("DELETE", f"repos/{KIT_REPO}/issues/comments/{snapshot['id']}")
+            for key in ("claim", "release"):
+                if receipt_comment(generation[key]["comment"]["id"]) is not None:
+                    raise LedgerError("comment deletion is unconfirmed; retry the broker")
+            completed.append(generation)
+        if completed:
+            updated = copy.deepcopy(self.index)
+            updated["generations"] = [item for item in updated["generations"] if item not in completed]
+            self.publish({self.index_path: updated})
+            self.index = updated
+        print(f"archived {len(completed)} closed reservation pair(s) to {ARCHIVE_REF}")
+
+
+def drain(days=STALE_DAYS, archive_closed=False):
     issue, state = ledger()
     body = issue["body"]
     skipped = unmatchable()
+    archive = ReceiptArchive() if archive_closed else None
+    if archive:
+        archive.capture(state)
+        archive.retire(state)
     processed = 0
+    acceptance_bodies = {}
     while True:
         comments = comments_after(state["cursor"])
         if not comments:
@@ -744,7 +1099,15 @@ def drain(days=STALE_DAYS):
             candidate = apply_comment(state, comment, skipped, now(), claim_check=claim_status)
             body = persist(candidate, body)
             state = candidate
+            acceptance_bodies[comment["id"]] = comment["body"]
             processed += 1
+            if archive and processed % ARCHIVE_BATCH == 0:
+                archive.capture(state, acceptance_bodies)
+                archive.retire(state)
+                acceptance_bodies.clear()
+    if archive:
+        archive.capture(state, acceptance_bodies)
+        archive.retire(state)
     timestamp = now()
     cutoff = parse_ts(timestamp) - datetime.timedelta(days=days)
     candidate = copy.deepcopy(state)
@@ -938,11 +1301,13 @@ def main():
     command = commands.add_parser("check")
     command.add_argument("addr")
     commands.add_parser("list")
-    commands.add_parser("broker", help="trusted workflow only: drain requests and expire stale rows")
+    command = commands.add_parser("broker", help="trusted workflow only: drain requests and expire stale rows")
+    command.add_argument("--archive-closed", action="store_true",
+                         help="trusted workflow only: publish closed receipts to Git before deleting comments")
     args = parser.parse_args()
     try:
         if args.cmd == "broker":
-            return drain(trusted_event())
+            return drain(trusted_event(), archive_closed=args.archive_closed)
         if hasattr(args, "wait") and not 0 <= args.wait <= 300:
             raise LedgerError("wait must be between 0 and 300 seconds")
         if not args.no_pull:

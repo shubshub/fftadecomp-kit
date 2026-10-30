@@ -211,7 +211,7 @@ whole-game coverage.
 
 The updated `reservations` workflow must be merged into this repository's
 default branch and enabled before requests can be accepted. It uses
-`issues: write`, `contents: read`, and `pull-requests: read`, checks out the trusted default branch,
+`issues: write`, `contents: write`, and `pull-requests: read`, checks out the trusted default branch,
 and handles request comments on the unique open owner-authored `address ledger`
 issue, scheduled expiry, and manual runs through one concurrency group. Ledger
 rotation does not require editing a workflow issue number. The legacy
@@ -363,6 +363,64 @@ address, including copies restored to LR. Overwrites discard that fact, joins
 retain it only when all incoming paths agree, and calls still invalidate
 caller-clobbered registers. Arithmetic, unknown inputs and wider or conditional
 moves do not establish return-address provenance.
+
+### Archiving closed reservation receipts
+
+Deploy `tools/reserve.py` and the `reservations` workflow together on the trusted
+**default branch**, then let older broker jobs finish. The workflow invokes
+`broker --archive-closed` under the existing `ffta-address-ledger-50` concurrency
+group. Its scheduled/manual runs work even when the ledger already has 2,500
+comments; recovery never requires posting another request. Local client updates
+provide no archival or deletion authority. The request and ledger schemas,
+capacity limits, duplicate guards, and client exit codes are unchanged.
+
+Only the trusted broker writes the dedicated `ledger-receipts-v1` branch using
+the repository Git API. It initializes a separate archive tree when absent;
+subsequent commits use exactly the captured parent and a non-forced ref update.
+Keep this branch permanently, prohibit force pushes/deletion, and restrict its
+writers to the serialized broker and trusted maintainers. Permit the workflow's
+`contents: write` access to that branch; it never changes the default branch.
+Direct ledger/archive maintenance must pause the same writer first.
+
+`issues/<ledger>/pending.json` journals authenticated accepted claim receipts
+across the ledger's 64-result retention window. Every 16 processed requests,
+and before/after draining, the broker checkpoints receipts. A complete closed
+pair is also preserved in immutable `issues/<ledger>/closed/<claim-id>.json`.
+Both receipts must be accepted with code 0 and agree on numeric account ID,
+lane, address, original claim ID and operation. Original request bodies remain
+verbatim, including claim notes and release reason, tried flags and unmatchable
+status. Archival does not approve a Parked attempt, alter the unmatchable
+registry, or expand MATCHED-only retirement policies in other tools.
+
+Newly processed requests include an acceptance-time body hash only when the
+archived body equals the exact request body applied by this broker run. Legacy
+bootstrap requires **both** authoritative accepted receipts still retained.
+Those bodies are explicitly labelled `snapshot-at-archive`, retain their
+created/updated timestamps, and record the acceptance-time hash as `UNPROVEN`.
+This preserves current historical evidence without inventing proof of its
+original freeform text. Missing receipts are never reconstructed from comments,
+labels, published source or an inferred release. Expired receipts without an
+earlier durable capture cannot be archived automatically.
+
+Before deletion the broker confirms the published branch/commit/tree and reads
+back every changed blob by its Git identity. It then rechecks the ledger and
+both complete comment snapshots immediately before retiring a pair. Active
+addresses (including newer claim generations), the current cursor comment,
+unconfirmed/rejected requests, foreign owners and mismatched control fields
+are excluded. At most 16 pairs are retired per pass. A publication failure,
+ref conflict, uncertain readback or edited snapshot authorizes no deletion.
+There is no automatic retry of a Git mutation. Partial comment deletion is
+recoverable from the already-published complete pair; a later broker run checks
+remaining snapshots and removes only still-present members. Completed receipts
+remain in Git after the pending index is pruned. GitHub has no atomic multi-
+comment delete or lock against comment editing; the final snapshot check and
+single trusted writer are required, and an external edit/write must halt the
+run rather than be reconciled by overwriting evidence.
+
+Focused offline checks (all GitHub responses are fixtures, with no network or
+live ledger writes):
+`PYTHONDONTWRITEBYTECODE=1 python -m unittest discover -s tests -p 'test_reservation*.py'`.
+
 
 ### Fixed Thumb stack frames
 
