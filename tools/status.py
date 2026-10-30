@@ -243,10 +243,13 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
         constants_profile = False
         quotient_frame = False
         signed_runtime_profile = False
+        addressed_runtime_profile = False
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
             try:
+                import addressed_signed_runtime_profile
+                addressed_runtime_profile = addressed_signed_runtime_profile.selector_for_report(saved_report)
                 import signed_divmod_profile
                 signed_runtime_profile = signed_divmod_profile.selector_for_report(saved_report)
                 import owner_admission_profile
@@ -262,6 +265,9 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
         if verify:
+            if addressed_runtime_profile and not report_matches(saved_report, root, int(addr, 16)):
+                problems.append(f"{addr}: invalid saved addressed signed runtime report")
+                return 0, 0, problems, []
             if signed_runtime_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved signed divmod report")
                 return 0, 0, problems, []
@@ -295,13 +301,15 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1):
                 command += ["--switch-profile", constants_profile.selector]
             if signed_runtime_profile:
                 command += ["--signed-runtime-profile", signed_runtime_profile]
+            if addressed_runtime_profile:
+                command += ["--addressed-signed-runtime-profile", addressed_runtime_profile]
             if quotient_frame:
                 command += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
             if not write_reports:
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
             ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or owner_profile or quotient_frame or signed_runtime_profile) and ok:
+        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or owner_profile or quotient_frame or signed_runtime_profile or addressed_runtime_profile) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()

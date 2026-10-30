@@ -34,6 +34,7 @@ import tempfile
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import signed_divmod_profile as signed_divmod
+import addressed_signed_runtime_profile as addressed_signed_runtime
 import umodsi3_profile as umodsi3
 import ashldi3_profile as ashldi3
 import inert_spin_profile as inert_spin
@@ -2622,9 +2623,26 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              bounded_stack_output_inventory_context=None,
                              bounded_stack_output_zero_index_inventory_context=None,
                              zero_aware_mixed_inventory_context=None,
-                             zero_aware_unsigned_quotient_inventory_context=None):
+                             zero_aware_unsigned_quotient_inventory_context=None,
+                             addressed_signed_runtime_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
     bounded_output_proof = None
+    addressed_dependencies = None
+    if addressed_signed_runtime_context is not None:
+        if not thumb or preloaded_switch or allow_switch_constants or allow_switch_scalar_frame or any(
+                value is not None for value in (buffer_proof, call_resolver, switch_relocations,
+                switch_data_relocations, udivsi3_context, modsi3_context, divsi3_context,
+                inert_spin_context, double_context, function_thunk_context, umodsi3_context,
+                ashldi3_context, float_context, acyclic_state_budget, ignored_leaf_alias_proof,
+                signed_quotient_profile, stack_pointer_compare_profile, signed_runtime_context,
+                remainder_inventory_context, remainder_ordinary_inventory_context,
+                remainder_shift_inventory_context, remainder_framed_shift_inventory_context,
+                remainder_byte_range_inventory_context, bounded_stack_output_inventory_context,
+                bounded_stack_output_zero_index_inventory_context, zero_aware_mixed_inventory_context,
+                zero_aware_unsigned_quotient_inventory_context)):
+            raise ValueError('addressed signed runtimes require their isolated explicit Thumb context')
+        addressed_dependencies = addressed_signed_runtime.prepare(
+            data, address, validated_calls or {}, addressed_signed_runtime_context)
     if zero_aware_unsigned_quotient_inventory_context is not None:
         if any(value is not None for value in (remainder_inventory_context,
                 remainder_ordinary_inventory_context, remainder_shift_inventory_context,
@@ -3039,6 +3057,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         software_double.OPERATIONS.get(double_context[3][current]) != target:
                     raise ValueError("software double requires its canonical runtime proof")
             if divsi3.reserved(target) and target != 0x0814274C and not (
+                    addressed_signed_runtime_context is not None and
+                    addressed_signed_runtime_context[3].get(current) == 'func_081426B8' and
+                    target == divsi3.ADDRESS or
                     double_context is not None and
                     software_double.shared_division_call(double_context[3].get(current), target) or
                     zero_aware_mixed_inventory_context is not None and target == divsi3.ADDRESS and
@@ -3046,6 +3067,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if divsi3_context is None or target != divsi3.ADDRESS or current not in divsi3_context[2]:
                     raise ValueError("signed quotient requires its canonical positive-constant proof")
             if modsi3.reserved(target) and target != 0x0814274C and not (
+                    addressed_signed_runtime_context is not None and
+                    addressed_signed_runtime_context[3].get(current) == modsi3.ADDRESSED_NAME and
+                    target == modsi3.ADDRESS or
                     double_context is not None and software_double.target_remainder_context(double_context) and
                     target == modsi3.ADDRESS and double_context[3].get(current) == "__modsi3"):
                 if modsi3_context is None:
@@ -3576,6 +3600,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if signed_runtime_context is not None:
         signed_divmod.finish(data, address, calls, signed_runtime_context,
                              instructions.values(), divsi3_context[3], transfers)
+    if addressed_signed_runtime_context is not None:
+        addressed_signed_runtime.finish(data, address, calls, addressed_signed_runtime_context,
+                                        instructions.values(), addressed_dependencies)
     if bounded_stack_output_inventory_context is not None:
         remainder_inventory.finish(data,address,calls,remainder_inventory_context,
                                    instructions.values(),bounded_output_proof)
@@ -3686,6 +3713,7 @@ def main():
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
     ap.add_argument("--signed-runtime-profile", choices=tuple(signed_divmod.SCHEMAS))
+    ap.add_argument("--addressed-signed-runtime-profile", choices=tuple(addressed_signed_runtime.SCHEMAS))
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
@@ -3715,6 +3743,8 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    if args.addressed_signed_runtime_profile is not None:
+        return addressed_signed_runtime.issue(Path(ROOT), addr, args)
     if args.signed_runtime_profile is not None:
         return signed_divmod.issue(Path(ROOT), addr, args)
     if args.signed_quotient_profile is not None and (

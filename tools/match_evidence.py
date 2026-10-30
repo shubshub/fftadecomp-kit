@@ -803,6 +803,9 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        import addressed_signed_runtime_profile
+        if addressed_signed_runtime_profile.selected(report):
+            return addressed_signed_runtime_profile.report_matches(report, root, address)
         import signed_divmod_profile
         if signed_divmod_profile.selected(report):
             return signed_divmod_profile.report_matches(report, root, address)

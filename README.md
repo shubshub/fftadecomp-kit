@@ -868,7 +868,9 @@ exact new pair is available; separate repository updates are not atomic, and
 arbitrary latest-tool/latest-game combinations are not an activation contract. Existing
 addressed callers must be explicitly corrected and independently byte-verified;
 do not enable these exclusions against an unmigrated selected game snapshot.
-There is no signed-quotient addressed-source exception or automatic rewrite.
+The default signed-quotient path has no addressed-source exception or automatic
+rewrite. The separate explicit addressed-runtime selector below makes no numeric
+quotient claim.
 
 ### Audited signed remainder runtime
 
@@ -933,6 +935,50 @@ already does; it is not toolchain attestation. Other legacy reports retain
 their existing replay path. A byte-identical `%` replacement cannot become an
 addressed-helper report merely by deleting signed metadata. Zero-handler
 machine behavior does not make C `% 0` defined.
+
+### Explicit conditional addressed signed-runtime calls
+
+`match.py --addressed-signed-runtime-profile addressed-signed-runtime-v1`
+admits actual direct calls named `func_081426B8` and/or `func_08142950`, including
+their mixed caller. The source contract is a signed32 word view of the actual
+two input registers and returned word, such as
+`s32 func_08142950(s32 numerator, s32 denominator);`. The original historical
+formal types are not asserted. Every call is conditional on returning and
+obeying the ordinary r4-r11/SP preserving ARM ABI. No numeric division or
+remainder result theorem, operand-domain theorem, zero-divisor semantics,
+universal termination or transitive ordinary-callee equivalence is granted.
+
+This selector checks authentic complete helper and shared zero-hook bytes,
+dependency calls, and both exact unique nonoverlapping function indexes. It
+retains complete caller CFG and literal ownership, saved-register/SP/entry-LR
+restoration, canonical original ELF call relocations, and the linker's exact
+modification surface. Ordinary indexed direct calls and scalar fixed frames are
+supported. Local stack aliases, buffers, callbacks, address literals, data or
+function relocations, switches and other runtime compositions are excluded.
+Compiler-generated `__divsi3`/`__modsi3` aliases remain outside this route.
+Default and numeric selector restrictions are unchanged.
+
+Reports bind source and headers, ROM, all three input snapshots, producer
+sources, original/linked ELF and assembly hashes, and the fixed toolchain's
+current executable hashes. Status verification restores the explicit selector;
+report acceptance freshly compiles the captured source and reruns all checks.
+Stale or mixed reports cannot substitute saved bytes for that replay. These
+hashes record the executables used, not a platform attestation.
+
+The separate opt-in
+`--addressed-signed-runtime-profile addressed-signed-runtime-readonly-word0-v1`
+adds only the existing read-only incoming word0 ABI contract: entry SP+0 must
+provide one readable aligned 4-byte incoming ABI word, with unknown contents.
+Caller allocation and readability are explicit premises. At least one reached
+canonical Thumb word load must read exactly that word after accounting for the
+saved and allocated frame. Reports bind the exact read sites/encodings, this
+conditional premise, the entry-policy implementation and current Python,
+Capstone and native tool hashes. Verification freshly checks the same selector
+and runtime. Entry writes, other incoming words, unaligned or narrow entry
+accesses, stack-address materialization and alias escapes remain excluded, as
+do buffers, callbacks and other runtime compositions. This does not prove the
+loaded value, allocation extent, numeric arithmetic or historical formal types.
+The base addressed selector retains its incoming-stack-read refusal.
 
 ### Guarded local Thumb switches
 
