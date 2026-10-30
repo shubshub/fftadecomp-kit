@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ce41b53ae15197bb01584bfda92745d8299859b56eb7e405009c594b14e52af6",
+    "acknowledged_cursor": 6523310700,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ce41b53ae15197bb01584bfda92745d8299859b56eb7e405009c594b14e52af6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08135CFC\",\"who\":\"sol-5CFC\",\"note\":\"Native plausible C matching of mapped palette/state operation\"}",
+      "created_at": "2026-10-30T12:53:31Z",
+      "id": 6523310700,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:53:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6dd740bd53474753ac1aac18d586d0dde00f560117bfc6174470f64eb59037bb",
+    "result": {
+      "address": "0x08135CFC",
+      "claim_id": 6523310700,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523310700,
+      "status": "accepted",
+      "who": "sol-5CFC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f718c6cbc269a8bb00940aa7ff4d1c57cd366cbefe4d1be7f425e411853a3ac2",
+    "acknowledged_cursor": 6523393514,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f718c6cbc269a8bb00940aa7ff4d1c57cd366cbefe4d1be7f425e411853a3ac2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08135CFC\",\"who\":\"sol-5CFC\",\"claim_id\":6523310700,\"reason\":\"MATCH:60 complete bytes,23/23instructions,plausible;second candidate with existing unsigned2-bit mode\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:58:01Z",
+      "id": 6523393514,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:58:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "de1cf52769ef21ecc313eca0722b476797433a77232f6571a7c1ea1bd2be2a29",
+    "result": {
+      "address": "0x08135CFC",
+      "claim_id": 6523310700,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523393514,
+      "status": "accepted",
+      "who": "sol-5CFC"
+    }
+  }
+}
