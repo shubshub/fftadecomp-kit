@@ -30,7 +30,35 @@
           "who": "sol-A36C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f1f5a67e98b78763972e09d4184b588d72872ebcb9b1b72ff2afbf67408f2695",
+        "acknowledged_cursor": 6528089418,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f1f5a67e98b78763972e09d4184b588d72872ebcb9b1b72ff2afbf67408f2695",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A36C\",\"who\":\"sol-A36C\",\"claim_id\":6528006896,\"reason\":\"Firstnative plausible complete44B/21instruction localbyte-output siblingMATCH; frozenproof.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T16:39:57Z",
+          "id": 6528087535,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:39:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ad917e688aeeed7581640208d27783fd4d3af51e0700a115da1864004f9e0eda",
+        "result": {
+          "address": "0x0809A36C",
+          "claim_id": 6528006896,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6528087535,
+          "status": "accepted",
+          "who": "sol-A36C"
+        }
+      }
     },
     {
       "claim": {
@@ -60,6 +88,38 @@
           "request_id": 6528047788,
           "status": "accepted",
           "who": "sol-04E0"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e34a01219092620c92bf20ffb6bb7f52c89e71506d66013aeefc40a82a2a29e2",
+        "acknowledged_cursor": 6528089418,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e34a01219092620c92bf20ffb6bb7f52c89e71506d66013aeefc40a82a2a29e2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812F2CC\",\"who\":\"sol-F2CC\",\"note\":\"Complete92B natural conditional scalarpredicate with fulls32kind and actualu8helperABI candidate-reservation46\"}",
+          "created_at": "2026-10-30T16:40:02Z",
+          "id": 6528089418,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:40:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ad917e688aeeed7581640208d27783fd4d3af51e0700a115da1864004f9e0eda",
+        "result": {
+          "address": "0x0812F2CC",
+          "claim_id": 6528089418,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6528089418,
+          "status": "accepted",
+          "who": "sol-F2CC"
         }
       },
       "release": null
