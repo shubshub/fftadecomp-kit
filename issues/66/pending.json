@@ -91,66 +91,6 @@
           "who": "sol-5320"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "c5aa19a856cbdc792eb9d77a42d7b5ecd6b9d775dec33484909ceacca88efb5b",
-        "acknowledged_cursor": 6529921299,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c5aa19a856cbdc792eb9d77a42d7b5ecd6b9d775dec33484909ceacca88efb5b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802BE40\",\"who\":\"sol-BE40\",\"note\":\"Complete112B flags/transfer wrapper; five actual defining helperABIs including integer B68 contract, exact existingdata/VRAM pointerevidence; oneSol executor.\"}",
-          "created_at": "2026-10-30T18:03:15Z",
-          "id": 6529921299,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T18:03:15Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d8b6d281ed32d46eac985325b27e372e852699377c97ef9ba1abdabffa0e1da1",
-        "result": {
-          "address": "0x0802BE40",
-          "claim_id": 6529921299,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6529921299,
-          "status": "accepted",
-          "who": "sol-BE40"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "6a6681662a790b81ebda92e8e2c7779fc6e916a567ea6ae62a7f296f56d1af58",
-        "acknowledged_cursor": 6529986724,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "6a6681662a790b81ebda92e8e2c7779fc6e916a567ea6ae62a7f296f56d1af58",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802BE40\",\"who\":\"sol-BE40\",\"claim_id\":6529921299,\"reason\":\"First normal native plausible complete112B MATCH; exact source/report/body/current-runtime receipt frozen in isolated next batch.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-30T18:05:05Z",
-          "id": 6529963633,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T18:05:05Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "64e3b4d38b972f640a9166b5a939d48e4ed277d5c12ec44f27a4b9806dc0140e",
-        "result": {
-          "address": "0x0802BE40",
-          "claim_id": 6529921299,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6529963633,
-          "status": "accepted",
-          "who": "sol-BE40"
-        }
-      }
     }
   ],
   "issue": 66,
