@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "04f60c298700f5e53922927e79f3992c17e6257fdbc13c2583553d8cf94a0c9b",
-        "acknowledged_cursor": 6531378094,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "04f60c298700f5e53922927e79f3992c17e6257fdbc13c2583553d8cf94a0c9b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080503E4\",\"who\":\"sol-03E4\",\"note\":\"Real BE/C6 byte-source identities and defining17FA8u32 formal preserved; actual501CC/4FD24 ABI; exact full216B; new qualified data1f9c8183; no C before accepted claim\"}",
-          "created_at": "2026-10-30T19:09:07Z",
-          "id": 6531355514,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T19:09:07Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "9f736a8088ad1b373aa51890fa0454137ff7b6ffde6c003b9a712f6f47b2220b",
-        "result": {
-          "address": "0x080503E4",
-          "claim_id": 6531355514,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6531355514,
-          "status": "accepted",
-          "who": "sol-03E4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "66e44ae4066f80cb1ed65ed9493af0629a82d2310d0e0b5aaaa9d25e17529570",
-        "acknowledged_cursor": 6531554212,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "66e44ae4066f80cb1ed65ed9493af0629a82d2310d0e0b5aaaa9d25e17529570",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080503E4\",\"who\":\"sol-03E4\",\"claim_id\":6531355514,\"reason\":\"Three grounded ordinary forms remain nonidentical; final plausible 216 bytes. Frozen receipt 9cd073bd. Zero MATCH credit.\",\"unmatchable\":true,\"tried\":\"Three native default forms: scalar reverse loop; direct reverse pointer for loop; guaranteed nonempty do loop. Plausible lengths 216, 220, 216. Natural loop and coordinate shift differences remain. No diagnostic or ABI workaround.\"}",
-          "created_at": "2026-10-30T19:18:46Z",
-          "id": 6531554212,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T19:18:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ec0c94b99a32932a3037ce843090d34c2c35f8e4c3c78515703a9da9356cf87e",
-        "result": {
-          "address": "0x080503E4",
-          "claim_id": 6531355514,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6531554212,
-          "status": "accepted",
-          "who": "sol-03E4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "0a6b2b59ba1921af308358cd5d3a59790ec3a014d40a20e8b7a217f919dfaf84",
         "acknowledged_cursor": 6531378094,
         "body_provenance": "acceptance-time",
