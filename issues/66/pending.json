@@ -59,6 +59,70 @@
           "who": "sol-D364"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fba18c3a5b246ae6657227d2dc9507e8103340985e0da1a33e8735c8f7bcdfac",
+        "acknowledged_cursor": 6529726280,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fba18c3a5b246ae6657227d2dc9507e8103340985e0da1a33e8735c8f7bcdfac",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD2C4\",\"who\":\"sol-D2C4\",\"note\":\"Complete158B bounds/table routine with actual defining mapped helper ABI and full CFG/literal/frame qualification; one Sol executor, no shared edits.\"}",
+          "created_at": "2026-10-30T17:53:02Z",
+          "id": 6529709839,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:53:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "af4e14a697ac1d956257dd127787e18fde646f605f28e41c3c67fd5b3e11f024",
+        "result": {
+          "address": "0x080CD2C4",
+          "claim_id": 6529709839,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529709839,
+          "status": "accepted",
+          "who": "sol-D2C4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1615c96ecc6a546480d44b0dd99462cde6cdc3905c4c13ec56c701715ecd0ab9",
+        "acknowledged_cursor": 6529726280,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1615c96ecc6a546480d44b0dd99462cde6cdc3905c4c13ec56c701715ecd0ab9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802C9F4\",\"who\":\"sol-C9F4\",\"note\":\"Complete100B two-transfer wrapper; actual defining helper ABIs and existing hardware-pointer analogue qualified; one Sol executor, no shared edits.\"}",
+          "created_at": "2026-10-30T17:53:46Z",
+          "id": 6529726280,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T17:53:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "af4e14a697ac1d956257dd127787e18fde646f605f28e41c3c67fd5b3e11f024",
+        "result": {
+          "address": "0x0802C9F4",
+          "claim_id": 6529726280,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6529726280,
+          "status": "accepted",
+          "who": "sol-C9F4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
