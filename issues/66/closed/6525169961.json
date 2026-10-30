@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8ef9ab3e9b2677ad413af03b2c2ff345c23dde5b858b0370a061c596d94c7e54",
+    "acknowledged_cursor": 6525183011,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8ef9ab3e9b2677ad413af03b2c2ff345c23dde5b858b0370a061c596d94c7e54",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8D18\",\"who\":\"sol-8D18\",\"note\":\"Batch31 bounded plausible matching; complete94B coordinate/effect wrapper, recent exact signed-output analogue and full effect helper ABI evidence.\"}",
+      "created_at": "2026-10-30T14:27:10Z",
+      "id": 6525169961,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:27:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+    "result": {
+      "address": "0x080D8D18",
+      "claim_id": 6525169961,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6525169961,
+      "status": "accepted",
+      "who": "sol-8D18"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b13b62b8610a2bfe8810b83841ce259ce5f79218afd0105a163ca64eda554c0e",
+    "acknowledged_cursor": 6525453907,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b13b62b8610a2bfe8810b83841ce259ce5f79218afd0105a163ca64eda554c0e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D8D18\",\"who\":\"sol-8D18\",\"claim_id\":6525169961,\"reason\":\"Exact natural source and both native refusals retained in Parked; private proven helper boundary repair exposes unsupported nested signed quotient proof. No match claim.\",\"unmatchable\":true,\"tried\":\"Two native attempts: default shared inputs rejected A92E4 omitted literal; one private corrected-boundary input resolves it then rejects nested A8BC4 signed quotient requiring canonical positive-constant proof. Source unchanged.\"}",
+      "created_at": "2026-10-30T14:40:26Z",
+      "id": 6525453907,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:40:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "93d1b13be2604df199f3695d390540becc53dddc5303449cdcb9379fe8f48276",
+    "result": {
+      "address": "0x080D8D18",
+      "claim_id": 6525169961,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6525453907,
+      "status": "accepted",
+      "who": "sol-8D18"
+    }
+  }
+}
