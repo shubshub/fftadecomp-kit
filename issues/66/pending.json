@@ -30,7 +30,35 @@
           "who": "sol-DA30"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "18f080dd0a5021ac17ba20d5bc8cfb9f71af06fd6d6e5ac9b1d9d441a385fbc7",
+        "acknowledged_cursor": 6527604692,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "18f080dd0a5021ac17ba20d5bc8cfb9f71af06fd6d6e5ac9b1d9d441a385fbc7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BDA30\",\"who\":\"sol-DA30\",\"claim_id\":6527538772,\"reason\":\"Native refused buffer callee081443FC unsupported buffer pointer use or escape; no compiled byte comparison or retry.\",\"unmatchable\":true,\"tried\":\"one natural nested-record reorder form; default -mthumb-interwork -O2; precise buffer proof refusal\"}",
+          "created_at": "2026-10-30T16:17:03Z",
+          "id": 6527604565,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:17:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e12e9bffa49106a4d5c9c3eda652650804a117eb1ee1bcab6b0e3d33d8ad17c2",
+        "result": {
+          "address": "0x080BDA30",
+          "claim_id": 6527538772,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6527604565,
+          "status": "accepted",
+          "who": "sol-DA30"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-FB68"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7443edcec3c539deb60ec61516dfd508b3c12ad6abc568e8d5ed7ef3d168640b",
+        "acknowledged_cursor": 6527604692,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7443edcec3c539deb60ec61516dfd508b3c12ad6abc568e8d5ed7ef3d168640b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813FB68\",\"who\":\"sol-FB68\",\"claim_id\":6527538973,\"reason\":\"First native plausible MATCH; complete20B/7instructions, successful proof frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T16:16:26Z",
+          "id": 6527591457,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:16:26Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e12e9bffa49106a4d5c9c3eda652650804a117eb1ee1bcab6b0e3d33d8ad17c2",
+        "result": {
+          "address": "0x0813FB68",
+          "claim_id": 6527538973,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6527591457,
+          "status": "accepted",
+          "who": "sol-FB68"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +150,35 @@
           "who": "sol-EDF0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "342b7bf4ba62db1b7d50a7b9039ccc29c0623bcfea25a98c361d0f265ba2146d",
+        "acknowledged_cursor": 6527604692,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "342b7bf4ba62db1b7d50a7b9039ccc29c0623bcfea25a98c361d0f265ba2146d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812EDF0\",\"who\":\"sol-EDF0\",\"claim_id\":6527539103,\"reason\":\"First native plausible complete166B switch MATCH, successful proof frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T16:17:03Z",
+          "id": 6527604692,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:17:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e12e9bffa49106a4d5c9c3eda652650804a117eb1ee1bcab6b0e3d33d8ad17c2",
+        "result": {
+          "address": "0x0812EDF0",
+          "claim_id": 6527539103,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6527604692,
+          "status": "accepted",
+          "who": "sol-EDF0"
+        }
+      }
     },
     {
       "claim": {

@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "aba07755d69fa6327704138490980ca66a526b6a5b4661ebd72c3793de035a1d",
+    "acknowledged_cursor": 6527539103,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "aba07755d69fa6327704138490980ca66a526b6a5b4661ebd72c3793de035a1d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813FB68\",\"who\":\"sol-FB68\",\"note\":\"Complete natural C match from qualified exact-span capsule candidate-resolve.json\"}",
+      "created_at": "2026-10-30T16:13:55Z",
+      "id": 6527538973,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:13:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "66ae0b47f0238d4686610be5ec2b0a62958caf8a3f6b29094d8bcc5c9f128e73",
+    "result": {
+      "address": "0x0813FB68",
+      "claim_id": 6527538973,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6527538973,
+      "status": "accepted",
+      "who": "sol-FB68"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7443edcec3c539deb60ec61516dfd508b3c12ad6abc568e8d5ed7ef3d168640b",
+    "acknowledged_cursor": 6527604692,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7443edcec3c539deb60ec61516dfd508b3c12ad6abc568e8d5ed7ef3d168640b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813FB68\",\"who\":\"sol-FB68\",\"claim_id\":6527538973,\"reason\":\"First native plausible MATCH; complete20B/7instructions, successful proof frozen.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T16:16:26Z",
+      "id": 6527591457,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T16:16:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e12e9bffa49106a4d5c9c3eda652650804a117eb1ee1bcab6b0e3d33d8ad17c2",
+    "result": {
+      "address": "0x0813FB68",
+      "claim_id": 6527538973,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6527591457,
+      "status": "accepted",
+      "who": "sol-FB68"
+    }
+  }
+}
