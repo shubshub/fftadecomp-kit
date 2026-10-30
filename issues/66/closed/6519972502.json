@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "2d9d80a771951bd74888e537738f662a79fc4db993dbf98941fe0b7b6e954b35",
+    "acknowledged_cursor": 6519972502,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "2d9d80a771951bd74888e537738f662a79fc4db993dbf98941fe0b7b6e954b35",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080294D8\",\"who\":\"sol-94D8\",\"note\":\"Match the 12-byte pointed-object halfword getter\"}",
+      "created_at": "2026-10-30T09:57:27Z",
+      "id": 6519972502,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T09:57:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "164dee5760bc33275b475ca38efe94700060856fea04ddf1e0fb861fa8390058",
+    "result": {
+      "address": "0x080294D8",
+      "claim_id": 6519972502,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6519972502,
+      "status": "accepted",
+      "who": "sol-94D8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a40449754359d204d177e057e2bedac5c92382b571b6ddaea44825f70aa55067",
+    "acknowledged_cursor": 6520019929,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a40449754359d204d177e057e2bedac5c92382b571b6ddaea44825f70aa55067",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080294D8\",\"who\":\"sol-94D8\",\"claim_id\":6519972502,\"reason\":\"Matched complete 12-byte pointed-object halfword getter; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:00:15Z",
+      "id": 6520019929,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:00:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "439280445441ff8829c3372f8d3ca8910a4127844f5651830f52fdce1905068b",
+    "result": {
+      "address": "0x080294D8",
+      "claim_id": 6519972502,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520019929,
+      "status": "accepted",
+      "who": "sol-94D8"
+    }
+  }
+}

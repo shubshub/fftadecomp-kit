@@ -126,7 +126,35 @@
           "who": "sol-E6E4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "56e0534325887590d331fe095a546b35f6f5291e1e6fb5c7f73c9b73131fef7b",
+        "acknowledged_cursor": 6520019929,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "56e0534325887590d331fe095a546b35f6f5291e1e6fb5c7f73c9b73131fef7b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801E6E4\",\"who\":\"sol-E6E4\",\"claim_id\":6519967713,\"reason\":\"Matched complete 12-byte named-state halfword getter; native source and report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T09:59:21Z",
+          "id": 6520004805,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T09:59:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "439280445441ff8829c3372f8d3ca8910a4127844f5651830f52fdce1905068b",
+        "result": {
+          "address": "0x0801E6E4",
+          "claim_id": 6519967713,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520004805,
+          "status": "accepted",
+          "who": "sol-E6E4"
+        }
+      }
     },
     {
       "claim": {
@@ -158,7 +186,35 @@
           "who": "sol-94D8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a40449754359d204d177e057e2bedac5c92382b571b6ddaea44825f70aa55067",
+        "acknowledged_cursor": 6520019929,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a40449754359d204d177e057e2bedac5c92382b571b6ddaea44825f70aa55067",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080294D8\",\"who\":\"sol-94D8\",\"claim_id\":6519972502,\"reason\":\"Matched complete 12-byte pointed-object halfword getter; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T10:00:15Z",
+          "id": 6520019929,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T10:00:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "439280445441ff8829c3372f8d3ca8910a4127844f5651830f52fdce1905068b",
+        "result": {
+          "address": "0x080294D8",
+          "claim_id": 6519972502,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6520019929,
+          "status": "accepted",
+          "who": "sol-94D8"
+        }
+      }
     }
   ],
   "issue": 66,
