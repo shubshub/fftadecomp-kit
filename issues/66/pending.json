@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "3e28a4b942a63bb48f9a2265eb79d01200d4210a978b0812a41d0c8cd496cded",
-        "acknowledged_cursor": 6535288531,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3e28a4b942a63bb48f9a2265eb79d01200d4210a978b0812a41d0c8cd496cded",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081491C0\",\"who\":\"sol-91C0\",\"note\":\"Qualified complete112B7word prefix packed-record caller with genuineR2dispatch, canonical-thunks-v1 conditionalABI and3incomingstackwords, GPT6.1Sol\"}",
-          "created_at": "2026-10-30T22:59:12Z",
-          "id": 6535288531,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T22:59:12Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "fa9f970c14d819ead9b818d952cf295717ddf9dca37419fbb2c93fa09e0e2615",
-        "result": {
-          "address": "0x081491C0",
-          "claim_id": 6535288531,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6535288531,
-          "status": "accepted",
-          "who": "sol-91C0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f54f3779b5def946d0c60af3174d406bcebfcda22bfa4c3aa5b3c50c47abf453",
-        "acknowledged_cursor": 6535343308,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f54f3779b5def946d0c60af3174d406bcebfcda22bfa4c3aa5b3c50c47abf453",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081491C0\",\"who\":\"sol-91C0\",\"claim_id\":6535288531,\"reason\":\"Stoppedbeforeauthor: pre-existingREADME-onlyParked source mismatch discovered; no changedoperation prerequisite, zeroCforms/compiler/native attempts. Preservehistoricalartifacts, no retry ornewmatchcredit\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-30T23:03:17Z",
-          "id": 6535343308,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T23:03:17Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "89f5897d26123298179d3b655a529539f8ca0419e82b9bf067376699c449027f",
-        "result": {
-          "address": "0x081491C0",
-          "claim_id": 6535288531,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6535343308,
-          "status": "accepted",
-          "who": "sol-91C0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "9b14a0032ed1578863904df9e8b39c72cb2f17fca2ee5b157b7fb879a4289d0a",
         "acknowledged_cursor": 6535674223,
         "body_provenance": "acceptance-time",
