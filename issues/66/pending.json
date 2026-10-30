@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "af8f8cfbe90199b123acddeb9b49d8e6e0da75e4b19a5cff2acf8faf1def9b95",
-        "acknowledged_cursor": 6527943501,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "af8f8cfbe90199b123acddeb9b49d8e6e0da75e4b19a5cff2acf8faf1def9b95",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08024A24\",\"who\":\"sol-4A24\",\"note\":\"Complete150B69instruction naturalcoordinate caller, actualC918/C960 outputABIs with retained D8BD8 analogue;candidate-match41\"}",
-          "created_at": "2026-10-30T16:32:34Z",
-          "id": 6527934453,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T16:32:34Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3a7f19ccce1a312e735d2054949e99e5739bc84fcfde6fe2b7d1268e42c0ae05",
-        "result": {
-          "address": "0x08024A24",
-          "claim_id": 6527934453,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6527934453,
-          "status": "accepted",
-          "who": "sol-4A24"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "6fa4081b41638017870958eae900d146cf0362364494667e4ff0a6d89bdb7e75",
-        "acknowledged_cursor": 6527990237,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "6fa4081b41638017870958eae900d146cf0362364494667e4ff0a6d89bdb7e75",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08024A24\",\"who\":\"sol-4A24\",\"claim_id\":6527934453,\"reason\":\"Firstnative nested buffer proof refusal at1B938->141898 nonleaf calls and interrupts requirelinkedCFG; no bytecomparison or retry.\",\"unmatchable\":true,\"tried\":\"one natural three-s16 coordinate-output caller; default -O2; exact transitivebufferrefusal\"}",
-          "created_at": "2026-10-30T16:35:15Z",
-          "id": 6527990237,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T16:35:15Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d2771feab5dde22b0d96c93f0bc984c3a9364bb5a393fd85692587dba2756280",
-        "result": {
-          "address": "0x08024A24",
-          "claim_id": 6527934453,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6527990237,
-          "status": "accepted",
-          "who": "sol-4A24"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "23913d8fbfaa2e98a2040838a088726834617ef04b1b26d65cb89344e9620343",
         "acknowledged_cursor": 6527990237,
         "body_provenance": "acceptance-time",
