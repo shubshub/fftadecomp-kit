@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "6e9bb95fdbec759962d8b419a41491e4ac7de3904360198a1b77a2c65cdc549e",
+    "acknowledged_cursor": 6535210630,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6e9bb95fdbec759962d8b419a41491e4ac7de3904360198a1b77a2c65cdc549e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CB24C\",\"who\":\"sol-B24C\",\"note\":\"Qualified complete isolated callback/caller matching under exact two new8B owner identities, actual comparator ABI, GPT6.1Sol\"}",
+      "created_at": "2026-10-30T22:53:32Z",
+      "id": 6535206388,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T22:53:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ef7f6c7e3ada9ad5fa8a22d3a86c8c726e29d384400cc91c94e2d7de890a2959",
+    "result": {
+      "address": "0x080CB24C",
+      "claim_id": 6535206388,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6535206388,
+      "status": "accepted",
+      "who": "sol-B24C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "06cb4ea7d696cc8539bbff3824a29a9ce8008486233cd9b96b72e6b8fbca4944",
+    "acknowledged_cursor": 6535244116,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "06cb4ea7d696cc8539bbff3824a29a9ce8008486233cd9b96b72e6b8fbca4944",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CB24C\",\"who\":\"sol-B24C\",\"claim_id\":6535206388,\"reason\":\"Firstnaturalform nativeMATCH complete48B17instructions plausible, originalsource/report/body/receipt frozen fornextcheckpoint\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T22:56:03Z",
+      "id": 6535244116,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T22:56:03Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "580c21c3e4012de35de4e6f63ec2c8fb244e65683f06316e7ff151a05b6ef50b",
+    "result": {
+      "address": "0x080CB24C",
+      "claim_id": 6535206388,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6535244116,
+      "status": "accepted",
+      "who": "sol-B24C"
+    }
+  }
+}
