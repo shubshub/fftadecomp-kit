@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "02d5489e13fde485aa3e32428eeb2f8019e846dc5d6a5c2760070334b35c1e19",
+    "acknowledged_cursor": 6528936561,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "02d5489e13fde485aa3e32428eeb2f8019e846dc5d6a5c2760070334b35c1e19",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BC40C\",\"who\":\"sol-C40C\",\"note\":\"Bounded natural matching complete positive span174B; actualhelper ABI and current typedcall analogue; freshpins, no sharededits.\"}",
+      "created_at": "2026-10-30T17:21:28Z",
+      "id": 6528936452,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T17:21:28Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5580211422232e331fbd35874e8207c67093f4052d48523ece13a9c80dea762b",
+    "result": {
+      "address": "0x080BC40C",
+      "claim_id": 6528936452,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6528936452,
+      "status": "accepted",
+      "who": "sol-C40C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b8a7c17dc34e0ed3e5120d716cb792ebf5937f23beb090e376a1cd5c0262b49f",
+    "acknowledged_cursor": 6528993424,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b8a7c17dc34e0ed3e5120d716cb792ebf5937f23beb090e376a1cd5c0262b49f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BC40C\",\"who\":\"sol-C40C\",\"claim_id\":6528936452,\"reason\":\"First default native attempt complete plausible MATCH174/174B state handler; frozen first success, no replay.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T17:24:21Z",
+      "id": 6528993424,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T17:24:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "293c8d6d4a80ceee26cfa6f8587d6c2ffdbc5f613502ee11c3f61187d1a75c85",
+    "result": {
+      "address": "0x080BC40C",
+      "claim_id": 6528936452,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6528993424,
+      "status": "accepted",
+      "who": "sol-C40C"
+    }
+  }
+}
