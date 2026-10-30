@@ -28,6 +28,10 @@ def inputs(words=WORDS):
 
 
 class FormalR0R1NamedLeafTests(unittest.TestCase):
+    def test_original_identity_pin_matches_the_same_machine_bytes(self):
+        self.assertEqual(profile.IDENTITY[:3],(0x0801E6F0,0x0801E700,6))
+        self.assertEqual(profile.IDENTITY[3],profile.sha(struct.pack('<8H',*WORDS)))
+
     def native(self,values=None,**changes):
         values = inputs() if values is None else dict(values)
         values.update(changes)

@@ -12,7 +12,7 @@ sha, text = second.sha, second.text
 SELECTOR = 'formal-r0-r1-named-leaf-inventory-v1'
 SCHEMA = 'thumb-formal-r0-r1-named-leaf-inventory-v1'
 IDENTITY = (0x0801E6F0, 0x0801E700, 6,
-            'ba7fcd94ac95474dc185f09353f3cc26122122112afb4a3819610ffa2580667fb0f')
+            'ba7fcd94ac95474dc185f09353f3cc26122112afb4a3819610ffa2580667fb0f')
 OUTPUT_SCHEMA = 'thumb-formal-r0-r1-writable-halfwords-v1'
 PREMISE = ('conditional: g_state_02007F40+36 and +38 provide initialized readable aligned '
            'halfwords at each reached load; their values remain unknown')
