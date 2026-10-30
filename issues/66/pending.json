@@ -30,7 +30,35 @@
           "who": "sol-D518"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "be5114443a2963f7f69ee2166b2d967bccdf77d51bf0d449c88de62c7c9fb71b",
+        "acknowledged_cursor": 6524978843,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "be5114443a2963f7f69ee2166b2d967bccdf77d51bf0d449c88de62c7c9fb71b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813D518\",\"who\":\"sol-D518\",\"claim_id\":6524731433,\"reason\":\"Three bounded natural forms. Last plausible392B candidate has61 same-address byte differences beginning0813D530; native aligned summary351/392B,145/170instructions. Types/narrowing intact, register/literal allocation and relative-coordinate scheduling remain different. Full source and current-machine proof retained in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural persistent-reference/global-reload scheduling forms; no steering\"}",
+          "created_at": "2026-10-30T14:16:31Z",
+          "id": 6524976653,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:16:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "13f9ad8053bf2fe401962ad60b5d753a32aadcfb2ba7872bedc33cd7f9ee202a",
+        "result": {
+          "address": "0x0813D518",
+          "claim_id": 6524731433,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6524976653,
+          "status": "accepted",
+          "who": "sol-D518"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +122,35 @@
           "who": "sol-8BD8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9e09b59456bfde5fc4405a9bba658c959880df14624578ac1b48c4e099487764",
+        "acknowledged_cursor": 6524978843,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9e09b59456bfde5fc4405a9bba658c959880df14624578ac1b48c4e099487764",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D8BD8\",\"who\":\"sol-8BD8\",\"claim_id\":6524889042,\"reason\":\"Second natural coordinate wrapper form complete128B plausible byte-identical native MATCH exit0; actual signed16 helper inputs/outputs and source-bound current-machine proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T14:16:31Z",
+          "id": 6524976728,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:16:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "13f9ad8053bf2fe401962ad60b5d753a32aadcfb2ba7872bedc33cd7f9ee202a",
+        "result": {
+          "address": "0x080D8BD8",
+          "claim_id": 6524889042,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6524976728,
+          "status": "accepted",
+          "who": "sol-8BD8"
+        }
+      }
     },
     {
       "claim": {
@@ -124,6 +180,38 @@
           "request_id": 6524946581,
           "status": "accepted",
           "who": "sol-ACF4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0047e495900a6256c961fa3153e660853cce5b2370c37ccdb5e8b267c24cfd34",
+        "acknowledged_cursor": 6524978843,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0047e495900a6256c961fa3153e660853cce5b2370c37ccdb5e8b267c24cfd34",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080269D8\",\"who\":\"sol-69D8\",\"note\":\"Batch30 bounded plausible matching; complete88B equipment predicate with strong actual five-slot loop analogue and full helper ABI evidence.\"}",
+          "created_at": "2026-10-30T14:16:36Z",
+          "id": 6524978843,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:16:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "13f9ad8053bf2fe401962ad60b5d753a32aadcfb2ba7872bedc33cd7f9ee202a",
+        "result": {
+          "address": "0x080269D8",
+          "claim_id": 6524978843,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524978843,
+          "status": "accepted",
+          "who": "sol-69D8"
         }
       },
       "release": null
