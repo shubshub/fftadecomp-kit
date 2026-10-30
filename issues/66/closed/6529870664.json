@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f2a625e3a5f1be43145dc5c61b32a882adcd698cac9df74e64980809fb68cb1f",
+    "acknowledged_cursor": 6529884893,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f2a625e3a5f1be43145dc5c61b32a882adcd698cac9df74e64980809fb68cb1f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FC04\",\"who\":\"sol-FC04\",\"note\":\"Complete136B constructor; actual defining scalarhelper ABI and explicit callback/helper limits, retained same-family native analogue; one Sol executor.\"}",
+      "created_at": "2026-10-30T18:00:48Z",
+      "id": 6529870664,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:00:48Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "30d0d185920177db647594acf3fc598996092b337570496891637131dbd6a3a6",
+    "result": {
+      "address": "0x0800FC04",
+      "claim_id": 6529870664,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6529870664,
+      "status": "accepted",
+      "who": "sol-FC04"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4278d94d6ceb08c2534d628c4bed03d4757eafe93f15f1310efb637e7e167110",
+    "acknowledged_cursor": 6530061489,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4278d94d6ceb08c2534d628c4bed03d4757eafe93f15f1310efb637e7e167110",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800FC04\",\"who\":\"sol-FC04\",\"claim_id\":6529870664,\"reason\":\"Three grounded natural forms fail ordinary exact mapped compiled-span guard against136B target; first diagnostic140B. Zero MATCH; exact owned recovered C/failures parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural forms, one unchanged-first compiler-only extent diagnostic; no model-impossibility claim or success replay\"}",
+      "created_at": "2026-10-30T18:09:45Z",
+      "id": 6530061489,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T18:09:45Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7735f3ec97066bb53a042cae87ac1492b3cd4aaef0e545b9c1f7c2ae5b538c66",
+    "result": {
+      "address": "0x0800FC04",
+      "claim_id": 6529870664,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6530061489,
+      "status": "accepted",
+      "who": "sol-FC04"
+    }
+  }
+}
