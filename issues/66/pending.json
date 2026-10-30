@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "860802ee231deb377f8c4ad9b0de8ccbb3f80681220df38b6fd4775354698b9f",
-        "acknowledged_cursor": 6528757802,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "860802ee231deb377f8c4ad9b0de8ccbb3f80681220df38b6fd4775354698b9f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08144314\",\"who\":\"sol-4314\",\"note\":\"Bounded actual fourword-record wrapper24B; defining complete float helper439C8 plus current bufferread profile; no fakeABI/shared changes.\"}",
-          "created_at": "2026-10-30T17:12:33Z",
-          "id": 6528757802,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:12:33Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2d9ff37775af66efb2720fa2630aa2e6b158ac67e160a18db2b2fabf9ccfce9b",
-        "result": {
-          "address": "0x08144314",
-          "claim_id": 6528757802,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6528757802,
-          "status": "accepted",
-          "who": "sol-4314"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4fbb155219e0745639c91e710d6629ff4f8d293435910d728b231c213ab9a6b4",
-        "acknowledged_cursor": 6528823315,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4fbb155219e0745639c91e710d6629ff4f8d293435910d728b231c213ab9a6b4",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08144314\",\"who\":\"sol-4314\",\"claim_id\":6528757802,\"reason\":\"First default native run refused addressed software-float runtime call: division runtime requires its canonical compiler alias. No comparison/MATCH, no alias workaround.\",\"unmatchable\":true,\"tried\":\"default -mthumb-interwork -O2; one natural source and one native failure; no diagnostic/retry\"}",
-          "created_at": "2026-10-30T17:15:47Z",
-          "id": 6528823315,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T17:15:47Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e59076d3085da2014c86d77fec0c7fa1f2691d46e031f2faeee7402a4f390c76",
-        "result": {
-          "address": "0x08144314",
-          "claim_id": 6528757802,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6528823315,
-          "status": "accepted",
-          "who": "sol-4314"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "54834de683fd6edb40be0bef62929d0127ded0df740d8132c9cd8752560d5db0",
         "acknowledged_cursor": 6528798345,
         "body_provenance": "acceptance-time",
