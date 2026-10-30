@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "001c80cffa887ba72b035bc1ce6e5d11ce0cd35d624aec5a291d0d5c8ae0bbe5",
+    "acknowledged_cursor": 6521039411,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "001c80cffa887ba72b035bc1ce6e5d11ce0cd35d624aec5a291d0d5c8ae0bbe5",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C153C\",\"who\":\"sol-153C\",\"note\":\"Match one complete plausible state accessor with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T10:58:47Z",
+      "id": 6521030694,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:58:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ee8786c0626d6c1e404750ec4b26fb84e0fd1d91871ca877b4e5f8334f9c32e6",
+    "result": {
+      "address": "0x080C153C",
+      "claim_id": 6521030694,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521030694,
+      "status": "accepted",
+      "who": "sol-153C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "10c6820f30d1281765700e623d1526782f79f2d9b8f004d20cc08183f8c48e00",
+    "acknowledged_cursor": 6521078262,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "10c6820f30d1281765700e623d1526782f79f2d9b8f004d20cc08183f8c48e00",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C153C\",\"who\":\"sol-153C\",\"claim_id\":6521030694,\"reason\":\"Complete plausible 20-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T11:00:59Z",
+      "id": 6521068186,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:00:59Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cd839f3590f6316957400598a35aea4cb4a4f7f3c30c282bcb7ecaae5f47f39b",
+    "result": {
+      "address": "0x080C153C",
+      "claim_id": 6521030694,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521068186,
+      "status": "accepted",
+      "who": "sol-153C"
+    }
+  }
+}
