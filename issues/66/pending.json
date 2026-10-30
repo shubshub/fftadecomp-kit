@@ -95,6 +95,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b9bca61f1758786b75273814d5c87874f6c8a9e9ce337781d1288213505536ae",
+        "acknowledged_cursor": 6524556835,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b9bca61f1758786b75273814d5c87874f6c8a9e9ce337781d1288213505536ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FA0C\",\"who\":\"sol-FA0C\",\"note\":\"Batch29 bounded plausible matching using complete body and defining helper types; existing concrete native C analogue retained.\"}",
+          "created_at": "2026-10-30T13:56:35Z",
+          "id": 6524556666,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:56:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c4722eb29a5716f921c26220d7de8cc1b0f23e78d6b0d2c0d37322956e860501",
+        "result": {
+          "address": "0x0800FA0C",
+          "claim_id": 6524556666,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524556666,
+          "status": "accepted",
+          "who": "sol-FA0C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e2647dc46358053273e446e5f35c384461b852008c9fece7bf9b96cc79aafae6",
+        "acknowledged_cursor": 6524556835,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e2647dc46358053273e446e5f35c384461b852008c9fece7bf9b96cc79aafae6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08147124\",\"who\":\"sol-7124\",\"note\":\"Batch29 bounded plausible matching using complete body and defining helper types; existing concrete native C analogue retained.\"}",
+          "created_at": "2026-10-30T13:56:35Z",
+          "id": 6524556835,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:56:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c4722eb29a5716f921c26220d7de8cc1b0f23e78d6b0d2c0d37322956e860501",
+        "result": {
+          "address": "0x08147124",
+          "claim_id": 6524556835,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524556835,
+          "status": "accepted",
+          "who": "sol-7124"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
