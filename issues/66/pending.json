@@ -91,6 +91,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "61c5ebfedb63d9a0a6c450e1c5e8269050fbb4ec21b7c489f5105f537f37cfc0",
+        "acknowledged_cursor": 6528006896,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "61c5ebfedb63d9a0a6c450e1c5e8269050fbb4ec21b7c489f5105f537f37cfc0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A36C\",\"who\":\"sol-A36C\",\"note\":\"Complete44B natural output-byte sibling of fresh A340 nativeMATCH; true22268ABI candidate-checkpoint44\"}",
+          "created_at": "2026-10-30T16:36:02Z",
+          "id": 6528006896,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T16:36:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d4a2f017bda25de17edf080381ceac6c4890389822f6c7c170fa77d572471629",
+        "result": {
+          "address": "0x0809A36C",
+          "claim_id": 6528006896,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6528006896,
+          "status": "accepted",
+          "who": "sol-A36C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
