@@ -102,7 +102,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
         from ordinary_formal_stack_callee_inventory import FormalStackCalleeProof
         from ordinary_two_output_callees_inventory import TwoOutputCalleesProof, NamedReadonlyFormalLeafProof
         from ordinary_second_formal_output_callees_inventory import SecondFormalOutputCalleesProof
-        if type(formal_stack_callee_proof) not in (FormalStackCalleeProof, TwoOutputCalleesProof, NamedReadonlyFormalLeafProof, SecondFormalOutputCalleesProof) or not stack_aliases or \
+        from ordinary_third_formal_output_callees_inventory import ThirdFormalOutputCalleesProof
+        if type(formal_stack_callee_proof) not in (FormalStackCalleeProof, TwoOutputCalleesProof, NamedReadonlyFormalLeafProof, SecondFormalOutputCalleesProof, ThirdFormalOutputCalleesProof) or not stack_aliases or \
                 local_alias_slot_policy is None or any(value is not None for value in (
                     buffer_proof, bounded_output_proof, runtime_calls, call_preservation,
                     entry_stack_policy, finite_stack_index_policy, discarded_exit_scratch)):
