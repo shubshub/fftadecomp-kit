@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "48f5398aae2befa19eb12304c4bc894a71f6eb297ad6f84bb44732730693d338",
+    "acknowledged_cursor": 6524113690,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "48f5398aae2befa19eb12304c4bc894a71f6eb297ad6f84bb44732730693d338",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8C58\",\"who\":\"sol-8C58\",\"note\":\"Sol executor genuine C matching; complete reached body and helper types captured; bounded native proof and release.\"}",
+      "created_at": "2026-10-30T13:34:15Z",
+      "id": 6524093235,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:34:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2cb5d5be26c11be684ed8593ffc7f51daf60fc5a5026f1174d6e70d8db9d36ac",
+    "result": {
+      "address": "0x080D8C58",
+      "claim_id": 6524093235,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6524093235,
+      "status": "accepted",
+      "who": "sol-8C58"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1bf0e00546b81e59a778135c73fdbca4a6fa2b3b04c764d5957a809af7d9fe81",
+    "acknowledged_cursor": 6524251331,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1bf0e00546b81e59a778135c73fdbca4a6fa2b3b04c764d5957a809af7d9fe81",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D8C58\",\"who\":\"sol-8C58\",\"claim_id\":6524093235,\"reason\":\"Bounded genuine candidates fail exact extent before comparison/plausibility; honest source/native refusal/raw diagnostics preserved in Parked.\",\"unmatchable\":true,\"tried\":\"-O2; two arrays104B,pair/triple aggregates112B,coordinate array/separate outputs116B versus122B target; native extent refusal on all three; no forced register/frame controls.\"}",
+      "created_at": "2026-10-30T13:42:05Z",
+      "id": 6524249631,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T13:42:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4aff3fb0f980a0c9dd267fcd3b8f475b0a8264d294b6146f59aa3a3931c518fc",
+    "result": {
+      "address": "0x080D8C58",
+      "claim_id": 6524093235,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6524249631,
+      "status": "accepted",
+      "who": "sol-8C58"
+    }
+  }
+}
