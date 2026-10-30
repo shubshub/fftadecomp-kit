@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "4ff6d88e0ecb8f5126d7eee0f984a8395267fa9972d1a933084b565b43739546",
+    "acknowledged_cursor": 6532249868,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4ff6d88e0ecb8f5126d7eee0f984a8395267fa9972d1a933084b565b43739546",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08042E48\",\"who\":\"sol-2E48\",\"note\":\"Complete112-byte scalar caller, actual defining17B50 and CpuSet ABIs, exact existing addressed func_08142950(s32,s32) conditional call route; no numeric percent-zero claim.\"}",
+      "created_at": "2026-10-30T19:56:39Z",
+      "id": 6532249463,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T19:56:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7b4108010f54c338432c89161eddfed6f69f70c8751b2ea79dc9c2fe5d42241d",
+    "result": {
+      "address": "0x08042E48",
+      "claim_id": 6532249463,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6532249463,
+      "status": "accepted",
+      "who": "sol-2E48"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "83861ee9b10e255153bf8829aea7effaefd90b4bca8be37508d127f86660ff13",
+    "acknowledged_cursor": 6532465675,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "83861ee9b10e255153bf8829aea7effaefd90b4bca8be37508d127f86660ff13",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08042E48\",\"who\":\"sol-2E48\",\"claim_id\":6532249463,\"reason\":\"Two grounded natural forms exhausted. First unchanged compiler diagnostic108 bytes versus112 target; final native exact-byte guard failure, extent unmeasured. No MATCH; source and diagnosis Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; two natural forms; addressed actual remainder call\"}",
+      "created_at": "2026-10-30T20:09:05Z",
+      "id": 6532465675,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T20:09:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0d16991de05936b4bda50776a8035204b84365f2859db85fb63eb5d49613ac8d",
+    "result": {
+      "address": "0x08042E48",
+      "claim_id": 6532249463,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6532465675,
+      "status": "accepted",
+      "who": "sol-2E48"
+    }
+  }
+}
