@@ -980,6 +980,31 @@ do buffers, callbacks and other runtime compositions. This does not prove the
 loaded value, allocation extent, numeric arithmetic or historical formal types.
 The base addressed selector retains its incoming-stack-read refusal.
 
+The separate opt-in
+`--addressed-signed-runtime-profile addressed-signed-runtime-data-v1`
+adds existing typed named-data linking to the conditional addressed-call ABI.
+It requires actual original `R_ARM_ABS32` relocations against unique undefined
+global object symbols in `config/data_symbols.json`. Original signed32 addends,
+alignment, nonoverlap and complete ownership are checked. Linked symbols must
+retain their absolute object type and mapped base, and each linked word must
+equal that base plus its original addend. Only original call and data relocation
+bytes may change during linking; the entire linked body must equal the ROM.
+Every data word must be reached by a PC-relative pool load outside code, and
+every reached address-domain word must have that typed provenance. Indexed code
+and canonical call thunks cannot be relabelled as data.
+
+Data identity supplies no physical readability, allocation, pointee type,
+memory safety or C semantic facts. No numeric division/remainder or zero-case
+theorem is added. This selector retains the complete CFG and frame/return checks
+and excludes local buffers, stack aliases, incoming stack words, callbacks,
+function literals, switches and other runtime compositions. It requires actual
+data bindings; the base and read-only selectors keep their existing exclusions.
+Reports bind the typed original addends, current data snapshot, actual producer
+sources, Python/Capstone and native tool hashes. Acceptance rebuilds the original
+ELF and rederives the bindings and complete linked body; status and publication
+restore this distinct selector. Changes to inputs, tools or producer sources
+invalidate the evidence.
+
 ### Guarded local Thumb switches
 
 The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted

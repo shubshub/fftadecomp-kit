@@ -447,4 +447,260 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
                     with self.assertRaises(ValueError):profile.build(root,A)
 
 
+    def data_fixture(self, operations=('mod',), addends=(0, 8)):
+        tokens=(0xB510,0x4C00,0x6820,0x2100,*operations,0x4C00,
+                'ordinary',0xBC10,0xBC02,0x4708)
+        f=self.fixture(tokens); body=bytearray(f['data'])
+        if len(body)%4: body+=b'\0\0'
+        offset=len(body); sites=(2,8+4*len(operations))
+        objects={'state':'0x03002810','table':'0x030009E0'}
+        records=[]
+        for index,(name,base) in enumerate(objects.items()):
+            literal=offset+index*4;site=sites[index]
+            struct.pack_into('<H',body,site,0x4C00|((literal-((site+4)&~3))//4))
+            body+=struct.pack('<I',int(base,16)+addends[index])
+            records.append([literal,name,addends[index]])
+        f['data']=bytes(body);rom=bytearray(f['rom'])
+        rom[A-match.ROM_BASE:A-match.ROM_BASE+len(body)]=body;f['rom']=bytes(rom)
+        rows=json.loads(f['mapping']);rows[0].update(end=f'0x{A+len(body):08X}',instrs=len(tokens))
+        f['mapping'],f['index']=indexes(rows)
+        f.update(data_mapping=json.dumps(objects).encode(),data_bindings=records)
+        return f
+
+    def data_image(self,f):
+        image=self.image(f);text=bytearray(image['text']);rels=bytearray(image['section_data'][2])
+        for offset,name,addend in f['data_bindings']:
+            image['symbols'].append(dict(name=name,value=0,size=0,type=0,bind=1,section=0))
+            rels+=struct.pack('<II',offset,((len(image['symbols'])-1)<<8)|2)
+            struct.pack_into('<i',text,offset,addend)
+        image['text']=image['section_data'][1]=bytes(text)
+        image['section_data'][2]=bytes(rels)
+        section=list(image['sections'][2]);section[5]=len(rels);image['sections'][2]=tuple(section)
+        return image
+
+    def linked_data_image(self,f,original):
+        linked=copy.deepcopy(original);linked.update(type=2,text=f['data'],relocations=[])
+        section=list(linked['sections'][1]);section[3]=A;linked['sections'][1]=tuple(section)
+        objects=json.loads(f['data_mapping'])
+        for symbol in linked['symbols']:
+            if symbol['section']:symbol['value']=A|1
+            elif symbol['name'] in objects:
+                symbol.update(value=int(objects[symbol['name']],16),section=0xFFF1,type=1)
+            else:
+                symbol.update(value=int(symbol['name'][5:],16)|1,section=0xFFF1,type=2)
+        return linked
+
+    def data_original_bindings(self,f,image=None):
+        data={}
+        calls,bindings,targets=profile.original_bindings(image or self.data_image(f),A,
+            f['rom'],f['mapping'],data_mapping=f['data_mapping'],data_relocations=data)
+        return calls,bindings,targets,data
+
+    def test_data_selector_admits_actual_typed_words_and_conditional_runtime(self):
+        for operations in (('div',),('mod',),('div','mod')):
+            for addends in ((0,8),(-4,0)):
+                with self.subTest(operations=operations,addends=addends):
+                    f=self.data_fixture(operations,addends)
+                    manifest,_=profile.verify(**f,selector=profile.DATA_SELECTOR)
+                    self.assertEqual(manifest['schema'],profile.DATA_SCHEMA)
+                    self.assertEqual(manifest['data_bindings'],f['data_bindings'])
+                    self.assertEqual(manifest['data_contract'],profile.DATA_CONTRACT)
+                    self.assertEqual(manifest['runtime_numeric_return_facts'],[])
+                    self.assertFalse(manifest['arithmetic_C_equivalence'])
+                    self.assertNotIn('entry_stack',manifest['frame'])
+                    self.assertEqual(profile.verify(**f,selector=profile.DATA_SELECTOR,manifest=manifest)[0],manifest)
+                    calls,bindings,targets,data=self.data_original_bindings(f)
+                    self.assertEqual((calls,bindings),(f['calls'],f['bindings']))
+                    self.assertEqual(data,{off:(name,addend) for off,name,addend in f['data_bindings']})
+                    self.assertEqual(targets['state'],0x03002810)
+
+    def test_data_selector_does_not_weaken_base_readonly_or_defaults(self):
+        f=self.data_fixture()
+        for selector in (profile.SELECTOR,profile.READONLY_SELECTOR):
+            with self.subTest(selector=selector),self.assertRaises(ValueError):
+                profile.verify(**f,selector=selector)
+        with self.assertRaises(ValueError):profile.verify(**self.fixture(),selector=profile.DATA_SELECTOR)
+        plain={k:v for k,v in f.items() if k not in ('data_mapping','data_bindings')}
+        for selector in (profile.SELECTOR,profile.READONLY_SELECTOR):
+            with self.assertRaises(ValueError):profile.verify(**plain,selector=selector)
+        with self.assertRaises(ValueError):
+            profile.original_bindings(self.data_image(f),A,f['rom'],f['mapping'])
+        with self.assertRaises(ValueError):
+            match.call_bindings(self.data_image(f),f'func_{A:08X}',A,f['mapping'],len(f['rom']),
+                f['rom'],f['data_mapping'],modsi3_bindings={})
+        context=(f['rom'],f['mapping'],f['index'],f['bindings'],{},profile.DATA_SELECTOR,
+                 f['data_mapping'],f['data_bindings'])
+        for extra in ({'buffer_proof':object()},{'switch_data_relocations':{}},
+                      {'function_thunk_context':{}},{'modsi3_context':()}):
+            with self.subTest(extra=extra),self.assertRaises(ValueError):
+                match.verify_leaf_instructions(f['data'],A,True,f['calls'],
+                    addressed_signed_runtime_context=context,**extra)
+        incoming=self.data_fixture();body=bytearray(incoming['data']);struct.pack_into('<H',body,4,0x9802)
+        rom=bytearray(incoming['rom']);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(body)]=body
+        incoming.update(data=bytes(body),rom=bytes(rom))
+        with self.assertRaises(ValueError):profile.verify(**incoming,selector=profile.DATA_SELECTOR)
+
+    def test_data_original_relocations_require_unique_typed_mapped_objects(self):
+        f=self.data_fixture();image=self.data_image(f)
+        for field,value in [('value',4),('size',4),('type',2),('bind',0),('section',1),('name','missing')]:
+            bad=copy.deepcopy(image);bad['symbols'][-1][field]=value
+            with self.subTest(field=field),self.assertRaises(ValueError):self.data_original_bindings(f,bad)
+        bad=copy.deepcopy(image);bad['symbols'].append(dict(bad['symbols'][-1]))
+        with self.assertRaises(ValueError):self.data_original_bindings(f,bad)
+        for offset,kind in ((1,2),(8,2),(f['data_bindings'][0][0],2),(len(f['data'])-2,2),(24,3)):
+            bad=copy.deepcopy(image);raw=bytearray(bad['section_data'][2])
+            struct.pack_into('<II',raw,len(raw)-8,offset,((len(bad['symbols'])-1)<<8)|kind)
+            bad['section_data'][2]=bytes(raw)
+            with self.subTest(offset=offset,kind=kind),self.assertRaises(ValueError):self.data_original_bindings(f,bad)
+        for objects in (b'{}',b'{"state":"0x03002810","state":"0x03002810"}',
+                        b'{"state":"0x03002810","table":"0xFFFFFFFF"}',
+                        b'{"state":"0x03002810","table":"0x08011000"}',
+                        b'{"state":"0x03002810","table":"0x08142244"}',
+                        b'{"state":"0x03002810","table":"0x08142950"}'):
+            with self.subTest(objects=objects),self.assertRaises(ValueError):
+                self.data_original_bindings(dict(f,data_mapping=objects))
+        bad=copy.deepcopy(image);bad['symbols'][1]['name']='__modsi3'
+        with self.assertRaises(ValueError):self.data_original_bindings(f,bad)
+        with self.assertRaises(ValueError):
+            profile.original_bindings(image,A,f['rom'],f['mapping'],data_mapping=f['data_mapping'],data_relocations={0:('state',0)})
+
+    def test_data_linked_symbols_words_and_modification_surface_are_exact(self):
+        f=self.data_fixture();original=self.data_image(f);linked=self.linked_data_image(f,original)
+        calls,_,targets,data=self.data_original_bindings(f,original)
+        self.assertEqual(profile.linked_bytes(original,linked,A,calls,targets,data_relocations=data),f['data'])
+        for change in ('word','outside','call','object_type','object_address','object_binding','object_section',
+                       'extra_object','undefined','relocations','text_extent','addend'):
+            bad=copy.deepcopy(linked);records=copy.deepcopy(data)
+            if change in ('word','outside','call'):
+                body=bytearray(bad['text']);body[24 if change=='word' else 0 if change=='outside' else 8]^=1
+                bad['text']=bytes(body)
+            elif change=='object_type':bad['symbols'][-1]['type']=2
+            elif change=='object_address':bad['symbols'][-1]['value']+=4
+            elif change=='object_binding':bad['symbols'][-1]['bind']=0
+            elif change=='object_section':bad['symbols'][-1]['section']=1
+            elif change=='extra_object':bad['symbols'].append(dict(bad['symbols'][-1],name='extra'))
+            elif change=='undefined':bad['symbols'][-1]['section']=0
+            elif change=='relocations':bad['relocations']=[2]
+            elif change=='text_extent':bad['text']+=b'\0\0'
+            else:records[next(iter(records))]=('state',4)
+            with self.subTest(change=change),self.assertRaises(ValueError):
+                profile.linked_bytes(original,bad,A,calls,targets,data_relocations=records)
+
+    def test_data_manifest_covers_only_reached_address_words_without_forgery(self):
+        f=self.data_fixture()
+        bads=[[],f['data_bindings'][:1],f['data_bindings']*2,
+              [[0,'state',0],f['data_bindings'][1]],
+              [[24,'state',4],f['data_bindings'][1]],
+              [[24,'missing',0],f['data_bindings'][1]],
+              [[24,'state',True],f['data_bindings'][1]],list(reversed(f['data_bindings']))]
+        for records in bads:
+            with self.subTest(records=records),self.assertRaises(ValueError):
+                profile.verify(**dict(f,data_bindings=records),selector=profile.DATA_SELECTOR)
+        for objects in (None,b'{}',b'{"state":"0x03002814","table":"0x030009E0"}'):
+            with self.assertRaises(ValueError):profile.verify(**dict(f,data_mapping=objects),selector=profile.DATA_SELECTOR)
+        # A forged binding to code is not an object identity, even with matching final bytes.
+        bad=dict(f);body=bytearray(f['data']);struct.pack_into('<I',body,24,B)
+        rom=bytearray(f['rom']);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(body)]=body
+        bad.update(data=bytes(body),rom=bytes(rom),data_mapping=b'{"state":"0x08011000","table":"0x030009E0"}')
+        with self.assertRaises(ValueError):profile.verify(**bad,selector=profile.DATA_SELECTOR)
+        # Move an actual reached load away: an ABS32 in an unreferenced word cannot qualify.
+        bad=dict(f);body=bytearray(f['data']);struct.pack_into('<H',body,2,0x46C0)
+        rom=bytearray(f['rom']);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(body)]=body
+        bad.update(data=bytes(body),rom=bytes(rom))
+        with self.assertRaises(ValueError):profile.verify(**bad,selector=profile.DATA_SELECTOR)
+
+    @contextmanager
+    def data_build_fixture(self):
+        scratch=Path(__file__).resolve().parents[1]/'build/tests';scratch.mkdir(parents=True,exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='addressed_data_',dir=scratch) as directory:
+            root=Path(directory);f=self.data_fixture();original=self.data_image(f);linked=self.linked_data_image(f,original)
+            for sub in ('src','include','config','symbols','docs/match'):(root/sub).mkdir(parents=True,exist_ok=True)
+            (root/'src/08010000.c').write_text('/* synthetic fingerprint token; never compiled */\n')
+            (root/'config/functions.json').write_bytes(f['mapping']);(root/'symbols/functions.txt').write_bytes(f['index'])
+            (root/'config/data_symbols.json').write_bytes(f['data_mapping']);rom=root/'baserom.bin';rom.write_bytes(f['rom'])
+            commands=[]
+            class Runner:
+                def __init__(self,*args,**kwargs):self.root=kwargs['root']
+                @contextmanager
+                def workspace(self):
+                    path=self.root/'workspace';path.mkdir();yield str(path)
+                def read_binary(self,path):
+                    return f['data'] if path.endswith('f.linked.bin') else b'synthetic ELF or assembly boundary'
+                def write_text(self,path,value):Path(path).write_text(value)
+                def sh(self,command):commands.append(command)
+            with (patch.dict(os.environ,FFTA_ROM=str(rom)),patch.object(match,'Runner',Runner),
+                  patch.object(match,'compile_object',return_value=(b'synthetic originalELF',None,original)) as compiler,
+                  patch.object(match,'elf_image',return_value=linked),
+                  patch.object(match,'_run_replay_process',return_value=None),
+                  patch.object(match,'plausibility_result',return_value=([],None))):
+                yield root,f,commands,compiler
+
+    def test_data_fresh_build_replays_original_link_and_detects_input_mutations(self):
+        with self.data_build_fixture() as (root,f,commands,compiler):
+            result=profile.build(root,A,selector=profile.DATA_SELECTOR)
+            self.assertEqual(result['manifest']['data_bindings'],f['data_bindings'])
+            self.assertEqual(result['runtime'],profile.runtime_fingerprint())
+            self.assertEqual(len(commands),3)
+            self.assertIn('--no-relax',commands[1])
+            self.assertIn('--orphan-handling=error',commands[1])
+            report=profile.render(result);compiler.reset_mock()
+            self.assertTrue(evidence.report_matches(report,root,A));compiler.assert_called_once()
+            self.assertIn('identity only',report)
+            for relative in ('config/data_symbols.json','config/functions.json','symbols/functions.txt',
+                             'src/08010000.c','baserom.bin'):
+                p=root/relative;old=p.read_bytes();p.write_bytes(old+b' ')
+                try:self.assertFalse(evidence.report_matches(report,root,A))
+                finally:p.write_bytes(old)
+            p=root/'include/new.h';p.write_text('/* stale */\n')
+            try:self.assertFalse(evidence.report_matches(report,root,A))
+            finally:p.unlink()
+            with patch.object(profile,'runtime_fingerprint',return_value={'stale':True}):
+                self.assertFalse(evidence.report_matches(report,root,A))
+            with patch.object(profile,'toolchain_fingerprint',return_value=[]):
+                self.assertFalse(evidence.report_matches(report,root,A))
+            forged=copy.deepcopy(result);forged['manifest']['data_bindings'][0][2]=4
+            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+            forged=copy.deepcopy(result);forged['manifest']['producer_source_sha256']['match.py']='0'*64
+            self.assertFalse(evidence.report_matches(profile.render(forged),root,A))
+            objects=root/'config/data_symbols.json';old=objects.read_bytes()
+            def mutation(*args,**kwargs):objects.write_bytes(old+b' ')
+            with patch.object(match,'_run_replay_process',side_effect=mutation):
+                try:
+                    with self.assertRaises(ValueError):profile.build(root,A,selector=profile.DATA_SELECTOR)
+                finally:objects.write_bytes(old)
+            with patch.object(match,'plausibility_result',return_value=(['implausible'],None)):
+                with self.assertRaises(ValueError):profile.build(root,A,selector=profile.DATA_SELECTOR)
+            pins=result['manifest']['producer_source_sha256']
+            for snapshots in ([pins,pins,{'changed':True}],[pins,{'changed':True},pins]):
+                with patch.object(profile,'data_producer_fingerprint',side_effect=snapshots):
+                    with self.assertRaises(ValueError):profile.build(root,A,selector=profile.DATA_SELECTOR)
+
+    def test_data_explicit_CLI_status_publisher_roundtrip_and_selector_isolation(self):
+        with self.data_build_fixture() as (root,f,commands,compiler):
+            with patch.object(sys,'argv',['match.py','--root',str(root),
+                 '--addressed-signed-runtime-profile',profile.DATA_SELECTOR,f'{A:08X}']),redirect_stdout(io.StringIO()):
+                self.assertEqual(match.main(),0)
+            report=(root/'docs/match/08010000.md').read_text()
+            self.assertEqual(profile.selector_for_report(report),profile.DATA_SELECTOR)
+            self.assertTrue(evidence.report_matches(report,root,A))
+            self.assertEqual(status.collect(str(root),verify=False)[1],1)
+            with patch.object(status.subprocess,'run',return_value=type('R',(),{
+                 'returncode':0,'stdout':f'extent    {len(f["data"])} bytes\nverdict MATCH - byte identical\n','stderr':''})()) as run:
+                self.assertEqual(status.collect(str(root),verify=True)[1],1)
+                self.assertIn(profile.DATA_SELECTOR,run.call_args[0][0])
+            with redirect_stdout(io.StringIO()):
+                self.assertTrue(push.check_reports(str(root)))
+                with patch.object(push,'run',return_value=(0,'up to date')) as gate:
+                    self.assertTrue(push.check_matches(str(root)))
+                    self.assertIn('--verify',gate.call_args[0][0])
+            self.assertFalse(evidence.report_matches(report.replace(profile.DATA_SELECTOR,profile.SELECTOR),root,A))
+            self.assertFalse(evidence.report_matches(report+'* verification: `other`\n',root,A))
+            for option,value in [('--signed-runtime-profile',match.signed_divmod.SELECTOR),
+                                 ('--function-address-profile',match.function_thunk.SELECTOR),('--mode','arm')]:
+                with (patch.object(profile,'build',side_effect=AssertionError('must not build')),
+                      patch.object(sys,'argv',['match.py','--root',str(root),
+                          '--addressed-signed-runtime-profile',profile.DATA_SELECTOR,option,value,f'{A:08X}'])):
+                    with self.assertRaises(ValueError):match.main()
+
+
 if __name__=='__main__':unittest.main()
