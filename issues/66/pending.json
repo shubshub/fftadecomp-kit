@@ -30,7 +30,35 @@
           "who": "sol-406C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6ae118d727b4ed9095429402a91949ec5193f2c627b61229ce956cd7ef3fc6fa",
+        "acknowledged_cursor": 6523856329,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6ae118d727b4ed9095429402a91949ec5193f2c627b61229ce956cd7ef3fc6fa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806406C\",\"who\":\"sol-406C\",\"claim_id\":6523648062,\"reason\":\"Genuine104B complete-function native plausible MATCH,44/44instructions, private proof with bounded evidence correcting merged156B index into104B+52B functions; source/report and exact proposed mapping diff retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T13:21:52Z",
+          "id": 6523850555,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:21:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+        "result": {
+          "address": "0x0806406C",
+          "claim_id": 6523648062,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6523850555,
+          "status": "accepted",
+          "who": "sol-406C"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-6694"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2e0bb62f3134834817712bb5335ac00fae81d4d8808c4da3ce1ae8345359f7aa",
+        "acknowledged_cursor": 6523856329,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2e0bb62f3134834817712bb5335ac00fae81d4d8808c4da3ce1ae8345359f7aa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08066694\",\"who\":\"sol-6694\",\"claim_id\":6523731398,\"reason\":\"Native complete plausible MATCH:132/132bytes,54/54instructions; current-machine source-bound receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T13:20:45Z",
+          "id": 6523828608,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:20:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+        "result": {
+          "address": "0x08066694",
+          "claim_id": 6523731398,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6523828608,
+          "status": "accepted",
+          "who": "sol-6694"
+        }
+      }
     },
     {
       "claim": {
@@ -188,6 +244,70 @@
           "request_id": 6523800941,
           "status": "accepted",
           "who": "sol-78C4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d83106501f0cd4c2dda560707c9d0aa1d76c5a6f8027a1d2ecbe7cfd0678c0e2",
+        "acknowledged_cursor": 6523856329,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d83106501f0cd4c2dda560707c9d0aa1d76c5a6f8027a1d2ecbe7cfd0678c0e2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A22F0\",\"who\":\"sol-22F0\",\"note\":\"Sol executor genuine exact C matching in isolated worktree; complete body/literals checked; bounded native proof and release.\"}",
+          "created_at": "2026-10-30T13:21:46Z",
+          "id": 6523848455,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:21:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+        "result": {
+          "address": "0x080A22F0",
+          "claim_id": 6523848455,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6523848455,
+          "status": "accepted",
+          "who": "sol-22F0"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c7a746970985a3cbca2a2a7d181ed47b690979a9f6ccc63ddc145045664d7463",
+        "acknowledged_cursor": 6523856329,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c7a746970985a3cbca2a2a7d181ed47b690979a9f6ccc63ddc145045664d7463",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081276D8\",\"who\":\"sol-76D8\",\"note\":\"Sol executor genuine complete C matching in isolated worktree; full body and literal extent checked; bounded native proof and release.\"}",
+          "created_at": "2026-10-30T13:22:10Z",
+          "id": 6523856329,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T13:22:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bc48ca84676fa2f65fc3693348ba8ba7c8fb3dbdf00412510350247b8985890e",
+        "result": {
+          "address": "0x081276D8",
+          "claim_id": 6523856329,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6523856329,
+          "status": "accepted",
+          "who": "sol-76D8"
         }
       },
       "release": null
