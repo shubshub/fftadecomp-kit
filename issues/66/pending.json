@@ -59,6 +59,102 @@
           "who": "sol-9208"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4ff6d88e0ecb8f5126d7eee0f984a8395267fa9972d1a933084b565b43739546",
+        "acknowledged_cursor": 6532249868,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4ff6d88e0ecb8f5126d7eee0f984a8395267fa9972d1a933084b565b43739546",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08042E48\",\"who\":\"sol-2E48\",\"note\":\"Complete112-byte scalar caller, actual defining17B50 and CpuSet ABIs, exact existing addressed func_08142950(s32,s32) conditional call route; no numeric percent-zero claim.\"}",
+          "created_at": "2026-10-30T19:56:39Z",
+          "id": 6532249463,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T19:56:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7b4108010f54c338432c89161eddfed6f69f70c8751b2ea79dc9c2fe5d42241d",
+        "result": {
+          "address": "0x08042E48",
+          "claim_id": 6532249463,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6532249463,
+          "status": "accepted",
+          "who": "sol-2E48"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a373241dc6075535f63665bf710a74ead97bb78816416ffee592246b62a0f166",
+        "acknowledged_cursor": 6532249868,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a373241dc6075535f63665bf710a74ead97bb78816416ffee592246b62a0f166",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08052790\",\"who\":\"sol-2790\",\"note\":\"Complete 112-byte loop with five-argument2ACD4 and defining17B50 ABI. Proven inventory boundary repaired; existing data0200F428 and default scalar frame-data route.\"}",
+          "created_at": "2026-10-30T19:56:40Z",
+          "id": 6532249782,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T19:56:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7b4108010f54c338432c89161eddfed6f69f70c8751b2ea79dc9c2fe5d42241d",
+        "result": {
+          "address": "0x08052790",
+          "claim_id": 6532249782,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6532249782,
+          "status": "accepted",
+          "who": "sol-2790"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "28504f083bf535bc57f1adc87b6c7ad8b47c22170d80461acd441ecaee143aca",
+        "acknowledged_cursor": 6532249868,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "28504f083bf535bc57f1adc87b6c7ad8b47c22170d80461acd441ecaee143aca",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08041FB4\",\"who\":\"sol-1FB4\",\"note\":\"Complete112-byte scalar caller, actual defining17B50 and CpuSet ABIs, exact existing addressed func_08142950(s32,s32) conditional call route; no numeric percent-zero claim.\"}",
+          "created_at": "2026-10-30T19:56:40Z",
+          "id": 6532249868,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T19:56:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7b4108010f54c338432c89161eddfed6f69f70c8751b2ea79dc9c2fe5d42241d",
+        "result": {
+          "address": "0x08041FB4",
+          "claim_id": 6532249868,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6532249868,
+          "status": "accepted",
+          "who": "sol-1FB4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
