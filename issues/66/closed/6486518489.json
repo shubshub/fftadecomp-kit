@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "UNPROVEN",
+    "acknowledged_cursor": 6489896965,
+    "body_provenance": "snapshot-at-archive",
+    "body_sha256": "7e3cbb2c76fbd4d046537215e6e1280cdafd241cb3cd3fd59684db816585b454",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080102EC\",\"who\":\"codex-sol61-v875-080102ec\",\"note\":\"Complete indexed function; Sol6.1 natural C matching\"}",
+      "created_at": "2026-10-29T02:49:14Z",
+      "id": 6486518489,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-29T02:49:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "587c280babcaf490a5f66fbcabbf7eccb24482b69a51a30aebfc93179ff058a8",
+    "result": {
+      "address": "0x080102EC",
+      "claim_id": 6486518489,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6486518489,
+      "status": "accepted",
+      "who": "codex-sol61-v875-080102ec"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "UNPROVEN",
+    "acknowledged_cursor": 6489896965,
+    "body_provenance": "snapshot-at-archive",
+    "body_sha256": "133ff352641a07275ef5193b86d75bfd67cf3fe2e56b65977cc2d6744bafed1d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080102EC\",\"who\":\"codex-sol61-v875-080102ec\",\"claim_id\":6486518489,\"reason\":\"Bounded natural C attempt parked; exact extent or scheduling gap documented.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-10-29T03:57:06Z",
+      "id": 6487488317,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-29T03:57:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "587c280babcaf490a5f66fbcabbf7eccb24482b69a51a30aebfc93179ff058a8",
+    "result": {
+      "address": "0x080102EC",
+      "claim_id": 6486518489,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6487488317,
+      "status": "accepted",
+      "who": "codex-sol61-v875-080102ec"
+    }
+  }
+}
