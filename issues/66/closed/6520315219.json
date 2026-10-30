@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "fb9d46bef0ed765559942db3b1c393237bbbc771578be6613655377786d8e243",
+    "acknowledged_cursor": 6520321231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fb9d46bef0ed765559942db3b1c393237bbbc771578be6613655377786d8e243",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802B548\",\"who\":\"sol-B548\",\"note\":\"Recover plausible complete small field accessor with fixed agbcc\"}",
+      "created_at": "2026-10-30T10:17:04Z",
+      "id": 6520315219,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:17:04Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dcdfc916b7291db115b7ed6993ccdc84694809d5bc9cb9388f3f9f3608366e97",
+    "result": {
+      "address": "0x0802B548",
+      "claim_id": 6520315219,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6520315219,
+      "status": "accepted",
+      "who": "sol-B548"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "2213faef6acc4945a9b969dd1ccbbb1b7e442433e25f8076fe0620f6149ec92e",
+    "acknowledged_cursor": 6520375498,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "2213faef6acc4945a9b969dd1ccbbb1b7e442433e25f8076fe0620f6149ec92e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802B548\",\"who\":\"sol-B548\",\"claim_id\":6520315219,\"reason\":\"Matched complete12-byte input-object byte getter at field0797; source and native report retained\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:19:34Z",
+      "id": 6520358347,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:19:34Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f791a75a2ce9bc48955da4633f33b0ab05390cbf28b8e1460f575c76e43f9e52",
+    "result": {
+      "address": "0x0802B548",
+      "claim_id": 6520315219,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520358347,
+      "status": "accepted",
+      "who": "sol-B548"
+    }
+  }
+}
