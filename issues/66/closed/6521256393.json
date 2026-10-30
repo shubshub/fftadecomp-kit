@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "626e9d3db7d81525a97c0402b5d8393372191481c0b5f4ac4e53bcf6ccdd5f23",
+    "acknowledged_cursor": 6521265822,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "626e9d3db7d81525a97c0402b5d8393372191481c0b5f4ac4e53bcf6ccdd5f23",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08060E0C\",\"who\":\"sol-0E0C\",\"note\":\"Match one complete plausible function with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T11:11:30Z",
+      "id": 6521256393,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:11:30Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0bc63dde306da2b8f1a2b991d5fc11a116b1f94299f3e2d5677a16f6e23ae2da",
+    "result": {
+      "address": "0x08060E0C",
+      "claim_id": 6521256393,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6521256393,
+      "status": "accepted",
+      "who": "sol-0E0C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "cf322967a12534fb76a833c7aff6481fdb81d8e11a6066dab2b4ec52f3e24b70",
+    "acknowledged_cursor": 6521359919,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cf322967a12534fb76a833c7aff6481fdb81d8e11a6066dab2b4ec52f3e24b70",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08060E0C\",\"who\":\"sol-0E0C\",\"claim_id\":6521256393,\"reason\":\"Parked plausible candidate:19/24bytes; global-literal scheduling and register allocation differ\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded trailing-array, typed-entry-base and index-offset source forms\"}",
+      "created_at": "2026-10-30T11:16:32Z",
+      "id": 6521348174,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T11:16:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "deae49b1e2458ce91a4f073b73d3ab67cc1a291e649c5785e9d8baf933d64353",
+    "result": {
+      "address": "0x08060E0C",
+      "claim_id": 6521256393,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6521348174,
+      "status": "accepted",
+      "who": "sol-0E0C"
+    }
+  }
+}
