@@ -30,7 +30,35 @@
           "who": "sol-FAA4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "aa780674311b864f8748bc915e2db0417edbc88fda8a07d0e9e7aac8003ff0d4",
+        "acknowledged_cursor": 6533484571,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aa780674311b864f8748bc915e2db0417edbc88fda8a07d0e9e7aac8003ff0d4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803FAA4\",\"who\":\"sol-FAA4\",\"claim_id\":6533346176,\"reason\":\"One plausible native default form has exact172-byte extent but ordinary constant scheduling and register differences,63 fixed-offset differing bytes. Original NOT-MATCH report remains paired with source in Parked; no grounded second form or MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; default frame/data profile; one natural source form, no compiler diagnostic or replay\"}",
+          "created_at": "2026-10-30T21:07:49Z",
+          "id": 6533484571,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T21:07:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "30c01e4339a755bf4e7e53fb2f306695abba3810d07c29e2d504505d8ff047c0",
+        "result": {
+          "address": "0x0803FAA4",
+          "claim_id": 6533346176,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6533484571,
+          "status": "accepted",
+          "who": "sol-FAA4"
+        }
+      }
     }
   ],
   "issue": 66,
