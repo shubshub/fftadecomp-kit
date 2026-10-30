@@ -30,7 +30,35 @@
           "who": "sol-B6D0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b7011d41b3b8a6a84019c3f1f28250a4d807f4e813154a7c7a6cf099f4608956",
+        "acknowledged_cursor": 6524707462,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b7011d41b3b8a6a84019c3f1f28250a4d807f4e813154a7c7a6cf099f4608956",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809B6D0\",\"who\":\"sol-B6D0\",\"claim_id\":6524525487,\"reason\":\"Three bounded natural clamp forms228,234,246B vs238B owner. Final mismatch starts0809B744 and clamp/register transfers differ; last report spans8B beyond owner, no matching-owner claim. Exact238B body, source and diagnostics retained in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; nested clamp, factored clamp and pointer-loop natural forms; no steering\"}",
+          "created_at": "2026-10-30T14:03:40Z",
+          "id": 6524704992,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:03:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bb60611696e9e0a205471f06a89efce7867e1719b63ff0f207637cace7d379d7",
+        "result": {
+          "address": "0x0809B6D0",
+          "claim_id": 6524525487,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6524704992,
+          "status": "accepted",
+          "who": "sol-B6D0"
+        }
+      }
     },
     {
       "claim": {
@@ -92,6 +120,38 @@
           "request_id": 6524624654,
           "status": "accepted",
           "who": "sol-2380"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e7f7aa135eeb8f7484c3543b13ddf5bc4282ac0d0f282a0970a5fc6e6b9c194f",
+        "acknowledged_cursor": 6524707462,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e7f7aa135eeb8f7484c3543b13ddf5bc4282ac0d0f282a0970a5fc6e6b9c194f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08062E1C\",\"who\":\"sol-2E1C\",\"note\":\"Batch30 bounded plausible matching; exact444B command-list body, concrete defining analogues and full helper ABI evidence retained.\"}",
+          "created_at": "2026-10-30T14:03:47Z",
+          "id": 6524707462,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:03:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "bb60611696e9e0a205471f06a89efce7867e1719b63ff0f207637cace7d379d7",
+        "result": {
+          "address": "0x08062E1C",
+          "claim_id": 6524707462,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6524707462,
+          "status": "accepted",
+          "who": "sol-2E1C"
         }
       },
       "release": null
