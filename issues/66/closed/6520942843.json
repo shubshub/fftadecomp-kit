@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9962fe4805a4d52bf16b4e8904248d366ca140735ede063a3ff01c468f35d5e8",
+    "acknowledged_cursor": 6520942843,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9962fe4805a4d52bf16b4e8904248d366ca140735ede063a3ff01c468f35d5e8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0814913C\",\"who\":\"sol-913C\",\"note\":\"Match one complete plausible function with an isolated gpt-6.1-sol executor\"}",
+      "created_at": "2026-10-30T10:53:38Z",
+      "id": 6520942843,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:53:38Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dd6c71e0f3e5cd16405024a283350f239d6d73acce5b017ad6524214b564d391",
+    "result": {
+      "address": "0x0814913C",
+      "claim_id": 6520942843,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6520942843,
+      "status": "accepted",
+      "who": "sol-913C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "78285c9a771b85ca0b348ac13aa19c83afe5df507c0a6586f0c864240f8019df",
+    "acknowledged_cursor": 6520977481,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "78285c9a771b85ca0b348ac13aa19c83afe5df507c0a6586f0c864240f8019df",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814913C\",\"who\":\"sol-913C\",\"claim_id\":6520942843,\"reason\":\"Complete plausible 16-byte MATCH retained in isolated source and native report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T10:55:40Z",
+      "id": 6520977481,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T10:55:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a2975d496768cddcdf5369127b5d639e9c55a14b4d976a17f23e3784dce3dd09",
+    "result": {
+      "address": "0x0814913C",
+      "claim_id": 6520942843,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6520977481,
+      "status": "accepted",
+      "who": "sol-913C"
+    }
+  }
+}
