@@ -59,6 +59,102 @@
           "who": "sol-D52C"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "036d5797d520eddb5600e0ea8f5667258a067af3a032643acffe6c3887a80634",
+        "acknowledged_cursor": 6522657924,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "036d5797d520eddb5600e0ea8f5667258a067af3a032643acffe6c3887a80634",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08036584\",\"who\":\"sol-6584\",\"note\":\"Sol isolated full52-72byte function C matching, evidence-backed local types/call signatures; existing proof profiles only.\"}",
+          "created_at": "2026-10-30T12:17:58Z",
+          "id": 6522657826,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:17:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4f2eff9a7076ecf4b600173103f8c599674f0952c265395780a6c4f10b0407f5",
+        "result": {
+          "address": "0x08036584",
+          "claim_id": 6522657826,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522657826,
+          "status": "accepted",
+          "who": "sol-6584"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bc52a615587824063046b55eea4e6a59e82c720015d93155642978e67a84262c",
+        "acknowledged_cursor": 6522657924,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bc52a615587824063046b55eea4e6a59e82c720015d93155642978e67a84262c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08035C48\",\"who\":\"sol-5C48\",\"note\":\"Sol isolated full52-72byte function C matching, evidence-backed local types/call signatures; existing proof profiles only.\"}",
+          "created_at": "2026-10-30T12:17:58Z",
+          "id": 6522657906,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:17:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4f2eff9a7076ecf4b600173103f8c599674f0952c265395780a6c4f10b0407f5",
+        "result": {
+          "address": "0x08035C48",
+          "claim_id": 6522657906,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522657906,
+          "status": "accepted",
+          "who": "sol-5C48"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8b36ab4dc3c676e0bc71d45960b5719e0582615ab7f6c298175dc57d38d37bdd",
+        "acknowledged_cursor": 6522657924,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8b36ab4dc3c676e0bc71d45960b5719e0582615ab7f6c298175dc57d38d37bdd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08037DF0\",\"who\":\"sol-7DF0\",\"note\":\"Sol isolated full52-72byte function C matching, evidence-backed local types/call signatures; existing proof profiles only.\"}",
+          "created_at": "2026-10-30T12:17:58Z",
+          "id": 6522657924,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T12:17:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4f2eff9a7076ecf4b600173103f8c599674f0952c265395780a6c4f10b0407f5",
+        "result": {
+          "address": "0x08037DF0",
+          "claim_id": 6522657924,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6522657924,
+          "status": "accepted",
+          "who": "sol-7DF0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
