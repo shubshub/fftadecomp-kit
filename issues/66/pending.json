@@ -62,7 +62,35 @@
           "who": "sol-8A98"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4c372058531320f9d18a86e357a8c44e1ae518cbbfc55b84bd8137a0787aa006",
+        "acknowledged_cursor": 6526077120,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4c372058531320f9d18a86e357a8c44e1ae518cbbfc55b84bd8137a0787aa006",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D8A98\",\"who\":\"sol-8A98\",\"claim_id\":6526032243,\"reason\":\"First native run MATCH, plausible complete50-byte coordinate-output body with24 identical instructions; defining u16 helper contract and original proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T15:09:21Z",
+          "id": 6526077120,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:09:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "780e07aed65436f720c3b530392d4c102b3985b8a3552e4b3623d599696dba52",
+        "result": {
+          "address": "0x080D8A98",
+          "claim_id": 6526032243,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6526077120,
+          "status": "accepted",
+          "who": "sol-8A98"
+        }
+      }
     },
     {
       "claim": {
@@ -92,6 +120,70 @@
           "request_id": 6526046783,
           "status": "accepted",
           "who": "sol-7A7C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "220399a86164bd358580e840db00c98818a4939695c57ca8f31edb5d150f6e34",
+        "acknowledged_cursor": 6526077120,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "220399a86164bd358580e840db00c98818a4939695c57ca8f31edb5d150f6e34",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08058C0C\",\"who\":\"sol-8C0C\",\"note\":\"Natural inventory scan with identical defining count-output helper and newly matched buffer-profile analogue.\"}",
+          "created_at": "2026-10-30T15:08:35Z",
+          "id": 6526060742,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:08:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "780e07aed65436f720c3b530392d4c102b3985b8a3552e4b3623d599696dba52",
+        "result": {
+          "address": "0x08058C0C",
+          "claim_id": 6526060742,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526060742,
+          "status": "accepted",
+          "who": "sol-8C0C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3c2eeb2c21324a4890344f358c8aaa7b18300487e0fbe8c25051fa085bc5b5f7",
+        "acknowledged_cursor": 6526077120,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3c2eeb2c21324a4890344f358c8aaa7b18300487e0fbe8c25051fa085bc5b5f7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812EE98\",\"who\":\"sol-EE98\",\"note\":\"Natural scalar wrapper using exact adjacent matched branch shape and actual u32/s32 helper types.\"}",
+          "created_at": "2026-10-30T15:08:35Z",
+          "id": 6526060865,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T15:08:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "780e07aed65436f720c3b530392d4c102b3985b8a3552e4b3623d599696dba52",
+        "result": {
+          "address": "0x0812EE98",
+          "claim_id": 6526060865,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6526060865,
+          "status": "accepted",
+          "who": "sol-EE98"
         }
       },
       "release": null
