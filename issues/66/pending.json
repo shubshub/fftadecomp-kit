@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "b822ed8d288db6c7c0f9ca3365cd7c270b64ca3e9086f6104dafa6d68c7ad5c3",
-        "acknowledged_cursor": 6526516066,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b822ed8d288db6c7c0f9ca3365cd7c270b64ca3e9086f6104dafa6d68c7ad5c3",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081464F8\",\"who\":\"sol-64F8\",\"note\":\"Batch35 ordinary leaf script word decoder; complete 72-byte span and defining dispatcher ABI pinned.\"}",
-          "created_at": "2026-10-30T15:27:50Z",
-          "id": 6526507267,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T15:27:50Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "51b2c98b63e6aa68643b1ecb1bb3b4d5b4e889480d4fe1f58061d2edbdc660d0",
-        "result": {
-          "address": "0x081464F8",
-          "claim_id": 6526507267,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6526507267,
-          "status": "accepted",
-          "who": "sol-64F8"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "325b373ef0f5a35ce00986bf0ac73b6f6b87bd4980fd5f7e3017fa060559178f",
-        "acknowledged_cursor": 6526646783,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "325b373ef0f5a35ce00986bf0ac73b6f6b87bd4980fd5f7e3017fa060559178f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081464F8\",\"who\":\"sol-64F8\",\"claim_id\":6526507267,\"reason\":\"Three plausible complete72B natural decoder forms admitted; all same code with25 fixed-offset differing bytes, cursor/scratch allocation and load/mask order. Owned source/native report preserved in Parked.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; initialized bitfield union cached cursor; byte-array union cached cursor; byte-array union direct cursor; three native mismatches\"}",
-          "created_at": "2026-10-30T15:33:10Z",
-          "id": 6526646783,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T15:33:10Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "de69f519cdf5da30ab169eda73668430dd3cdeffc1685fb5735068dad942830d",
-        "result": {
-          "address": "0x081464F8",
-          "claim_id": 6526507267,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6526646783,
-          "status": "accepted",
-          "who": "sol-64F8"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1669a13744be3e099fd7493d0784329ea65fb17e4ef9138077082b4c1b4a42a9",
         "acknowledged_cursor": 6526705478,
         "body_provenance": "acceptance-time",
