@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "UNPROVEN",
+    "acknowledged_cursor": 6525122997,
+    "body_provenance": "snapshot-at-archive",
+    "body_sha256": "beaf5543826269184e43f6cbbddb4d88f89755d39a396d720cfb73373c630ab7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813BB04\",\"who\":\"sol-BB04\",\"note\":\"Batch31 bounded plausible matching; complete180B copy/metadata routine with actual defining caller signature and full helper ABI evidence retained.\"}",
+      "created_at": "2026-10-30T14:24:11Z",
+      "id": 6525122997,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:24:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "72f9490196d4fd29cbd1669df327808fc66d1b78843ee151b437712fa41fd5e4",
+    "result": {
+      "address": "0x0813BB04",
+      "claim_id": 6525122997,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6525122997,
+      "status": "accepted",
+      "who": "sol-BB04"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5512d3a1ba16c1a3ec1ffbbf36fe49adac293452d0116f64184d1b39d5cb99f6",
+    "acknowledged_cursor": 6525183011,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5512d3a1ba16c1a3ec1ffbbf36fe49adac293452d0116f64184d1b39d5cb99f6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813BB04\",\"who\":\"sol-BB04\",\"claim_id\":6525122997,\"reason\":\"First native candidate complete180B plausible byte-identical MATCH exit0; genuine existing caller contract, bounded helper ABI and source-bound current-machine proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T14:27:58Z",
+      "id": 6525183011,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T14:27:58Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+    "result": {
+      "address": "0x0813BB04",
+      "claim_id": 6525122997,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6525183011,
+      "status": "accepted",
+      "who": "sol-BB04"
+    }
+  }
+}

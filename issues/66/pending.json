@@ -30,6 +30,162 @@
           "who": "sol-BB04"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "5512d3a1ba16c1a3ec1ffbbf36fe49adac293452d0116f64184d1b39d5cb99f6",
+        "acknowledged_cursor": 6525183011,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5512d3a1ba16c1a3ec1ffbbf36fe49adac293452d0116f64184d1b39d5cb99f6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813BB04\",\"who\":\"sol-BB04\",\"claim_id\":6525122997,\"reason\":\"First native candidate complete180B plausible byte-identical MATCH exit0; genuine existing caller contract, bounded helper ABI and source-bound current-machine proof retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T14:27:58Z",
+          "id": 6525183011,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:27:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+        "result": {
+          "address": "0x0813BB04",
+          "claim_id": 6525122997,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6525183011,
+          "status": "accepted",
+          "who": "sol-BB04"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4cb12e6a8fd7292f54632a30f26f4560424ee44cd5555238a4aa8a838481ad1d",
+        "acknowledged_cursor": 6525183011,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4cb12e6a8fd7292f54632a30f26f4560424ee44cd5555238a4aa8a838481ad1d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08025464\",\"who\":\"sol-5464\",\"note\":\"Batch31 bounded plausible matching; complete span, supported natural body and actual helper types grounded in concrete C analogues.\"}",
+          "created_at": "2026-10-30T14:26:22Z",
+          "id": 6525157020,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:26:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+        "result": {
+          "address": "0x08025464",
+          "claim_id": 6525157020,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525157020,
+          "status": "accepted",
+          "who": "sol-5464"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "04e0a02b487fa40a169225d4fa6a9abbad9fb971d0ac01e925a954af80d35bb4",
+        "acknowledged_cursor": 6525183011,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "04e0a02b487fa40a169225d4fa6a9abbad9fb971d0ac01e925a954af80d35bb4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806261C\",\"who\":\"sol-261C\",\"note\":\"Batch31 bounded plausible matching; complete span, supported natural body and actual helper types grounded in concrete C analogues.\"}",
+          "created_at": "2026-10-30T14:26:22Z",
+          "id": 6525157025,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:26:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+        "result": {
+          "address": "0x0806261C",
+          "claim_id": 6525157025,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525157025,
+          "status": "accepted",
+          "who": "sol-261C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "80e45ee7ece1bfce4c0575ddd7da1ecf0d6e26a9d2ee364bd508708fa6ce84dc",
+        "acknowledged_cursor": 6525183011,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "80e45ee7ece1bfce4c0575ddd7da1ecf0d6e26a9d2ee364bd508708fa6ce84dc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080853A0\",\"who\":\"sol-53A0\",\"note\":\"Batch31 bounded plausible matching; complete span, supported natural body and actual helper types grounded in concrete C analogues.\"}",
+          "created_at": "2026-10-30T14:26:22Z",
+          "id": 6525157234,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:26:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+        "result": {
+          "address": "0x080853A0",
+          "claim_id": 6525157234,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525157234,
+          "status": "accepted",
+          "who": "sol-53A0"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8ef9ab3e9b2677ad413af03b2c2ff345c23dde5b858b0370a061c596d94c7e54",
+        "acknowledged_cursor": 6525183011,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8ef9ab3e9b2677ad413af03b2c2ff345c23dde5b858b0370a061c596d94c7e54",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8D18\",\"who\":\"sol-8D18\",\"note\":\"Batch31 bounded plausible matching; complete94B coordinate/effect wrapper, recent exact signed-output analogue and full effect helper ABI evidence.\"}",
+          "created_at": "2026-10-30T14:27:10Z",
+          "id": 6525169961,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T14:27:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c4d7b8521145b6598432e46d374c54daae6d84f1702afc95f9639eff68375b",
+        "result": {
+          "address": "0x080D8D18",
+          "claim_id": 6525169961,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6525169961,
+          "status": "accepted",
+          "who": "sol-8D18"
+        }
+      },
       "release": null
     }
   ],
