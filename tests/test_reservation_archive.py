@@ -30,10 +30,10 @@ def comment(request_id, request, owner=7):
             "issue_url": f"https://api.github.com/repos/{reserve.KIT_REPO}/issues/66"}
 
 
-def pair(claim_id=100, release_id=101, owner=7):
-    claim = comment(claim_id, {"operation": "claim", "address": ADDRESS,
+def pair(claim_id=100, release_id=101, owner=7, address=ADDRESS):
+    claim = comment(claim_id, {"operation": "claim", "address": address,
                               "who": "lane", "note": "natural source attempt"}, owner)
-    release = comment(release_id, {"operation": "release", "address": ADDRESS,
+    release = comment(release_id, {"operation": "release", "address": address,
                                   "who": "lane", "claim_id": claim_id,
                                   "reason": "Complete natural C misses; retained reason Ω",
                                   "tried": "-mthumb-interwork -O2; genuine field layouts",
@@ -77,7 +77,7 @@ class FakeArchiveAPI:
             request_id = int(endpoint.removeprefix(comments))
             if method == "GET":
                 if request_id not in self.comments:
-                    raise reserve.NotFound("missing comment")
+                    raise reserve.LedgerError("GitHub request failed: gh: Not Found (HTTP 404)")
                 if self.changed and self.head:
                     self.changed(self.comments[request_id])
                 return copy.deepcopy(self.comments[request_id])
@@ -202,6 +202,20 @@ class ReservationArchiveTests(unittest.TestCase):
         for key in ("claim", "release"):
             self.assertEqual(closed[key]["body_provenance"], "acceptance-time")
             self.assertEqual(closed[key]["acceptance_body_sha256"], closed[key]["body_sha256"])
+
+    def test_full_rom_closed_pairs_preserve_late_rom_coordinates(self):
+        for address in ("0x08150000", "0x08A38A2C", "0x08FFFFFE"):
+            with self.subTest(address=address):
+                state, comments = pair(address=address)
+                fake = FakeArchiveAPI(state, comments)
+                archive = self.run_archive(fake)
+                with patch.object(reserve, "api", side_effect=fake):
+                    closed = archive.read("issues/66/closed/100.json")
+                self.assertEqual(fake.deletes, [101, 100])
+                for operation, snapshot in zip(("claim", "release"), comments):
+                    self.assertEqual(closed[operation]["comment"], snapshot)
+                    self.assertEqual(closed[operation]["result"]["address"], address)
+                    self.assertEqual(reserve.validate_receipt(closed[operation], operation)["address"], address)
 
     def test_publication_failures_and_ref_conflicts_delete_nothing(self):
         for failure in ("blob", "tree", "commit", "ref", "readback", "conflict", "uncertain"):
@@ -437,12 +451,27 @@ class ReservationArchiveTests(unittest.TestCase):
     def test_delete_204_is_empty_success_and_404_is_read_only_missing(self):
         with patch.object(reserve.subprocess, "run", return_value=subprocess.CompletedProcess([], 0, "", "")):
             self.assertIsNone(reserve.api("DELETE", "repos/owner/repo/issues/comments/100"))
-        with patch.object(reserve.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "gh: Not Found (HTTP 404)")):
-            with self.assertRaises(reserve.NotFound):
-                reserve.api("GET", "repos/owner/repo/issues/comments/100")
-            with self.assertRaises(reserve.LedgerError) as caught:
+        with patch.object(reserve.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "gh: Not Found (HTTP 404)")) as run, \
+                patch.object(reserve.time, "sleep") as sleep:
+            self.assertIsNone(reserve.receipt_comment(100))
+            run.assert_called_once()
+            sleep.assert_not_called()
+        with patch.object(reserve.subprocess, "run", return_value=subprocess.CompletedProcess([], 1, "", "gh: Not Found (HTTP 404)")) as run, \
+                patch.object(reserve.time, "sleep") as sleep:
+            with self.assertRaises(reserve.LedgerError):
                 reserve.api("DELETE", "repos/owner/repo/issues/comments/100")
-            self.assertNotIsInstance(caught.exception, reserve.NotFound)
+            run.assert_called_once()
+            sleep.assert_not_called()
+
+    def test_comment_snapshot_read_retries_transient_error_before_confirmed_404(self):
+        transient = subprocess.CompletedProcess([], 1, "", "gh: Service Unavailable (HTTP 503)")
+        missing = subprocess.CompletedProcess([], 1, "", "gh: Not Found (HTTP 404)")
+        with patch.object(reserve.subprocess, "run", side_effect=[transient, missing]) as run, \
+                patch.object(reserve.time, "sleep") as sleep:
+            self.assertIsNone(reserve.receipt_comment(100))
+        self.assertEqual(run.call_count, 2)
+        self.assertEqual(run.call_args_list[0], run.call_args_list[1])
+        sleep.assert_called_once_with(1)
 
 
 if __name__ == "__main__":
