@@ -59,6 +59,38 @@
           "who": "sol-FC04"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "231f53dd99762bf6cb601d414801bf9da035c1b7b00f5e45d4b11b4354820af8",
+        "acknowledged_cursor": 6530119706,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "231f53dd99762bf6cb601d414801bf9da035c1b7b00f5e45d4b11b4354820af8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800FB68\",\"who\":\"sol-FB68\",\"note\":\"Complete156B radius constructor; actual scalarhelper/callback ABI evidence and explicit opaque allocator/ordinarycall caveats; oneSol executor, no sharededits.\"}",
+          "created_at": "2026-10-30T18:12:31Z",
+          "id": 6530119706,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T18:12:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5d933b315ce26bc4262d2727c063fa8bf3c12c6aa0437f537d8245bdb0e7937",
+        "result": {
+          "address": "0x0800FB68",
+          "claim_id": 6530119706,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6530119706,
+          "status": "accepted",
+          "who": "sol-FB68"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
