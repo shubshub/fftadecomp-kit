@@ -154,7 +154,35 @@
           "who": "sol-53F8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0fe7d8abfcdfdecbd2ceaa0cdcc6618707dc3c81f5cfe661be6aadc134d180ef",
+        "acknowledged_cursor": 6530599259,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0fe7d8abfcdfdecbd2ceaa0cdcc6618707dc3c81f5cfe661be6aadc134d180ef",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C53F8\",\"who\":\"sol-53F8\",\"claim_id\":6530437252,\"reason\":\"First default native MATCH complete plausible40B with corrected complete indexed body; original proof frozen, no replay\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-30T18:33:58Z",
+          "id": 6530599259,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-30T18:33:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6d1308fac6f4dbd619447d6f602a7f003010fe73576e251a1c73a3a683e939cf",
+        "result": {
+          "address": "0x080C53F8",
+          "claim_id": 6530437252,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6530599259,
+          "status": "accepted",
+          "who": "sol-53F8"
+        }
+      }
     }
   ],
   "issue": 66,
