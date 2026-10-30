@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "96eb1395f4d93bcd496f2edf1afcc5b5cc98c5d060773588141c9a2eb02e3a02",
+    "acknowledged_cursor": 6523256306,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "96eb1395f4d93bcd496f2edf1afcc5b5cc98c5d060773588141c9a2eb02e3a02",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C15DC\",\"who\":\"sol-15DC\",\"note\":\"Native plausible C matching of larger mapped state/record operation\"}",
+      "created_at": "2026-10-30T12:50:29Z",
+      "id": 6523256232,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:50:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4b4b04e4e4103ac2c68dfb8bcdf4e8ece70f86593ae176565a4e2f3ec80a5748",
+    "result": {
+      "address": "0x080C15DC",
+      "claim_id": 6523256232,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6523256232,
+      "status": "accepted",
+      "who": "sol-15DC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7d1d2abd68d0be4bd825bc9d2c5db66d5fb09660fa2a5f972a1352a113f80a1d",
+    "acknowledged_cursor": 6523350682,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7d1d2abd68d0be4bd825bc9d2c5db66d5fb09660fa2a5f972a1352a113f80a1d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C15DC\",\"who\":\"sol-15DC\",\"claim_id\":6523256232,\"reason\":\"MATCH:120 complete bytes,52/52instructions,plausible,first candidate; genuine packed nibble fields\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-30T12:54:44Z",
+      "id": 6523333229,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-30T12:54:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f5f2700843f3dfb2aff10e7356e8fd38024915337d5fbea7bea4bf8bda2bb89d",
+    "result": {
+      "address": "0x080C15DC",
+      "claim_id": 6523256232,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6523333229,
+      "status": "accepted",
+      "who": "sol-15DC"
+    }
+  }
+}
