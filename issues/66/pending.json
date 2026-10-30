@@ -91,66 +91,6 @@
           "who": "sol-7D2C"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "167fbff0bc4222262d88888ccb6831f328211ded08453ca61b7838c9ea32f56c",
-        "acknowledged_cursor": 6524113690,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "167fbff0bc4222262d88888ccb6831f328211ded08453ca61b7838c9ea32f56c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802CFB0\",\"who\":\"sol-CFB0\",\"note\":\"Sol executor genuine full C matching; scoped complete-target/type evidence captured before claim; bounded native proof and release.\"}",
-          "created_at": "2026-10-30T13:35:11Z",
-          "id": 6524113665,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T13:35:11Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2cb5d5be26c11be684ed8593ffc7f51daf60fc5a5026f1174d6e70d8db9d36ac",
-        "result": {
-          "address": "0x0802CFB0",
-          "claim_id": 6524113665,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6524113665,
-          "status": "accepted",
-          "who": "sol-CFB0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "711f347bce89688cc9941d4c780acb248a5deb5fa35f261a492e1bf3398d219b",
-        "acknowledged_cursor": 6524178677,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "711f347bce89688cc9941d4c780acb248a5deb5fa35f261a492e1bf3398d219b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802CFB0\",\"who\":\"sol-CFB0\",\"claim_id\":6524113665,\"reason\":\"Native plausible complete MATCH:100/100bytes,41/41instructions; source-bound actual current-runtime/mapping receipt retained.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-30T13:38:22Z",
-          "id": 6524178677,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-30T13:38:22Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "04cd9ea9d4ed735b69c61ff339c2bbe115ae3fe2170f66b7b0d4d15e65943239",
-        "result": {
-          "address": "0x0802CFB0",
-          "claim_id": 6524113665,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6524178677,
-          "status": "accepted",
-          "who": "sol-CFB0"
-        }
-      }
     }
   ],
   "issue": 66,
