@@ -6,6 +6,7 @@ boundary. It supplies no numeric division/remainder result or domain theorem.
 import argparse
 from contextvars import ContextVar
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
@@ -29,10 +30,17 @@ READONLY_TWO_SELECTOR = 'addressed-signed-runtime-readonly-two-words-v1'
 READONLY_TWO_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-words-v1'
 DATA_SELECTOR = 'addressed-signed-runtime-data-v1'
 DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-data-v1'
+CALLBACK_SELECTOR = 'addressed-signed-runtime-r2-callback-data-v1'
+CALLBACK_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-r2-callback-data-v1'
+CALLBACK_ALIAS = '_call_via_r2'
+CALLBACK_CONTRACT = ('conditional returning typed source callback via canonical r2; '
+                     'r0/r1 are caller arguments, r2 is the target, not a third C formal; '
+                     'no callback numeric, buffer, memory or termination equivalence facts')
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
 SCHEMAS = {SELECTOR: SCHEMA, READONLY_SELECTOR: READONLY_SCHEMA,
-           READONLY_TWO_SELECTOR: READONLY_TWO_SCHEMA, DATA_SELECTOR: DATA_SCHEMA}
+            READONLY_TWO_SELECTOR: READONLY_TWO_SCHEMA, DATA_SELECTOR: DATA_SCHEMA,
+            CALLBACK_SELECTOR: CALLBACK_SCHEMA}
 OPERATIONS = {'func_081426B8': quotient.ADDRESS, remainder.ADDRESSED_NAME: remainder.ADDRESS}
 ABI = 'conditional returning ARM ABI; arbitrary incoming word patterns; no numeric return facts'
 _replay = ContextVar('addressed_signed_runtime_replay', default=False)
@@ -54,8 +62,8 @@ def context_selector(context):
             return READONLY_SELECTOR
         if len(context) == 6 and type(context[5]) is str and context[5] == READONLY_TWO_SELECTOR:
             return READONLY_TWO_SELECTOR
-        if len(context) == 8 and context[5] == DATA_SELECTOR:
-            return DATA_SELECTOR
+        if len(context) == 8 and type(context[5]) is str and context[5] in (DATA_SELECTOR, CALLBACK_SELECTOR):
+            return context[5]
     raise ValueError('addressed signed runtimes require an exact explicit context')
 
 
@@ -101,9 +109,70 @@ def data_producer_fingerprint():
     modules = (match, owner, graph, frame, quotient, remainder, match.function_thunk,
                match.software_double, match.software_float, match.ashldi3, match.umodsi3)
     paths = {Path(module.__file__) for module in modules} | {Path(__file__)}
-    paths.update(Path(__file__).with_name(name) for name in
-                 ('match_evidence.py', 'inert_spin_profile.py', 'analyze.py', 'plausible.py'))
+    paths.update(Path(importlib.import_module(name).__file__) for name in
+                 ('match_evidence', 'inert_spin_profile', 'analyze', 'plausible'))
     return {path.name: sha(path.read_bytes()) for path in sorted(paths)}
+
+
+def callback_dependencies(rom, mapping, index):
+    """Reuse canonical thunk identity, with its actual two-byte indexed owner."""
+    import match
+    import owner_admission_profile as owner
+    target = match.function_thunk.ALIASES[CALLBACK_ALIAS]
+    offset = target - match.ROM_BASE
+    owner.validate_span(rom[offset:offset+2], target, rom, mapping, index)
+    return match.function_thunk.dependencies([CALLBACK_ALIAS], rom)
+
+
+def callback_sites(instructions, edges, calls, address, records):
+    """Require an unambiguous straight-line mapped slot-zero load into r2."""
+    import match
+    target = match.function_thunk.ALIASES[CALLBACK_ALIAS]
+    reverse = {site: set() for site in instructions}
+    for site, successors in edges.items():
+        for successor in successors:
+            reverse[successor].add(site)
+    bindings = {offset: (name, addend) for offset, name, addend in records}
+    result = []
+    for site in sorted(site for site, value in calls.items() if value == target):
+        cursor = site
+        load = None
+        for distance in range(8):
+            predecessors = reverse[cursor]
+            if len(predecessors) != 1:
+                break
+            previous = next(iter(predecessors))
+            item = instructions[previous]
+            if previous + item.size != cursor or edges[previous] != (cursor,) or previous in calls:
+                break
+            operands = item.operands
+            if distance == 0:
+                if item.mnemonic != 'ldr' or len(operands) != 2 or \
+                        operands[0].type != match.ARM_OP_REG or operands[0].reg != match.ARM_REG_R2 or \
+                        operands[1].type != match.ARM_OP_MEM or operands[1].mem.base != match.ARM_REG_R2 or \
+                        operands[1].mem.index or operands[1].mem.disp:
+                    break
+                load = previous
+            elif item.mnemonic == 'ldr' and len(operands) == 2 and \
+                    operands[0].type == match.ARM_OP_REG and operands[0].reg == match.ARM_REG_R2 and \
+                    operands[1].type == match.ARM_OP_MEM and operands[1].mem.base == match.ARM_REG_PC and \
+                    not operands[1].mem.index:
+                literal = ((previous + 4) & ~3) + operands[1].mem.disp - address
+                if literal not in bindings or bindings[literal][1] != 0:
+                    break
+                result.append([site-address, previous-address, load-address,
+                               literal, bindings[literal][0]])
+                break
+            elif match.ARM_REG_R2 in item.regs_access()[1]:
+                break
+            cursor = previous
+        else:
+            raise ValueError('r2 callback exceeds its bounded mapped-load chain')
+        if not result or result[-1][0] != site-address:
+            raise ValueError('r2 callback requires an unambiguous mapped slot-zero target load')
+    if not result:
+        raise ValueError('r2 callback selector requires an actual canonical callback call')
+    return result
 
 
 def prepare(data, address, calls, context):
@@ -115,8 +184,12 @@ def prepare(data, address, calls, context):
         raise ValueError('addressed signed runtimes require a fresh exact context')
     rom, mapping, index, bindings, _ = context[:5]
     entries = owner.validate_span(data, address, rom, mapping, index)
-    if selector == DATA_SELECTOR:
+    if selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         data_literals(data, address, rom, mapping, context[6], context[7])
+    if selector == CALLBACK_SELECTOR:
+        callback_dependencies(rom, mapping, index)
+        if match.function_thunk.ALIASES[CALLBACK_ALIAS] not in calls.values():
+            raise ValueError('r2 callback selector requires an actual canonical callback call')
     if any(type(site) is not int or type(name) is not str or name not in OPERATIONS or
            calls.get(site) != OPERATIONS[name] for site, name in bindings.items()) or \
             set(bindings) != {site for site, target in calls.items() if target in OPERATIONS.values()}:
@@ -131,6 +204,8 @@ def prepare(data, address, calls, context):
             selected.append([lo, hi, digest])
     for site, target in calls.items():
         if site not in bindings:
+            if selector == CALLBACK_SELECTOR and target == match.function_thunk.ALIASES[CALLBACK_ALIAS]:
+                continue
             match.function_address_target(f'func_{target:08X}', entries, address, len(data), len(rom))
     return sorted({tuple(row) for row in selected})
 
@@ -147,7 +222,7 @@ def finish(data, address, calls, context, verified, dependencies):
         raise ValueError('addressed signed runtimes require the exact closed direct-call CFG')
     partition = graph.partition(data, address, refinement, instructions, words)
     selector = context_selector(context)
-    if selector == DATA_SELECTOR:
+    if selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         literals = data_literals(data, address, context[0], context[1], context[6], context[7])
         match.verify_data_literals(instructions.values(), address, literals)
         address_words = {row['address'] - address for row in partition['words']
@@ -174,19 +249,26 @@ def finish(data, address, calls, context, verified, dependencies):
         modules += (incoming,)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
-    if selector == DATA_SELECTOR:
+    if selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         pins = data_producer_fingerprint()
     context[4].update(schema=SCHEMAS[selector], calls=[
-        [site-address, context[3].get(site, f'func_{target:08X}')]
+        [site-address, CALLBACK_ALIAS if selector == CALLBACK_SELECTOR and
+         target == match.function_thunk.ALIASES[CALLBACK_ALIAS] else
+         context[3].get(site, f'func_{target:08X}')]
         for site, target in sorted(calls.items())], dependencies=[list(row) for row in dependencies],
         runtime_ABI=ABI, runtime_numeric_return_facts=[], arithmetic_C_equivalence=False,
         original_formal_type_certainty=False,
         ordinary_calls='conditional returning r4-r11/SP preserving ABI only; no transitive callee proof',
         termination='every reached region has a checked return path; universal termination unproved',
         frame=restored, partition=partition, producer_source_sha256=pins)
-    if selector == DATA_SELECTOR:
+    if selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         context[4].update(data_bindings=[list(row) for row in context[7]],
             data_contract=DATA_CONTRACT)
+    if selector == CALLBACK_SELECTOR:
+        context[4]['callback'] = dict(contract=CALLBACK_CONTRACT,
+            sites=callback_sites(instructions, edges, calls, address, context[7]),
+            dependencies=callback_dependencies(context[0], context[1], context[2]),
+            runtime=match.function_thunk.RUNTIME, abi=match.function_thunk.ABI)
 
 
 def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *, selector=SELECTOR,
@@ -198,9 +280,9 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
     context = (rom, mapping, index, bindings, observed)
     if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR):
         context += (selector,)
-    elif selector == DATA_SELECTOR:
+    elif selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         context += (selector, data_mapping, data_bindings)
-    if selector != DATA_SELECTOR and (data_mapping is not None or data_bindings is not None):
+    if selector not in (DATA_SELECTOR, CALLBACK_SELECTOR) and (data_mapping is not None or data_bindings is not None):
         raise ValueError('typed data requires its separate explicit addressed selector')
     instructions = match.verify_leaf_instructions(data, address, True, calls,
         addressed_signed_runtime_context=context)
@@ -209,7 +291,8 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
     return observed, instructions
 
 
-def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_relocations=None):
+def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_relocations=None,
+                      selector=SELECTOR):
     """Canonical addressed calls, with separately requested typed original ABS32."""
     import match
     with_data = data_mapping is not None or data_relocations is not None
@@ -217,6 +300,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                       data_relocations):
         raise ValueError('addressed data linking requires a snapshot and fresh empty binding collection')
     objects = match.parse_data_symbols(data_mapping) if with_data else {}
+    if selector not in SCHEMAS or selector == CALLBACK_SELECTOR and not with_data:
+        raise ValueError('r2 callback linking requires its exact selector and typed data')
     if image['type'] != 1:
         raise ValueError('addressed signed runtimes require original relocatable ELF')
     match.allocated_text_only(image)
@@ -258,7 +343,11 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                 raise ValueError('addressed calls require unique undefined zero-valued global functions')
             target = OPERATIONS.get(name)
             if target is None:
-                target = match.function_address_target(name, entries, address, len(image['text']), len(rom))
+                if selector == CALLBACK_SELECTOR and name == CALLBACK_ALIAS:
+                    target = match.function_thunk.ALIASES[name]
+                    match.function_thunk.dependencies([name], rom)
+                else:
+                    target = match.function_address_target(name, entries, address, len(image['text']), len(rom))
             else:
                 bindings[address+offset] = name
             decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
@@ -275,6 +364,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                            item['name'] and not item['section'] and item['name'] not in targets
                            for item in image['symbols']):
         raise ValueError('addressed runtime ELF requires actual addressed calls and no unresolved symbols')
+    if selector == CALLBACK_SELECTOR and CALLBACK_ALIAS not in targets:
+        raise ValueError('r2 callback ELF requires its actual compiler-emitted canonical call')
     return calls, bindings, targets
 
 
@@ -338,9 +429,11 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
     import match
     from inert_spin_profile import fixed_configuration
     fixed_configuration(args)
-    data = {} if selector == DATA_SELECTOR else None
+    data = {} if selector in (DATA_SELECTOR, CALLBACK_SELECTOR) else None
+    if selector == CALLBACK_SELECTOR:
+        match.function_thunk.namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     calls, bindings, targets = original_bindings(original,address,rom,mapping,
-        data_mapping=data_mapping if data is not None else None, data_relocations=data)
+        data_mapping=data_mapping if data is not None else None, data_relocations=data, selector=selector)
     data_names = {record[0] for record in (data or {}).values()}
     definitions = ['.syntax unified','.thumb']
     for name,target in sorted(targets.items()):
@@ -398,8 +491,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     fixed_configuration(args)
     if selector not in SCHEMAS:
         raise ValueError('unknown addressed signed runtime selector')
-    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR) else None
-    producers = data_producer_fingerprint() if selector == DATA_SELECTOR else None
+    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR, CALLBACK_SELECTOR) else None
+    producers = data_producer_fingerprint() if selector in (DATA_SELECTOR, CALLBACK_SELECTOR) else None
     source,mapping,index = source_fingerprint(root,address),mapping_snapshot(root),index_snapshot(root)
     objects,selected_rom = data_snapshot(root),report_rom_path(root)
     rom = Path(selected_rom).read_bytes(); tools = toolchain_fingerprint()
@@ -423,11 +516,11 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
                 selector=selector,data_mapping=objects)
             body,calls,bindings = linked_result[:3]
             data_options = (dict(data_mapping=objects,data_bindings=linked_result[3])
-                            if selector == DATA_SELECTOR else {})
+                            if selector in (DATA_SELECTOR, CALLBACK_SELECTOR) else {})
             manifest,instructions = verify(body,address,rom,mapping,index,calls,bindings,expected,
                                            selector=selector,**data_options)
             linked = runner.read_binary(f'{workspace}/f.elf')
-        check = match._run_replay_process([sys.executable,str(Path(__file__).with_name('plausible.py')),
+        check = match._run_replay_process([sys.executable,str(Path(importlib.import_module('plausible').__file__)),
             '--quiet','--addr',f'0x{address:08X}','--json']+
             [str(path) for path in source_paths(captured,address)],captured,120)
         findings,allowed = match.plausibility_result(check,address)
@@ -455,8 +548,10 @@ def render(result):
         raise ValueError('unknown addressed signed runtime manifest schema')
     premise = [] if selector not in (READONLY_SELECTOR, READONLY_TWO_SELECTOR) else [
         '* incoming stack ABI: ' + result['manifest']['frame']['entry_stack']['contract']]
-    if selector == DATA_SELECTOR:
+    if selector in (DATA_SELECTOR, CALLBACK_SELECTOR):
         premise = ['* named data binding: ' + result['manifest']['data_contract']]
+    if selector == CALLBACK_SELECTOR:
+        premise.append('* mapped r2 callback ABI: ' + result['manifest']['callback']['contract'])
     evidence = {key:value for key,value in result.items() if key not in
                 ('body','original_elf','assembly','linked_elf')}
     for key in ('body','original_elf','assembly','linked_elf'):
@@ -522,7 +617,7 @@ def report_matches(report, root, address):
                 saved['rom_sha256'] != sha(Path(report_rom_path(root)).read_bytes()) or \
                 saved['toolchain'] != toolchain_fingerprint():
             return False
-        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR) and saved['runtime'] != runtime_fingerprint():
+        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR, CALLBACK_SELECTOR) and saved['runtime'] != runtime_fingerprint():
             return False
         return render(build(root,address,expected=saved['manifest'],selector=selector)) == report
     except (OSError,ValueError,KeyError,TypeError,IndexError,RuntimeError,subprocess.SubprocessError):
