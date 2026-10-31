@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "5b09b40b776a2b69a8a08e3baecad2eaaa970964d5b2c59db8bd1defbe26fc41",
-        "acknowledged_cursor": 6537898465,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5b09b40b776a2b69a8a08e3baecad2eaaa970964d5b2c59db8bd1defbe26fc41",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08081B24\",\"who\":\"sol-1B24\",\"note\":\"One grounded natural C first original addressed-signed-runtime-v1 attempt; complete saved200B95instr root/actual ABI/current selector qualified, no new ROM or C before acceptance.\"}",
-          "created_at": "2026-10-31T02:38:41Z",
-          "id": 6537898465,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:38:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "970b1b3c9237bd21e3e714c4455c6e9b92dd8153e65c145e2f6fec6127b69825",
-        "result": {
-          "address": "0x08081B24",
-          "claim_id": 6537898465,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6537898465,
-          "status": "accepted",
-          "who": "sol-1B24"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "68de44526e7c1be61b268d9372676f3523b7417673cf0336715b10fe03570a44",
-        "acknowledged_cursor": 6537944469,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "68de44526e7c1be61b268d9372676f3523b7417673cf0336715b10fe03570a44",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08081B24\",\"who\":\"sol-1B24\",\"claim_id\":6537898465,\"reason\":\"One grounded natural C original addressed-signed-runtime-v1 native stopped emitted extent/owner guard before report. One unchanged-source compiler-only diagnostic emitted complete184B versus target200B. Source parked unchanged, no semantic correction or secondform/native retry.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-31T02:43:09Z",
-          "id": 6537944469,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:43:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c80b77f15e70177283775a14693d3fc47ed893ca0ded182edbf674d9b06d7735",
-        "result": {
-          "address": "0x08081B24",
-          "claim_id": 6537898465,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6537944469,
-          "status": "accepted",
-          "who": "sol-1B24"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "637aa8e50e61ef488378ec26c03264203b1974708f2f39f7003054d1f52b1915",
         "acknowledged_cursor": 6537919596,
         "body_provenance": "acceptance-time",
