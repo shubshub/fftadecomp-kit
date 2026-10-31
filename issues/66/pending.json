@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "31b33402fb0811d430599a88bb429ce571e243c762ec95e20bb8308e08eb65d3",
+        "acknowledged_cursor": 6538190846,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "31b33402fb0811d430599a88bb429ce571e243c762ec95e20bb8308e08eb65d3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08062248\",\"who\":\"sol-2248\",\"note\":\"One natural source first native u16-scalars-v1 attempt under saved complete252B owner and defining ABI; immediate release after stop\"}",
+          "created_at": "2026-10-31T03:06:28Z",
+          "id": 6538190846,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T03:06:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7537c621c8f81e93962277468f4d8614c79985c5e48ee539ee87dd2dfac457a2",
+        "result": {
+          "address": "0x08062248",
+          "claim_id": 6538190846,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6538190846,
+          "status": "accepted",
+          "who": "sol-2248"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
