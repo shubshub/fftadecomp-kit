@@ -59,6 +59,38 @@
           "who": "sol-CB2C"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "defdf17bfd74ec07ad6c168f70f55f8cab2f0fb6a44f543841646537fd4bdb23",
+        "acknowledged_cursor": 6537103008,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "defdf17bfd74ec07ad6c168f70f55f8cab2f0fb6a44f543841646537fd4bdb23",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806D428\",\"who\":\"sol-D428\",\"note\":\"One natural C form and one original default native attempt; complete358B owner, actual four defining helper contracts and existing data identity retained\"}",
+          "created_at": "2026-10-31T01:22:04Z",
+          "id": 6537103008,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T01:22:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fd0672dde0868f1348a86c3febca92032768f384db280764c589b4751821a73d",
+        "result": {
+          "address": "0x0806D428",
+          "claim_id": 6537103008,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537103008,
+          "status": "accepted",
+          "who": "sol-D428"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
