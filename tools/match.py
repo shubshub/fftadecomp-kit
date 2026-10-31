@@ -59,6 +59,9 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SWITCH_DATA_SCHEMA, SWITCH_DATA_SUMMARY, switch_data_fingerprint,
                             SWITCH_MULTIPLE_DATA_SCHEMA, SWITCH_MULTIPLE_DATA_SUMMARY,
                             SWITCH_MULTIPLE_DATA_POLICY, switch_multiple_data_fingerprint,
+                            SWITCH_U16_SCALAR_SELECTOR, SWITCH_U16_SCALAR_SCHEMA,
+                            SWITCH_U16_SCALAR_SUMMARY, SWITCH_U16_SCALAR_POLICY,
+                            switch_u16_scalar_fingerprint,
                             PRELOADED_SWITCH_SCHEMA, PRELOADED_SWITCH_SUMMARY,
                             PRELOADED_SWITCH_CONTROL_FLOW, preloaded_switch_fingerprint,
                             UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
@@ -1910,13 +1913,42 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
     return candidates[0]
 
 
+def switch_u16_scalar_records(data, address, instructions, descriptor, data_relocations):
+    """Exact reached words left after the local table pointer and typed objects.
+
+    This policy admits only literal u16 numbers, not extra address bindings or
+    facts about the values produced by the instructions that consume them.
+    """
+    known = {address + descriptor["literal"]} | {
+        address + offset for offset in data_relocations}
+    reached = {((item.address + 4) & ~3) + operand.mem.disp
+               for item in instructions for operand in item.operands
+               if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC}
+    records = []
+    table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
+    for literal in sorted(reached - known):
+        offset = literal - address
+        if literal % 4 or offset < table_end or offset + 4 > len(data):
+            raise ValueError("u16 scalar word must be aligned, complete and after the switch table")
+        value = struct.unpack_from("<I", data, offset)[0]
+        if value > 0xFFFF:
+            raise ValueError("switch scalar policy admits only u16 literal values")
+        records.append([offset, value])
+    if not records:
+        raise ValueError("u16 switch-data policy requires a reached scalar word")
+    return records
+
+
 def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None):
     data_profile = data_mapping is not None
     complete_data = data_profile and isinstance(manifest, dict) and \
         manifest.get("data_policy") == SWITCH_MULTIPLE_DATA_POLICY
+    scalar_data = complete_data and manifest.get("scalar_policy") == SWITCH_U16_SCALAR_POLICY
     fields = {"calls", "data", "switch"} if data_profile else {"calls", "switch"}
     if complete_data:
         fields.add("data_policy")
+    if scalar_data:
+        fields.update(("scalar_policy", "scalars"))
     if mapping is None or not isinstance(manifest, dict) or set(manifest) != fields or \
             not isinstance(manifest["calls"], list) or not isinstance(manifest["switch"], dict):
         raise ValueError("invalid switch manifest")
@@ -1958,6 +1990,25 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         relocations[record[0]] = record[1]
     if switch_layout(data, address, relocations, data_relocations) != descriptor:
         raise ValueError("switch descriptor does not match the guarded bytes")
+    scalars = {}
+    if scalar_data:
+        records = manifest["scalars"]
+        if not isinstance(records, list) or not 1 <= len(records) <= len(data) // 4:
+            raise ValueError("u16 switch-data requires a finite nonempty scalar manifest")
+        previous = -1
+        table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
+        for record in records:
+            if not isinstance(record, list) or len(record) != 2:
+                raise ValueError("invalid u16 scalar word record")
+            offset, value = record
+            if type(offset) is not int or offset <= previous or offset < table_end or \
+                    (address + offset) % 4 or offset + 4 > len(data) or \
+                    type(value) is not int or not 0 <= value <= 0xFFFF or \
+                    offset in relocations or offset in data_relocations or \
+                    struct.unpack_from("<I", data, offset)[0] != value:
+                raise ValueError("u16 scalar words require unique ordered exact nonoverlapping values")
+            previous = offset
+            scalars[offset] = value
     entries = json.loads(mapping)
     if not isinstance(entries, list):
         raise ValueError("function mapping must be a list")
@@ -1971,7 +2022,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         raise ValueError("switch caller differs from the ROM")
     calls = {}
     previous = -1
-    occupied = {position for offset in (*relocations, *(data_relocations or {}))
+    occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars)
                 for position in range(offset, offset + 4)}
     for record in manifest["calls"]:
         if not isinstance(record, list) or len(record) != 2:
@@ -1990,14 +2041,19 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             switch_relocations=relocations,
                                             switch_data_relocations=data_relocations)
     if complete_data:
-        # This version admits only the local table pointer and typed object
-        # literals. It grants no numeric-literal or generic-address composition.
+        # The default policy still admits only the table pointer and typed
+        # objects. The separate explicit policy binds every extra u16 word.
         reached_literals = {
             ((item.address + 4) & ~3) + operand.mem.disp
             for item in instructions for operand in item.operands
             if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC}
         expected_literals = {address + descriptor["literal"]} | {
             address + offset for offset in data_relocations}
+        if scalar_data:
+            if manifest["scalars"] != switch_u16_scalar_records(
+                    data, address, instructions, descriptor, data_relocations):
+                raise ValueError("complete reachable u16 scalar literal-word coverage is required")
+            expected_literals.update(address + offset for offset in scalars)
         if reached_literals != expected_literals:
             raise ValueError("complete switch-data literal-word coverage is required")
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
@@ -3793,6 +3849,20 @@ def plausibility_result(result, address):
     return findings, allowed
 
 
+def switch_u16_scalar_configuration(args):
+    if args.switch_data_profile is None:
+        return
+    if args.switch_data_profile != SWITCH_U16_SCALAR_SELECTOR or \
+            args.mode != "thumb" or args.control_flow_profile != "ordinary" or \
+            any((args.signed_quotient_profile, args.signed_runtime_profile,
+                 args.addressed_signed_runtime_profile, args.software_double_profile,
+                 args.software_double_remainder_profile, args.function_address_profile,
+                 args.switch_profile, args.owner_runtime_profile)) or \
+            (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) != \
+            (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS):
+        raise ValueError("u16 switch-data requires its isolated explicit selector and fixed Thumb toolchain")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("addr")
@@ -3811,6 +3881,7 @@ def main():
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=(function_thunk.SELECTOR,))
     ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1"))
+    ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR,))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))
@@ -3836,6 +3907,10 @@ def main():
     ROOT = repo_root(args.root)
 
     addr = int(args.addr, 16)
+    try:
+        switch_u16_scalar_configuration(args)
+    except ValueError as error:
+        sys.exit(str(error))
     if args.addressed_signed_runtime_profile is not None:
         return addressed_signed_runtime.issue(Path(ROOT), addr, args)
     if args.signed_runtime_profile is not None:
@@ -3982,6 +4057,11 @@ def main():
                 linked_profile = bool(calls)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
+            if args.switch_data_profile and (
+                    not switch_relocations or not data_relocations or function_relocations or
+                    any((float_bindings, ashldi3_bindings, umodsi3_bindings, divsi3_bindings,
+                         modsi3_bindings, udivsi3_bindings))):
+                raise ValueError("u16 switch-data requires a mapped local switch without other runtimes or function literals")
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
             if thunk_profile:
                 verified_instructions = verify_leaf_instructions(got, addr, True, calls, function_thunk_context={})
@@ -4109,6 +4189,16 @@ def main():
                         for offset, (name, value) in sorted(data_relocations.items())]
                     if not preloaded_profile and len(data_relocations) > 1:
                         switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
+                if args.switch_data_profile:
+                    if preloaded_profile:
+                        raise ValueError("u16 switch-data excludes preloaded switches")
+                    scalar_instructions = verify_leaf_instructions(
+                        got, addr, True, calls, switch_relocations=switch_relocations,
+                        switch_data_relocations=data_relocations)
+                    switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
+                    switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
+                    switch_evidence["scalars"] = switch_u16_scalar_records(
+                        got, addr, scalar_instructions, switch_evidence["switch"], data_relocations)
                 if preloaded_profile:
                     verified_instructions, _ = verify_preloaded_switches(
                         got, addr, rom, mapping, data_mapping, switch_evidence)
@@ -4177,6 +4267,7 @@ def main():
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
+                  SWITCH_U16_SCALAR_SCHEMA if "scalar_policy" in switch_evidence else
                   SWITCH_MULTIPLE_DATA_SCHEMA if "data_policy" in switch_evidence else
                   SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
     if udivsi3_bindings:
@@ -4408,11 +4499,13 @@ def main():
                     f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
             if switch_relocations:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
+                           SWITCH_U16_SCALAR_SUMMARY if "scalar_policy" in switch_evidence else
                            SWITCH_MULTIPLE_DATA_SUMMARY if "data_policy" in switch_evidence else
                            SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
                 f.write(f"* switches: {summary}\n")
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
+                                      switch_u16_scalar_fingerprint if "scalar_policy" in switch_evidence else
                                       switch_multiple_data_fingerprint if "data_policy" in switch_evidence else
                                       switch_data_fingerprint if data_profile else switch_fingerprint)
                 proof_digest = fingerprint_switch(addr, got_body, switch_evidence)

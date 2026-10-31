@@ -124,6 +124,65 @@ def callback_dependencies(rom, mapping, index):
     return match.function_thunk.dependencies([CALLBACK_ALIAS], rom)
 
 
+def callback_r0_slot(instructions, edges, reverse, calls, site, address, bindings):
+    """One closed R0 slot load, then two explicit register argument assignments."""
+    import match
+    chain, cursor = [], site
+    for _ in range(4):
+        if len(reverse[cursor]) != 1:
+            return None
+        previous = next(iter(reverse[cursor]))
+        item = instructions[previous]
+        if item.size != 2 or previous + item.size != cursor or \
+                edges[previous] != (cursor,) or previous in calls:
+            return None
+        chain.append(item)
+        cursor = previous
+    literal_load, slot_load, arg0, arg1 = reversed(chain)
+
+    def register(operand, value):
+        return operand.type == match.ARM_OP_REG and operand.reg == value
+
+    def memory(operand, base):
+        return operand.type == match.ARM_OP_MEM and operand.mem.base == base and \
+            not operand.mem.index and not operand.mem.disp
+
+    operands = literal_load.operands
+    if literal_load.mnemonic != 'ldr' or len(operands) != 2 or \
+            not register(operands[0], match.ARM_REG_R0) or \
+            operands[1].type != match.ARM_OP_MEM or \
+            operands[1].mem.base != match.ARM_REG_PC or operands[1].mem.index:
+        return None
+    literal = ((literal_load.address + 4) & ~3) + operands[1].mem.disp - address
+    if literal not in bindings or bindings[literal][1] != 0:
+        return None
+    operands = slot_load.operands
+    if slot_load.mnemonic != 'ldr' or len(operands) != 2 or \
+            not register(operands[0], match.ARM_REG_R2) or \
+            not memory(operands[1], match.ARM_REG_R0):
+        return None
+    operands = arg0.operands
+    if arg0.mnemonic != 'adds' or len(operands) != 3 or \
+            not register(operands[0], match.ARM_REG_R0) or \
+            operands[1].type != match.ARM_OP_REG or \
+            arg0.reg_name(operands[1].reg) not in ('r4', 'r5', 'r6', 'r7') or \
+            operands[2].type != match.ARM_OP_IMM or operands[2].imm != 0:
+        return None
+    source = arg0.reg_name(operands[1].reg)
+    operands = arg1.operands
+    if arg1.mnemonic != 'movs' or len(operands) != 2 or \
+            not register(operands[0], match.ARM_REG_R1) or \
+            operands[1].type != match.ARM_OP_IMM or not 0 <= operands[1].imm <= 255:
+        return None
+    return [site-address, literal_load.address-address, slot_load.address-address,
+            literal, bindings[literal][0], dict(policy='r0-slot-zero-argument-setup-v1',
+                base_register='r0', target_register='r2', slot_offset=0,
+                argument_setup=[dict(offset=arg0.address-address, bytes=arg0.bytes.hex(),
+                                     destination='r0', source=source),
+                                dict(offset=arg1.address-address, bytes=arg1.bytes.hex(),
+                                     destination='r1', immediate=operands[1].imm)])]
+
+
 def callback_sites(instructions, edges, calls, address, records):
     """Require an unambiguous straight-line mapped slot-zero load into r2."""
     import match
@@ -169,7 +228,10 @@ def callback_sites(instructions, edges, calls, address, records):
         else:
             raise ValueError('r2 callback exceeds its bounded mapped-load chain')
         if not result or result[-1][0] != site-address:
-            raise ValueError('r2 callback requires an unambiguous mapped slot-zero target load')
+            row = callback_r0_slot(instructions, edges, reverse, calls, site, address, bindings)
+            if row is None:
+                raise ValueError('r2 callback requires an unambiguous mapped slot-zero target load')
+            result.append(row)
     if not result:
         raise ValueError('r2 callback selector requires an actual canonical callback call')
     return result
