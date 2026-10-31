@@ -59,6 +59,38 @@
           "who": "sol-C340"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "89cc0b04bc53f294c81454e58bfff4230573dc524b08923a964614ae933fe3ae",
+        "acknowledged_cursor": 6539580792,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "89cc0b04bc53f294c81454e58bfff4230573dc524b08923a964614ae933fe3ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813F19C\",\"who\":\"sol-F19C\",\"note\":\"One natural original source from saved complete60B typed addressed-runtime qualification. ISO-only author work; no steering/repeated successful proof, primary integration after publication193 settles and clean203base.\"}",
+          "created_at": "2026-10-31T05:30:19Z",
+          "id": 6539580792,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T05:30:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e9b0278c6cda82667045643b5f0f0cd483eaba62f71289c6ee6d7a1e53b2606b",
+        "result": {
+          "address": "0x0813F19C",
+          "claim_id": 6539580792,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6539580792,
+          "status": "accepted",
+          "who": "sol-F19C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
