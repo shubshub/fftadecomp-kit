@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "cdb063ca4cf5a03642fc1269eba9133f745344b2a21d0ca9a01e7bfe4263d607",
+    "acknowledged_cursor": 6538573709,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cdb063ca4cf5a03642fc1269eba9133f745344b2a21d0ca9a01e7bfe4263d607",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801D980\",\"who\":\"sol-D980\",\"note\":\"Complete saved qualification; one natural C/native attempt, frozen final inputs\"}",
+      "created_at": "2026-10-31T03:44:38Z",
+      "id": 6538573709,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T03:44:38Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0e991e6feb7c3c3164654d84d37a56228bf0312e73322dcc3b50404252489994",
+    "result": {
+      "address": "0x0801D980",
+      "claim_id": 6538573709,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6538573709,
+      "status": "accepted",
+      "who": "sol-D980"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8df300619f1c4ad8fcdcc14cf23a976fb67d9da2f6c7c5a2bbe2611c4b184b92",
+    "acknowledged_cursor": 6538627956,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8df300619f1c4ad8fcdcc14cf23a976fb67d9da2f6c7c5a2bbe2611c4b184b92",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801D980\",\"who\":\"sol-D980\",\"claim_id\":6538573709,\"reason\":\"One naturalC default native1; full144B report mismatch preserved, no diagnostic/retry, parked unchanged.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-10-31T03:49:45Z",
+      "id": 6538626622,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T03:49:45Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b099e9c48cda2b861d852b5b143f79b5714289d6c1b734c52b569f4a8cba5999",
+    "result": {
+      "address": "0x0801D980",
+      "claim_id": 6538573709,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6538626622,
+      "status": "accepted",
+      "who": "sol-D980"
+    }
+  }
+}
