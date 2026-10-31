@@ -30,7 +30,35 @@
           "who": "sol-1B24"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "68de44526e7c1be61b268d9372676f3523b7417673cf0336715b10fe03570a44",
+        "acknowledged_cursor": 6537944469,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "68de44526e7c1be61b268d9372676f3523b7417673cf0336715b10fe03570a44",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08081B24\",\"who\":\"sol-1B24\",\"claim_id\":6537898465,\"reason\":\"One grounded natural C original addressed-signed-runtime-v1 native stopped emitted extent/owner guard before report. One unchanged-source compiler-only diagnostic emitted complete184B versus target200B. Source parked unchanged, no semantic correction or secondform/native retry.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T02:43:09Z",
+          "id": 6537944469,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:43:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c80b77f15e70177283775a14693d3fc47ed893ca0ded182edbf674d9b06d7735",
+        "result": {
+          "address": "0x08081B24",
+          "claim_id": 6537898465,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6537944469,
+          "status": "accepted",
+          "who": "sol-1B24"
+        }
+      }
     },
     {
       "claim": {
