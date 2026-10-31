@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "ba356e781e8e54c4cd44cf07cf2eb6128bdadc89d5f08c87f179b3e15f8c2eb1",
-        "acknowledged_cursor": 6539195208,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ba356e781e8e54c4cd44cf07cf2eb6128bdadc89d5f08c87f179b3e15f8c2eb1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A8194\",\"who\":\"sol-8194\",\"note\":\"One original natural 208-byte source attempt from saved complete qualification and corrected owner. Canonical thunks only; preserve ordinary conditional ABI and original errors.\"}",
-          "created_at": "2026-10-31T04:48:01Z",
-          "id": 6539195208,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:48:01Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b019a95b4db55bc5b47c29aed90924dcebc8439bbd8f9d53cc5d2f39c259a1e1",
-        "result": {
-          "address": "0x080A8194",
-          "claim_id": 6539195208,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6539195208,
-          "status": "accepted",
-          "who": "sol-8194"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "38c03f3acd9500e2cfae6b936103fa81537f96c3919c28029859d94b31080e0c",
-        "acknowledged_cursor": 6539269077,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "38c03f3acd9500e2cfae6b936103fa81537f96c3919c28029859d94b31080e0c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A8194\",\"who\":\"sol-8194\",\"claim_id\":6539195208,\"reason\":\"One unchanged source emits complete 212-byte body versus mapped 208 bytes; original native error and single compiler/link diagnostic retained, including one preserved diagnostic setup error. No MATCH.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-31T04:55:50Z",
-          "id": 6539269077,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:55:50Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0d8c2d979418e82c682678a52ae342382ac474e29cd20c5382055512bbf83ae1",
-        "result": {
-          "address": "0x080A8194",
-          "claim_id": 6539195208,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6539269077,
-          "status": "accepted",
-          "who": "sol-8194"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "315a88b61f3e8b214a6f1ec4f6cb7beafbc3ffd64b33ab7177cc62886cc8bd56",
         "acknowledged_cursor": 6539235165,
         "body_provenance": "acceptance-time",
