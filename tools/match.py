@@ -2188,6 +2188,32 @@ def thumb_stack_alias_stm(instruction, aliases, depth):
     return base, offset, registers
 
 
+def thumb_stack_alias_ldm(instruction, aliases, depth):
+    """Recognize one exact Thumb-1 LDMIA word with a distinct low base."""
+    operands = instruction.operands
+    if not instruction.mnemonic.startswith("ldm") or not operands or \
+            operands[0].type != ARM_OP_REG or operands[0].reg not in aliases:
+        return None
+    encoded = int.from_bytes(instruction.bytes, "little")
+    base = ARM_REG_R0 + ((encoded >> 8) & 7)
+    registers = tuple(ARM_REG_R0 + bit for bit in range(8) if encoded & (1 << bit))
+    read, written = instruction.regs_access()
+    if instruction.size != 2 or len(instruction.bytes) != 2 or \
+            encoded & 0xF800 != 0xC800 or \
+            instruction.mnemonic != "ldm" or not instruction.writeback or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            len(registers) != 1 or base in registers or \
+            tuple(operand.reg for operand in operands) != (base, *registers) or \
+            any(operand.type != ARM_OP_REG or operand.shift.type or
+                operand.shift.value or operand.subtracted for operand in operands) or \
+            set(read) != {base} or set(written) != {base, *registers}:
+        raise ValueError("unsupported stack-alias LDM encoding or register list")
+    offset = aliases[base]
+    if offset % 4 or not -4 * depth <= offset or offset + 4 > 0:
+        raise ValueError("stack-alias LDM is unaligned or outside the tracked frame")
+    return base, offset, registers[0]
+
+
 CALLER_CLOBBERED = (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
                     ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
 
@@ -3282,6 +3308,31 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                           offset + 4 * index, 4, register)
                     allowed_aliases.add(base)
                     assignment = (base, offset + 4 * len(stored_registers), base)
+                ldm = thumb_stack_alias_ldm(instruction, aliases, len(stack)) if thumb else None
+                loaded_constant = None
+                if ldm is not None:
+                    base, offset, destination = ldm
+                    slot = (offset + 4 * len(stack)) // 4
+                    if word_mode and (offset in words or offset in pointer_slots):
+                        buffer_proof.access(offset, 4, stack)
+                        fact = words.get(offset)
+                        if fact is None or offset in pointer_slots and \
+                                fact != ('pointer', pointer_slots[offset]):
+                            raise ValueError("descriptor LDM reload lacks an exact surviving word value")
+                        kind, value = fact
+                        if kind == 'pointer':
+                            buffer_proof.validate_pointer_value(value, stack)
+                            loaded_alias = (destination, value)
+                        elif kind == 'constant':
+                            loaded_constant = value
+                        else:
+                            raise ValueError("descriptor LDM reload has unsupported word provenance")
+                    elif offset in pointer_slots:
+                        loaded_alias = (destination, pointer_slots[offset])
+                    if stack[slot][0]:
+                        assigned_return = destination
+                    allowed_aliases.add(base)
+                    assignment = (base, offset + 4, base)
                 if thumb and unconditional and instruction.id == ARM_INS_CMP and \
                         instruction.size == 2 and not instruction.writeback and \
                         len(operands) == 2 and operands[0].type == ARM_OP_REG and \
@@ -3389,6 +3440,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     constants.pop(register, None)
                 if constant is not None:
                     constants[operands[0].reg] = constant
+                if loaded_constant is not None:
+                    constants[ldm[2]] = loaded_constant
                 if assignment is not None:
                     aliases[assignment[0]] = assignment[1]
                 if loaded_alias is not None:
