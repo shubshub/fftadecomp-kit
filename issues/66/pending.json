@@ -30,7 +30,35 @@
           "who": "sol-7FC8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7301d80f39ef608c308f637f39ded332e1c289765210e1fafe672a9be5ef1b79",
+        "acknowledged_cursor": 6539795014,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7301d80f39ef608c308f637f39ded332e1c289765210e1fafe672a9be5ef1b79",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B7FC8\",\"who\":\"sol-7FC8\",\"claim_id\":6539756183,\"reason\":\"One natural source failed complete unique Thumb span admission; original emitted ELF retained without source steering or retries.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T05:55:12Z",
+          "id": 6539795014,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T05:55:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b3978734c1a3238b20bfbf46cf89d2f0d6d06c302e092ad860e89b2718a75dd8",
+        "result": {
+          "address": "0x080B7FC8",
+          "claim_id": 6539756183,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6539795014,
+          "status": "accepted",
+          "who": "sol-7FC8"
+        }
+      }
     },
     {
       "claim": {
