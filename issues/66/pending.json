@@ -30,7 +30,35 @@
           "who": "sol-7C9C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0180c55553e566c6f5090aaaf5b74ebece1ac7852dc43111739b744fe9f19038",
+        "acknowledged_cursor": 6539148756,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0180c55553e566c6f5090aaaf5b74ebece1ac7852dc43111739b744fe9f19038",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A7C9C\",\"who\":\"sol-7C9C\",\"claim_id\":6539039008,\"reason\":\"GNU zero-tail form emits 210 bytes versus mapped 194 bytes. Original frontend rejection, sole syntax correction, both native errors and one unchanged-source ELF diagnostic preserved. No MATCH.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T04:43:27Z",
+          "id": 6539148756,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T04:43:27Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "11e5a665125c38adc0f25c891bd4ccd5f50dfaf577df2ed4e0a80558b8ff5968",
+        "result": {
+          "address": "0x080A7C9C",
+          "claim_id": 6539039008,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6539148756,
+          "status": "accepted",
+          "who": "sol-7C9C"
+        }
+      }
     }
   ],
   "issue": 66,
