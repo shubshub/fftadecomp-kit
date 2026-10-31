@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "637aa8e50e61ef488378ec26c03264203b1974708f2f39f7003054d1f52b1915",
-        "acknowledged_cursor": 6537919596,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "637aa8e50e61ef488378ec26c03264203b1974708f2f39f7003054d1f52b1915",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800F6A8\",\"who\":\"sol-F6A8\",\"note\":\"One natural C original named-data-buffer-v1 attempt; complete200B96instruction root and real44B helper effects/ABI statically qualified with saved evidence; no C before acceptance.\"}",
-          "created_at": "2026-10-31T02:40:47Z",
-          "id": 6537919596,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:40:47Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cbb827aeb6f4495df368435b0ad86031a981c5e5f75acb981abd1bc0e70a3d03",
-        "result": {
-          "address": "0x0800F6A8",
-          "claim_id": 6537919596,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6537919596,
-          "status": "accepted",
-          "who": "sol-F6A8"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "13ac919765cfe83e0f73b6cc58892737e49c9d160681994f35bdaa5f3f9aa7c4",
-        "acknowledged_cursor": 6537974756,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "13ac919765cfe83e0f73b6cc58892737e49c9d160681994f35bdaa5f3f9aa7c4",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800F6A8\",\"who\":\"sol-F6A8\",\"claim_id\":6537919596,\"reason\":\"One grounded natural C first named-data-buffer-v1 native stopped exact-span guard before report. One unchanged-source compiler-only diagnostic emitted complete184B versus target200B. Ordinary extent/register-save/sign-extension mismatch, no definite semantic bug; source parked unchanged, no secondform/native retry.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-31T02:45:51Z",
-          "id": 6537974756,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:45:51Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c6866996df511c7c587d8709cb0c9e2fe828365c4a733b003a77a11bfad2fc20",
-        "result": {
-          "address": "0x0800F6A8",
-          "claim_id": 6537919596,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6537974756,
-          "status": "accepted",
-          "who": "sol-F6A8"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d0086cff942c44407886de104a6a6a94c6c2b0666454733e568c548dd5e33076",
         "acknowledged_cursor": 6538068834,
         "body_provenance": "acceptance-time",
