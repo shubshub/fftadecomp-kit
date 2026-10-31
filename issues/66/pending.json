@@ -59,6 +59,70 @@
           "who": "sol-2F00"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "96dbdf2fbb315fcc1753a5a90795881f9defe792a9f9eb6a9800d3bcbdff6df3",
+        "acknowledged_cursor": 6537371170,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "96dbdf2fbb315fcc1753a5a90795881f9defe792a9f9eb6a9800d3bcbdff6df3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C26EC\",\"who\":\"sol-26EC\",\"note\":\"One statically qualified natural C form; complete saved owner and actual ABI, default native route; no register or spelling steering\"}",
+          "created_at": "2026-10-31T01:45:59Z",
+          "id": 6537363598,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T01:45:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f7f43466b926cb2def5254d6e0a44c15daa3e739f4b4371fa60889172a6b5c50",
+        "result": {
+          "address": "0x080C26EC",
+          "claim_id": 6537363598,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537363598,
+          "status": "accepted",
+          "who": "sol-26EC"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "43a89360d2607102a5f07c72d8d78d004a66a28c0870585dafaaa7a7fa78037f",
+        "acknowledged_cursor": 6537371170,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "43a89360d2607102a5f07c72d8d78d004a66a28c0870585dafaaa7a7fa78037f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081465E8\",\"who\":\"sol-65E8\",\"note\":\"One statically qualified natural C form; complete saved owner and actual ABI, default native route; no register or spelling steering\"}",
+          "created_at": "2026-10-31T01:46:42Z",
+          "id": 6537371170,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T01:46:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f7f43466b926cb2def5254d6e0a44c15daa3e739f4b4371fa60889172a6b5c50",
+        "result": {
+          "address": "0x081465E8",
+          "claim_id": 6537371170,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537371170,
+          "status": "accepted",
+          "who": "sol-65E8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
