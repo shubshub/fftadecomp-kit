@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "36bde02f08604ee9a712d07a2eb794c6cd0912991730b20a2c526915696b6a09",
+    "acknowledged_cursor": 6538573709,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "36bde02f08604ee9a712d07a2eb794c6cd0912991730b20a2c526915696b6a09",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D29D4\",\"who\":\"sol-29D4\",\"note\":\"Complete saved qualification; one natural C/native attempt, frozen final inputs\"}",
+      "created_at": "2026-10-31T03:43:43Z",
+      "id": 6538564793,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T03:43:43Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0e991e6feb7c3c3164654d84d37a56228bf0312e73322dcc3b50404252489994",
+    "result": {
+      "address": "0x080D29D4",
+      "claim_id": 6538564793,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6538564793,
+      "status": "accepted",
+      "who": "sol-29D4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4487902ab91eee47bb077eabfa3dbf992692efaedaebb42217f55c1c81502074",
+    "acknowledged_cursor": 6538612591,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4487902ab91eee47bb077eabfa3dbf992692efaedaebb42217f55c1c81502074",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D29D4\",\"who\":\"sol-29D4\",\"claim_id\":6538564793,\"reason\":\"One natural C/native nonmatch; unchanged diagnostic252B vs252B,5 differing bytes in fallback sequence. Parked unchanged, no retry.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-10-31T03:48:27Z",
+      "id": 6538612591,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T03:48:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a7927e42903129e448a541d38cc92d921ed7c718e854533d6e2969af39575b91",
+    "result": {
+      "address": "0x080D29D4",
+      "claim_id": 6538564793,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6538612591,
+      "status": "accepted",
+      "who": "sol-29D4"
+    }
+  }
+}
