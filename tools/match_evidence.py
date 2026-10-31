@@ -845,6 +845,9 @@ def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
     try:
+        import private_float_pack_admission_profile
+        if private_float_pack_admission_profile.selected(report):
+            return private_float_pack_admission_profile.report_matches(report, root, address)
         import addressed_signed_runtime_profile
         if addressed_signed_runtime_profile.selected(report):
             return addressed_signed_runtime_profile.report_matches(report, root, address)

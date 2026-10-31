@@ -3901,7 +3901,8 @@ def main():
                                                       "descriptor-single-store-v1",
                                                       "descriptor-disjunctive-alias-v1",
                                                       "descriptor-callee-constant-v1",
-                                                      "descriptor-cursor-value-v1"))
+                                                      "descriptor-cursor-value-v1",
+                                                      "private-float-unpack-pack-v1"))
     args = ap.parse_args()
     global ROOT
     ROOT = repo_root(args.root)
@@ -3921,6 +3922,9 @@ def main():
             args.function_address_profile or args.switch_profile or args.owner_runtime_profile):
         sys.exit("framed signed quotient excludes other selectors and requires Thumb mode")
     if args.owner_runtime_profile:
+        if args.owner_runtime_profile == "private-float-unpack-pack-v1":
+            from private_float_pack_admission_profile import issue
+            return issue(Path(ROOT), addr, args)
         import owner_admission_profile
         return owner_admission_profile.issue(Path(ROOT), addr, args)
     if args.switch_profile is not None:
