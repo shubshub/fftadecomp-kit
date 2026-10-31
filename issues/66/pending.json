@@ -30,7 +30,35 @@
           "who": "sol-ADEC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a6c614e98ed2184b7f38974f30301570bde946a315fe37f9974059336517a290",
+        "acknowledged_cursor": 6536371947,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a6c614e98ed2184b7f38974f30301570bde946a315fe37f9974059336517a290",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809ADEC\",\"who\":\"sol-ADEC\",\"claim_id\":6536280766,\"reason\":\"One natural form emitted134B symbol versus150B target; eight signed-extension instructions absent; original native failure and one unchanged-source diagnostic preserved; no steering\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural source form; one unchanged-source diagnostic\"}",
+          "created_at": "2026-10-31T00:17:38Z",
+          "id": 6536363148,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T00:17:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "566f315e484e7d46db889ed9a2db4290e55a39c0a79a70c0dfd691980777b514",
+        "result": {
+          "address": "0x0809ADEC",
+          "claim_id": 6536280766,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6536363148,
+          "status": "accepted",
+          "who": "sol-ADEC"
+        }
+      }
     },
     {
       "claim": {
@@ -122,7 +150,35 @@
           "who": "sol-C3C8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3c1adafec698953d9f9ab5b2d9cb7c35f5f4c412097662a163abbf91d1d0da2c",
+        "acknowledged_cursor": 6536371947,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3c1adafec698953d9f9ab5b2d9cb7c35f5f4c412097662a163abbf91d1d0da2c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CC3C8\",\"who\":\"sol-C3C8\",\"claim_id\":6536294203,\"reason\":\"One natural packed-field getter emitted358B versus326B target; exact native extent guard failed; original source and one unchanged-source diagnostic preserved; no steering\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; one natural source form; one unchanged-source diagnostic\"}",
+          "created_at": "2026-10-31T00:18:20Z",
+          "id": 6536371947,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T00:18:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "566f315e484e7d46db889ed9a2db4290e55a39c0a79a70c0dfd691980777b514",
+        "result": {
+          "address": "0x080CC3C8",
+          "claim_id": 6536294203,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6536371947,
+          "status": "accepted",
+          "who": "sol-C3C8"
+        }
+      }
     }
   ],
   "issue": 66,
