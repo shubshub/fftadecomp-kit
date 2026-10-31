@@ -57,6 +57,8 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SCHEMA, STACK_BUFFER_SCHEMA, STACK_BUFFER_SUMMARY,
                             SWITCH_SCHEMA, SWITCH_SUMMARY, switch_fingerprint, switch_manifest,
                             SWITCH_DATA_SCHEMA, SWITCH_DATA_SUMMARY, switch_data_fingerprint,
+                            SWITCH_MULTIPLE_DATA_SCHEMA, SWITCH_MULTIPLE_DATA_SUMMARY,
+                            SWITCH_MULTIPLE_DATA_POLICY, switch_multiple_data_fingerprint,
                             PRELOADED_SWITCH_SCHEMA, PRELOADED_SWITCH_SUMMARY,
                             PRELOADED_SWITCH_CONTROL_FLOW, preloaded_switch_fingerprint,
                             UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
@@ -1799,18 +1801,18 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
         raise ValueError("switch words must describe an adjacent table and forward local cases")
     object_before_table = False
     if data_relocations is not None:
-        if not isinstance(data_relocations, dict) or len(data_relocations) != 1:
-            raise ValueError("switch-data requires exactly one interposed object word")
-        offset, binding = next(iter(data_relocations.items()))
-        if type(offset) is not int or offset < 0 or offset + 4 > len(data) or \
-                (offset != literal - 4 and offset < table_end) or \
-                (address + offset) % 4 or not isinstance(binding, (tuple, list)) or \
-                len(binding) != 2 or not isinstance(binding[0], str) or \
-                type(binding[1]) is not int or not 0 <= binding[1] <= 0xFFFFFFFF or \
-                address <= binding[1] < address + len(data) or \
-                struct.unpack_from("<I", data, offset)[0] != binding[1]:
-            raise ValueError("invalid interposed switch-data object word")
-        object_before_table = offset == literal - 4
+        if not isinstance(data_relocations, dict) or not 1 <= len(data_relocations) <= len(data) // 4:
+            raise ValueError("switch-data requires a finite nonempty object-word manifest")
+        for offset, binding in data_relocations.items():
+            if type(offset) is not int or offset < 0 or offset + 4 > len(data) or \
+                    (offset != literal - 4 and offset < table_end) or \
+                    (address + offset) % 4 or not isinstance(binding, (tuple, list)) or \
+                    len(binding) != 2 or not isinstance(binding[0], str) or \
+                    type(binding[1]) is not int or not 0 <= binding[1] <= 0xFFFFFFFF or \
+                    address <= binding[1] < address + len(data) or \
+                    struct.unpack_from("<I", data, offset)[0] != binding[1]:
+                raise ValueError("invalid interposed switch-data object word")
+        object_before_table = literal - 4 in data_relocations
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     decoder.detail = True
 
@@ -1910,24 +1912,36 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
 
 def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None):
     data_profile = data_mapping is not None
+    complete_data = data_profile and isinstance(manifest, dict) and \
+        manifest.get("data_policy") == SWITCH_MULTIPLE_DATA_POLICY
     fields = {"calls", "data", "switch"} if data_profile else {"calls", "switch"}
+    if complete_data:
+        fields.add("data_policy")
     if mapping is None or not isinstance(manifest, dict) or set(manifest) != fields or \
             not isinstance(manifest["calls"], list) or not isinstance(manifest["switch"], dict):
         raise ValueError("invalid switch manifest")
     data_relocations = None
     if data_profile:
         records = manifest["data"]
-        if not isinstance(records, list) or len(records) != 1 or \
-                not isinstance(records[0], list) or len(records[0]) != 3:
+        if not isinstance(records, list) or not 1 <= len(records) <= len(data) // 4 or \
+                not complete_data and len(records) != 1:
             raise ValueError("switch-data requires one canonical object binding")
-        offset, name, addend = records[0]
         objects = parse_data_symbols(data_mapping)
-        if type(offset) is not int or offset < 0 or offset + 4 > len(data) or \
-                (address + offset) % 4 or not isinstance(name, str) or name not in objects or \
-                type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF:
-            raise ValueError("invalid switch-data object binding")
-        value = objects[name] + addend
-        data_relocations = {offset: (name, value)}
+        data_relocations = {}
+        previous = -1
+        for record in records:
+            if not isinstance(record, list) or len(record) != 3:
+                raise ValueError("invalid switch-data object binding")
+            offset, name, addend = record
+            if type(offset) is not int or offset <= previous:
+                raise ValueError("switch-data bindings require unique ordered integer offsets")
+            previous = offset
+            if offset < 0 or offset + 4 > len(data) or \
+                    (address + offset) % 4 or not isinstance(name, str) or name not in objects or \
+                    type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF:
+                raise ValueError("invalid switch-data object binding")
+            value = objects[name] + addend
+            data_relocations[offset] = (name, value)
     descriptor = manifest["switch"]
     fields = {"comparison", "guard", "dispatch", "default", "literal", "table", "bound", "relocations"}
     if set(descriptor) != fields or \
@@ -1975,6 +1989,17 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     instructions = verify_leaf_instructions(data, address, True, calls,
                                             switch_relocations=relocations,
                                             switch_data_relocations=data_relocations)
+    if complete_data:
+        # This version admits only the local table pointer and typed object
+        # literals. It grants no numeric-literal or generic-address composition.
+        reached_literals = {
+            ((item.address + 4) & ~3) + operand.mem.disp
+            for item in instructions for operand in item.operands
+            if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC}
+        expected_literals = {address + descriptor["literal"]} | {
+            address + offset for offset in data_relocations}
+        if reached_literals != expected_literals:
+            raise ValueError("complete switch-data literal-word coverage is required")
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
@@ -3419,7 +3444,22 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         raise ValueError("inconsistent stack aliases at control-flow join")
                     incoming_aliases = tuple((register, offset) for register, offset in incoming_aliases
                                              if register not in differing)
-                merged_aliases = (merge_possible_aliases(previous[2], outgoing[2])
+                previous_register_aliases = previous[2]
+                if stack_arguments and thumb:
+                    previous_offsets = dict(previous_register_aliases)
+                    dead_conflicts = {register for register, offset in incoming_aliases
+                                      if register in previous_offsets and
+                                      previous_offsets[register] != offset and
+                                      stack_alias_overwritten_before_use(
+                                          data, address, successor, register, decoder)}
+                    # Only register facts die here. Pointer-bearing stack slots
+                    # still require the unchanged exact offset merge below.
+                    previous_register_aliases = tuple(
+                        (register, offset) for register, offset in previous_register_aliases
+                        if register not in dead_conflicts)
+                    incoming_aliases = tuple((register, offset) for register, offset in incoming_aliases
+                                             if register not in dead_conflicts)
+                merged_aliases = (merge_possible_aliases(previous_register_aliases, incoming_aliases)
                                   if stack_arguments else incoming_aliases)
                 merged_slots = merge_possible_aliases(previous[4], outgoing[4])
                 merged = (previous[0] & outgoing[0],
@@ -4014,6 +4054,8 @@ def main():
                     switch_evidence["data"] = [
                         [offset, name, value - objects[name]]
                         for offset, (name, value) in sorted(data_relocations.items())]
+                    if not preloaded_profile and len(data_relocations) > 1:
+                        switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                 if preloaded_profile:
                     verified_instructions, _ = verify_preloaded_switches(
                         got, addr, rom, mapping, data_mapping, switch_evidence)
@@ -4082,6 +4124,7 @@ def main():
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
+                  SWITCH_MULTIPLE_DATA_SCHEMA if "data_policy" in switch_evidence else
                   SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
     if udivsi3_bindings:
         schema = UDIVSI3_SCHEMA
@@ -4312,10 +4355,12 @@ def main():
                     f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
             if switch_relocations:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
+                           SWITCH_MULTIPLE_DATA_SUMMARY if "data_policy" in switch_evidence else
                            SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
                 f.write(f"* switches: {summary}\n")
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
+                                      switch_multiple_data_fingerprint if "data_policy" in switch_evidence else
                                       switch_data_fingerprint if data_profile else switch_fingerprint)
                 proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
                 f.write(f"* switch proof SHA-256: `{proof_digest}`\n")

@@ -215,8 +215,7 @@ class SwitchDataPlacementTests(unittest.TestCase):
             relocations = dict(manifest["switch"]["relocations"])
             data_relocations = {labels["object"] + 4 * index: ("g_object", OBJECT)
                                 for index in range(count)}
-            with self.subTest(layout_count=count), self.assertRaisesRegex(
-                    ValueError, "exactly one interposed object word"):
+            with self.subTest(layout_count=count), self.assertRaises(ValueError):
                 match.switch_layout(bytes(body), BASE, relocations, data_relocations)
 
     def test_exact_unsigned_guard_required(self):

@@ -25,11 +25,14 @@ SELECTOR = 'addressed-signed-runtime-v1'
 SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-v1'
 READONLY_SELECTOR = 'addressed-signed-runtime-readonly-word0-v1'
 READONLY_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-word0-v1'
+READONLY_TWO_SELECTOR = 'addressed-signed-runtime-readonly-two-words-v1'
+READONLY_TWO_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-words-v1'
 DATA_SELECTOR = 'addressed-signed-runtime-data-v1'
 DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-data-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
-SCHEMAS = {SELECTOR: SCHEMA, READONLY_SELECTOR: READONLY_SCHEMA, DATA_SELECTOR: DATA_SCHEMA}
+SCHEMAS = {SELECTOR: SCHEMA, READONLY_SELECTOR: READONLY_SCHEMA,
+           READONLY_TWO_SELECTOR: READONLY_TWO_SCHEMA, DATA_SELECTOR: DATA_SCHEMA}
 OPERATIONS = {'func_081426B8': quotient.ADDRESS, remainder.ADDRESSED_NAME: remainder.ADDRESS}
 ABI = 'conditional returning ARM ABI; arbitrary incoming word patterns; no numeric return facts'
 _replay = ContextVar('addressed_signed_runtime_replay', default=False)
@@ -49,6 +52,8 @@ def context_selector(context):
             return SELECTOR
         if len(context) == 6 and context[5] == READONLY_SELECTOR:
             return READONLY_SELECTOR
+        if len(context) == 6 and type(context[5]) is str and context[5] == READONLY_TWO_SELECTOR:
+            return READONLY_TWO_SELECTOR
         if len(context) == 8 and context[5] == DATA_SELECTOR:
             return DATA_SELECTOR
     raise ValueError('addressed signed runtimes require an exact explicit context')
@@ -151,16 +156,21 @@ def finish(data, address, calls, context, verified, dependencies):
             raise ValueError('addressed data requires exact typed coverage of reached address words')
     elif any(remainder.address_literal(row['value']) for row in partition['words']):
         raise ValueError('addressed signed runtimes exclude address literals and data bindings')
-    if selector == READONLY_SELECTOR:
-        import readonly_entry_stack_profile as incoming
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR):
+        if selector == READONLY_TWO_SELECTOR:
+            import readonly_entry_stack_words_profile as incoming
+            policy = {'schema': incoming.SCHEMA, 'words': [0, 1]}
+        else:
+            import readonly_entry_stack_profile as incoming
+            policy = {'schema': incoming.SCHEMA, 'words': [0]}
         restored = frame.prove_frame(instructions, edges, address, {}, calls,
-            entry_stack_policy={'schema': incoming.SCHEMA, 'words': [0]})
+            entry_stack_policy=policy)
         if not restored['entry_stack']['reads']:
-            raise ValueError('addressed readonly word0 requires an actual checked incoming read')
+            raise ValueError('addressed readonly ABI requires actual checked incoming reads')
     else:
         restored = frame.prove_frame(instructions, edges, address, {}, calls)
     modules = (match, owner, graph, frame, quotient, remainder)
-    if selector == READONLY_SELECTOR:
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR):
         modules += (incoming,)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
@@ -186,7 +196,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
         raise ValueError('unknown addressed signed runtime selector')
     observed = {}
     context = (rom, mapping, index, bindings, observed)
-    if selector == READONLY_SELECTOR:
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR):
         context += (selector,)
     elif selector == DATA_SELECTOR:
         context += (selector, data_mapping, data_bindings)
@@ -388,7 +398,7 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     fixed_configuration(args)
     if selector not in SCHEMAS:
         raise ValueError('unknown addressed signed runtime selector')
-    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, DATA_SELECTOR) else None
+    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR) else None
     producers = data_producer_fingerprint() if selector == DATA_SELECTOR else None
     source,mapping,index = source_fingerprint(root,address),mapping_snapshot(root),index_snapshot(root)
     objects,selected_rom = data_snapshot(root),report_rom_path(root)
@@ -443,7 +453,7 @@ def render(result):
     selector = next((key for key,value in SCHEMAS.items() if value == result['manifest']['schema']),None)
     if selector is None:
         raise ValueError('unknown addressed signed runtime manifest schema')
-    premise = [] if selector != READONLY_SELECTOR else [
+    premise = [] if selector not in (READONLY_SELECTOR, READONLY_TWO_SELECTOR) else [
         '* incoming stack ABI: ' + result['manifest']['frame']['entry_stack']['contract']]
     if selector == DATA_SELECTOR:
         premise = ['* named data binding: ' + result['manifest']['data_contract']]
@@ -512,7 +522,7 @@ def report_matches(report, root, address):
                 saved['rom_sha256'] != sha(Path(report_rom_path(root)).read_bytes()) or \
                 saved['toolchain'] != toolchain_fingerprint():
             return False
-        if selector in (READONLY_SELECTOR, DATA_SELECTOR) and saved['runtime'] != runtime_fingerprint():
+        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, DATA_SELECTOR) and saved['runtime'] != runtime_fingerprint():
             return False
         return render(build(root,address,expected=saved['manifest'],selector=selector)) == report
     except (OSError,ValueError,KeyError,TypeError,IndexError,RuntimeError,subprocess.SubprocessError):
