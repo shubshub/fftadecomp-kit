@@ -30,7 +30,35 @@
           "who": "sol-CB2C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "93ed4299d25affc94825e6eb5b5ad4a667519f9a042e5beaf1dc54af0a001c1e",
+        "acknowledged_cursor": 6537083377,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "93ed4299d25affc94825e6eb5b5ad4a667519f9a042e5beaf1dc54af0a001c1e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BCB2C\",\"who\":\"sol-CB2C\",\"claim_id\":6537051946,\"reason\":\"One original natural C addressedruntime native attempt stopped exactspanownershipbyteguard before reportbody; original source and authorized unchangedsource diagnostic retained; no secondform or nativeretry\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T01:20:15Z",
+          "id": 6537083377,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T01:20:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2ac8312665bce67b542d6c75d0d98dc7c32434dde60f70e12a6e575384a5557e",
+        "result": {
+          "address": "0x080BCB2C",
+          "claim_id": 6537051946,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6537083377,
+          "status": "accepted",
+          "who": "sol-CB2C"
+        }
+      }
     }
   ],
   "issue": 66,
