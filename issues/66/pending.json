@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "debd8bc1afcaa4340bb8d340016af5f5fa15c888488209f518c3dacec38e6b7e",
-        "acknowledged_cursor": 6539039008,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "debd8bc1afcaa4340bb8d340016af5f5fa15c888488209f518c3dacec38e6b7e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A7C9C\",\"who\":\"sol-7C9C\",\"note\":\"One grounded natural C form and one first DEFAULT native attempt; saved complete194B78-instruction root and authentic ABI qualification; fixed current inputs.\"}",
-          "created_at": "2026-10-31T04:32:05Z",
-          "id": 6539039008,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:32:05Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b5dd663a013bddbd76e0389cafd8e9270459267368f8b9afb513b5be15b843fb",
-        "result": {
-          "address": "0x080A7C9C",
-          "claim_id": 6539039008,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6539039008,
-          "status": "accepted",
-          "who": "sol-7C9C"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0180c55553e566c6f5090aaaf5b74ebece1ac7852dc43111739b744fe9f19038",
-        "acknowledged_cursor": 6539148756,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0180c55553e566c6f5090aaaf5b74ebece1ac7852dc43111739b744fe9f19038",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A7C9C\",\"who\":\"sol-7C9C\",\"claim_id\":6539039008,\"reason\":\"GNU zero-tail form emits 210 bytes versus mapped 194 bytes. Original frontend rejection, sole syntax correction, both native errors and one unchanged-source ELF diagnostic preserved. No MATCH.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-31T04:43:27Z",
-          "id": 6539148756,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:43:27Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "11e5a665125c38adc0f25c891bd4ccd5f50dfaf577df2ed4e0a80558b8ff5968",
-        "result": {
-          "address": "0x080A7C9C",
-          "claim_id": 6539039008,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6539148756,
-          "status": "accepted",
-          "who": "sol-7C9C"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "7b0dbf3849303abba8c42f977eb519076e66f7aeb25f17e56ab922b0cf2b4eae",
         "acknowledged_cursor": 6539179000,
         "body_provenance": "acceptance-time",
