@@ -30,6 +30,66 @@
           "who": "sol-5758"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "58d2e60f16dff25a76a8bdd7303106d5eb3242ced7d1fc821f9487c0cfd66e8c",
+        "acknowledged_cursor": 6537625979,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "58d2e60f16dff25a76a8bdd7303106d5eb3242ced7d1fc821f9487c0cfd66e8c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025758\",\"who\":\"sol-5758\",\"claim_id\":6537571568,\"reason\":\"One grounded natural switchdata C original DEFAULT native differsfromROM before reportbody; one unchangedsource compiler-only diagnostic retained complete364B with73fixedoffsetdifferences, no secondform or native retry\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T02:10:46Z",
+          "id": 6537618123,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:10:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4d1380f82e3277b22ff749e36ad6385b8b37ef7b9419c61ab48eeb41bdc75698",
+        "result": {
+          "address": "0x08025758",
+          "claim_id": 6537571568,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6537618123,
+          "status": "accepted",
+          "who": "sol-5758"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8bff0fd92bd2d3731b70322c7ccf49b67f1722bcd8256e321b4d16566d514970",
+        "acknowledged_cursor": 6537625979,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8bff0fd92bd2d3731b70322c7ccf49b67f1722bcd8256e321b4d16566d514970",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805D784\",\"who\":\"sol-D784\",\"note\":\"One qualified408B natural framed-data form, actual ten-slot1174C ABI with halfword thirdformal and complete saved owner, default native route\"}",
+          "created_at": "2026-10-31T02:11:34Z",
+          "id": 6537625979,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:11:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4d1380f82e3277b22ff749e36ad6385b8b37ef7b9419c61ab48eeb41bdc75698",
+        "result": {
+          "address": "0x0805D784",
+          "claim_id": 6537625979,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537625979,
+          "status": "accepted",
+          "who": "sol-D784"
+        }
+      },
       "release": null
     }
   ],
