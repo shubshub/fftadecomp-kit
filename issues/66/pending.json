@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "aeb2f79cac480f6de1605aef10856434f57c8915b33ee47febcc78b3522d0b08",
+        "acknowledged_cursor": 6538089984,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aeb2f79cac480f6de1605aef10856434f57c8915b33ee47febcc78b3522d0b08",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08019AE4\",\"who\":\"sol-9AE4\",\"note\":\"One natural C first default stack-buffer native; complete100B47instr root and genuine output helper/ten-position ABI qualified; no selector range or total initialization premise. No C before accepted.\"}",
+          "created_at": "2026-10-31T02:56:35Z",
+          "id": 6538089984,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:56:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "36a781eb13c8cef293f8baf244413573286c89f0e994713c22f79131f98e5066",
+        "result": {
+          "address": "0x08019AE4",
+          "claim_id": 6538089984,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6538089984,
+          "status": "accepted",
+          "who": "sol-9AE4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
