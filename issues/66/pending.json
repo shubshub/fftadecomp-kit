@@ -63,6 +63,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8b1eac3a52cdc03a7efcd3aa4114c8304bd0bf750d2ae22780cc3863d325fc37",
+        "acknowledged_cursor": 6540017783,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8b1eac3a52cdc03a7efcd3aa4114c8304bd0bf750d2ae22780cc3863d325fc37",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805C520\",\"who\":\"sol-C520\",\"note\":\"First natural source after accepted exact three-data-identity map application, complete72byte frozen owner.\"}",
+          "created_at": "2026-10-31T06:20:32Z",
+          "id": 6540017783,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T06:20:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "713626a3af10791516e411dd4f20f959c5cd113d1ce93600eedb6a5987db5f17",
+        "result": {
+          "address": "0x0805C520",
+          "claim_id": 6540017783,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6540017783,
+          "status": "accepted",
+          "who": "sol-C520"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
