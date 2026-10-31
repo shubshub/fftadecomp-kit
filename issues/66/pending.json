@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "2bc29c6eefac5fc24061eb0798473f1ab25b0237b81927153886b76b0fbc0a95",
-        "acknowledged_cursor": 6538880498,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2bc29c6eefac5fc24061eb0798473f1ab25b0237b81927153886b76b0fbc0a95",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080312F0\",\"who\":\"sol-12F0\",\"note\":\"One grounded natural C form and first DEFAULT native attempt; exact complete44-byte saved body; qualified canonical source identity applied; fixed current inputs.\"}",
-          "created_at": "2026-10-31T04:15:29Z",
-          "id": 6538880498,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:15:29Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e911e04729ce7ebda168bb6088da12c5b2cdb9d58fb7565f767a8daea810c082",
-        "result": {
-          "address": "0x080312F0",
-          "claim_id": 6538880498,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6538880498,
-          "status": "accepted",
-          "who": "sol-12F0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0a6d5dcdda46c8f13d403e29c8e66434163b41c83c38e0687f1f926f0280d67a",
-        "acknowledged_cursor": 6538910346,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0a6d5dcdda46c8f13d403e29c8e66434163b41c83c38e0687f1f926f0280d67a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080312F0\",\"who\":\"sol-12F0\",\"claim_id\":6538880498,\"reason\":\"First natural source matched complete44 bytes13 instructions on first DEFAULT native attempt; original source/report frozen and author fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-31T04:18:38Z",
-          "id": 6538910346,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T04:18:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b32bf1fbcc1941b24eccb538e7e03be33569881eecc149814b91b08ca99d9574",
-        "result": {
-          "address": "0x080312F0",
-          "claim_id": 6538880498,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6538910346,
-          "status": "accepted",
-          "who": "sol-12F0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "debd8bc1afcaa4340bb8d340016af5f5fa15c888488209f518c3dacec38e6b7e",
         "acknowledged_cursor": 6539039008,
         "body_provenance": "acceptance-time",
