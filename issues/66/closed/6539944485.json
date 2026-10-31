@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "a39f739761d3a660e02e22ecc0deb8b54e7520e1a9465b5715f81db2b15e11c1",
+    "acknowledged_cursor": 6539944485,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a39f739761d3a660e02e22ecc0deb8b54e7520e1a9465b5715f81db2b15e11c1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DD304\",\"who\":\"sol-D304\",\"note\":\"First natural source from frozen complete56byte static qualification, isolated future matching batch.\"}",
+      "created_at": "2026-10-31T06:12:18Z",
+      "id": 6539944485,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T06:12:18Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ae04a1a491868020ff9d32eeb00b5ed187b359d2e5995db85bb9b1ef96731990",
+    "result": {
+      "address": "0x080DD304",
+      "claim_id": 6539944485,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6539944485,
+      "status": "accepted",
+      "who": "sol-D304"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7a0de701cec1632aa0575c1878b3f655beaac619a85ca5accd53fe9adf7120d5",
+    "acknowledged_cursor": 6540025707,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7a0de701cec1632aa0575c1878b3f655beaac619a85ca5accd53fe9adf7120d5",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DD304\",\"who\":\"sol-D304\",\"claim_id\":6539944485,\"reason\":\"Original natural source passed native plausible complete56byte MATCH; immutable artifacts retained, author stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-31T06:21:26Z",
+      "id": 6540025707,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T06:21:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8c35d2956d88c32a62d95054e415f910f3c74b143e4e28e7665e79cdcb4247e1",
+    "result": {
+      "address": "0x080DD304",
+      "claim_id": 6539944485,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6540025707,
+      "status": "accepted",
+      "who": "sol-D304"
+    }
+  }
+}
