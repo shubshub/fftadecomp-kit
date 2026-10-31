@@ -59,66 +59,6 @@
           "who": "sol-EC84"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "eff05f272252eda2f11ee8a7d45a5ad6646fd9a85a033cf7039f31c0f1d56e68",
-        "acknowledged_cursor": 6536907873,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "eff05f272252eda2f11ee8a7d45a5ad6646fd9a85a033cf7039f31c0f1d56e68",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BE074\",\"who\":\"sol-E074\",\"note\":\"Match qualified complete owner under default selector; onefunction naturalC and no sharedheaders\"}",
-          "created_at": "2026-10-31T01:04:04Z",
-          "id": 6536907873,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T01:04:04Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "806e5ede9a4d03c6ad37f15b3534f77c717bfe94a2629b49c00a4851909219c9",
-        "result": {
-          "address": "0x080BE074",
-          "claim_id": 6536907873,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6536907873,
-          "status": "accepted",
-          "who": "sol-E074"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4a17029b24c10cf1f11b352f5292798c9b2d4f9d436420de2e33533ea490fa37",
-        "acknowledged_cursor": 6536974813,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4a17029b24c10cf1f11b352f5292798c9b2d4f9d436420de2e33533ea490fa37",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BE074\",\"who\":\"sol-E074\",\"claim_id\":6536907873,\"reason\":\"One original grounded default native attempt emitted388B versus384B; original complete report and plausible source preserved; no retry, compiler diagnostic or second form\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-10-31T01:09:32Z",
-          "id": 6536968560,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T01:09:32Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c27de6ce568a17529b06e9693f2af5d4affccceb32322ec99ee83b40c490bead",
-        "result": {
-          "address": "0x080BE074",
-          "claim_id": 6536907873,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6536968560,
-          "status": "accepted",
-          "who": "sol-E074"
-        }
-      }
     }
   ],
   "issue": 66,
