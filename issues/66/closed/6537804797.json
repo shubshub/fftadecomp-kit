@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "781b4fad9e83c957e5ca5a95669b7abe4673b49baa4b9548b08f1c777097f267",
+    "acknowledged_cursor": 6537804797,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "781b4fad9e83c957e5ca5a95669b7abe4673b49baa4b9548b08f1c777097f267",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080182CC\",\"who\":\"sol-82CC\",\"note\":\"One grounded natural C original native after authenticated named-table binding; complete saved368B139instr owner and current selector ABI closure frozen; no C until accepted.\"}",
+      "created_at": "2026-10-31T02:29:26Z",
+      "id": 6537804797,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T02:29:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4653b7f7bbb7d6e585114f1dcfd4dbd2a8101af40affbcd243495abf34a4fffb",
+    "result": {
+      "address": "0x080182CC",
+      "claim_id": 6537804797,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6537804797,
+      "status": "accepted",
+      "who": "sol-82CC"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "930bcf705f24119928dcca4bfff0fca40dd7bde705d2bcaa6288f7592f75cf86",
+    "acknowledged_cursor": 6537875139,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "930bcf705f24119928dcca4bfff0fca40dd7bde705d2bcaa6288f7592f75cf86",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080182CC\",\"who\":\"sol-82CC\",\"claim_id\":6537804797,\"reason\":\"Two bounded forms: first build failed existing typedef Record collision; identifier-only correction compiled complete368B but switch mismatch. One unchanged compiler-only diagnostic retains11 fixed byte differences in register allocation; no semantic bug or further correction/retry. Parked frozen.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-10-31T02:36:16Z",
+      "id": 6537875139,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T02:36:16Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "50bfd081fbeed8ba7d53f79db2a2099ea445d0b8b4e043813e93953c04234ffa",
+    "result": {
+      "address": "0x080182CC",
+      "claim_id": 6537804797,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6537875139,
+      "status": "accepted",
+      "who": "sol-82CC"
+    }
+  }
+}
