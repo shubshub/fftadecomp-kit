@@ -90,7 +90,35 @@
           "who": "sol-5558"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a042339124b835979d9cdc5bb8f7a428433a817b8bf49035f7d05fdcced36e68",
+        "acknowledged_cursor": 6540055434,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a042339124b835979d9cdc5bb8f7a428433a817b8bf49035f7d05fdcced36e68",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08085558\",\"who\":\"sol-5558\",\"claim_id\":6539964990,\"reason\":\"One original natural form failed whole-symbol span guard. One unchanged-source compiler diagnostic emitted108bytes versus112target, different saved-register layout and shifted code/pool; exact source parked, all compiler work stopped.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T06:24:44Z",
+          "id": 6540055434,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T06:24:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "32e185b45c0ac8fd801b9caf6443ae57bcb9c3ebeeb484f92c71ce786d66185b",
+        "result": {
+          "address": "0x08085558",
+          "claim_id": 6539964990,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6540055434,
+          "status": "accepted",
+          "who": "sol-5558"
+        }
+      }
     },
     {
       "claim": {
@@ -122,7 +150,35 @@
           "who": "sol-C520"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b97f8226664f7f2f49fefbbaf2cae625bdf7c545cc3e923450f90be127ecb063",
+        "acknowledged_cursor": 6540055434,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b97f8226664f7f2f49fefbbaf2cae625bdf7c545cc3e923450f90be127ecb063",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805C520\",\"who\":\"sol-C520\",\"claim_id\":6540017783,\"reason\":\"Original natural source passed native plausible complete72byte MATCH under applied final data mappings; author stopped, original artifacts retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-10-31T06:23:49Z",
+          "id": 6540047095,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T06:23:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "32e185b45c0ac8fd801b9caf6443ae57bcb9c3ebeeb484f92c71ce786d66185b",
+        "result": {
+          "address": "0x0805C520",
+          "claim_id": 6540017783,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6540047095,
+          "status": "accepted",
+          "who": "sol-C520"
+        }
+      }
     }
   ],
   "issue": 66,

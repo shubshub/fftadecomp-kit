@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8b1eac3a52cdc03a7efcd3aa4114c8304bd0bf750d2ae22780cc3863d325fc37",
+    "acknowledged_cursor": 6540017783,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8b1eac3a52cdc03a7efcd3aa4114c8304bd0bf750d2ae22780cc3863d325fc37",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805C520\",\"who\":\"sol-C520\",\"note\":\"First natural source after accepted exact three-data-identity map application, complete72byte frozen owner.\"}",
+      "created_at": "2026-10-31T06:20:32Z",
+      "id": 6540017783,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T06:20:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "713626a3af10791516e411dd4f20f959c5cd113d1ce93600eedb6a5987db5f17",
+    "result": {
+      "address": "0x0805C520",
+      "claim_id": 6540017783,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6540017783,
+      "status": "accepted",
+      "who": "sol-C520"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b97f8226664f7f2f49fefbbaf2cae625bdf7c545cc3e923450f90be127ecb063",
+    "acknowledged_cursor": 6540055434,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b97f8226664f7f2f49fefbbaf2cae625bdf7c545cc3e923450f90be127ecb063",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805C520\",\"who\":\"sol-C520\",\"claim_id\":6540017783,\"reason\":\"Original natural source passed native plausible complete72byte MATCH under applied final data mappings; author stopped, original artifacts retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-10-31T06:23:49Z",
+      "id": 6540047095,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-10-31T06:23:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "32e185b45c0ac8fd801b9caf6443ae57bcb9c3ebeeb484f92c71ce786d66185b",
+    "result": {
+      "address": "0x0805C520",
+      "claim_id": 6540017783,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6540047095,
+      "status": "accepted",
+      "who": "sol-C520"
+    }
+  }
+}
