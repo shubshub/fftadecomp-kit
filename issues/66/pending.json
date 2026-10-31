@@ -91,66 +91,6 @@
           "who": "sol-6798"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "e6e974aee81a5704bd5ff04e1ae2cc376c52ab69a229eddaa831b8a13e3b2814",
-        "acknowledged_cursor": 6537687307,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e6e974aee81a5704bd5ff04e1ae2cc376c52ab69a229eddaa831b8a13e3b2814",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812FAFC\",\"who\":\"sol-FAFC\",\"note\":\"One statically qualified complete natural C form with saved actual ABI, default native route, current published guardedLDM toolkit pins\"}",
-          "created_at": "2026-10-31T02:17:28Z",
-          "id": 6537687307,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:17:28Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "978510112d11f29536dd2df7ef9a64e1dff0816b9694b7870fd87a72a6a52674",
-        "result": {
-          "address": "0x0812FAFC",
-          "claim_id": 6537687307,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6537687307,
-          "status": "accepted",
-          "who": "sol-FAFC"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c09239be1aaf7cd3e7ffca1084ec3cda59bde8f20ce332607de8add508952251",
-        "acknowledged_cursor": 6537726592,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c09239be1aaf7cd3e7ffca1084ec3cda59bde8f20ce332607de8add508952251",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812FAFC\",\"who\":\"sol-FAFC\",\"claim_id\":6537687307,\"reason\":\"First grounded natural C DEFAULT native exit0 plausible MATCH complete374of374bytes101instructions; exact original source report and success receipt frozen for native publication\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-10-31T02:20:53Z",
-          "id": 6537721182,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-10-31T02:20:53Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e519a5908ee5a8a9839156d8542f621df5a9f7d9fe6627421ce7c722161c5011",
-        "result": {
-          "address": "0x0812FAFC",
-          "claim_id": 6537687307,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6537721182,
-          "status": "accepted",
-          "who": "sol-FAFC"
-        }
-      }
     }
   ],
   "issue": 66,
