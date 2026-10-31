@@ -30,7 +30,35 @@
           "who": "sol-873C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9f64be4d43f42fe80633241080a0ecbb023687a84c2aeeb4c8973195ad73ea0f",
+        "acknowledged_cursor": 6536781050,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9f64be4d43f42fe80633241080a0ecbb023687a84c2aeeb4c8973195ad73ea0f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805873C\",\"who\":\"sol-873C\",\"claim_id\":6536710934,\"reason\":\"One grounded natural C form emitted336B versus qualified340B target; originalnative extentfailure and one unchangedsource diagnostic retained; Parked with exact finite dispatch difference; no source retry\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T00:51:41Z",
+          "id": 6536774080,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T00:51:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b21f57d9291ebe45bbfd8970c69211da81545340d3fa22a6433e1786c117cf56",
+        "result": {
+          "address": "0x0805873C",
+          "claim_id": 6536710934,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6536774080,
+          "status": "accepted",
+          "who": "sol-873C"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +122,35 @@
           "who": "sol-8824"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8da2b448ffc4220495678cdfff8f50a921af5f483d91d0435cfc645acb87f5c7",
+        "acknowledged_cursor": 6536781050,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8da2b448ffc4220495678cdfff8f50a921af5f483d91d0435cfc645acb87f5c7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08028824\",\"who\":\"sol-8824\",\"claim_id\":6536726156,\"reason\":\"One grounded natural C form emitted330B matching targetextent but differs28bytes in two instruction regions; one native failure and one unchangedsource diagnostic preserved; no second form or register steering\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T00:52:19Z",
+          "id": 6536781050,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T00:52:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b21f57d9291ebe45bbfd8970c69211da81545340d3fa22a6433e1786c117cf56",
+        "result": {
+          "address": "0x08028824",
+          "claim_id": 6536726156,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6536781050,
+          "status": "accepted",
+          "who": "sol-8824"
+        }
+      }
     }
   ],
   "issue": 66,
