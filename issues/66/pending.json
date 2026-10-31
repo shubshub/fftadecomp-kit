@@ -30,7 +30,35 @@
           "who": "sol-87C4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f5580089085cee57087925b0db48d43077cf358b8b3cef71e718d36e2f64cbe8",
+        "acknowledged_cursor": 6538603702,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f5580089085cee57087925b0db48d43077cf358b8b3cef71e718d36e2f64cbe8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081287C4\",\"who\":\"sol-87C4\",\"claim_id\":6538553997,\"reason\":\"One natural C native failed mapped span; unchanged diagnostic210B vs212B target. Parked unchanged, no retries.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T03:47:36Z",
+          "id": 6538603702,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T03:47:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91b16d7e511fdf6bd4c2bd90d82ad1347ed1db8e7afb6868fe48b0a3e87de78a",
+        "result": {
+          "address": "0x081287C4",
+          "claim_id": 6538553997,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6538603702,
+          "status": "accepted",
+          "who": "sol-87C4"
+        }
+      }
     },
     {
       "claim": {
