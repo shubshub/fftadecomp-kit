@@ -208,6 +208,131 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
         for tokens in bads:
             with self.subTest(tokens=tokens),self.assertRaises(ValueError):profile.verify(**self.fixture(tokens))
 
+    def terminal_alignment_images(self, tokens=None):
+        # Real agbcc/as shape: sole 2-mod-4 FUNC, four-aligned .text, one
+        # terminal Thumb NOP outside the symbol. No compiler or real ROM.
+        f = self.fixture(tokens or (0xB500, 'mod', 'ordinary', 0xBC01, 0x4700))
+        self.assertEqual(len(f['data']) % 4, 2)
+        original = self.image(f)
+        original['text'] += bytes.fromhex('c046')
+        section = list(original['sections'][1])
+        section[5], section[8] = len(original['text']), 4
+        original['sections'][1] = tuple(section)
+        original['section_data'][1] = original['text']
+        original['symbols'] += [
+            dict(name='.gcc2_compiled.', value=0, size=0, type=0, bind=0, section=1),
+            dict(name='$t', value=0, size=0, type=0, bind=0, section=1)]
+        linked = copy.deepcopy(original)
+        linked.update(type=2, text=f['data'] + bytes.fromhex('c046'), relocations=[])
+        section = list(linked['sections'][1]); section[3] = A
+        linked['sections'][1] = tuple(section)
+        linked['section_data'][1] = linked['text']
+        for symbol in linked['symbols']:
+            if symbol['section'] == 1:
+                symbol['value'] += A
+            elif symbol['name']:
+                symbol.update(value=int(symbol['name'][5:], 16) | 1,
+                              section=0xFFF1, type=2)
+        return f, original, linked
+
+    def test_terminal_alignment_accepts_compiler_shape_and_extracts_only_FUNC(self):
+        f, original, linked = self.terminal_alignment_images()
+        with patch.object(match, 'function_address_target',
+                          wraps=match.function_address_target) as ordinary:
+            calls, bindings, targets = profile.original_bindings(
+                original, A, f['rom'], f['mapping'])
+        self.assertEqual((calls, bindings), (f['calls'], f['bindings']))
+        self.assertEqual(ordinary.call_args.args[3], len(f['data']))
+        body = profile.linked_bytes(original, linked, A, calls, targets)
+        self.assertEqual(body, f['data'])
+        self.assertEqual(len(body) + 2, len(linked['text']))
+        manifest, _ = profile.verify(**dict(f, data=body))
+        self.assertEqual(manifest['runtime_numeric_return_facts'], [])
+        self.assertEqual(manifest['partition']['code_bytes'], len(body))
+
+    def test_terminal_alignment_rejects_other_extent_and_alignment_shapes(self):
+        f, original, _ = self.terminal_alignment_images()
+        for change in ('non_nop', 'one_byte', 'four_bytes', 'truncated',
+                       'leading', 'wrong_FUNC_size', 'odd_FUNC_size',
+                       'alignment', 'section_size', 'section_address', 'section_flags'):
+            bad = copy.deepcopy(original)
+            if change == 'non_nop': bad['text'] = bad['text'][:-2] + b'\0\0'
+            elif change == 'one_byte': bad['text'] = bad['text'][:-1]
+            elif change == 'four_bytes': bad['text'] += bytes.fromhex('c046')
+            elif change == 'truncated': bad['text'] = bad['text'][:4]
+            elif change == 'leading': bad['symbols'][0]['value'] = 3
+            elif change == 'wrong_FUNC_size': bad['symbols'][0]['size'] -= 2
+            elif change == 'odd_FUNC_size': bad['symbols'][0]['size'] -= 1
+            else:
+                section = list(bad['sections'][1])
+                field, value = {'alignment':(8,2), 'section_size':(5,999),
+                    'section_address':(3,2), 'section_flags':(2,2)}[change]
+                section[field] = value; bad['sections'][1] = tuple(section)
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                profile.original_bindings(bad, A, f['rom'], f['mapping'])
+
+    def test_terminal_alignment_rejects_tail_symbols_and_relocations(self):
+        f, original, _ = self.terminal_alignment_images()
+        size = len(f['data'])
+        for symbol in [
+                dict(name='$t.1',value=size,size=0,type=0,bind=0,section=1),
+                dict(name='$d',value=size,size=0,type=0,bind=0,section=1),
+                dict(name='tail',value=size,size=0,type=0,bind=0,section=1),
+                dict(name='crossing',value=size-2,size=4,type=0,bind=0,section=1),
+                dict(name='object',value=0,size=2,type=1,bind=0,section=1),
+                dict(name='extra',value=3,size=2,type=2,bind=1,section=1)]:
+            bad = copy.deepcopy(original); bad['symbols'].append(symbol)
+            with self.subTest(symbol=symbol), self.assertRaises(ValueError):
+                profile.original_bindings(bad, A, f['rom'], f['mapping'])
+        for offset in (size-2, size):
+            bad = copy.deepcopy(original)
+            rel = bad['section_data'][2] + struct.pack('<II', offset, (1 << 8) | 10)
+            bad['section_data'][2] = rel
+            section = list(bad['sections'][2]); section[5] = len(rel)
+            bad['sections'][2] = tuple(section)
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                profile.original_bindings(bad, A, f['rom'], f['mapping'])
+        bad = copy.deepcopy(original); bad['symbols'][1]['name'] = '__modsi3'
+        with self.assertRaises(ValueError):
+            profile.original_bindings(bad, A, f['rom'], f['mapping'])
+
+    def test_terminal_alignment_preserves_full_link_integrity(self):
+        f, original, linked = self.terminal_alignment_images()
+        calls, _, targets = profile.original_bindings(original, A, f['rom'], f['mapping'])
+        for change in ('tail', 'body', 'extra_tail', 'FUNC_size', 'alignment',
+                       'section_size', 'tail_label', 'crossing_label'):
+            bad = copy.deepcopy(linked)
+            if change in ('tail', 'body'):
+                data = bytearray(bad['text']); data[-1 if change == 'tail' else 0] ^= 1
+                bad['text'] = bytes(data)
+            elif change == 'extra_tail': bad['text'] += bytes.fromhex('c046')
+            elif change == 'FUNC_size': bad['symbols'][0]['size'] += 2
+            elif change in ('alignment', 'section_size'):
+                section = list(bad['sections'][1])
+                section[8 if change == 'alignment' else 5] = 2 if change == 'alignment' else 999
+                bad['sections'][1] = tuple(section)
+            else:
+                size = len(f['data'])
+                bad['symbols'].append(dict(name='extra',value=A+size-(2 if change=='crossing_label' else 0),
+                    size=4 if change=='crossing_label' else 0,type=0,bind=0,section=1))
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                profile.linked_bytes(original, bad, A, calls, targets)
+        bad = copy.deepcopy(original); bad['text'] = bad['text'][:-2] + b'\0\0'
+        with self.assertRaises(ValueError):
+            profile.linked_bytes(bad, linked, A, calls, targets)
+
+    def test_terminal_alignment_does_not_admit_CFG_pool_or_frame_gaps(self):
+        for tokens in [
+                (0xB500, 'mod', 0xBC01, 0xE7FF),  # branch into omitted tail
+                (0xB500, 'mod', 0x4900, 0xBD00),  # pool word crosses FUNC end
+                (0xB510, 'mod', 0xBC01, 0x4700),  # unbalanced saved r4
+                (0xB500, 0xA800, 'mod', 0xBD00)]: # local alias to runtime
+            f, original, linked = self.terminal_alignment_images(tokens)
+            calls, _, targets = profile.original_bindings(original, A, f['rom'], f['mapping'])
+            body = profile.linked_bytes(original, linked, A, calls, targets)
+            with self.subTest(tokens=tokens), self.assertRaises(ValueError):
+                profile.verify(**dict(f, data=body))
+
     def synthetic_result(self,root,f,selector=None):
         selector=selector or profile.SELECTOR
         manifest,_=profile.verify(**f,selector=selector)

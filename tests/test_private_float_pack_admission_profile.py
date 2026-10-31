@@ -344,5 +344,131 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
                 self.assertFalse(evidence.report_matches(report,root,ADDRESS))
 
 
+class PrivateFloatTerminalAlignmentTests(unittest.TestCase):
+    def fixture(self):
+        return PrivateFloatPackAdmissionTests().fixture()
+
+    @contextmanager
+    def closure(self):
+        with PrivateFloatPackAdmissionTests().closure() as fixture:
+            yield fixture
+
+    def padded(self, body):
+        original, linked = elf_pair(body)
+        for image in (original, linked):
+            image['text'] += bytes.fromhex('c046')
+            section = list(image['sections'][1])
+            section[5], section[8] = len(image['text']), 4
+            image['sections'][1] = tuple(section)
+        return original, linked
+
+    def test_terminal_alignment_original_linked_and_exact_function_bytes(self):
+        with self.closure() as (body,rom,_,mapping,index,_):
+            original,linked=self.padded(body)
+            calls,targets=admission.original_bindings(original,ADDRESS,rom,mapping,index)
+            compiled=admission.linked_bytes(original,linked,ADDRESS,calls,targets)
+            self.assertEqual(compiled,body)
+            self.assertEqual(len(original['text']),40)
+            self.assertEqual(original['symbols'][0]['size'],38)
+            manifest,instructions=admission.verify(compiled,ADDRESS,rom,mapping,index,calls)
+            self.assertEqual(len(instructions),17)
+            self.assertEqual(manifest['inventory']['body_sha256'],admission.sha(body))
+
+    def test_terminal_alignment_malformed_extent_and_section_geometry(self):
+        with self.closure() as (body,rom,_,mapping,index,_):
+            original,linked=self.padded(body)
+            calls=[[10,f'func_{UNPACK:08X}'],[28,f'func_{PACK:08X}']]
+            targets={f'func_{UNPACK:08X}':UNPACK,f'func_{PACK:08X}':PACK}
+            changes=[]
+            for tail in (b'\0\0',bytes.fromhex('00bf'),bytes.fromhex('7047'),b'\0',bytes.fromhex('c046c046')):
+                changes.append(('tail '+tail.hex(),lambda image,tail=tail:image.update(text=image['text'][:38]+tail)))
+            for size in (0,36,37,39,40,42):
+                changes.append(('size '+str(size),lambda image,size=size:image['symbols'][0].update(size=size)))
+            for field,value in ((8,1),(8,2),(8,8),(5,38),(3,2)):
+                def section(image,field=field,value=value):
+                    row=list(image['sections'][1]);row[field]=value;image['sections'][1]=tuple(row)
+                changes.append(('section '+str((field,value)),section))
+            for name,change in changes:
+                for phase,base in (('original',original),('linked',linked)):
+                    image=copy.deepcopy(base);change(image)
+                    with self.subTest(name=name,phase=phase),self.assertRaises(ValueError):
+                        if phase=='original':admission.original_bindings(image,ADDRESS,rom,mapping,index)
+                        else:admission.linked_bytes(original,image,ADDRESS,calls,targets)
+
+    def test_terminal_alignment_rejects_symbols_ownership_and_relocations(self):
+        with self.closure() as (body,rom,_,mapping,index,_):
+            original,linked=self.padded(body)
+            calls=[[10,f'func_{UNPACK:08X}'],[28,f'func_{PACK:08X}']]
+            targets={f'func_{UNPACK:08X}':UNPACK,f'func_{PACK:08X}':PACK}
+            for phase,base in (('original',original),('linked',linked)):
+                for name,kind,value,size in (('tail_label',0,38,0),('$t.tail',0,38,0),
+                        ('$d',0,39,0),('end_label',0,40,0),('overlap',0,36,4),
+                        ('foreign',2,2,2),('object',1,0,4)):
+                    image=copy.deepcopy(base)
+                    base_address=ADDRESS if phase=='linked' else 0
+                    image['symbols'].append(dict(name=name,type=kind,bind=0,section=1,
+                        value=base_address+value,size=size))
+                    with self.subTest(phase=phase,name=name),self.assertRaises(ValueError):
+                        if phase=='original':admission.original_bindings(image,ADDRESS,rom,mapping,index)
+                        else:admission.linked_bytes(original,image,ADDRESS,calls,targets)
+            for site in (36,38,40):
+                changed=copy.deepcopy(original)
+                data=changed['section_data'][2]+struct.pack('<II',site,1<<8|10)
+                changed['section_data'][2]=data
+                row=list(changed['sections'][2]);row[5]=len(data);changed['sections'][2]=tuple(row)
+                with self.subTest(relocation=site),self.assertRaises(ValueError):
+                    admission.original_bindings(changed,ADDRESS,rom,mapping,index)
+            rows=json.loads(mapping);rows.append(dict(rom=f'0x{ADDRESS+38:08X}',end=f'0x{ADDRESS+40:08X}',mode='thumb',instrs=1))
+            # ELF-only padding never enlarges the mapped ROM owner or its proof body.
+            calls,targets=admission.original_bindings(original,ADDRESS,rom,json.dumps(rows).encode(),index)
+            self.assertEqual(admission.linked_bytes(original,linked,ADDRESS,calls,targets),body)
+
+    def test_terminal_alignment_rejects_control_and_literal_padding_references(self):
+        with self.closure() as (body,rom,_,mapping,index,_):
+            original,_=self.padded(body)
+            for opcode in (0xE011,0xD011,0x4808,0xA008,0x4678):
+                changed=copy.deepcopy(original)
+                changed['text']=words(opcode)+changed['text'][2:]
+                with self.subTest(opcode=hex(opcode)),self.assertRaises(ValueError):
+                    admission.original_bindings(changed,ADDRESS,rom,mapping,index)
+
+    def test_terminal_alignment_object_path_integrity_and_unpadded_compatibility(self):
+        with self.closure() as (body,rom,_,mapping,index,_):
+            original,linked=self.padded(body)
+            commands=[]
+            class Runner:
+                def write_text(self,path,data):pass
+                def sh(self,command):commands.append(command)
+                def read_binary(self,path):return b'synthetic linked ELF'
+            with patch.object(match,'elf_image',return_value=linked):
+                compiled,calls=admission.object_bytes(Runner(),'/synthetic/workspace',arguments(),original,
+                                                       ADDRESS,rom,mapping,index)
+            self.assertEqual(compiled,body)
+            self.assertEqual(len(commands),2)
+            self.assertIn('--no-undefined --no-relax --orphan-handling=error',commands[1])
+            for offset in (0,38):
+                changed=copy.deepcopy(linked);data=bytearray(changed['text']);data[offset]^=1;changed['text']=bytes(data)
+                with self.subTest(offset=offset),self.assertRaises(ValueError):
+                    admission.linked_bytes(original,changed,ADDRESS,calls,
+                        {f'func_{UNPACK:08X}':UNPACK,f'func_{PACK:08X}':PACK})
+            plain,plain_linked=elf_pair(body)
+            bindings,targets=admission.original_bindings(plain,ADDRESS,rom,mapping,index)
+            self.assertEqual(admission.linked_bytes(plain,plain_linked,ADDRESS,bindings,targets),body)
+
+    def test_terminal_alignment_fresh_report_replays_complete_function_only(self):
+        helper=PrivateFloatPackAdmissionTests()
+        with helper.project() as (root,fixture),helper.fake_native(root,fixture) as (commands,_):
+            original,linked=self.padded(fixture[0])
+            with patch.object(match,'compile_object',return_value=(b'synthetic padded ET_REL',b'',original)), \
+                    patch.object(match,'elf_image',return_value=linked):
+                result=admission.build(root,ADDRESS)
+                report=admission.render(result)
+                self.assertEqual(len(result['body']),38)
+                self.assertEqual(len(original['text']),40)
+                self.assertTrue(evidence.report_matches(report,root,ADDRESS))
+                self.assertEqual(len(commands),4)
+                self.assertIn('38/38 bytes',report)
+
+
 if __name__=='__main__':
     unittest.main()

@@ -455,6 +455,40 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
     return observed, instructions
 
 
+def terminal_alignment(image, symbol):
+    """Only the native assembler's two-byte, four-alignment Thumb NOP tail."""
+    size = symbol['size']
+    padding = image['text'][size:]
+    if not padding:
+        return
+    section = image['sections'][image['text_index']]
+    if size <= 0 or size % 4 != 2 or padding != b'\xc0\x46' or symbol['bind'] != 1 or \
+            section[1] != 1 or section[2] != 6 or section[3] % 4 or section[4] % 4 or \
+            section[5] != len(image['text']) or section[8] != 4 or \
+            image['type'] == 1 and section[3] != 0:
+        raise ValueError('addressed runtime text has noncanonical terminal alignment')
+    for item in image['symbols']:
+        if item is symbol or item['section'] != image['text_index']:
+            continue
+        offset = item['value'] - section[3]
+        if not 0 <= offset < size or offset + item['size'] > size:
+            raise ValueError('addressed runtime terminal alignment has a symbol owner')
+
+
+def original_function(image, address):
+    import match
+    if image['type'] != 1:
+        raise ValueError('addressed signed runtimes require original relocatable ELF')
+    match.allocated_text_only(image)
+    symbol, offset = match.function_record(image, f'func_{address:08X}', address, True)
+    if offset or any(
+            item is not symbol and item['type'] in (1, 2) and item['section'] or
+            re.fullmatch(r'\$a(?:\..*)?', item['name']) for item in image['symbols']):
+        raise ValueError('addressed signed runtimes require sole complete original Thumb text')
+    terminal_alignment(image, symbol)
+    return symbol
+
+
 def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_relocations=None,
                       selector=SELECTOR):
     """Canonical addressed calls, with separately requested typed original ABS32."""
@@ -466,14 +500,7 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
     objects = match.parse_data_symbols(data_mapping) if with_data else {}
     if selector not in SCHEMAS or selector in CALLBACK_SELECTORS and not with_data:
         raise ValueError('callback linking requires its exact selector and typed data')
-    if image['type'] != 1:
-        raise ValueError('addressed signed runtimes require original relocatable ELF')
-    match.allocated_text_only(image)
-    symbol, offset = match.function_record(image, f'func_{address:08X}', address, True)
-    if offset or symbol['size'] != len(image['text']) or any(
-            item is not symbol and item['type'] in (1, 2) and item['section'] or
-            re.fullmatch(r'\$a(?:\..*)?', item['name']) for item in image['symbols']):
-        raise ValueError('addressed signed runtimes require sole complete original Thumb text')
+    symbol = original_function(image, address)
     entries = json.loads(mapping)
     calls, bindings, targets, occupied = {}, {}, {}, set()
     for section_index in image['relocations']:
@@ -511,7 +538,7 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                     target = match.function_thunk.ALIASES[name]
                     match.function_thunk.dependencies([name], rom)
                 else:
-                    target = match.function_address_target(name, entries, address, len(image['text']), len(rom))
+                    target = match.function_address_target(name, entries, address, symbol['size'], len(rom))
             else:
                 bindings[address+offset] = name
             decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
@@ -539,12 +566,13 @@ def linked_bytes(original, linked, address, calls, targets, *, data_relocations=
         raise ValueError('addressed runtime link requires executable ELF without relocations')
     match.allocated_text_only(linked)
     name = f'func_{address:08X}'
-    before, _ = match.function_record(original, name, address, True)
+    before = original_function(original, address)
     after, offset = match.function_record(linked, name, address, True)
     if offset or after['value'] != address | 1 or after['size'] != before['size'] or \
             linked['sections'][linked['text_index']][3] != address or \
             len(linked['text']) != len(original['text']):
         raise ValueError('addressed runtime linker changed extent, mode, placement or text size')
+    terminal_alignment(linked, after)
     if data_relocations is not None and (type(data_relocations) is not dict or not data_relocations):
         raise ValueError('addressed data linker requires actual original bindings')
     data_relocations = data_relocations or {}
@@ -585,7 +613,7 @@ def linked_bytes(original, linked, address, calls, targets, *, data_relocations=
     if any(index not in occupied and first != second for index, (first,second) in
            enumerate(zip(original['text'],linked['text']))):
         raise ValueError('addressed runtime linker changed bytes outside call relocations')
-    return linked['text']
+    return linked['text'][:after['size']]
 
 
 def object_bytes(runner, workspace, args, original, address, rom, mapping, *,

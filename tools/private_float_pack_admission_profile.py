@@ -60,28 +60,66 @@ def selected(report):
     return True
 
 
+def function_size(image, address):
+    """Keep only the complete symbol, with one unreferenced compiler NOP tail."""
+    import match
+    match.allocated_text_only(image)
+    symbol, offset = match.function_record(image, f'func_{address:08X}', address, True)
+    size, data = symbol['size'], image['text']
+    if offset:
+        raise ValueError('private float requires a function at the section start')
+    if size == len(data):
+        return size
+    section = image['sections'][image['text_index']]
+    base = address if image['type'] == 2 else 0
+    if size % 4 != 2 or data[size:] != b'\xc0\x46' or address % 4 or \
+            section[3] != base or section[5] != len(data) or section[8] != 4:
+        raise ValueError('private float permits only exact terminal Thumb NOP alignment')
+    for item in image['symbols']:
+        if item is symbol or item['section'] != image['text_index']:
+            continue
+        position = (item['value'] & ~1) - base
+        if item['type'] in (1, 2) or position < 0 or position >= size or position + item['size'] > size:
+            raise ValueError('private float alignment has foreign symbol ownership')
+    decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+    decoder.detail = True
+    instructions = list(decoder.disasm(data[:size], address))
+    if sum(item.size for item in instructions) != size:
+        raise ValueError('private float aligned symbol has undecoded bytes')
+    for item in instructions:
+        if item.id == match.ARM_INS_ADR or any(
+                operand.type == match.ARM_OP_REG and operand.reg == match.ARM_REG_PC or
+                operand.type == match.ARM_OP_MEM and operand.mem.base == match.ARM_REG_PC
+                for operand in item.operands) or \
+                (item.group(match.CS_GRP_JUMP) or item.group(match.CS_GRP_CALL)) and any(
+                    operand.type == match.ARM_OP_IMM and address+size <= operand.imm < address+len(data)
+                    for operand in item.operands):
+            raise ValueError('private float alignment cannot have code or data references')
+    return size
+
+
 def original_bindings(image, address, rom, mapping, index):
     """Authenticate only the two genuine private entry symbols, without aliases."""
     import match
     from software_double_profile import indices, span_record
     if image['type'] != 1:
         raise ValueError('private float requires original relocatable ELF')
-    match.allocated_text_only(image)
+    size = function_size(image, address)
     symbol, offset = match.function_record(image, f'func_{address:08X}', address, True)
-    if offset or symbol['size'] != len(image['text']) or any(
+    if offset or any(
             item['type'] == 2 and item is not symbol and item['section'] or
             item['type'] == 1 and item['section'] or
             re.fullmatch(r'\$a(?:\..*)?', item['name']) for item in image['symbols']):
         raise ValueError('private float requires one complete Thumb ELF function')
     entries, rows = indices(mapping, index)
-    span_record(address, address + len(image['text']), entries, rows, rom)
+    span_record(address, address + size, entries, rows, rom)
     if sha(rom) != inventory.runtime.ROM_SHA256:
         raise ValueError('private float requires the approved ROM identity')
     targets = {}
     for _, (start, end, count, digest), _ in inventory.HELPERS:
         record = span_record(start, end, entries, rows, rom)
         if record['instrs'] != count or sha(rom[start-match.ROM_BASE:end-match.ROM_BASE]) != digest or \
-                start < address + len(image['text']) and end > address:
+                start < address + size and end > address:
             raise ValueError('private float helper identity/count/ownership differs')
         targets[f'func_{start:08X}'] = start
     calls, occupied = [], set()
@@ -95,7 +133,7 @@ def original_bindings(image, address, rom, mapping, index):
         for position in range(0, section[5], 8):
             site, info = struct.unpack_from('<II', image['section_data'][section_index], position)
             if symbols is None or info >> 8 >= len(symbols) or info & 255 != 10 or \
-                    site % 2 or site + 4 > len(image['text']) or occupied.intersection(range(site, site+4)):
+                    site % 2 or site + 4 > size or occupied.intersection(range(site, site+4)):
                 raise ValueError('invalid or overlapping private-float call relocation')
             occupied.update(range(site, site+4))
             target = symbols[info >> 8]
@@ -118,10 +156,11 @@ def original_bindings(image, address, rom, mapping, index):
 
 def linked_bytes(original, linked, address, calls, targets):
     import match
-    match.allocated_text_only(linked)
+    size = function_size(original, address)
+    linked_size = function_size(linked, address)
     record, offset = match.function_record(linked, f'func_{address:08X}', address, True)
     if linked['type'] != 2 or offset or linked['relocations'] or \
-            record['size'] != len(original['text']) or len(linked['text']) != len(original['text']) or any(
+            linked_size != size or len(linked['text']) != len(original['text']) or any(
             item['type'] == 2 and item is not record and item['section'] == linked['text_index']
             for item in linked['symbols']):
         raise ValueError('private float linker altered complete function extent or retained relocations')
@@ -136,7 +175,7 @@ def linked_bytes(original, linked, address, calls, targets):
         expected[site:site+4] = linked['text'][site:site+4]
     if bytes(expected) != linked['text']:
         raise ValueError('private float linker changed bytes outside original BL relocations')
-    return linked['text']
+    return linked['text'][:size]
 
 
 def object_bytes(runner, workspace, args, original, address, rom, mapping, index):
