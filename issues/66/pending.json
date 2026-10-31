@@ -59,6 +59,38 @@
           "who": "sol-F6A8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d0086cff942c44407886de104a6a6a94c6c2b0666454733e568c548dd5e33076",
+        "acknowledged_cursor": 6538068834,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d0086cff942c44407886de104a6a6a94c6c2b0666454733e568c548dd5e33076",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08084BD0\",\"who\":\"sol-4BD0\",\"note\":\"One grounded natural C first addressed-signed-runtime-v1 original; complete saved200B95instr root and actual helper ABI qualified under fixed current inputs. No C before accepted.\"}",
+          "created_at": "2026-10-31T02:54:27Z",
+          "id": 6538068834,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:54:27Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eca037edd48c3427aff584448ba7e8b6e1c5fcb46f676ddb04647ca69e0f3a23",
+        "result": {
+          "address": "0x08084BD0",
+          "claim_id": 6538068834,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6538068834,
+          "status": "accepted",
+          "who": "sol-4BD0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
