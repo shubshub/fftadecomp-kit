@@ -30,7 +30,35 @@
           "who": "sol-F19C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5c7743f5b7ddcc712daa07152fb185b8fd3c46bf85beb1e2f1136530b88122f4",
+        "acknowledged_cursor": 6539611694,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5c7743f5b7ddcc712daa07152fb185b8fd3c46bf85beb1e2f1136530b88122f4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813F19C\",\"who\":\"sol-F19C\",\"claim_id\":6539580792,\"reason\":\"One grounded scalar interpolation source emitted a complete60-byte symbol with differing ROM bytes. Original native result, source and full ELF/body evidence retained unchanged; no source steering or successful replay.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T05:33:53Z",
+          "id": 6539611694,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T05:33:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7e562376b6cadce7c2cf01529d4e9861aede0a219b28e2dc332f71cb4dcf07d6",
+        "result": {
+          "address": "0x0813F19C",
+          "claim_id": 6539580792,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6539611694,
+          "status": "accepted",
+          "who": "sol-F19C"
+        }
+      }
     }
   ],
   "issue": 66,
