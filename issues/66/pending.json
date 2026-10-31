@@ -59,6 +59,38 @@
           "who": "sol-4DBC"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "61c801f8e6e376a9c988f505826c8b483d1f58db83132927ec43476e2b708d3a",
+        "acknowledged_cursor": 6537571568,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "61c801f8e6e376a9c988f505826c8b483d1f58db83132927ec43476e2b708d3a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08025758\",\"who\":\"sol-5758\",\"note\":\"One statically qualified364B natural switch-data form with actual helper/caller ABI and already-mapped resources, default native route\"}",
+          "created_at": "2026-10-31T02:06:13Z",
+          "id": 6537571568,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T02:06:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b21aa037c2f7776d2ec42a9b0a8577e928576e83645faf2b8368fa024993e7aa",
+        "result": {
+          "address": "0x08025758",
+          "claim_id": 6537571568,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537571568,
+          "status": "accepted",
+          "who": "sol-5758"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
