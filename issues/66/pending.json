@@ -30,7 +30,35 @@
           "who": "sol-3848"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "cc79f030efeae2886c13cfdf27dcac131ffa03db11207fc11a9b393f2991937b",
+        "acknowledged_cursor": 6539897735,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cc79f030efeae2886c13cfdf27dcac131ffa03db11207fc11a9b393f2991937b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A3848\",\"who\":\"sol-3848\",\"claim_id\":6539857282,\"reason\":\"One natural source emitted a412byte complete ELF function for432byte indexed target; original artifact and failure retained without source steering or retries.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-10-31T06:06:57Z",
+          "id": 6539897735,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T06:06:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "413957809983a9f7582a71931aaad256eadd3f4ec8026e01c5ea13405545c6e3",
+        "result": {
+          "address": "0x080A3848",
+          "claim_id": 6539857282,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6539897735,
+          "status": "accepted",
+          "who": "sol-3848"
+        }
+      }
     }
   ],
   "issue": 66,
