@@ -59,6 +59,38 @@
           "who": "sol-DE30"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "38f319401e8080dc041b2b69ad859941c358ac108fe5cd17192a7b1850f02102",
+        "acknowledged_cursor": 6537051946,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "38f319401e8080dc041b2b69ad859941c358ac108fe5cd17192a7b1850f02102",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BCB2C\",\"who\":\"sol-CB2C\",\"note\":\"One natural C form and one original addressed-signed-runtime-v1 attempt; complete324B owner and grounded helper/source contracts retained\"}",
+          "created_at": "2026-10-31T01:17:17Z",
+          "id": 6537051946,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-10-31T01:17:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4f225ca6944a04a7daca6f61c22270764aed423be1f1821213c3eda4dab4ee22",
+        "result": {
+          "address": "0x080BCB2C",
+          "claim_id": 6537051946,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6537051946,
+          "status": "accepted",
+          "who": "sol-CB2C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
