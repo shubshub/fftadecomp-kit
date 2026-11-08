@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "407c6d8542a7e2307ae0084ebe4e19d21804d6130ce2fefdf42ee86216c133df",
+    "acknowledged_cursor": 6717015954,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "407c6d8542a7e2307ae0084ebe4e19d21804d6130ce2fefdf42ee86216c133df",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E7B04\",\"who\":\"team2-native162\",\"note\":\"Unchanged frozen254B original qualified113instructions under tested named three-output composition. First native and gated publication.\"}",
+      "created_at": "2026-11-08T04:03:11Z",
+      "id": 6717015954,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T04:03:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b025805e80e610c322116689ea1ae84eed1aa82e079e64dfd573c1e69d91f878",
+    "result": {
+      "address": "0x080E7B04",
+      "claim_id": 6717015954,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6717015954,
+      "status": "accepted",
+      "who": "team2-native162"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "40da4dca04ea7883c696212898e0f77ee6b2fe0b177e6e9d6245fabedecdb3f8",
+    "acknowledged_cursor": 6717038843,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "40da4dca04ea7883c696212898e0f77ee6b2fe0b177e6e9d6245fabedecdb3f8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E7B04\",\"who\":\"team2-native162\",\"claim_id\":6717015954,\"reason\":\"First native 254-byte MATCH frozen; original source unchanged; one compiler execution; ready for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T04:05:48Z",
+      "id": 6717038843,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T04:05:48Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "71690dea44c6989c57bcc58c30c679c43987294abb465084e5855bfc41a6143c",
+    "result": {
+      "address": "0x080E7B04",
+      "claim_id": 6717015954,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6717038843,
+      "status": "accepted",
+      "who": "team2-native162"
+    }
+  }
+}
