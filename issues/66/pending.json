@@ -539,6 +539,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6a408125a5e795eaac164ba4d65d87137dcc2bd32adbb798a5cd108e0f9b4e4a",
+        "acknowledged_cursor": 6716857329,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6a408125a5e795eaac164ba4d65d87137dcc2bd32adbb798a5cd108e0f9b4e4a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F1E20\",\"who\":\"team2-native161\",\"note\":\"Unchanged frozen252B original; tested finite spilled-scalar loop policy and current118-instruction complete qualification passed. First native matching and gated publication.\"}",
+          "created_at": "2026-11-08T03:44:46Z",
+          "id": 6716857329,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:44:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "297e10912e399b04c94690ff0faaef2a84856052871fbfba57aa0e0f1f60d3ab",
+        "result": {
+          "address": "0x080F1E20",
+          "claim_id": 6716857329,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6716857329,
+          "status": "accepted",
+          "who": "team2-native161"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
