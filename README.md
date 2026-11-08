@@ -692,6 +692,31 @@ active; an unknown overwrite fails closed. The narrow supported provenance
 case is the inspected, numerically separated SP-relative workspace address.
 This does not establish destruction of the separate retained r9 alias.
 
+### Conditional local-buffer interfaces
+
+Issue #73's two interfaces have separate opt-in owner profiles:
+
+```sh
+python tools/match.py --root ../fftadecomp 08006970 --owner-runtime-profile conditional-scheduler-descriptor-calls-v1
+python tools/match.py --root ../fftadecomp 0809A77C --owner-runtime-profile conditional-local-state-iterator-v1
+```
+
+The scheduler profile checks a complete 28-byte local descriptor, exact indexed
+scheduler bodies, typed callback literals, and the canonical dependency thunks.
+The state profile checks the complete four-byte state/initialized visitor caller,
+actual size argument, iterator, adapter, state callback, and canonical thunks.
+Both retain exact ELF relocation, full-symbol ROM comparison, plausibility,
+source/index binding and report replay. Default buffer rules remain unchanged.
+
+These are **conditional effect contracts**. Reports list their assumptions:
+compatible returning calls, protected-frame preservation, bounded local effects,
+and no retained or returned local pointers. Scheduler copying exposes both the
+copy in R1 and the original pointer in R9; it does not establish nonescape.
+Likewise, `n = 4` alone does not establish the installed callback's write bound
+or initialization behavior. Allocator/installed callback effects, physical
+permissions and termination remain unproved. Select these profiles only under
+the stated contracts; they are not an unconditional memory-safety theorem.
+
 ### Named data literals
 
 For a known external object address, add an explicit mapping to the decomp
