@@ -1754,7 +1754,35 @@
           "who": "sol-08001244-3826"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "923fe229ce153a7a747d7a1c2d01dd7f2387b5f3a989f4c2f41ac275a31306f2",
+        "acknowledged_cursor": 6718022768,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "923fe229ce153a7a747d7a1c2d01dd7f2387b5f3a989f4c2f41ac275a31306f2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08001244\",\"who\":\"sol-08001244-3826\",\"claim_id\":6717944310,\"reason\":\"New bounded natural matching forms preserve documented byte mismatches; all historical and current source/evidence retained\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; new forms only, no successful compiler replay or tooling changes\"}",
+          "created_at": "2026-11-08T06:03:35Z",
+          "id": 6718022763,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:03:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c87afaf6044d2c2add0a3fbf7cc676f4c0317692ee1da1ec0394a17483c9a8c",
+        "result": {
+          "address": "0x08001244",
+          "claim_id": 6717944310,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718022763,
+          "status": "accepted",
+          "who": "sol-08001244-3826"
+        }
+      }
     },
     {
       "claim": {
@@ -1786,7 +1814,35 @@
           "who": "sol-08005EF8-3826"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "45ff7a79e94ebcb7871e604746b194611ee7d1f5b05233f5fac30c418a1206d2",
+        "acknowledged_cursor": 6718022768,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "45ff7a79e94ebcb7871e604746b194611ee7d1f5b05233f5fac30c418a1206d2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08005EF8\",\"who\":\"sol-08005EF8-3826\",\"claim_id\":6717944317,\"reason\":\"New bounded natural matching forms preserve documented byte mismatches; all historical and current source/evidence retained\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; new forms only, no successful compiler replay or tooling changes\"}",
+          "created_at": "2026-11-08T06:03:35Z",
+          "id": 6718022768,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:03:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c87afaf6044d2c2add0a3fbf7cc676f4c0317692ee1da1ec0394a17483c9a8c",
+        "result": {
+          "address": "0x08005EF8",
+          "claim_id": 6717944317,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718022768,
+          "status": "accepted",
+          "who": "sol-08005EF8-3826"
+        }
+      }
     },
     {
       "claim": {
@@ -1818,7 +1874,35 @@
           "who": "sol-080078A8-3826"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0eb09a12d55955e4b76d10550f516f4d97aa57cbfb332221725b59f32cefceb9",
+        "acknowledged_cursor": 6718022768,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0eb09a12d55955e4b76d10550f516f4d97aa57cbfb332221725b59f32cefceb9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080078A8\",\"who\":\"sol-080078A8-3826\",\"claim_id\":6717944318,\"reason\":\"New bounded natural matching forms preserve documented byte mismatches; all historical and current source/evidence retained\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; new forms only, no successful compiler replay or tooling changes\"}",
+          "created_at": "2026-11-08T06:03:35Z",
+          "id": 6718022748,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:03:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c87afaf6044d2c2add0a3fbf7cc676f4c0317692ee1da1ec0394a17483c9a8c",
+        "result": {
+          "address": "0x080078A8",
+          "claim_id": 6717944318,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718022748,
+          "status": "accepted",
+          "who": "sol-080078A8-3826"
+        }
+      }
     },
     {
       "claim": {
