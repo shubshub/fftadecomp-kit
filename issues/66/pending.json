@@ -1630,7 +1630,35 @@
           "who": "sol-0809AAC8-3838"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7c50f998a8d7dbbcd6303d3ea992003443ac1d95f2545aff8bc937c8d24d9eb2",
+        "acknowledged_cursor": 6718487800,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7c50f998a8d7dbbcd6303d3ea992003443ac1d95f2545aff8bc937c8d24d9eb2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809AAC8\",\"who\":\"sol-0809AAC8-3838\",\"claim_id\":6718398182,\"reason\":\"Five natural forms stopped. Best68B body has nine differing nonrelocation bytes; diagnostic and source retained batch3838/result.json. No tooling changes.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-11-08T06:58:47Z",
+          "id": 6718487800,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:58:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "200f1448ea37462cd57389312fc6472632e1cec640b28d474fd1815506353ed6",
+        "result": {
+          "address": "0x0809AAC8",
+          "claim_id": 6718398182,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718487800,
+          "status": "accepted",
+          "who": "sol-0809AAC8-3838"
+        }
+      }
     },
     {
       "claim": {
@@ -1691,6 +1719,102 @@
           "who": "FFTA-Team2-176"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "97c7be8bcd0189d2454a9ad6a045221a4fabb225784e7143def59af7694a9b3b",
+        "acknowledged_cursor": 6718487800,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "97c7be8bcd0189d2454a9ad6a045221a4fabb225784e7143def59af7694a9b3b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804FFB8\",\"who\":\"sol-0804FFB8-3839\",\"note\":\"Existing generic canonical-integer scalar source selector supports mixed compiler integer runtimes plus ordinary ABI calls. Reuse frozen genuine C; no tooling changes.\"}",
+          "created_at": "2026-11-08T06:58:12Z",
+          "id": 6718483195,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:58:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "200f1448ea37462cd57389312fc6472632e1cec640b28d474fd1815506353ed6",
+        "result": {
+          "address": "0x0804FFB8",
+          "claim_id": 6718483195,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718483195,
+          "status": "accepted",
+          "who": "sol-0804FFB8-3839"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dbaa6027752ca86831c225d616a05bc16dacce3cc9e38adfe9da078ac4022337",
+        "acknowledged_cursor": 6718487800,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dbaa6027752ca86831c225d616a05bc16dacce3cc9e38adfe9da078ac4022337",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080898E0\",\"who\":\"sol-080898E0-3839\",\"note\":\"Existing generic canonical-integer scalar source selector supports mixed compiler integer runtimes plus ordinary ABI calls. Reuse frozen genuine C; no tooling changes.\"}",
+          "created_at": "2026-11-08T06:58:13Z",
+          "id": 6718483257,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:58:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "200f1448ea37462cd57389312fc6472632e1cec640b28d474fd1815506353ed6",
+        "result": {
+          "address": "0x080898E0",
+          "claim_id": 6718483257,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718483257,
+          "status": "accepted",
+          "who": "sol-080898E0-3839"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a0ea92e5de856a9e3841dc515acc0e486f156a3a8d4aa53101103563bab1f754",
+        "acknowledged_cursor": 6718487800,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a0ea92e5de856a9e3841dc515acc0e486f156a3a8d4aa53101103563bab1f754",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E2750\",\"who\":\"FFTA-Team2-177\",\"note\":\"Solo first natural C matching complete248B indexed owner; actual direct helper interfaces and canonical data only; unchanged published toolkit\"}",
+          "created_at": "2026-11-08T06:58:22Z",
+          "id": 6718484488,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:58:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "200f1448ea37462cd57389312fc6472632e1cec640b28d474fd1815506353ed6",
+        "result": {
+          "address": "0x080E2750",
+          "claim_id": 6718484488,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718484488,
+          "status": "accepted",
+          "who": "FFTA-Team2-177"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
