@@ -187,6 +187,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "60e23adeb347482006595bf3b35a8f66f0b6e1ddba7ffd3eb692236816663fdf",
+        "acknowledged_cursor": 6720456043,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "60e23adeb347482006595bf3b35a8f66f0b6e1ddba7ffd3eb692236816663fdf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4870\",\"who\":\"team2-native195\",\"note\":\"Unchanged saved exact 108B source; implement separate bounded scheduler-loop prerequisite with strict frame and alias guards, then one changed-context native qualification.\"}",
+          "created_at": "2026-11-08T10:39:18Z",
+          "id": 6720456043,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:39:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a09d91fe235963f5863658604471c98a0831d88eca9bd05beb69d0b941244b77",
+        "result": {
+          "address": "0x080D4870",
+          "claim_id": 6720456043,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720456043,
+          "status": "accepted",
+          "who": "team2-native195"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
