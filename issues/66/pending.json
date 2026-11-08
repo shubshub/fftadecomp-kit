@@ -1759,6 +1759,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ff67498f432e32a2c4ef6ac124268cc8afd6bc5850459613d0a0a127c6c3b0fc",
+        "acknowledged_cursor": 6717808218,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ff67498f432e32a2c4ef6ac124268cc8afd6bc5850459613d0a0a127c6c3b0fc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002FB8\",\"who\":\"FFTA-Team2-168a\",\"note\":\"Fresh independently grounded signed-input/direct-output correction from newly published exact03014 sibling; retain all native164 forms\"}",
+          "created_at": "2026-11-08T05:37:21Z",
+          "id": 6717808218,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:37:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a2d27bd6ee52ffa0e18c77afabf38f20815b6f540c573c4ef9bcbdedb85ba375",
+        "result": {
+          "address": "0x08002FB8",
+          "claim_id": 6717808218,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717808218,
+          "status": "accepted",
+          "who": "FFTA-Team2-168a"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
