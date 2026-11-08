@@ -254,7 +254,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "469aec8bdb1a1a7c67aabda625681c38956b2bd5e8164bd77ee6b122f493ac71",
+        "acknowledged_cursor": 6716759476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "469aec8bdb1a1a7c67aabda625681c38956b2bd5e8164bd77ee6b122f493ac71",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08070260\",\"who\":\"claude-ffta2\",\"claim_id\":6716655860,\"reason\":\"parked: '/' form instruction-identical but no verifier profile admits compiler __divsi3 with variable divisor in a framed data-free function; see Parked/08070260\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T03:33:15Z",
+          "id": 6716759476,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:33:15Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91f47320cfea164f8137483ad70e4d649b2394650085013a20006da93d1305ac",
+        "result": {
+          "address": "0x08070260",
+          "claim_id": 6716655860,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6716759476,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
