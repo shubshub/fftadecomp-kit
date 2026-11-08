@@ -2170,7 +2170,35 @@
           "who": "ffta-team2-native191"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3bc3226c7ce3d8059452372da01e9d3e3b38c74cef206ac485b4182803c6a8ab",
+        "acknowledged_cursor": 6719988446,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3bc3226c7ce3d8059452372da01e9d3e3b38c74cef206ac485b4182803c6a8ab",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DBB74\",\"who\":\"ffta-team2-native191\",\"claim_id\":6719912653,\"reason\":\"Unchanged original complete148B native MATCH under tested two-payload contract; frozen result and exact source retained, native publication underway. Matching fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:46:57Z",
+          "id": 6719983806,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:46:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "006c70b120aa9b2cee60d67e9dbfe099a63392840fd4bd423db1cfed1d9ae844",
+        "result": {
+          "address": "0x080DBB74",
+          "claim_id": 6719912653,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719983806,
+          "status": "accepted",
+          "who": "ffta-team2-native191"
+        }
+      }
     },
     {
       "claim": {
@@ -2202,7 +2230,35 @@
           "who": "sol-08074FA4-3862"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "33ee4e8661c77919d7a383897aab265eeeb374b8ed03c8ebd3b469ffb210ee66",
+        "acknowledged_cursor": 6719988446,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "33ee4e8661c77919d7a383897aab265eeeb374b8ed03c8ebd3b469ffb210ee66",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08074FA4\",\"who\":\"sol-08074FA4-3862\",\"claim_id\":6719922661,\"reason\":\"Plausible complete308B native MATCH frozen for native publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:47:29Z",
+          "id": 6719988446,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:47:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "006c70b120aa9b2cee60d67e9dbfe099a63392840fd4bd423db1cfed1d9ae844",
+        "result": {
+          "address": "0x08074FA4",
+          "claim_id": 6719922661,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719988446,
+          "status": "accepted",
+          "who": "sol-08074FA4-3862"
+        }
+      }
     },
     {
       "claim": {
@@ -2266,7 +2322,35 @@
           "who": "sol-08100D00-3862"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7616aad97d77ca7ca97de82359d1c16d2a7357ec043646f9a52af96befe43d6d",
+        "acknowledged_cursor": 6719988446,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7616aad97d77ca7ca97de82359d1c16d2a7357ec043646f9a52af96befe43d6d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08100D00\",\"who\":\"sol-08100D00-3862\",\"claim_id\":6719922711,\"reason\":\"Plausible complete342B native MATCH frozen for native publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:47:29Z",
+          "id": 6719988442,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:47:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "006c70b120aa9b2cee60d67e9dbfe099a63392840fd4bd423db1cfed1d9ae844",
+        "result": {
+          "address": "0x08100D00",
+          "claim_id": 6719922711,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719988442,
+          "status": "accepted",
+          "who": "sol-08100D00-3862"
+        }
+      }
     },
     {
       "claim": {
