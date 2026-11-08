@@ -30,7 +30,35 @@
           "who": "sol-080686F4-3865"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "22f2044c1c9c5b29c2104fc7b5f3430843dc9c3326dfd5d6e5bdde7678f3176f",
+        "acknowledged_cursor": 6720553167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "22f2044c1c9c5b29c2104fc7b5f3430843dc9c3326dfd5d6e5bdde7678f3176f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080686F4\",\"who\":\"sol-080686F4-3865\",\"claim_id\":6720347335,\"reason\":\"Bounded matching fully stopped; genuine nonmatch or existing native-profile refusal frozen; no MATCH credit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:49:50Z",
+          "id": 6720553167,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:49:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fd49ea5496fd826502fd617312c4d0b45ca3963307b30d545eeb6c50d5ec818c",
+        "result": {
+          "address": "0x080686F4",
+          "claim_id": 6720347335,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720553167,
+          "status": "accepted",
+          "who": "sol-080686F4-3865"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "sol-0807A094-3866"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "78a1710936a3ff929abe60a67bc5cd59a13cb55b88dd3bd71751f18742a27a1b",
+        "acknowledged_cursor": 6720553167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "78a1710936a3ff929abe60a67bc5cd59a13cb55b88dd3bd71751f18742a27a1b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0807A094\",\"who\":\"sol-0807A094-3866\",\"claim_id\":6720475622,\"reason\":\"Bounded matching fully stopped; genuine nonmatch or existing native-profile refusal frozen; no MATCH credit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:49:50Z",
+          "id": 6720553140,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:49:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fd49ea5496fd826502fd617312c4d0b45ca3963307b30d545eeb6c50d5ec818c",
+        "result": {
+          "address": "0x0807A094",
+          "claim_id": 6720475622,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720553140,
+          "status": "accepted",
+          "who": "sol-0807A094-3866"
+        }
+      }
     },
     {
       "claim": {
@@ -94,7 +150,35 @@
           "who": "sol-0808CBDC-3866"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "90c55b3f2ae13e33941088120c41267a49fa5a42f152be86f013a54a59efccba",
+        "acknowledged_cursor": 6720553167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "90c55b3f2ae13e33941088120c41267a49fa5a42f152be86f013a54a59efccba",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0808CBDC\",\"who\":\"sol-0808CBDC-3866\",\"claim_id\":6720475667,\"reason\":\"Bounded matching fully stopped; genuine nonmatch or existing native-profile refusal frozen; no MATCH credit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:49:50Z",
+          "id": 6720553154,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:49:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fd49ea5496fd826502fd617312c4d0b45ca3963307b30d545eeb6c50d5ec818c",
+        "result": {
+          "address": "0x0808CBDC",
+          "claim_id": 6720475667,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720553154,
+          "status": "accepted",
+          "who": "sol-0808CBDC-3866"
+        }
+      }
     },
     {
       "claim": {
@@ -126,7 +210,35 @@
           "who": "sol-08148B60-3866"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "454212e1147dcc3b89a9c9c4f9e296dd85e8c2e01ad631b999041e5f2f94b653",
+        "acknowledged_cursor": 6720553167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "454212e1147dcc3b89a9c9c4f9e296dd85e8c2e01ad631b999041e5f2f94b653",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08148B60\",\"who\":\"sol-08148B60-3866\",\"claim_id\":6720475730,\"reason\":\"Bounded matching fully stopped; genuine nonmatch or existing native-profile refusal frozen; no MATCH credit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:49:50Z",
+          "id": 6720553156,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:49:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fd49ea5496fd826502fd617312c4d0b45ca3963307b30d545eeb6c50d5ec818c",
+        "result": {
+          "address": "0x08148B60",
+          "claim_id": 6720475730,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720553156,
+          "status": "accepted",
+          "who": "sol-08148B60-3866"
+        }
+      }
     },
     {
       "claim": {
