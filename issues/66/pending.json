@@ -2014,7 +2014,35 @@
           "who": "sol-080DF7A0-3855"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c529136fb4e3c44d52ab59858c90129598a10288841fae00aaebcf17142f3595",
+        "acknowledged_cursor": 6719521005,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c529136fb4e3c44d52ab59858c90129598a10288841fae00aaebcf17142f3595",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DF7A0\",\"who\":\"sol-080DF7A0-3855\",\"claim_id\":6719452975,\"reason\":\"Native plausible MATCH complete88B, full FUNC fresh ROM exact; frozen receipts queued publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T08:56:13Z",
+          "id": 6719520978,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:56:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfa9680003b3f81505452a91863b326e1c6a19d6120465e85dc1573eab61ff4f",
+        "result": {
+          "address": "0x080DF7A0",
+          "claim_id": 6719452975,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719520978,
+          "status": "accepted",
+          "who": "sol-080DF7A0-3855"
+        }
+      }
     },
     {
       "claim": {
@@ -2046,7 +2074,35 @@
           "who": "sol-080FDE58-3855"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3b571c27a340e1aecea46e241e0288f485c0e96a0742fe32f73f3ed6c6d0ea2d",
+        "acknowledged_cursor": 6719521005,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3b571c27a340e1aecea46e241e0288f485c0e96a0742fe32f73f3ed6c6d0ea2d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FDE58\",\"who\":\"sol-080FDE58-3855\",\"claim_id\":6719453111,\"reason\":\"Native plausible MATCH complete66B, full FUNC fresh ROM exact; frozen receipts queued publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T08:56:14Z",
+          "id": 6719521005,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:56:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfa9680003b3f81505452a91863b326e1c6a19d6120465e85dc1573eab61ff4f",
+        "result": {
+          "address": "0x080FDE58",
+          "claim_id": 6719453111,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719521005,
+          "status": "accepted",
+          "who": "sol-080FDE58-3855"
+        }
+      }
     },
     {
       "claim": {
