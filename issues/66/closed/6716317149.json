@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "21d3f8e7d81e7782bbba22af8abd673f0183c32d39c082720540519c024cfe2f",
+    "acknowledged_cursor": 6716317149,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "21d3f8e7d81e7782bbba22af8abd673f0183c32d39c082720540519c024cfe2f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813158C\",\"who\":\"sol-0813158C-3799\",\"note\":\"Bounded natural C hand matching using saved candidate and unchanged native verifier. No tooling edits.\"}",
+      "created_at": "2026-11-08T02:44:06Z",
+      "id": 6716317149,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:44:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d53da0a4904b74533e6740d03cea1072191617355aad9d9613d7b092902423e6",
+    "result": {
+      "address": "0x0813158C",
+      "claim_id": 6716317149,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6716317149,
+      "status": "accepted",
+      "who": "sol-0813158C-3799"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e6af314a18960926c419e8e93ba773f18ae1017bc60bbb00987ff2f76b56bb64",
+    "acknowledged_cursor": 6716384675,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e6af314a18960926c419e8e93ba773f18ae1017bc60bbb00987ff2f76b56bb64",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813158C\",\"who\":\"sol-0813158C-3799\",\"claim_id\":6716317149,\"reason\":\"Fourth source passes70B native identity guard but native refuses signed16/nonzero operand proof for literal257. Frozen and fully stopped, no native MATCH or plausibility credit.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; four forms, five native invocations including initial incompatible data selector, three separate failed-source diagnostics\"}",
+      "created_at": "2026-11-08T02:51:57Z",
+      "id": 6716384675,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:51:57Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0cbdfb166012389e9ed44f5a3ec54ca1220a50418d16a985527cd9f624c172c0",
+    "result": {
+      "address": "0x0813158C",
+      "claim_id": 6716317149,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6716384675,
+      "status": "accepted",
+      "who": "sol-0813158C-3799"
+    }
+  }
+}
