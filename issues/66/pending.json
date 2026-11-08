@@ -62,7 +62,35 @@
           "who": "sol-080D29D4-3801"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9a2b123f1f2db0dadaf3baf540f1a463996f401f10f80a08618b9f963239e071",
+        "acknowledged_cursor": 6716489156,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9a2b123f1f2db0dadaf3baf540f1a463996f401f10f80a08618b9f963239e071",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D29D4\",\"who\":\"sol-080D29D4-3801\",\"claim_id\":6716439703,\"reason\":\"Native MATCH, plausible complete252B identical to original ROM; frozen and fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T03:04:06Z",
+          "id": 6716489156,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:04:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "53879b9d8a50e1b1087dbd1723a3ae06b79a8b4020b8ae283d7b27be69d0e3c4",
+        "result": {
+          "address": "0x080D29D4",
+          "claim_id": 6716439703,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716489156,
+          "status": "accepted",
+          "who": "sol-080D29D4-3801"
+        }
+      }
     },
     {
       "claim": {
@@ -250,6 +278,38 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6716482778,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6706fe1b91c17f80e2a2c15252d716ea0780aae5e064c14b4847653ed3553354",
+        "acknowledged_cursor": 6716489156,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6706fe1b91c17f80e2a2c15252d716ea0780aae5e064c14b4847653ed3553354",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08000788\",\"who\":\"claude-ffta2\",\"note\":\"hand matching via sub-agent (ffta-2 session)\"}",
+          "created_at": "2026-11-08T03:03:55Z",
+          "id": 6716487444,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:03:55Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "53879b9d8a50e1b1087dbd1723a3ae06b79a8b4020b8ae283d7b27be69d0e3c4",
+        "result": {
+          "address": "0x08000788",
+          "claim_id": 6716487444,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6716487444,
           "status": "accepted",
           "who": "claude-ffta2"
         }
