@@ -1570,66 +1570,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "c43343aec2b9ea991d5c3c0e89c3c3d9244343d565fc93bd70b7d196d090e828",
-        "acknowledged_cursor": 6718576001,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c43343aec2b9ea991d5c3c0e89c3c3d9244343d565fc93bd70b7d196d090e828",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDB48\",\"who\":\"sol-080BDB48-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
-          "created_at": "2026-11-08T07:09:03Z",
-          "id": 6718575785,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:09:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
-        "result": {
-          "address": "0x080BDB48",
-          "claim_id": 6718575785,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6718575785,
-          "status": "accepted",
-          "who": "sol-080BDB48-3841"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "2c1e4c2beb9f743df024282fd398cafc0e58508969e27d6d55ffe0bbc9e9c18b",
-        "acknowledged_cursor": 6718642492,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2c1e4c2beb9f743df024282fd398cafc0e58508969e27d6d55ffe0bbc9e9c18b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BDB48\",\"who\":\"sol-080BDB48-3841\",\"claim_id\":6718575785,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T07:16:42Z",
-          "id": 6718642492,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:16:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0a7294144e70d525269b818859f53f9cfd04b49424fe759e318776cbf4e3fe4f",
-        "result": {
-          "address": "0x080BDB48",
-          "claim_id": 6718575785,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6718642492,
-          "status": "accepted",
-          "who": "sol-080BDB48-3841"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "20a7546cffec3c8241a5aafddcebb16cf07cf844e0eb099a21722eaa8fd339e8",
         "acknowledged_cursor": 6718667671,
         "body_provenance": "acceptance-time",
