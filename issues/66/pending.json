@@ -2014,7 +2014,35 @@
           "who": "sol-08131B20-3853"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "06b78498f850a3feb8a7edd69c290ac188cd0b88937b91c6ce7c934ae5fca881",
+        "acknowledged_cursor": 6719424598,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "06b78498f850a3feb8a7edd69c290ac188cd0b88937b91c6ce7c934ae5fca881",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131B20\",\"who\":\"sol-08131B20-3853\",\"claim_id\":6719251806,\"reason\":\"Existing switch evidence excludes object, callback and runtime-thunk bindings. Target uses R1 thunk; existing R3 and cyclic switch selectors do not fit. No native match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural forms and existing-route check\"}",
+          "created_at": "2026-11-08T08:45:28Z",
+          "id": 6719424598,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:45:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "da435d4ae34f0952b0fb600088d228870dab3d8d83c366ad86745ec38fb1c2a9",
+        "result": {
+          "address": "0x08131B20",
+          "claim_id": 6719251806,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719424598,
+          "status": "accepted",
+          "who": "sol-08131B20-3853"
+        }
+      }
     },
     {
       "claim": {
