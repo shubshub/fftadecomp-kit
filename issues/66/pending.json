@@ -1882,7 +1882,35 @@
           "who": "sol-08006920-3826"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "626cadcb0d2c4893b0d06e3f51bc668967b4a507601c52a0e1dd6ddee99793c4",
+        "acknowledged_cursor": 6718000289,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "626cadcb0d2c4893b0d06e3f51bc668967b4a507601c52a0e1dd6ddee99793c4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08006920\",\"who\":\"sol-08006920-3826\",\"claim_id\":6717944379,\"reason\":\"Plausible native MATCH complete32B frozen under explicit conditional scheduler premises; queued native main publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T06:00:59Z",
+          "id": 6718000289,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:00:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "425b1d83c5545ea215b815d76ec65a598b963d8b52dcaabf75d8baa311b95347",
+        "result": {
+          "address": "0x08006920",
+          "claim_id": 6717944379,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718000289,
+          "status": "accepted",
+          "who": "sol-08006920-3826"
+        }
+      }
     },
     {
       "claim": {
