@@ -1666,66 +1666,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "c102ac50c2870645bc2e9a37640d74526ff8fcf2938b7679738a0328db457398",
-        "acknowledged_cursor": 6717859158,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c102ac50c2870645bc2e9a37640d74526ff8fcf2938b7679738a0328db457398",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801B5D4\",\"who\":\"sol-0801B5D4-3824\",\"note\":\"Fresh natural C matching via dedicated implementation sub-agent; existing native tooling only\"}",
-          "created_at": "2026-11-08T05:43:42Z",
-          "id": 6717859075,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:43:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4bb7fb201d9bea78658f6bfd0effb1efbdd6fabd085d7b22148e31f58c0bf42a",
-        "result": {
-          "address": "0x0801B5D4",
-          "claim_id": 6717859075,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717859075,
-          "status": "accepted",
-          "who": "sol-0801B5D4-3824"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "7546b6d939cc9a0291c223c83db675813892416c6219852bff2cab128eca3bdb",
-        "acknowledged_cursor": 6717914658,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7546b6d939cc9a0291c223c83db675813892416c6219852bff2cab128eca3bdb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801B5D4\",\"who\":\"sol-0801B5D4-3824\",\"claim_id\":6717859075,\"reason\":\"One natural source refused at nested buffer helper0801AF08 stack-alias boundary; source preserved\",\"unmatchable\":true,\"tried\":\"Existing fixed compiler and native profiles; no tooling changes, finite boundary preserved\"}",
-          "created_at": "2026-11-08T05:50:23Z",
-          "id": 6717914658,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:50:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f72ed892254544e8b6cf65c49507d8c0af39335221d49254e846e14cfd908e6a",
-        "result": {
-          "address": "0x0801B5D4",
-          "claim_id": 6717859075,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717914658,
-          "status": "accepted",
-          "who": "sol-0801B5D4-3824"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "882d1a14d74f75093a3d74798828d8eeca22bcc937f3e6c7f6cebccec5612b22",
         "acknowledged_cursor": 6717859158,
         "body_provenance": "acceptance-time",
@@ -1781,66 +1721,6 @@
           "request_id": 6717932101,
           "status": "accepted",
           "who": "sol-08016A98-3824"
-        }
-      }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "98720cdc3eb8203a5bb41aa57d38820f15e244a81a16a51e4ce060f0fd25f21a",
-        "acknowledged_cursor": 6717875171,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "98720cdc3eb8203a5bb41aa57d38820f15e244a81a16a51e4ce060f0fd25f21a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801D818\",\"who\":\"sol-0801D818-3824\",\"note\":\"Fresh natural C matching via dedicated implementation sub-agent; existing native tooling only\"}",
-          "created_at": "2026-11-08T05:45:41Z",
-          "id": 6717875051,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:45:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6bd2b1d2e1dc4e91c3601fbec410425ec1b999b23593d89a2c62e5951270f648",
-        "result": {
-          "address": "0x0801D818",
-          "claim_id": 6717875051,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717875051,
-          "status": "accepted",
-          "who": "sol-0801D818-3824"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c21ebaf8f32383fa667b8a8d92eeb074896bfa9cdb60d6dac53669bb9a471a50",
-        "acknowledged_cursor": 6717932101,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c21ebaf8f32383fa667b8a8d92eeb074896bfa9cdb60d6dac53669bb9a471a50",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801D818\",\"who\":\"sol-0801D818-3824\",\"claim_id\":6717875051,\"reason\":\"Bounded matching stopped at preserved native byte or nested-buffer proof refusal; no match credit\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; actual native errors preserved, no tooling edits or successful replay\"}",
-          "created_at": "2026-11-08T05:52:29Z",
-          "id": 6717932085,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:52:29Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "63ed00761830412a78e7985a95adb3a2c03f572f6f47255aa9bce08a7810eebd",
-        "result": {
-          "address": "0x0801D818",
-          "claim_id": 6717875051,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717932085,
-          "status": "accepted",
-          "who": "sol-0801D818-3824"
         }
       }
     },
