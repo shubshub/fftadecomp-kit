@@ -2011,6 +2011,70 @@
           "who": "FFTA-Team2-183"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "56ad9d7696380faf16a27627574bc2eb1e1e9a2783de6c723bb6ea62fbc76bce",
+        "acknowledged_cursor": 6719019245,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "56ad9d7696380faf16a27627574bc2eb1e1e9a2783de6c723bb6ea62fbc76bce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4D58\",\"who\":\"sol-080D4D58-3850\",\"note\":\"Unattempted indexed Thumb leaf; natural plausible C matching only with existing native verifier. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:00:28Z",
+          "id": 6719019229,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:00:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf025dd7bcf4fb080d5cee78ddff2e75b5342c7741f5ebec80a5ee4711c6b8bc",
+        "result": {
+          "address": "0x080D4D58",
+          "claim_id": 6719019229,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719019229,
+          "status": "accepted",
+          "who": "sol-080D4D58-3850"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c689a9f3c2f6cc2ac8ba910d009aac9936068c3b65711facd9422f162e34086d",
+        "acknowledged_cursor": 6719019245,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c689a9f3c2f6cc2ac8ba910d009aac9936068c3b65711facd9422f162e34086d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08087F0C\",\"who\":\"sol-08087F0C-3850\",\"note\":\"Unattempted indexed Thumb leaf; natural plausible C matching only with existing native verifier. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:00:28Z",
+          "id": 6719019245,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:00:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf025dd7bcf4fb080d5cee78ddff2e75b5342c7741f5ebec80a5ee4711c6b8bc",
+        "result": {
+          "address": "0x08087F0C",
+          "claim_id": 6719019245,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719019245,
+          "status": "accepted",
+          "who": "sol-08087F0C-3850"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
