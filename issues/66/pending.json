@@ -2106,7 +2106,35 @@
           "who": "ffta-team2-native188"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7d1ac2f28146fe5b32e88599529a69f6fd3ed98391202cc36a82eeee3a2222ea",
+        "acknowledged_cursor": 6719543336,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7d1ac2f28146fe5b32e88599529a69f6fd3ed98391202cc36a82eeee3a2222ea",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811896C\",\"who\":\"ffta-team2-native188\",\"claim_id\":6719515891,\"reason\":\"Unchanged154B original native MATCH under published branch scheduler profile; two actual data-point bindings authenticated. Frozen for native publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T08:58:45Z",
+          "id": 6719543336,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:58:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "71eedc54bb62251a3545f386ca35ed2d1960cad7a4210c733e7e143e0d4efa87",
+        "result": {
+          "address": "0x0811896C",
+          "claim_id": 6719515891,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719543336,
+          "status": "accepted",
+          "who": "ffta-team2-native188"
+        }
+      }
     }
   ],
   "issue": 66,
