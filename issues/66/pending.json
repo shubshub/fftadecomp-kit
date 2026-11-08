@@ -1026,66 +1026,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "51feb68a5abc425d472a5dce776cbc7cb45ea8a0db2ec80ee36bb7850a6142e9",
-        "acknowledged_cursor": 6717434306,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "51feb68a5abc425d472a5dce776cbc7cb45ea8a0db2ec80ee36bb7850a6142e9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D98D4\",\"who\":\"sol-080D98D4-3815\",\"note\":\"Bounded natural-C matching; existing native tooling only; primary handles publication\"}",
-          "created_at": "2026-11-08T04:51:42Z",
-          "id": 6717429048,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T04:51:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c97925ccc1c67ccfd8582f9051d1afb2a5ca19096735205ff78bbb669382ce18",
-        "result": {
-          "address": "0x080D98D4",
-          "claim_id": 6717429048,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717429048,
-          "status": "accepted",
-          "who": "sol-080D98D4-3815"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "da74070e03448bae0fc4c8df44c52c2289f25e78fd24c70cd756c6e72c83399f",
-        "acknowledged_cursor": 6717508434,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "da74070e03448bae0fc4c8df44c52c2289f25e78fd24c70cd756c6e72c83399f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D98D4\",\"who\":\"sol-080D98D4-3815\",\"claim_id\":6717429048,\"reason\":\"Four native natural forms differ in halfword normalization and descriptor-store order; diagnostic64B retained\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; bounded natural forms; existing native profile only\"}",
-          "created_at": "2026-11-08T05:01:26Z",
-          "id": 6717508417,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:01:26Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "25bb9f01f969aaf635a7cd0c4143e5989baa8d8912f496bf87f7386d0fe6693d",
-        "result": {
-          "address": "0x080D98D4",
-          "claim_id": 6717429048,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717508417,
-          "status": "accepted",
-          "who": "sol-080D98D4-3815"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "969cfbf4f1aeb8d78b3d04614a131c12474eab2400e5ab7194a72d2a488c3de7",
         "acknowledged_cursor": 6717434306,
         "body_provenance": "acceptance-time",
