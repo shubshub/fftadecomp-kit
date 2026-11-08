@@ -90,7 +90,35 @@
           "who": "sol-0800A154-3797"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "64bffeddb14ada751745582ff5b58a4db48434707ae242270f3380983276eef4",
+        "acknowledged_cursor": 6716296114,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "64bffeddb14ada751745582ff5b58a4db48434707ae242270f3380983276eef4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800A154\",\"who\":\"sol-0800A154-3797\",\"claim_id\":6716248762,\"reason\":\"Native MATCH, plausible complete84B identical to original ROM; frozen and fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:41:41Z",
+          "id": 6716296114,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:41:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7cb42ee772621fb03e96ca8eef94f0b5f3e7851db452c1ce152ac05d0c97376e",
+        "result": {
+          "address": "0x0800A154",
+          "claim_id": 6716248762,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716296114,
+          "status": "accepted",
+          "who": "sol-0800A154-3797"
+        }
+      }
     },
     {
       "claim": {
