@@ -378,7 +378,35 @@
           "who": "team2-native196"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "60338d3781861f9cdeefc4474c6c8de1bef6d893e104e34e4b7089bbce2fc0ce",
+        "acknowledged_cursor": 6720568180,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "60338d3781861f9cdeefc4474c6c8de1bef6d893e104e34e4b7089bbce2fc0ce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080EEE50\",\"who\":\"team2-native196\",\"claim_id\":6720536697,\"reason\":\"Saved exact160B authenticated; actual ordered-output/stale-pointer-slot prerequisite frozen for separate implementation. No new C/compiler/native/proof invocation; original refusals retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:51:27Z",
+          "id": 6720568180,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:51:27Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "554e7b6323764d526d651a95c05215c2f8a5e7d8b7de55c6e930b1014ae12c27",
+        "result": {
+          "address": "0x080EEE50",
+          "claim_id": 6720536697,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720568180,
+          "status": "accepted",
+          "who": "team2-native196"
+        }
+      }
     }
   ],
   "issue": 66,
