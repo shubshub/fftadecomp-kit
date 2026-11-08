@@ -1694,7 +1694,35 @@
           "who": "sol-0801B5D4-3824"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7546b6d939cc9a0291c223c83db675813892416c6219852bff2cab128eca3bdb",
+        "acknowledged_cursor": 6717914658,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7546b6d939cc9a0291c223c83db675813892416c6219852bff2cab128eca3bdb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801B5D4\",\"who\":\"sol-0801B5D4-3824\",\"claim_id\":6717859075,\"reason\":\"One natural source refused at nested buffer helper0801AF08 stack-alias boundary; source preserved\",\"unmatchable\":true,\"tried\":\"Existing fixed compiler and native profiles; no tooling changes, finite boundary preserved\"}",
+          "created_at": "2026-11-08T05:50:23Z",
+          "id": 6717914658,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:50:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f72ed892254544e8b6cf65c49507d8c0af39335221d49254e846e14cfd908e6a",
+        "result": {
+          "address": "0x0801B5D4",
+          "claim_id": 6717859075,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717914658,
+          "status": "accepted",
+          "who": "sol-0801B5D4-3824"
+        }
+      }
     },
     {
       "claim": {
@@ -1790,7 +1818,35 @@
           "who": "sol-0801CE6C-3824"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "87c60eb0683f417d0d5d537078771ab6752ee16a3dedc769f76c8112ace5faf2",
+        "acknowledged_cursor": 6717914658,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "87c60eb0683f417d0d5d537078771ab6752ee16a3dedc769f76c8112ace5faf2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801CE6C\",\"who\":\"sol-0801CE6C-3824\",\"claim_id\":6717875171,\"reason\":\"Existing BIOS fast-fill source profile excludes this mixed-call owner; zero C/compiler/native calls\",\"unmatchable\":true,\"tried\":\"Existing fixed compiler and native profiles; no tooling changes, finite boundary preserved\"}",
+          "created_at": "2026-11-08T05:50:23Z",
+          "id": 6717914642,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:50:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f72ed892254544e8b6cf65c49507d8c0af39335221d49254e846e14cfd908e6a",
+        "result": {
+          "address": "0x0801CE6C",
+          "claim_id": 6717875171,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717914642,
+          "status": "accepted",
+          "who": "sol-0801CE6C-3824"
+        }
+      }
     },
     {
       "claim": {
