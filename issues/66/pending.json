@@ -1979,6 +1979,230 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "675b14f9e8af45b76489d6ee53bd4519c3debc61e0bad75618807086a550c715",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "675b14f9e8af45b76489d6ee53bd4519c3debc61e0bad75618807086a550c715",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08080EB8\",\"who\":\"claude-ffta2\",\"note\":\"re-claim: parked source unblocked by kit #83/#86\"}",
+          "created_at": "2026-11-08T07:40:15Z",
+          "id": 6718845379,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:40:15Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x08080EB8",
+          "claim_id": 6718845379,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6718845379,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "97fdf77c4ac94458090972de342ea4ef45b8054e1a07f46bbc2157208dc79287",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "97fdf77c4ac94458090972de342ea4ef45b8054e1a07f46bbc2157208dc79287",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EDBD0\",\"who\":\"sol-080EDBD0-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:10Z",
+          "id": 6718853140,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x080EDBD0",
+          "claim_id": 6718853140,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853140,
+          "status": "accepted",
+          "who": "sol-080EDBD0-3846"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1cea4cbc9b08401ad4adee14054c3b7c87bc7a6c3fc9c1f17315992e356b39d1",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1cea4cbc9b08401ad4adee14054c3b7c87bc7a6c3fc9c1f17315992e356b39d1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E07EC\",\"who\":\"sol-080E07EC-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:10Z",
+          "id": 6718853154,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x080E07EC",
+          "claim_id": 6718853154,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853154,
+          "status": "accepted",
+          "who": "sol-080E07EC-3846"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d11596ed66aa6e5c2aac3dd4603be77f0ba1463edcfba9fc9443fc4110ab4b65",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d11596ed66aa6e5c2aac3dd4603be77f0ba1463edcfba9fc9443fc4110ab4b65",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EEF60\",\"who\":\"sol-080EEF60-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:10Z",
+          "id": 6718853162,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x080EEF60",
+          "claim_id": 6718853162,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853162,
+          "status": "accepted",
+          "who": "sol-080EEF60-3846"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "26938b18c3de3b5540b5d71249bc1168f704e5c4d3c7b6ba83ca7999166373b9",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "26938b18c3de3b5540b5d71249bc1168f704e5c4d3c7b6ba83ca7999166373b9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F1204\",\"who\":\"sol-080F1204-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:10Z",
+          "id": 6718853193,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x080F1204",
+          "claim_id": 6718853193,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853193,
+          "status": "accepted",
+          "who": "sol-080F1204-3846"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bdc28ac7a51a3e57dfbced441e5ee4c9da2d136179020075e4fd46a2d081271a",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bdc28ac7a51a3e57dfbced441e5ee4c9da2d136179020075e4fd46a2d081271a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08122D74\",\"who\":\"sol-08122D74-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:11Z",
+          "id": 6718853247,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x08122D74",
+          "claim_id": 6718853247,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853247,
+          "status": "accepted",
+          "who": "sol-08122D74-3846"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f68544d5830dddc7f4c02f11609ee88496f1cc92b5b14891da16f9c5d708ab86",
+        "acknowledged_cursor": 6718853258,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f68544d5830dddc7f4c02f11609ee88496f1cc92b5b14891da16f9c5d708ab86",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801AE58\",\"who\":\"sol-0801AE58-3846\",\"note\":\"Complete omitted Thumb owner in a nonoverlapping index gap; natural C matching only with existing native verifier and frozen ROM-grounded maps.\"}",
+          "created_at": "2026-11-08T07:41:11Z",
+          "id": 6718853258,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:41:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6b411d086bd315600cdd3f03a877e3417e88a6f1b5c0f5610f3ac472a36dd532",
+        "result": {
+          "address": "0x0801AE58",
+          "claim_id": 6718853258,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718853258,
+          "status": "accepted",
+          "who": "sol-0801AE58-3846"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
