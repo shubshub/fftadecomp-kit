@@ -859,6 +859,38 @@
           "who": "team2-native162"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9f3d7b66eeffd4bb703d3d67e845f70b38ddfd799d8ff957f5395ff8f553a0d3",
+        "acknowledged_cursor": 6717052791,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9f3d7b66eeffd4bb703d3d67e845f70b38ddfd799d8ff957f5395ff8f553a0d3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08037C84\",\"who\":\"claude-ffta2\",\"note\":\"sibling-guided hand matching via sub-agent (ffta-2 session)\"}",
+          "created_at": "2026-11-08T04:07:20Z",
+          "id": 6717052791,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:07:20Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9ba8a30acf8febf6c3096e517213e5bda02d9399e7eeb9f2a572b21eed5834e3",
+        "result": {
+          "address": "0x08037C84",
+          "claim_id": 6717052791,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6717052791,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
