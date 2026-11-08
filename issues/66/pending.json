@@ -383,6 +383,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9c57a9855b2a8b70014889f6882692f0e695b8a7b18742151a1bb4717aa2149b",
+        "acknowledged_cursor": 6721010883,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9c57a9855b2a8b70014889f6882692f0e695b8a7b18742151a1bb4717aa2149b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127B40\",\"who\":\"FFTA-Team2-Solo197\",\"note\":\"Saved unchanged exact original; tested new pool scheduler wrapper transport; first native under changed policy.\"}",
+          "created_at": "2026-11-08T11:38:49Z",
+          "id": 6721010883,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:38:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2cedbcda10335d70e1a921afc6288ade9fbaac6858b634fa8ae5c6b97da70184",
+        "result": {
+          "address": "0x08127B40",
+          "claim_id": 6721010883,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721010883,
+          "status": "accepted",
+          "who": "FFTA-Team2-Solo197"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
