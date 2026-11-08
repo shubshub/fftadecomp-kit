@@ -90,7 +90,35 @@
           "who": "codex-recovery-08035CAC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8b66ba90b3c58e8382e034c50c88b74a2defb94a0c13f4c04fc683afacef9cf1",
+        "acknowledged_cursor": 6715979294,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8b66ba90b3c58e8382e034c50c88b74a2defb94a0c13f4c04fc683afacef9cf1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08035CAC\",\"who\":\"codex-recovery-08035CAC\",\"claim_id\":6714786819,\"reason\":\"Recovered C verified byte-identical with unchanged upstream toolkit; submitted in https://github.com/shubshub/fftadecomp/pull/21\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:06:46Z",
+          "id": 6715976838,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:06:46Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "489fb88ca90721a39ceda328fb1d792b6270395d81426775654d12b98a5f9cca",
+        "result": {
+          "address": "0x08035CAC",
+          "claim_id": 6714786819,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6715976838,
+          "status": "accepted",
+          "who": "codex-recovery-08035CAC"
+        }
+      }
     },
     {
       "claim": {
@@ -602,7 +630,35 @@
           "who": "FFTA-Team2-native156"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "20de7c904824246cdb75d4729f7af8e80f02f240f2fda7baf80b659eef4c9235",
+        "acknowledged_cursor": 6715979294,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "20de7c904824246cdb75d4729f7af8e80f02f240f2fda7baf80b659eef4c9235",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0808F1F4\",\"who\":\"FFTA-Team2-native156\",\"claim_id\":6715964285,\"reason\":\"First native MATCH544B frozen, one compiler, unchanged original source; publishing through native gate\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:07:02Z",
+          "id": 6715979294,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:07:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "489fb88ca90721a39ceda328fb1d792b6270395d81426775654d12b98a5f9cca",
+        "result": {
+          "address": "0x0808F1F4",
+          "claim_id": 6715964285,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715979294,
+          "status": "accepted",
+          "who": "FFTA-Team2-native156"
+        }
+      }
     },
     {
       "claim": {
