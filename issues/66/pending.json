@@ -606,7 +606,35 @@
           "who": "sol-0800DA88-3786"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e79123487235f1a96223c93ab6fe76827e36a9dd47761c3603504ba2945d7766",
+        "acknowledged_cursor": 6715563948,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e79123487235f1a96223c93ab6fe76827e36a9dd47761c3603504ba2945d7766",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DA88\",\"who\":\"sol-0800DA88-3786\",\"claim_id\":6715488427,\"reason\":\"Plausible complete48B nonmatch46/48 bytes. Only DAA4/DAA6 argument moves reversed; original evidence frozen and fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; five native/compiler calls including one recorded unchanged invocation; genuine locals and argument forms\"}",
+          "created_at": "2026-11-08T01:22:03Z",
+          "id": 6715563948,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:22:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f67eaa3ce3eadb9eef5f7d7c430bb01564ad9d62fe503fbefe455d33ca679275",
+        "result": {
+          "address": "0x0800DA88",
+          "claim_id": 6715488427,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715563948,
+          "status": "accepted",
+          "who": "sol-0800DA88-3786"
+        }
+      }
     },
     {
       "claim": {
