@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "d5742cd8af2bfe0683ab6ca0627fe08ca1a14187b0f5877bd26c68eaea60f6a5",
+    "acknowledged_cursor": 6715881699,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d5742cd8af2bfe0683ab6ca0627fe08ca1a14187b0f5877bd26c68eaea60f6a5",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801E204\",\"who\":\"sol-0801E204-3791\",\"note\":\"Bounded plausible C hand matching from saved recovery; current native verifier, no tooling edits.\"}",
+      "created_at": "2026-11-08T01:56:15Z",
+      "id": 6715881550,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T01:56:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bdf0824a69d12778fdb2c463d14f0cf9cafc8ddb57d2018bf55d91debbcc2c3d",
+    "result": {
+      "address": "0x0801E204",
+      "claim_id": 6715881550,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6715881550,
+      "status": "accepted",
+      "who": "sol-0801E204-3791"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "3043d62d36b60c5904f6345eb194a62eca3f10cc8763eac5947cf453712b729f",
+    "acknowledged_cursor": 6716023389,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3043d62d36b60c5904f6345eb194a62eca3f10cc8763eac5947cf453712b729f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801E204\",\"who\":\"sol-0801E204-3791\",\"claim_id\":6715881550,\"reason\":\"Eleven native natural forms plus one failed-source diagnostic; best plausible complete160B retains OR association and state-store/register scheduling gap. Fully stopped/frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; actual helper result widths, packed integer fields and local declaration points; eleven native plus one diagnostic compiler call\"}",
+      "created_at": "2026-11-08T02:11:30Z",
+      "id": 6716022615,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:11:30Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e6d7c6cef76df7633dbae144ee16c8efde87090f2e88f36c2dd5f70e93e0941b",
+    "result": {
+      "address": "0x0801E204",
+      "claim_id": 6715881550,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6716022615,
+      "status": "accepted",
+      "who": "sol-0801E204-3791"
+    }
+  }
+}

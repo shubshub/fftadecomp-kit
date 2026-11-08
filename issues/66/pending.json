@@ -90,7 +90,35 @@
           "who": "codex-recovery-0812C700"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3ed7bbb0d7df4d2c7358580a8aa5bdca680e6060ebf4ebb780bbbaafb583191f",
+        "acknowledged_cursor": 6716023389,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3ed7bbb0d7df4d2c7358580a8aa5bdca680e6060ebf4ebb780bbbaafb583191f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812C700\",\"who\":\"codex-recovery-0812C700\",\"claim_id\":6714842878,\"reason\":\"Recovered C verified byte-identical with unchanged upstream toolkit; submitted in https://github.com/shubshub/fftadecomp/pull/21\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:10:46Z",
+          "id": 6716015634,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:10:46Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e6d7c6cef76df7633dbae144ee16c8efde87090f2e88f36c2dd5f70e93e0941b",
+        "result": {
+          "address": "0x0812C700",
+          "claim_id": 6714842878,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6716015634,
+          "status": "accepted",
+          "who": "codex-recovery-0812C700"
+        }
+      }
     },
     {
       "claim": {
@@ -122,7 +150,35 @@
           "who": "codex-recovery-08131718"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8b40be745abb5f60db1ebfb6377d8e9c4642c6de4e97e969fe786b9121280407",
+        "acknowledged_cursor": 6716023389,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8b40be745abb5f60db1ebfb6377d8e9c4642c6de4e97e969fe786b9121280407",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131718\",\"who\":\"codex-recovery-08131718\",\"claim_id\":6714850683,\"reason\":\"Recovered C verified byte-identical with unchanged upstream toolkit; submitted in https://github.com/shubshub/fftadecomp/pull/21\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:11:35Z",
+          "id": 6716023389,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:11:35Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e6d7c6cef76df7633dbae144ee16c8efde87090f2e88f36c2dd5f70e93e0941b",
+        "result": {
+          "address": "0x08131718",
+          "claim_id": 6714850683,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6716023389,
+          "status": "accepted",
+          "who": "codex-recovery-08131718"
+        }
+      }
     },
     {
       "claim": {
@@ -218,7 +274,35 @@
           "who": "sol-0801E204-3791"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3043d62d36b60c5904f6345eb194a62eca3f10cc8763eac5947cf453712b729f",
+        "acknowledged_cursor": 6716023389,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3043d62d36b60c5904f6345eb194a62eca3f10cc8763eac5947cf453712b729f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801E204\",\"who\":\"sol-0801E204-3791\",\"claim_id\":6715881550,\"reason\":\"Eleven native natural forms plus one failed-source diagnostic; best plausible complete160B retains OR association and state-store/register scheduling gap. Fully stopped/frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; actual helper result widths, packed integer fields and local declaration points; eleven native plus one diagnostic compiler call\"}",
+          "created_at": "2026-11-08T02:11:30Z",
+          "id": 6716022615,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:11:30Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e6d7c6cef76df7633dbae144ee16c8efde87090f2e88f36c2dd5f70e93e0941b",
+        "result": {
+          "address": "0x0801E204",
+          "claim_id": 6715881550,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716022615,
+          "status": "accepted",
+          "who": "sol-0801E204-3791"
+        }
+      }
     },
     {
       "claim": {
