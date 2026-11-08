@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "0c7c31c67d7acaf1001bc900cf58103f5ffff015c2f40fb8fa9af4b5b0e815bb",
-        "acknowledged_cursor": 6715966922,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0c7c31c67d7acaf1001bc900cf58103f5ffff015c2f40fb8fa9af4b5b0e815bb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081451EC\",\"who\":\"sol-081451EC-3791\",\"note\":\"Bounded natural C matching from saved recovery; current unchanged verifier, no tooling changes.\"}",
-          "created_at": "2026-11-08T02:05:37Z",
-          "id": 6715965957,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:05:37Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b1de3619181d1b198823fdc0d337094a6e59fa5c661661c1645cac48b2c7fda1",
-        "result": {
-          "address": "0x081451EC",
-          "claim_id": 6715965957,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6715965957,
-          "status": "accepted",
-          "who": "sol-081451EC-3791"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "b0ea1164330e1294a5b7a2aa1b9af9bcba2a9d7d75492596d48fb0525fd5354c",
-        "acknowledged_cursor": 6716090257,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b0ea1164330e1294a5b7a2aa1b9af9bcba2a9d7d75492596d48fb0525fd5354c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081451EC\",\"who\":\"sol-081451EC-3791\",\"claim_id\":6715965957,\"reason\":\"Seven native/compiler attempts, best plausible complete76B71/76; guard matches, tablebase/index register allocation remains. Fully stopped and frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine named table records, scalar displacements and natural declaration/guard forms; actual native failures frozen\"}",
-          "created_at": "2026-11-08T02:18:46Z",
-          "id": 6716090257,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:18:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8c9157fe256f8853f48665ed41c0625b908cf19dacf38e2141a1afae85953241",
-        "result": {
-          "address": "0x081451EC",
-          "claim_id": 6715965957,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6716090257,
-          "status": "accepted",
-          "who": "sol-081451EC-3791"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e37c4969cc108ed4eefd0d7bb1c7ab5c5e711c387d3d40b700a102f2e6f1c596",
         "acknowledged_cursor": 6716014346,
         "body_provenance": "acceptance-time",
@@ -91,66 +31,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "3df98910807a42e7fb35827685bb6cb10fb036aa4e00e82a0f4d93f42539751b",
-        "acknowledged_cursor": 6716069061,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3df98910807a42e7fb35827685bb6cb10fb036aa4e00e82a0f4d93f42539751b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08025238\",\"who\":\"FFTA-Team2-native157\",\"note\":\"First native admission of frozen exact236B coordinate source under published selective-scratch policy; no source rewrite\"}",
-          "created_at": "2026-11-08T02:16:25Z",
-          "id": 6716069061,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:16:25Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5fca0484f988a35a4d3a270fda88d5a5981bbf10d18d36e9412080ca735ea95c",
-        "result": {
-          "address": "0x08025238",
-          "claim_id": 6716069061,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6716069061,
-          "status": "accepted",
-          "who": "FFTA-Team2-native157"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "1628884916e59e0b1e1e9f51bcf2f894c40db2ea1418f25eed67b19788ca1b5f",
-        "acknowledged_cursor": 6716102529,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1628884916e59e0b1e1e9f51bcf2f894c40db2ea1418f25eed67b19788ca1b5f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025238\",\"who\":\"FFTA-Team2-native157\",\"claim_id\":6716069061,\"reason\":\"Original complete236B first native MATCH; one compiler, unchanged source, frozen and stopped; isolated native publication underway.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T02:19:56Z",
-          "id": 6716100756,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:19:56Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3609435e6ee9ab310a58305cc08e51abf32951df4b3a2dc102d18f27559c0e16",
-        "result": {
-          "address": "0x08025238",
-          "claim_id": 6716069061,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6716100756,
-          "status": "accepted",
-          "who": "FFTA-Team2-native157"
-        }
-      }
     },
     {
       "claim": {
