@@ -2107,6 +2107,134 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "03819a0096766e8f185694b94d6a1cf9534c791b2278efb7e4a71838c0bef1fb",
+        "acknowledged_cursor": 6719391153,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "03819a0096766e8f185694b94d6a1cf9534c791b2278efb7e4a71838c0bef1fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811896C\",\"who\":\"ffta-team2-native187\",\"note\":\"Frozen exact original; separately tested bounded phase-branch scheduler composition, unchanged natural source, first native admission under changed policy.\"}",
+          "created_at": "2026-11-08T08:41:46Z",
+          "id": 6719390996,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:41:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fbc171eae63865076ae040580507fbf5df2b528cfe6e718f512d37c7a20fa543",
+        "result": {
+          "address": "0x0811896C",
+          "claim_id": 6719390996,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719390996,
+          "status": "accepted",
+          "who": "ffta-team2-native187"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "622619bddb0509259dd691f32ae8f401eb5808a0e30a9f68aa85d822ac6a6851",
+        "acknowledged_cursor": 6719391153,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "622619bddb0509259dd691f32ae8f401eb5808a0e30a9f68aa85d822ac6a6851",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08100E58\",\"who\":\"ffta-team2-native187\",\"note\":\"Frozen exact original; separately tested bounded phase-branch scheduler composition, unchanged natural source, first native admission under changed policy.\"}",
+          "created_at": "2026-11-08T08:41:46Z",
+          "id": 6719391017,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:41:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fbc171eae63865076ae040580507fbf5df2b528cfe6e718f512d37c7a20fa543",
+        "result": {
+          "address": "0x08100E58",
+          "claim_id": 6719391017,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719391017,
+          "status": "accepted",
+          "who": "ffta-team2-native187"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0964690114c54e58d3a4bb75bfb937f23dcb3bea20535ca3c698ef9ce8067d15",
+        "acknowledged_cursor": 6719391153,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0964690114c54e58d3a4bb75bfb937f23dcb3bea20535ca3c698ef9ce8067d15",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811E934\",\"who\":\"ffta-team2-native187\",\"note\":\"Frozen exact original; separately tested bounded phase-branch scheduler composition, unchanged natural source, first native admission under changed policy.\"}",
+          "created_at": "2026-11-08T08:41:46Z",
+          "id": 6719391049,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:41:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fbc171eae63865076ae040580507fbf5df2b528cfe6e718f512d37c7a20fa543",
+        "result": {
+          "address": "0x0811E934",
+          "claim_id": 6719391049,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719391049,
+          "status": "accepted",
+          "who": "ffta-team2-native187"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "cdfbfe5e3da88dbc67d48788076a610dab329265f15dc4f69f9f112e1e2ff821",
+        "acknowledged_cursor": 6719391153,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cdfbfe5e3da88dbc67d48788076a610dab329265f15dc4f69f9f112e1e2ff821",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811EA68\",\"who\":\"ffta-team2-native187\",\"note\":\"Frozen exact original; separately tested bounded phase-branch scheduler composition, unchanged natural source, first native admission under changed policy.\"}",
+          "created_at": "2026-11-08T08:41:47Z",
+          "id": 6719391153,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:41:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fbc171eae63865076ae040580507fbf5df2b528cfe6e718f512d37c7a20fa543",
+        "result": {
+          "address": "0x0811EA68",
+          "claim_id": 6719391153,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719391153,
+          "status": "accepted",
+          "who": "ffta-team2-native187"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
