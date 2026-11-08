@@ -2014,7 +2014,35 @@
           "who": "sol-08145BF4-3856"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a7462c24c867a553c15a0dbcee95a14d27062f20fc341e994ceea30462fbcf3c",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a7462c24c867a553c15a0dbcee95a14d27062f20fc341e994ceea30462fbcf3c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08145BF4\",\"who\":\"sol-08145BF4-3856\",\"claim_id\":6719486279,\"reason\":\"Four bounded native attempts: switch84B, two if forms76B versus frameless80B target. Natural MMIO source plausible, return/frame shape differs. No native MATCH or tooling changes.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; -O2; natural switch, early-return chain, if-else\"}",
+          "created_at": "2026-11-08T08:59:48Z",
+          "id": 6719552494,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x08145BF4",
+          "claim_id": 6719486279,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719552494,
+          "status": "accepted",
+          "who": "sol-08145BF4-3856"
+        }
+      }
     },
     {
       "claim": {
@@ -2075,6 +2103,198 @@
           "who": "ffta-team2-native188"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "43cbe9ef66ec421c82f71312ec5d2e08a46f1efac442e705189ee47cdec53c03",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "43cbe9ef66ec421c82f71312ec5d2e08a46f1efac442e705189ee47cdec53c03",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811D19C\",\"who\":\"sol-0811D19C-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:35Z",
+          "id": 6719550603,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x0811D19C",
+          "claim_id": 6719550603,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550603,
+          "status": "accepted",
+          "who": "sol-0811D19C-3857"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "045656bd89a8554263524e91508150b2798c839466dd49e7e7c065e14dd9d313",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "045656bd89a8554263524e91508150b2798c839466dd49e7e7c065e14dd9d313",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081051A0\",\"who\":\"sol-081051A0-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:35Z",
+          "id": 6719550619,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x081051A0",
+          "claim_id": 6719550619,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550619,
+          "status": "accepted",
+          "who": "sol-081051A0-3857"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "59fe5915433c574e61916a83917f4de51752b537da41ccd965d1c14fb091f077",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "59fe5915433c574e61916a83917f4de51752b537da41ccd965d1c14fb091f077",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811DFB8\",\"who\":\"sol-0811DFB8-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:35Z",
+          "id": 6719550646,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x0811DFB8",
+          "claim_id": 6719550646,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550646,
+          "status": "accepted",
+          "who": "sol-0811DFB8-3857"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "85f497fc64b1a21802ced837e7f8d2cc00602f6d9195f28e42d184132fcb3f28",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "85f497fc64b1a21802ced837e7f8d2cc00602f6d9195f28e42d184132fcb3f28",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811896C\",\"who\":\"sol-0811896C-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:35Z",
+          "id": 6719550653,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x0811896C",
+          "claim_id": 6719550653,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550653,
+          "status": "accepted",
+          "who": "sol-0811896C-3857"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b1949a808e2c146c8316d8ca80f08254c06440828c37e19edb494844e22dec9a",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b1949a808e2c146c8316d8ca80f08254c06440828c37e19edb494844e22dec9a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810A4B0\",\"who\":\"sol-0810A4B0-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:36Z",
+          "id": 6719550663,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x0810A4B0",
+          "claim_id": 6719550663,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550663,
+          "status": "accepted",
+          "who": "sol-0810A4B0-3857"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1f62c5acc2a13b29e4d5326f5dee42b8ea697e2f782f9cd2597b3e522aaa37f8",
+        "acknowledged_cursor": 6719552494,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1f62c5acc2a13b29e4d5326f5dee42b8ea697e2f782f9cd2597b3e522aaa37f8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EEE50\",\"who\":\"sol-080EEE50-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
+          "created_at": "2026-11-08T08:59:36Z",
+          "id": 6719550665,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:59:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
+        "result": {
+          "address": "0x080EEE50",
+          "claim_id": 6719550665,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719550665,
+          "status": "accepted",
+          "who": "sol-080EEE50-3857"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
