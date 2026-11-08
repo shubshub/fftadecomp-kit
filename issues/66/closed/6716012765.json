@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e37c4969cc108ed4eefd0d7bb1c7ab5c5e711c387d3d40b700a102f2e6f1c596",
+    "acknowledged_cursor": 6716014346,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e37c4969cc108ed4eefd0d7bb1c7ab5c5e711c387d3d40b700a102f2e6f1c596",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08017380\",\"who\":\"sol-08017380-3791\",\"note\":\"Bounded natural C matching of window draw arguments from saved recovery; unchanged native commands, no tooling edits.\"}",
+      "created_at": "2026-11-08T02:10:29Z",
+      "id": 6716012765,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:10:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dc2b2f1d3f1fb096ee5c851d5188fafc267e198f4e5a8e4631fa9fa887b353ce",
+    "result": {
+      "address": "0x08017380",
+      "claim_id": 6716012765,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6716012765,
+      "status": "accepted",
+      "who": "sol-08017380-3791"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1d317cfd99902a8c401fb2f727c9fe12d08d10ab5b57135a2ab57d2dbb6876a0",
+    "acknowledged_cursor": 6716149077,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1d317cfd99902a8c401fb2f727c9fe12d08d10ab5b57135a2ab57d2dbb6876a0",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08017380\",\"who\":\"sol-08017380-3791\",\"claim_id\":6716012765,\"reason\":\"Ten native forms plus one failed diagnostic, plausible complete164B improved149 to160/164 aligned bytes; odd-height copy/increment placement remains. Fully stopped, frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine row-height/helper width and natural initializer/coordinate forms; ten native plus one failed-source diagnostic\"}",
+      "created_at": "2026-11-08T02:24:53Z",
+      "id": 6716146542,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:24:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "84d18a7e03f6a8ec62de996734591518fd2f101fd52bf099afa0b0d808a4b023",
+    "result": {
+      "address": "0x08017380",
+      "claim_id": 6716012765,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6716146542,
+      "status": "accepted",
+      "who": "sol-08017380-3791"
+    }
+  }
+}
