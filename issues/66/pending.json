@@ -606,7 +606,35 @@
           "who": "sol-080B4D70-3789"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5a1c3b3c7d5f05c36f993d7e16970890374b3255a3a3f5e46469867ec810b5bb",
+        "acknowledged_cursor": 6715765215,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5a1c3b3c7d5f05c36f993d7e16970890374b3255a3a3f5e46469867ec810b5bb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B4D70\",\"who\":\"sol-080B4D70-3789\",\"claim_id\":6715676975,\"reason\":\"Complete plausible120B remains nonmatching, count-pointer/index allocation differs. Best aligned101/120B, fixed-offset80/120B. Evidence frozen, no successful replay, fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; nine distinct natural native forms plus one failed-candidate diagnostic compile\"}",
+          "created_at": "2026-11-08T01:43:18Z",
+          "id": 6715765215,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:43:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e9d2b0b150c88a131925d9b39986aa7b307c850828a5e520b8972c04648d562a",
+        "result": {
+          "address": "0x080B4D70",
+          "claim_id": 6715676975,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715765215,
+          "status": "accepted",
+          "who": "sol-080B4D70-3789"
+        }
+      }
     },
     {
       "claim": {
