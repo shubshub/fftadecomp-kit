@@ -1754,7 +1754,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4420f370919caa12ac3c5d8d98bd5c70502026873b653c14ed572ecd0838f910",
+        "acknowledged_cursor": 6717695856,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4420f370919caa12ac3c5d8d98bd5c70502026873b653c14ed572ecd0838f910",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DF82C\",\"who\":\"claude-ffta2\",\"claim_id\":6717595434,\"reason\":\"parked: code identical; descriptor carries pointer to second local payload, refused by scheduler contract; https://github.com/shubshub/fftadecomp-kit/issues/82\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T05:23:24Z",
+          "id": 6717693200,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:23:24Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f2389ebe3d54eef6cb760f9b37013f998f5a9cad0cf25cd56c0fcac382b1001c",
+        "result": {
+          "address": "0x080DF82C",
+          "claim_id": 6717595434,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6717693200,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -2136,6 +2164,66 @@
           "request_id": 6717671682,
           "status": "accepted",
           "who": "FFTA-Team2-167"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "55ba1d881743c69727dc40e5c80418d87429a3d5565eb20e897cf4f9c07f8425",
+        "acknowledged_cursor": 6717695856,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "55ba1d881743c69727dc40e5c80418d87429a3d5565eb20e897cf4f9c07f8425",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08002838\",\"who\":\"FFTA-Team2-167\",\"claim_id\":6717671682,\"reason\":\"Original144B local-state and148B global-state forms frozen; arithmetic/call order agrees but register allocation and constant reloads differ. No steering.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; local state then actual primitive global update\"}",
+          "created_at": "2026-11-08T05:23:22Z",
+          "id": 6717692929,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:23:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f2389ebe3d54eef6cb760f9b37013f998f5a9cad0cf25cd56c0fcac382b1001c",
+        "result": {
+          "address": "0x08002838",
+          "claim_id": 6717671682,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717692929,
+          "status": "accepted",
+          "who": "FFTA-Team2-167"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fc8fa70afa65994d48378cbab8b43471a330fa589106fe484e5ea4944f91e678",
+        "acknowledged_cursor": 6717695856,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fc8fa70afa65994d48378cbab8b43471a330fa589106fe484e5ea4944f91e678",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003014\",\"who\":\"FFTA-Team2-167b\",\"note\":\"First natural typed16-bit decimal tile formatter; actual split divide10 arithmetic and full original ELF matching\"}",
+          "created_at": "2026-11-08T05:23:43Z",
+          "id": 6717695856,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:23:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f2389ebe3d54eef6cb760f9b37013f998f5a9cad0cf25cd56c0fcac382b1001c",
+        "result": {
+          "address": "0x08003014",
+          "claim_id": 6717695856,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717695856,
+          "status": "accepted",
+          "who": "FFTA-Team2-167b"
         }
       },
       "release": null
