@@ -2298,7 +2298,35 @@
           "who": "sol-080F2B5C-3862"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0519c699ff9864b7e9a6da5a7eef109c21357d7c7e97d2bbf597fda09bf11bd7",
+        "acknowledged_cursor": 6719970513,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0519c699ff9864b7e9a6da5a7eef109c21357d7c7e97d2bbf597fda09bf11bd7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F2B5C\",\"who\":\"sol-080F2B5C-3862\",\"claim_id\":6719922706,\"reason\":\"No C/native attempted: actual reached PC-relative load080F2B3A identifies080F2B5C as literal word0894B580, not a function entry. Frozen exact evidence.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:45:30Z",
+          "id": 6719970513,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:45:30Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d87bb2c8a1ac91e8011175865867e9da49fe34541dcfa3f33b6eb52b48d634fe",
+        "result": {
+          "address": "0x080F2B5C",
+          "claim_id": 6719922706,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719970513,
+          "status": "accepted",
+          "who": "sol-080F2B5C-3862"
+        }
+      }
     },
     {
       "claim": {
