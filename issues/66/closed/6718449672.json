@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "65667b97b0a517eeb01d6a22142d1408669ce2beb8fa774047074b709e6e6992",
+    "acknowledged_cursor": 6718449672,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "65667b97b0a517eeb01d6a22142d1408669ce2beb8fa774047074b709e6e6992",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08087F0C\",\"who\":\"FFTA-Team2-176\",\"note\":\"Solo first-natural C for complete172B indexed no-call owner; current canonical data identities and fixed published toolkit only\"}",
+      "created_at": "2026-11-08T06:54:05Z",
+      "id": 6718449672,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:54:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5341de5fb8bf91fef936301c1b41e5625250c110eb16d97300cf19b94a7802e9",
+    "result": {
+      "address": "0x08087F0C",
+      "claim_id": 6718449672,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6718449672,
+      "status": "accepted",
+      "who": "FFTA-Team2-176"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "69ef87fea377f8645dc3b9f5070970ff039d19c5cb2c2994dff9150537834435",
+    "acknowledged_cursor": 6718480103,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "69ef87fea377f8645dc3b9f5070970ff039d19c5cb2c2994dff9150537834435",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08087F0C\",\"who\":\"FFTA-Team2-176\",\"claim_id\":6718449672,\"reason\":\"Two grounded bytefield/halfword-register views compile152B vs172B; actual old-byte reads remain unexplained. No forced reads or volatile. Original ETREL typedELF/fullFUNC current167 runtime ROM retained; fully stopped zero credit.\",\"unmatchable\":true,\"tried\":\"agbcc fixed -mthumb-interwork -O2; byte fields and actual16-bit control fields; no options/register/type sweep\"}",
+      "created_at": "2026-11-08T06:57:49Z",
+      "id": 6718480103,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:57:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b435098161e398f30cf61bc6aa2631175bec8d2b2f3e886762f833bf31ebc3cb",
+    "result": {
+      "address": "0x08087F0C",
+      "claim_id": 6718449672,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6718480103,
+      "status": "accepted",
+      "who": "FFTA-Team2-176"
+    }
+  }
+}
