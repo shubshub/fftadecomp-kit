@@ -2074,7 +2074,35 @@
           "who": "sol-081141EC-3861"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3ba1aab3d2e52b427d1de847a12c739a4c8fb2acd6e4c5f639e2bbb52a5e159a",
+        "acknowledged_cursor": 6719815063,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3ba1aab3d2e52b427d1de847a12c739a4c8fb2acd6e4c5f639e2bbb52a5e159a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081141EC\",\"who\":\"sol-081141EC-3861\",\"claim_id\":6719773551,\"reason\":\"Finite source boundary: six discarded ordinary shadow-RAM byte reads have no grounded permitted storage representation. Zero C/compiler/native; no forced reads or RAM volatile.\",\"unmatchable\":true,\"tried\":\"Static full owner and defining-source inspection only; compiler flags not executed.\"}",
+          "created_at": "2026-11-08T09:28:24Z",
+          "id": 6719815063,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:28:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4953abf298a913cb1b0dadd7331976176c6cda3e35b1eafa99d74fbc477b9faf",
+        "result": {
+          "address": "0x081141EC",
+          "claim_id": 6719773551,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719815063,
+          "status": "accepted",
+          "who": "sol-081141EC-3861"
+        }
+      }
     },
     {
       "claim": {
@@ -2104,6 +2132,38 @@
           "request_id": 6719773579,
           "status": "accepted",
           "who": "sol-080E2750-3861"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f668766f89972efd49be2d0ca5cb8f3fa0410d8a6e3603e65be2b7346e97d008",
+        "acknowledged_cursor": 6719815063,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f668766f89972efd49be2d0ca5cb8f3fa0410d8a6e3603e65be2b7346e97d008",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4724\",\"who\":\"claude-ffta2\",\"note\":\"\"}",
+          "created_at": "2026-11-08T09:28:05Z",
+          "id": 6719812188,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:28:05Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4953abf298a913cb1b0dadd7331976176c6cda3e35b1eafa99d74fbc477b9faf",
+        "result": {
+          "address": "0x080D4724",
+          "claim_id": 6719812188,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6719812188,
+          "status": "accepted",
+          "who": "claude-ffta2"
         }
       },
       "release": null
