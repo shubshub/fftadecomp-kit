@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "df9fe41eb82e9023a9a82be01765810926400c9719847cf6e9526555acf9c7ac",
+    "acknowledged_cursor": 6717500603,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "df9fe41eb82e9023a9a82be01765810926400c9719847cf6e9526555acf9c7ac",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08142D34\",\"who\":\"codex-next-08142D34\",\"note\":\"bounded natural-C hand match via dedicated sub-agent; parked 216/220-byte binary64 candidate\"}",
+      "created_at": "2026-11-08T05:00:30Z",
+      "id": 6717500495,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T05:00:30Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fd02429f53550258f8561095005e6dbebf9286d03ad2de6662eb4e69ae1228c5",
+    "result": {
+      "address": "0x08142D34",
+      "claim_id": 6717500495,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 31369,
+      "request_id": 6717500495,
+      "status": "accepted",
+      "who": "codex-next-08142D34"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "27b29d0f7aab8d0110caa1f0cfe4e0d4685433eedb7637f2a6651d46e7a619d3",
+    "acknowledged_cursor": 6718108949,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "27b29d0f7aab8d0110caa1f0cfe4e0d4685433eedb7637f2a6651d46e7a619d3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142D34\",\"who\":\"codex-next-08142D34\",\"claim_id\":6717500495,\"reason\":\"Natural C remains 216/220 bytes equal; four register-allocation bytes differ after bounded attempts; retained in Parked\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T06:13:44Z",
+      "id": 6718108882,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:13:44Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3b0c1f3b830987bd2d6a09d551214ebd4221a9c853ae3fea3b2a9bb004a85dc2",
+    "result": {
+      "address": "0x08142D34",
+      "claim_id": 6717500495,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 31369,
+      "request_id": 6718108882,
+      "status": "accepted",
+      "who": "codex-next-08142D34"
+    }
+  }
+}
