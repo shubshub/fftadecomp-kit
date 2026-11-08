@@ -543,6 +543,166 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6f79655fdc5c4ce19fa3476a73dba87f49d823f7432808ca7cf01e4d3487bebc",
+        "acknowledged_cursor": 6721186818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6f79655fdc5c4ce19fa3476a73dba87f49d823f7432808ca7cf01e4d3487bebc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805F670\",\"who\":\"FFTA-Team2-Solo199\",\"note\":\"Unchanged saved exact original; current published scheduler entry admission or grounded prerequisite; preserve all prior receipts.\"}",
+          "created_at": "2026-11-08T11:57:23Z",
+          "id": 6721184641,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:57:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "76cd8e0a92a5b2b9b7cee63385105cf5fbd293d59d738b8390cce5ebf2a1c7eb",
+        "result": {
+          "address": "0x0805F670",
+          "claim_id": 6721184641,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721184641,
+          "status": "accepted",
+          "who": "FFTA-Team2-Solo199"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ea98ebd0f2fde6af5361231e3e24cf6b5ca67ddb0e4303b4066dbc737da26b3b",
+        "acknowledged_cursor": 6721186818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ea98ebd0f2fde6af5361231e3e24cf6b5ca67ddb0e4303b4066dbc737da26b3b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127C54\",\"who\":\"sol-08127C54-3870\",\"note\":\"Natural C matching under published scheduler-entry descriptor profile; isolated source\"}",
+          "created_at": "2026-11-08T11:57:35Z",
+          "id": 6721186462,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:57:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "76cd8e0a92a5b2b9b7cee63385105cf5fbd293d59d738b8390cce5ebf2a1c7eb",
+        "result": {
+          "address": "0x08127C54",
+          "claim_id": 6721186462,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721186462,
+          "status": "accepted",
+          "who": "sol-08127C54-3870"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6e3ee91dcf8e90a5d8429459b740e30288f20eb392e506537f569bea5bf03549",
+        "acknowledged_cursor": 6721186818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6e3ee91dcf8e90a5d8429459b740e30288f20eb392e506537f569bea5bf03549",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127B80\",\"who\":\"sol-08127B80-3870\",\"note\":\"Natural C matching under published scheduler-entry descriptor profile; isolated source\"}",
+          "created_at": "2026-11-08T11:57:35Z",
+          "id": 6721186538,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:57:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "76cd8e0a92a5b2b9b7cee63385105cf5fbd293d59d738b8390cce5ebf2a1c7eb",
+        "result": {
+          "address": "0x08127B80",
+          "claim_id": 6721186538,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721186538,
+          "status": "accepted",
+          "who": "sol-08127B80-3870"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fd78128324ea6df043ff217fea19cc8e1a3700ab55c8d9a25157aa1600f24d11",
+        "acknowledged_cursor": 6721186818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fd78128324ea6df043ff217fea19cc8e1a3700ab55c8d9a25157aa1600f24d11",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127BC4\",\"who\":\"sol-08127BC4-3870\",\"note\":\"Natural C matching under published scheduler-entry descriptor profile; isolated source\"}",
+          "created_at": "2026-11-08T11:57:36Z",
+          "id": 6721186629,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:57:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "76cd8e0a92a5b2b9b7cee63385105cf5fbd293d59d738b8390cce5ebf2a1c7eb",
+        "result": {
+          "address": "0x08127BC4",
+          "claim_id": 6721186629,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721186629,
+          "status": "accepted",
+          "who": "sol-08127BC4-3870"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "20f4b23d9fde66fa47a72aa233e665316be3c975f04819282d5dcce8085777e7",
+        "acknowledged_cursor": 6721186818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "20f4b23d9fde66fa47a72aa233e665316be3c975f04819282d5dcce8085777e7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127C10\",\"who\":\"sol-08127C10-3870\",\"note\":\"Natural C matching under published scheduler-entry descriptor profile; isolated source\"}",
+          "created_at": "2026-11-08T11:57:37Z",
+          "id": 6721186818,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:57:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "76cd8e0a92a5b2b9b7cee63385105cf5fbd293d59d738b8390cce5ebf2a1c7eb",
+        "result": {
+          "address": "0x08127C10",
+          "claim_id": 6721186818,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721186818,
+          "status": "accepted",
+          "who": "sol-08127C10-3870"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
