@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "96a96060bbcdefd6ba429290b835fecaa941e83afd4fb2ace35b055e75b4675f",
+    "acknowledged_cursor": 6721102667,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "96a96060bbcdefd6ba429290b835fecaa941e83afd4fb2ace35b055e75b4675f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08126B3C\",\"who\":\"sol-08126B3C-3869\",\"note\":\"Natural C matching using published scheduler-entry descriptor profile; one isolated executor\"}",
+      "created_at": "2026-11-08T11:48:05Z",
+      "id": 6721097961,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T11:48:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cfbcd8ecbe62d62eb18d96428b3ecc54696e8ce1cb7b673e08031a51a59c9812",
+    "result": {
+      "address": "0x08126B3C",
+      "claim_id": 6721097961,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6721097961,
+      "status": "accepted",
+      "who": "sol-08126B3C-3869"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "61545003d19b53866cd12aea65cba0472d31ba64212869bbf7dcc373c1913800",
+    "acknowledged_cursor": 6721148713,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "61545003d19b53866cd12aea65cba0472d31ba64212869bbf7dcc373c1913800",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08126B3C\",\"who\":\"sol-08126B3C-3869\",\"claim_id\":6721097961,\"reason\":\"Frozen native MATCH queued publication\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T11:53:22Z",
+      "id": 6721147576,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T11:53:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3f6071da1722f22b871149924db44798022c817d80aaeee9e5686e6cb7995d89",
+    "result": {
+      "address": "0x08126B3C",
+      "claim_id": 6721097961,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6721147576,
+      "status": "accepted",
+      "who": "sol-08126B3C-3869"
+    }
+  }
+}
