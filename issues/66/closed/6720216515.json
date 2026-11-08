@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "3c417bc3feb2da2bc336e15b99de8fb03a995a8f56953b2caeaf1cee3780e931",
+    "acknowledged_cursor": 6720227824,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3c417bc3feb2da2bc336e15b99de8fb03a995a8f56953b2caeaf1cee3780e931",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E7C04\",\"who\":\"ffta-team2-native192\",\"note\":\"Unchanged saved exact complete phase controller. New explicit bounded eight-ordinary-target scheduler branch contract; unchanged old guards, each call alias/effect contract checked, original actual data identities only. Focused tests before one native original; no source steering.\"}",
+      "created_at": "2026-11-08T10:12:37Z",
+      "id": 6720216515,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:12:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "22d6ba4a5a951c74f8b9ad5b9dbb0d79b58ce74e38e78f2eae00827bd1d329f1",
+    "result": {
+      "address": "0x080E7C04",
+      "claim_id": 6720216515,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720216515,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8a125e56b0fd2b249f3d870629ae6a5603dfc6c8a726402e3bbd958b584fb3c4",
+    "acknowledged_cursor": 6720251741,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8a125e56b0fd2b249f3d870629ae6a5603dfc6c8a726402e3bbd958b584fb3c4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E7C04\",\"who\":\"ffta-team2-native192\",\"claim_id\":6720216515,\"reason\":\"Frozen original FUNC is a nonmatch; no new C/compiler/proof/native. No independent grounded source change.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:15:23Z",
+      "id": 6720241298,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:15:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bd727986fbbf9f2020f4f16f97c1e7999ed418c7851cc896360bedfe9b7482ed",
+    "result": {
+      "address": "0x080E7C04",
+      "claim_id": 6720216515,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720241298,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  }
+}
