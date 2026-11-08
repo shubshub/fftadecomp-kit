@@ -2011,66 +2011,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "1f62c5acc2a13b29e4d5326f5dee42b8ea697e2f782f9cd2597b3e522aaa37f8",
-        "acknowledged_cursor": 6719552494,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1f62c5acc2a13b29e4d5326f5dee42b8ea697e2f782f9cd2597b3e522aaa37f8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EEE50\",\"who\":\"sol-080EEE50-3857\",\"note\":\"Match natural phase callback C using existing accepted scheduler branch profile. No tooling changes.\"}",
-          "created_at": "2026-11-08T08:59:36Z",
-          "id": 6719550665,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T08:59:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4c574a78be0d36497711745f905d001f388c35600fd6ac00bf554f6281e7afc0",
-        "result": {
-          "address": "0x080EEE50",
-          "claim_id": 6719550665,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6719550665,
-          "status": "accepted",
-          "who": "sol-080EEE50-3857"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4ca6c45db120c6f5859a8787354570b80fbf4619dd571d3525f5d5304de531bd",
-        "acknowledged_cursor": 6719638852,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4ca6c45db120c6f5859a8787354570b80fbf4619dd571d3525f5d5304de531bd",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080EEE50\",\"who\":\"sol-080EEE50-3857\",\"claim_id\":6719550665,\"reason\":\"Existing branch contract refuses genuine local output pointers passed to coordinate helpers; one native refusal, no C edits, diagnostics, or tooling changes.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; existing branch profile, genuine local-output-pointer refusal\"}",
-          "created_at": "2026-11-08T09:08:59Z",
-          "id": 6719638852,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:08:59Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a35a47c2d7f37609673aa9822cfc5d95ba95a57aac5a9601e2b3fc5a816ff7ed",
-        "result": {
-          "address": "0x080EEE50",
-          "claim_id": 6719550665,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719638852,
-          "status": "accepted",
-          "who": "sol-080EEE50-3857"
-        }
-      }
     }
   ],
   "issue": 66,
