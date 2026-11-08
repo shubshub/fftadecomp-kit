@@ -735,6 +735,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "54fe8496398fb308209debfb76e73d9361d4c7b8ee12de44cc92a927ddcdfab9",
+        "acknowledged_cursor": 6717087994,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "54fe8496398fb308209debfb76e73d9361d4c7b8ee12de44cc92a927ddcdfab9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A77C\",\"who\":\"sol-0809A77C-issue73\",\"note\":\"Recover issue 73 local-state callback caller for native regression and matching\"}",
+          "created_at": "2026-11-08T04:11:17Z",
+          "id": 6717087994,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:11:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "74c7fcdb8350c0f14d4173a58c90a55d967766f976463e3e7a0b0c7ae4320057",
+        "result": {
+          "address": "0x0809A77C",
+          "claim_id": 6717087994,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717087994,
+          "status": "accepted",
+          "who": "sol-0809A77C-issue73"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
