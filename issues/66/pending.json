@@ -1858,66 +1858,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "14fd10bb77c0c75bc332a5166605e1eebbae5783ec600d0aadb9a1dcc66f3609",
-        "acknowledged_cursor": 6719773579,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "14fd10bb77c0c75bc332a5166605e1eebbae5783ec600d0aadb9a1dcc66f3609",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081101DC\",\"who\":\"sol-081101DC-3861\",\"note\":\"Match natural phase callback C using existing native profiles. No tooling changes.\"}",
-          "created_at": "2026-11-08T09:23:40Z",
-          "id": 6719773374,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:23:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b7b172d35c20ff3b38a81d9a7e97cbbdd1cb09d0cb2115453afd4643c26a97ce",
-        "result": {
-          "address": "0x081101DC",
-          "claim_id": 6719773374,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6719773374,
-          "status": "accepted",
-          "who": "sol-081101DC-3861"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "ed4c5dc2e45e30643fd3db19dc756ff1c7ba02e4364be9a4d9f2e2fe94653a6d",
-        "acknowledged_cursor": 6719850428,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ed4c5dc2e45e30643fd3db19dc756ff1c7ba02e4364be9a4d9f2e2fe94653a6d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081101DC\",\"who\":\"sol-081101DC-3861\",\"claim_id\":6719773374,\"reason\":\"One natural ordinary-byte source has a concrete full-symbol mismatch; discarded shadow-RAM reads lack grounded permitted storage authority. Frozen result retained; no forced reads or RAM volatile.\",\"unmatchable\":true,\"tried\":\"One native -mthumb-interwork -O2 compile; no diagnostics or replay.\"}",
-          "created_at": "2026-11-08T09:32:18Z",
-          "id": 6719850383,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:32:18Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
-        "result": {
-          "address": "0x081101DC",
-          "claim_id": 6719773374,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719850383,
-          "status": "accepted",
-          "who": "sol-081101DC-3861"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "f10d1e4721f8a3a8ef94ec6c372b8544f996de5a44f561ac0670bf74f043e86f",
         "acknowledged_cursor": 6719773579,
         "body_provenance": "acceptance-time",
@@ -2039,66 +1979,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "adaf49d32ccb37d7b1d7d8658dd54f053f804b1c39c8df55372365672276bd51",
-        "acknowledged_cursor": 6719773579,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "adaf49d32ccb37d7b1d7d8658dd54f053f804b1c39c8df55372365672276bd51",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E2750\",\"who\":\"sol-080E2750-3861\",\"note\":\"Match natural phase callback C using existing native profiles. No tooling changes.\"}",
-          "created_at": "2026-11-08T09:23:42Z",
-          "id": 6719773579,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:23:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b7b172d35c20ff3b38a81d9a7e97cbbdd1cb09d0cb2115453afd4643c26a97ce",
-        "result": {
-          "address": "0x080E2750",
-          "claim_id": 6719773579,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6719773579,
-          "status": "accepted",
-          "who": "sol-080E2750-3861"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "9c181198781f5f19182544c534c7ea15fdb0d3bb85bd6df9d21c94450731adb2",
-        "acknowledged_cursor": 6719850428,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "9c181198781f5f19182544c534c7ea15fdb0d3bb85bd6df9d21c94450731adb2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E2750\",\"who\":\"sol-080E2750-3861\",\"claim_id\":6719773579,\"reason\":\"One natural ordinary-byte source has a concrete full-symbol mismatch; discarded shadow-RAM reads lack grounded permitted storage authority. Frozen result retained; no forced reads or RAM volatile.\",\"unmatchable\":true,\"tried\":\"One native -mthumb-interwork -O2 compile; no diagnostics or replay.\"}",
-          "created_at": "2026-11-08T09:32:18Z",
-          "id": 6719850400,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:32:18Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
-        "result": {
-          "address": "0x080E2750",
-          "claim_id": 6719773579,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719850400,
-          "status": "accepted",
-          "who": "sol-080E2750-3861"
-        }
-      }
     },
     {
       "claim": {
