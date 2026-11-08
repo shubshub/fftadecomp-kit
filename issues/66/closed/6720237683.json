@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f66dcc4e540e0b436525539dd041006dd61875ff54de06a0b288edd17a37e436",
+    "acknowledged_cursor": 6720239588,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f66dcc4e540e0b436525539dd041006dd61875ff54de06a0b288edd17a37e436",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DCFE4\",\"who\":\"sol-080DCFE4-3865\",\"note\":\"Match natural scheduler constructor with current supported native profiles; no tooling changes\"}",
+      "created_at": "2026-11-08T10:14:59Z",
+      "id": 6720237683,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:14:59Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f57272c5c735bbf25c39d936bf2b3c1c6281bbc34e88210486a31912686b70f7",
+    "result": {
+      "address": "0x080DCFE4",
+      "claim_id": 6720237683,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720237683,
+      "status": "accepted",
+      "who": "sol-080DCFE4-3865"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "70649518d6aec89be7529f463742d677d87f34735de3eaec577fabc47aa0409a",
+    "acknowledged_cursor": 6720285476,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "70649518d6aec89be7529f463742d677d87f34735de3eaec577fabc47aa0409a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DCFE4\",\"who\":\"sol-080DCFE4-3865\",\"claim_id\":6720237683,\"reason\":\"Zero C/native: current profiles do not admit two branch-dependent interior descriptors with one+4 pointer at shared scheduler call. Existing boundary saved; no tooling changed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:19:57Z",
+      "id": 6720282466,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:19:57Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+    "result": {
+      "address": "0x080DCFE4",
+      "claim_id": 6720237683,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720282466,
+      "status": "accepted",
+      "who": "sol-080DCFE4-3865"
+    }
+  }
+}

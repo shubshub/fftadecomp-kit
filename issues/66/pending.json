@@ -218,7 +218,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2043c03ce647136925c40062cd2c493853eda04c0ed5abd119ad51a36cdecd85",
+        "acknowledged_cursor": 6720285476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2043c03ce647136925c40062cd2c493853eda04c0ed5abd119ad51a36cdecd85",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DF92C\",\"who\":\"claude-ffta2\",\"claim_id\":6717459962,\"reason\":\"matched on main (integrated from jaesharp PRs #26-#30, d3bba35eeb)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:19:36Z",
+          "id": 6720279334,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:19:36Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+        "result": {
+          "address": "0x080DF92C",
+          "claim_id": 6717459962,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6720279334,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -506,7 +534,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5f3a8a4b742158254fb1fc6e9948be0abea57347c52eefdce85878e0f3f6c0f3",
+        "acknowledged_cursor": 6720285476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5f3a8a4b742158254fb1fc6e9948be0abea57347c52eefdce85878e0f3f6c0f3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DF9AC\",\"who\":\"claude-ffta2\",\"claim_id\":6718776519,\"reason\":\"matched on main (integrated from jaesharp PRs #26-#30, d3bba35eeb)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:20:17Z",
+          "id": 6720285476,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:20:17Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+        "result": {
+          "address": "0x080DF9AC",
+          "claim_id": 6718776519,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6720285476,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -634,7 +690,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "cfef28a04dc055a0ef450f7fc56ad27392c66c9e9f5d00db992fbb828f8ccb61",
+        "acknowledged_cursor": 6720285476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cfef28a04dc055a0ef450f7fc56ad27392c66c9e9f5d00db992fbb828f8ccb61",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F15C8\",\"who\":\"claude-ffta2\",\"claim_id\":6720230341,\"reason\":\"only volatile on IWRAM 0x03000940 reproduces the dead ldrb pattern (as 08009728); recovery parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:20:11Z",
+          "id": 6720284602,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:20:11Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+        "result": {
+          "address": "0x080F15C8",
+          "claim_id": 6720230341,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6720284602,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -762,7 +846,35 @@
           "who": "sol-080DCFE4-3865"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "70649518d6aec89be7529f463742d677d87f34735de3eaec577fabc47aa0409a",
+        "acknowledged_cursor": 6720285476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "70649518d6aec89be7529f463742d677d87f34735de3eaec577fabc47aa0409a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DCFE4\",\"who\":\"sol-080DCFE4-3865\",\"claim_id\":6720237683,\"reason\":\"Zero C/native: current profiles do not admit two branch-dependent interior descriptors with one+4 pointer at shared scheduler call. Existing boundary saved; no tooling changed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:19:57Z",
+          "id": 6720282466,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:19:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+        "result": {
+          "address": "0x080DCFE4",
+          "claim_id": 6720237683,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720282466,
+          "status": "accepted",
+          "who": "sol-080DCFE4-3865"
+        }
+      }
     },
     {
       "claim": {
@@ -856,6 +968,38 @@
           "request_id": 6720239588,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a2b378c251bd8c379fa18a4dd5452e076c6f99ae62053b2fc8f3a80c99622730",
+        "acknowledged_cursor": 6720285476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a2b378c251bd8c379fa18a4dd5452e076c6f99ae62053b2fc8f3a80c99622730",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DBB14\",\"who\":\"sol-080DBB14-3865\",\"note\":\"Admit existing plausible parked constructor under newly landed two-payload native profile; no tooling changes\"}",
+          "created_at": "2026-11-08T10:20:08Z",
+          "id": 6720284239,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:20:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+        "result": {
+          "address": "0x080DBB14",
+          "claim_id": 6720284239,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720284239,
+          "status": "accepted",
+          "who": "sol-080DBB14-3865"
         }
       },
       "release": null

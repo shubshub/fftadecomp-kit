@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c66c37b83ff8f465e08a9e7797d86a2534c15c932f79b33a30799a85f5711345",
+    "acknowledged_cursor": 6720239588,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c66c37b83ff8f465e08a9e7797d86a2534c15c932f79b33a30799a85f5711345",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F15C8\",\"who\":\"claude-ffta2\",\"note\":\"\"}",
+      "created_at": "2026-11-08T10:14:09Z",
+      "id": 6720230341,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:14:09Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f57272c5c735bbf25c39d936bf2b3c1c6281bbc34e88210486a31912686b70f7",
+    "result": {
+      "address": "0x080F15C8",
+      "claim_id": 6720230341,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 31369,
+      "request_id": 6720230341,
+      "status": "accepted",
+      "who": "claude-ffta2"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "cfef28a04dc055a0ef450f7fc56ad27392c66c9e9f5d00db992fbb828f8ccb61",
+    "acknowledged_cursor": 6720285476,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cfef28a04dc055a0ef450f7fc56ad27392c66c9e9f5d00db992fbb828f8ccb61",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F15C8\",\"who\":\"claude-ffta2\",\"claim_id\":6720230341,\"reason\":\"only volatile on IWRAM 0x03000940 reproduces the dead ldrb pattern (as 08009728); recovery parked\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:20:11Z",
+      "id": 6720284602,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:20:11Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8f13613dd7c676de51c2bbdd064fa393e66c1d7224a026109d0fd5cc62b1b269",
+    "result": {
+      "address": "0x080F15C8",
+      "claim_id": 6720230341,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 31369,
+      "request_id": 6720284602,
+      "status": "accepted",
+      "who": "claude-ffta2"
+    }
+  }
+}
