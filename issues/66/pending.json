@@ -1026,66 +1026,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "e99fcd33a5da2623d594f74564d9b5f7578af68d7ffc9a8f48dec66243bf7da8",
-        "acknowledged_cursor": 6717325880,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e99fcd33a5da2623d594f74564d9b5f7578af68d7ffc9a8f48dec66243bf7da8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002FB8\",\"who\":\"FFTA-Team2-164\",\"note\":\"First natural decimal formatter from complete92B current indexed owner; preserve original compiler output; canonical integer proof only.\"}",
-          "created_at": "2026-11-08T04:39:46Z",
-          "id": 6717325880,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T04:39:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ae2ce044cb02e46608d853d789dcec7406e1b817e609e2008ede6178b789222f",
-        "result": {
-          "address": "0x08002FB8",
-          "claim_id": 6717325880,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717325880,
-          "status": "accepted",
-          "who": "FFTA-Team2-164"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "d09686a4fe653c65f25b37e67ea99a230cada0ab56a1b843b4f4f11af32b7913",
-        "acknowledged_cursor": 6717351936,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "d09686a4fe653c65f25b37e67ea99a230cada0ab56a1b843b4f4f11af32b7913",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08002FB8\",\"who\":\"FFTA-Team2-164\",\"claim_id\":6717325880,\"reason\":\"Stopped grounded decimal formatter forms74/84/last recorded full FUNC versus actual92B. Originals and residual frozen native164; no compiler scheduling or prototype sweeps.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T04:42:52Z",
-          "id": 6717351936,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T04:42:52Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "11156b0b5a28077aeca1506f1cca05903cec7e582d014cec5304b2f073929436",
-        "result": {
-          "address": "0x08002FB8",
-          "claim_id": 6717325880,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717351936,
-          "status": "accepted",
-          "who": "FFTA-Team2-164"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "51bb291a3764020535ce9724f0b499e6392fae6423829212d5fa8036335fa331",
         "acknowledged_cursor": 6717351936,
         "body_provenance": "acceptance-time",
