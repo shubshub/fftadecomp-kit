@@ -1666,66 +1666,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "5ed8b3824e1cfae77e6c8aabf498d0a649e67405dd720e5c7ca87e8e563bec11",
-        "acknowledged_cursor": 6717792045,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5ed8b3824e1cfae77e6c8aabf498d0a649e67405dd720e5c7ca87e8e563bec11",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08006EC0\",\"who\":\"sol-08006EC0-3823\",\"note\":\"Natural C hand matching via dedicated sub-agent; allocator sibling decoder lead\"}",
-          "created_at": "2026-11-08T05:35:24Z",
-          "id": 6717792045,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:35:24Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a7c9d26cb28235277f7ef2a30b4cbfe655dd701a791f4b210d1d6d40c2bf783f",
-        "result": {
-          "address": "0x08006EC0",
-          "claim_id": 6717792045,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717792045,
-          "status": "accepted",
-          "who": "sol-08006EC0-3823"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "e2999b95f5da07d6344d28a5722e1b0548212bcf8ec728b68e2592aac0ae68b2",
-        "acknowledged_cursor": 6717838061,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e2999b95f5da07d6344d28a5722e1b0548212bcf8ec728b68e2592aac0ae68b2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08006EC0\",\"who\":\"sol-08006EC0-3823\",\"claim_id\":6717792045,\"reason\":\"One natural allocator source hits existing local stack pointer return-escape boundary; no byte comparison or MATCH claim; source preserved\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; one new form, one native invocation, no retries\"}",
-          "created_at": "2026-11-08T05:40:37Z",
-          "id": 6717834410,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:40:37Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "492ace7e1f955095d665f1830c1d6d24e4fd56ab802e9abf2c9a0b32871ff13d",
-        "result": {
-          "address": "0x08006EC0",
-          "claim_id": 6717792045,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717834410,
-          "status": "accepted",
-          "who": "sol-08006EC0-3823"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "c78b0db4a23ca425fd97c8aa4617d1f790703e358ddc92f16918836cbe23b5b6",
         "acknowledged_cursor": 6717800426,
         "body_provenance": "acceptance-time",
