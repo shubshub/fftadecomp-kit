@@ -731,6 +731,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "96cc2489b67ad16ca5c02407a04b4247f12b46eb6c0698b436c0bc61b288a44d",
+        "acknowledged_cursor": 6716941594,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "96cc2489b67ad16ca5c02407a04b4247f12b46eb6c0698b436c0bc61b288a44d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08006970\",\"who\":\"sol-08006970-3811\",\"note\":\"Bounded ordinary C matching from retained candidate; no tooling changes.\"}",
+          "created_at": "2026-11-08T03:54:33Z",
+          "id": 6716941533,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:54:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "087595b0553f6d504d682d303ba61a096ae70574a1b21aec934df9d0418d524c",
+        "result": {
+          "address": "0x08006970",
+          "claim_id": 6716941533,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6716941533,
+          "status": "accepted",
+          "who": "sol-08006970-3811"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5560b987fe9ac4890f81db53d344029b68ef4bc3dc22f1a6c6ae73cbfcefb0af",
+        "acknowledged_cursor": 6716941594,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5560b987fe9ac4890f81db53d344029b68ef4bc3dc22f1a6c6ae73cbfcefb0af",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805CF00\",\"who\":\"sol-0805CF00-3811\",\"note\":\"Bounded ordinary C matching from retained candidate; no tooling changes.\"}",
+          "created_at": "2026-11-08T03:54:33Z",
+          "id": 6716941558,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:54:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "087595b0553f6d504d682d303ba61a096ae70574a1b21aec934df9d0418d524c",
+        "result": {
+          "address": "0x0805CF00",
+          "claim_id": 6716941558,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6716941558,
+          "status": "accepted",
+          "who": "sol-0805CF00-3811"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "78eafe7f90fc4463bc613a15deb003769a85dc965ab7df77acc849480d84e04f",
+        "acknowledged_cursor": 6716941594,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "78eafe7f90fc4463bc613a15deb003769a85dc965ab7df77acc849480d84e04f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DD4D4\",\"who\":\"sol-080DD4D4-3811\",\"note\":\"Bounded ordinary C matching from retained candidate; no tooling changes.\"}",
+          "created_at": "2026-11-08T03:54:33Z",
+          "id": 6716941594,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:54:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "087595b0553f6d504d682d303ba61a096ae70574a1b21aec934df9d0418d524c",
+        "result": {
+          "address": "0x080DD4D4",
+          "claim_id": 6716941594,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6716941594,
+          "status": "accepted",
+          "who": "sol-080DD4D4-3811"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
