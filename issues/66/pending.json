@@ -990,7 +990,35 @@
           "who": "sol-080D989C-3813"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "47842481985b5b9661f8819d5c1db45326c31cdb31023f826d2ba73c77539590",
+        "acknowledged_cursor": 6717413321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "47842481985b5b9661f8819d5c1db45326c31cdb31023f826d2ba73c77539590",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D989C\",\"who\":\"sol-080D989C-3813\",\"claim_id\":6717348703,\"reason\":\"Native byte-identical scheduler caller complete; frozen for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T04:49:51Z",
+          "id": 6717413318,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:49:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3e776b85e9cb560005abc6aad2b21817aeaf3a8293e534baae57fb58bbd27231",
+        "result": {
+          "address": "0x080D989C",
+          "claim_id": 6717348703,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717413318,
+          "status": "accepted",
+          "who": "sol-080D989C-3813"
+        }
+      }
     },
     {
       "claim": {
@@ -1022,7 +1050,35 @@
           "who": "sol-080068D4-3813"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "1bbceb4f7b360a0ddd85a15676089d72d13e30e2bc60e04144381138bb464946",
+        "acknowledged_cursor": 6717413321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1bbceb4f7b360a0ddd85a15676089d72d13e30e2bc60e04144381138bb464946",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080068D4\",\"who\":\"sol-080068D4-3813\",\"claim_id\":6717348790,\"reason\":\"Native byte-identical scheduler caller complete; frozen for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T04:49:51Z",
+          "id": 6717413321,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:49:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3e776b85e9cb560005abc6aad2b21817aeaf3a8293e534baae57fb58bbd27231",
+        "result": {
+          "address": "0x080068D4",
+          "claim_id": 6717348790,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717413321,
+          "status": "accepted",
+          "who": "sol-080068D4-3813"
+        }
+      }
     },
     {
       "claim": {
@@ -1054,7 +1110,35 @@
           "who": "sol-080069B0-3813"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6eec12ee24dbbffe4a1f6eb6f8eacecd0446f6bb8c46ad490bbd85e709f7cd8a",
+        "acknowledged_cursor": 6717413321,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6eec12ee24dbbffe4a1f6eb6f8eacecd0446f6bb8c46ad490bbd85e709f7cd8a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080069B0\",\"who\":\"sol-080069B0-3813\",\"claim_id\":6717364860,\"reason\":\"Native byte-identical scheduler caller complete; frozen for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T04:49:51Z",
+          "id": 6717413314,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:49:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3e776b85e9cb560005abc6aad2b21817aeaf3a8293e534baae57fb58bbd27231",
+        "result": {
+          "address": "0x080069B0",
+          "claim_id": 6717364860,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717413314,
+          "status": "accepted",
+          "who": "sol-080069B0-3813"
+        }
+      }
     },
     {
       "claim": {
