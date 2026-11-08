@@ -667,6 +667,70 @@
           "who": "sol-08040D3C-3786"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4330effd9da291aa4a69da5bc148d8f897bdc60cf215053b5f642023c870aa6a",
+        "acknowledged_cursor": 6715611424,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4330effd9da291aa4a69da5bc148d8f897bdc60cf215053b5f642023c870aa6a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801CAE0\",\"who\":\"FFTA-Team2-native152\",\"note\":\"Grounded scalar value-lifetime correction of retained Parked source; complete64B literal extent; no steering or prior successful replay\"}",
+          "created_at": "2026-11-08T01:26:38Z",
+          "id": 6715606884,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:26:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "168a15786731dd50a7129fd14f3ab7898bf351381d2d33b198f7a648d9ef9ee1",
+        "result": {
+          "address": "0x0801CAE0",
+          "claim_id": 6715606884,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6715606884,
+          "status": "accepted",
+          "who": "FFTA-Team2-native152"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d3c03a16819daa1030a564b661485fee93f4b81c1c3aa1e4bbc07e94847f0436",
+        "acknowledged_cursor": 6715611424,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d3c03a16819daa1030a564b661485fee93f4b81c1c3aa1e4bbc07e94847f0436",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812F124\",\"who\":\"sol-0812F124-3788\",\"note\":\"Plausible complete C matching with existing published fixed compiler; natural expression/declaration forms.\"}",
+          "created_at": "2026-11-08T01:27:09Z",
+          "id": 6715611424,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:27:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "168a15786731dd50a7129fd14f3ab7898bf351381d2d33b198f7a648d9ef9ee1",
+        "result": {
+          "address": "0x0812F124",
+          "claim_id": 6715611424,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6715611424,
+          "status": "accepted",
+          "who": "sol-0812F124-3788"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
