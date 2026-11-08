@@ -30,7 +30,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "99a84f845f42f1a4eceb073fbe1abad88e651c1007236d93935b48a6e0cbea16",
+        "acknowledged_cursor": 6716613728,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "99a84f845f42f1a4eceb073fbe1abad88e651c1007236d93935b48a6e0cbea16",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D61C\",\"who\":\"claude-ffta2\",\"claim_id\":6716512073,\"reason\":\"dead ldrb before each strb needs volatile struct on RAM buffer (banned); two-pointer loop unreproduced; index also lacks func_0800DEC0 and misses the 0x0800D660 pool word; see Parked/0800D61C\",\"unmatchable\":true,\"tried\":\"u8/vu8 stores, 8-bit bitfield structs, volatile struct members, two-pointer forms\"}",
+          "created_at": "2026-11-08T03:17:20Z",
+          "id": 6716613728,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T03:17:20Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3c7ad57f63519117a9da38d31256f38df0c51c1e8ed84135f898510be97d0c98",
+        "result": {
+          "address": "0x0800D61C",
+          "claim_id": 6716512073,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6716613728,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
