@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "38f31ab392cce5645aa206c7a47f02288a91af68bc8ad7f34069fc2f7f6be38a",
+    "acknowledged_cursor": 6717566033,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "38f31ab392cce5645aa206c7a47f02288a91af68bc8ad7f34069fc2f7f6be38a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFA30\",\"who\":\"sol-080DFA30-3819\",\"note\":\"Natural-C scheduler matching only; existing native tools\"}",
+      "created_at": "2026-11-08T05:08:17Z",
+      "id": 6717566033,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T05:08:17Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f07ede7918008d657b3e373c999ee6023b15dc84ad6cace6106e31ca08cb843a",
+    "result": {
+      "address": "0x080DFA30",
+      "claim_id": 6717566033,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6717566033,
+      "status": "accepted",
+      "who": "sol-080DFA30-3819"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "18b3d950bb8d3c04c1b8d63e7367d4f14b97e4d4a06d152fb45bddec84a638a8",
+    "acknowledged_cursor": 6717625444,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "18b3d950bb8d3c04c1b8d63e7367d4f14b97e4d4a06d152fb45bddec84a638a8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFA30\",\"who\":\"sol-080DFA30-3819\",\"claim_id\":6717566033,\"reason\":\"Native complete64B scheduler caller byte-identical and frozen for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T05:15:20Z",
+      "id": 6717625444,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T05:15:20Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2592c63ab136f02f64251cdaa6c20b4dc109fba921d6a92e359b003e87cd372c",
+    "result": {
+      "address": "0x080DFA30",
+      "claim_id": 6717566033,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6717625444,
+      "status": "accepted",
+      "who": "sol-080DFA30-3819"
+    }
+  }
+}
