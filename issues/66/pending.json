@@ -30,7 +30,35 @@
           "who": "sol-08104AEC-3867"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "865ddc66a40253b17da9cbe8bb331d7e01e2bf7b6e203d3edbbb64e199fb31b5",
+        "acknowledged_cursor": 6720945051,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "865ddc66a40253b17da9cbe8bb331d7e01e2bf7b6e203d3edbbb64e199fb31b5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08104AEC\",\"who\":\"sol-08104AEC-3867\",\"claim_id\":6720819186,\"reason\":\"Three bounded source/native forms frozen; authentic complete1366B diagnostic has46 differing bytes; no MATCH\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T11:31:41Z",
+          "id": 6720945051,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:31:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "069040a3b65b8a6dc4e1928a0419b09998214d6736c7622b34d8b4d09967f548",
+        "result": {
+          "address": "0x08104AEC",
+          "claim_id": 6720819186,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720945051,
+          "status": "accepted",
+          "who": "sol-08104AEC-3867"
+        }
+      }
     },
     {
       "claim": {
