@@ -578,66 +578,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "b3654587757596acc51dfdf43041624073dc02a2521f95aef7e8167ce0f1e314",
-        "acknowledged_cursor": 6715823133,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b3654587757596acc51dfdf43041624073dc02a2521f95aef7e8167ce0f1e314",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0808F804\",\"who\":\"FFTA-Team2-native154\",\"note\":\"First native admission of unchanged frozen68B original under nine tested conditional-thunk and discarded-scratch cases; actual indexed30 instructions, genuine OBJECT point08394028.\"}",
-          "created_at": "2026-11-08T01:49:38Z",
-          "id": 6715823133,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T01:49:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "21d5d485e7b5422dc3344021df77113681a9d6b9d9fd74262502179573bf3d99",
-        "result": {
-          "address": "0x0808F804",
-          "claim_id": 6715823133,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6715823133,
-          "status": "accepted",
-          "who": "FFTA-Team2-native154"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "9c0fc1e11e45b5b320097138914b4ae67fa33d2e370c48a7fedbccf474a32765",
-        "acknowledged_cursor": 6715831933,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "9c0fc1e11e45b5b320097138914b4ae67fa33d2e370c48a7fedbccf474a32765",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0808F804\",\"who\":\"FFTA-Team2-native154\",\"claim_id\":6715823133,\"reason\":\"First native MATCH68B frozen, one compiler, unchanged original; nine focused composition tests passed. Native publication underway.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T01:50:38Z",
-          "id": 6715831933,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T01:50:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8a5850abc24d5bc5d84c469e9248b69fee66e39d9ff0dce959955aa1c4c81030",
-        "result": {
-          "address": "0x0808F804",
-          "claim_id": 6715823133,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6715831933,
-          "status": "accepted",
-          "who": "FFTA-Team2-native154"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "2957ed9f3351e70dbfcfa13fa6c50710b112f337bcff7303bb31e13b9fb94b0e",
         "acknowledged_cursor": 6715881699,
         "body_provenance": "acceptance-time",
