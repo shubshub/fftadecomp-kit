@@ -1975,6 +1975,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "83f5ea976900c61fe044eb663ba4f3098525ab61ba0a85eebe10ecb0ddfcfa1b",
+        "acknowledged_cursor": 6718392001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "83f5ea976900c61fe044eb663ba4f3098525ab61ba0a85eebe10ecb0ddfcfa1b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805ABB0\",\"who\":\"FFTA-Team2-175\",\"note\":\"Solo first natural C for complete384B window selection update; actual helper interfaces and canonical identities only; unchanged published toolkit\"}",
+          "created_at": "2026-11-08T06:47:11Z",
+          "id": 6718392001,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:47:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d60772957254286536a203df11722da7213256b06a5e99ac0c4ccdd9f92a1936",
+        "result": {
+          "address": "0x0805ABB0",
+          "claim_id": 6718392001,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718392001,
+          "status": "accepted",
+          "who": "FFTA-Team2-175"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
