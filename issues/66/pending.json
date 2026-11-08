@@ -830,6 +830,98 @@
           "who": "FFTA-Team2-164"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "e746a6c97bc6d4c72e38b0649a11dc82c9826b43ef2d0a60150c15901b5859a4",
+        "acknowledged_cursor": 6717277237,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e746a6c97bc6d4c72e38b0649a11dc82c9826b43ef2d0a60150c15901b5859a4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802A4B4\",\"who\":\"FFTA-Team2-164\",\"claim_id\":6717265231,\"reason\":\"Stopped first natural typed window fields: original compiler92B vs actual128B; no forced reads, volatile or layout/type sweeps. Originals frozen native164.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T04:33:51Z",
+          "id": 6717277237,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:33:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca95861d44406b5d61e48147223aa6b7086d77e7b6b6c0e0a9f24629e98b6c9",
+        "result": {
+          "address": "0x0802A4B4",
+          "claim_id": 6717265231,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717277237,
+          "status": "accepted",
+          "who": "FFTA-Team2-164"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2bbad7cf0b8326f7ad031ce659f1e97a617699700db8c4944bf31720e7cb694f",
+        "acknowledged_cursor": 6717277237,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2bbad7cf0b8326f7ad031ce659f1e97a617699700db8c4944bf31720e7cb694f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D979C\",\"who\":\"sol-080D979C-3813\",\"note\":\"Match scheduler descriptor caller using newly verified explicit conditional profile for issue73\"}",
+          "created_at": "2026-11-08T04:33:23Z",
+          "id": 6717273410,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:33:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca95861d44406b5d61e48147223aa6b7086d77e7b6b6c0e0a9f24629e98b6c9",
+        "result": {
+          "address": "0x080D979C",
+          "claim_id": 6717273410,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717273410,
+          "status": "accepted",
+          "who": "sol-080D979C-3813"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1c78ccfa0961deffb5f515fd5991380b2db5d1d5884dc57d244089bcba9ef682",
+        "acknowledged_cursor": 6717277237,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1c78ccfa0961deffb5f515fd5991380b2db5d1d5884dc57d244089bcba9ef682",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08006878\",\"who\":\"sol-08006878-3813\",\"note\":\"Match scheduler descriptor caller using newly verified explicit conditional profile for issue73\"}",
+          "created_at": "2026-11-08T04:33:24Z",
+          "id": 6717273473,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:33:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca95861d44406b5d61e48147223aa6b7086d77e7b6b6c0e0a9f24629e98b6c9",
+        "result": {
+          "address": "0x08006878",
+          "claim_id": 6717273473,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717273473,
+          "status": "accepted",
+          "who": "sol-08006878-3813"
+        }
+      },
       "release": null
     }
   ],
