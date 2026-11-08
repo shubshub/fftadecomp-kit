@@ -98,66 +98,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "62ff6784ed5089c7eff31eef092acbf7018010803ba42a7c761a13ff57955c4c",
-        "acknowledged_cursor": 6720345224,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "62ff6784ed5089c7eff31eef092acbf7018010803ba42a7c761a13ff57955c4c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4724\",\"who\":\"ffta-team2-native194\",\"note\":\"PR31 contribution is now incorporated with retained Parked refusal. Claim only if broker confirms FREE. Unchanged frozen exact48B original, new published b44897cb following-call conditional profile; no previous successful native replay or source edits.\"}",
-          "created_at": "2026-11-08T10:26:36Z",
-          "id": 6720342629,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:26:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "68e1c358c7db56d95f985f5a05d91750737160f43bbf103a42b6922820a8e89b",
-        "result": {
-          "address": "0x080D4724",
-          "claim_id": 6720342629,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6720342629,
-          "status": "accepted",
-          "who": "ffta-team2-native194"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "12fee72e4720d1978202545da47e23f622d4bc09a13d3a8278d4e549a5883a43",
-        "acknowledged_cursor": 6720373557,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "12fee72e4720d1978202545da47e23f622d4bc09a13d3a8278d4e549a5883a43",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D4724\",\"who\":\"ffta-team2-native194\",\"claim_id\":6720342629,\"reason\":\"New first native MATCH48B under published following-call policy. Frozen original ETREL/ELF/FUNC/source current167/ROM receipts. No source changes; prior refusal preserved. Included in five-function W192 publication.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T10:30:06Z",
-          "id": 6720373557,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:30:06Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c4a6d00b0082adcdfbb0e5d1ce92cc8ecbf142eb0067da33b0ad970bf96525f6",
-        "result": {
-          "address": "0x080D4724",
-          "claim_id": 6720342629,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6720373557,
-          "status": "accepted",
-          "who": "ffta-team2-native194"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "9a9efa67bb091869a7ad5ee2c38aa7b2e95f3f1da16f9954b3f381a2e0526146",
         "acknowledged_cursor": 6720355838,
         "body_provenance": "acceptance-time",
