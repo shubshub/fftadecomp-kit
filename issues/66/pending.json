@@ -1566,7 +1566,35 @@
           "who": "sol-080DD214-3817"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "54695d0d1d6a07a7c3e369141d3ba5840cf6090891706dcaea31ec6b794919e4",
+        "acknowledged_cursor": 6717571272,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "54695d0d1d6a07a7c3e369141d3ba5840cf6090891706dcaea31ec6b794919e4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DD214\",\"who\":\"sol-080DD214-3817\",\"claim_id\":6717519132,\"reason\":\"Two bounded natural forms differ; original descriptor also requires currently excluded nested-local-pointer slot\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; bounded natural C; existing conditional scheduler profile\"}",
+          "created_at": "2026-11-08T05:08:48Z",
+          "id": 6717570415,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:08:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c678d65d2f36e2e756c86d9da3918141ff739b9547d882a0ba963c92e16e2ee3",
+        "result": {
+          "address": "0x080DD214",
+          "claim_id": 6717519132,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717570415,
+          "status": "accepted",
+          "who": "sol-080DD214-3817"
+        }
+      }
     },
     {
       "claim": {
@@ -1598,7 +1626,35 @@
           "who": "sol-080DD1AC-3817"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3087bafe77276471ad9a2d22e7b1ffbe77dc040740247ad94d17af8e1a0a66cc",
+        "acknowledged_cursor": 6717571272,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3087bafe77276471ad9a2d22e7b1ffbe77dc040740247ad94d17af8e1a0a66cc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DD1AC\",\"who\":\"sol-080DD1AC-3817\",\"claim_id\":6717519147,\"reason\":\"Exact52B diagnostic; native scheduler contract excludes genuine nested-local-pointer slots\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; bounded natural C; existing conditional scheduler profile\"}",
+          "created_at": "2026-11-08T05:08:48Z",
+          "id": 6717570414,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:08:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c678d65d2f36e2e756c86d9da3918141ff739b9547d882a0ba963c92e16e2ee3",
+        "result": {
+          "address": "0x080DD1AC",
+          "claim_id": 6717519147,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717570414,
+          "status": "accepted",
+          "who": "sol-080DD1AC-3817"
+        }
+      }
     },
     {
       "claim": {
@@ -1820,6 +1876,38 @@
           "request_id": 6717566033,
           "status": "accepted",
           "who": "sol-080DFA30-3819"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1bce927a7aa46fd208ca3d6f9862c08c60324940bcbe67af6601876e285c9aa7",
+        "acknowledged_cursor": 6717571272,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1bce927a7aa46fd208ca3d6f9862c08c60324940bcbe67af6601876e285c9aa7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DE4F4\",\"who\":\"claude-ffta2\",\"note\":\"scheduler-descriptor caller via sub-agent (kit #79 profile)\"}",
+          "created_at": "2026-11-08T05:08:54Z",
+          "id": 6717571272,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:08:54Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c678d65d2f36e2e756c86d9da3918141ff739b9547d882a0ba963c92e16e2ee3",
+        "result": {
+          "address": "0x080DE4F4",
+          "claim_id": 6717571272,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6717571272,
+          "status": "accepted",
+          "who": "claude-ffta2"
         }
       },
       "release": null
