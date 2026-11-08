@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9bfc82f53a9c917870fabfdc19bec9e990e0c68d6b42c08a168158db6df73338",
+    "acknowledged_cursor": 6715499788,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9bfc82f53a9c917870fabfdc19bec9e990e0c68d6b42c08a168158db6df73338",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805E5C0\",\"who\":\"sol-0805E5C0-3786\",\"note\":\"Complete plausible C matching from saved reconstruction with fixed existing native compiler.\"}",
+      "created_at": "2026-11-08T01:15:06Z",
+      "id": 6715499788,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T01:15:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1d812715fa1fd402ad447d208c5c3bb5b5e5e95728ea2794150d9e181f9474ca",
+    "result": {
+      "address": "0x0805E5C0",
+      "claim_id": 6715499788,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6715499788,
+      "status": "accepted",
+      "who": "sol-0805E5C0-3786"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0e2c9fcc7f7c2fcde18628d7b61de3ec4457a1a0aff84cc7c7f210eec8759977",
+    "acknowledged_cursor": 6715655065,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0e2c9fcc7f7c2fcde18628d7b61de3ec4457a1a0aff84cc7c7f210eec8759977",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805E5C0\",\"who\":\"sol-0805E5C0-3786\",\"claim_id\":6715499788,\"reason\":\"Complete plausible472B candidate improved456 to470 matching bytes; only two commuted ADD encodings E6D4/E71A remain. Native exit1; no MATCH credit. Evidence frozen and fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; twelve native natural C variants plus one distinct failed-candidate diagnostic compilation\"}",
+      "created_at": "2026-11-08T01:31:49Z",
+      "id": 6715655065,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T01:31:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "130c68c1f7cee4f04fd0f917a495b052c3c02539fa6d2d9388046543a12a9d4d",
+    "result": {
+      "address": "0x0805E5C0",
+      "claim_id": 6715499788,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6715655065,
+      "status": "accepted",
+      "who": "sol-0805E5C0-3786"
+    }
+  }
+}
