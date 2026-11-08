@@ -2143,6 +2143,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "502e3d2d40ebc912227032f2a85f71cd6075eb3bdc474c60741684020aac96f2",
+        "acknowledged_cursor": 6719486279,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "502e3d2d40ebc912227032f2a85f71cd6075eb3bdc474c60741684020aac96f2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08145BF4\",\"who\":\"sol-08145BF4-3856\",\"note\":\"Match genuine GBA sound MMIO byte-write dispatch as natural C, existing verifier only. No tooling work.\"}",
+          "created_at": "2026-11-08T08:52:22Z",
+          "id": 6719486279,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:52:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1fedfe6e3cd603e0b0dce7470b18e6458ebcfb8b6627ccfab3de6f8bd8e613d2",
+        "result": {
+          "address": "0x08145BF4",
+          "claim_id": 6719486279,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719486279,
+          "status": "accepted",
+          "who": "sol-08145BF4-3856"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
