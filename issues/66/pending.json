@@ -734,7 +734,35 @@
           "who": "FFTA-Team2-native153"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "11b135d78f30d85dee4e295e2a8cc98d32fc44746aef72d1c16b2e03ecd5594e",
+        "acknowledged_cursor": 6715756078,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "11b135d78f30d85dee4e295e2a8cc98d32fc44746aef72d1c16b2e03ecd5594e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08024758\",\"who\":\"FFTA-Team2-native153\",\"claim_id\":6715741720,\"reason\":\"First native MATCH164B frozen; original source unchanged, one compiler, thirteen focused/regression checks; publication through native gate underway.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T01:42:19Z",
+          "id": 6715756078,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:42:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "12f704387b0a1e1dc623fee1316fff969a69a36b128b7b4560f31717830fac7e",
+        "result": {
+          "address": "0x08024758",
+          "claim_id": 6715741720,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715756078,
+          "status": "accepted",
+          "who": "FFTA-Team2-native153"
+        }
+      }
     }
   ],
   "issue": 66,
