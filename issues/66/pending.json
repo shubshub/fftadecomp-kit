@@ -734,7 +734,35 @@
           "who": "sol-0809A77C-issue73"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4bd9cf6b7e8ca05195945899fe3abb598676ce9ab6c0fc5e11c53127f17ef977",
+        "acknowledged_cursor": 6717206383,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4bd9cf6b7e8ca05195945899fe3abb598676ce9ab6c0fc5e11c53127f17ef977",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A77C\",\"who\":\"sol-0809A77C-issue73\",\"claim_id\":6717087994,\"reason\":\"Recovered exact 60-byte caller; source and original ELF retained, issue73 opt-in profile now verifies it\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T04:25:14Z",
+          "id": 6717206383,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:25:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ea49fb398c27e56188acdb5880dd119d93a312c7273d8173f914e0f55b41c6b5",
+        "result": {
+          "address": "0x0809A77C",
+          "claim_id": 6717087994,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717206383,
+          "status": "accepted",
+          "who": "sol-0809A77C-issue73"
+        }
+      }
     },
     {
       "claim": {
