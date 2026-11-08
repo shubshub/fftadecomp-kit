@@ -94,7 +94,35 @@
           "who": "sol-080AA29C-3866"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5a2ecfb13c0c82de791d0bd2ff906209616544e590e36c86bc9e28147642c4d8",
+        "acknowledged_cursor": 6720747502,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5a2ecfb13c0c82de791d0bd2ff906209616544e590e36c86bc9e28147642c4d8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080AA29C\",\"who\":\"sol-080AA29C-3866\",\"claim_id\":6720677949,\"reason\":\"One natural C/native frozen at actual switch plus signed-remainder profile boundary; no MATCH\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T11:10:45Z",
+          "id": 6720747502,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:10:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "836ec7a848acc3de0120bae18c440b45dd7cb563d35358ad9db3a9740bdb471a",
+        "result": {
+          "address": "0x080AA29C",
+          "claim_id": 6720677949,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720747502,
+          "status": "accepted",
+          "who": "sol-080AA29C-3866"
+        }
+      }
     },
     {
       "claim": {
