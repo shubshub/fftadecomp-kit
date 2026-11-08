@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "38421fd027d4a294f61ffe458e09510a195213e383cc35aee6e49cc9b1f560cf",
+    "acknowledged_cursor": 6715990193,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "38421fd027d4a294f61ffe458e09510a195213e383cc35aee6e49cc9b1f560cf",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081451C0\",\"who\":\"sol-081451C0-3791\",\"note\":\"Natural C matching from saved one-form recovery using existing named data bindings; no tooling edits.\"}",
+      "created_at": "2026-11-08T02:07:47Z",
+      "id": 6715986304,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:07:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2097be9400c24893068c8fcf71d1ecbcf86ddf1b89f5bb9b67c804af01dc0bb5",
+    "result": {
+      "address": "0x081451C0",
+      "claim_id": 6715986304,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6715986304,
+      "status": "accepted",
+      "who": "sol-081451C0-3791"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d56a2ad2d3808c2db80a23a4c5e580143c80a10e020dfb84267ec5c3741000f6",
+    "acknowledged_cursor": 6716090257,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d56a2ad2d3808c2db80a23a4c5e580143c80a10e020dfb84267ec5c3741000f6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081451C0\",\"who\":\"sol-081451C0-3791\",\"claim_id\":6715986304,\"reason\":\"Eight native/compiler attempts, plausible complete44B39/44; tablebase/selector register roles differ. Concurrent peer reference changes recorded, fully stopped/frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine named table records, scalar displacements and natural declaration/guard forms; actual native failures frozen\"}",
+      "created_at": "2026-11-08T02:18:46Z",
+      "id": 6716090238,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:18:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8c9157fe256f8853f48665ed41c0625b908cf19dacf38e2141a1afae85953241",
+    "result": {
+      "address": "0x081451C0",
+      "claim_id": 6715986304,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6716090238,
+      "status": "accepted",
+      "who": "sol-081451C0-3791"
+    }
+  }
+}
