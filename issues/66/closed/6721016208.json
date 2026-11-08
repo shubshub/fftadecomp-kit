@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e8fcf1027907f39c37af005e2a07809b64cc2f491fa62b700a696ef23b6e4d15",
+    "acknowledged_cursor": 6721016208,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e8fcf1027907f39c37af005e2a07809b64cc2f491fa62b700a696ef23b6e4d15",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127AF8\",\"who\":\"FFTA-Team2-Solo197\",\"note\":\"Saved unchanged exact original; tested new pool scheduler wrapper transport; first native under changed policy.\"}",
+      "created_at": "2026-11-08T11:39:23Z",
+      "id": 6721016208,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T11:39:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "560c2c6a3ffa6a978747a645e0694128f9de48035a8c5770a86121587fbf6ef8",
+    "result": {
+      "address": "0x08127AF8",
+      "claim_id": 6721016208,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6721016208,
+      "status": "accepted",
+      "who": "FFTA-Team2-Solo197"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "335f7f428626b1e87584e42efe3499cbc4c3a5ed3790fe8aacb17df0e0ff0266",
+    "acknowledged_cursor": 6721053150,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "335f7f428626b1e87584e42efe3499cbc4c3a5ed3790fe8aacb17df0e0ff0266",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08127AF8\",\"who\":\"FFTA-Team2-Solo197\",\"claim_id\":6721016208,\"reason\":\"Original complete FUNC first native MATCH; unchanged source; fully stopped and frozen for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T11:43:19Z",
+      "id": 6721053150,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T11:43:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c4f2786eef34fa59ac5fcf53c96bfd6de38f2dd1244592bd7593679325648ef6",
+    "result": {
+      "address": "0x08127AF8",
+      "claim_id": 6721016208,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6721053150,
+      "status": "accepted",
+      "who": "FFTA-Team2-Solo197"
+    }
+  }
+}
