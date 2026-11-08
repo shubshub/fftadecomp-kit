@@ -34,66 +34,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "60e23adeb347482006595bf3b35a8f66f0b6e1ddba7ffd3eb692236816663fdf",
-        "acknowledged_cursor": 6720456043,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "60e23adeb347482006595bf3b35a8f66f0b6e1ddba7ffd3eb692236816663fdf",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4870\",\"who\":\"team2-native195\",\"note\":\"Unchanged saved exact 108B source; implement separate bounded scheduler-loop prerequisite with strict frame and alias guards, then one changed-context native qualification.\"}",
-          "created_at": "2026-11-08T10:39:18Z",
-          "id": 6720456043,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:39:18Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a09d91fe235963f5863658604471c98a0831d88eca9bd05beb69d0b941244b77",
-        "result": {
-          "address": "0x080D4870",
-          "claim_id": 6720456043,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6720456043,
-          "status": "accepted",
-          "who": "team2-native195"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "ee9b0353b21453cdc8c98773f18dca560194eee1a5d41b5e5ddaa7b027417a07",
-        "acknowledged_cursor": 6720515015,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ee9b0353b21453cdc8c98773f18dca560194eee1a5d41b5e5ddaa7b027417a07",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D4870\",\"who\":\"team2-native195\",\"claim_id\":6720456043,\"reason\":\"Unchanged original108B native MATCH under new tested29-case counted scheduler loop contract; frozen native1/compiler1; publishing through native gate.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T10:45:41Z",
-          "id": 6720515015,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:45:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "99fe6394c7dcc1b1e6049c5e3fa04ba9e3a690318d4d2aa6191ac5bc20e7dd8b",
-        "result": {
-          "address": "0x080D4870",
-          "claim_id": 6720456043,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6720515015,
-          "status": "accepted",
-          "who": "team2-native195"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "b2d67ca90ddc20628f444febf31022f5ee6b885955d40eec50a850523c29cef4",
         "acknowledged_cursor": 6720475730,
         "body_provenance": "acceptance-time",
@@ -307,66 +247,6 @@
           "operation": "release",
           "owner_id": 31369,
           "request_id": 6720526759,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "545c234b98c97ebea17f2bb1c81dc06d5704a7a6446d36962b6452fe9b8a2fe7",
-        "acknowledged_cursor": 6720511368,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "545c234b98c97ebea17f2bb1c81dc06d5704a7a6446d36962b6452fe9b8a2fe7",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08050DA0\",\"who\":\"claude-ffta2\",\"note\":\"\"}",
-          "created_at": "2026-11-08T10:43:57Z",
-          "id": 6720499179,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:43:57Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "687359c91c3f803d473ac7dfc7d5a2ab814ebca09acabe3056b5eda26acabc01",
-        "result": {
-          "address": "0x08050DA0",
-          "claim_id": 6720499179,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6720499179,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "848d3b926cc93d6e18d7df3144bb24605bef1c206bba90789a5d4122661973be",
-        "acknowledged_cursor": 6720526759,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "848d3b926cc93d6e18d7df3144bb24605bef1c206bba90789a5d4122661973be",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08050DA0\",\"who\":\"claude-ffta2\",\"claim_id\":6720499179,\"reason\":\"dead ldrb before strb on IWRAM 0x03000940 needs volatile; recovery parked\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T10:46:47Z",
-          "id": 6720524969,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T10:46:47Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cf8028339e79350011308798c4fb8d4e85574c2eedc936dcded9760b5c369ab0",
-        "result": {
-          "address": "0x08050DA0",
-          "claim_id": 6720499179,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6720524969,
           "status": "accepted",
           "who": "claude-ffta2"
         }
