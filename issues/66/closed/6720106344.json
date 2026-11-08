@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e7967c8c497c2e34c4cd230f7b7a8f378ebe50868c67320494560550c2f135a3",
+    "acknowledged_cursor": 6720110050,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e7967c8c497c2e34c4cd230f7b7a8f378ebe50868c67320494560550c2f135a3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DBB14\",\"who\":\"ffta-team2-native192\",\"note\":\"Unchanged saved natural original initializer; new published bounded scheduler payload policy. Freeze exact original artifact/currentROM/runtime; no source steering, current maps preserved unless independently closed ownership requires correction.\"}",
+      "created_at": "2026-11-08T10:00:36Z",
+      "id": 6720106344,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:00:36Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0058694d9f0f9f25bc3a935f4e8820da30be558861f361a2874ffc67f0026282",
+    "result": {
+      "address": "0x080DBB14",
+      "claim_id": 6720106344,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720106344,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "378b8f9e55bd086c257d88c3f779926799efc962e7e11eac898bb4a7756d7738",
+    "acknowledged_cursor": 6720123020,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "378b8f9e55bd086c257d88c3f779926799efc962e7e11eac898bb4a7756d7738",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DBB14\",\"who\":\"ffta-team2-native192\",\"claim_id\":6720106344,\"reason\":\"Read-only frozen evidence shows prior natural forms remain diagnostic nonmatches; published payload policy cannot fix byte differences. No compiler/proof/C changes or unchanged replay; stopped, originals preserved.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:02:26Z",
+      "id": 6720123020,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:02:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bd22ab0b18ca1be602d3706de24895179249a33a5a728a31f76aa45f2d43efdb",
+    "result": {
+      "address": "0x080DBB14",
+      "claim_id": 6720106344,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720123020,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  }
+}
