@@ -859,6 +859,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "021f6652afb40d8a67d0dc07c3f8b59a06efb0cf4f59d882159e1d147e6ba1bc",
+        "acknowledged_cursor": 6717265231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "021f6652afb40d8a67d0dc07c3f8b59a06efb0cf4f59d882159e1d147e6ba1bc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802A4B4\",\"who\":\"FFTA-Team2-164\",\"note\":\"First natural C for complete128B indexed display state configuration; solo native matching and gated publication.\"}",
+          "created_at": "2026-11-08T04:32:23Z",
+          "id": 6717265231,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T04:32:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "85d162e56d681b69a4def4ebcf1a137f3ad96fcb783af8f47f6983dc4ae91cfd",
+        "result": {
+          "address": "0x0802A4B4",
+          "claim_id": 6717265231,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717265231,
+          "status": "accepted",
+          "who": "FFTA-Team2-164"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
