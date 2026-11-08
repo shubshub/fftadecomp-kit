@@ -1790,66 +1790,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "cf1e0d85d9c900c457fb28818020073e8e62a7bde32980ec27afd1b62a3d219e",
-        "acknowledged_cursor": 6717875171,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cf1e0d85d9c900c457fb28818020073e8e62a7bde32980ec27afd1b62a3d219e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801CE6C\",\"who\":\"sol-0801CE6C-3824\",\"note\":\"Fresh natural C matching via dedicated implementation sub-agent; existing native tooling only\"}",
-          "created_at": "2026-11-08T05:45:42Z",
-          "id": 6717875171,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:45:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6bd2b1d2e1dc4e91c3601fbec410425ec1b999b23593d89a2c62e5951270f648",
-        "result": {
-          "address": "0x0801CE6C",
-          "claim_id": 6717875171,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717875171,
-          "status": "accepted",
-          "who": "sol-0801CE6C-3824"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "87c60eb0683f417d0d5d537078771ab6752ee16a3dedc769f76c8112ace5faf2",
-        "acknowledged_cursor": 6717914658,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "87c60eb0683f417d0d5d537078771ab6752ee16a3dedc769f76c8112ace5faf2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801CE6C\",\"who\":\"sol-0801CE6C-3824\",\"claim_id\":6717875171,\"reason\":\"Existing BIOS fast-fill source profile excludes this mixed-call owner; zero C/compiler/native calls\",\"unmatchable\":true,\"tried\":\"Existing fixed compiler and native profiles; no tooling changes, finite boundary preserved\"}",
-          "created_at": "2026-11-08T05:50:23Z",
-          "id": 6717914642,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:50:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f72ed892254544e8b6cf65c49507d8c0af39335221d49254e846e14cfd908e6a",
-        "result": {
-          "address": "0x0801CE6C",
-          "claim_id": 6717875171,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717914642,
-          "status": "accepted",
-          "who": "sol-0801CE6C-3824"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d2889dcd648cf01ab51b3db615d81a8860c80c05d47b1da0a1eb43cc7c04c09c",
         "acknowledged_cursor": 6717899461,
         "body_provenance": "acceptance-time",
