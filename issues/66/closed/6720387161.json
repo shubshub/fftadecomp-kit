@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5100bd90c7de72dcb199cf52bb7827513366561eb58ddb307580b79fe35e5c22",
+    "acknowledged_cursor": 6720387161,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5100bd90c7de72dcb199cf52bb7827513366561eb58ddb307580b79fe35e5c22",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F4A70\",\"who\":\"sol-080F4A70-3865\",\"note\":\"Bounded natural callback matching from complete fresh ROM CFG; no tooling changes\"}",
+      "created_at": "2026-11-08T10:31:37Z",
+      "id": 6720387161,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:31:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6a08e5ae056b9c95d86ccd81c6f75fdb3365e04385bdba93d1c515f0e8cce6a9",
+    "result": {
+      "address": "0x080F4A70",
+      "claim_id": 6720387161,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720387161,
+      "status": "accepted",
+      "who": "sol-080F4A70-3865"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "af21bee498855260ce7f5cf245f5d82c18c43504c5ea1b38b2f2ac0e7baaae2f",
+    "acknowledged_cursor": 6720418249,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "af21bee498855260ce7f5cf245f5d82c18c43504c5ea1b38b2f2ac0e7baaae2f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F4A70\",\"who\":\"sol-080F4A70-3865\",\"claim_id\":6720387161,\"reason\":\"Stopped before C: thirteen discarded RAM reads lack genuine storage layout authority; zero source/compiler/native calls; precise refusal retained\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:35:04Z",
+      "id": 6720418249,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:35:04Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "868fa1296b98c64d6bc8c69ccb6a9f5b6ea07addea35547408edd544ae7692d4",
+    "result": {
+      "address": "0x080F4A70",
+      "claim_id": 6720387161,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720418249,
+      "status": "accepted",
+      "who": "sol-080F4A70-3865"
+    }
+  }
+}

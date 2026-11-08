@@ -126,7 +126,35 @@
           "who": "sol-0802EEF8-3865"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c82662bb3db71f469196a9c6ce92b1350cd10e7061a9e55a9817ae8524d05073",
+        "acknowledged_cursor": 6720418249,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c82662bb3db71f469196a9c6ce92b1350cd10e7061a9e55a9817ae8524d05073",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802EEF8\",\"who\":\"sol-0802EEF8-3865\",\"claim_id\":6720347253,\"reason\":\"Native plausible whole FUNC MATCH328B frozen, independently checked, queued for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:35:04Z",
+          "id": 6720418230,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:35:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "868fa1296b98c64d6bc8c69ccb6a9f5b6ea07addea35547408edd544ae7692d4",
+        "result": {
+          "address": "0x0802EEF8",
+          "claim_id": 6720347253,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720418230,
+          "status": "accepted",
+          "who": "sol-0802EEF8-3865"
+        }
+      }
     },
     {
       "claim": {
@@ -222,7 +250,35 @@
           "who": "sol-080F4A70-3865"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "af21bee498855260ce7f5cf245f5d82c18c43504c5ea1b38b2f2ac0e7baaae2f",
+        "acknowledged_cursor": 6720418249,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "af21bee498855260ce7f5cf245f5d82c18c43504c5ea1b38b2f2ac0e7baaae2f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F4A70\",\"who\":\"sol-080F4A70-3865\",\"claim_id\":6720387161,\"reason\":\"Stopped before C: thirteen discarded RAM reads lack genuine storage layout authority; zero source/compiler/native calls; precise refusal retained\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T10:35:04Z",
+          "id": 6720418249,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T10:35:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "868fa1296b98c64d6bc8c69ccb6a9f5b6ea07addea35547408edd544ae7692d4",
+        "result": {
+          "address": "0x080F4A70",
+          "claim_id": 6720387161,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720418249,
+          "status": "accepted",
+          "who": "sol-080F4A70-3865"
+        }
+      }
     }
   ],
   "issue": 66,
