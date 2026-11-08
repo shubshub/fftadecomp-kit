@@ -1694,7 +1694,35 @@
           "who": "sol-08021064-3823"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2bf804d56046cfe11ad67aaefb7051023c1060b40fca09080c04eba284c4cf5a",
+        "acknowledged_cursor": 6717895040,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2bf804d56046cfe11ad67aaefb7051023c1060b40fca09080c04eba284c4cf5a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021064\",\"who\":\"sol-08021064-3823\",\"claim_id\":6717800426,\"reason\":\"Plausible native MATCH complete128B/64I frozen; queued native main publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T05:48:08Z",
+          "id": 6717895040,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:48:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3874f493911c11d45ef7ad74d95012912171928b0612bd3f64d5aba8540b82c8",
+        "result": {
+          "address": "0x08021064",
+          "claim_id": 6717800426,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717895040,
+          "status": "accepted",
+          "who": "sol-08021064-3823"
+        }
+      }
     },
     {
       "claim": {
@@ -1790,7 +1818,35 @@
           "who": "sol-0801B630-3824"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e026c316b33326a981df97a309f691643cbbe661a1ccddd66d850c36dffbdc76",
+        "acknowledged_cursor": 6717895040,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e026c316b33326a981df97a309f691643cbbe661a1ccddd66d850c36dffbdc76",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801B630\",\"who\":\"sol-0801B630-3824\",\"claim_id\":6717859158,\"reason\":\"Stopped before C; three required actual ROM table point bindings missing; precise prerequisite preserved\",\"unmatchable\":true,\"tried\":\"Zero C/native/compiler calls; original exact table point bindings absent\"}",
+          "created_at": "2026-11-08T05:48:08Z",
+          "id": 6717895030,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:48:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3874f493911c11d45ef7ad74d95012912171928b0612bd3f64d5aba8540b82c8",
+        "result": {
+          "address": "0x0801B630",
+          "claim_id": 6717859158,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6717895030,
+          "status": "accepted",
+          "who": "sol-0801B630-3824"
+        }
+      }
     },
     {
       "claim": {
