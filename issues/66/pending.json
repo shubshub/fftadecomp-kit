@@ -1506,66 +1506,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "030dcd8d62552f0a7a3f4bf211c9306a08d70f855ae72e1a6d93b2feb0974c45",
-        "acknowledged_cursor": 6717519231,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "030dcd8d62552f0a7a3f4bf211c9306a08d70f855ae72e1a6d93b2feb0974c45",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DE074\",\"who\":\"sol-080DE074-3817\",\"note\":\"Natural-C scheduler matching only using existing native selector\"}",
-          "created_at": "2026-11-08T05:02:46Z",
-          "id": 6717519091,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:02:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4f7b93f787dbb8806799a38c0424f5b3394bc576985d39f9d51706df47ab2202",
-        "result": {
-          "address": "0x080DE074",
-          "claim_id": 6717519091,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717519091,
-          "status": "accepted",
-          "who": "sol-080DE074-3817"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "3d7314ddb8b185bf05e924f46232011b1b491cbae3549d293a5c3d609f7d20cb",
-        "acknowledged_cursor": 6717605802,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3d7314ddb8b185bf05e924f46232011b1b491cbae3549d293a5c3d609f7d20cb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DE074\",\"who\":\"sol-080DE074-3817\",\"claim_id\":6717519091,\"reason\":\"Four natural forms; best56B source differs in descriptor-pointer/store ordering\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; bounded natural C; existing conditional scheduler profile\"}",
-          "created_at": "2026-11-08T05:13:00Z",
-          "id": 6717605802,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:13:00Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e664b051c1962565e401543b6b49ebdf652674cc9241a641bc47c42ca520c628",
-        "result": {
-          "address": "0x080DE074",
-          "claim_id": 6717519091,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717605802,
-          "status": "accepted",
-          "who": "sol-080DE074-3817"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "83df99130596bb13471d4bd1c63af105f18c9fc458f490b20090a02cd7e9c472",
         "acknowledged_cursor": 6717552010,
         "body_provenance": "acceptance-time",
