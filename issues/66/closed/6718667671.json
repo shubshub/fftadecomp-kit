@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "20a7546cffec3c8241a5aafddcebb16cf07cf844e0eb099a21722eaa8fd339e8",
+    "acknowledged_cursor": 6718667671,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "20a7546cffec3c8241a5aafddcebb16cf07cf844e0eb099a21722eaa8fd339e8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080613D0\",\"who\":\"FFTA-Team2-179\",\"note\":\"Solo first natural matching, actual complete124B tile initializer including seven reached literal words. Reconcile private extent94->124 without removing entries; preserve shared167 and native gates.\"}",
+      "created_at": "2026-11-08T07:19:38Z",
+      "id": 6718667671,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T07:19:38Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7853dca561b3b647012c8e5058e06a17d70c1ae79403312da61f03921ddcf881",
+    "result": {
+      "address": "0x080613D0",
+      "claim_id": 6718667671,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6718667671,
+      "status": "accepted",
+      "who": "FFTA-Team2-179"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ab9c600edd11a9170920efec6ae2ac51336d5c42034d10dcdb0f493554e00daa",
+    "acknowledged_cursor": 6718696039,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ab9c600edd11a9170920efec6ae2ac51336d5c42034d10dcdb0f493554e00daa",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080613D0\",\"who\":\"FFTA-Team2-179\",\"claim_id\":6718667671,\"reason\":\"Two natural tile initializer forms retained. Actual complete124B/47instr extent including seven literal words grounded privately. First124B differs108/124 onlyregisterallocation;32-column model152B. No nativeMATCH.\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; same-component row initializer, then actual stride32 storage model; no register/declaration/order/prototype sweep.\"}",
+      "created_at": "2026-11-08T07:22:55Z",
+      "id": 6718696039,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T07:22:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b1f85c382367342bcd9464b988c1eb63dbd6c33a3ae4ae1f0f715214196c6b33",
+    "result": {
+      "address": "0x080613D0",
+      "claim_id": 6718667671,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6718696039,
+      "status": "accepted",
+      "who": "FFTA-Team2-179"
+    }
+  }
+}
