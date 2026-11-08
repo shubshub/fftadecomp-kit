@@ -62,66 +62,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "3e04be1c7f68847572f3e57fb08b98685278df804bbdadad7b4db6ff9de810d3",
-        "acknowledged_cursor": 6716270676,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3e04be1c7f68847572f3e57fb08b98685278df804bbdadad7b4db6ff9de810d3",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08026F9C\",\"who\":\"sol-08026F9C-3797\",\"note\":\"Bounded natural C hand matching from saved candidate, unchanged native verifier, no tooling edits.\"}",
-          "created_at": "2026-11-08T02:38:27Z",
-          "id": 6716268078,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:38:27Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ae61a4587b71f078779dfebbabdf6db9030e97fb36f0908e9f1d1bf592d5e2c0",
-        "result": {
-          "address": "0x08026F9C",
-          "claim_id": 6716268078,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6716268078,
-          "status": "accepted",
-          "who": "sol-08026F9C-3797"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "73a106a1a89ecc9e3a22f6950a88b51f714cbbc4e03b58653389a36433b076e0",
-        "acknowledged_cursor": 6716356559,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "73a106a1a89ecc9e3a22f6950a88b51f714cbbc4e03b58653389a36433b076e0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08026F9C\",\"who\":\"sol-08026F9C-3797\",\"claim_id\":6716268078,\"reason\":\"Six plausible complete304B natural forms converge295/304 positional; nine entry/resource register encoding bytes remain swapped. Frozen and fully stopped, zero MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; six native/compiler forms, zero diagnostics and zero success replays\"}",
-          "created_at": "2026-11-08T02:48:41Z",
-          "id": 6716356559,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:48:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3d9241448fe261a4d5c95033312f9625c2edabd223f3c19b4ecbd3e42b81b1b7",
-        "result": {
-          "address": "0x08026F9C",
-          "claim_id": 6716268078,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6716356559,
-          "status": "accepted",
-          "who": "sol-08026F9C-3797"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "21d3f8e7d81e7782bbba22af8abd673f0183c32d39c082720540519c024cfe2f",
         "acknowledged_cursor": 6716317149,
         "body_provenance": "acceptance-time",
