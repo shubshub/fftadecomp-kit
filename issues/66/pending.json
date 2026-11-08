@@ -34,66 +34,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "67c733cb2ba9b47574ef84bc138acc078243d2c61c66b6a7f43310af69aaa763",
-        "acknowledged_cursor": 6716102529,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "67c733cb2ba9b47574ef84bc138acc078243d2c61c66b6a7f43310af69aaa763",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08057500\",\"who\":\"sol-08057500-3795\",\"note\":\"Bounded hand matching from saved C with existing published native verifier; no tooling edits.\"}",
-          "created_at": "2026-11-08T02:20:07Z",
-          "id": 6716102390,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:20:07Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3609435e6ee9ab310a58305cc08e51abf32951df4b3a2dc102d18f27559c0e16",
-        "result": {
-          "address": "0x08057500",
-          "claim_id": 6716102390,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6716102390,
-          "status": "accepted",
-          "who": "sol-08057500-3795"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "a6b09b9775d9b3f3a7ae6c5610d3fbacca5a88c3c7b6c44d9169dda09d9de0a7",
-        "acknowledged_cursor": 6716219618,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a6b09b9775d9b3f3a7ae6c5610d3fbacca5a88c3c7b6c44d9169dda09d9de0a7",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08057500\",\"who\":\"sol-08057500-3795\",\"claim_id\":6716102390,\"reason\":\"Six natural forms remain117/120B; address ADD and LDRB register roles differ. Fully stopped, frozen, zero native matches.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; six natural forms with existing named-data-buffer-v1, seven native attempts, six separate diagnostics\"}",
-          "created_at": "2026-11-08T02:32:56Z",
-          "id": 6716219618,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:32:56Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "aef8cb0efe2d07b5e70e40103aaa6fd1db6422fd81ed42cf05139b72ee241767",
-        "result": {
-          "address": "0x08057500",
-          "claim_id": 6716102390,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6716219618,
-          "status": "accepted",
-          "who": "sol-08057500-3795"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "de72dc1fa0ed223c4f6caae834c2e7b4ae71c1d50f8f7cc1a2664a7e93af36f1",
         "acknowledged_cursor": 6716102529,
         "body_provenance": "acceptance-time",
