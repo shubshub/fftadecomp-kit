@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "807f0e6d76dd4c24fc3646b86c1a8e0e2b277e9e50011b7885944139802fb668",
+    "acknowledged_cursor": 6717643526,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "807f0e6d76dd4c24fc3646b86c1a8e0e2b277e9e50011b7885944139802fb668",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003188\",\"who\":\"sol-08003188-3822\",\"note\":\"Bounded hand matching from preserved near-match; new natural C forms only, existing tools\"}",
+      "created_at": "2026-11-08T05:17:25Z",
+      "id": 6717643324,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T05:17:25Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e23db8eded98fce08b0e20d12fe3acfaa3450f9a649918ea84d0fc1892c1f515",
+    "result": {
+      "address": "0x08003188",
+      "claim_id": 6717643324,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6717643324,
+      "status": "accepted",
+      "who": "sol-08003188-3822"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "3d0c692addaa670482a317393b692c68acceb4ce8500fce0290c0ccc39295975",
+    "acknowledged_cursor": 6717726885,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3d0c692addaa670482a317393b692c68acceb4ce8500fce0290c0ccc39295975",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08003188\",\"who\":\"sol-08003188-3822\",\"claim_id\":6717643324,\"reason\":\"New bounded natural forms remain shorter than target; original sources and artifacts preserved\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; new natural forms only\"}",
+      "created_at": "2026-11-08T05:27:26Z",
+      "id": 6717726860,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T05:27:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1e8bd4943b5cdb92225ac8bae4a09ed8a898032ebff4b07c80ef8c0e458a3b3b",
+    "result": {
+      "address": "0x08003188",
+      "claim_id": 6717643324,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6717726860,
+      "status": "accepted",
+      "who": "sol-08003188-3822"
+    }
+  }
+}
