@@ -666,7 +666,35 @@
           "who": "sol-08027B2C-3789"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8ad73d212581767db44d5c605cb3d0d6a89c8e6e1ee89de1b4e3581fb786aad1",
+        "acknowledged_cursor": 6715815869,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8ad73d212581767db44d5c605cb3d0d6a89c8e6e1ee89de1b4e3581fb786aad1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08027B2C\",\"who\":\"sol-08027B2C-3789\",\"claim_id\":6715701210,\"reason\":\"Defining helper interfaces improved432 to481/484B, plausible complete484B; final count copy/reload residual. Seven native plus one failed diagnostic, no MATCH. Fully stopped, evidence frozen.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine defining interfaces and seven natural count scope forms; one distinct failed-source diagnostic\"}",
+          "created_at": "2026-11-08T01:48:50Z",
+          "id": 6715815869,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:48:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4f07b598a0be610794caf26b794dfe188444837677f3498f0f893dc312bb0425",
+        "result": {
+          "address": "0x08027B2C",
+          "claim_id": 6715701210,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715815869,
+          "status": "accepted",
+          "who": "sol-08027B2C-3789"
+        }
+      }
     }
   ],
   "issue": 66,
