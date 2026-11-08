@@ -2139,6 +2139,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e94991589e491b1311a554f795f02af01d1d8751b8305d7fc3f5459945d55f1a",
+        "acknowledged_cursor": 6719515891,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e94991589e491b1311a554f795f02af01d1d8751b8305d7fc3f5459945d55f1a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811896C\",\"who\":\"ffta-team2-native188\",\"note\":\"Frozen exact154B original; two actual canonical data-point bindings in separate current-map candidate, unchanged natural source and published branch scheduler policy.\"}",
+          "created_at": "2026-11-08T08:55:41Z",
+          "id": 6719515891,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:55:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3c9b23caa69f88a915704e0087dc2bcb061ca398f643b50d156abb74caeadde7",
+        "result": {
+          "address": "0x0811896C",
+          "claim_id": 6719515891,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719515891,
+          "status": "accepted",
+          "who": "ffta-team2-native188"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
