@@ -1570,66 +1570,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "5e0dbf99eeb6fcc26116671fd822a313414aa337816af2119d482f78482853b8",
-        "acknowledged_cursor": 6718570361,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5e0dbf99eeb6fcc26116671fd822a313414aa337816af2119d482f78482853b8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08136DEC\",\"who\":\"FFTA-Team2-178\",\"note\":\"Solo natural C matching of complete indexed 596-byte menu animation state update; current ROM and helper interfaces; no source steering; native gated publication if exact.\"}",
-          "created_at": "2026-11-08T07:08:26Z",
-          "id": 6718570361,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:08:26Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cde7e9b8b550c7356d89c9ca2ac7d8db7ea73607d04162ef1b45d64e9c5fd804",
-        "result": {
-          "address": "0x08136DEC",
-          "claim_id": 6718570361,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6718570361,
-          "status": "accepted",
-          "who": "FFTA-Team2-178"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "98db6462369431bba2fcf64427e7913895a4907286f6014420039d4055eb003c",
-        "acknowledged_cursor": 6718631975,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "98db6462369431bba2fcf64427e7913895a4907286f6014420039d4055eb003c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08136DEC\",\"who\":\"FFTA-Team2-178\",\"claim_id\":6718570361,\"reason\":\"Three grounded natural forms retained; complete596B diagnostic residual505/596. Renderer zero-argument setup remains different; default mixed object/numeric switch pool unsupported. No native credit.\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; first form, observed context-snapshot correction, same-component published renderer interface correction; no flags/register/order sweep.\"}",
-          "created_at": "2026-11-08T07:15:30Z",
-          "id": 6718631975,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:15:30Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2b5ac75f8390d4ad8c99a01a221cc0b73fb8b6e98afd916db3bb2bc154348174",
-        "result": {
-          "address": "0x08136DEC",
-          "claim_id": 6718570361,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6718631975,
-          "status": "accepted",
-          "who": "FFTA-Team2-178"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "c43343aec2b9ea991d5c3c0e89c3c3d9244343d565fc93bd70b7d196d090e828",
         "acknowledged_cursor": 6718576001,
         "body_provenance": "acceptance-time",
@@ -1685,66 +1625,6 @@
           "request_id": 6718642492,
           "status": "accepted",
           "who": "sol-080BDB48-3841"
-        }
-      }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "66fc40cfa0da9deffdb9130c3923821131509bfd9e82bce3b2720167a59a929c",
-        "acknowledged_cursor": 6718576001,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "66fc40cfa0da9deffdb9130c3923821131509bfd9e82bce3b2720167a59a929c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08045484\",\"who\":\"sol-08045484-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
-          "created_at": "2026-11-08T07:09:04Z",
-          "id": 6718575872,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:09:04Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
-        "result": {
-          "address": "0x08045484",
-          "claim_id": 6718575872,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6718575872,
-          "status": "accepted",
-          "who": "sol-08045484-3841"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "25e5486b474f7f1db01610359c298faa294c68435781e0f61be8d911672967ba",
-        "acknowledged_cursor": 6718642492,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "25e5486b474f7f1db01610359c298faa294c68435781e0f61be8d911672967ba",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08045484\",\"who\":\"sol-08045484-3841\",\"claim_id\":6718575872,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T07:16:42Z",
-          "id": 6718642482,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:16:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0a7294144e70d525269b818859f53f9cfd04b49424fe759e318776cbf4e3fe4f",
-        "result": {
-          "address": "0x08045484",
-          "claim_id": 6718575872,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6718642482,
-          "status": "accepted",
-          "who": "sol-08045484-3841"
         }
       }
     }
