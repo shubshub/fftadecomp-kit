@@ -319,6 +319,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "054157b975e0d4aab97718ada53631025b2741a279b33f113a8e9c448f5f1a92",
+        "acknowledged_cursor": 6721344588,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "054157b975e0d4aab97718ada53631025b2741a279b33f113a8e9c448f5f1a92",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08144944\",\"who\":\"sol-08144944-3871\",\"note\":\"Natural C matching for closed28B Thumb leaf; no tooling, one isolated executor\"}",
+          "created_at": "2026-11-08T12:13:43Z",
+          "id": 6721344588,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T12:13:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a1c6f40b081381af6fffedb4760f0b4acbc6f4f5559e58a60a7a4024022649f5",
+        "result": {
+          "address": "0x08144944",
+          "claim_id": 6721344588,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6721344588,
+          "status": "accepted",
+          "who": "sol-08144944-3871"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
