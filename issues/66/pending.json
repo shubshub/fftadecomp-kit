@@ -350,7 +350,35 @@
           "who": "sol-08144944-3871"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5a66ce6f0c4ad59578be363666f43538f340d45f29526b804fa355044fd9e7eb",
+        "acknowledged_cursor": 6721383583,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5a66ce6f0c4ad59578be363666f43538f340d45f29526b804fa355044fd9e7eb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08144944\",\"who\":\"sol-08144944-3871\",\"claim_id\":6721344588,\"reason\":\"Pre-C private ABI: byte result R3 with incoming R0 preserved; no natural ordinary C ABI body attempted; zero C/compiler/native\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T12:17:40Z",
+          "id": 6721383583,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T12:17:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9cd2d2dc17bcbbd1dff95e191c7efa5201ac89d210dcb97ce462772e8bfe92ba",
+        "result": {
+          "address": "0x08144944",
+          "claim_id": 6721344588,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6721383583,
+          "status": "accepted",
+          "who": "sol-08144944-3871"
+        }
+      }
     }
   ],
   "issue": 66,
