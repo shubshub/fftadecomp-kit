@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "a0ea92e5de856a9e3841dc515acc0e486f156a3a8d4aa53101103563bab1f754",
+    "acknowledged_cursor": 6718487800,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a0ea92e5de856a9e3841dc515acc0e486f156a3a8d4aa53101103563bab1f754",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E2750\",\"who\":\"FFTA-Team2-177\",\"note\":\"Solo first natural C matching complete248B indexed owner; actual direct helper interfaces and canonical data only; unchanged published toolkit\"}",
+      "created_at": "2026-11-08T06:58:22Z",
+      "id": 6718484488,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:58:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "200f1448ea37462cd57389312fc6472632e1cec640b28d474fd1815506353ed6",
+    "result": {
+      "address": "0x080E2750",
+      "claim_id": 6718484488,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6718484488,
+      "status": "accepted",
+      "who": "FFTA-Team2-177"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c8fea850f153efb58485edb689a52c16ac0e04cab140d315d872621f37df5275",
+    "acknowledged_cursor": 6718520497,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c8fea850f153efb58485edb689a52c16ac0e04cab140d315d872621f37df5275",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E2750\",\"who\":\"FFTA-Team2-177\",\"claim_id\":6718484488,\"reason\":\"First natural four-state callback252B vs248B; dispatch pivot257 rather than256 and omitted old-value display reads. No dummy cases/inert paths or forced reads. Full original ETREL typedELF/FUNC current167 modulesROM frozen; fully stopped zero credit.\",\"unmatchable\":true,\"tried\":\"agbcc fixed -mthumb-interwork -O2; one natural source; no order/options/register/prototype sweeps\"}",
+      "created_at": "2026-11-08T07:02:44Z",
+      "id": 6718520497,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T07:02:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1c13a2cd08756056d1d9067a03a8acf3f36d7857d9eaa214be88bf81479a1a1a",
+    "result": {
+      "address": "0x080E2750",
+      "claim_id": 6718484488,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6718520497,
+      "status": "accepted",
+      "who": "FFTA-Team2-177"
+    }
+  }
+}
