@@ -1787,6 +1787,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "17de24c44df2b1db09405e1117c22aeb26a7a305ee481c15c2e13a60bd21e07c",
+        "acknowledged_cursor": 6718268528,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "17de24c44df2b1db09405e1117c22aeb26a7a305ee481c15c2e13a60bd21e07c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080898E0\",\"who\":\"FFTA-Team2-173\",\"note\":\"Natural C numeric tile renderer; actual four incoming words and complete original ELF. Solo user authorization; no forced reads or compiler steering.\"}",
+          "created_at": "2026-11-08T06:32:18Z",
+          "id": 6718266884,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:32:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "18ea4ab837ee033fdfd547439c199d105ef3f105afa1eaf1d3a915ccca10a388",
+        "result": {
+          "address": "0x080898E0",
+          "claim_id": 6718266884,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718266884,
+          "status": "accepted",
+          "who": "FFTA-Team2-173"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e995c6b53eb573db1ffa949d6d5da546e5176e48ea608082cc184c3e1322f047",
+        "acknowledged_cursor": 6718268528,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e995c6b53eb573db1ffa949d6d5da546e5176e48ea608082cc184c3e1322f047",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C268\",\"who\":\"sol-0800C268-3833\",\"note\":\"Natural unlink-and-free matching of real closed88B owner at actual prologue, omitted from legacy index; verified owned in-body data pools, no toolkit changes\"}",
+          "created_at": "2026-11-08T06:32:30Z",
+          "id": 6718268528,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:32:30Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "18ea4ab837ee033fdfd547439c199d105ef3f105afa1eaf1d3a915ccca10a388",
+        "result": {
+          "address": "0x0800C268",
+          "claim_id": 6718268528,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718268528,
+          "status": "accepted",
+          "who": "sol-0800C268-3833"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
