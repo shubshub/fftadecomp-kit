@@ -1883,6 +1883,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f4958a4681295a79b6d93dd438ad81f1f323503403c39e8e1680af1122dd5289",
+        "acknowledged_cursor": 6717827565,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f4958a4681295a79b6d93dd438ad81f1f323503403c39e8e1680af1122dd5289",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080258C4\",\"who\":\"sol-080258C4-3823\",\"note\":\"Bounded new natural C source forms for existing52B near-match via dedicated sub-agent\"}",
+          "created_at": "2026-11-08T05:39:46Z",
+          "id": 6717827565,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T05:39:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2c05c1065759350bb6c7bee6921bcdb94d3e3742b7af5f48586909d33d991605",
+        "result": {
+          "address": "0x080258C4",
+          "claim_id": 6717827565,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6717827565,
+          "status": "accepted",
+          "who": "sol-080258C4-3823"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
