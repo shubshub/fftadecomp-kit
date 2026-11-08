@@ -1954,66 +1954,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "310aa46d37bfe58404d40437b26760267c6f280f18f22704b3edde5507177004",
-        "acknowledged_cursor": 6718993364,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "310aa46d37bfe58404d40437b26760267c6f280f18f22704b3edde5507177004",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D6238\",\"who\":\"FFTA-Team2-183\",\"note\":\"Unchanged frozen76B original; tested bounded pointer-word store under explicit payload contract. Original refusal retained; one changed-context native admission.\"}",
-          "created_at": "2026-11-08T07:57:23Z",
-          "id": 6718993364,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:57:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bcee93c2a805828780e2bf92c0a8fd04c56a25b8b067ff230b0241a64a1b838c",
-        "result": {
-          "address": "0x080D6238",
-          "claim_id": 6718993364,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6718993364,
-          "status": "accepted",
-          "who": "FFTA-Team2-183"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "fd7e4b0d3674a07a45f8b7918201ce643f20dbc1d3e24c6a65e3af0e89f65c38",
-        "acknowledged_cursor": 6719003992,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "fd7e4b0d3674a07a45f8b7918201ce643f20dbc1d3e24c6a65e3af0e89f65c38",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D6238\",\"who\":\"FFTA-Team2-183\",\"claim_id\":6718993364,\"reason\":\"Original76B source unchanged, native MATCH once under tested private aligned payload-pointer store extension. Fixed167/currentROM/runtime preserved; publishing toolkit and source through unchanged gates. Prior refusal retained.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T07:58:40Z",
-          "id": 6719003992,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T07:58:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "92b697972f20da041db500146413567728684f3e83d2f72d22b7606bd2657a0c",
-        "result": {
-          "address": "0x080D6238",
-          "claim_id": 6718993364,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719003992,
-          "status": "accepted",
-          "who": "FFTA-Team2-183"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "56ad9d7696380faf16a27627574bc2eb1e1e9a2783de6c723bb6ea62fbc76bce",
         "acknowledged_cursor": 6719019245,
         "body_provenance": "acceptance-time",
