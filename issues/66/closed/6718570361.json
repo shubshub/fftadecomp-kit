@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5e0dbf99eeb6fcc26116671fd822a313414aa337816af2119d482f78482853b8",
+    "acknowledged_cursor": 6718570361,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5e0dbf99eeb6fcc26116671fd822a313414aa337816af2119d482f78482853b8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08136DEC\",\"who\":\"FFTA-Team2-178\",\"note\":\"Solo natural C matching of complete indexed 596-byte menu animation state update; current ROM and helper interfaces; no source steering; native gated publication if exact.\"}",
+      "created_at": "2026-11-08T07:08:26Z",
+      "id": 6718570361,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T07:08:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cde7e9b8b550c7356d89c9ca2ac7d8db7ea73607d04162ef1b45d64e9c5fd804",
+    "result": {
+      "address": "0x08136DEC",
+      "claim_id": 6718570361,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6718570361,
+      "status": "accepted",
+      "who": "FFTA-Team2-178"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "98db6462369431bba2fcf64427e7913895a4907286f6014420039d4055eb003c",
+    "acknowledged_cursor": 6718631975,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "98db6462369431bba2fcf64427e7913895a4907286f6014420039d4055eb003c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08136DEC\",\"who\":\"FFTA-Team2-178\",\"claim_id\":6718570361,\"reason\":\"Three grounded natural forms retained; complete596B diagnostic residual505/596. Renderer zero-argument setup remains different; default mixed object/numeric switch pool unsupported. No native credit.\",\"unmatchable\":true,\"tried\":\"Fixed agbcc -mthumb-interwork -O2; first form, observed context-snapshot correction, same-component published renderer interface correction; no flags/register/order sweep.\"}",
+      "created_at": "2026-11-08T07:15:30Z",
+      "id": 6718631975,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T07:15:30Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2b5ac75f8390d4ad8c99a01a221cc0b73fb8b6e98afd916db3bb2bc154348174",
+    "result": {
+      "address": "0x08136DEC",
+      "claim_id": 6718570361,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6718631975,
+      "status": "accepted",
+      "who": "FFTA-Team2-178"
+    }
+  }
+}
