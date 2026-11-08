@@ -2011,6 +2011,70 @@
           "who": "ffta-team2-native185"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "86793dc31e0324f4b21ce4208dc903a66076bede0f05c2d0d3825d73a3af1e5d",
+        "acknowledged_cursor": 6719212192,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "86793dc31e0324f4b21ce4208dc903a66076bede0f05c2d0d3825d73a3af1e5d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08143958\",\"who\":\"sol-08143958-3852\",\"note\":\"Natural plausible C matching only with existing frozen verifier. No tooling development. Exact indexed ROM body.\"}",
+          "created_at": "2026-11-08T08:21:53Z",
+          "id": 6719212094,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:21:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aaa47156acecda92a958a7ad9dc5d23f19f53c28a646e64d348834b8b40e67a3",
+        "result": {
+          "address": "0x08143958",
+          "claim_id": 6719212094,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719212094,
+          "status": "accepted",
+          "who": "sol-08143958-3852"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "761f387b96660cbf1e2226cfec478162eefe6ec80484f860359a66876ec7704b",
+        "acknowledged_cursor": 6719212192,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "761f387b96660cbf1e2226cfec478162eefe6ec80484f860359a66876ec7704b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081491C0\",\"who\":\"sol-081491C0-3852\",\"note\":\"Natural plausible C matching only with existing frozen verifier. No tooling development. Exact indexed ROM body.\"}",
+          "created_at": "2026-11-08T08:21:53Z",
+          "id": 6719212192,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T08:21:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aaa47156acecda92a958a7ad9dc5d23f19f53c28a646e64d348834b8b40e67a3",
+        "result": {
+          "address": "0x081491C0",
+          "claim_id": 6719212192,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719212192,
+          "status": "accepted",
+          "who": "sol-081491C0-3852"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
