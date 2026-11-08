@@ -962,66 +962,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "aae6cc2d58c265d0e783e440a8f6b66567ff5347a306ccf910d8ab0ca09dde72",
-        "acknowledged_cursor": 6717394557,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "aae6cc2d58c265d0e783e440a8f6b66567ff5347a306ccf910d8ab0ca09dde72",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809FA1C\",\"who\":\"FFTA-Team2-165\",\"note\":\"First natural sample-envelope breakpoint extraction; complete470B indexed owner, original artifacts and native gate, no scheduling/type sweeps.\"}",
-          "created_at": "2026-11-08T04:47:39Z",
-          "id": 6717394557,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T04:47:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "514858ca9fe348db651eae58cdbba95379d50fc50503bf3177e3b67c3906c060",
-        "result": {
-          "address": "0x0809FA1C",
-          "claim_id": 6717394557,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717394557,
-          "status": "accepted",
-          "who": "FFTA-Team2-165"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "da7aa4a876392017d2dc47dfdb0f49eab7db15d43c0f71b7d069cf4c1de9e1aa",
-        "acknowledged_cursor": 6717434306,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "da7aa4a876392017d2dc47dfdb0f49eab7db15d43c0f71b7d069cf4c1de9e1aa",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809FA1C\",\"who\":\"FFTA-Team2-165\",\"claim_id\":6717394557,\"reason\":\"Frozen two grounded forms480/456 versus470B. Complete originals retained, no native credit, no further justified correction.\",\"unmatchable\":true,\"tried\":\"natural indexed and actual pointer-walking scans; fixed native flags\"}",
-          "created_at": "2026-11-08T04:52:20Z",
-          "id": 6717434306,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T04:52:20Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c97925ccc1c67ccfd8582f9051d1afb2a5ca19096735205ff78bbb669382ce18",
-        "result": {
-          "address": "0x0809FA1C",
-          "claim_id": 6717394557,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717434306,
-          "status": "accepted",
-          "who": "FFTA-Team2-165"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "bcfbeed16b83f3b65f74c4b311fef12bc982b62b4d6f0e014a304e1d56198395",
         "acknowledged_cursor": 6717402509,
         "body_provenance": "acceptance-time",
