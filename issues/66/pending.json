@@ -90,7 +90,35 @@
           "who": "sol-08127228-3799"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c039ad081f5ad6f91c6d4dd055a634bad773773b9d087e9c7e300a2eddfd219b",
+        "acknowledged_cursor": 6716397025,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c039ad081f5ad6f91c6d4dd055a634bad773773b9d087e9c7e300a2eddfd219b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08127228\",\"who\":\"sol-08127228-3799\",\"claim_id\":6716323356,\"reason\":\"Native MATCH, plausible complete342B identical to original ROM, actual helper low16 ABI evidence retained. Frozen and fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:53:22Z",
+          "id": 6716397025,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:53:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a9e1abf9e4e6b6f0c6796c9be283291d22e0fcfd70281f151eee0db53383a07e",
+        "result": {
+          "address": "0x08127228",
+          "claim_id": 6716323356,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716397025,
+          "status": "accepted",
+          "who": "sol-08127228-3799"
+        }
+      }
     },
     {
       "claim": {
