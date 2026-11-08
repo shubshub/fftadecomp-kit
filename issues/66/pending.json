@@ -2143,6 +2143,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f3b06f1fc73ca63d36a012e34f595446e1285c2d223283d0c8220b3bed23a7ae",
+        "acknowledged_cursor": 6719912653,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f3b06f1fc73ca63d36a012e34f595446e1285c2d223283d0c8220b3bed23a7ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DBB74\",\"who\":\"ffta-team2-native191\",\"note\":\"Reconcile saved complete148B owner from indexed evidence; new bounded two-local-payload scheduler composition, unchanged original C, first native under changed tested policy.\"}",
+          "created_at": "2026-11-08T09:39:12Z",
+          "id": 6719912653,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:39:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "55a0a5d4822875756f75bdbc6fba31730ac6a55938104e8e0bbccd0974a4f74f",
+        "result": {
+          "address": "0x080DBB74",
+          "claim_id": 6719912653,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6719912653,
+          "status": "accepted",
+          "who": "ffta-team2-native191"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
