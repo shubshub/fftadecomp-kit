@@ -30,7 +30,35 @@
           "who": "sol-08054664-3867"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "eb7687caed46b9a4818ca2f24d2c67f856cd3a75f1b10d49c21268aaf684a644",
+        "acknowledged_cursor": 6721034937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "eb7687caed46b9a4818ca2f24d2c67f856cd3a75f1b10d49c21268aaf684a644",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08054664\",\"who\":\"sol-08054664-3867\",\"claim_id\":6720819215,\"reason\":\"Frozen plausible diagnostic1860/1860B exact; native unsupported register stack-pointer allocation, zero MATCH credit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T11:41:21Z",
+          "id": 6721034929,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:41:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8032a52e04be129b1496c7cc9ed11da687e65bfcb6c836543605d984ee763954",
+        "result": {
+          "address": "0x08054664",
+          "claim_id": 6720819215,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6721034929,
+          "status": "accepted",
+          "who": "sol-08054664-3867"
+        }
+      }
     },
     {
       "claim": {
@@ -314,7 +342,35 @@
           "who": "FFTA-Team2-Solo197"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "dfeaa46bbdb3b61f6175d25f0261001c362124072657f50d02d3377e9e7bdc16",
+        "acknowledged_cursor": 6721034937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dfeaa46bbdb3b61f6175d25f0261001c362124072657f50d02d3377e9e7bdc16",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08126EA4\",\"who\":\"FFTA-Team2-Solo197\",\"claim_id\":6721000055,\"reason\":\"Original complete FUNC first native MATCH; unchanged source; fully stopped and frozen for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T11:41:21Z",
+          "id": 6721034937,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:41:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8032a52e04be129b1496c7cc9ed11da687e65bfcb6c836543605d984ee763954",
+        "result": {
+          "address": "0x08126EA4",
+          "claim_id": 6721000055,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6721034937,
+          "status": "accepted",
+          "who": "FFTA-Team2-Solo197"
+        }
+      }
     },
     {
       "claim": {
