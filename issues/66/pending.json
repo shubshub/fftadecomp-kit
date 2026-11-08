@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "2b778a44001063b35bf5d21198bda3b1ddcdf85eb832b9f0b35b98a8ac7fd107",
-        "acknowledged_cursor": 6716149077,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2b778a44001063b35bf5d21198bda3b1ddcdf85eb832b9f0b35b98a8ac7fd107",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803578C\",\"who\":\"sol-0803578C-3795\",\"note\":\"Bounded plausible hand matching from saved C using unchanged native commands; no tooling edits.\"}",
-          "created_at": "2026-11-08T02:25:09Z",
-          "id": 6716149010,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:25:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "84d18a7e03f6a8ec62de996734591518fd2f101fd52bf099afa0b0d808a4b023",
-        "result": {
-          "address": "0x0803578C",
-          "claim_id": 6716149010,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6716149010,
-          "status": "accepted",
-          "who": "sol-0803578C-3795"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "05b90fa53bf9662f304c49429df38e5a230f5b12f1722e5776ea5c4dff763299",
-        "acknowledged_cursor": 6716234249,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "05b90fa53bf9662f304c49429df38e5a230f5b12f1722e5776ea5c4dff763299",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803578C\",\"who\":\"sol-0803578C-3795\",\"claim_id\":6716149010,\"reason\":\"Eight natural scalar-mode/pointer/base forms remain nonmatching, best184B162/184 aligned; first panel scheduling and mode-mask copy differ. Fully stopped and frozen.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; eight native failures and one separate failed-source compiler diagnostic\"}",
-          "created_at": "2026-11-08T02:34:35Z",
-          "id": 6716234249,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T02:34:35Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "dd5b2c8632e63326259ad61f7c1d32feaebff73bb725541d69189c12facbfb42",
-        "result": {
-          "address": "0x0803578C",
-          "claim_id": 6716149010,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6716234249,
-          "status": "accepted",
-          "who": "sol-0803578C-3795"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "154e69791ceb8910ee883fd241df22875fff44801b979fcad5d9eddda3cc06b2",
         "acknowledged_cursor": 6716149077,
         "body_provenance": "acceptance-time",
