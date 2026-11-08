@@ -1599,6 +1599,198 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c43343aec2b9ea991d5c3c0e89c3c3d9244343d565fc93bd70b7d196d090e828",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c43343aec2b9ea991d5c3c0e89c3c3d9244343d565fc93bd70b7d196d090e828",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDB48\",\"who\":\"sol-080BDB48-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:03Z",
+          "id": 6718575785,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x080BDB48",
+          "claim_id": 6718575785,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718575785,
+          "status": "accepted",
+          "who": "sol-080BDB48-3841"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f2080f0ea1e47272f094e9eaac5d24fcb60f84cfeb5512e30257a6b76dc94f91",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f2080f0ea1e47272f094e9eaac5d24fcb60f84cfeb5512e30257a6b76dc94f91",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002C50\",\"who\":\"sol-08002C50-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:04Z",
+          "id": 6718575841,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x08002C50",
+          "claim_id": 6718575841,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718575841,
+          "status": "accepted",
+          "who": "sol-08002C50-3841"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "66fc40cfa0da9deffdb9130c3923821131509bfd9e82bce3b2720167a59a929c",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "66fc40cfa0da9deffdb9130c3923821131509bfd9e82bce3b2720167a59a929c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08045484\",\"who\":\"sol-08045484-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:04Z",
+          "id": 6718575872,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x08045484",
+          "claim_id": 6718575872,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718575872,
+          "status": "accepted",
+          "who": "sol-08045484-3841"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "46e3fd9384353fe3a1422f33b4bbcab7a30ff28e98bad16e14f9df6a639fb3da",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "46e3fd9384353fe3a1422f33b4bbcab7a30ff28e98bad16e14f9df6a639fb3da",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD498\",\"who\":\"sol-080CD498-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:04Z",
+          "id": 6718575875,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x080CD498",
+          "claim_id": 6718575875,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718575875,
+          "status": "accepted",
+          "who": "sol-080CD498-3841"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "76d8f002c7f37436076ffa59eb507305ae1cceb95663ca19d25d40137c5c8ae8",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "76d8f002c7f37436076ffa59eb507305ae1cceb95663ca19d25d40137c5c8ae8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002A64\",\"who\":\"sol-08002A64-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:05Z",
+          "id": 6718575994,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x08002A64",
+          "claim_id": 6718575994,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718575994,
+          "status": "accepted",
+          "who": "sol-08002A64-3841"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b2598c699a694ad1ae4d8019fb1160dbcc6b9501bf54c2ced372aa71fc96896c",
+        "acknowledged_cursor": 6718576001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b2598c699a694ad1ae4d8019fb1160dbcc6b9501bf54c2ced372aa71fc96896c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD4AC\",\"who\":\"sol-080CD4AC-3841\",\"note\":\"Previously omitted complete Thumb PUSH-LR leaf in a nonoverlapping function-index gap. Natural original C matching only; isolated ROM-grounded owner metadata, no toolkit changes.\"}",
+          "created_at": "2026-11-08T07:09:05Z",
+          "id": 6718576001,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:09:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b48aa6d81c0077ac3a1cd81ac64e03d9c7114ce48faf869a05da4c10b0916679",
+        "result": {
+          "address": "0x080CD4AC",
+          "claim_id": 6718576001,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718576001,
+          "status": "accepted",
+          "who": "sol-080CD4AC-3841"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
