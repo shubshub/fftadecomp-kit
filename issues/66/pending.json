@@ -2018,66 +2018,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "8411d2eb49020d6ae2e5a3a39ae7a547664db0f5ba259d2e2cd837680a8ff225",
-        "acknowledged_cursor": 6719080200,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8411d2eb49020d6ae2e5a3a39ae7a547664db0f5ba259d2e2cd837680a8ff225",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802A534\",\"who\":\"sol-0802A534-3850\",\"note\":\"Unattempted indexed Thumb body. Natural plausible C matching only, existing native verifier, no tooling changes.\"}",
-          "created_at": "2026-11-08T08:07:15Z",
-          "id": 6719080037,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T08:07:15Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cbc69c4b718f37413c73dc0b1b31a18c3fe3cadd32118672f4920cc2c65bc6ad",
-        "result": {
-          "address": "0x0802A534",
-          "claim_id": 6719080037,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6719080037,
-          "status": "accepted",
-          "who": "sol-0802A534-3850"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "5edefe57893c581bbd5fbe72172b398b0a0caab234e8486ada5c9c6f9590e133",
-        "acknowledged_cursor": 6719130746,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5edefe57893c581bbd5fbe72172b398b0a0caab234e8486ada5c9c6f9590e133",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802A534\",\"who\":\"sol-0802A534-3850\",\"claim_id\":6719080037,\"reason\":\"Three natural byte-field and clear-copy forms compile88B vs target152B. Extra target RAM reads remain unexplained without forced accesses. No MATCH.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural C forms\"}",
-          "created_at": "2026-11-08T08:12:49Z",
-          "id": 6719130746,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T08:12:49Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f1c3d0eb05cdb5ce7aa5e6c8e102c29b40adc76c6861252382ed3f54aeffcc40",
-        "result": {
-          "address": "0x0802A534",
-          "claim_id": 6719080037,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719130746,
-          "status": "accepted",
-          "who": "sol-0802A534-3850"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "43f5dad4b7f4280591bfc6bdfacba94bc398a7baf235e7197770e5a69bfc2afc",
         "acknowledged_cursor": 6719080200,
         "body_provenance": "acceptance-time",
