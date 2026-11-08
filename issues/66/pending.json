@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "8faeff6ab68ae6aafb40fa4df1572dc46db8bb95f7708817cd4d2d567f68dd04",
-        "acknowledged_cursor": 6716505889,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8faeff6ab68ae6aafb40fa4df1572dc46db8bb95f7708817cd4d2d567f68dd04",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08009728\",\"who\":\"claude-ffta2\",\"note\":\"hand matching via sub-agent (ffta-2 session)\"}",
-          "created_at": "2026-11-08T03:05:55Z",
-          "id": 6716505889,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T03:05:55Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5b7ce0b80b311ba294aa59d7cf6c378ae1b331279a2f9257bce43db3b54d6080",
-        "result": {
-          "address": "0x08009728",
-          "claim_id": 6716505889,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6716505889,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "27d18bdee719c20506b5f1aab5d73fc04d1d657c5cd83fec10461827314234f7",
-        "acknowledged_cursor": 6716599206,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "27d18bdee719c20506b5f1aab5d73fc04d1d657c5cd83fec10461827314234f7",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08009728\",\"who\":\"claude-ffta2\",\"claim_id\":6716505889,\"reason\":\"dead ldrb before each strb reproduces only with volatile u8 members on IWRAM 0x03000940 (banned); same as Parked/08135D38; see Parked/08009728\",\"unmatchable\":true,\"tried\":\"bitfields u8/u16/u32 :8, 4-bit and 1+7 pairs, &=0, *=0, volatile bitfields\"}",
-          "created_at": "2026-11-08T03:15:47Z",
-          "id": 6716599206,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T03:15:47Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c2a53870651f7c81ea8e3559125fc7b09552ce157961284882018460378e95ad",
-        "result": {
-          "address": "0x08009728",
-          "claim_id": 6716505889,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6716599206,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "85c47c3d232193a26da38ef65edb7fe86cf803f9102ca919a0e957d84b1f8804",
         "acknowledged_cursor": 6716512073,
         "body_provenance": "acceptance-time",
