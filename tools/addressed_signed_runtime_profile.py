@@ -46,6 +46,7 @@ UNSIGNED_SELECTOR = 'addressed-unsigned-runtime-v1'
 UNSIGNED_SCHEMA = 'elf-symbol-thumb-addressed-unsigned-runtime-v1'
 UNSIGNED_DATA_SELECTOR = 'addressed-unsigned-runtime-data-v1'
 UNSIGNED_DATA_SCHEMA = 'elf-symbol-thumb-addressed-unsigned-runtime-data-v1'
+UNSIGNED_READONLY_SELECTOR = 'addressed-unsigned-runtime-readonly-word0-v1'
 UNSIGNED_BUFFER_SELECTOR = 'addressed-unsigned-runtime-native-buffer-v1'
 BUFFER_SELECTOR = 'addressed-signed-runtime-native-buffer-v1'
 BUFFER_DATA_SELECTOR = 'addressed-signed-runtime-native-buffer-data-v1'
@@ -86,7 +87,7 @@ INTEGER_READONLY_SELECTOR = 'addressed-integer-runtime-readonly-word0-v1'
 INTEGER_THREE_DATA_SELECTOR = 'addressed-integer-runtime-readonly-three-words-data-v1'
 INTEGER_SELECTORS = (INTEGER_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_READONLY_SELECTOR,
                      INTEGER_THREE_DATA_SELECTOR)
-UNSIGNED_CAPABLE_SELECTORS = (*BIOS_ORDINARY_SELECTORS, *BIOS_SELECTORS, *UNSIGNED_SELECTORS, *INTEGER_SELECTORS, UNSIGNED_BUFFER_SELECTOR,
+UNSIGNED_CAPABLE_SELECTORS = (*BIOS_ORDINARY_SELECTORS, *BIOS_SELECTORS, *UNSIGNED_SELECTORS, *INTEGER_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                              UNSIGNED_BUFFER_DATA_SELECTOR)
 CALLBACK_SELECTORS = (CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_DATA_SELECTOR)
 DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
@@ -124,6 +125,7 @@ SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
             READONLY_TWO_DATA_SELECTOR: READONLY_TWO_DATA_SCHEMA,
             CALLBACK_SELECTOR: CALLBACK_SCHEMA, R3_CALLBACK_SELECTOR: R3_CALLBACK_SCHEMA,
             UNSIGNED_SELECTOR: UNSIGNED_SCHEMA, UNSIGNED_DATA_SELECTOR: UNSIGNED_DATA_SCHEMA,
+            UNSIGNED_READONLY_SELECTOR: 'elf-symbol-thumb-addressed-unsigned-runtime-readonly-word0-v1',
             UNSIGNED_BUFFER_SELECTOR: 'elf-symbol-thumb-addressed-unsigned-runtime-native-buffer-v1',
             BUFFER_SELECTOR: 'elf-symbol-thumb-addressed-signed-runtime-native-buffer-v1',
             BUFFER_SCRATCH_SELECTOR: 'elf-symbol-thumb-addressed-signed-runtime-native-buffer-zero-index-discarded-scratch-v1',
@@ -182,7 +184,7 @@ def context_selector(context):
             return READONLY_SELECTOR
         if len(context) == 6 and type(context[5]) is str and context[5] == READONLY_TWO_SELECTOR:
             return READONLY_TWO_SELECTOR
-        if len(context) == 6 and type(context[5]) is str and context[5] in (UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR):
+        if len(context) == 6 and type(context[5]) is str and context[5] in (UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR):
             return context[5]
         if len(context) == 8 and type(context[5]) is str and context[5] in DATA_SELECTORS:
             return context[5]
@@ -195,7 +197,7 @@ def operations(selector):
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS, **{NAME:ADDRESS})
     if selector in INTEGER_SELECTORS:
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS)
-    return UNSIGNED_OPERATIONS if selector in (*UNSIGNED_SELECTORS, UNSIGNED_BUFFER_SELECTOR,
+    return UNSIGNED_OPERATIONS if selector in (*UNSIGNED_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                                                UNSIGNED_BUFFER_DATA_SELECTOR) else OPERATIONS
 
 
@@ -602,7 +604,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             raise ValueError('addressed data requires exact typed coverage of reached address words')
     elif any(remainder.address_literal(row['value']) for row in partition['words']):
         raise ValueError('addressed signed runtimes exclude address literals and data bindings')
-    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
         if selector in (READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
             import readonly_entry_stack_words_profile as incoming
             policy = {'schema': incoming.SCHEMA, 'words': ([0, 1, 2] if selector == INTEGER_THREE_DATA_SELECTOR else [0, 1])}
@@ -661,7 +663,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
         modules += (zero_index,)
     if selector in UNSIGNED_CAPABLE_SELECTORS:
         modules += (unsigned_remainder,)
-    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, INTEGER_READONLY_SELECTOR, BIOS_READONLY_TWO_SELECTOR):
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, BIOS_READONLY_TWO_SELECTOR):
         modules += (incoming,)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
@@ -762,7 +764,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
         raise ValueError('unknown addressed signed runtime selector')
     observed = {}
     context = (rom, mapping, index, bindings, observed)
-    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR):
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR):
         context += (selector,)
     elif selector in DATA_SELECTORS:
         context += (selector, data_mapping, data_bindings)
@@ -1043,7 +1045,7 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     fixed_configuration(args)
     if selector not in SCHEMAS:
         raise ValueError('unknown addressed signed runtime selector')
-    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, *DATA_SELECTORS) else None
+    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, *DATA_SELECTORS) else None
     producers = data_producer_fingerprint(selector) if selector in DATA_SELECTORS else None
     source,mapping,index = source_fingerprint(root,address),mapping_snapshot(root),index_snapshot(root)
     objects,selected_rom = data_snapshot(root),report_rom_path(root)
@@ -1098,7 +1100,7 @@ def render(result):
     selector = next((key for key,value in SCHEMAS.items() if value == result['manifest']['schema']),None)
     if selector is None:
         raise ValueError('unknown addressed signed runtime manifest schema')
-    premise = [] if selector not in (BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR) else [
+    premise = [] if selector not in (BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR) else [
         '* incoming stack ABI: ' + result['manifest']['frame']['entry_stack']['contract']]
     if selector in DATA_SELECTORS:
         premise.append('* named data binding: ' + result['manifest']['data_contract'])
@@ -1172,7 +1174,7 @@ def report_matches(report, root, address):
                 saved['rom_sha256'] != sha(Path(report_rom_path(root)).read_bytes()) or \
                 saved['toolchain'] != toolchain_fingerprint():
             return False
-        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, *DATA_SELECTORS) and saved['runtime'] != runtime_fingerprint():
+        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, *DATA_SELECTORS) and saved['runtime'] != runtime_fingerprint():
             return False
         return render(build(root,address,expected=saved['manifest'],selector=selector)) == report
     except (OSError,ValueError,KeyError,TypeError,IndexError,RuntimeError,subprocess.SubprocessError):

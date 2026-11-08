@@ -1471,6 +1471,17 @@ ELF and rederives the bindings and complete linked body; status and publication
 restore this distinct selector. Changes to inputs, tools or producer sources
 invalidate the evidence.
 
+The separate opt-in `addressed-unsigned-runtime-readonly-word0-v1` composes the
+same word0 contract with the explicit unsigned runtime calls. It admits only
+`func_08142AB0`/`func_08142B28`; signed and mixed calls, data, buffers and
+callbacks stay with their own selectors. At least one reached canonical Thumb
+word load must read entry SP+0. Entry writes, other incoming words, narrow or
+unaligned entry accesses, stack-address materialization and alias escapes still
+fail, and the base unsigned and unsigned native-buffer selectors keep their
+incoming-stack-read refusal. Caller allocation and readability remain explicit
+premises; loaded values, numeric results and historical formal types are not
+proved.
+
 ### Guarded local Thumb switches
 
 The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted
