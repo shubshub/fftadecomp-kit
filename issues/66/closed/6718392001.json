@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "83f5ea976900c61fe044eb663ba4f3098525ab61ba0a85eebe10ecb0ddfcfa1b",
+    "acknowledged_cursor": 6718392001,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "83f5ea976900c61fe044eb663ba4f3098525ab61ba0a85eebe10ecb0ddfcfa1b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805ABB0\",\"who\":\"FFTA-Team2-175\",\"note\":\"Solo first natural C for complete384B window selection update; actual helper interfaces and canonical identities only; unchanged published toolkit\"}",
+      "created_at": "2026-11-08T06:47:11Z",
+      "id": 6718392001,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:47:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d60772957254286536a203df11722da7213256b06a5e99ac0c4ccdd9f92a1936",
+    "result": {
+      "address": "0x0805ABB0",
+      "claim_id": 6718392001,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6718392001,
+      "status": "accepted",
+      "who": "FFTA-Team2-175"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a44b369c61f09b25a985ce0228ea92d0aa2130460b891f315b91222eda44db94",
+    "acknowledged_cursor": 6718427831,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a44b369c61f09b25a985ce0228ea92d0aa2130460b891f315b91222eda44db94",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805ABB0\",\"who\":\"FFTA-Team2-175\",\"claim_id\":6718392001,\"reason\":\"Frozen two natural record-storage forms376/360B vs actual384B; field-address branch placement/pools differ. All original ET_REL typedELF completeFUNC current167 runtime ROM retained. No byte match/native credit; fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc fixed -mthumb-interwork -O2; separate field view and structured record+4 access; no register/order/prototype/options sweeps\"}",
+      "created_at": "2026-11-08T06:51:29Z",
+      "id": 6718427762,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T06:51:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3732e17ccc6f2980ebb1287a63491b53da6bd7ae1ecc65fed67024a546927737",
+    "result": {
+      "address": "0x0805ABB0",
+      "claim_id": 6718392001,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6718427762,
+      "status": "accepted",
+      "who": "FFTA-Team2-175"
+    }
+  }
+}
