@@ -1342,7 +1342,35 @@
           "who": "codex-next-08131E90"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8aedbbabae4296abf19721d02ade89b8bdec9d1f87be2a99c73346687ae7c8e1",
+        "acknowledged_cursor": 6718120730,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8aedbbabae4296abf19721d02ade89b8bdec9d1f87be2a99c73346687ae7c8e1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131E90\",\"who\":\"codex-next-08131E90\",\"claim_id\":6717489242,\"reason\":\"Matched byte-identical 48/48 bytes with plausible natural C; preparing submission\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T06:14:34Z",
+          "id": 6718115933,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:14:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a3b6a3eb4a278b5aa90dba989f620cd14f7ed3cb792a877fd6e925c0494a4099",
+        "result": {
+          "address": "0x08131E90",
+          "claim_id": 6717489242,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6718115933,
+          "status": "accepted",
+          "who": "codex-next-08131E90"
+        }
+      }
     },
     {
       "claim": {
@@ -1722,7 +1750,35 @@
           "who": "sol-0803155C-3828"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5fb282b988dcfe020cc174b86b942c6be0cb44b2c209d9ce02f708f0036321e6",
+        "acknowledged_cursor": 6718120730,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5fb282b988dcfe020cc174b86b942c6be0cb44b2c209d9ce02f708f0036321e6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803155C\",\"who\":\"sol-0803155C-3828\",\"claim_id\":6718048183,\"reason\":\"Zero C: six discarded shadow RAM reads lack grounded retained-access storage; no forced reads.\",\"unmatchable\":true,\"tried\":\"pre-C complete-owner and binding inspection; zero compiler executions\"}",
+          "created_at": "2026-11-08T06:15:08Z",
+          "id": 6718120730,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:15:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a3b6a3eb4a278b5aa90dba989f620cd14f7ed3cb792a877fd6e925c0494a4099",
+        "result": {
+          "address": "0x0803155C",
+          "claim_id": 6718048183,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718120730,
+          "status": "accepted",
+          "who": "sol-0803155C-3828"
+        }
+      }
     },
     {
       "claim": {
