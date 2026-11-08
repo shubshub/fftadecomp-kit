@@ -90,7 +90,35 @@
           "who": "sol-08142BE8-3799"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9c235cc24a0f0b8e52e3bc8c074722ccb81a1071cbd0e87f91c5fe1822dc2576",
+        "acknowledged_cursor": 6716400449,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9c235cc24a0f0b8e52e3bc8c074722ccb81a1071cbd0e87f91c5fe1822dc2576",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142BE8\",\"who\":\"sol-08142BE8-3799\",\"claim_id\":6716329175,\"reason\":\"Two natural storage/width views remain332B318/332 diagnostic bytes; final field-store encoding residual converges to historical14B gap. Native exact-byte guard refuses, frozen and fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; two native attempts and one separate failed-source fixed compile/link diagnostic\"}",
+          "created_at": "2026-11-08T02:53:46Z",
+          "id": 6716400449,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:53:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f5af9889367e6cace171df0f1787dac38ffe3268b182eead9a35c0df21937857",
+        "result": {
+          "address": "0x08142BE8",
+          "claim_id": 6716329175,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716400449,
+          "status": "accepted",
+          "who": "sol-08142BE8-3799"
+        }
+      }
     },
     {
       "claim": {
