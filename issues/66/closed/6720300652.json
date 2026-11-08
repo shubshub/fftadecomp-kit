@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "82d180e96a3d4015f6bfcc471c8a26cd639bfaba19adfdb5df01af8a05a81dba",
+    "acknowledged_cursor": 6720302030,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "82d180e96a3d4015f6bfcc471c8a26cd639bfaba19adfdb5df01af8a05a81dba",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E4A14\",\"who\":\"ffta-team2-native193\",\"note\":\"Unchanged cached whole-exact298B phase controller; new published b44897cb bounded eight-target scheduler profile; authenticate two genuine canonical data points, then first native original. No source steering or unchanged successful replay.\"}",
+      "created_at": "2026-11-08T10:21:58Z",
+      "id": 6720300652,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:21:58Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "879df32b49558711d2a77f8ded12524d73f63a14c6d1ee03521a13eb0870d7d5",
+    "result": {
+      "address": "0x080E4A14",
+      "claim_id": 6720300652,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720300652,
+      "status": "accepted",
+      "who": "ffta-team2-native193"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "11276f160e41cca05310ea3f400171896dc97b98e1660f17aa884902aabcbcb3",
+    "acknowledged_cursor": 6720325137,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "11276f160e41cca05310ea3f400171896dc97b98e1660f17aa884902aabcbcb3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E4A14\",\"who\":\"ffta-team2-native193\",\"claim_id\":6720300652,\"reason\":\"New first native MATCH298B, unchanged original C and full FUNC; existing published bounded scheduler policy. Frozen all167/ROM/module/ETREL/ELF receipts; included with W192 publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:24:38Z",
+      "id": 6720325000,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:24:38Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0ec23eae6f96a4f1d05bf85bd5c3e908be2b13ee48b848d03795d534bc59273d",
+    "result": {
+      "address": "0x080E4A14",
+      "claim_id": 6720300652,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720325000,
+      "status": "accepted",
+      "who": "ffta-team2-native193"
+    }
+  }
+}
