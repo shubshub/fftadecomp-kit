@@ -122,6 +122,162 @@
           "who": "sol-080D5594-3866"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "d34251e27ecaff267128eeaa655d75f369dbb20aa446750c5652aa3e3eb65d37",
+        "acknowledged_cursor": 6720682874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d34251e27ecaff267128eeaa655d75f369dbb20aa446750c5652aa3e3eb65d37",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D5594\",\"who\":\"sol-080D5594-3866\",\"claim_id\":6720575320,\"reason\":\"Native MATCH1228B frozen; complete freshROM and plausible source independently verified; publication pending\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T11:03:48Z",
+          "id": 6720682874,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:03:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e038f085dcc462e84bbad0ea8bf8ecd13903832f00388f4bf5c4f1a1380ceb8b",
+        "result": {
+          "address": "0x080D5594",
+          "claim_id": 6720575320,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6720682874,
+          "status": "accepted",
+          "who": "sol-080D5594-3866"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b5962068372e1e7bb4a5103bdef7a6792a60b4b7670210f1c08e4b07bdfd0fd9",
+        "acknowledged_cursor": 6720682874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b5962068372e1e7bb4a5103bdef7a6792a60b4b7670210f1c08e4b07bdfd0fd9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080ACC24\",\"who\":\"sol-080ACC24-3866\",\"note\":\"Natural matching of complete small-frame callback using existing native profiles; no tooling development\"}",
+          "created_at": "2026-11-08T11:03:17Z",
+          "id": 6720677905,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:03:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e038f085dcc462e84bbad0ea8bf8ecd13903832f00388f4bf5c4f1a1380ceb8b",
+        "result": {
+          "address": "0x080ACC24",
+          "claim_id": 6720677905,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720677905,
+          "status": "accepted",
+          "who": "sol-080ACC24-3866"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "023f9d839b87da5636fc3642b6162ab9c5d9d292b9602b76b764d5e571de4080",
+        "acknowledged_cursor": 6720682874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "023f9d839b87da5636fc3642b6162ab9c5d9d292b9602b76b764d5e571de4080",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080AA894\",\"who\":\"sol-080AA894-3866\",\"note\":\"Natural matching of complete small-frame callback using existing native profiles; no tooling development\"}",
+          "created_at": "2026-11-08T11:03:17Z",
+          "id": 6720677908,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:03:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e038f085dcc462e84bbad0ea8bf8ecd13903832f00388f4bf5c4f1a1380ceb8b",
+        "result": {
+          "address": "0x080AA894",
+          "claim_id": 6720677908,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720677908,
+          "status": "accepted",
+          "who": "sol-080AA894-3866"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "100c533b1fdfa30aa356b3176e5c947072b7e68618b7f30bb91905a3a4abc659",
+        "acknowledged_cursor": 6720682874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "100c533b1fdfa30aa356b3176e5c947072b7e68618b7f30bb91905a3a4abc659",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080AA29C\",\"who\":\"sol-080AA29C-3866\",\"note\":\"Natural matching of complete small-frame callback using existing native profiles; no tooling development\"}",
+          "created_at": "2026-11-08T11:03:18Z",
+          "id": 6720677949,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:03:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e038f085dcc462e84bbad0ea8bf8ecd13903832f00388f4bf5c4f1a1380ceb8b",
+        "result": {
+          "address": "0x080AA29C",
+          "claim_id": 6720677949,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720677949,
+          "status": "accepted",
+          "who": "sol-080AA29C-3866"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "41930057a92a257c24498f75baf9c765c16b94adb7ddb7e51b3eea29290b1cfd",
+        "acknowledged_cursor": 6720682874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "41930057a92a257c24498f75baf9c765c16b94adb7ddb7e51b3eea29290b1cfd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080AD168\",\"who\":\"sol-080AD168-3866\",\"note\":\"Natural matching of complete small-frame callback using existing native profiles; no tooling development\"}",
+          "created_at": "2026-11-08T11:03:18Z",
+          "id": 6720678090,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:03:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e038f085dcc462e84bbad0ea8bf8ecd13903832f00388f4bf5c4f1a1380ceb8b",
+        "result": {
+          "address": "0x080AD168",
+          "claim_id": 6720678090,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720678090,
+          "status": "accepted",
+          "who": "sol-080AD168-3866"
+        }
+      },
       "release": null
     }
   ],
