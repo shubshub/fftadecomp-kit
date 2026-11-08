@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "23940a92daecffd94f97e2c35ae5e0ff63840069156ecc5cd7c04ccfdf3579d9",
+    "acknowledged_cursor": 6720002753,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "23940a92daecffd94f97e2c35ae5e0ff63840069156ecc5cd7c04ccfdf3579d9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081419C0\",\"who\":\"sol-081419C0-3862\",\"note\":\"Plausible complete168B leaf C matching; existing native toolkit only\"}",
+      "created_at": "2026-11-08T09:48:41Z",
+      "id": 6719999668,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T09:48:41Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "00abf061354ca9c5ece39a93c841c34a49322ef30bdba638a827583732ce6daa",
+    "result": {
+      "address": "0x081419C0",
+      "claim_id": 6719999668,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6719999668,
+      "status": "accepted",
+      "who": "sol-081419C0-3862"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8d9467ec643cd2dbae6fef72d3ff51d4b218e3a7b670f2efa057d2406900fe84",
+    "acknowledged_cursor": 6720062409,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8d9467ec643cd2dbae6fef72d3ff51d4b218e3a7b670f2efa057d2406900fe84",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081419C0\",\"who\":\"sol-081419C0-3862\",\"claim_id\":6719999668,\"reason\":\"Zero new C/native: retained164B optimizer residual lacks intermediate ordinary RAM pointer store from168B target; unchanged candidate not replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T09:54:56Z",
+      "id": 6720056677,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T09:54:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "989fcbe7132c3d53b3b8c42a74ea7a7d4e59ebe99e7c8ecf5dcf9b76dcb3d51d",
+    "result": {
+      "address": "0x081419C0",
+      "claim_id": 6719999668,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720056677,
+      "status": "accepted",
+      "who": "sol-081419C0-3862"
+    }
+  }
+}

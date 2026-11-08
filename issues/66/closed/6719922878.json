@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "400328dbb4660368da24c3d74dbfca398399a377599a78953d4a83cf1ab8e5d9",
+    "acknowledged_cursor": 6719922878,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "400328dbb4660368da24c3d74dbfca398399a377599a78953d4a83cf1ab8e5d9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081457FC\",\"who\":\"sol-081457FC-3862\",\"note\":\"Plausible complete C matching; existing native toolkit only\"}",
+      "created_at": "2026-11-08T09:40:20Z",
+      "id": 6719922878,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T09:40:20Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "052a67b3275b7419c5a0e8a57de341469453f33b42d7fa3d4e664310c4e28ad6",
+    "result": {
+      "address": "0x081457FC",
+      "claim_id": 6719922878,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6719922878,
+      "status": "accepted",
+      "who": "sol-081457FC-3862"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0b6f25afb0b0ff0eaa4c9a8d38fd1eaf18a74db2278b8b48f9e32d061dfb62ef",
+    "acknowledged_cursor": 6720062409,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0b6f25afb0b0ff0eaa4c9a8d38fd1eaf18a74db2278b8b48f9e32d061dfb62ef",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081457FC\",\"who\":\"sol-081457FC-3862\",\"claim_id\":6719922878,\"reason\":\"Zero new C/native: no grounded RAM byte4 storage qualifier for discarded read. Finite inspection boundary saved.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T09:54:56Z",
+      "id": 6720056672,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T09:54:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "989fcbe7132c3d53b3b8c42a74ea7a7d4e59ebe99e7c8ecf5dcf9b76dcb3d51d",
+    "result": {
+      "address": "0x081457FC",
+      "claim_id": 6719922878,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720056672,
+      "status": "accepted",
+      "who": "sol-081457FC-3862"
+    }
+  }
+}
