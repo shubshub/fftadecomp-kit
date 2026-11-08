@@ -1630,7 +1630,35 @@
           "who": "sol-080D9F60-3831"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2765c48b13299dcaad9a018a29d9645cea93e79d67c24b7be66727ac1e3c1c97",
+        "acknowledged_cursor": 6718284112,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2765c48b13299dcaad9a018a29d9645cea93e79d67c24b7be66727ac1e3c1c97",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D9F60\",\"who\":\"sol-080D9F60-3831\",\"claim_id\":6718164565,\"reason\":\"Natural scanline record/control models remain shorter than complete target; discarded byte loads unresolved. All source forms preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; recorded native forms and bounded fixed-toolchain diagnostics only\"}",
+          "created_at": "2026-11-08T06:34:18Z",
+          "id": 6718284087,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:34:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a371730ef769f9d87f879e18e8f111a7c6bdd003873f7a7ce44a9eb3103e0851",
+        "result": {
+          "address": "0x080D9F60",
+          "claim_id": 6718164565,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718284087,
+          "status": "accepted",
+          "who": "sol-080D9F60-3831"
+        }
+      }
     },
     {
       "claim": {
@@ -1694,7 +1722,35 @@
           "who": "sol-0800D324-3831"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d92f2bbb7e963758832b51a5dcb08e88301aee16509471fcb4bfa911820b97ef",
+        "acknowledged_cursor": 6718284112,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d92f2bbb7e963758832b51a5dcb08e88301aee16509471fcb4bfa911820b97ef",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D324\",\"who\":\"sol-0800D324-3831\",\"claim_id\":6718164628,\"reason\":\"Natural scanline record/control models remain shorter than complete target; discarded byte loads unresolved. All source forms preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; recorded native forms and bounded fixed-toolchain diagnostics only\"}",
+          "created_at": "2026-11-08T06:34:19Z",
+          "id": 6718284112,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:34:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a371730ef769f9d87f879e18e8f111a7c6bdd003873f7a7ce44a9eb3103e0851",
+        "result": {
+          "address": "0x0800D324",
+          "claim_id": 6718164628,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718284112,
+          "status": "accepted",
+          "who": "sol-0800D324-3831"
+        }
+      }
     },
     {
       "claim": {
