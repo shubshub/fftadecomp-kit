@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c2f017e82ebe3f1cf04e517a9a637f987700c49bef2baceb66fc4cde9578c268",
+    "acknowledged_cursor": 6720202217,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c2f017e82ebe3f1cf04e517a9a637f987700c49bef2baceb66fc4cde9578c268",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FDAB0\",\"who\":\"ffta-team2-native192\",\"note\":\"Unchanged saved exact complete phase controller. New explicit bounded eight-ordinary-target scheduler branch contract; unchanged old guards, each call alias/effect contract checked, original actual data identities only. Focused tests before one native original; no source steering.\"}",
+      "created_at": "2026-11-08T10:10:26Z",
+      "id": 6720196690,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:10:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5fff7c989dcf506514804e220b0fb416fce34ec39c780f0c88b919bec9e92653",
+    "result": {
+      "address": "0x080FDAB0",
+      "claim_id": 6720196690,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6720196690,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8ffb9af41e2371f4aeb0d1f59d31ec623b7c8c4d9d8b8daf26edc65d0241c61d",
+    "acknowledged_cursor": 6720262349,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8ffb9af41e2371f4aeb0d1f59d31ec623b7c8c4d9d8b8daf26edc65d0241c61d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FDAB0\",\"who\":\"ffta-team2-native192\",\"claim_id\":6720196690,\"reason\":\"New first native MATCH under tested bounded eight-target scheduler profile. Original source unchanged; complete FUNC exact; frozen packet. Publication gate underway, no further source work.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-08T10:17:33Z",
+      "id": 6720261223,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T10:17:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "289e2557e0a42f52e1e6967e2a9fbb121a258a7fb1935e443aff36fa6c72727c",
+    "result": {
+      "address": "0x080FDAB0",
+      "claim_id": 6720196690,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6720261223,
+      "status": "accepted",
+      "who": "ffta-team2-native192"
+    }
+  }
+}
