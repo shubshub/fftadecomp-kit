@@ -94,7 +94,35 @@
           "who": "sol-080071E8-3797"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "edc7f10c50d5cc196e5ab1bdd8b86bc762b175ae20bf0654abd4823d51c0df71",
+        "acknowledged_cursor": 6716270676,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "edc7f10c50d5cc196e5ab1bdd8b86bc762b175ae20bf0654abd4823d51c0df71",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080071E8\",\"who\":\"sol-080071E8-3797\",\"claim_id\":6716243201,\"reason\":\"Native MATCH, plausible complete76B identical to original ROM; frozen and fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:38:45Z",
+          "id": 6716270676,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:38:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ae61a4587b71f078779dfebbabdf6db9030e97fb36f0908e9f1d1bf592d5e2c0",
+        "result": {
+          "address": "0x080071E8",
+          "claim_id": 6716243201,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716270676,
+          "status": "accepted",
+          "who": "sol-080071E8-3797"
+        }
+      }
     },
     {
       "claim": {
@@ -188,6 +216,38 @@
           "request_id": 6716261865,
           "status": "accepted",
           "who": "sol-080B4C90-3797"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3e04be1c7f68847572f3e57fb08b98685278df804bbdadad7b4db6ff9de810d3",
+        "acknowledged_cursor": 6716270676,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3e04be1c7f68847572f3e57fb08b98685278df804bbdadad7b4db6ff9de810d3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08026F9C\",\"who\":\"sol-08026F9C-3797\",\"note\":\"Bounded natural C hand matching from saved candidate, unchanged native verifier, no tooling edits.\"}",
+          "created_at": "2026-11-08T02:38:27Z",
+          "id": 6716268078,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:38:27Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ae61a4587b71f078779dfebbabdf6db9030e97fb36f0908e9f1d1bf592d5e2c0",
+        "result": {
+          "address": "0x08026F9C",
+          "claim_id": 6716268078,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6716268078,
+          "status": "accepted",
+          "who": "sol-08026F9C-3797"
         }
       },
       "release": null
