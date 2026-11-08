@@ -1858,66 +1858,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "55e066663ee3d97193a141a16620a84315d4bb858349e35e4ef25e9cddd2b2fe",
-        "acknowledged_cursor": 6719736996,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "55e066663ee3d97193a141a16620a84315d4bb858349e35e4ef25e9cddd2b2fe",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D6098\",\"who\":\"ffta-team2-native190\",\"note\":\"Unchanged saved124B original; implement actual formal-halfword-output and bounded scheduler payload composition, then first native admission.\"}",
-          "created_at": "2026-11-08T09:19:40Z",
-          "id": 6719736996,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:19:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bf030bf96851bbb6f5998536de787152832b0343259f91fb51a1ec72a0c8075f",
-        "result": {
-          "address": "0x080D6098",
-          "claim_id": 6719736996,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6719736996,
-          "status": "accepted",
-          "who": "ffta-team2-native190"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "8fc209cde72e0c06973107518257b801c515d404acfcbd1b71621b86047bce2b",
-        "acknowledged_cursor": 6719800457,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8fc209cde72e0c06973107518257b801c515d404acfcbd1b71621b86047bce2b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D6098\",\"who\":\"ffta-team2-native190\",\"claim_id\":6719736996,\"reason\":\"Frozen new native MATCH124B, unchanged original C. Exact output-leaf and conditional bounded scheduler payload composition; source/proof work stopped for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-08T09:26:44Z",
-          "id": 6719800457,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T09:26:44Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "fea1285ea09f90114552a99dc3b34272263134f3ab388c5f786392aa8134ec3d",
-        "result": {
-          "address": "0x080D6098",
-          "claim_id": 6719736996,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6719800457,
-          "status": "accepted",
-          "who": "ffta-team2-native190"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "14fd10bb77c0c75bc332a5166605e1eebbae5783ec600d0aadb9a1dcc66f3609",
         "acknowledged_cursor": 6719773579,
         "body_provenance": "acceptance-time",
