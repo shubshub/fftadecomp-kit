@@ -702,7 +702,35 @@
           "who": "sol-08003454-3791"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0210e910052b98cbd7e4f0fea32d37a896417e53cec79f6f95285813f9838287",
+        "acknowledged_cursor": 6715934422,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0210e910052b98cbd7e4f0fea32d37a896417e53cec79f6f95285813f9838287",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08003454\",\"who\":\"sol-08003454-3791\",\"claim_id\":6715881580,\"reason\":\"Native exit0 plausible complete98B exact; primary whole-original-ROM intake passed, receipts frozen, agent fully stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:02:15Z",
+          "id": 6715934422,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:02:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "578214fb9532960f45b0b5e2386c30260b4628e8c58196373f73befd137208f8",
+        "result": {
+          "address": "0x08003454",
+          "claim_id": 6715881580,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715934422,
+          "status": "accepted",
+          "who": "sol-08003454-3791"
+        }
+      }
     },
     {
       "claim": {
