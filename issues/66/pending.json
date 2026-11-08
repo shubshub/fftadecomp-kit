@@ -90,7 +90,35 @@
           "who": "codex-recovery-08071888"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a20ac22eef8a32b53d1924e0628f821117e3da367ad0bf66b1a8485efc5bf6d2",
+        "acknowledged_cursor": 6715997318,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a20ac22eef8a32b53d1924e0628f821117e3da367ad0bf66b1a8485efc5bf6d2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08071888\",\"who\":\"codex-recovery-08071888\",\"claim_id\":6714810939,\"reason\":\"Recovered C verified byte-identical with unchanged upstream toolkit; submitted in https://github.com/shubshub/fftadecomp/pull/21\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T02:08:57Z",
+          "id": 6715997318,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:08:57Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5af889e1f40d247cec7dc065463fbdf3d5119ff2946e9defbd40f0c5a2cb6040",
+        "result": {
+          "address": "0x08071888",
+          "claim_id": 6714810939,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6715997318,
+          "status": "accepted",
+          "who": "codex-recovery-08071888"
+        }
+      }
     },
     {
       "claim": {
