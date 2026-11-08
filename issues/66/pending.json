@@ -1822,7 +1822,35 @@
           "who": "sol-08097504-3829"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f3feb020998c091b1695a69ef70ecfed129cc91f2915fe6cc9d624f6eefc8569",
+        "acknowledged_cursor": 6718143259,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f3feb020998c091b1695a69ef70ecfed129cc91f2915fe6cc9d624f6eefc8569",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08097504\",\"who\":\"sol-08097504-3829\",\"claim_id\":6718125609,\"reason\":\"No source or compilation begun; prioritizing fresh scheduler wrappers supported by the merged issue73 fix. Preserved previous attempts unchanged.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T06:17:46Z",
+          "id": 6718143259,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:17:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1f71a6f50e8233e2478111534610be3f29244d57fa99feeff6f1f70013a8f4fc",
+        "result": {
+          "address": "0x08097504",
+          "claim_id": 6718125609,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718143259,
+          "status": "accepted",
+          "who": "sol-08097504-3829"
+        }
+      }
     }
   ],
   "issue": 66,
