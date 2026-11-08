@@ -1787,6 +1787,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a2ae817cc8df7344d4c9f0b57983893079af315e9a9b6a53b698da8c92476149",
+        "acknowledged_cursor": 6718216334,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a2ae817cc8df7344d4c9f0b57983893079af315e9a9b6a53b698da8c92476149",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C224\",\"who\":\"sol-0800C224-3832\",\"note\":\"First natural-C complete58B owner matching via dedicated executor; one ordinary direct call, no tooling changes\"}",
+          "created_at": "2026-11-08T06:26:21Z",
+          "id": 6718216334,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T06:26:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c0914c445be40007a2ebc4f124c65a5b4c5c786f75b8e6f7195bfb39840fde35",
+        "result": {
+          "address": "0x0800C224",
+          "claim_id": 6718216334,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718216334,
+          "status": "accepted",
+          "who": "sol-0800C224-3832"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
