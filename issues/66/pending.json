@@ -123,6 +123,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f0141940c812f96ec411b37da28c8300065e52c5f665acb44184dc47bcab1690",
+        "acknowledged_cursor": 6720923773,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f0141940c812f96ec411b37da28c8300065e52c5f665acb44184dc47bcab1690",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812638C\",\"who\":\"FFTA-Team2-Solo197\",\"note\":\"Saved original36B exact source; prove explicit complete scheduler wrapper transport from actual121B8C then first native under tested new opt-in. No source steering.\"}",
+          "created_at": "2026-11-08T11:29:23Z",
+          "id": 6720923773,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T11:29:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8fdbc8db7c0f66145605d1ed2ad8e26c81560d239cd193afe92d5e9d8af9b31a",
+        "result": {
+          "address": "0x0812638C",
+          "claim_id": 6720923773,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6720923773,
+          "status": "accepted",
+          "who": "FFTA-Team2-Solo197"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
