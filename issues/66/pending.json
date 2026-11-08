@@ -1762,66 +1762,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "6bdeabf8be45faa3c4dc152a8dfd1490d701e68eb13efb36d21b236bac0e5733",
-        "acknowledged_cursor": 6717601844,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "6bdeabf8be45faa3c4dc152a8dfd1490d701e68eb13efb36d21b236bac0e5733",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800D324\",\"who\":\"FFTA-Team2-166\",\"note\":\"Natural C scanline table interleave; original diagnostic and native exact matching under current guards\"}",
-          "created_at": "2026-11-08T05:12:15Z",
-          "id": 6717599624,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:12:15Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "1936859b9a85e1057f653c0b138fdd5bee67ae659a4bf46219e3ebcd19c06d27",
-        "result": {
-          "address": "0x0800D324",
-          "claim_id": 6717599624,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6717599624,
-          "status": "accepted",
-          "who": "FFTA-Team2-166"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4593db99bec2e2a541321520cc4060d8e695a39d1ca056352e9ee9a2952d0a65",
-        "acknowledged_cursor": 6717643526,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4593db99bec2e2a541321520cc4060d8e695a39d1ca056352e9ee9a2952d0a65",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D324\",\"who\":\"FFTA-Team2-166\",\"claim_id\":6717599624,\"reason\":\"Two grounded forms retained; corrected8-byte scanline layout compiles78/150B. Original destination reads and mask/high-halfword shape remain; no forced reads or steering.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; halfword-pair fields then actual8-byte record layout\"}",
-          "created_at": "2026-11-08T05:17:21Z",
-          "id": 6717642780,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-08T05:17:21Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e23db8eded98fce08b0e20d12fe3acfaa3450f9a649918ea84d0fc1892c1f515",
-        "result": {
-          "address": "0x0800D324",
-          "claim_id": 6717599624,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6717642780,
-          "status": "accepted",
-          "who": "FFTA-Team2-166"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "70f58c467b0cf2d65b8fe213d6862e03e927d8cb71cea31393aa4006a0db367f",
         "acknowledged_cursor": 6717601844,
         "body_provenance": "acceptance-time",
