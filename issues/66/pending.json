@@ -666,7 +666,35 @@
           "who": "sol-080CCA20-3789"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "319d898528b217e75f65a11df8f46781a40e03cce0b3d82de36bce567a125ee9",
+        "acknowledged_cursor": 6715770593,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "319d898528b217e75f65a11df8f46781a40e03cce0b3d82de36bce567a125ee9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CCA20\",\"who\":\"sol-080CCA20-3789\",\"claim_id\":6715680851,\"reason\":\"Plausible complete52B remains nonmatching: lower index copy/table register/ADD/pool residue. Best aligned45/52B, positional34/52B; one short48B refusal retained. Evidence frozen, fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; eight native natural index/address/declaration variants, zero diagnostics\"}",
+          "created_at": "2026-11-08T01:43:52Z",
+          "id": 6715770593,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:43:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3ed5029fdd5db51281affbefb73ae7fd4377fd9dd53a59dd4e6799390affbebd",
+        "result": {
+          "address": "0x080CCA20",
+          "claim_id": 6715680851,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715770593,
+          "status": "accepted",
+          "who": "sol-080CCA20-3789"
+        }
+      }
     },
     {
       "claim": {
