@@ -90,7 +90,35 @@
           "who": "sol-080076A0-3791"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a85d8936c2049c6f9d51cfaf2044e834d36228cc3eea25b9274ee842f5d0e17b",
+        "acknowledged_cursor": 6716048217,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a85d8936c2049c6f9d51cfaf2044e834d36228cc3eea25b9274ee842f5d0e17b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080076A0\",\"who\":\"sol-080076A0-3791\",\"claim_id\":6715965941,\"reason\":\"Five native/compiler attempts, best plausible complete84B82/84 aligned bytes, adjacent period-preservation/threshold-load order remains. Fully stopped, evidence frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; natural field views/scalar snapshots/initializer scopes and loop update associations, five native/compiler executions\"}",
+          "created_at": "2026-11-08T02:14:14Z",
+          "id": 6716048217,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:14:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dcd663a31c009808186ec62d99396743c06533234dfb9b7ebff7161a7544cd1d",
+        "result": {
+          "address": "0x080076A0",
+          "claim_id": 6715965941,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716048217,
+          "status": "accepted",
+          "who": "sol-080076A0-3791"
+        }
+      }
     },
     {
       "claim": {
