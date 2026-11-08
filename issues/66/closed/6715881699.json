@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "607a025a11596d92b243f78fca5fdc8521d3cd2a38f7f067d0282eff8440f594",
+    "acknowledged_cursor": 6715881699,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "607a025a11596d92b243f78fca5fdc8521d3cd2a38f7f067d0282eff8440f594",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08081DEC\",\"who\":\"sol-08081DEC-3791\",\"note\":\"Bounded plausible C hand matching from saved recovery; current native verifier, no tooling edits.\"}",
+      "created_at": "2026-11-08T01:56:16Z",
+      "id": 6715881699,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T01:56:16Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bdf0824a69d12778fdb2c463d14f0cf9cafc8ddb57d2018bf55d91debbcc2c3d",
+    "result": {
+      "address": "0x08081DEC",
+      "claim_id": 6715881699,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6715881699,
+      "status": "accepted",
+      "who": "sol-08081DEC-3791"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "85c2f55228fe086fcbd242a9b9e3fe5a5df6f6b9e14fe56a4566a627c1e9c7e8",
+    "acknowledged_cursor": 6716014346,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "85c2f55228fe086fcbd242a9b9e3fe5a5df6f6b9e14fe56a4566a627c1e9c7e8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08081DEC\",\"who\":\"sol-08081DEC-3791\",\"claim_id\":6715881699,\"reason\":\"Eight natural forms plus failed diagnostic, plausible452B improves414 to421/452 but scalar address ADD/order and narrowing residual remains. Fully stopped, receipts frozen, no MATCH.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine panel scalar base/displacement, signed helper result at point of use, byte view layouts; eight native plus one diagnostic\"}",
+      "created_at": "2026-11-08T02:10:14Z",
+      "id": 6716010124,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-08T02:10:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dc2b2f1d3f1fb096ee5c851d5188fafc267e198f4e5a8e4631fa9fa887b353ce",
+    "result": {
+      "address": "0x08081DEC",
+      "claim_id": 6715881699,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6716010124,
+      "status": "accepted",
+      "who": "sol-08081DEC-3791"
+    }
+  }
+}
