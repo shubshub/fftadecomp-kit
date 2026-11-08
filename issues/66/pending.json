@@ -90,7 +90,35 @@
           "who": "sol-0803578C-3795"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "05b90fa53bf9662f304c49429df38e5a230f5b12f1722e5776ea5c4dff763299",
+        "acknowledged_cursor": 6716234249,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "05b90fa53bf9662f304c49429df38e5a230f5b12f1722e5776ea5c4dff763299",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803578C\",\"who\":\"sol-0803578C-3795\",\"claim_id\":6716149010,\"reason\":\"Eight natural scalar-mode/pointer/base forms remain nonmatching, best184B162/184 aligned; first panel scheduling and mode-mask copy differ. Fully stopped and frozen.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; eight native failures and one separate failed-source compiler diagnostic\"}",
+          "created_at": "2026-11-08T02:34:35Z",
+          "id": 6716234249,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T02:34:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dd5b2c8632e63326259ad61f7c1d32feaebff73bb725541d69189c12facbfb42",
+        "result": {
+          "address": "0x0803578C",
+          "claim_id": 6716149010,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6716234249,
+          "status": "accepted",
+          "who": "sol-0803578C-3795"
+        }
+      }
     },
     {
       "claim": {
