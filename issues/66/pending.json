@@ -2175,6 +2175,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3186da8059ce581075e6d02dfb2d8a2e5156eabbbf5dc2a14e57d273f6aa80c7",
+        "acknowledged_cursor": 6718879578,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3186da8059ce581075e6d02dfb2d8a2e5156eabbbf5dc2a14e57d273f6aa80c7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E0730\",\"who\":\"FFTA-Team2-182\",\"note\":\"Frozen original exact; first native under published4573 scheduler payload descriptor contract. Solo, unchanged source, no assumptions beyond explicit published contract.\"}",
+          "created_at": "2026-11-08T07:44:08Z",
+          "id": 6718879578,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:44:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e3d994acf4463bd905af727b1396707f3bc69515088eadccac954679d550c5b3",
+        "result": {
+          "address": "0x080E0730",
+          "claim_id": 6718879578,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718879578,
+          "status": "accepted",
+          "who": "FFTA-Team2-182"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
