@@ -1598,7 +1598,35 @@
           "who": "sol-0800BE34-3843"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e7db2aae0a0935fbc360a0ce298a2a8d6a8a8d76c30eb5f237837ebab3fe88e6",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e7db2aae0a0935fbc360a0ce298a2a8d6a8a8d76c30eb5f237837ebab3fe88e6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800BE34\",\"who\":\"sol-0800BE34-3843\",\"claim_id\":6718742540,\"reason\":\"Complete plausible native MATCH36B frozen for primary publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T07:34:53Z",
+          "id": 6718799292,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x0800BE34",
+          "claim_id": 6718742540,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718799292,
+          "status": "accepted",
+          "who": "sol-0800BE34-3843"
+        }
+      }
     },
     {
       "claim": {
@@ -1718,6 +1746,262 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6718782950,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0b4f59c2297d7cbb060fca85753c211d915729c6fe73d7b2947c01ccc1ff8dcc",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0b4f59c2297d7cbb060fca85753c211d915729c6fe73d7b2947c01ccc1ff8dcc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DF7F8\",\"who\":\"claude-ffta2\",\"note\":\"re-claim: parked source unblocked by kit #83/#86\"}",
+          "created_at": "2026-11-08T07:34:13Z",
+          "id": 6718793542,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:13Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080DF7F8",
+          "claim_id": 6718793542,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6718793542,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "27bd7b08f7a27927e423ea38827ae6d5b038aa8790fc9015c96be4a9df185855",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "27bd7b08f7a27927e423ea38827ae6d5b038aa8790fc9015c96be4a9df185855",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DAE38\",\"who\":\"sol-080DAE38-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:45Z",
+          "id": 6718798145,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080DAE38",
+          "claim_id": 6718798145,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798145,
+          "status": "accepted",
+          "who": "sol-080DAE38-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ae313ffb542d36f640c52651c737d2c97724e97403214161e0aa888e08dd8f63",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ae313ffb542d36f640c52651c737d2c97724e97403214161e0aa888e08dd8f63",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BCA08\",\"who\":\"sol-080BCA08-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:45Z",
+          "id": 6718798195,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080BCA08",
+          "claim_id": 6718798195,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798195,
+          "status": "accepted",
+          "who": "sol-080BCA08-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9f8ebabdfa5156a011be0127ad4db15f17cf7948dc6276d6fb28eced0f31d2f6",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9f8ebabdfa5156a011be0127ad4db15f17cf7948dc6276d6fb28eced0f31d2f6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E05D0\",\"who\":\"sol-080E05D0-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:45Z",
+          "id": 6718798216,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080E05D0",
+          "claim_id": 6718798216,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798216,
+          "status": "accepted",
+          "who": "sol-080E05D0-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a498e811d600ad25ab4780e14971342aad33d52fe16d1acbb74bc44c431f083e",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a498e811d600ad25ab4780e14971342aad33d52fe16d1acbb74bc44c431f083e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BC9FC\",\"who\":\"sol-080BC9FC-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:46Z",
+          "id": 6718798386,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080BC9FC",
+          "claim_id": 6718798386,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798386,
+          "status": "accepted",
+          "who": "sol-080BC9FC-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1fe0840304b927a8ec55a555c370eb5418928bb57d2b48d1ff70f5fd322433de",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1fe0840304b927a8ec55a555c370eb5418928bb57d2b48d1ff70f5fd322433de",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8AE0\",\"who\":\"sol-080D8AE0-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:47Z",
+          "id": 6718798467,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080D8AE0",
+          "claim_id": 6718798467,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798467,
+          "status": "accepted",
+          "who": "sol-080D8AE0-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9b390e41c26d14108fbba86af0a7a4288401e4ae9b3704e1bbb07eeb93b39081",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9b390e41c26d14108fbba86af0a7a4288401e4ae9b3704e1bbb07eeb93b39081",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C7554\",\"who\":\"sol-080C7554-3844\",\"note\":\"Previously omitted complete 10-byte Thumb forwarding wrapper in a disjoint function-index gap. Natural typed C matching, frozen owner metadata, no tool changes.\"}",
+          "created_at": "2026-11-08T07:34:47Z",
+          "id": 6718798530,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080C7554",
+          "claim_id": 6718798530,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718798530,
+          "status": "accepted",
+          "who": "sol-080C7554-3844"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0b538c6109920b40449f343c143a0d8feb1305689eca68d9d777bb932f3dc6b8",
+        "acknowledged_cursor": 6718800007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0b538c6109920b40449f343c143a0d8feb1305689eca68d9d777bb932f3dc6b8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DF82C\",\"who\":\"claude-ffta2\",\"note\":\"re-claim: parked source unblocked by kit #83/#86\"}",
+          "created_at": "2026-11-08T07:34:57Z",
+          "id": 6718800007,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:34:57Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3633f45567304d1d56b5df13625e5029a0eab22ba31132094c5348e5f68a4755",
+        "result": {
+          "address": "0x080DF82C",
+          "claim_id": 6718800007,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6718800007,
           "status": "accepted",
           "who": "claude-ffta2"
         }
