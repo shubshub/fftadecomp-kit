@@ -1627,6 +1627,198 @@
           "who": "FFTA-Team2-179"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "792390c12dd893f012a90646fbe0e793810d37a32b7000d7d0fe1b7b0831d599",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "792390c12dd893f012a90646fbe0e793810d37a32b7000d7d0fe1b7b0831d599",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BE58\",\"who\":\"sol-0800BE58-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:20Z",
+          "id": 6718742459,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x0800BE58",
+          "claim_id": 6718742459,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742459,
+          "status": "accepted",
+          "who": "sol-0800BE58-3843"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b7db98a452ec6af442ee8dd515da1d2095a9c4a43d5fdd2779686e4584d8a3a9",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b7db98a452ec6af442ee8dd515da1d2095a9c4a43d5fdd2779686e4584d8a3a9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A0D4\",\"who\":\"sol-0809A0D4-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:20Z",
+          "id": 6718742470,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x0809A0D4",
+          "claim_id": 6718742470,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742470,
+          "status": "accepted",
+          "who": "sol-0809A0D4-3843"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6c7704218f61ceb6ee8fdb670833024002b05bc87a20f8c5c5e205c033ac69be",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6c7704218f61ceb6ee8fdb670833024002b05bc87a20f8c5c5e205c033ac69be",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C7B84\",\"who\":\"sol-080C7B84-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:21Z",
+          "id": 6718742516,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x080C7B84",
+          "claim_id": 6718742516,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742516,
+          "status": "accepted",
+          "who": "sol-080C7B84-3843"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f3bc4a84e0b8af4de0c00ede903d3489109b2b143b6ccb6fbfb1600525d6516f",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f3bc4a84e0b8af4de0c00ede903d3489109b2b143b6ccb6fbfb1600525d6516f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A8050\",\"who\":\"sol-080A8050-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:21Z",
+          "id": 6718742534,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x080A8050",
+          "claim_id": 6718742534,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742534,
+          "status": "accepted",
+          "who": "sol-080A8050-3843"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "72f8c38491fc9eb15c0eda1b01f29374bf466663099e6183af46cf11827296f2",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "72f8c38491fc9eb15c0eda1b01f29374bf466663099e6183af46cf11827296f2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BE34\",\"who\":\"sol-0800BE34-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:21Z",
+          "id": 6718742540,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x0800BE34",
+          "claim_id": 6718742540,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742540,
+          "status": "accepted",
+          "who": "sol-0800BE34-3843"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "51a149f14061b01de4c233779ec72acb32ca6d2855cfee6d57b7461369c08b36",
+        "acknowledged_cursor": 6718742551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "51a149f14061b01de4c233779ec72acb32ca6d2855cfee6d57b7461369c08b36",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08005BDC\",\"who\":\"sol-08005BDC-3843\",\"note\":\"Previously omitted complete Thumb function in a disjoint index gap. Natural C matching with frozen ROM-grounded owner metadata; no tool changes.\"}",
+          "created_at": "2026-11-08T07:28:21Z",
+          "id": 6718742551,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:28:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7e3ce059436d5e2fe36e2fff60838604cc7674af86d4d29394c53ce3f5cfb3",
+        "result": {
+          "address": "0x08005BDC",
+          "claim_id": 6718742551,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6718742551,
+          "status": "accepted",
+          "who": "sol-08005BDC-3843"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
