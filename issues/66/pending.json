@@ -1662,7 +1662,35 @@
           "who": "sol-08002C50-3841"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "63dc29021aa75952deffb8b7027dbbc3c13835cb6081c042e680d0db28b4392f",
+        "acknowledged_cursor": 6718612115,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "63dc29021aa75952deffb8b7027dbbc3c13835cb6081c042e680d0db28b4392f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08002C50\",\"who\":\"sol-08002C50-3841\",\"claim_id\":6718575841,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T07:13:14Z",
+          "id": 6718612115,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:13:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfb14ce1223fa5c3821cab845d9d05ed50e13ec2526df82ea501e039be957b7e",
+        "result": {
+          "address": "0x08002C50",
+          "claim_id": 6718575841,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718612115,
+          "status": "accepted",
+          "who": "sol-08002C50-3841"
+        }
+      }
     },
     {
       "claim": {
@@ -1726,7 +1754,35 @@
           "who": "sol-080CD498-3841"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "aa96e3fbfb0cbdaeb310710204d7f13e4d2c9d38d666117ae25a4ca597708bce",
+        "acknowledged_cursor": 6718612115,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aa96e3fbfb0cbdaeb310710204d7f13e4d2c9d38d666117ae25a4ca597708bce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CD498\",\"who\":\"sol-080CD498-3841\",\"claim_id\":6718575875,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T07:13:14Z",
+          "id": 6718612110,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:13:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfb14ce1223fa5c3821cab845d9d05ed50e13ec2526df82ea501e039be957b7e",
+        "result": {
+          "address": "0x080CD498",
+          "claim_id": 6718575875,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718612110,
+          "status": "accepted",
+          "who": "sol-080CD498-3841"
+        }
+      }
     },
     {
       "claim": {
@@ -1758,7 +1814,35 @@
           "who": "sol-08002A64-3841"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c4ab4eeca903c02effefde60bbd908bb896d3bf5fb89b808a9a60b2a0ee1fe80",
+        "acknowledged_cursor": 6718612115,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c4ab4eeca903c02effefde60bbd908bb896d3bf5fb89b808a9a60b2a0ee1fe80",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08002A64\",\"who\":\"sol-08002A64-3841\",\"claim_id\":6718575994,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T07:13:14Z",
+          "id": 6718612109,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:13:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfb14ce1223fa5c3821cab845d9d05ed50e13ec2526df82ea501e039be957b7e",
+        "result": {
+          "address": "0x08002A64",
+          "claim_id": 6718575994,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718612109,
+          "status": "accepted",
+          "who": "sol-08002A64-3841"
+        }
+      }
     },
     {
       "claim": {
@@ -1790,7 +1874,35 @@
           "who": "sol-080CD4AC-3841"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "df4bd037dc03e8fffd1873f9f985de9bce55401ba95083e04ab4571277bbd72d",
+        "acknowledged_cursor": 6718612115,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "df4bd037dc03e8fffd1873f9f985de9bce55401ba95083e04ab4571277bbd72d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CD4AC\",\"who\":\"sol-080CD4AC-3841\",\"claim_id\":6718576001,\"reason\":\"Complete plausible native MATCH frozen in batch3841; all bytes exact; primary preparing publication, matching compiler work stopped.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T07:13:14Z",
+          "id": 6718612114,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T07:13:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfb14ce1223fa5c3821cab845d9d05ed50e13ec2526df82ea501e039be957b7e",
+        "result": {
+          "address": "0x080CD4AC",
+          "claim_id": 6718576001,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6718612114,
+          "status": "accepted",
+          "who": "sol-080CD4AC-3841"
+        }
+      }
     }
   ],
   "issue": 66,
