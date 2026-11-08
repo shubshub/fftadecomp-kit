@@ -1886,7 +1886,35 @@
           "who": "ffta-team2-native190"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8fc209cde72e0c06973107518257b801c515d404acfcbd1b71621b86047bce2b",
+        "acknowledged_cursor": 6719800457,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8fc209cde72e0c06973107518257b801c515d404acfcbd1b71621b86047bce2b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D6098\",\"who\":\"ffta-team2-native190\",\"claim_id\":6719736996,\"reason\":\"Frozen new native MATCH124B, unchanged original C. Exact output-leaf and conditional bounded scheduler payload composition; source/proof work stopped for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:26:44Z",
+          "id": 6719800457,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:26:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fea1285ea09f90114552a99dc3b34272263134f3ab388c5f786392aa8134ec3d",
+        "result": {
+          "address": "0x080D6098",
+          "claim_id": 6719736996,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719800457,
+          "status": "accepted",
+          "who": "ffta-team2-native190"
+        }
+      }
     },
     {
       "claim": {
