@@ -666,7 +666,35 @@
           "who": "sol-080078A8-3786"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "49c2ee41c6def404ab4f0c0a52cb03dfd2e5f53e8fd5b4271e941001cffa1fa8",
+        "acknowledged_cursor": 6715542647,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "49c2ee41c6def404ab4f0c0a52cb03dfd2e5f53e8fd5b4271e941001cffa1fa8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080078A8\",\"who\":\"sol-080078A8-3786\",\"claim_id\":6715445003,\"reason\":\"Eight natural C native attempts; nine total compiler runs. Best complete422B vs420B, stack frame36 vs24; no match. Fully stopped.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; genuine Bresenham locals and signed halfword counter forms\"}",
+          "created_at": "2026-11-08T01:19:43Z",
+          "id": 6715542647,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T01:19:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ad4e567d3e711b7fc231e2e10577f89dbcd6f9a6b8407d1b25e4920f9b0c288a",
+        "result": {
+          "address": "0x080078A8",
+          "claim_id": 6715445003,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6715542647,
+          "status": "accepted",
+          "who": "sol-080078A8-3786"
+        }
+      }
     },
     {
       "claim": {
