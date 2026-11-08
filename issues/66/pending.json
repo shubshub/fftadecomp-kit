@@ -1886,7 +1886,35 @@
           "who": "sol-081101DC-3861"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ed4c5dc2e45e30643fd3db19dc756ff1c7ba02e4364be9a4d9f2e2fe94653a6d",
+        "acknowledged_cursor": 6719850428,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ed4c5dc2e45e30643fd3db19dc756ff1c7ba02e4364be9a4d9f2e2fe94653a6d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081101DC\",\"who\":\"sol-081101DC-3861\",\"claim_id\":6719773374,\"reason\":\"One natural ordinary-byte source has a concrete full-symbol mismatch; discarded shadow-RAM reads lack grounded permitted storage authority. Frozen result retained; no forced reads or RAM volatile.\",\"unmatchable\":true,\"tried\":\"One native -mthumb-interwork -O2 compile; no diagnostics or replay.\"}",
+          "created_at": "2026-11-08T09:32:18Z",
+          "id": 6719850383,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:32:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
+        "result": {
+          "address": "0x081101DC",
+          "claim_id": 6719773374,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719850383,
+          "status": "accepted",
+          "who": "sol-081101DC-3861"
+        }
+      }
     },
     {
       "claim": {
@@ -1950,7 +1978,35 @@
           "who": "sol-080F7A34-3861"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ed36fc201f095fa73bfc3cae4f36d39d86e1c8b5f45dceb8923799c11ec28eb2",
+        "acknowledged_cursor": 6719850428,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ed36fc201f095fa73bfc3cae4f36d39d86e1c8b5f45dceb8923799c11ec28eb2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F7A34\",\"who\":\"sol-080F7A34-3861\",\"claim_id\":6719773503,\"reason\":\"Plausible native complete226B MATCH frozen and staged for required publication gate.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-08T09:32:19Z",
+          "id": 6719850428,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:32:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
+        "result": {
+          "address": "0x080F7A34",
+          "claim_id": 6719773503,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719850428,
+          "status": "accepted",
+          "who": "sol-080F7A34-3861"
+        }
+      }
     },
     {
       "claim": {
@@ -2014,7 +2070,35 @@
           "who": "sol-080E2750-3861"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9c181198781f5f19182544c534c7ea15fdb0d3bb85bd6df9d21c94450731adb2",
+        "acknowledged_cursor": 6719850428,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9c181198781f5f19182544c534c7ea15fdb0d3bb85bd6df9d21c94450731adb2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E2750\",\"who\":\"sol-080E2750-3861\",\"claim_id\":6719773579,\"reason\":\"One natural ordinary-byte source has a concrete full-symbol mismatch; discarded shadow-RAM reads lack grounded permitted storage authority. Frozen result retained; no forced reads or RAM volatile.\",\"unmatchable\":true,\"tried\":\"One native -mthumb-interwork -O2 compile; no diagnostics or replay.\"}",
+          "created_at": "2026-11-08T09:32:18Z",
+          "id": 6719850400,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:32:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
+        "result": {
+          "address": "0x080E2750",
+          "claim_id": 6719773579,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6719850400,
+          "status": "accepted",
+          "who": "sol-080E2750-3861"
+        }
+      }
     },
     {
       "claim": {
@@ -2138,6 +2222,38 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6719836581,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "628ffad615d1bc59901d4812b71148bbac59d8a8de8016fe576f8cec9e99d398",
+        "acknowledged_cursor": 6719850428,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "628ffad615d1bc59901d4812b71148bbac59d8a8de8016fe576f8cec9e99d398",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DF978\",\"who\":\"claude-ffta2\",\"note\":\"\"}",
+          "created_at": "2026-11-08T09:31:48Z",
+          "id": 6719845872,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-08T09:31:48Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6ffce2207582e3a5e39081bf791439c94da41ee7a35007de900aa10420f68dbf",
+        "result": {
+          "address": "0x080DF978",
+          "claim_id": 6719845872,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6719845872,
           "status": "accepted",
           "who": "claude-ffta2"
         }
