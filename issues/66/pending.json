@@ -538,7 +538,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d08be29e415185c74a5f16dcc83b39a9e1d0539bd7d2416ccbf6ed318ab59aa4",
+        "acknowledged_cursor": 6730124077,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d08be29e415185c74a5f16dcc83b39a9e1d0539bd7d2416ccbf6ed318ab59aa4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813ECC4\",\"who\":\"claude-ffta2\",\"claim_id\":6728735541,\"reason\":\"byte-identical with include/control_flags.h but refused by the volatile semantic check: re-read of a just-stored member feeding arithmetic (kit #98 PR body); policy decision pending. Source in claude work notes.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-09T01:33:02Z",
+          "id": 6730124077,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-09T01:33:02Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8737e5efaee313767ed33c486d702fb88d99ae0993a96323a334bcced7b948a4",
+        "result": {
+          "address": "0x0813ECC4",
+          "claim_id": 6728735541,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6730124077,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
