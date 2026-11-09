@@ -291,7 +291,10 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None):
     except (OSError, ValueError):
         rom = None
     if rom is not None and mapping is not None:
-        interfaces = volatile_semantics.RomInterfaces(rom, json.loads(mapping))
+        try:
+            interfaces = volatile_semantics.RomInterfaces(rom, json.loads(mapping))
+        except ValueError:
+            interfaces = None
     with runner.workspace() as workspace:
         compile_object(runner, workspace, args, str(root), address, source)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")

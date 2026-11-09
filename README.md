@@ -1747,7 +1747,9 @@ symbolically along every path, and the check requires:
   register the callee never reads carries nothing into it, and one it
   overwrites on every path carries nothing out, so a dead load there is
   dead across the call. A register it leaves alone stays live past the call,
-  so a later read of it uses the load. Only ROM bytes and the function index
+  so a later read of it uses the load. The report lists each interface a
+  dead load relied on as `callee interfaces from ROM: func_X reads {...}
+  writes {...}`. Only ROM bytes and the function index
   are read, never source. Only the libgcc division helpers have an exact
   interface otherwise;
 * every access to the object to be `symbol + constant` inside it: an
@@ -1784,7 +1786,11 @@ symbolically along every path, and the check requires:
   of its second `0xFF` store and drops the first). Such a store is admitted
   only when the permuted compile is checked and the store follows its
   member there, so an alias all-ones store through another member, the
-  base or a cast is still refused;
+  base, a cast or an index read back from a typed copy is still refused.
+  The report lists such stores as `unloaded all-ones stores at [...]`. When
+  register allocation differs so that the permuted compile keeps a load
+  that the real compile drops (or the reverse), the object accesses differ
+  and the source is refused: a false refusal;
 * no store to write back the value just loaded from the same member (an
   `ldrb`/`strb` or `ldrh`/`strh` self-assignment).
 
@@ -1803,10 +1809,25 @@ source can compute from the layout changes between the two compiles: another
 member's address, `sizeof` and `__alignof__` all keep their values.
 
 A bit-field has no address, so a pinned member can only be reached through
-its own name, which follows the permutation. An access computed any other way has
-the same address in both compiles and so cannot follow the move. That covers
-accesses from another member, from the base, or through a cast, macro, comma
-lvalue, `__extension__` or a size-dependent index. On every path, the real
+its own name, which follows the permutation. An access computed from
+immediates and literal words has the same address in both compiles and so
+cannot follow the move. That covers accesses from another member, from the
+base, or through a cast, macro, comma lvalue, `__extension__` or a
+size-dependent index. The one other way a pinned offset reaches a value is
+memory: a store through the pinned member of another object of the type (a
+stack copy declared with `__typeof__`, a union over it) read back at a fixed
+offset shows where the member landed, and an alias indexed by that value
+would follow the permutation (review probes `p01`, `p04`). So the executor
+marks every value read back from memory: any load except a literal word or
+a word reloaded from a word store of an unmarked value at an unmarked
+address (a register spill; a pinned member is never a word, so no store
+through one is). Marks follow arithmetic and copies. An object access whose
+address registers are marked is refused, and flags computed from a marked
+value never decide a branch by themselves, even when the executor knows
+the value: such a branch becomes a decision, imposed alike on all three
+compiles and compared there, so no branch can follow the layout. The
+permutation therefore shows that each access follows the layout and that
+its offset was not computed from a layout-dependent runtime value. On every path, the real
 compile's trace, branch conditions and object accesses, with each pinned
 offset X mapped to its permuted offset P(X), must equal the perturbed
 compile's. In both compiles any access that overlaps a pinned member without
@@ -1824,8 +1845,12 @@ that is not `symbol.member`, apart from the pinned declaration itself. It
 refuses the plausibility `&` and subscript rules there too. The lexical
 rules (array subscripts, `&`, `&(...)` around the symbol, `__extension__` in
 users, casts and macros) are cheap defence in depth. With the lexical passes
-switched off, every aliasing repro from six review rounds is still refused
-by the permutation or the overlap rule.
+switched off, every aliasing repro from the review rounds (`revw-old`,
+`revw-c`, `revf-c`, as far as they compile against the current header) is
+still refused by the permutation, the overlap rule or the read-back rule;
+`p01` and `p04` are refused only by the read-back rule. Probes the lexical
+rules alone stop and the structural rules do not are not claimed: the
+lexical passes remain part of the check.
 
 A planted read either vanishes from the stripped compile, which leaves a load
 the rules cannot explain, or stays, which shows the qualifier did not produce
@@ -1918,6 +1943,10 @@ has these gaps:
   `symbol.win0h_lo = (symbol.bg0cnt = a)` passes.
 * It reasons about agbcc's assembly. It assumes cc1's output is what the
   assembler encodes.
+* The read-back rule refuses an object offset computed from any byte or
+  halfword local read back from memory, and turns branches on such values
+  into decisions; the extra, possibly infeasible, paths count against the
+  256-path and 32-decision bounds (080D3CB4 goes from 73 to 79 paths).
 * Callee interfaces assume the ARM calling convention for r4-r11 (a callee
   that reads a callee-saved register as a hidden argument is not modelled,
   as before), that capstone reports each Thumb instruction's register reads

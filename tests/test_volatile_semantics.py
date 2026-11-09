@@ -84,7 +84,7 @@ class SemanticDiffTests(unittest.TestCase):
         stripped = assembly("ldr\tr1, .L3", "add\tr1, r1, #60", "mov\tr0, #19", "strb\tr0, [r1]",
                             "bx\tlr")
         (result,) = compare(real, stripped)
-        self.assertEqual(result, ("func_08028C34", 1, [2], []))
+        self.assertEqual(result, ("func_08028C34", 1, [2], [], [], []))
         self.assertIn("read-modify-write loads at [3]",
                       semantics.record(SYMBOL, [result]))
 
@@ -95,7 +95,7 @@ class SemanticDiffTests(unittest.TestCase):
         stripped = assembly("ldr\tr2, .L3", "add\tr0, r2, #0", "add\tr0, r0, #61", "mov\tr1, #0",
                             "strb\tr1, [r0]", "add\tr0, r2, #0", "add\tr0, r0, #60",
                             "strb\tr1, [r0]", "bx\tlr")
-        self.assertEqual(compare(real, stripped)[0][1:], (1, [3, 7], []))
+        self.assertEqual(compare(real, stripped)[0][1:4], (1, [3, 7], []))
 
     def test_chained_assignment_re_read_is_accepted(self):
         # `sym.unknown_3C = (sym.unknown_3D = 0);`: volatile re-reads 0x3D
@@ -104,7 +104,7 @@ class SemanticDiffTests(unittest.TestCase):
                         "ldrb\tr1, [r2]", "strb\tr0, [r2]", "bx\tlr")
         stripped = assembly("ldr\tr3, .L3", "add\tr2, r3, #61", "mov\tr1, #0", "strb\tr1, [r2]",
                             "sub\tr2, r2, #1", "strb\tr1, [r2]", "bx\tlr")
-        self.assertEqual(compare(real, stripped)[0][1:], (1, [3, 8], [6]))
+        self.assertEqual(compare(real, stripped)[0][1:4], (1, [3, 8], [6]))
         # the re-read value may only reach pinned byte stores, unchanged:
         # `sym.unknown_3C = (sym.unknown_3D = 0) + 1;` keeps a read the
         # stripped compile does not need
@@ -188,14 +188,14 @@ class SemanticDiffTests(unittest.TestCase):
         genuine = assembly("add\tr2, r0, #0", "mov\tr0, r2", "mul\tr0, r0, r1", "add\tr2, r0, #7",
                            "ldr\tr0, .L3", "add\tr0, r0, #60", "ldrb\tr1, [r0]", "strb\tr2, [r0]",
                            "bx\tlr")
-        self.assertEqual(compare(genuine, stripped)[0][1:], (1, [6], []))
+        self.assertEqual(compare(genuine, stripped)[0][1:4], (1, [6], []))
         # a hoisted constant for a later store may sit in between (08050D50)
         hoisted = assembly("ldr\tr1, .L3", "add\tr1, r1, #61", "ldrb\tr0, [r1]", "mov\tr2, #0",
                            "mov\tr0, #19", "strb\tr0, [r1]", "sub\tr1, r1, #1", "ldrb\tr0, [r1]",
                            "strb\tr2, [r1]", "bx\tlr")
         plain = assembly("ldr\tr1, .L3", "add\tr1, r1, #61", "mov\tr2, #0", "mov\tr0, #19",
                          "strb\tr0, [r1]", "sub\tr1, r1, #1", "strb\tr2, [r1]", "bx\tlr")
-        self.assertEqual(compare(hoisted, plain)[0][1:], (1, [2, 7], []))
+        self.assertEqual(compare(hoisted, plain)[0][1:4], (1, [2, 7], []))
 
     def test_chained_re_read_needs_the_assignment_shape(self):
         # review repro 08000004: store 3C, unrelated work, then 3D = 3C
@@ -266,7 +266,7 @@ class SemanticDiffTests(unittest.TestCase):
             compare(real, stripped, one)
         self.assertIn("might take as an argument", str(caught.exception))
         overwritten = real.replace("strb\tr0, [r2]", "strb\tr0, [r2]\n\tmov\tr1, #0")
-        self.assertEqual(compare(overwritten, overwritten.replace("ldrb\tr1, [r2]\n\t", ""), one)[0][1:],
+        self.assertEqual(compare(overwritten, overwritten.replace("ldrb\tr1, [r2]\n\t", ""), one)[0][1:4],
                          (1, [3], []))
 
     def test_layout_perturbation_permutes_only_the_pinned_bytes(self):
@@ -297,7 +297,7 @@ class SemanticDiffTests(unittest.TestCase):
         real = assembly("ldr\tr1, .L3", "add\tr1, r1, #60", "ldrb\tr2, [r1]", "mov\tr2, #1",
                         "strb\tr2, [r1]", "bx\tlr")
         moved = real.replace("#60", "#61")
-        self.assertEqual(self.perturbed(real, moved)[0][1:], (1, [2], []))
+        self.assertEqual(self.perturbed(real, moved)[0][1:4], (1, [2], []))
         # every alias (round 5 e1/e2, round 6 s1): computed from another
         # member or sizeof, so it has the same address in both compiles
         with self.assertRaises(semantics.SemanticError) as caught:
@@ -325,19 +325,19 @@ class SemanticDiffTests(unittest.TestCase):
         real = assembly("ldr\tr1, .L3", "ldr\tr0, .L3+4", "ldrh\tr2, [r1, #4]", "strh\tr0, [r1, #4]",
                         "bx\tlr").replace(f".word\t{SYMBOL}\n", f".word\t{SYMBOL}\n\t.word\t0x1F08\n")
         stripped = real.replace("ldrh\tr2, [r1, #4]\n\t", "")
-        self.assertEqual(self.compare16(real, stripped)[0][1:], (1, [2], []))
+        self.assertEqual(self.compare16(real, stripped)[0][1:4], (1, [2], []))
         self.assertIn("read-modify-write loads at [3]",
                       semantics.record(SYMBOL, self.compare16(real, stripped)))
         # `sym.bg1cnt += 1`: the used load is the stripped compile's counterpart
         increment = assembly("ldr\tr1, .L3", "ldrh\tr0, [r1, #4]", "add\tr0, r0, #1",
                              "ldrh\tr2, [r1, #4]", "strh\tr0, [r1, #4]", "bx\tlr")
-        self.assertEqual(self.compare16(increment, increment.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:],
+        self.assertEqual(self.compare16(increment, increment.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:4],
                          (1, [3], []))
         # agbcc builds a halfword constant after the dead load (`sym.bg1cnt =
         # 0x100`); arithmetic on anything but constants may not sit there
         built = assembly("ldr\tr1, .L3", "ldrh\tr2, [r1, #4]", "mov\tr0, #128", "lsl\tr0, r0, #1",
                          "strh\tr0, [r1, #4]", "bx\tlr")
-        self.assertEqual(self.compare16(built, built.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:],
+        self.assertEqual(self.compare16(built, built.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:4],
                          (1, [1], []))
         # the constant may reach the value register through a copy, as a
         # literal may; a constant built into any other register may not sit there
@@ -387,7 +387,7 @@ class SemanticDiffTests(unittest.TestCase):
                         "ldrh\tr0, [r1, #4]", "ldrh\tr3, [r1, #2]", "strh\tr0, [r1, #2]", "bx\tlr")
         stripped = assembly("ldr\tr1, .L3", "mov\tr2, #0", "strh\tr2, [r1, #4]", "strh\tr2, [r1, #2]",
                             "bx\tlr")
-        self.assertEqual(self.compare16(real, stripped)[0][1:], (1, [1, 5], [4]))
+        self.assertEqual(self.compare16(real, stripped)[0][1:4], (1, [1, 5], [4]))
         # a byte re-read of the halfword is not the chained shape
         narrow = real.replace("ldrh\tr0, [r1, #4]\n\tldrh\tr3", "ldrb\tr0, [r1, #4]\n\tldrh\tr3")
         self.assertNotEqual(narrow, real)
@@ -404,7 +404,7 @@ class SemanticDiffTests(unittest.TestCase):
         real = assembly("ldr\tr1, .L3", "ldrh\tr2, [r1, #4]", "mov\tr2, #1", "strh\tr2, [r1, #4]",
                         "bx\tlr")
         stripped = real.replace("ldrh\tr2, [r1, #4]\n\t", "")
-        self.assertEqual(self.compare16(real, stripped, real.replace("#4]", "#2]"))[0][1:], (1, [1], []))
+        self.assertEqual(self.compare16(real, stripped, real.replace("#4]", "#2]"))[0][1:4], (1, [1], []))
         # an access to +0x04 computed without bg1cnt's name stays put
         with self.assertRaises(semantics.SemanticError) as caught:
             self.compare16(real, stripped, real)
@@ -448,7 +448,7 @@ class SemanticDiffTests(unittest.TestCase):
                             "mov\tr3, #128", "lsl\tr3, r3, #7", "orr\tr2, r2, r3", "strh\tr2, [r1]",
                             "bx\tlr")
         perturbed = real.replace("#2]", "#4]").replace("#58", "#59")
-        self.assertEqual(self.compare16(real, stripped, perturbed)[0][1:], (1, [1, 5], []))
+        self.assertEqual(self.compare16(real, stripped, perturbed)[0][1:4], (1, [1, 5], []))
         # moving only one width class is not the permutation
         for wrong in (real.replace("#2]", "#4]"), real.replace("#58", "#59")):
             with self.subTest(perturbed=wrong), self.assertRaises(semantics.SemanticError):
@@ -551,7 +551,7 @@ class SemanticDiffTests(unittest.TestCase):
         stripped = real.replace("ldrb\tr2, [r1]\n\t", "")
         moved = real.replace("#60", "#61")
         (result,) = semantics.compare(real, stripped, prelude, SYMBOL, DECLARATION, moved)
-        self.assertEqual(result[1:], (1, [3], []))
+        self.assertEqual(result[1:4], (1, [3], []))
         # and still refuses a perturbed compile that drops the call
         with self.assertRaises(semantics.SemanticError) as caught:
             semantics.compare(real, stripped, prelude, SYMBOL, DECLARATION,
@@ -562,9 +562,11 @@ class SemanticDiffTests(unittest.TestCase):
         # agbcc's combine folds `(ior (mem/v x) 0xFF)` to 0xFF and drops the
         # load of a volatile all-ones store (081175D4 stores 0xFF to +0x3E)
         ones = assembly("ldr\tr1, .L3", "add\tr1, r1, #60", "mov\tr2, #255", "strb\tr2, [r1]", "bx\tlr")
-        self.assertEqual(self.perturbed(ones, ones.replace("#60", "#61"), ones)[0][1:], (1, [], []))
+        self.assertEqual(self.perturbed(ones, ones.replace("#60", "#61"), ones)[0][1:4], (1, [], []))
+        self.assertIn("unloaded all-ones stores at [4]",
+                      semantics.record(SYMBOL, self.perturbed(ones, ones.replace("#60", "#61"), ones)))
         minus_one = ones.replace("mov\tr2, #255", "mov\tr2, #1\n\tneg\tr2, r2")
-        self.assertEqual(self.perturbed(minus_one, minus_one.replace("#60", "#61"), minus_one)[0][1:],
+        self.assertEqual(self.perturbed(minus_one, minus_one.replace("#60", "#61"), minus_one)[0][1:4],
                          (1, [], []))
         # a planted alias all-ones store (`((u8 *)&sym.display)[0x3C] = 0xFF`)
         # has the same address in the permuted compile and is refused
@@ -581,7 +583,7 @@ class SemanticDiffTests(unittest.TestCase):
         # halfwords: 0xFFFF without its ldrh
         half = assembly("ldr\tr1, .L3", "ldr\tr0, .L3+4", "strh\tr0, [r1, #4]", "bx\tlr").replace(
             f".word\t{SYMBOL}\n", f".word\t{SYMBOL}\n\t.word\t0xFFFF\n")
-        self.assertEqual(self.compare16(half, half, half.replace("#4]", "#2]"))[0][1:], (1, [], []))
+        self.assertEqual(self.compare16(half, half, half.replace("#4]", "#2]"))[0][1:4], (1, [], []))
         with self.assertRaises(semantics.SemanticError) as caught:
             self.compare16(half, half, half)
         self.assertIn("does not follow its member", str(caught.exception))
@@ -595,13 +597,42 @@ class SemanticDiffTests(unittest.TestCase):
         near = assembly("ldr\tr1, .L3", "cmp\tr0, #0", "beq\t.L9", "add\tr1, r1, #60",
                         "ldrb\tr2, [r1]", "mov\tr2, #1", "strb\tr2, [r1]", ".L9:", "bx\tlr")
         far = near.replace("beq\t.L9", "bne\t.LCB9\n\tb\t.L9\n.LCB9:")
-        self.assertEqual(compare(far, near.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:], (2, [5], []))
-        self.assertEqual(compare(near, far.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:], (2, [4], []))
+        self.assertEqual(compare(far, near.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:4], (2, [5], []))
+        self.assertEqual(compare(near, far.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:4], (2, [4], []))
         unsigned = near.replace("beq", "bcs").replace("ldrb\tr2, [r1]\n\t", "")
         self.assertEqual(compare(near.replace("beq", "bhs"), unsigned)[0][1], 2)
         # the inverse branch with the same targets is a different program
         self.refused(near, near.replace("beq", "bne").replace("ldrb\tr2, [r1]\n\t", ""),
                      "differ in observable behaviour")
+
+    def test_values_read_back_from_memory_build_no_object_offset(self):
+        # review round (p01/p04): a store through a pinned member of a stack
+        # copy, read back at a fixed offset, reveals where the member landed.
+        # A branch on it is a decision imposed alike on every compile...
+        probe = assembly("sub\tsp, sp, #8", "mov\tr0, #1", "strb\tr0, [sp, #4]", "ldrb\tr1, [sp, #4]",
+                         "cmp\tr1, #0", "beq\t.L9", "ldr\tr2, .L3", "add\tr2, r2, #60",
+                         "ldrb\tr3, [r2]", "mov\tr3, #1", "strb\tr3, [r2]", ".L9:", "add\tsp, sp, #8",
+                         "bx\tlr")
+        stripped = probe.replace("ldrb\tr3, [r2]\n\t", "")
+        self.assertEqual(compare(probe, stripped)[0][1:4], (2, [8], []))
+        # ...so a copy whose probe byte moved (`strb r0, [sp, #5]`) cannot
+        # steer the permuted compile onto the moved member
+        moved = probe.replace("strb\tr0, [sp, #4]", "strb\tr0, [sp, #5]").replace("#60", "#61")
+        with self.assertRaises(semantics.SemanticError) as caught:
+            semantics.compare(probe, stripped, PREPROCESSED, SYMBOL, DECLARATION, moved)
+        self.assertIn("behaves differently", str(caught.exception))
+        # and the value itself may not build an object offset
+        offset = assembly("sub\tsp, sp, #8", "mov\tr0, #60", "strb\tr0, [sp, #4]", "ldrb\tr1, [sp, #4]",
+                          "ldr\tr2, .L3", "add\tr2, r2, r1", "mov\tr3, #255", "strb\tr3, [r2]",
+                          "add\tsp, sp, #8", "bx\tlr")
+        self.refused(offset, offset, "computed from a value read back from memory")
+        # a word spilled from a clean register reloads clean (a register
+        # spill); a pinned member is never a word, so no probe is a word store
+        spilled = assembly("sub\tsp, sp, #8", "mov\tr0, #60", "str\tr0, [sp, #4]", "ldr\tr1, [sp, #4]",
+                           "ldr\tr2, .L3", "add\tr2, r2, r1", "ldrb\tr3, [r2]", "mov\tr3, #1",
+                           "strb\tr3, [r2]", "add\tsp, sp, #8", "bx\tlr")
+        self.assertEqual(compare(spilled, spilled.replace("ldrb\tr3, [r2]\n\t", ""))[0][1:4],
+                         (1, [6], []))
 
 
 # Thumb functions for a synthetic ROM: (address, halfwords); "bl" entries are
@@ -616,6 +647,7 @@ CALLEES = (
     (0x08000260, [0x2000, 0x4770]),                              # movs r0, #0; bx lr
     (0x08000270, [0x2800, 0xD000, 0x1C10, 0x4770]),              # reads r2 on one path
     (0x08000280, [0xB5F0, 0xBCF0, 0xBC01, 0x4700]),              # push/pop r4-r7 only
+    (0x08000290, [0xB500, ("bl", 0x08000250), ("bl", 0x08000250), 0xBC01, 0x4700]),  # recursion twice
 )
 
 
@@ -657,10 +689,16 @@ class CalleeInterfaceTests(unittest.TestCase):
             with self.subTest(callee=hex(address)):
                 self.assertEqual(interfaces(f"func_{address:08X}"), (frozenset(reads), frozenset(writes)))
         # a CFG that leaves its span, recursion and unindexed addresses fail closed
-        for address in (0x08000240, 0x08000250, 0x08000204, 0x08000290):
+        for address in (0x08000240, 0x08000250, 0x08000204, 0x080002A0):
             with self.subTest(callee=hex(address)):
                 self.assertIsNone(interfaces(f"func_{address:08X}"))
         self.assertIsNone(interfaces("k"))
+        # a non-exact summary is reused within one top-level call: the
+        # recursive callee reached twice is analysed once
+        fresh = self.interfaces()
+        self.assertEqual(fresh("func_08000290"), (frozenset(semantics.ARGUMENT_REGISTERS),
+                                                  frozenset({"r0"})))
+        self.assertEqual(fresh.budget, semantics.MAX_CALLEES - 2)
 
     def check(self, callee, after=("pop\t{r0}", "bx\tr0"), returns="void"):
         # `sym.unknown_3C = p[4]; callee(p);`: the read-modify-write load
@@ -675,7 +713,10 @@ class CalleeInterfaceTests(unittest.TestCase):
     def test_a_dead_load_is_refused_only_in_a_register_the_callee_reads(self):
         for callee in (0x08000200, 0x08000230, 0x08000260):
             with self.subTest(callee=hex(callee)):
-                self.assertEqual(self.check(callee)[0][1:], (1, [4], []))
+                self.assertEqual(self.check(callee)[0][1:4], (1, [4], []))
+        # the record names the interface the verdict relied on
+        self.assertIn("callee interfaces from ROM: func_08000200 reads {r0} writes {r0}",
+                      semantics.record(SYMBOL, self.check(0x08000200)))
         for callee in (0x08000210, 0x08000220):
             with self.subTest(callee=hex(callee)), self.assertRaises(semantics.SemanticError) as caught:
                 self.check(callee)
@@ -701,7 +742,7 @@ class CalleeInterfaceTests(unittest.TestCase):
             self.check(0x08000260, after, "int")
         self.assertIn("without the read-modify-write load", str(caught.exception))
         # func_08000230 overwrites r3 on every path
-        self.assertEqual(self.check(0x08000230, after, "int")[0][1:], (1, [4], []))
+        self.assertEqual(self.check(0x08000230, after, "int")[0][1:4], (1, [4], []))
 
 
 class ReportRecordTests(unittest.TestCase):
@@ -896,7 +937,8 @@ class CompiledSemanticTests(unittest.TestCase):
         # agbcc drops the load of the first 0xFF store (combine folds the
         # insertion to the constant) and keeps the second's (081175D4)
         (record,) = self.check(f"{s}.win0v_hi = 0; {s}.win0v_lo = 255; {s}.win1v_lo = 255;")
-        self.assertIn("read-modify-write loads at [4, 11]", record)
+        self.assertIn("read-modify-write loads at [4, 11], chained re-reads at [], "
+                      "unloaded all-ones stores at [9]", record)
         # a planted alias all-ones store: refused lexically and, with the
         # lexical passes off, by the permuted compile
         alias = f"((u8 *)&{s}.display)[0x3E] = 0xFF;"
@@ -908,6 +950,34 @@ class CompiledSemanticTests(unittest.TestCase):
                 self.assertRaises(semantics.SemanticError) as caught:
             self.check(alias)
         self.assertIn("does not follow its member", str(caught.exception))
+
+    def test_layout_probes_through_a_typed_copy_are_refused(self):
+        # review round (revf p01, p04): a stack copy of the object's type
+        # reveals where a pinned member landed; an alias indexed by it would
+        # follow the permutation.  Refused lexically (`__typeof__` and the
+        # whole-object use) and, with the lexical passes off, structurally.
+        s = SYMBOL
+        probes = (("p01", "void",
+                   f"union {{ __typeof__({s}) s; u8 b[0x50]; }} t; int i; t.b[0x3A] = 0; t.b[0x43] = 0; "
+                   f"t.s.win0h_lo = 1; i = t.b[0x3A] ? 0x3A : 0x43; ((u8 *)&{s}.display)[i] = 0xFF;"),
+                  ("p04", "u8 v",
+                   f"union {{ __typeof__({s}) s; u8 b[0x50]; }} t; u8 *p; t.b[0x3A] = 0; t.b[0x43] = 0; "
+                   f"t.s.win0h_lo = 1; p = (u8 *)&{s}.display + (t.b[0x3A] ? 0x3A : 0x43); "
+                   f"(void){s}.win0h_lo; *p = 0x80;"),
+                  ("offset", "void",
+                   f"union {{ __typeof__({s}) s; u8 b[0x50]; }} t; int i; t.b[0x3A] = 0; t.b[0x43] = 0; "
+                   f"t.s.win0h_lo = 9; i = 0x43 - t.b[0x3A]; ((u8 *)&{s}.display)[i] = 0xFF;"))
+        for name, parameters, body in probes:
+            with self.subTest(probe=name, lexical=True), self.assertRaises(semantics.SemanticError) as caught:
+                self.check(body, parameters)
+            self.assertIn("after preprocessing", str(caught.exception))
+            with self.subTest(probe=name, lexical=False), \
+                    mock.patch.object(plausible, "member_provenance", return_value=[]), \
+                    mock.patch.object(plausible, "whole_object_uses", return_value=[]), \
+                    self.assertRaises(semantics.SemanticError) as caught:
+                self.check(body, parameters)
+            self.assertRegex(str(caught.exception),
+                             "does not follow its member|behaves differently|read back from memory")
 
     def test_dead_loads_live_into_calls_through_agbcc(self):
         # the read-modify-write load leaves r3 live into the call; the
@@ -923,6 +993,8 @@ class CompiledSemanticTests(unittest.TestCase):
                 if callee == 0x08000200:
                     (record,) = self.check(body.format(callee=callee), "u8 *p", prelude)
                     self.assertIn("read-modify-write loads at [5]", record)
+                    self.assertIn("callee interfaces from ROM: func_08000200 reads {r0} writes {r0}",
+                                  record)
                     continue
                 with self.assertRaises(semantics.SemanticError) as caught:
                     self.check(body.format(callee=callee), "u8 *p", prelude)

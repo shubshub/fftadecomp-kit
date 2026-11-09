@@ -73,6 +73,11 @@ text, every occurrence of the symbol that is not `symbol.member`
 (plausible.whole_object_uses) and plausible.py's member rules; those token
 rules are defence in depth.
 
+A pinned offset can also reach a value through memory: a store through
+the pinned member of a typed copy, read back at a fixed offset.  So values
+read back from memory (Executor.derived) may not build an object address,
+and a branch on them is always a decision, imposed alike on every compile.
+
 A planted read therefore either vanishes from the stripped compile, so the
 real compile has a load the rules cannot explain, or it stays, which shows
 the qualifier did not produce it; then it is ordinary code that the stripped
@@ -683,15 +688,25 @@ class Executor:
         self.signatures, self.interfaces = signatures, interfaces
         self.symbol, self.size, self.pinned = layout
 
-    def check_address(self, address, width, text, multiple=False):
+    def check_address(self, address, width, text, multiple=False, derived=False):
         """fail closed unless an access to the object is `symbol + constant` inside it,
-        and an access that overlaps a pinned member is exactly that member"""
+        the constant comes from immediates and literal words only (derived: an
+        address register holds a value read back from memory), and an access
+        that overlaps a pinned member is exactly that member"""
         atom = ("sym", self.symbol)
         if not contains(address, atom):
             return
         constant, terms = linear(address)
         if multiple:
             self.fail(text, f"a multi-register transfer touches {self.symbol}")
+        if derived:
+            # A pinned member's offset can reach a value only through memory:
+            # a store through that member of another object of the type (a
+            # stack copy, `__typeof__`) read back at a fixed offset.  Such an
+            # offset would follow the permutation without being the member.
+            self.fail(text, f"the address of this {self.symbol} access is computed from a value "
+                      "read back from memory; only immediates and literal words may build an "
+                      "object offset")
         if terms != {atom: 1}:
             self.fail(text, f"the address {show(address)} combines {self.symbol} with other "
                       "terms; only constant member offsets are modelled")
@@ -731,6 +746,11 @@ class Executor:
         self.memory, self.trace, self.records = [], [], []
         self.escaped, self.known, self.conditions = False, {}, []
         self.frame_base = None
+        # registers and flags holding a value read back from memory: any load
+        # but a literal word or a word reload of a clean word store (see
+        # check_address and decide)
+        self.derived, self.flags_derived = set(), False
+        self.load_clean = False
         self.decisions = list(decisions)
         pc, steps = 0, 0
         while True:
@@ -747,8 +767,15 @@ class Executor:
 
     def decide(self, code, text):
         known = evaluate(code, self.flags)
-        if known is not None:
+        if known is not None and not self.flags_derived:
             return known
+        # Flags computed from a value read back from memory decide nothing by
+        # themselves, even when the executor knows the value: the value could
+        # be a store through a pinned member of another object of the type (a
+        # stack copy) read back at a fixed offset, which moves with the
+        # permutation.  Such a condition is a decision instead, imposed alike
+        # on every compile and compared there, so no branch can follow the
+        # layout.
         # A condition and its inverse are one decision, recorded under one
         # spelling: agbcc writes `bne .LCB; b .L @long jump` for a far
         # `beq .L`, so the two compiles may test the same flags either way.
@@ -795,16 +822,20 @@ class Executor:
                                           for entry in self.memory)
         stack = is_stack(address) and (not self.escaped or saved)
         version, forwarded = "entry", None
+        self.load_clean = False
         for entry in reversed(self.memory):
             if entry[0] == "call":
                 if not stack:
                     version = ("call", entry[1])
                     break
                 continue
-            _, stored_width, stored_address, stored, event, _ = entry
+            _, stored_width, stored_address, stored, event, _, derived = entry
             relation = self.relation(address, width, stored_address, stored_width, saved)
             if relation == "same":
                 forwarded = stored
+                # Only a word store can be reloaded clean: a pinned member is
+                # a byte or a halfword, so a store through one is never a word.
+                self.load_clean = width == 4 and not derived
                 break
             if relation == "overlap":
                 if event is None:
@@ -862,7 +893,7 @@ class Executor:
                 frame[offset + byte - self.frame_base] = part
         self.trace.append(("escape", tuple(sorted(frame.items()))))
 
-    def store(self, width, address, value, saved=False, text=""):
+    def store(self, width, address, value, saved=False, text="", derived=False):
         value = truncate(value, width * 8)
         if carries(value, ("sym", self.symbol)):
             self.fail(text, f"the address of {self.symbol} is stored to memory")
@@ -872,7 +903,7 @@ class Executor:
         if not is_stack(address) or self.escaped:
             event = len(self.trace)
             self.trace.append(("store", width, self.observed(address), value))
-        self.memory.append(("store", width, address, value, event, saved))
+        self.memory.append(("store", width, address, value, event, saved, derived))
         return value
 
     def call(self, target, text, record):
@@ -904,6 +935,7 @@ class Executor:
         else:
             reads, writes = interface
             record.guarded, record.derived = set(reads) - named, target
+            record.interface = (reads, writes)
             record.writes = set(writes) | {"lr"}
         record.reads = named | record.guarded | (record.reads - set(ARGUMENT_REGISTERS))
         if any(carries(argument, ("sym", self.symbol)) for argument in arguments):
@@ -915,7 +947,8 @@ class Executor:
         self.regs["r0"] = ("ret", event)
         for name in ("r1", "r2", "r3", "r12", "lr"):
             self.regs[name] = ("clobber", event, name)
-        self.flags = ("clobber", event)
+        self.derived -= {"r0", "r1", "r2", "r3", "r12", "lr"}
+        self.flags, self.flags_derived = ("clobber", event), False
         self.records.append(record)
 
     def finish(self, text, record):
@@ -948,6 +981,7 @@ class Executor:
 
     def step(self, pc, mnemonic, operands, text):
         record = Record(pc, text)
+        flags = self.flags
         alu = ("mov", "add", "sub", "neg", "mvn", "and", "orr", "eor", "bic", "mul",
                "lsl", "lsr", "asr", "ror")
         if mnemonic.endswith("s") and mnemonic[:-1] in alu:
@@ -1008,6 +1042,10 @@ class Executor:
             record.constant = record.constant or (
                 isinstance(result, int) and all(isinstance(value, int) for value in values))
             regs[destination] = result
+            derived = bool(record.reads & self.derived)
+            self.derived = (self.derived | {destination}) if derived else (self.derived - {destination})
+            if self.flags is not flags:
+                self.flags_derived = derived
             self.records.append(record)
             return None
         if mnemonic in ("cmp", "cmn", "tst"):
@@ -1016,6 +1054,7 @@ class Executor:
             record.reads = {register(o) for o in operands if register(o)}
             a, b = self.value(operands[0], text), self.value(operands[1], text)
             self.flags = ("nz", operation("and", a, b)) if mnemonic == "tst" else (mnemonic, a, b)
+            self.flags_derived = bool(record.reads & self.derived)
             self.records.append(record)
             return None
         if mnemonic in ("ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "str", "strb", "strh"):
@@ -1031,22 +1070,29 @@ class Executor:
                     self.fail(text, "literal load outside a pool")
                 record.kind, record.writes = "literal", {subject}
                 regs[subject] = words[offset // 4]
+                self.derived.discard(subject)
                 self.records.append(record)
                 return None
             address, reads = self.memory_operand(operands[1], text)
-            self.check_address(address, width, text)
+            derived = bool(reads & self.derived)
+            self.check_address(address, width, text, derived=derived)
             record.address, record.width = address, width
             if mnemonic.startswith("ldr"):
                 record.kind, record.reads, record.writes = "load", reads, {subject}
                 record.signed = mnemonic in ("ldrsb", "ldrsh")
                 regs[subject], record.forwarded = self.load(width, record.signed, address, text)
                 record.value = regs[subject]
+                if derived or not self.load_clean or record.signed:
+                    self.derived.add(subject)
+                else:
+                    self.derived.discard(subject)
             else:
                 record.kind, record.reads, record.value_register = "store", reads | {subject}, subject
                 value = truncate(regs[subject], width * 8)
                 record.self_assignment = isinstance(value, tuple) and value[0] == "load" and \
                     value == self.current(width, address)
-                record.value = self.store(width, address, regs[subject], text=text)
+                record.value = self.store(width, address, regs[subject], text=text,
+                                          derived=derived or subject in self.derived)
             self.records.append(record)
             return None
         if mnemonic in ("push", "stmia", "stm", "pop", "ldmia", "ldm"):
@@ -1065,19 +1111,23 @@ class Executor:
             record.kind = "push" if storing else "pop"
             record.reads = {base} | (set(names) if storing else set())
             record.writes = {base} | (set() if storing else set(names) - {"pc"})
-            loaded = {}
+            loaded, clean = {}, {}
+            derived = base in self.derived
             for n, name in enumerate(names):
                 address = add(start, 4 * n)
                 self.check_address(address, 4, text, multiple=True)
                 if storing:
-                    self.store(4, address, regs[name], saved=mnemonic == "push", text=text)
+                    self.store(4, address, regs[name], saved=mnemonic == "push", text=text,
+                               derived=derived or name in self.derived)
                 else:
                     loaded[name] = self.load(4, False, address, text)[0]
+                    clean[name] = self.load_clean and not derived
             if writeback:
                 regs[base] = start if mnemonic == "push" else add(regs[base], 4 * len(names))
             for name, value in loaded.items():
                 if name != "pc":
                     regs[name] = value
+                    self.derived = (self.derived - {name}) if clean[name] else (self.derived | {name})
             if "pc" in loaded:
                 if loaded["pc"] != ("entry", "lr"):
                     self.fail(text, "pop into pc of something other than the return address")
@@ -1161,7 +1211,7 @@ class RomInterfaces:
 
     def __init__(self, rom, functions):
         self.rom, self.functions = rom, functions
-        self.cache, self.budget, self.names = {}, MAX_CALLEES, {}
+        self.cache, self.budget, self.names, self.inexact = {}, MAX_CALLEES, {}, {}
 
     def __call__(self, name):
         """(reads, writes) for a callee name, or None when nothing could be derived.
@@ -1174,6 +1224,7 @@ class RomInterfaces:
         if found is None:
             return None
         if name not in self.names:
+            self.inexact = {}
             summary = self.summary(int(found[1], 16), ())[:2]
             self.names[name] = None if summary == UNKNOWN_INTERFACE else summary
         return self.names[name]
@@ -1182,6 +1233,10 @@ class RomInterfaces:
         """(reads, writes, exact); exact is False when a bound, not the code, decided"""
         if address in self.cache:
             return self.cache[address] + (True,)
+        if address in self.inexact:
+            # an over-approximation, so reusing it within one top-level
+            # call is sound and keeps revisits from spending the budget
+            return self.inexact[address] + (False,)
         if address in active or len(active) >= MAX_CALLEE_DEPTH or self.budget <= 0:
             return UNKNOWN_INTERFACE + (False,)
         self.budget -= 1
@@ -1210,8 +1265,7 @@ class RomInterfaces:
                     written_at[successor] = merged
                     pending.append(successor)
         result = (frozenset(reads), ends or frozenset())
-        if exact:
-            self.cache[address] = result
+        (self.cache if exact else self.inexact)[address] = result
         return result + (exact,)
 
     def control_flow(self, address):
@@ -1305,14 +1359,19 @@ def object_offset(address, symbol, size):
     return None
 
 
-def dead(records, position, destination):
+def dead(records, position, destination, relied=None):
     """True if overwritten before any use, False if used, or the call record
-    whose source-supplied prototype leaves the register's use unknown"""
+    whose source-supplied prototype leaves the register's use unknown.
+
+    relied, if given, collects the calls crossed only because their ROM
+    interface shows the callee does not read the register."""
     for record in records[position + 1:]:
         if destination in record.guarded:
             return record
         if destination in record.reads:
             return False
+        if relied is not None and record.derived and destination in ARGUMENT_REGISTERS:
+            relied.add(record)
         if destination in record.writes:
             return True
     return True
@@ -1423,7 +1482,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
 
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
-    read_modify_write, chained = set(), set()
+    read_modify_write, chained, unloaded, relied = set(), set(), set(), set()
     for number, path in enumerate(paths, 1):
         records = path.records
         # 4. a store must not write back the value it read from the same byte
@@ -1438,7 +1497,12 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 continue
             destination = next(iter(record.writes))
             if record.width == pinned_width(record.address) and not record.signed:
-                verdict = dead(records, position, destination)
+                crossed = set()
+                verdict = dead(records, position, destination, crossed)
+                if verdict is True:
+                    relied.update(call.derived + " reads {" + ", ".join(sorted(call.interface[0])) +
+                                  "} writes {" + ", ".join(sorted(call.interface[1])) + "}"
+                                  for call in crossed)
                 if isinstance(verdict, Record) and verdict.derived:
                     raise SemanticError(
                         f"{name}: {describe(record)} loads {where(record.address)} into "
@@ -1482,6 +1546,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 # member's all-ones value can lose it.  The permuted compile
                 # (perturbation_check, which unloaded_all_ones requires) has
                 # already shown that this store follows its member's name.
+                unloaded.add(record.index)
                 continue
             if record.width != pinned.get(offset) or position not in explained_stores:
                 raise SemanticError(f"{name}: {describe(record)} stores to {where(record.address)} "
@@ -1511,7 +1576,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                     "load there; the qualifier added a read")
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
-    return len(paths), sorted(read_modify_write), sorted(chained)
+    return len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied)
 
 
 def show_event(event):
@@ -1654,10 +1719,15 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
 def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
-    for name, paths, read_modify_write, chained in results:
+    for name, paths, read_modify_write, chained, *extra in results:
+        unloaded, relied = (extra + [[], []])[:2]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
-                     f"chained re-reads at {list(n + 1 for n in chained)}")
+                     f"chained re-reads at {list(n + 1 for n in chained)}" +
+                     # only what a verdict relied on beyond #94's rules, so
+                     # reports that need neither keep their text
+                     (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
+                     (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
             "; ".join(parts))
