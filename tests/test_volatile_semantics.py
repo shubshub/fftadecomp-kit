@@ -633,6 +633,11 @@ class SemanticDiffTests(unittest.TestCase):
                            "strb\tr3, [r2]", "add\tsp, sp, #8", "bx\tlr")
         self.assertEqual(compare(spilled, spilled.replace("ldrb\tr3, [r2]\n\t", ""))[0][1:4],
                          (1, [6], []))
+        # the clean reload rests on pinned members being narrower than a
+        # word; were word members admitted, the same spill is refused
+        with mock.patch.object(semantics, "PINNED_WIDTHS", (1, 2, 4)):
+            self.refused(spilled, spilled.replace("ldrb\tr3, [r2]\n\t", ""),
+                         "computed from a value read back from memory")
 
 
 # Thumb functions for a synthetic ROM: (address, halfwords); "bl" entries are

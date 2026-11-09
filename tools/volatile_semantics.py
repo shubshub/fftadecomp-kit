@@ -833,9 +833,11 @@ class Executor:
             relation = self.relation(address, width, stored_address, stored_width, saved)
             if relation == "same":
                 forwarded = stored
-                # Only a word store can be reloaded clean: a pinned member is
-                # a byte or a halfword, so a store through one is never a word.
-                self.load_clean = width == 4 and not derived
+                # Only a store wider than every pinned member can be reloaded
+                # clean: a store through a pinned member is never that wide.
+                # Derived from PINNED_WIDTHS, so admitting word members makes
+                # no reload clean (fails closed) rather than breaking this.
+                self.load_clean = width == 4 and width > max(PINNED_WIDTHS) and not derived
                 break
             if relation == "overlap":
                 if event is None:
