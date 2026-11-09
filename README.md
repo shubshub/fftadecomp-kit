@@ -1718,7 +1718,9 @@ symbolically along every path, and the check requires:
 
 * the same observable behaviour: the same non-stack stores with the same
   values in the same order, the same calls with the same arguments, the same
-  branch conditions and, for a non-void function, the same return value.
+  branch conditions (a condition and its inverse are one decision, since
+  agbcc writes a far `beq .L` as `bne .LCB; b .L`) and, for a non-void
+  function, the same return value.
   When a stack address escapes (as a call argument or a value stored to
   memory), every local frame byte at that moment, with the stores applied in
   program order, is part of the behaviour too, relative to the first

@@ -590,6 +590,20 @@ class SemanticDiffTests(unittest.TestCase):
                            half.replace("0xFFFF", "0xFFFE").replace("#4]", "#2]"))
         self.assertIn("without the read-modify-write load", str(caught.exception))
 
+    def test_a_condition_and_its_inverse_are_one_decision(self):
+        # agbcc spells a far `beq .L9` as `bne .LCB; b .L9 @long jump`
+        near = assembly("ldr\tr1, .L3", "cmp\tr0, #0", "beq\t.L9", "add\tr1, r1, #60",
+                        "ldrb\tr2, [r1]", "mov\tr2, #1", "strb\tr2, [r1]", ".L9:", "bx\tlr")
+        far = near.replace("beq\t.L9", "bne\t.LCB9\n\tb\t.L9\n.LCB9:")
+        self.assertEqual(compare(far, near.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:], (2, [5], []))
+        self.assertEqual(compare(near, far.replace("ldrb\tr2, [r1]\n\t", ""))[0][1:], (2, [4], []))
+        unsigned = near.replace("beq", "bcs").replace("ldrb\tr2, [r1]\n\t", "")
+        self.assertEqual(compare(near.replace("beq", "bhs"), unsigned)[0][1], 2)
+        # the inverse branch with the same targets is a different program
+        self.refused(near, near.replace("beq", "bne").replace("ldrb\tr2, [r1]\n\t", ""),
+                     "differ in observable behaviour")
+
+
 # Thumb functions for a synthetic ROM: (address, halfwords); "bl" entries are
 # expanded to the two-halfword BL to the given address
 CALLEES = (

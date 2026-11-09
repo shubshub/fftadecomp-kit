@@ -746,14 +746,18 @@ class Executor:
             pc = pc + 1 if result is None else result
 
     def decide(self, code, text):
-        condition = (code, self.flags)
         known = evaluate(code, self.flags)
         if known is not None:
             return known
+        # A condition and its inverse are one decision, recorded under one
+        # spelling: agbcc writes `bne .LCB; b .L @long jump` for a far
+        # `beq .L`, so the two compiles may test the same flags either way.
+        code = {"hs": "cs", "lo": "cc"}.get(code, code)
+        canonical = min(code, INVERSE[code])
+        flipped = canonical != code
+        condition = (canonical, self.flags)
         if condition in self.known:
-            return self.known[condition]
-        if (INVERSE[code], self.flags) in self.known:
-            return not self.known[(INVERSE[code], self.flags)]
+            return self.known[condition] != flipped
         if len(self.conditions) >= len(self.decisions):
             if len(self.decisions) >= MAX_DECISIONS:
                 raise SemanticError(f"{self.label} compile of {self.name}: more than {MAX_DECISIONS} "
@@ -763,7 +767,7 @@ class Executor:
         taken = self.decisions[len(self.conditions)]
         self.conditions.append(condition)
         self.known[condition] = taken
-        return taken
+        return taken != flipped
 
     # memory ---------------------------------------------------------------
 
