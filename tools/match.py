@@ -282,6 +282,16 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None):
         raise ValueError("the semantic check needs exactly one addressed source")
     source = sources[0].relative_to(root).as_posix()
     records = []
+    # Callee argument registers come from the ROM and the function index;
+    # without either every call keeps reading r0-r3 (the strict rule).
+    interfaces = None
+    mapping = mapping_snapshot(root)
+    try:
+        rom = Path(report_rom_path(root)).read_bytes()
+    except (OSError, ValueError):
+        rom = None
+    if rom is not None and mapping is not None:
+        interfaces = volatile_semantics.RomInterfaces(rom, json.loads(mapping))
     with runner.workspace() as workspace:
         compile_object(runner, workspace, args, str(root), address, source)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
@@ -295,7 +305,7 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None):
                            rewrite=lambda text: volatile_semantics.perturb_pinned(text, declaration))
             perturbed = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
             results = volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"], declaration,
-                                                 perturbed)
+                                                 perturbed, interfaces)
             records.append(volatile_semantics.record(entry["symbol"], results, perturbed=True))
     return records
 

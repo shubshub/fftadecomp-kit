@@ -1732,8 +1732,22 @@ symbolically along every path, and the check requires:
   the callee reads: a lying one, or a callee whose own source hides
   parameters behind a macro, would let the qualifier's dead load pass a
   hidden argument. So every call counts as reading r0-r3, and a dead load
-  is accepted only if its register is overwritten before the call. Only the
-  libgcc division helpers have an exact interface;
+  is accepted only if its register is overwritten before the call, unless
+  the callee's own ROM code shows otherwise. For `bl func_XXXXXXXX` (the
+  name the byte match links to that address) the callee must be an indexed
+  Thumb function whose CFG `analyze.refine_function` closes over its indexed
+  span. A dataflow pass over that CFG then gives the argument registers some
+  path reads before writing (pushes and stores count as reads) and those
+  every path overwrites before returning. A call inside the callee reads and
+  writes what its own callee does, transitively, up to 8 levels and 64
+  callees. Recursion, a CFG that does not close, a word switch, an unindexed
+  or ARM target and anything unmodelled leave the strict rule in place. A
+  register the callee never reads carries nothing into it, and one it
+  overwrites on every path carries nothing out, so a dead load there is
+  dead across the call. A register it leaves alone stays live past the call,
+  so a later read of it uses the load. Only ROM bytes and the function index
+  are read, never source. Only the libgcc division helpers have an exact
+  interface otherwise;
 * every access to the object to be `symbol + constant` inside it: an
   address that adds a variable term (`(&sym)[n].x`, a variable subscript),
   lies outside the object or comes from a multi-register transfer fails
@@ -1761,7 +1775,14 @@ symbolically along every path, and the check requires:
 * every access overlapping a pinned member to be exactly that member, at its
   offset and width (a byte of a halfword, a halfword over two bytes and a
   word over two halfwords are refused), and every such store to carry its
-  own read-modify-write load;
+  own read-modify-write load. The one exception is a store of the member's
+  all-ones value (`0xFF`, `0xFFFF`): agbcc's combine pass folds the
+  bit-field insertion `(ior (mem/v x) 0xFF)` to the constant and drops that
+  store's load, depending on register allocation (081175D4 keeps the load
+  of its second `0xFF` store and drops the first). Such a store is admitted
+  only when the permuted compile is checked and the store follows its
+  member there, so an alias all-ones store through another member, the
+  base or a cast is still refused;
 * no store to write back the value just loaded from the same member (an
   `ldrb`/`strb` or `ldrh`/`strh` self-assignment).
 
@@ -1857,7 +1878,9 @@ has these gaps:
   - callees need a fixed one-word-per-argument prototype;
   - a dead load into an argument register is refused unless that register
     is overwritten before the next call, whatever the callee's prototype
-    says.
+    says, when the callee is not an indexed Thumb function whose CFG closes
+    (indirect calls, BIOS calls, recursion, switches), or when its ROM code
+    reads the register.
 * The permutation refuses any access to a pinned member that is not made
   through its member's name. A computed offset that happens to equal a
   member's is a false refusal. The check assumes agbcc places full-width
@@ -1893,6 +1916,12 @@ has these gaps:
   `symbol.win0h_lo = (symbol.bg0cnt = a)` passes.
 * It reasons about agbcc's assembly. It assumes cc1's output is what the
   assembler encodes.
+* Callee interfaces assume the ARM calling convention for r4-r11 (a callee
+  that reads a callee-saved register as a hidden argument is not modelled,
+  as before), that capstone reports each Thumb instruction's register reads
+  and writes, and that `func_XXXXXXXX` is linked to that address (the byte
+  match enforces it). The all-ones exception rests on the permutation:
+  without the permuted compile every pinned store still needs its load.
 * It does not police reads that stay in both compiles. These are ordinary
   code that any declaration produces, and the general plausibility rules
   apply to them.

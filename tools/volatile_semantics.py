@@ -28,7 +28,9 @@ symbolically along every path, and the check requires
    needs a file-scope prototype with a fixed list of one-word arguments;
    no prototype, `()`, `...`, indirect calls and wider arguments fail
    closed.  No prototype is trusted to name every register the callee
-   reads, so every call counts as reading r0-r3;
+   reads, so every call counts as reading r0-r3, unless the callee is an
+   indexed Thumb function whose ROM code shows which of them it reads
+   (RomInterfaces, transitively through its own calls, failing closed);
 2. every access to the object to be `symbol + constant` inside it; variable
    offsets, out-of-object offsets, multi-register transfers and the
    object's address reaching a call argument or a stored value fail closed;
@@ -48,7 +50,10 @@ symbolically along every path, and the check requires
      in order with the same address and width;
 4. every access overlapping a pinned member to be exactly that member: its
    offset and its width (Executor.check_address), and every such store to
-   carry its own read-modify-write load;
+   carry its own read-modify-write load, except a store of the member's
+   all-ones value once the permuted compile has shown it follows its member
+   (agbcc's combine folds that store's insertion to the constant and drops
+   the load);
 5. no store to write back the value just loaded from the same member (an
    `ldrb`/`strb` or `ldrh`/`strh` self-assignment, `sym.x = sym.x` or
    `sym.x |= 0`).
@@ -105,6 +110,7 @@ MAX_PATHS = 256
 MAX_STEPS = 20000
 MAX_DECISIONS = 32
 RUNTIME_ARITY = {"__divsi3": 2, "__udivsi3": 2, "__modsi3": 2, "__umodsi3": 2}
+ARGUMENT_REGISTERS = ("r0", "r1", "r2", "r3")
 PINNED_WIDTHS = (1, 2)      # volatile members the rules model: bytes and halfwords
 TYPE_SIZES = {"u8": 1, "s8": 1, "char": 1, "vu8": 1, "vs8": 1,
               "u16": 2, "s16": 2, "short": 2, "vu16": 2, "vs16": 2,
@@ -577,7 +583,7 @@ class Record:
         self.address = self.width = self.value_register = None
         self.signed = self.forwarded = self.copy = self.constant = self.self_assignment = False
         self.immediate = False
-        self.guarded = set()
+        self.guarded, self.derived = set(), None
         self.__dict__.update(fields)
 
 
@@ -671,10 +677,10 @@ def evaluate(code, flags):
 class Executor:
     """symbolic execution of one agbcc Thumb function along one path"""
 
-    def __init__(self, name, function, signatures, label, layout):
+    def __init__(self, name, function, signatures, label, layout, interfaces=None):
         self.name, self.label = name, label
         self.instructions, self.labels, self.pools = function
-        self.signatures = signatures
+        self.signatures, self.interfaces = signatures, interfaces
         self.symbol, self.size, self.pinned = layout
 
     def check_address(self, address, width, text, multiple=False):
@@ -881,10 +887,21 @@ class Executor:
         # No prototype is trusted to name every register the callee reads:
         # a dead load into an unnamed argument register could be a hidden
         # argument, so r0-r3 all count as read (only runtime helpers with a
-        # known interface are exact).
+        # known interface are exact) unless the callee's own ROM code shows
+        # which of them it reads (RomInterfaces).  Then exactly those count
+        # as read, and only the registers it overwrites on every path count
+        # as written; a register it leaves alone stays live past the call.
         named = {f"r{n}" for n in range(min(count, 4))}
-        record.guarded = set() if trusted else {"r0", "r1", "r2", "r3"} - named
-        record.reads = named | record.guarded | (record.reads - {"r0", "r1", "r2", "r3"})
+        interface = None
+        if not trusted and isinstance(target, str) and self.interfaces is not None:
+            interface = self.interfaces(target)
+        if interface is None:
+            record.guarded = set() if trusted else set(ARGUMENT_REGISTERS) - named
+        else:
+            reads, writes = interface
+            record.guarded, record.derived = set(reads) - named, target
+            record.writes = set(writes) | {"lr"}
+        record.reads = named | record.guarded | (record.reads - set(ARGUMENT_REGISTERS))
         if any(carries(argument, ("sym", self.symbol)) for argument in arguments):
             self.fail(text, f"the address of {self.symbol} is passed to a call")
         self.escape(arguments, text)
@@ -1108,14 +1125,154 @@ class Executor:
         self.fail(text, "computed jumps are not modelled")
 
 
+# ---------------------------------------------------------------- callee interfaces
+
+ROM_BASE = 0x08000000
+MAX_CALLEE_BYTES = 0x4000
+MAX_CALLEE_DEPTH = 8
+MAX_CALLEES = 64
+UNKNOWN_INTERFACE = (frozenset(ARGUMENT_REGISTERS), frozenset())
+
+
+class RomInterfaces:
+    """which of r0-r3 an indexed Thumb callee reads, derived from its ROM bytes.
+
+    For `bl func_XXXXXXXX` the callee is the indexed Thumb function at that
+    address (the name is what the byte match links it to).  Its CFG comes
+    from analyze.refine_function over the indexed span, and a dataflow pass
+    over that CFG finds
+    * reads: the argument registers some path reads before writing them, and
+    * writes: the argument registers every path overwrites before returning.
+    Register effects are capstone's (pushes and stores count as reads).  A
+    call inside the callee reads what its own callee reads, transitively, and
+    writes what that callee writes on every path; recursion, more than
+    MAX_CALLEE_DEPTH levels or MAX_CALLEES callees, a CFG that does not close,
+    a word switch, an unindexed or non-Thumb target, and anything else this
+    does not model give UNKNOWN_INTERFACE (reads r0-r3, writes none), so the
+    analysis fails closed.  A register the callee never reads cannot carry
+    information into it, and one it overwrites on every path carries none
+    out, so a dead load in such a register is dead across the call.
+    Only ROM bytes and the function index are used, never source.
+    """
+
+    def __init__(self, rom, functions):
+        self.rom, self.functions = rom, functions
+        self.cache, self.budget, self.names = {}, MAX_CALLEES, {}
+
+    def __call__(self, name):
+        """(reads, writes) for a callee name, or None when nothing could be derived.
+
+        None keeps the strict rule (the call reads r0-r3).  The answer is
+        fixed per name on first use, so every compile of the function sees
+        the same interface whatever the budget does later.
+        """
+        found = re.fullmatch(r"func_([0-9A-F]{8})", name)
+        if found is None:
+            return None
+        if name not in self.names:
+            summary = self.summary(int(found[1], 16), ())[:2]
+            self.names[name] = None if summary == UNKNOWN_INTERFACE else summary
+        return self.names[name]
+
+    def summary(self, address, active):
+        """(reads, writes, exact); exact is False when a bound, not the code, decided"""
+        if address in self.cache:
+            return self.cache[address] + (True,)
+        if address in active or len(active) >= MAX_CALLEE_DEPTH or self.budget <= 0:
+            return UNKNOWN_INTERFACE + (False,)
+        self.budget -= 1
+        try:
+            instructions, entry, returns = self.control_flow(address)
+        except Exception:       # anything unmodelled fails closed
+            self.cache[address] = UNKNOWN_INTERFACE
+            return UNKNOWN_INTERFACE + (True,)
+        arguments = frozenset(ARGUMENT_REGISTERS)
+        written_at, pending, reads, ends, exact = {entry: frozenset()}, [entry], set(), None, True
+        while pending:
+            position = pending.pop()
+            read, write, successors, target = instructions[position]
+            if target is not None:
+                read, write, inner = self.summary(target, active + (address,))
+                exact = exact and inner
+            # the must-written sets only shrink, so each revisit can only add reads
+            written = written_at[position]
+            reads |= (read & arguments) - written
+            written = written | (write & arguments)
+            if position in returns:
+                ends = written if ends is None else ends & written
+            for successor in successors:
+                merged = written_at[successor] & written if successor in written_at else written
+                if written_at.get(successor) != merged:
+                    written_at[successor] = merged
+                    pending.append(successor)
+        result = (frozenset(reads), ends or frozenset())
+        if exact:
+            self.cache[address] = result
+        return result + (exact,)
+
+    def control_flow(self, address):
+        """({position: (reads, writes, successors, call target)}, entry, return sites)"""
+        from capstone import CS_ARCH_ARM, CS_MODE_THUMB, Cs     # before analyze, which exits without it
+        from capstone.arm_const import ARM_OP_IMM
+        import analyze
+        offset = address - ROM_BASE
+        if address % 2 or not 0 <= offset < len(self.rom):
+            raise SemanticError("callee outside the ROM")
+        data = bytes(self.rom[offset:offset + MAX_CALLEE_BYTES])
+        refined = analyze.refine_function(data, address, self.functions, max_bytes=len(data),
+                                          max_instructions=len(data) // 2,
+                                          rom_end=ROM_BASE + len(self.rom))
+        if not refined["cfg_closed"] or refined["mode"] != "thumb" or refined["word_switches"]:
+            raise SemanticError("callee CFG does not close")
+        calls = {int(call["site"], 16): int(call["target"], 16) for call in refined["calls"]}
+        returns = {int(site, 16) for site in refined["returns"]}
+        engine = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        engine.detail = True
+        instructions = {}
+        for start, stop in refined["code_ranges"]:
+            start, stop = int(start, 16), int(stop, 16)
+            position = start
+            while position < stop:
+                instruction = next(engine.disasm(data[position - address:stop - address], position,
+                                                 count=1), None)
+                if instruction is None:
+                    raise SemanticError("undecodable callee instruction")
+                size, mnemonic = instruction.size, instruction.mnemonic
+                read, write = (frozenset(instruction.reg_name(r) for r in registers)
+                               for registers in instruction.regs_access())
+                following = [position + size]
+                if position in returns:
+                    following = []
+                elif mnemonic == "bl":
+                    if position not in calls:
+                        raise SemanticError("callee BL is not an indexed call")
+                elif mnemonic == "b" or (mnemonic[:1] == "b" and mnemonic[1:] in INVERSE):
+                    operands = instruction.operands
+                    if len(operands) != 1 or operands[0].type != ARM_OP_IMM:
+                        raise SemanticError("unmodelled callee branch")
+                    following = [operands[0].imm] + (following if mnemonic != "b" else [])
+                elif "pc" in write:
+                    raise SemanticError("unmodelled callee transfer")
+                instructions[position] = (read, write, following, calls.get(position))
+                position += size
+            if position != stop:
+                raise SemanticError("callee code range ends inside an instruction")
+        if len(instructions) != refined["instrs"] or set(calls) - set(instructions) or \
+                returns - set(instructions) or address not in instructions or \
+                any(successor not in instructions
+                    for _, _, successors, _ in instructions.values() for successor in successors):
+            raise SemanticError("callee CFG and decoding disagree")
+        return instructions, address, returns
+
+
 # ---------------------------------------------------------------- comparison
 
-def explore(name, function, signatures, label, layout):
+def explore(name, function, signatures, label, layout, interfaces=None):
     paths, pending = [], [[]]
     while pending:
         decisions = pending.pop()
         try:
-            path = Executor(name, function, signatures, label, layout).run(decisions)
+            path = Executor(name, function, signatures, label, layout, interfaces).run(decisions)
         except NeedDecision:
             pending += [decisions + [False], decisions + [True]]
             continue
@@ -1125,9 +1282,9 @@ def explore(name, function, signatures, label, layout):
     return paths
 
 
-def replay(name, function, signatures, label, decisions, layout):
+def replay(name, function, signatures, label, decisions, layout, interfaces=None):
     try:
-        return Executor(name, function, signatures, label, layout).run(decisions)
+        return Executor(name, function, signatures, label, layout, interfaces).run(decisions)
     except NeedDecision:
         raise SemanticError(f"{name}: the stripped compile branches where the real one does not")
 
@@ -1251,7 +1408,8 @@ def chained_reread(records, position, pinned_width):
     return store is not None
 
 
-def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned):
+def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
+                     interfaces=None, unloaded_all_ones=False):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -1260,7 +1418,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         offset = object_offset(address, symbol, size)
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
 
-    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned))
+    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
     read_modify_write, chained = set(), set()
     for number, path in enumerate(paths, 1):
         records = path.records
@@ -1277,6 +1435,12 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             destination = next(iter(record.writes))
             if record.width == pinned_width(record.address) and not record.signed:
                 verdict = dead(records, position, destination)
+                if isinstance(verdict, Record) and verdict.derived:
+                    raise SemanticError(
+                        f"{name}: {describe(record)} loads {where(record.address)} into "
+                        f"{destination}, which {verdict.derived} reads before writing it (from its "
+                        "ROM code) although its prototype does not name it; the load must be "
+                        "overwritten before the call")
                 if isinstance(verdict, Record):
                     raise SemanticError(
                         f"{name}: {describe(record)} loads {where(record.address)} into "
@@ -1307,11 +1471,20 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             if offset is None or not any(start < offset + record.width and offset < start + width
                                          for start, width in pinned.items()):
                 continue
+            if record.width == pinned.get(offset) and position not in explained_stores and \
+                    unloaded_all_ones and record.value == (1 << 8 * record.width) - 1:
+                # agbcc's combine folds `(ior (mem/v x) all-ones)` to the
+                # constant and so drops this store's own load; only the
+                # member's all-ones value can lose it.  The permuted compile
+                # (perturbation_check, which unloaded_all_ones requires) has
+                # already shown that this store follows its member's name.
+                continue
             if record.width != pinned.get(offset) or position not in explained_stores:
                 raise SemanticError(f"{name}: {describe(record)} stores to {where(record.address)} "
                                     "without the read-modify-write load of a volatile member store")
         # 1. the stripped compile behaves the same on this path
-        other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned))
+        other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
+                       interfaces)
         if other.conditions != path.conditions:
             raise SemanticError(f"{name}: the real and stripped compiles branch on different "
                                 f"conditions (path {number})")
@@ -1358,8 +1531,14 @@ def normalised(lines):
 
 
 def remap(expression, atom, mapping):
-    """expression with every `symbol + pinned offset` replaced by its moved offset"""
-    if not isinstance(expression, tuple):
+    """expression with every `symbol + pinned offset` replaced by its moved offset.
+
+    Trace events are walked structurally, so containers reach here as well as
+    values: a zero-argument call's argument tuple and an escape with no
+    local frame bytes are both `()`.  An empty tuple holds no address and is
+    its own image; the caller compares it exactly, element for element.
+    """
+    if not isinstance(expression, tuple) or not expression:
         return expression
     if expression[0] == "lin":
         constant, terms = linear(expression)
@@ -1377,7 +1556,7 @@ def object_accesses(records, atom):
 
 
 def perturbation_check(name, real_function, perturbed_function, signatures, symbol, size, pinned,
-                       mapping):
+                       mapping, interfaces=None):
     """the layout-perturbed compile must follow every pinned access, and only those.
 
     On every path, the real compile's trace, branch conditions and object
@@ -1390,10 +1569,10 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
     executor in both compiles, so remapping an access's start is enough.
     """
     atom = ("sym", symbol)
-    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned))
+    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
     for number, path in enumerate(paths, 1):
         other = replay(name, perturbed_function, signatures, "layout-perturbed", path.decisions,
-                       (symbol, size, pinned))
+                       (symbol, size, pinned), interfaces)
         mine = [(kind, width, remap(address, atom, mapping))
                 for kind, width, address in object_accesses(path.records, atom)]
         theirs = object_accesses(other.records, atom)
@@ -1414,7 +1593,8 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
     return len(paths)
 
 
-def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration, perturbed_assembly):
+def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration, perturbed_assembly,
+            interfaces=None):
     """[(function, paths, read-modify-write instructions, chained re-reads)].
 
     The three compiles are the source as written, with `volatile` stripped
@@ -1422,14 +1602,15 @@ def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
     members permuted (perturb_pinned).  Raises SemanticError with the reason
     when the real compile differs from the stripped one by anything but the
     qualifier's documented effect, or reaches a pinned member other than
-    through its name.
+    through its name.  interfaces, if given, is a RomInterfaces: the callees'
+    argument registers derived from their ROM code.
     """
     return _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
-                            perturbed_assembly)
+                            perturbed_assembly, interfaces)
 
 
 def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
-                     perturbed_assembly=None):
+                     perturbed_assembly=None, interfaces=None):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
     from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
@@ -1457,8 +1638,12 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
             raise SemanticError("the real and layout-perturbed compiles define different functions")
         for name in sorted(real):
             perturbation_check(name, real[name], perturbed[name], signatures, symbol, size, pinned,
-                               mapping)
-    return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned)
+                               mapping, interfaces)
+    # A pinned store may lack its read-modify-write load only for the
+    # all-ones value, and only once the permuted compile has shown it follows
+    # its member; without that compile the rule stays strict.
+    return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
+                                       interfaces, unloaded_all_ones=perturbed_assembly is not None)
             for name in sorted(real)]
 
 

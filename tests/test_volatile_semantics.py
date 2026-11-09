@@ -540,6 +540,155 @@ class SemanticDiffTests(unittest.TestCase):
         self.refused(assembly("bx\tlr"), assembly("bx\tlr", name="func_08028C38"),
                      "define different functions")
 
+    def test_zero_argument_calls_and_empty_escapes_follow_the_perturbation(self):
+        # a zero-argument call's argument tuple and an escape with no local
+        # frame bytes are both `()` in the trace; remapping keeps them exact
+        self.assertEqual(semantics.remap((), ("sym", SYMBOL), {0x3C: 0x3D}), ())
+        prelude = PREPROCESSED + "extern void func_0802B000(void);\nextern void func_0802B004(void *);\n"
+        real = assembly("push\t{lr}", "ldr\tr1, .L3", "add\tr1, r1, #60", "ldrb\tr2, [r1]",
+                        "mov\tr2, #1", "strb\tr2, [r1]", "bl\tfunc_0802B000", "mov\tr0, sp",
+                        "bl\tfunc_0802B004", "pop\t{r0}", "bx\tr0")
+        stripped = real.replace("ldrb\tr2, [r1]\n\t", "")
+        moved = real.replace("#60", "#61")
+        (result,) = semantics.compare(real, stripped, prelude, SYMBOL, DECLARATION, moved)
+        self.assertEqual(result[1:], (1, [3], []))
+        # and still refuses a perturbed compile that drops the call
+        with self.assertRaises(semantics.SemanticError) as caught:
+            semantics.compare(real, stripped, prelude, SYMBOL, DECLARATION,
+                              moved.replace("bl\tfunc_0802B000\n\t", ""))
+        self.assertIn("behaves differently", str(caught.exception))
+
+    def test_all_ones_store_may_lack_its_load_only_when_it_follows_its_member(self):
+        # agbcc's combine folds `(ior (mem/v x) 0xFF)` to 0xFF and drops the
+        # load of a volatile all-ones store (081175D4 stores 0xFF to +0x3E)
+        ones = assembly("ldr\tr1, .L3", "add\tr1, r1, #60", "mov\tr2, #255", "strb\tr2, [r1]", "bx\tlr")
+        self.assertEqual(self.perturbed(ones, ones.replace("#60", "#61"), ones)[0][1:], (1, [], []))
+        minus_one = ones.replace("mov\tr2, #255", "mov\tr2, #1\n\tneg\tr2, r2")
+        self.assertEqual(self.perturbed(minus_one, minus_one.replace("#60", "#61"), minus_one)[0][1:],
+                         (1, [], []))
+        # a planted alias all-ones store (`((u8 *)&sym.display)[0x3C] = 0xFF`)
+        # has the same address in the permuted compile and is refused
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.perturbed(ones, ones, ones)
+        self.assertIn("does not follow its member", str(caught.exception))
+        # any other value still needs its load, and so does every store
+        # when the permuted compile is not checked
+        other = ones.replace("#255", "#254")
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.perturbed(other, other.replace("#60", "#61"), other)
+        self.assertIn("without the read-modify-write load", str(caught.exception))
+        self.refused(ones, ones, "without the read-modify-write load")
+        # halfwords: 0xFFFF without its ldrh
+        half = assembly("ldr\tr1, .L3", "ldr\tr0, .L3+4", "strh\tr0, [r1, #4]", "bx\tlr").replace(
+            f".word\t{SYMBOL}\n", f".word\t{SYMBOL}\n\t.word\t0xFFFF\n")
+        self.assertEqual(self.compare16(half, half, half.replace("#4]", "#2]"))[0][1:], (1, [], []))
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.compare16(half, half, half)
+        self.assertIn("does not follow its member", str(caught.exception))
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.compare16(half.replace("0xFFFF", "0xFFFE"), half.replace("0xFFFF", "0xFFFE"),
+                           half.replace("0xFFFF", "0xFFFE").replace("#4]", "#2]"))
+        self.assertIn("without the read-modify-write load", str(caught.exception))
+
+# Thumb functions for a synthetic ROM: (address, halfwords); "bl" entries are
+# expanded to the two-halfword BL to the given address
+CALLEES = (
+    (0x08000200, [0x3001, 0x4770]),                              # adds r0, #1; bx lr
+    (0x08000210, [0x1C18, 0x4770]),                              # adds r0, r3, #0; bx lr
+    (0x08000220, [0xB500, ("bl", 0x08000210), 0xBC01, 0x4700]),  # passes r3 on
+    (0x08000230, [0xB500, 0x2300, ("bl", 0x08000210), 0xBC01, 0x4700]),  # movs r3, #0 first
+    (0x08000240, [0xE7DE]),                                      # b 0x08000200 (tail branch)
+    (0x08000250, [0xB500, ("bl", 0x08000250), 0xBC01, 0x4700]),  # recursion
+    (0x08000260, [0x2000, 0x4770]),                              # movs r0, #0; bx lr
+    (0x08000270, [0x2800, 0xD000, 0x1C10, 0x4770]),              # reads r2 on one path
+    (0x08000280, [0xB5F0, 0xBCF0, 0xBC01, 0x4700]),              # push/pop r4-r7 only
+)
+
+
+def synthetic_rom():
+    rom = bytearray(0x300)
+    for address, words in CALLEES:
+        position = address - 0x08000000
+        for word in words:
+            if isinstance(word, tuple):
+                offset = word[1] - (0x08000000 + position + 4)
+                halves = (0xF000 | ((offset >> 12) & 0x7FF), 0xF800 | ((offset >> 1) & 0x7FF))
+            else:
+                halves = (word,)
+            for half in halves:
+                rom[position:position + 2] = half.to_bytes(2, "little")
+                position += 2
+    return bytes(rom), [{"rom": f"0x{address:08X}", "mode": "thumb"} for address, _ in CALLEES]
+
+
+try:
+    import capstone  # noqa: F401
+except ImportError:
+    capstone = None
+
+
+@unittest.skipUnless(capstone, "capstone required")
+class CalleeInterfaceTests(unittest.TestCase):
+    """dead loads live into a call: the callee's ROM code says which of r0-r3 it reads"""
+
+    def interfaces(self):
+        return semantics.RomInterfaces(*synthetic_rom())
+
+    def test_interfaces_come_from_the_callee_rom_code(self):
+        interfaces = self.interfaces()
+        for address, reads, writes in ((0x08000200, {"r0"}, {"r0"}), (0x08000210, {"r3"}, {"r0"}),
+                                       (0x08000220, {"r3"}, {"r0"}), (0x08000230, set(), {"r0", "r3"}),
+                                       (0x08000260, set(), {"r0"}), (0x08000270, {"r0", "r2"}, set()),
+                                       (0x08000280, set(), {"r0"})):
+            with self.subTest(callee=hex(address)):
+                self.assertEqual(interfaces(f"func_{address:08X}"), (frozenset(reads), frozenset(writes)))
+        # a CFG that leaves its span, recursion and unindexed addresses fail closed
+        for address in (0x08000240, 0x08000250, 0x08000204, 0x08000290):
+            with self.subTest(callee=hex(address)):
+                self.assertIsNone(interfaces(f"func_{address:08X}"))
+        self.assertIsNone(interfaces("k"))
+
+    def check(self, callee, after=("pop\t{r0}", "bx\tr0"), returns="void"):
+        # `sym.unknown_3C = p[4]; callee(p);`: the read-modify-write load
+        # leaves r3 live into the call (08092230, 081269E4, 0800664C, 080D3CB4)
+        real = assembly("push\t{lr}", "ldr\tr1, .L3", "ldrb\tr2, [r0, #4]", "add\tr1, r1, #60",
+                        "ldrb\tr3, [r1]", "strb\tr2, [r1]", f"bl\tfunc_{callee:08X}", *after)
+        stripped = real.replace("ldrb\tr3, [r1]\n\t", "")
+        prelude = f"{returns} func_08028C34(u8 *p);\nextern void func_{callee:08X}(u8 *);\n"
+        return semantics.compare(real, stripped, prelude, SYMBOL, DECLARATION,
+                                 real.replace("#60", "#61"), self.interfaces())
+
+    def test_a_dead_load_is_refused_only_in_a_register_the_callee_reads(self):
+        for callee in (0x08000200, 0x08000230, 0x08000260):
+            with self.subTest(callee=hex(callee)):
+                self.assertEqual(self.check(callee)[0][1:], (1, [4], []))
+        for callee in (0x08000210, 0x08000220):
+            with self.subTest(callee=hex(callee)), self.assertRaises(semantics.SemanticError) as caught:
+                self.check(callee)
+            self.assertIn("reads before writing it", str(caught.exception))
+        for callee in (0x08000240, 0x08000250):
+            with self.subTest(callee=hex(callee)), self.assertRaises(semantics.SemanticError) as caught:
+                self.check(callee)
+            self.assertIn("might take as an argument", str(caught.exception))
+        # without interfaces every call reads r0-r3
+        with self.assertRaises(semantics.SemanticError) as caught:
+            real = assembly("push\t{lr}", "ldr\tr1, .L3", "ldrb\tr2, [r0, #4]", "add\tr1, r1, #60",
+                            "ldrb\tr3, [r1]", "strb\tr2, [r1]", "bl\tfunc_08000200", "pop\t{r0}", "bx\tr0")
+            semantics.compare(real, real.replace("ldrb\tr3, [r1]\n\t", ""),
+                              "void func_08028C34(u8 *p);\nextern void func_08000200(u8 *);\n",
+                              SYMBOL, DECLARATION, real.replace("#60", "#61"))
+        self.assertIn("might take as an argument", str(caught.exception))
+
+    def test_a_register_the_callee_leaves_alone_stays_live(self):
+        # r3 survives func_08000260, so reading it after the call uses the
+        # load, which then explains no store
+        after = ("mov\tr0, r3", "pop\t{r1}", "bx\tr1")
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.check(0x08000260, after, "int")
+        self.assertIn("without the read-modify-write load", str(caught.exception))
+        # func_08000230 overwrites r3 on every path
+        self.assertEqual(self.check(0x08000230, after, "int")[0][1:], (1, [4], []))
+
 
 class ReportRecordTests(unittest.TestCase):
     USES = "* allowlisted volatile: `g_control_flags_03000940` at `0x03000940` declared in x"
@@ -727,6 +876,49 @@ class CompiledSemanticTests(unittest.TestCase):
                 with self.assertRaises(semantics.SemanticError) as caught:
                     self.check(plant + tail)
                 self.assertIn(reason, str(caught.exception))
+
+    def test_all_ones_stores_through_agbcc(self):
+        s = SYMBOL
+        # agbcc drops the load of the first 0xFF store (combine folds the
+        # insertion to the constant) and keeps the second's (081175D4)
+        (record,) = self.check(f"{s}.win0v_hi = 0; {s}.win0v_lo = 255; {s}.win1v_lo = 255;")
+        self.assertIn("read-modify-write loads at [4, 11]", record)
+        # a planted alias all-ones store: refused lexically and, with the
+        # lexical passes off, by the permuted compile
+        alias = f"((u8 *)&{s}.display)[0x3E] = 0xFF;"
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.check(alias)
+        self.assertIn("after preprocessing", str(caught.exception))
+        with mock.patch.object(plausible, "member_provenance", return_value=[]), \
+                mock.patch.object(plausible, "whole_object_uses", return_value=[]), \
+                self.assertRaises(semantics.SemanticError) as caught:
+            self.check(alias)
+        self.assertIn("does not follow its member", str(caught.exception))
+
+    def test_dead_loads_live_into_calls_through_agbcc(self):
+        # the read-modify-write load leaves r3 live into the call; the
+        # synthetic ROM's callee at 0x08000200 reads only r0, the one at
+        # 0x08000210 reads r3
+        rom, functions = synthetic_rom()
+        (self.root / "baserom.bin").write_bytes(rom)
+        (self.root / "config" / "functions.json").write_text(json.dumps(functions))
+        body = f"{SYMBOL}.bldcnt_lo = p[4]; func_{{callee:08X}}(p);"
+        try:
+            for callee in (0x08000200, 0x08000210):
+                prelude = f"extern void func_{callee:08X}(u8 *);\n"
+                if callee == 0x08000200:
+                    (record,) = self.check(body.format(callee=callee), "u8 *p", prelude)
+                    self.assertIn("read-modify-write loads at [5]", record)
+                    continue
+                with self.assertRaises(semantics.SemanticError) as caught:
+                    self.check(body.format(callee=callee), "u8 *p", prelude)
+                self.assertIn("func_08000210 reads before writing it", str(caught.exception))
+        finally:
+            (self.root / "baserom.bin").unlink()
+            (self.root / "config" / "functions.json").unlink()
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.check(body.format(callee=0x08000200), "u8 *p", "extern void func_08000200(u8 *);\n")
+        self.assertIn("might take as an argument", str(caught.exception))
 
     def test_compiled_layout_equals_the_modelled_layout(self):
         """agbcc places every member, pinned or not, of the shipped declaration
