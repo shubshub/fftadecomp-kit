@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "51726e8ef66fde9c32f2b7b2ec61aa2cf97f9659de63ef73c6f8bbfd777d58c1",
-        "acknowledged_cursor": 6831656753,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "51726e8ef66fde9c32f2b7b2ec61aa2cf97f9659de63ef73c6f8bbfd777d58c1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081419C0\",\"who\":\"match-native-081419C0\",\"note\":\"Recover natural C for complete independently qualified native body; strict byte-exact verification.\"}",
-          "created_at": "2026-11-12T17:58:47Z",
-          "id": 6831656753,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T17:58:47Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b549f499c660f6010b16591e3b3b7a2a7ea0f722bc230059ee7c9da6f98ef88f",
-        "result": {
-          "address": "0x081419C0",
-          "claim_id": 6831656753,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6831656753,
-          "status": "accepted",
-          "who": "match-native-081419C0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "ef4503bb9128e08b9b31f680abf70050d5ed37616637b0b84890ca60b8e525c3",
-        "acknowledged_cursor": 6831769449,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ef4503bb9128e08b9b31f680abf70050d5ed37616637b0b84890ca60b8e525c3",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081419C0\",\"who\":\"match-native-081419C0\",\"claim_id\":6831656753,\"reason\":\"Complete168-byte candidate differs at45 positions after three natural formulations; ordinary declarations do not establish asynchronous interrupt-register semantics.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural nonvolatile formulations\"}",
-          "created_at": "2026-11-12T18:03:39Z",
-          "id": 6831769449,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T18:03:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ee44f2c413e0ac200a3ca260dc99a78b49d7ac5879bb45aa8fbcb484411c05a7",
-        "result": {
-          "address": "0x081419C0",
-          "claim_id": 6831656753,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6831769449,
-          "status": "accepted",
-          "who": "match-native-081419C0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1c8ae4aca4b7f3c9683a1da85fc36eeae66d603f5fe5414623d5f2fb4a21bbcd",
         "acknowledged_cursor": 6832169667,
         "body_provenance": "acceptance-time",
