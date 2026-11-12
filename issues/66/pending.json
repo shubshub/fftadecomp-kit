@@ -34,66 +34,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "ef05096793640fa044678cdf8b3a37ca3e2d9a01445ed810fad65f0b76efdf0b",
-        "acknowledged_cursor": 6820821440,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ef05096793640fa044678cdf8b3a37ca3e2d9a01445ed810fad65f0b76efdf0b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DDCC\",\"who\":\"match-native-0804DDCC\",\"note\":\"Recover complete192-byte display transition initializer with native verification\"}",
-          "created_at": "2026-11-12T10:14:10Z",
-          "id": 6820821440,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T10:14:10Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "efcc2941689da3d6e6e63d23d9204a0abec46ca0e7ec47851f84e1a7ef739c1f",
-        "result": {
-          "address": "0x0804DDCC",
-          "claim_id": 6820821440,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6820821440,
-          "status": "accepted",
-          "who": "match-native-0804DDCC"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "e34df45d770f9127c3d3fba16bcd4a5336bf6ecb06e7d1726d250deff1bbef73",
-        "acknowledged_cursor": 6820984883,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e34df45d770f9127c3d3fba16bcd4a5336bf6ecb06e7d1726d250deff1bbef73",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DDCC\",\"who\":\"match-native-0804DDCC\",\"claim_id\":6820821440,\"reason\":\"Plausible C preserved; best complete compile188 versus target192 bytes. Local halfword initialization register/order and target-store allocation differ; native bounded fill selector rejects extent.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; signed scalar fill, separate assignment and one-element array variants\"}",
-          "created_at": "2026-11-12T10:22:02Z",
-          "id": 6820984883,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T10:22:02Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f6de3bc8be891f11742cb43e5ee9dcd8cb9abc3590b68cf39fdda8d92bcd276e",
-        "result": {
-          "address": "0x0804DDCC",
-          "claim_id": 6820821440,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6820984883,
-          "status": "accepted",
-          "who": "match-native-0804DDCC"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1b117817df02e044a825a1e6222041d0d6a9199aee55ad16865a5d6ce8548e98",
         "acknowledged_cursor": 6821275122,
         "body_provenance": "acceptance-time",
