@@ -151,6 +151,38 @@
           "who": "match-team-0802A534"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "709f47e4bd498709ae1b77ddf1fb2786d7307bf8986df5e9b75b660569dd5557",
+        "acknowledged_cursor": 6819749831,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "709f47e4bd498709ae1b77ddf1fb2786d7307bf8986df5e9b75b660569dd5557",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802A2C0\",\"who\":\"match-team-0802A2C0\",\"note\":\"Recover complete plausible window/control function in isolated matching lane.\"}",
+          "created_at": "2026-11-12T09:22:17Z",
+          "id": 6819749831,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:22:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "83da1ce41393b916f771a56d81cb58e5f32ab6264192b69845c6cb5f488813ca",
+        "result": {
+          "address": "0x0802A2C0",
+          "claim_id": 6819749831,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6819749831,
+          "status": "accepted",
+          "who": "match-team-0802A2C0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
