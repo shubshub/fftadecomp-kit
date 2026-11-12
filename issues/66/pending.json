@@ -59,6 +59,38 @@
           "who": "match-native-0800C720"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "65aa2a2f81a50950759e6d1d81e38e6cf84d50f79eabe9e70df9df82bef61672",
+        "acknowledged_cursor": 6826806744,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "65aa2a2f81a50950759e6d1d81e38e6cf84d50f79eabe9e70df9df82bef61672",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C720\",\"who\":\"match-native-0800C720\",\"note\":\"Recover plausible C for prepared complete226-byte owner with native subagent\"}",
+          "created_at": "2026-11-12T14:46:14Z",
+          "id": 6826806744,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T14:46:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0c2fae3dfb9a21aebb6aa6a40e96f6d7a6f797ce052e278dcd9f635d6e7ae8e7",
+        "result": {
+          "address": "0x0800C720",
+          "claim_id": 6826806744,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6826806744,
+          "status": "accepted",
+          "who": "match-native-0800C720"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
