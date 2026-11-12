@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "313b8bbb2958448376aae081a598d9e38679793b4fb04a16d78e0d38d593e9f2",
+    "acknowledged_cursor": 6820142025,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "313b8bbb2958448376aae081a598d9e38679793b4fb04a16d78e0d38d593e9f2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DD54\",\"who\":\"match-native-0804DD54\",\"note\":\"Recover complete plausible control-state caller in isolated matching lane.\"}",
+      "created_at": "2026-11-12T09:41:29Z",
+      "id": 6820141596,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T09:41:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "68b5abb494c10cfe6e2218ad6037dc62e15d15a082fb95a78b4abd42cbe1e873",
+    "result": {
+      "address": "0x0804DD54",
+      "claim_id": 6820141596,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6820141596,
+      "status": "accepted",
+      "who": "match-native-0804DD54"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4f13ed49e64c6dc250430dd57e5617a6e619b1d330e7ef84b6087dcb3e10ee4b",
+    "acknowledged_cursor": 6820504001,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4f13ed49e64c6dc250430dd57e5617a6e619b1d330e7ef84b6087dcb3e10ee4b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DD54\",\"who\":\"match-native-0804DD54\",\"claim_id\":6820141596,\"reason\":\"Plausible natural C retained in isolated scratch; native complete symbol110/120 bytes39/47 instructions. Remaining outer loop counter register and arithmetic scheduling differ; all calls inner loop and literals match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural pointer/index loops, signedness, equivalent loop bounds and explicit row offsets\"}",
+      "created_at": "2026-11-12T09:58:58Z",
+      "id": 6820504001,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T09:58:58Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2eab756d16966b14290b8dd70918f05b59b34020f12bce772fc1585b8ba9d7a9",
+    "result": {
+      "address": "0x0804DD54",
+      "claim_id": 6820141596,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6820504001,
+      "status": "accepted",
+      "who": "match-native-0804DD54"
+    }
+  }
+}
