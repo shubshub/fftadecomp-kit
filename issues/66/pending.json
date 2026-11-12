@@ -90,7 +90,35 @@
           "who": "match-0804018C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e1998d7b1332438205f6c1334c49de0064415df9f0058f1656f61bebfb5d3862",
+        "acknowledged_cursor": 6817598372,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e1998d7b1332438205f6c1334c49de0064415df9f0058f1656f61bebfb5d3862",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804018C\",\"who\":\"match-0804018C\",\"claim_id\":6817406724,\"reason\":\"Bounded plausible matching attempt retained in isolated scratch with exact remaining register-allocation/length differences; no native MATCH and no source integration.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T07:32:19Z",
+          "id": 6817598372,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T07:32:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "044adedc373c1f8268533dc36e3f58d23be7a42b6eaab18282d0cbbe0493bb03",
+        "result": {
+          "address": "0x0804018C",
+          "claim_id": 6817406724,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6817598372,
+          "status": "accepted",
+          "who": "match-0804018C"
+        }
+      }
     }
   ],
   "issue": 66,
