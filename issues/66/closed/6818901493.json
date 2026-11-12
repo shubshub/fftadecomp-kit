@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f8ec811cc9101eb7192b24aed077a543119ffdb40f1921042e72fb5330ca6896",
+    "acknowledged_cursor": 6818901699,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f8ec811cc9101eb7192b24aed077a543119ffdb40f1921042e72fb5330ca6896",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08142AB0\",\"who\":\"match-08142AB0\",\"note\":\"Recover complete tilemap update function\"}",
+      "created_at": "2026-11-12T08:40:26Z",
+      "id": 6818901493,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T08:40:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "59f48b03c585d37f4bf960c5dc58f8c15592678ecf001479fb3335dc7b9b9878",
+    "result": {
+      "address": "0x08142AB0",
+      "claim_id": 6818901493,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6818901493,
+      "status": "accepted",
+      "who": "match-08142AB0"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "384feb01dfd496e702fed22a92997b4a53430e372242c960b5384d6830892278",
+    "acknowledged_cursor": 6818959679,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "384feb01dfd496e702fed22a92997b4a53430e372242c960b5384d6830892278",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142AB0\",\"who\":\"match-08142AB0\",\"claim_id\":6818901493,\"reason\":\"Known compiler __udivsi3 assembly runtime; ordinary C rejected by canonical runtime admission\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-11-12T08:43:07Z",
+      "id": 6818953652,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T08:43:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38e3985b938059b970cf02164cb762b96a629a287c25552b72ebd3dab1835792",
+    "result": {
+      "address": "0x08142AB0",
+      "claim_id": 6818901493,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6818953652,
+      "status": "accepted",
+      "who": "match-08142AB0"
+    }
+  }
+}
