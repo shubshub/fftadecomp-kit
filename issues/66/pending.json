@@ -34,66 +34,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "06bf16134b0bcfda0cce16f7f424da20c54ea848a3031ac609655f25057b0f35",
-        "acknowledged_cursor": 6839050663,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "06bf16134b0bcfda0cce16f7f424da20c54ea848a3031ac609655f25057b0f35",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FA384\",\"who\":\"native-080fa384\",\"note\":\"Recover plausible complete C after native 24-target scheduler qualification; isolated source with parent-owned integration.\"}",
-          "created_at": "2026-11-12T23:31:38Z",
-          "id": 6839050663,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T23:31:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "80a9bdb8c5923c9c8b324368b8c93d4c3211ab068f0341c84822174f38ba1f07",
-        "result": {
-          "address": "0x080FA384",
-          "claim_id": 6839050663,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6839050663,
-          "status": "accepted",
-          "who": "native-080fa384"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c745c0f229290932533830865591d3062cd761c6f829d9a8b44993231bd5c9b2",
-        "acknowledged_cursor": 6839189267,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c745c0f229290932533830865591d3062cd761c6f829d9a8b44993231bd5c9b2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FA384\",\"who\":\"native-080fa384\",\"claim_id\":6839050663,\"reason\":\"Nine natural formulations leave 43 byte differences in complete 656-byte symbol; register allocation and initialization remain different. Candidate and genuine native errors preserved privately in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; nine natural formulations\"}",
-          "created_at": "2026-11-12T23:39:06Z",
-          "id": 6839189267,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T23:39:06Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ed704f458ecb93568ffdc8844eb7e137e0dced55b77ce39b5e38ad932414b7b2",
-        "result": {
-          "address": "0x080FA384",
-          "claim_id": 6839050663,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6839189267,
-          "status": "accepted",
-          "who": "native-080fa384"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "01d012abbc25e692e4505a64e2865caf17bb2c41f7a7170771d3f2fcd403fb4d",
         "acknowledged_cursor": 6839070414,
         "body_provenance": "acceptance-time",
