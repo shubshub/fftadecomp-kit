@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "3fd2564600edd4d1fa3cc2895887dcd79005668c9afb342f1e95ebd095af300d",
-        "acknowledged_cursor": 6823794764,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3fd2564600edd4d1fa3cc2895887dcd79005668c9afb342f1e95ebd095af300d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08027528\",\"who\":\"match-team-08027528\",\"note\":\"Recover complete bounded local pointer-list copy caller; preserve native refusals\"}",
-          "created_at": "2026-11-12T12:36:58Z",
-          "id": 6823794764,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T12:36:58Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d0dd3d81e2392788d7b0f2f5db6437e63f33c4d2955672f452f2312a2d65f60c",
-        "result": {
-          "address": "0x08027528",
-          "claim_id": 6823794764,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6823794764,
-          "status": "accepted",
-          "who": "match-team-08027528"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "39883a69c86ac4dee53d94040449c5bc008f13c4674aeea36493bd64f9a43503",
-        "acknowledged_cursor": 6823974051,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "39883a69c86ac4dee53d94040449c5bc008f13c4674aeea36493bd64f9a43503",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08027528\",\"who\":\"match-team-08027528\",\"claim_id\":6823794764,\"reason\":\"Recovered plausible 50-byte diagnostic equality; native refuses helper STM buffer effect and advancing caller local pointer loop. Preserved exact boundary evidence for later proof support.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T12:45:26Z",
-          "id": 6823974051,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T12:45:26Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "dd6ea803c11f2ad1829897006539308d29f91a103118e4491cc673380b3035ba",
-        "result": {
-          "address": "0x08027528",
-          "claim_id": 6823794764,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6823974051,
-          "status": "accepted",
-          "who": "match-team-08027528"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "61fdb75b576ebeab0a2edee628ff57a204432cb79454efde1843d95d9ca35de6",
         "acknowledged_cursor": 6823995419,
         "body_provenance": "acceptance-time",
