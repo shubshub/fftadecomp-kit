@@ -850,6 +850,16 @@ predicate reads require live, defined ordinary memory and valid, nonoverlapping
 stack saves. Actual readability and predicate values are not established.
 The descriptor and payload profiles keep their existing single-call limit.
 
+Two mutually exclusive calls through `func_08121B8C` have a separate
+`conditional-scheduler-entry-branch-descriptor-calls-v1` selector. It accepts
+exactly two static calls to that pinned wrapper and no other calls. Acyclic
+all-path propagation rejects any call reached after a wrapper return, proving
+at most one invocation per path. Both sites retain the existing entry profile's
+aligned 28-byte private descriptor, alias, complete dependency and frame/return
+checks. Reports retain the same conditional scheduler, parent, callback and
+nonretention premises; actual callback effects and termination remain unproved.
+The single-entry selector still requires exactly one static call.
+
 Phase branches with ordinary calls have a separate
 `conditional-scheduler-branch-descriptor-calls-v1` profile. It authenticates the
 complete caller CFG and ordinary indexed helper bodies, allowing at most two
