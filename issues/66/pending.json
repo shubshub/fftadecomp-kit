@@ -30,7 +30,35 @@
           "who": "native-0810de24"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a7a12b4be25b0fbd362c5513a026ae9ceb006ffc8a9a116cf59af08ff3ed6530",
+        "acknowledged_cursor": 6839010999,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a7a12b4be25b0fbd362c5513a026ae9ceb006ffc8a9a116cf59af08ff3ed6530",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810DE24\",\"who\":\"native-0810de24\",\"claim_id\":6838803334,\"reason\":\"Bounded natural C emits 632 bytes with 26 remaining register-allocation differences. Native rejection and candidate preserved privately in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural formulations\"}",
+          "created_at": "2026-11-12T23:29:31Z",
+          "id": 6839010999,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T23:29:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "07c08b3248a7490b8753fd6636c5a1bfcb9804d6af1dff9da1b157f9684a4765",
+        "result": {
+          "address": "0x0810DE24",
+          "claim_id": 6838803334,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6839010999,
+          "status": "accepted",
+          "who": "native-0810de24"
+        }
+      }
     },
     {
       "claim": {
