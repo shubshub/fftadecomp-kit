@@ -112,16 +112,20 @@ class NativeTests(unittest.TestCase):
             with self.subTest(instruction=ins.mnemonic),self.assertRaises(ValueError):
                 proof.word_memory(ins,args,{},frame,dict(facts),-12,frozenset({-12}))
 
-    def test_unknown_base_write_kills_all_word_facts(self):
+    def test_unknown_base_write_cannot_forget_pointer_word(self):
         proof=self.proof();decoder=match.Cs(match.CS_ARCH_ARM,match.CS_MODE_THUMB);decoder.detail=True
         store=next(decoder.disasm(b'\x08\x60',B))  # str r0, [r1], unproved base
         facts={-12:('pointer',-4),-8:('constant',C+1)}
-        proof.word_memory(store,{}, {},[(False,False,True)]*3,facts,-12,frozenset({-12}))
+        with self.assertRaisesRegex(ValueError,'unknown store.*pointer'):
+            proof.word_memory(store,{}, {},[(False,False,True)]*3,facts,-12,frozenset({-12}))
+        self.assertEqual(facts,{-12:('pointer',-4),-8:('constant',C+1)})
+
+    def test_unknown_base_write_still_kills_scalar_facts(self):
+        proof=self.proof();decoder=match.Cs(match.CS_ARCH_ARM,match.CS_MODE_THUMB);decoder.detail=True
+        store=next(decoder.disasm(b'\x08\x60',B))
+        facts={-8:('constant',C+1)}
+        proof.word_memory(store,{}, {},[(False,False,True)]*3,facts,-12,frozenset())
         self.assertEqual(facts,{})
-        load=next(decoder.disasm(b'\x01\x68',B))
-        with self.assertRaisesRegex(ValueError,'exact surviving word value'):
-            proof.word_memory(load,{match.ARM_REG_R0:-12},{},[(False,False,True)]*3,
-                              facts,-12,frozenset({-12}))
 
     def test_identical_word_value_survives_both_conditional_paths(self):
         worker='''struct Descriptor { unsigned char *bytes; void (*callback)(unsigned char *); };
