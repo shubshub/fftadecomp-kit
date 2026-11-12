@@ -324,44 +324,144 @@ def file_scope(preprocessed):
         text = folded
 
 
-def argument_words(declaration):
-    """argument words of one parameter or return type, or None if not one word"""
-    tokens = [t for t in re.findall(r"[A-Za-z_]\w*|\*|\S", declaration) if t not in QUALIFIERS]
+def parameter_parts(text):
+    """Split only outer commas; malformed or unbounded declarators fail closed."""
+    parts, start, depth = [], 0, 0
+    for position, character in enumerate(text):
+        if character == "(":
+            depth += 1
+            if depth > 8:
+                raise SemanticError("callback declaration nesting exceeds bound")
+        elif character == ")":
+            depth -= 1
+            if depth < 0:
+                raise SemanticError("unbalanced parameter declaration")
+        elif character == "," and depth == 0:
+            parts.append(text[start:position].strip())
+            start = position + 1
+    parts.append(text[start:].strip())
+    if depth or any(not part for part in parts):
+        raise SemanticError("malformed parameter declaration")
+    return parts
+
+
+def callback_declaration(declaration):
+    """One direct function-pointer declarator, with an optional parameter name.
+
+    Callback argument types are syntax only: they supply no callee effect or
+    register-preservation facts. Arrays, pointer-to-pointer declarators and
+    variable/old-style callback argument lists are outside this bounded reader.
+    """
+    matched = re.fullmatch(
+        r"([^()]+?)\s*\(\s*\*\s*((?:(?:const|volatile)\s+)*)"
+        r"([A-Za-z_]\w*)?\s*\)\s*\((.*)\)", declaration.strip(), re.S)
+    if not matched:
+        return None
+    result, _, name, parameters = matched.groups()
+    if (result.strip() != "void" and argument_words(result) is None and
+            not re.fullmatch(r"double|(?:unsigned\s+|signed\s+)?long\s+long", result.strip())):
+        return None
+    if not parameters.strip() or "..." in parameters:
+        return None
+    if parameters.strip() != "void":
+        for parameter in parameter_parts(parameters):
+            # Multiword numeric callback arguments do not change the outer
+            # pointer's ABI width, but their declarations must still be readable.
+            if argument_words(parameter) is None and not re.fullmatch(
+                    r"(?:double|(?:unsigned\s+|signed\s+)?long\s+long)"
+                    r"(?:\s+[A-Za-z_]\w*)?", parameter):
+                return None
+    return name or ""
+
+
+def argument_words(declaration, callback_types=()):
+    """One outer ABI word, or None; callback signatures are never ABI summaries."""
+    declaration = declaration.strip()
+    if re.search(r"[^A-Za-z_0-9\s*(),]", declaration):
+        return None
+    if "(" in declaration or ")" in declaration:
+        return 1 if callback_declaration(declaration) is not None else None
+    tokens = [t for t in re.findall(r"[A-Za-z_]\w*|\*|\S", declaration)
+              if t not in QUALIFIERS]
     if "*" in tokens:
-        return 1 if "(" not in tokens and "[" not in tokens else None
+        first = tokens.index("*")
+        base, pointer = tokens[:first], tokens[first:]
+        if pointer and pointer[-1] != "*":
+            if not re.fullmatch(r"[A-Za-z_]\w*", pointer[-1]):
+                return None
+            pointer = pointer[:-1]
+        base_ok = (len(base) == 1 and re.fullmatch(r"[A-Za-z_]\w*", base[0]) or
+                   len(base) == 2 and base[0] in ("struct", "union", "enum") and
+                   re.fullmatch(r"[A-Za-z_]\w*", base[1]) or
+                   base and all(t in SCALAR_TYPES for t in base))
+        return 1 if base_ok and pointer and all(t == "*" for t in pointer) else None
     names = [t for t in tokens if re.fullmatch(r"[A-Za-z_]\w*", t)]
-    types = [t for t in names if t in SCALAR_TYPES]
-    if not types or types.count("long") > 1 or len(names) - len(types) > 1:
+    if tokens != names:
+        return None
+    if names and names[0] in callback_types:
+        return 1 if len(names) <= 2 else None
+    if any(t in ("void", "double", "struct", "union", "enum", "typedef") for t in names):
+        return None
+    types = names[:-1] if names and names[-1] not in SCALAR_TYPES else names
+    if not types or any(t not in SCALAR_TYPES for t in types) or types.count("long") > 1:
         return None
     return 1
 
 
-def function_signature(scope, name):
-    """(returns a value, argument words or None) for a name.
+def callback_typedefs(scope):
+    """Only unique direct function-pointer typedefs; no typedef-chain inference."""
+    candidates = {}
+    for declaration in scope.split(";"):
+        if not re.match(r"\s*typedef\b", declaration):
+            continue
+        body = re.sub(r"^\s*typedef\s+", "", declaration)
+        name = callback_declaration(body)
+        if name:
+            candidates[name] = candidates.get(name, 0) + 1
+    # Any other typedef mentioning the candidate makes its meaning ambiguous.
+    return {name for name, count in candidates.items() if count == 1 and
+            sum(bool(re.search(r"\b" + re.escape(name) + r"\b", declaration))
+                for declaration in scope.split(";")
+                if re.match(r"\s*typedef\b", declaration)) == 1}
 
-    Every file-scope declaration or definition must agree.  The argument
-    count is None (unknown) without a prototype, for `()` or `...`; a
-    parameter or return value that is not a scalar or pointer of one word
-    fails closed.
+
+def function_signature(scope, name):
+    """Read agreeing outer prototypes, counting each explicit callback as one word.
+
+    Unknown/variable outer arity remains unknown. Unsupported declarations fail
+    closed. Reading a prototype never authenticates callee behavior.
     """
     found = set()
-    for match in re.finditer(r"(?:^|;)([^;]*?)\b" + re.escape(name) + r"\s*\(([^;]*?)\)\s*(?=;)", scope):
-        prefix, parameters = match[1], match[2].strip()
-        if "(" in parameters or ")" in parameters or "(" in prefix:
+    callback_types = callback_typedefs(scope)
+    for declaration in scope.split(";"):
+        matched = re.search(r"\b" + re.escape(name) + r"\s*\(", declaration)
+        if not matched:
+            continue
+        prefix = declaration[:matched.start()].strip()
+        rest = declaration[matched.end():].strip()
+        if not rest.endswith(")") or "(" in prefix or "typedef" in prefix.split():
             raise SemanticError(f"the declaration of {name} is too complex to read its signature")
-        returns = prefix.split() and [t for t in prefix.split() if t not in QUALIFIERS] != ["void"]
+        if not prefix:
+            raise SemanticError(f"the declaration of {name} has no explicit return type")
+        parameters = rest[:-1].strip()
+        returns = bool(prefix.split() and
+                       [t for t in prefix.split() if t not in QUALIFIERS] != ["void"])
         if returns and argument_words(prefix) is None:
             raise SemanticError(f"{name} returns a value that is not one scalar or pointer word")
         if parameters == "void":
             arity = 0
-        elif not parameters or "..." in parameters:
+        elif not parameters:
             arity = None
         else:
-            words = [argument_words(parameter) for parameter in parameters.split(",")]
+            parts = parameter_parts(parameters)
+            if parts[-1] == "..." and len(parts) > 1:
+                parts, arity = parts[:-1], None
+            else:
+                arity = len(parts)
+            words = [argument_words(parameter, callback_types) for parameter in parts]
             if None in words:
                 raise SemanticError(f"a parameter of {name} is not one scalar or pointer word")
-            arity = sum(words)
-        found.add((bool(returns), arity))
+        found.add((returns, arity))
     if len(found) > 1:
         raise SemanticError(f"the file-scope declarations of {name} disagree")
     return found.pop() if found else (True, None)
