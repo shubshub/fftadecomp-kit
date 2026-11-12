@@ -59,6 +59,38 @@
           "who": "match-08000DBC"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1fb0089ad398848b8e800943a0f7b300784f4035faddc3572ea8b78f4abf028a",
+        "acknowledged_cursor": 6818497674,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1fb0089ad398848b8e800943a0f7b300784f4035faddc3572ea8b78f4abf028a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08022B24\",\"who\":\"match-08022B24\",\"note\":\"Recover one complete indexed Thumb body as plausible C with native verification.\"}",
+          "created_at": "2026-11-12T08:19:45Z",
+          "id": 6818497674,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T08:19:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3761f3d5f34c3df75da61e1181be8581c68db866d9b2d657685c9bd75aa5c64f",
+        "result": {
+          "address": "0x08022B24",
+          "claim_id": 6818497674,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6818497674,
+          "status": "accepted",
+          "who": "match-08022B24"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
