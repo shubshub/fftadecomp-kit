@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "edd48b6dfbe08ef6bab29684431c25120f96ddca38092f6013b2c93ee5e61718",
+    "acknowledged_cursor": 6837335080,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "edd48b6dfbe08ef6bab29684431c25120f96ddca38092f6013b2c93ee5e61718",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800AA54\",\"who\":\"native-0800aa54\",\"note\":\"Recover complete plausible C after native bounded-buffer qualification\"}",
+      "created_at": "2026-11-12T22:11:31Z",
+      "id": 6837335080,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:11:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b2632ccf886fe3b450f54d5799454c967c8058d0124a1ad6604e2e71726aee6d",
+    "result": {
+      "address": "0x0800AA54",
+      "claim_id": 6837335080,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6837335080,
+      "status": "accepted",
+      "who": "native-0800aa54"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "9c167a73c5e71ef4aca31bbd3a682b6dcd296e80232d670f1b161cc06c44266a",
+    "acknowledged_cursor": 6837531712,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9c167a73c5e71ef4aca31bbd3a682b6dcd296e80232d670f1b161cc06c44266a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800AA54\",\"who\":\"native-0800aa54\",\"claim_id\":6837335080,\"reason\":\"Natural C matches full 596-byte extent but differs at 159 bytes: register allocation, packet alignment and load ordering; preserved privately, no match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-11-12T22:21:16Z",
+      "id": 6837531712,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:21:16Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "539d548fdf551d4ff82d31920ba6b3b44231e9b866dc6b9aa9335c85cf8d825e",
+    "result": {
+      "address": "0x0800AA54",
+      "claim_id": 6837335080,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6837531712,
+      "status": "accepted",
+      "who": "native-0800aa54"
+    }
+  }
+}
