@@ -122,7 +122,35 @@
           "who": "native-0810c8d0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e8cd9247d4d2ea4b993ed089622d60b0f8d4a222edde8ed0586ba62c1f340892",
+        "acknowledged_cursor": 6839252922,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e8cd9247d4d2ea4b993ed089622d60b0f8d4a222edde8ed0586ba62c1f340892",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810C8D0\",\"who\":\"native-0810c8d0\",\"claim_id\":6839070414,\"reason\":\"Complete 662-byte candidate has 69 differing bytes after bounded natural formulations; frame size, register allocation and boolean lowering remain different. Native failures and recovered C retained privately in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural formulations\"}",
+          "created_at": "2026-11-12T23:42:36Z",
+          "id": 6839252922,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T23:42:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa76a620b0fbce1c615bfaf2a2ae17f19201b1933e6fd58ce5a65436e7b05c67",
+        "result": {
+          "address": "0x0810C8D0",
+          "claim_id": 6839070414,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6839252922,
+          "status": "accepted",
+          "who": "native-0810c8d0"
+        }
+      }
     },
     {
       "claim": {
