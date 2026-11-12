@@ -259,7 +259,7 @@ def compile_object(runner, workspace, args, root, address, source, thumb=True, r
     return object_data, text_data, image
 
 
-def allowlisted_volatile_semantics(root, address, args=None, runner=None):
+def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, owner_runtime_profile=None):
     """report records of the kit#90 semantic check, one per allowlisted object used.
 
     The addressed source is compiled as written and again with `volatile`
@@ -273,7 +273,8 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None):
         return []
     if args is None:
         args = argparse.Namespace(cc=DEFAULT_CC, cpp=DEFAULT_CPP, assembler=DEFAULT_AS,
-                                  objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS)
+                                  objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS,
+                                  owner_runtime_profile=owner_runtime_profile)
     if runner is None:
         runner = Runner(DEFAULT_CC, "Ubuntu", DEFAULT_WSL_PATH, root=str(root),
                         timeout=SIGNED_REPLAY_TIMEOUT)
@@ -295,6 +296,17 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None):
             interfaces = volatile_semantics.RomInterfaces(rom, json.loads(mapping))
         except ValueError:
             interfaces = None
+    if getattr(args, "owner_runtime_profile", None) == "bounded-buffer-bios-fill-source-v1":
+        from bios_cpuset_fill_profile import ConditionalVolatileInterfaces
+        from inert_spin_profile import index_snapshot
+        if rom is None or mapping is None:
+            raise ValueError("conditional CpuSet interface requires current ROM and paired indexes")
+        size = function_span(address, Path(root, "symbols/functions.txt"))
+        if size is None or size <= 0:
+            raise ValueError("conditional CpuSet interface requires a complete indexed owner")
+        data = rom[address-ROM_BASE:address-ROM_BASE+size]
+        interfaces = ConditionalVolatileInterfaces(interfaces, data, address, rom,
+            mapping, index_snapshot(root), data_snapshot(root))
     with runner.workspace() as workspace:
         compile_object(runner, workspace, args, str(root), address, source)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")

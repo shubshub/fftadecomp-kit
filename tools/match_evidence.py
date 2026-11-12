@@ -965,7 +965,12 @@ def report_matches(report, root, address):
         records = plausible.allowlisted_volatile_uses(root, address)
         if records:
             from match import allowlisted_volatile_semantics
-            records += allowlisted_volatile_semantics(root, address)
+            from named_data_buffer_profile import BIOS_FILL_SCHEMA, BIOS_FILL_SELECTOR
+            if f'* verification: `{BIOS_FILL_SCHEMA}`' in report.splitlines():
+                records += allowlisted_volatile_semantics(root, address,
+                    owner_runtime_profile=BIOS_FILL_SELECTOR)
+            else:
+                records += allowlisted_volatile_semantics(root, address)
         report = strip_volatile_records(report, records)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):

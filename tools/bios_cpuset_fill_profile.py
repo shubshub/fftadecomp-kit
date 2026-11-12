@@ -24,6 +24,32 @@ MASK = 0xFFFFFFFF
 MAX_UPDATES = 4096
 
 
+class ConditionalVolatileInterfaces:
+    """Read sets under the explicitly selected, freshly checked fill premise.
+
+    The SWI bytes do not prove the BIOS register interface. No guaranteed
+    overwrite is asserted, so a later read of r3 still keeps its value live.
+    Complete original-ELF admission remains the selected profile's job.
+    """
+
+    def __init__(self, ordinary, data, address, rom, mapping, index, objects):
+        import owner_admission_profile as owner
+        import named_data_buffer_profile as named
+        manifest, _, _ = owner.preflight(data, address, rom, mapping, index,
+                                         objects, selector=named.BIOS_FILL_SELECTOR)
+        fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True,
+            separators=(',', ':')).encode()).hexdigest()
+        self.ordinary = ordinary
+        self.conditional_premises = {NAME:
+            'conditional returning CpuSet consumes only r0-r2; no guaranteed '
+            'register overwrite; native fill preflight SHA-256 ' + fingerprint}
+
+    def __call__(self, name):
+        if name == NAME:
+            return {'r0', 'r1', 'r2'}, set()
+        return self.ordinary(name) if self.ordinary is not None else None
+
+
 def scalar_control_words(instructions, edges, calls, partition, address):
     """Recognize literal words used solely as the actual CpuSet R2 control."""
     result = []

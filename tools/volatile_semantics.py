@@ -648,6 +648,7 @@ class Record:
         self.alu_sources, self.alu_operation = (), None
         self.flags_written = False
         self.guarded, self.derived = set(), None
+        self.conditional_interface = None
         self.__dict__.update(fields)
 
 
@@ -997,6 +998,8 @@ class Executor:
             reads, writes = interface
             record.guarded, record.derived = set(reads) - named, target
             record.interface = (reads, writes)
+            record.conditional_interface = getattr(
+                self.interfaces, "conditional_premises", {}).get(target)
             record.writes = set(writes) | {"lr"}
         record.reads = named | record.guarded | (record.reads - set(ARGUMENT_REGISTERS))
         if any(carries(argument, ("sym", self.symbol)) for argument in arguments):
@@ -1742,7 +1745,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
 
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
-    read_modify_write, chained, unloaded, relied, updates, ordinary = (set() for _ in range(6))
+    read_modify_write, chained, unloaded, relied, updates, ordinary, conditional = (set() for _ in range(7))
     for number, path in enumerate(paths, 1):
         records = path.records
         # 4. a store must not write back the value it read from the same byte
@@ -1760,14 +1763,19 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 crossed = set()
                 verdict = dead(records, position, destination, crossed)
                 if verdict is True:
-                    relied.update(call.derived + " reads {" + ", ".join(sorted(call.interface[0])) +
-                                  "} writes {" + ", ".join(sorted(call.interface[1])) + "}"
-                                  for call in crossed)
+                    for call in crossed:
+                        if call.conditional_interface:
+                            conditional.add(call.derived + ": " + call.conditional_interface)
+                        else:
+                            relied.add(call.derived + " reads {" + ", ".join(sorted(call.interface[0])) +
+                                       "} writes {" + ", ".join(sorted(call.interface[1])) + "}")
                 if isinstance(verdict, Record) and verdict.derived:
+                    evidence = ("under its explicit conditional interface" if verdict.conditional_interface
+                                else "from its ROM code")
                     raise SemanticError(
                         f"{name}: {describe(record)} loads {where(record.address)} into "
-                        f"{destination}, which {verdict.derived} reads before writing it (from its "
-                        "ROM code) although its prototype does not name it; the load must be "
+                        f"{destination}, which {verdict.derived} reads before writing it ({evidence}) "
+                        "although its prototype does not name it; the load must be "
                         "overwritten before the call")
                 if isinstance(verdict, Record):
                     raise SemanticError(
@@ -1855,6 +1863,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    if conditional:
+        return result + (sorted(updates), sorted(ordinary), sorted(conditional))
     if ordinary:
         return result + (sorted(updates), sorted(ordinary))
     return result + (sorted(updates),) if updates else result
@@ -2001,7 +2011,7 @@ def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
     for name, paths, read_modify_write, chained, *extra in results:
-        unloaded, relied, updates, ordinary = (extra + [[], [], [], []])[:4]
+        unloaded, relied, updates, ordinary, conditional = (extra + [[], [], [], [], []])[:5]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
                      f"chained re-reads at {list(n + 1 for n in chained)}" +
@@ -2010,7 +2020,8 @@ def record(symbol, results, perturbed=False):
                      (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
                      (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
-                     (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else ""))
+                     (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
+                     (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
             "; ".join(parts))
