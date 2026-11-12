@@ -30,7 +30,35 @@
           "who": "match-native-0810a134"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "fa615afdf39f149d313dbbad645b1728abd3a68d5cbae39425f0ac91327b1c5e",
+        "acknowledged_cursor": 6836596782,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fa615afdf39f149d313dbbad645b1728abd3a68d5cbae39425f0ac91327b1c5e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810A134\",\"who\":\"match-native-0810a134\",\"claim_id\":6836493637,\"reason\":\"Qualified target and exact private maps prepared; no C authored. Deferring source recovery to the next matching batch; release the unused lease.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T21:36:24Z",
+          "id": 6836596782,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T21:36:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e64d7fb1db5dd532534b00fc83fbe38be313d01ad6c49649449a19be8ba507e",
+        "result": {
+          "address": "0x0810A134",
+          "claim_id": 6836493637,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6836596782,
+          "status": "accepted",
+          "who": "match-native-0810a134"
+        }
+      }
     },
     {
       "claim": {
