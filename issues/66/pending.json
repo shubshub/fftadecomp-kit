@@ -30,6 +30,66 @@
           "who": "cellebrite-ffta"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "71e42ef9a46f27a341bc064f2d90e08097f1d5ae1979d40702dad87b7e103659",
+        "acknowledged_cursor": 6815590976,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "71e42ef9a46f27a341bc064f2d90e08097f1d5ae1979d40702dad87b7e103659",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D38B4\",\"who\":\"cellebrite-ffta\",\"claim_id\":6815571548,\"reason\":\"MATCH 80/80 complete bytes, plausible source, semantic equivalence on two paths; source and native report retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T05:32:29Z",
+          "id": 6815590976,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:32:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d7ff21ed836c355dac35a0e50200ad8390643ad0e0f690445caea2c709ed1780",
+        "result": {
+          "address": "0x080D38B4",
+          "claim_id": 6815571548,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6815590976,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1212514c04cf2cd5bfd3f0312867a41da82fd17f0ca98d75a42a5b5dbed546f6",
+        "acknowledged_cursor": 6815590976,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1212514c04cf2cd5bfd3f0312867a41da82fd17f0ca98d75a42a5b5dbed546f6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E2848\",\"who\":\"cellebrite-ffta\",\"note\":\"Recover 96-byte display transition parameter setup using complete ROM offsets, defined task helpers and pinned LCD shadow.\"}",
+          "created_at": "2026-11-12T05:32:01Z",
+          "id": 6815583581,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:32:01Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d7ff21ed836c355dac35a0e50200ad8390643ad0e0f690445caea2c709ed1780",
+        "result": {
+          "address": "0x080E2848",
+          "claim_id": 6815583581,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6815583581,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      },
       "release": null
     }
   ],

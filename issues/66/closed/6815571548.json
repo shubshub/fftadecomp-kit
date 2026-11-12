@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c6c3d12549f9cd5fde03767110fc2b6e0c73cd0a0c1c5eebf1f3d966d47beece",
+    "acknowledged_cursor": 6815571548,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c6c3d12549f9cd5fde03767110fc2b6e0c73cd0a0c1c5eebf1f3d966d47beece",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D38B4\",\"who\":\"cellebrite-ffta\",\"note\":\"Recover complete 80-byte display-state reset, fixed helper signatures and existing register-shadow binding.\"}",
+      "created_at": "2026-11-12T05:31:13Z",
+      "id": 6815571548,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T05:31:13Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1bd408e696aaab9203a9722d4b19ed2ef390515784c616e5f11f47f931ab23e6",
+    "result": {
+      "address": "0x080D38B4",
+      "claim_id": 6815571548,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6815571548,
+      "status": "accepted",
+      "who": "cellebrite-ffta"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "71e42ef9a46f27a341bc064f2d90e08097f1d5ae1979d40702dad87b7e103659",
+    "acknowledged_cursor": 6815590976,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "71e42ef9a46f27a341bc064f2d90e08097f1d5ae1979d40702dad87b7e103659",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D38B4\",\"who\":\"cellebrite-ffta\",\"claim_id\":6815571548,\"reason\":\"MATCH 80/80 complete bytes, plausible source, semantic equivalence on two paths; source and native report retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T05:32:29Z",
+      "id": 6815590976,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T05:32:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d7ff21ed836c355dac35a0e50200ad8390643ad0e0f690445caea2c709ed1780",
+    "result": {
+      "address": "0x080D38B4",
+      "claim_id": 6815571548,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6815590976,
+      "status": "accepted",
+      "who": "cellebrite-ffta"
+    }
+  }
+}
