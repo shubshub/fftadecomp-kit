@@ -59,6 +59,38 @@
           "who": "match-team-08027528"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "61fdb75b576ebeab0a2edee628ff57a204432cb79454efde1843d95d9ca35de6",
+        "acknowledged_cursor": 6823995419,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "61fdb75b576ebeab0a2edee628ff57a204432cb79454efde1843d95d9ca35de6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08029DD4\",\"who\":\"match-team-08029DD4\",\"note\":\"Recover complete BIOS-filled decimal tile rendering routine with native verification\"}",
+          "created_at": "2026-11-12T12:46:24Z",
+          "id": 6823995419,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T12:46:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "531b89a917688054cde829a2868250558153c01061728a1529759ccabd32eeba",
+        "result": {
+          "address": "0x08029DD4",
+          "claim_id": 6823995419,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6823995419,
+          "status": "accepted",
+          "who": "match-team-08029DD4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
