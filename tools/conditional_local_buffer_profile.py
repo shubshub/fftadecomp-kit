@@ -29,6 +29,7 @@ SCHEDULER_ENTRY = 'conditional-scheduler-entry-descriptor-calls-v1'
 SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1'
 SCHEDULER_MANAGER_FIELD = 'conditional-scheduler-indirect-manager-v1'
 SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
+SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8)}
 STATE = 'conditional-local-state-iterator-v1'
 OUTPUT = 'conditional-local-output-word-call-v1'
@@ -48,6 +49,7 @@ SCHEMAS = {
     SCHEDULER_ENTRY_BRANCH: 'elf-symbol-thumb-' + SCHEDULER_ENTRY_BRANCH,
     SCHEDULER_MANAGER_FIELD: 'elf-symbol-thumb-conditional-scheduler-indirect-manager-v1',
     SCHEDULER_MANAGER_OFFSET: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_OFFSET,
+    SCHEDULER_MANAGER_PATHS: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_PATHS,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
     OUTPUT: 'elf-symbol-thumb-conditional-local-output-word-call-v1',
 }
@@ -124,8 +126,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             self.scheduler_entry, self.scheduler_entry_branches = entry_branch.bind(data, address, ins, edges, calls)
             dependencies = self.scheduler_entry['dependencies']
             runtime_names = ('_call_via_r2', '_call_via_r3')
-        elif self.policy in (SCHEDULER_ENTRY, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET):
-            if self.policy == SCHEDULER_MANAGER_OFFSET:
+        elif self.policy in (SCHEDULER_ENTRY, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET, SCHEDULER_MANAGER_PATHS):
+            if self.policy == SCHEDULER_MANAGER_PATHS:
+                import scheduler_manager_paths_profile as entry
+            elif self.policy == SCHEDULER_MANAGER_OFFSET:
                 import scheduler_manager_offset_profile as entry
             elif self.policy == SCHEDULER_MANAGER_FIELD:
                 import scheduler_manager_field_profile as entry
@@ -191,8 +195,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if self.policy == SCHEDULER_PROJECTED:
             import scheduler_projected_outputs_profile as projected
             return projected.check_call(self, address, aliases, stack, slots, site=site)
-        if self.policy in (SCHEDULER_ENTRY, SCHEDULER_ENTRY_BRANCH, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET):
-            if self.policy == SCHEDULER_MANAGER_OFFSET:
+        if self.policy in (SCHEDULER_ENTRY, SCHEDULER_ENTRY_BRANCH, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET, SCHEDULER_MANAGER_PATHS):
+            if self.policy == SCHEDULER_MANAGER_PATHS:
+                import scheduler_manager_paths_profile as entry
+            elif self.policy == SCHEDULER_MANAGER_OFFSET:
                 import scheduler_manager_offset_profile as entry
             elif self.policy == SCHEDULER_MANAGER_FIELD:
                 import scheduler_manager_field_profile as entry
@@ -282,8 +288,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if self.policy == SCHEDULER_PROJECTED:
             import scheduler_projected_outputs_profile as projected
             return projected.manifest(self)
-        if self.policy in (SCHEDULER_ENTRY, SCHEDULER_ENTRY_BRANCH, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET):
-            if self.policy == SCHEDULER_MANAGER_OFFSET:
+        if self.policy in (SCHEDULER_ENTRY, SCHEDULER_ENTRY_BRANCH, SCHEDULER_MANAGER_FIELD, SCHEDULER_MANAGER_OFFSET, SCHEDULER_MANAGER_PATHS):
+            if self.policy == SCHEDULER_MANAGER_PATHS:
+                import scheduler_manager_paths_profile as entry
+            elif self.policy == SCHEDULER_MANAGER_OFFSET:
                 import scheduler_manager_offset_profile as entry
             elif self.policy == SCHEDULER_MANAGER_FIELD:
                 import scheduler_manager_field_profile as entry
