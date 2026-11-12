@@ -1850,7 +1850,7 @@ def forwarded_constant_update(records, position, pinned_width):
     return stored
 
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
-                     interfaces=None, unloaded_all_ones=False):
+                     interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -1873,6 +1873,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                     f"from {where(record.address)} (a load/store self-assignment)")
         # 2. classify every load of the object in the real compile
         counterparts, explained_stores = [], set()
+        classified_dead_reads = set()
         for position, record in enumerate(records):
             if record.kind != "load" or object_offset(record.address, symbol, size) is None:
                 continue
@@ -1912,6 +1913,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                             "qualifier's documented effect")
                     explained_stores.add(store)
                     read_modify_write.add(record.index)
+                    classified_dead_reads.add(record.index)
                     continue
                 if record.forwarded and chained_reread(records, position, pinned_width):
                     chained.add(record.index)
@@ -1961,9 +1963,12 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         if other.conditions != path.conditions:
             raise SemanticError(f"{name}: the real and stripped compiles branch on different "
                                 f"conditions (path {number})")
-        if other.trace != path.trace:
-            for index, (mine, theirs) in enumerate(zip(path.trace + [None] * len(other.trace),
-                                                       other.trace + [None] * len(path.trace))):
+        mine_trace, other_trace = path.trace, other.trace
+        if _ordered_trace_check is not None:
+            mine_trace, other_trace = _ordered_trace_check(path, other, classified_dead_reads)
+        if other_trace != mine_trace:
+            for index, (mine, theirs) in enumerate(zip(mine_trace + [None] * len(other_trace),
+                                                       other_trace + [None] * len(mine_trace))):
                 if mine != theirs:
                     break
             raise SemanticError(f"{name}: the real and stripped compiles differ in observable "
@@ -2088,7 +2093,7 @@ def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
 
 
 def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
-                     perturbed_assembly=None, interfaces=None):
+                     perturbed_assembly=None, interfaces=None, *, _ordinary_overwrite=False):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
     from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
@@ -2120,6 +2125,14 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     # A pinned store may lack its read-modify-write load only for the
     # all-ones value, and only once the permuted compile has shown it follows
     # its member; without that compile the rule stays strict.
+    if _ordinary_overwrite:
+        import overwritten_control_store_composition as composition
+        if perturbed_assembly is None:
+            raise SemanticError("ordinary overwritten stores require independent permuted compile")
+        _, mapping, _ = perturbed_declaration(declaration)
+        return [(name, composition.compare_function(name, real[name], stripped[name], perturbed[name],
+                    signatures, symbol, size, pinned, mapping, selector=composition.SELECTOR,
+                    premise=composition.PREMISE, interfaces=interfaces)) for name in sorted(real)]
     return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
                                        interfaces, unloaded_all_ones=perturbed_assembly is not None)
             for name in sorted(real)]
