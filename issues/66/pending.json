@@ -62,66 +62,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "abc4a95c9a874e422c4bc6040284c5179a0e3de90d49f5d45b64dc73b571449c",
-        "acknowledged_cursor": 6827803276,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "abc4a95c9a874e422c4bc6040284c5179a0e3de90d49f5d45b64dc73b571449c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08074A54\",\"who\":\"match-native-08074A54\",\"note\":\"Native plausible C recovery for statically qualified complete owner; isolated address scope\"}",
-          "created_at": "2026-11-12T15:25:46Z",
-          "id": 6827803276,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:25:46Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d47e939be4470e759a76be7ccd726771648d4581a26db23076707c666e9420d9",
-        "result": {
-          "address": "0x08074A54",
-          "claim_id": 6827803276,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6827803276,
-          "status": "accepted",
-          "who": "match-native-08074A54"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "cc66a48182474563f0215c7a54b6953a7744f1c350f05175bc247aad8d3d17b9",
-        "acknowledged_cursor": 6828030059,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cc66a48182474563f0215c7a54b6953a7744f1c350f05175bc247aad8d3d17b9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08074A54\",\"who\":\"match-native-08074A54\",\"claim_id\":6827803276,\"reason\":\"Plausible 660-byte recovery remains unequal; register, table load order and literal differences preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural byte-array and record layouts\"}",
-          "created_at": "2026-11-12T15:34:36Z",
-          "id": 6828030059,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:34:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "58b5985348bee11c035497c9bbc9b278cc250e0b0bb5ffa0eda610a6cc446277",
-        "result": {
-          "address": "0x08074A54",
-          "claim_id": 6827803276,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6828030059,
-          "status": "accepted",
-          "who": "match-native-08074A54"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d8ba70dc3dd0855f260efe63a1b9ea5503dbecc516c5aa1f0caa83de8f59a03a",
         "acknowledged_cursor": 6827849103,
         "body_provenance": "acceptance-time",
