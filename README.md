@@ -1905,6 +1905,27 @@ profile validator the report without them. The premise is that the pinned
 declaration is the original program's. The byte comparison, linking and
 every other check are unchanged.
 
+The explicit owner selector
+`--owner-runtime-profile bounded-buffer-bios-fill-overwritten-control-stores-v1`
+adds a conditional ordinary-memory policy for exact overwritten constant stores.
+It authenticates the pinned declaration and local CpuSet source contract, then
+checks the real, qualifier-stripped and permuted compiler outputs. Load-time
+provenance and typed event correspondence preserve every surviving effect's
+order, address, width and value. A removed constant store must have a complete
+same-member overwrite. Intervening reads qualify only as independently classified
+exact-width forwarded constants with a sole copy use; an intervening plain store
+qualifies only as a complete scalar member in the same authenticated object with
+proven disjoint byte intervals. Unknown effects, live reads, calls, branches,
+returns, overlap and unsupported provenance remain barriers.
+
+This policy explicitly assumes stable ordinary memory without asynchronous,
+hardware or external observers. It establishes no MMIO equivalence, physical
+readability, callee behavior or termination. The ordinary default policy remains
+unchanged. Native reports bind the selected policy, producer/runtime pins and
+fresh semantic evidence; inventory-only manifests cannot establish admission.
+A passing semantic check still requires plausible source and complete ELF bytes
+identical to the ROM before a function earns match credit.
+
 **Residual risk:** the semantic check can refuse genuine code but cannot
 accept an unexplained effect of the qualifier, within its model. The model
 has these gaps:

@@ -46,7 +46,7 @@ class ConditionalVolatileInterfaces:
         import owner_admission_profile as owner
         import named_data_buffer_profile as named
         selector = named.BIOS_FILL_SELECTOR if selector is None else selector
-        if selector not in (named.BIOS_FILL_SELECTOR, named.BIOS_LOCAL_FILL_SELECTOR):
+        if selector not in (named.BIOS_FILL_SELECTOR, named.BIOS_LOCAL_FILL_SELECTOR, named.BIOS_OVERWRITE_SELECTOR):
             raise ValueError('unknown conditional CpuSet semantic policy selector')
         manifest, _, _ = owner.preflight(data, address, rom, mapping, index,
                                          objects, selector=selector)
@@ -55,7 +55,7 @@ class ConditionalVolatileInterfaces:
         self.ordinary = ordinary
         self.local_fill_premise = (LOCAL_SOURCE_CONTRACT +
             '; native fill preflight SHA-256 ' + fingerprint
-            if selector == named.BIOS_LOCAL_FILL_SELECTOR else None)
+            if selector in (named.BIOS_LOCAL_FILL_SELECTOR, named.BIOS_OVERWRITE_SELECTOR) else None)
         self.conditional_premises = {NAME:
             'conditional returning CpuSet consumes only r0-r2; no guaranteed '
             'register overwrite; native fill preflight SHA-256 ' + fingerprint}

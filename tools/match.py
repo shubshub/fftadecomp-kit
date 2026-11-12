@@ -297,7 +297,8 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
         except ValueError:
             interfaces = None
     if getattr(args, "owner_runtime_profile", None) in ("bounded-buffer-bios-fill-source-v1",
-            "bounded-buffer-bios-fill-local-source-semantics-v1"):
+            "bounded-buffer-bios-fill-local-source-semantics-v1",
+            "bounded-buffer-bios-fill-overwritten-control-stores-v1"):
         from bios_cpuset_fill_profile import ConditionalVolatileInterfaces
         from inert_spin_profile import index_snapshot
         if rom is None or mapping is None:
@@ -320,9 +321,21 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
             compile_object(runner, workspace, args, str(root), address, source,
                            rewrite=lambda text: volatile_semantics.perturb_pinned(text, declaration))
             perturbed = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
-            results = volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"], declaration,
-                                                 perturbed, interfaces)
-            records.append(volatile_semantics.record(entry["symbol"], results, perturbed=True))
+            from named_data_buffer_profile import BIOS_OVERWRITE_SELECTOR
+            if getattr(args, "owner_runtime_profile", None) == BIOS_OVERWRITE_SELECTOR:
+                import overwritten_control_store_composition as composition
+                pinned_size, _ = volatile_semantics.pinned_members(declaration)
+                location = parse_data_symbols(data_snapshot(root)).get(entry["symbol"])
+                if location is None or not (0x02000000 <= location <= 0x02040000-pinned_size or
+                        0x03000000 <= location <= 0x03008000-pinned_size):
+                    raise ValueError("ordinary overwritten control members require exact mapped ordinary RAM object")
+                results = volatile_semantics._compare_compiles(real, stripped, preprocessed,
+                    entry["symbol"], declaration, perturbed, interfaces, _ordinary_overwrite=True)
+                records.append(composition.record(entry["symbol"], results))
+            else:
+                results = volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"], declaration,
+                                                     perturbed, interfaces)
+                records.append(volatile_semantics.record(entry["symbol"], results, perturbed=True))
     return records
 
 
@@ -4460,6 +4473,7 @@ def main():
                                                       "bounded-buffer-bios-sqrt-scratch-v1",
                                                       "bounded-buffer-bios-fill-source-v1",
                                                       "bounded-buffer-bios-fill-local-source-semantics-v1",
+                                                      "bounded-buffer-bios-fill-overwritten-control-stores-v1",
                                                       "bounded-buffer-bios-fast-fill-source-v1",
                                                       "bounded-buffer-guarded-switch-v1",
                                                       "bounded-buffer-guarded-callee-aliases-v1",

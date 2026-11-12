@@ -966,8 +966,11 @@ def report_matches(report, root, address):
         if records:
             from match import allowlisted_volatile_semantics
             from named_data_buffer_profile import (BIOS_FILL_SCHEMA, BIOS_FILL_SELECTOR,
-                BIOS_LOCAL_FILL_SCHEMA, BIOS_LOCAL_FILL_SELECTOR)
-            if f'* verification: `{BIOS_LOCAL_FILL_SCHEMA}`' in report.splitlines():
+                BIOS_LOCAL_FILL_SCHEMA, BIOS_LOCAL_FILL_SELECTOR, BIOS_OVERWRITE_SCHEMA, BIOS_OVERWRITE_SELECTOR)
+            if f'* verification: `{BIOS_OVERWRITE_SCHEMA}`' in report.splitlines():
+                records += allowlisted_volatile_semantics(root, address,
+                    owner_runtime_profile=BIOS_OVERWRITE_SELECTOR)
+            elif f'* verification: `{BIOS_LOCAL_FILL_SCHEMA}`' in report.splitlines():
                 records += allowlisted_volatile_semantics(root, address,
                     owner_runtime_profile=BIOS_LOCAL_FILL_SELECTOR)
             elif f'* verification: `{BIOS_FILL_SCHEMA}`' in report.splitlines():

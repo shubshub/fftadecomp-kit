@@ -657,6 +657,47 @@ class Record:
         self.__dict__.update(fields)
 
 
+_EXECUTOR_LOAD_KEY = object()
+
+
+class LoadProvenance:
+    """Immutable executor snapshot, reconstructed during every native replay.
+
+    Compact captures bind load time and the version computed by the unchanged
+    conservative may-alias memory scan. Full histories are not copied.
+    They are in-process producer evidence, never trusted serialized input.
+    """
+    __slots__ = ('trace', 'records', 'record_snapshot', 'captures', 'decisions', 'conditions')
+
+    def __init__(self, path, captures, *, _producer=None):
+        if _producer is not _EXECUTOR_LOAD_KEY:
+            raise SemanticError('load provenance requires fresh executor producer')
+        for name, value in dict(trace=tuple(path.trace), records=tuple(path.records),
+                record_snapshot=repr([r.__dict__ for r in path.records]),
+                captures=tuple(captures), decisions=tuple(path.decisions),
+                conditions=tuple(path.conditions)).items():
+            object.__setattr__(self, name, value)
+
+    def __setattr__(self, name, value):
+        raise AttributeError('immutable executor load provenance')
+
+    def __deepcopy__(self, memo):
+        # Copying a Path does not authenticate the copied instruction records.
+        return self
+
+    def validate(self, path):
+        origin = getattr(path, '_trace_origin', 0)
+        positions = {id(row): i for i, row in enumerate(self.records)}
+        selected = [positions.get(id(row), -1) for row in path.records]
+        if (type(origin) is not int or origin < 0 or
+                tuple(path.trace) != self.trace[origin:] or
+                tuple(path.decisions) != self.decisions or tuple(path.conditions) != self.conditions or
+                repr([r.__dict__ for r in self.records]) != self.record_snapshot or
+                any(i < 0 for i in selected) or selected != sorted(set(selected))):
+            raise SemanticError('stale or foreign executor load provenance')
+        return origin
+
+
 class Path:
     def __init__(self, decisions, conditions, trace, records):
         self.decisions, self.conditions = decisions, conditions
@@ -804,11 +845,12 @@ class Executor:
             self.fail(text, f"branch to unknown label `{operand}`")
         return self.labels[operand]
 
-    def run(self, decisions):
+    def run(self, decisions, *, _capture_load_provenance=False):
         self.regs = {f"r{n}": (("arg", n) if n < 4 else ("entry", f"r{n}")) for n in range(13)}
         self.regs.update(sp=SP, lr=("entry", "lr"))
         self.flags = ("entry",)
         self.memory, self.trace, self.records = [], [], []
+        self.load_captures = [] if _capture_load_provenance else None
         self.escaped, self.known, self.conditions = False, {}, []
         self.frame_base = None
         # registers and flags holding a value read back from memory: any load
@@ -827,7 +869,10 @@ class Executor:
                 raise SemanticError(f"{self.label} compile of {self.name}: execution runs off the end")
             result = self.step(pc, *self.instructions[pc])
             if result == "return":
-                return Path(list(decisions), self.conditions, self.trace, self.records)
+                path = Path(list(decisions), self.conditions, self.trace, self.records)
+                if self.load_captures is not None:
+                    path._load_provenance = LoadProvenance(path, self.load_captures, _producer=_EXECUTOR_LOAD_KEY)
+                return path
             pc = pc + 1 if result is None else result
 
     def decide(self, code, text):
@@ -913,6 +958,8 @@ class Executor:
             value = forwarded
         else:
             value = ("load", width, self.observed(address), version)
+            if self.load_captures is not None:
+                self.load_captures.append((value, len(self.trace)))
         if signed:
             value = sign_extend(value, width * 8)
         return value, forwarded is not None
@@ -1470,12 +1517,14 @@ class RomInterfaces:
 
 # ---------------------------------------------------------------- comparison
 
-def explore(name, function, signatures, label, layout, interfaces=None):
+def explore(name, function, signatures, label, layout, interfaces=None, *,
+            _capture_load_provenance=False):
     paths, pending = [], [[]]
     while pending:
         decisions = pending.pop()
         try:
-            path = Executor(name, function, signatures, label, layout, interfaces).run(decisions)
+            path = Executor(name, function, signatures, label, layout, interfaces).run(
+                decisions, _capture_load_provenance=_capture_load_provenance)
         except NeedDecision:
             pending += [decisions + [False], decisions + [True]]
             continue
@@ -1485,9 +1534,11 @@ def explore(name, function, signatures, label, layout, interfaces=None):
     return paths
 
 
-def replay(name, function, signatures, label, decisions, layout, interfaces=None):
+def replay(name, function, signatures, label, decisions, layout, interfaces=None, *,
+           _capture_load_provenance=False):
     try:
-        return Executor(name, function, signatures, label, layout, interfaces).run(decisions)
+        return Executor(name, function, signatures, label, layout, interfaces).run(
+                decisions, _capture_load_provenance=_capture_load_provenance)
     except NeedDecision:
         raise SemanticError(f"{name}: the stripped compile branches where the real one does not")
 
@@ -1850,7 +1901,8 @@ def forwarded_constant_update(records, position, pinned_width):
     return stored
 
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
-                     interfaces=None, unloaded_all_ones=False):
+                     interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None,
+                     _capture_load_provenance=False):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -1859,7 +1911,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         offset = object_offset(address, symbol, size)
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
 
-    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
+    paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces,
+                    _capture_load_provenance=_capture_load_provenance)
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional = (set() for _ in range(7))
     for number, path in enumerate(paths, 1):
         records = path.records
@@ -1873,6 +1926,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                     f"from {where(record.address)} (a load/store self-assignment)")
         # 2. classify every load of the object in the real compile
         counterparts, explained_stores = [], set()
+        classified_dead_reads = set()
         for position, record in enumerate(records):
             if record.kind != "load" or object_offset(record.address, symbol, size) is None:
                 continue
@@ -1912,6 +1966,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                             "qualifier's documented effect")
                     explained_stores.add(store)
                     read_modify_write.add(record.index)
+                    classified_dead_reads.add(record.index)
                     continue
                 if record.forwarded and chained_reread(records, position, pinned_width):
                     chained.add(record.index)
@@ -1947,7 +2002,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                     "without the read-modify-write load of a volatile member store")
         # 1. the stripped compile behaves the same on this path
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
-                       interfaces)
+                       interfaces, _capture_load_provenance=_capture_load_provenance)
         if updates:
             # Ordinary reads crossed by the distinct forwarding proof are not
             # discarded: require their complete ordered provenance in both
@@ -1961,9 +2016,12 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         if other.conditions != path.conditions:
             raise SemanticError(f"{name}: the real and stripped compiles branch on different "
                                 f"conditions (path {number})")
-        if other.trace != path.trace:
-            for index, (mine, theirs) in enumerate(zip(path.trace + [None] * len(other.trace),
-                                                       other.trace + [None] * len(path.trace))):
+        mine_trace, other_trace = path.trace, other.trace
+        if _ordered_trace_check is not None:
+            mine_trace, other_trace = _ordered_trace_check(path, other, classified_dead_reads)
+        if other_trace != mine_trace:
+            for index, (mine, theirs) in enumerate(zip(mine_trace + [None] * len(other_trace),
+                                                       other_trace + [None] * len(mine_trace))):
                 if mine != theirs:
                     break
             raise SemanticError(f"{name}: the real and stripped compiles differ in observable "
@@ -2088,7 +2146,7 @@ def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
 
 
 def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
-                     perturbed_assembly=None, interfaces=None):
+                     perturbed_assembly=None, interfaces=None, *, _ordinary_overwrite=False):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
     from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
@@ -2120,6 +2178,14 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     # A pinned store may lack its read-modify-write load only for the
     # all-ones value, and only once the permuted compile has shown it follows
     # its member; without that compile the rule stays strict.
+    if _ordinary_overwrite:
+        import overwritten_control_store_composition as composition
+        if perturbed_assembly is None:
+            raise SemanticError("ordinary overwritten stores require independent permuted compile")
+        _, mapping, _ = perturbed_declaration(declaration)
+        return [(name, composition.compare_function(name, real[name], stripped[name], perturbed[name],
+                    signatures, symbol, size, pinned, mapping, selector=composition.SELECTOR,
+                    premise=composition.PREMISE, interfaces=interfaces)) for name in sorted(real)]
     return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
                                        interfaces, unloaded_all_ones=perturbed_assembly is not None)
             for name in sorted(real)]
