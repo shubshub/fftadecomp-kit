@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "19efada653c3f1df8f441c5d87eb517ad930a5d3355d3fea6d202c3b47d7f763",
+    "acknowledged_cursor": 6823403336,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "19efada653c3f1df8f441c5d87eb517ad930a5d3355d3fea6d202c3b47d7f763",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08023130\",\"who\":\"match-native-08023130\",\"note\":\"Recover qualified complete body with native frame and typed-call proof; preserve bounded failures\"}",
+      "created_at": "2026-11-12T12:18:28Z",
+      "id": 6823403336,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:18:28Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5f5b1028e1c976f7d9073c734c0bce5872121281b7b834cd3727c172b33552b1",
+    "result": {
+      "address": "0x08023130",
+      "claim_id": 6823403336,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6823403336,
+      "status": "accepted",
+      "who": "match-native-08023130"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "3dee6fb8a0b919e7ac5282f6865a9e5a0121d310cb4204f7da661cf93b559654",
+    "acknowledged_cursor": 6823580391,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3dee6fb8a0b919e7ac5282f6865a9e5a0121d310cb4204f7da661cf93b559654",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08023130\",\"who\":\"match-native-08023130\",\"claim_id\":6823403336,\"reason\":\"Complete74-byte diagnostic equality; native nested callback rejected via08099CDC,080C7CC0,0814225C. Reconstructed13-pointer capacity is not a proved helper bound.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural typed structs and loops; original native verifier and complete linked diagnostics\"}",
+      "created_at": "2026-11-12T12:26:51Z",
+      "id": 6823580391,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:26:51Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d558866bd9cc22d72424db1e099f9e2ef1cb299194380fee54cf4ce9b0050c5e",
+    "result": {
+      "address": "0x08023130",
+      "claim_id": 6823403336,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6823580391,
+      "status": "accepted",
+      "who": "match-native-08023130"
+    }
+  }
+}
