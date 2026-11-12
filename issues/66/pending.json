@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "313b8bbb2958448376aae081a598d9e38679793b4fb04a16d78e0d38d593e9f2",
-        "acknowledged_cursor": 6820142025,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "313b8bbb2958448376aae081a598d9e38679793b4fb04a16d78e0d38d593e9f2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DD54\",\"who\":\"match-native-0804DD54\",\"note\":\"Recover complete plausible control-state caller in isolated matching lane.\"}",
-          "created_at": "2026-11-12T09:41:29Z",
-          "id": 6820141596,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T09:41:29Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "68b5abb494c10cfe6e2218ad6037dc62e15d15a082fb95a78b4abd42cbe1e873",
-        "result": {
-          "address": "0x0804DD54",
-          "claim_id": 6820141596,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6820141596,
-          "status": "accepted",
-          "who": "match-native-0804DD54"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4f13ed49e64c6dc250430dd57e5617a6e619b1d330e7ef84b6087dcb3e10ee4b",
-        "acknowledged_cursor": 6820504001,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4f13ed49e64c6dc250430dd57e5617a6e619b1d330e7ef84b6087dcb3e10ee4b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DD54\",\"who\":\"match-native-0804DD54\",\"claim_id\":6820141596,\"reason\":\"Plausible natural C retained in isolated scratch; native complete symbol110/120 bytes39/47 instructions. Remaining outer loop counter register and arithmetic scheduling differ; all calls inner loop and literals match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural pointer/index loops, signedness, equivalent loop bounds and explicit row offsets\"}",
-          "created_at": "2026-11-12T09:58:58Z",
-          "id": 6820504001,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T09:58:58Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2eab756d16966b14290b8dd70918f05b59b34020f12bce772fc1585b8ba9d7a9",
-        "result": {
-          "address": "0x0804DD54",
-          "claim_id": 6820141596,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6820504001,
-          "status": "accepted",
-          "who": "match-native-0804DD54"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "0dfe1389d704b321b198681b0a44bc67f73f447b2b3ef2394935d1b5fbabb469",
         "acknowledged_cursor": 6820142025,
         "body_provenance": "acceptance-time",
@@ -91,66 +31,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "5449930274bb013af63740bea24a50302fbb8778f793629a0c5ea9e4d3419d8a",
-        "acknowledged_cursor": 6820504001,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5449930274bb013af63740bea24a50302fbb8778f793629a0c5ea9e4d3419d8a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08126B6C\",\"who\":\"match-native-08126B6C\",\"note\":\"Recover scheduler descriptor wrapper with complete symbol verification\"}",
-          "created_at": "2026-11-12T09:58:28Z",
-          "id": 6820493798,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T09:58:28Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2eab756d16966b14290b8dd70918f05b59b34020f12bce772fc1585b8ba9d7a9",
-        "result": {
-          "address": "0x08126B6C",
-          "claim_id": 6820493798,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6820493798,
-          "status": "accepted",
-          "who": "match-native-08126B6C"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f62b4b2668908690b12125146c6026e05709f1fcc51af3dc1fa47ed3d000c8ad",
-        "acknowledged_cursor": 6820558095,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f62b4b2668908690b12125146c6026e05709f1fcc51af3dc1fa47ed3d000c8ad",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08126B6C\",\"who\":\"match-native-08126B6C\",\"claim_id\":6820493798,\"reason\":\"Native MATCH complete48-byte scheduler descriptor wrapper; isolated verified source retained for next batch\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T10:01:35Z",
-          "id": 6820558088,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T10:01:35Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b0a803d8b54cb1060d6c2ed88317281d3d2439f4f932e7fa2df43a5b23776352",
-        "result": {
-          "address": "0x08126B6C",
-          "claim_id": 6820493798,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6820558088,
-          "status": "accepted",
-          "who": "match-native-08126B6C"
-        }
-      }
     },
     {
       "claim": {
