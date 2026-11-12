@@ -6,7 +6,7 @@ import volatile_semantics as semantics
 import overwritten_control_store_prerequisite as prerequisite
 
 SELECTOR = "conditional-classified-overwritten-control-stores-v1"
-PREMISE = prerequisite.PREMISE
+PREMISE = prerequisite.FORWARDED_PREMISE
 
 
 def compare_function(name, real, stripped, permuted, signatures, symbol, size, pinned,
@@ -20,8 +20,10 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
     witnesses = []
 
     def ordered(real_path, stripped_path, classified):
-        # Only the existing classifier's dead full-member insertion loads can be
-        # crossed. Do not infer deadness from a final trace or discard a live read.
+        # Remove only classified dead insertion reads from the record view.
+        # Live forwarded constant control reads stay in their original positions;
+        # normalise independently rechecks the bounded chain before crossing.
+        # Their consumers and all surviving memory effects remain ordered.
         prefix, real_tail, stripped_tail = unchanged_fill_prefix(real_path, stripped_path, interfaces)
         filtered = semantics.Path(real_tail.decisions, real_tail.conditions, real_tail.trace,
             [row for row in real_tail.records
@@ -30,9 +32,11 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
             filtered._load_provenance = real_tail._load_provenance
             filtered._trace_origin = getattr(real_tail, '_trace_origin', 0)
         mine, removed = prerequisite.normalise(filtered, symbol, size, pinned,
-                                               _typed_correspondence=True)
+                                               _typed_correspondence=True,
+                                               _forwarded_constant_controls=True)
         theirs, other_removed = prerequisite.normalise(stripped_tail, symbol, size, pinned,
-                                                       _typed_correspondence=True)
+                                                       _typed_correspondence=True,
+                                               _forwarded_constant_controls=True)
         correspondence = compare_survivors(filtered, stripped_tail, removed, other_removed,
             load_time_provenance=True)
         witnesses.append(dict(unchanged_fill_prefix=prefix, real_removed=removed, stripped_removed=other_removed,

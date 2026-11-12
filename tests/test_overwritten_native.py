@@ -22,9 +22,28 @@ SELECTOR=named.BIOS_OVERWRITE_SELECTOR
 class NativeTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.temporary=tempfile.TemporaryDirectory()
-        cls.root=root=Path(cls.temporary.name)
-        for folder in ('src','include','config','symbols','build'):(root/folder).mkdir()
+        build = Path(__file__).resolve().parents[1]/'build'
+        build.mkdir(exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(prefix='overwritten-native-', dir=build)
+        cls.addClassCleanup(cls.temporary.cleanup)
+        cls.root = root = Path(cls.temporary.name)
+        for folder in ('src','include','config','symbols','build'):
+            (root/folder).mkdir()
+        # All Python/native replay scratch stays in this disk-backed fixture.
+        cls.scratch = patch.dict(os.environ, TMPDIR=str(root/'build'))
+        cls.scratch.start()
+        cls.addClassCleanup(cls.scratch.stop)
+        cls.tempdir = patch.object(tempfile, 'tempdir', str(root/'build'))
+        cls.tempdir.start()
+        cls.addClassCleanup(cls.tempdir.stop)
+        retention = os.environ.get('FFTA_NATIVE_TEST_ARTIFACTS')
+        if retention:
+            parent = Path(retention).resolve()/'overwritten-native'
+            parent.mkdir(parents=True, exist_ok=True)
+            cls.evidence = Path(tempfile.mkdtemp(prefix='run-',dir=parent))
+        else:
+            cls.evidence = root/'artifacts'
+            cls.evidence.mkdir()
         entry=next(e for e in plausible.volatile_allow_entries() if e['symbol']=='g_control_flags_03000940')
         (root/'include/control_flags.h').write_text('#ifndef CONTROL_FLAGS_H\n#define CONTROL_FLAGS_H\n'+entry['declaration']+'\n#endif\n')
         source='''typedef unsigned char u8;
@@ -69,19 +88,16 @@ void func_08001000(void) {
                                ('symbols/functions.txt',cls.index),('baserom.bin',bytes(rom))):
             (root/relative).write_bytes(value)
         cls.env=patch.dict(os.environ,FFTA_ROM=str(root/'baserom.bin'));cls.env.start()
+        cls.addClassCleanup(cls.env.stop)
         cls.result=owner.build(root,A,selector=SELECTOR)
         cls.report=owner.render(A,cls.result)
-        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-store-versions-evidence'
+        evidence=cls.evidence
         evidence.mkdir(exist_ok=True)
         (evidence/'native-synthetic-report.md').write_text(cls.report)
         (evidence/'native-synthetic-manifest.json').write_text(json.dumps(cls.result[1],sort_keys=True,indent=2)+'\n')
         (evidence/'native-synthetic-original.o').write_bytes(cls.result[8])
         (evidence/'native-synthetic-linked.bin').write_bytes(cls.result[0])
         (evidence/'native-synthetic-source.c').write_text(source)
-
-    @classmethod
-    def tearDownClass(cls):
-        cls.env.stop();cls.temporary.cleanup()
 
     def test_native_fresh_report_and_actual_cli(self):
         self.assertEqual(self.result[1]['profile'],named.BIOS_OVERWRITE_SCHEMA)
@@ -96,8 +112,22 @@ void func_08001000(void) {
         output=match._run_replay_process(command,self.root,120)
         self.assertEqual(output.returncode,0,output.stdout+output.stderr)
         self.assertIn('verdict MATCH - byte identical',output.stdout)
-        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-store-versions-evidence'
+        evidence=self.evidence
         (evidence/'native-synthetic-cli.log').write_text(output.stdout+output.stderr)
+
+    def test_artifact_isolation(self):
+        build = Path(__file__).resolve().parents[1]/'build'
+        self.assertTrue(self.root.is_relative_to(build))
+        self.assertEqual(Path(tempfile.gettempdir()),self.root/'build')
+        self.assertEqual(Path(os.environ['TMPDIR']),self.root/'build')
+        retention = os.environ.get('FFTA_NATIVE_TEST_ARTIFACTS')
+        if retention:
+            self.assertEqual(self.evidence.parent,Path(retention).resolve()/'overwritten-native')
+        else:
+            self.assertEqual(self.evidence,self.root/'artifacts')
+        self.assertTrue((self.evidence/'native-synthetic-report.md').is_file())
+        self.assertNotEqual(self.evidence,Path(__file__).resolve().parents[2]/
+            'overwritten-control-store-versions-evidence')
 
     def test_missing_mutated_native_semantics_and_runtime_refuse(self):
         import copy

@@ -548,7 +548,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             if selector in (named_buffer.BIOS_LOCAL_FILL_SELECTOR, named_buffer.BIOS_OVERWRITE_SELECTOR):
                 proof['conditional_volatile_local_source_policy'] = fill.LOCAL_SOURCE_CONTRACT
             if selector == named_buffer.BIOS_OVERWRITE_SELECTOR:
-                from overwritten_control_store_prerequisite import PREMISE
+                from overwritten_control_store_composition import PREMISE
                 proof['conditional_overwritten_control_store_policy'] = PREMISE
             proof['buffers']['bios_fill'] = buffers.bios_manifest()
             proof['bios_scalar_control_words'] = fill.scalar_control_words(ins, edges, calls, proof['partition'], address)

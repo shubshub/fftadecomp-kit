@@ -1,6 +1,7 @@
 """Explicit conditional overwritten-store prerequisite; no native/report admission.
 
-This bounded rule admits no memory read between the candidate and overwrite.
+The legacy default admits no memory read between candidate and overwrite.
+The explicit classified composition can cross narrowly proven forwarded constants.
 It deliberately refuses event-version expressions instead of guessing how to
 renumber opaque memory/call identities after removal. Legacy semantics remain
 unchanged and are not replaced by this prerequisite.
@@ -20,6 +21,17 @@ PREMISE = ('Authenticated ordinary control members are stable live ordinary memo
     'return or address observation. No volatile hardware/MMIO equivalence is claimed.')
 
 
+FORWARDED_PREMISE = ('Authenticated ordinary control members are stable live ordinary memory; '
+    'no concurrent, asynchronous, hardware or external observer can observe intermediate '
+    'stores. Exact constant stores may be removed before a complete exact-member overwrite; '
+    'intervening reads are limited to independently classified unsigned exact-width pinned '
+    'forwarded integer constants whose sole copy use reaches the next pinned store. '
+    'All surviving effects retain their original order, addresses, widths and values. '
+    'Unknown memory effects, ordinary reads, calls, branches, returns and address observations '
+    'remain barriers. No volatile hardware/MMIO equivalence, callee semantics, physical '
+    'readability or termination is claimed.')
+
+
 def require(condition, message):
     if not condition:
         raise semantics.SemanticError(message)
@@ -33,7 +45,8 @@ def has_versions(value):
     return any(has_versions(part) for part in value)
 
 
-def normalise(path, symbol, size, pinned, *, _typed_correspondence=False):
+def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
+              _forwarded_constant_controls=False):
     """Retain order, delete only exact constant stores with local witnesses.
 
     Record/trace association is authenticated by exact ordered store tuples.
@@ -52,14 +65,33 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False):
         require(event == ('store',row.width,row.address,row.value),
                 'overwritten-store record/trace identity differs')
         association[position]=index
+    # This route is private to the explicit classified ordinary-memory policy.
+    # Classify on this path's records; never accept a caller-provided list of
+    # supposedly harmless reads. The forwarding source, width, constant value,
+    # sole use and absence of other effects are checked independently below.
+    crossed_reads = set()
+    if _forwarded_constant_controls:
+        require(_typed_correspondence,
+                'forwarded control reads require typed ordered correspondence')
+        def pinned_width(address):
+            return pinned.get(semantics.object_offset(address, symbol, size))
+        for position, row in enumerate(records):
+            if (row.kind == 'load' and row.forwarded and not row.signed and
+                    type(row.value) is int and row.width == pinned_width(row.address) and
+                    semantics.chained_reread(records, position, pinned_width)):
+                crossed_reads.add(position)
     removed=[]
     for position,row in stores:
         offset=semantics.object_offset(row.address,symbol,size)
         if offset not in pinned or row.width != pinned[offset] or type(row.value) is not int:
             continue
         require(not row.self_assignment, 'overwritten-store cannot discharge load/store self-assignment')
+        crossed = []
         for other_position in range(position+1,len(records)):
             other=records[other_position]
+            if other_position in crossed_reads:
+                crossed.append(other.index)
+                continue
             if other.kind in ('alu','literal'):
                 continue
             if other.kind != 'store':
@@ -74,6 +106,8 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False):
                     removed.append(dict(event=association[position],instruction=row.index,
                         offset=offset,width=row.width,value=row.value,
                         overwritten_by_instruction=other.index))
+                    if crossed:
+                        removed[-1]['crossed_forwarded_constant_reads'] = crossed
                 break
     deleted={row['event'] for row in removed}
     if deleted and not _typed_correspondence:
