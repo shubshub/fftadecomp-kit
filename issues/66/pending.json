@@ -94,7 +94,35 @@
           "who": "match-native-08137cc4-forwarded"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c40bb18124aac1f454650325c43e8dcbce3a969692463a647fa4f098e87b7f7e",
+        "acknowledged_cursor": 6836110072,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c40bb18124aac1f454650325c43e8dcbce3a969692463a647fa4f098e87b7f7e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08137CC4\",\"who\":\"match-native-08137cc4-forwarded\",\"claim_id\":6836064477,\"reason\":\"One unchanged-source native replay refused typed surviving ordered events after bounded forwarded-control prerequisite; source and original compiler products retained. No match credit.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T21:13:49Z",
+          "id": 6836110072,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T21:13:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "150d47bf12ee060cc5c793406786892f2bc3fd4ac3fa2e0db263d8e2ebddaf7f",
+        "result": {
+          "address": "0x08137CC4",
+          "claim_id": 6836064477,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6836110072,
+          "status": "accepted",
+          "who": "match-native-08137cc4-forwarded"
+        }
+      }
     },
     {
       "claim": {
