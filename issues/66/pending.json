@@ -59,6 +59,38 @@
           "who": "match-team-08029DD4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5f1a8a92a3657e9db729d4b72a48c8aaa7ed33f1fad4a780718caeb62fa2f927",
+        "acknowledged_cursor": 6824185842,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5f1a8a92a3657e9db729d4b72a48c8aaa7ed33f1fad4a780718caeb62fa2f927",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080311B0\",\"who\":\"match-team-080311B0\",\"note\":\"Recover complete display buffer initialization routine with original BIOS fill verification\"}",
+          "created_at": "2026-11-12T12:55:14Z",
+          "id": 6824185842,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T12:55:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6e815671c182c7d297db120a5e15bd57a4e8923b4052a2f3331b1e49d36e0ac0",
+        "result": {
+          "address": "0x080311B0",
+          "claim_id": 6824185842,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6824185842,
+          "status": "accepted",
+          "who": "match-team-080311B0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
