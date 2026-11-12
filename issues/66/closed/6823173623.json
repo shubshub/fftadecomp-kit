@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c60c0deccdc64b6dabb862e269e22317d61ad0d7265ea09d007dbf3092b212fb",
+    "acknowledged_cursor": 6823173623,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c60c0deccdc64b6dabb862e269e22317d61ad0d7265ea09d007dbf3092b212fb",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08021FB4\",\"who\":\"match-native-08021FB4\",\"note\":\"Recover qualified complete animation helper with canonical typed function-address linking; native match required\"}",
+      "created_at": "2026-11-12T12:07:47Z",
+      "id": 6823173623,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:07:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "97308c9d5cb208658c30313fde8af6edda109d848335c4fe133af9362cf5fa2c",
+    "result": {
+      "address": "0x08021FB4",
+      "claim_id": 6823173623,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6823173623,
+      "status": "accepted",
+      "who": "match-native-08021FB4"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "dc90ff95f487e173a377bbbeb3243e6f2e14b1a18ebfdd801cc88c5726c902a6",
+    "acknowledged_cursor": 6823309851,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dc90ff95f487e173a377bbbeb3243e6f2e14b1a18ebfdd801cc88c5726c902a6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021FB4\",\"who\":\"match-native-08021FB4\",\"claim_id\":6823173623,\"reason\":\"Native complete86-byte MATCH; plausible stackless linked-tree traversal; canonical-thunks-v1; integrated locally\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T12:14:07Z",
+      "id": 6823309851,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:14:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "48c7a2933a69dbf55f82b7d153213af3d37b5865fbbfaeb0f6b4bd2b102755a3",
+    "result": {
+      "address": "0x08021FB4",
+      "claim_id": 6823173623,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6823309851,
+      "status": "accepted",
+      "who": "match-native-08021FB4"
+    }
+  }
+}
