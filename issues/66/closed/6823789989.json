@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "504f0cbb5e425b531bf089e177bc3d73b6385a2a93063be5267974be38ffbb15",
+    "acknowledged_cursor": 6823794764,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "504f0cbb5e425b531bf089e177bc3d73b6385a2a93063be5267974be38ffbb15",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08025720\",\"who\":\"match-team-08025720\",\"note\":\"Recover complete scheduler descriptor caller with native verification\"}",
+      "created_at": "2026-11-12T12:36:44Z",
+      "id": 6823789989,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:36:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d0dd3d81e2392788d7b0f2f5db6437e63f33c4d2955672f452f2312a2d65f60c",
+    "result": {
+      "address": "0x08025720",
+      "claim_id": 6823789989,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6823789989,
+      "status": "accepted",
+      "who": "match-team-08025720"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5660a2d25a3b0edb30bb4a25c78a88fa8ff62225c8516190cff11cd0e63dc1c4",
+    "acknowledged_cursor": 6823956673,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5660a2d25a3b0edb30bb4a25c78a88fa8ff62225c8516190cff11cd0e63dc1c4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025720\",\"who\":\"match-team-08025720\",\"claim_id\":6823789989,\"reason\":\"Complete 56-byte native MATCH from plausible C with explicit manager-offset profile; verified local toolkit change awaiting publication\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T12:44:36Z",
+      "id": 6823956673,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T12:44:36Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "621296a18bd1c2ef920317004f4eec3a363b1fa968d8efa031cae1b041d4dc45",
+    "result": {
+      "address": "0x08025720",
+      "claim_id": 6823789989,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6823956673,
+      "status": "accepted",
+      "who": "match-team-08025720"
+    }
+  }
+}
