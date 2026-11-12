@@ -90,7 +90,35 @@
           "who": "cellebrite-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9857f8c397c2744f6a617aff3ecc8d96084f6500d2da4feba1ba550b54bfd27b",
+        "acknowledged_cursor": 6815565569,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9857f8c397c2744f6a617aff3ecc8d96084f6500d2da4feba1ba550b54bfd27b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080096E0\",\"who\":\"cellebrite-ffta\",\"claim_id\":6815548510,\"reason\":\"MATCH 72/72 complete bytes, plausible source and unchanged pin semantic gates passed. Source and report retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T05:30:49Z",
+          "id": 6815565569,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:30:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "677762666910f76803f709fe9b7ba4888a07bd8d6f76dc8593ed3e802e6a3e03",
+        "result": {
+          "address": "0x080096E0",
+          "claim_id": 6815548510,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6815565569,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      }
     }
   ],
   "issue": 66,
