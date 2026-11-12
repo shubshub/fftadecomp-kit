@@ -59,6 +59,38 @@
           "who": "claude-ffta2"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b0c7e85b9914ddd291e3867ee033fe846fc317faa700f9180feb3dd172f3f81e",
+        "acknowledged_cursor": 6815437741,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b0c7e85b9914ddd291e3867ee033fe846fc317faa700f9180feb3dd172f3f81e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08024A24\",\"who\":\"cellebrite-ffta\",\"note\":\"Recover plausible C for complete 150-byte 08024A24 caller; original C918/C960 structural proof retained.\"}",
+          "created_at": "2026-11-12T05:22:12Z",
+          "id": 6815437741,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:22:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a18cd1b7a86e83547aefc187554740c05b137e4ef73b7830099fdd538822816d",
+        "result": {
+          "address": "0x08024A24",
+          "claim_id": 6815437741,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6815437741,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
