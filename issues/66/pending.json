@@ -59,6 +59,38 @@
           "who": "cellebrite-ffta"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ca3e8cd5937ff1dd920d86f81b7ba0dc7dfdd7539f5e59da6ad8e83572350d81",
+        "acknowledged_cursor": 6816679162,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ca3e8cd5937ff1dd920d86f81b7ba0dc7dfdd7539f5e59da6ad8e83572350d81",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813EC74\",\"who\":\"primary\",\"note\":\"Recover the bounded alpha-blend update from its complete indexed body using the existing control-register declaration and canonical signed division.\"}",
+          "created_at": "2026-11-12T06:39:29Z",
+          "id": 6816679162,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T06:39:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d3ca0a949c73a309f0ca60ad59341bdf0506e56f901123795fac40c55d378a60",
+        "result": {
+          "address": "0x0813EC74",
+          "claim_id": 6816679162,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6816679162,
+          "status": "accepted",
+          "who": "primary"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
