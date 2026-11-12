@@ -42,10 +42,16 @@ symbolically along every path, and the check requires
      (immediate moves and arithmetic on known constants) and copies or
      literal loads into the store's operand registers in between
      (read_modify_write_store);
-   * a chained re-read for `a = (b = v)`: the forwarding store of the same
-     width to the same member is the immediately preceding memory access
-     and the value feeds, through copies only, the next store, a store to a
-     pinned member of its width (chained_reread);
+   * a forwarded re-read: the forwarding store of the same width to the
+     same member is the immediately preceding memory access and the value
+     feeds the next pinned member store through copies (chained_reread).
+     An unknown forwarded value may also pass through addition/subtraction
+     by constants or negation, all of which are invertible at its width.
+     Every such operation must feed the same-width destination store; no
+     discarded operation, extra use, call, branch or unrelated access is
+     admitted. Later branches are refused because arithmetic flags are
+     not tracked by the forwarding check. Constant-derived arithmetic
+     remains refused;
    * a counterpart of the stripped compile's loads of the object, matched
      in order with the same address and width;
 4. every access overlapping a pinned member to be exactly that member: its
@@ -453,12 +459,30 @@ def shift(name, value, amount):
 def truncate(value, bits):
     if bits == 32:
         return value
+    mask = (1 << bits) - 1
     if isinstance(value, int):
-        return value & ((1 << bits) - 1)
-    if is_zero_extended(value, (1 << bits) - 1):
+        return value & mask
+    if is_zero_extended(value, mask):
         return value
-    if isinstance(value, tuple) and value[0] == "trunc" and value[1] >= bits:
-        return ("trunc", bits, value[2])
+    if value[0] == "trunc" and value[1] >= bits:
+        return truncate(value[2], bits)
+    if value[0] == "lin":
+        # Addition and constant scaling preserve congruence modulo 2**bits.
+        # A narrower inner truncation or a shift remains an opaque term.
+        constant, terms = linear(value)
+        normalized = {}
+        for term, coefficient in terms.items():
+            reduced = truncate(term, bits)
+            if isinstance(reduced, tuple) and reduced[0] == "trunc" and reduced[1] == bits:
+                reduced = reduced[2]
+            inner, parts = linear(reduced)
+            constant += coefficient * inner
+            for atom, factor in parts.items():
+                normalized[atom] = normalized.get(atom, 0) + coefficient * factor
+        value = make_linear(constant & mask,
+                            {term: coefficient & mask for term, coefficient in normalized.items()})
+        if isinstance(value, int):
+            return value
     return ("trunc", bits, value)
 
 
@@ -588,6 +612,7 @@ class Record:
         self.address = self.width = self.value_register = None
         self.signed = self.forwarded = self.copy = self.constant = self.self_assignment = False
         self.immediate = False
+        self.affine_source = None
         self.guarded, self.derived = set(), None
         self.__dict__.update(fields)
 
@@ -1043,6 +1068,11 @@ class Executor:
             # builds 0x100) is constant materialisation, like an immediate mov
             record.constant = record.constant or (
                 isinstance(result, int) and all(isinstance(value, int) for value in values))
+            if mnemonic in ("add", "sub", "neg"):
+                symbolic = [operand for operand, value in zip(sources, values)
+                            if not isinstance(value, int)]
+                if len(symbolic) == 1:
+                    record.affine_source = register(symbolic[0])
             regs[destination] = result
             derived = bool(record.reads & self.derived)
             self.derived = (self.derived | {destination}) if derived else (self.derived - {destination})
@@ -1432,10 +1462,15 @@ def chained_reread(records, position, pinned_width):
 
     The forwarding store of the load's width to the same member must be the
     immediately preceding memory access, with only register arithmetic in
-    between, and the value must reach (through register copies) the next
-    store, which is a store to a pinned member of that member's width;
+    between, and the value must reach the next pinned store through copies.
+    Unknown values may also undergo constant addition/subtraction or negation
+    when every such operation feeds a store of the load's width. These
+    operations are bijective modulo that width, so the read remains live.
+    Constant-derived arithmetic and narrowing this extended chain refuse;
     apart from that store's own read-modify-write load no memory access,
     call or branch may intervene, and the value is used nowhere else.
+    Extended chains also refuse later branches: overwritten registers do
+    not prove their arithmetic flags dead.
     pinned_width maps an address to its pinned member's width, or None.
     """
     load = records[position]
@@ -1446,6 +1481,7 @@ def chained_reread(records, position, pinned_width):
             records[earlier].address != load.address:
         return False
     tracked, store, loads = set(load.writes), None, []
+    arithmetic, between = set(), []
     for record in records[position + 1:]:
         if store is None:
             if record.kind == "store":
@@ -1454,21 +1490,38 @@ def chained_reread(records, position, pinned_width):
                         (record.reads - {record.value_register}) & tracked or \
                         any(address != record.address for address in loads) or len(loads) > 1:
                     return False
+                if arithmetic:
+                    if record.width != load.width:
+                        return False
+                    live, feeding = {record.value_register}, set()
+                    for step in reversed(between):
+                        if step.writes & live:
+                            feeding.add(step.index)
+                            live = (live - step.writes) | step.reads
+                    if not arithmetic <= feeding:
+                        return False
                 store = record
                 continue
             if record.kind == "load" and not record.reads & tracked:
                 loads.append(record.address)
             elif record.kind not in ("alu", "literal"):
                 return False
-            elif record.reads & tracked and not (record.copy and record.reads <= tracked):
-                return False
-            elif record.copy and record.reads & tracked:
+            elif record.reads & tracked:
+                if record.copy and record.reads <= tracked:
+                    pass
+                elif not isinstance(load.value, int) and record.affine_source in tracked and \
+                        record.reads & tracked == {record.affine_source}:
+                    arithmetic.add(record.index)
+                else:
+                    return False
+                between.append(record)
                 tracked |= record.writes
                 continue
-        elif record.reads & tracked:
+            between.append(record)
+        elif record.reads & tracked or (arithmetic and record.kind == "branch"):
             return False
         tracked -= record.writes
-        if not tracked:
+        if not tracked and not arithmetic:
             break
     return store is not None
 
