@@ -288,7 +288,7 @@ class StatusParallelTests(unittest.TestCase):
             run.assert_called_once_with(command, cwd=str(self.root))
 
     def test_push_cli_keeps_archived_snapshot_gates_with_jobs(self):
-        (self.root / ".git").mkdir()
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         archive = self.root / "archive"
         archive.mkdir()
         snapshot = ("refs/heads/main", "a" * 40)
@@ -315,7 +315,7 @@ class StatusParallelTests(unittest.TestCase):
         self.assertFalse(archive.exists())
 
     def test_push_archive_failure_never_falls_back_to_working_tree(self):
-        (self.root / ".git").mkdir()
+        subprocess.run(["git", "init", "-q", str(self.root)], check=True)
         with patch.object(sys, "argv", ["push.py", "--repo", str(self.root), "--check-only", "--jobs", "6"]), \
                 patch.object(push, "publish_snapshot", return_value=("refs/heads/main", "a" * 40)), \
                 patch.object(push, "committed_tree", return_value=None), \

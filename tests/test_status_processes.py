@@ -144,8 +144,6 @@ class ProcessVerificationTests(unittest.TestCase):
                         {'worker_processes': 2, 'jobs': 2}):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 status.collect(str(self.root), True, **options)
-        with self.assertRaisesRegex(ValueError, 'require verify'):
-            status.collect(str(self.root), False, worker_processes=2)
         with patch.object(status.multiprocessing, 'get_all_start_methods', return_value=['spawn']), \
                 self.assertRaisesRegex(ValueError, 'require fork'):
             self.collect(2)
@@ -177,6 +175,7 @@ class ProcessVerificationTests(unittest.TestCase):
             archive.mkdir()
             with self.subTest(match_ok=match_ok), \
                     patch.object(sys, 'argv', ['push.py', '--repo', str(self.root), '--worker-processes', '8']), \
+                    patch.object(push, 'is_checkout_root', return_value=True), \
                     patch.object(push, 'publish_snapshot', return_value=('refs/heads/main', 'a'*40)) as capture, \
                     patch.object(push, 'committed_tree', return_value=str(archive)) as archived, \
                     patch.object(push, 'check_history', return_value=True) as history, \
@@ -212,6 +211,142 @@ class ProcessVerificationTests(unittest.TestCase):
                 push.main()
             self.assertEqual(error.exception.code, 2)
             capture.assert_not_called()
+
+
+class OfflineProcessReplayTests(unittest.TestCase):
+    setUp = fixtures.StatusParallelTests.setUp
+    fixture = fixtures.StatusParallelTests.fixture
+
+    def report(self, address, size=8, valid=True):
+        text = '* compiled : `' + '00' * size + '`\n'
+        if not valid:
+            text += 'stale\n'
+        (self.root / f'docs/match/{address:08X}.md').write_text(text)
+
+    def test_serial_parallel_replay_equivalence_order_progress_and_no_compile(self):
+        addresses = [0x08000000 + i * 16 for i in range(12)]
+        self.fixture(addresses)
+        for address in addresses[:-1]:
+            self.report(address, valid=address != addresses[3])
+        snapshot = {p: p.read_bytes() for p in self.root.rglob('*.md')}
+        ctx = multiprocessing.get_context('fork')
+        count, active, peak = [ctx.Value('i', 0) for _ in range(3)]
+        lock, barrier = ctx.Lock(), ctx.Barrier(4)
+        workers = 0
+        def replay(report, root, address):
+            with lock:
+                count.value += 1
+                first = count.value <= 4
+                active.value += 1
+                peak.value = max(peak.value, active.value)
+            if workers and first:
+                barrier.wait(timeout=10)
+            if address == addresses[0]:
+                time.sleep(.03)
+            with (self.root / f'{address:08X}.replay').open('a') as stream:
+                stream.write(str(os.getpid()) + '\n')
+            with lock:
+                active.value -= 1
+            return 'stale' not in report
+        results, progresses = [], []
+        with patch.object(status, 'report_matches', side_effect=replay), \
+                patch.object(status.subprocess, 'run', side_effect=AssertionError('offline compiled')):
+            for workers in (0, 4):
+                count.value = active.value = peak.value = 0
+                progress = {}
+                results.append(status.collect(str(self.root), False,
+                    worker_processes=workers, progress=progress, write_reports=True))
+                progresses.append(progress)
+                self.assertEqual(count.value, 11)
+                self.assertEqual(peak.value, 4 if workers else 1)
+        self.assertEqual(results[0], results[1])
+        self.assertEqual(results[0][:4], (12, 10, 96, 80))
+        self.assertEqual(results[0][4], [
+            '08000030: no current, source-bound MATCH report; re-run match.py',
+            '080000B0: no match report in docs/match/',
+            '080000B0: no current, source-bound MATCH report; re-run match.py'])
+        self.assertEqual(progresses[0], progresses[1])
+        self.assertEqual(snapshot, {p:p.read_bytes() for p in self.root.rglob('*.md')})
+        records = [p.read_text().splitlines() for p in self.root.glob('*.replay')]
+        self.assertTrue(all(len(row) == 2 and int(row[0]) == os.getpid()
+                            and int(row[1]) != os.getpid() for row in records))
+
+    def test_duplicate_reports_stay_in_one_process(self):
+        self.fixture([0x08000000, 0x08000010])
+        (self.root / 'src/nested').mkdir()
+        (self.root / 'src/nested/08000000.c').write_text('void duplicate(void) {}\n')
+        for address in (0x08000000, 0x08000010):
+            self.report(address)
+        def replay(report, root, address):
+            with (self.root / f'{address:08X}.pid').open('a') as stream:
+                stream.write(str(os.getpid()) + '\n')
+            return True
+        with patch.object(status, 'report_matches', side_effect=replay):
+            result = status.collect(str(self.root), False, worker_processes=2)
+        self.assertEqual(result[1], 3)
+        pids = (self.root / '08000000.pid').read_text().splitlines()
+        self.assertEqual(len(pids), 2)
+        self.assertEqual(len(set(pids)), 1)
+
+    def test_parent_rejects_cross_worker_overlap_and_malformed_late_extent(self):
+        self.fixture([0x0814FFF0, 0x08150000, 0x08150010])
+        self.report(0x0814FFF0, size=24)
+        self.report(0x08150000)
+        self.report(0x08150010, size=10)
+        with patch.object(status, 'report_matches', return_value=True):
+            serial = status.collect(str(self.root), False)
+            parallel = status.collect(str(self.root), False, worker_processes=3)
+        self.assertEqual(serial, parallel)
+        self.assertEqual(parallel[4], [
+            '08150010: complete verified body disagrees with the late indexed extent',
+            '08150000: late function overlaps another verified body'])
+        self.assertEqual(parallel[-2:], (0, 0))
+
+    def test_parent_rejects_unknown_main_extent_and_duplicate_late_source(self):
+        self.fixture([0x0814FFF0, 0x08150000])
+        (self.root / 'docs/match/0814FFF0.md').write_text('missing extent\n')
+        self.report(0x08150000)
+        with patch.object(status, 'report_matches', return_value=True):
+            expected = status.collect(str(self.root), False)
+            self.assertEqual(status.collect(str(self.root), False, worker_processes=2), expected)
+        self.assertEqual(expected[4], [
+            '08150000: cannot exclude overlap with an unknown complete main-body extent'])
+        (self.root / 'src/nested').mkdir()
+        (self.root / 'src/nested/08150000.c').write_text('void duplicate(void) {}\n')
+        with patch.object(status, 'report_matches', return_value=True):
+            serial = status.collect(str(self.root), False)
+            self.assertEqual(status.collect(str(self.root), False, worker_processes=2), serial)
+        self.assertEqual(serial[-2:], (0, 0))
+        self.assertEqual(serial[4], [
+            '08150000: late source requires one canonical addressed source',
+            '08150000: late source requires one canonical addressed source'])
+
+    def test_offline_worker_exceptions_and_death_are_failures(self):
+        self.fixture([0x08000000])
+        self.report(0x08000000)
+        with patch.object(status, 'report_matches', side_effect=ValueError('replay failed')), \
+                self.assertRaisesRegex(ValueError, 'replay failed'):
+            status.collect(str(self.root), False, worker_processes=2)
+        with patch.object(status, 'report_matches', side_effect=lambda *args: os._exit(17)), \
+                self.assertRaises(BrokenProcessPool):
+            status.collect(str(self.root), False, worker_processes=2)
+
+    def test_offline_restrictions_and_cli_readonly_check(self):
+        for options in ({'jobs': 2}, {'worker_processes': 65}):
+            with self.subTest(options=options), self.assertRaises(ValueError):
+                status.collect(str(self.root), False, **({'worker_processes':2} | options))
+        for target, value in ((status.multiprocessing, ['spawn']), (status, 2)):
+            name = 'get_all_start_methods' if target is status.multiprocessing else 'active_count'
+            with patch.object(target, name, return_value=value), self.assertRaises(ValueError):
+                status.collect(str(self.root), False, worker_processes=2)
+        with patch.object(sys, 'argv', ['status.py', '--root', str(self.root), '--check',
+                                      '--write', '--worker-processes', '4']), \
+                patch.object(status, 'collect', return_value=(0,0,0,0,[],0,0)) as collect, \
+                patch.object(status, 'badge_base_from_remote', return_value=''), \
+                contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
+            status.main()
+        collect.assert_called_once_with(str(self.root), False, write_reports=False,
+                                        jobs=1, progress={}, worker_processes=4)
 
 
 if __name__ == '__main__':

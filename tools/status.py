@@ -218,8 +218,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
     if not 0 <= worker_processes <= 64:
         raise ValueError("worker_processes must be between 0 and 64")
     if worker_processes:
-        if not verify or jobs != 1:
-            raise ValueError("worker processes require verify and jobs=1")
+        if jobs != 1:
+            raise ValueError("worker processes require jobs=1")
         if "fork" not in multiprocessing.get_all_start_methods() or active_count() != 1:
             raise ValueError("worker processes require fork and a single-threaded caller")
     cfg = os.path.join(root, "config", "functions.json")
@@ -430,7 +430,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
 
         return matched_f, matched_b, problems, verified_bodies
 
-    # Duplicate addresses share a report path, so never verify them concurrently.
+    # Duplicate addresses share a report path, so never process them concurrently.
     report_locks = {identity: Lock() for identity, count in source_counts.items() if count > 1}
 
     def check_locked_source(path):
@@ -605,7 +605,7 @@ def main():
     ap.add_argument("--jobs", type=int, choices=range(1, 65), default=1, metavar="N",
                     help="verify up to N sources concurrently (1..64; default: 1)")
     ap.add_argument("--worker-processes", type=int, choices=range(1, 65), metavar="N",
-                    help="verify in N forked processes; requires --verify and --jobs 1")
+                    help="recompile or replay reports in N forked processes; requires --jobs 1")
     ap.add_argument("--write", action="store_true",
                     help="update status files; with --verify, regenerate match reports too")
     ap.add_argument("--check", action="store_true")
