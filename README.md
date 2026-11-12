@@ -2946,3 +2946,18 @@ typed zero-addend data binding. Existing descriptor and frame checks still
 apply. Readability, address arithmetic without wraparound, storage separation,
 the final manager contract and callback effects remain explicit conditions;
 intervening writes do not imply that memory values remain unchanged.
+
+
+The separate `conditional-scheduler-manager-paths-v1` profile authenticates every
+syntactic entry-to-call path into one pinned `08005954` call. Each path must
+establish R0 from a low-register PC-relative literal, a zero-offset word load,
+and an aligned immediate field word load at offset 0 through 124. First reaching
+register definitions are checked; paths may share loads but may not contain a
+cycle, missing entry origin, intervening call, unsupported load or overwritten
+provenance. Traversal is bounded to 4,096 paths, 4,096 instructions per path and
+65,536 traversal steps. Every distinct chain is recorded and every literal word
+requires an authenticated typed zero-addend data binding. The existing outgoing
+parent, aligned 28-byte descriptor, frame and scheduler dependency checks apply.
+Readability, separation, arithmetic without wraparound, valid manager, ABI and
+callback effects remain explicit premises; no equality of loaded values between
+paths follows. Prior straight-line selectors retain their existing boundaries.
