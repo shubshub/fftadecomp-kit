@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "df223931f631c341a99d71f0d63e2b3b36f23bcb8793c45145a04cdfb5cae162",
-        "acknowledged_cursor": 6833841867,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "df223931f631c341a99d71f0d63e2b3b36f23bcb8793c45145a04cdfb5cae162",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800052C\",\"who\":\"match-native-0800052c\",\"note\":\"Recover plausible C for complete early fixed-frame function; existing named literal/callback identities and exact native gate required.\"}",
-          "created_at": "2026-11-12T19:32:25Z",
-          "id": 6833841867,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T19:32:25Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f9aa39405533439f0e2cedc1cdd80b61922c59260541c4fa202d4f4afd8f7089",
-        "result": {
-          "address": "0x0800052C",
-          "claim_id": 6833841867,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6833841867,
-          "status": "accepted",
-          "who": "match-native-0800052c"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "680f663f1ed3316b95a43ba123e919582896ef3806ae269d9913ebe4566d3300",
-        "acknowledged_cursor": 6834287742,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "680f663f1ed3316b95a43ba123e919582896ef3806ae269d9913ebe4566d3300",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800052C\",\"who\":\"match-native-0800052c\",\"claim_id\":6833841867,\"reason\":\"Unchanged plausible initializer now native MATCH96/96 with authenticated typed callback literals and fixed-O0 orphan profile. Source, original ELF, linked ELF and complete proof preserved for integration.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T19:51:54Z",
-          "id": 6834287742,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T19:51:54Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "125787e923fbf7201b0c84cdd8488869b3b50e2bee9cd68a07597e85ad31813c",
-        "result": {
-          "address": "0x0800052C",
-          "claim_id": 6833841867,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6834287742,
-          "status": "accepted",
-          "who": "match-native-0800052c"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "7ea34c3fcafe38bd72dd642a77f719d48a6501bd193cfdc15610ff17118c6023",
         "acknowledged_cursor": 6834548441,
         "body_provenance": "acceptance-time",
