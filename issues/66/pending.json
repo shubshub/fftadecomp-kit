@@ -90,7 +90,35 @@
           "who": "match-native-08022298"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "fa57708ca40b9505542f912dbd313ff990498a7cd39f51c38ddedfe4170e59d0",
+        "acknowledged_cursor": 6823387035,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fa57708ca40b9505542f912dbd313ff990498a7cd39f51c38ddedfe4170e59d0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08022298\",\"who\":\"match-native-08022298\",\"claim_id\":6823189819,\"reason\":\"Parked276-byte plausible candidate for complete282-byte owner; native exact-span rejection and register/control-flow differences\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; eight natural decode and branch variants\"}",
+          "created_at": "2026-11-12T12:17:42Z",
+          "id": 6823387035,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T12:17:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e05e23de75a6f03a1472c39cbf4b8a5a603b24802840e51999b3eeb263d85c2",
+        "result": {
+          "address": "0x08022298",
+          "claim_id": 6823189819,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6823387035,
+          "status": "accepted",
+          "who": "match-native-08022298"
+        }
+      }
     }
   ],
   "issue": 66,
