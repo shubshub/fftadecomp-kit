@@ -196,12 +196,19 @@ def check_reports(root):
     return True
 
 
-def check_history(repo, remote, branch, force=False):
+def check_history(repo, remote, branch, force=False, base=None):
     log("[1/5] history: rebased and linear")
-    code, _ = git("fetch", remote, branch, repo=repo)
-    if code != 0:
-        log("    FAIL  could not fetch the remote")
+    if base is not None and force:
+        log("    FAIL  creation cannot skip linear-history checks")
         return False
+    reference = label = f"{remote}/{branch}"
+    if base is None:
+        code, _ = git("fetch", remote, branch, repo=repo)
+        if code != 0:
+            log("    FAIL  could not fetch the remote")
+            return False
+    else:
+        reference, label = base
     code, out = git("rev-parse", "--abbrev-ref", "HEAD", repo=repo)
     if code != 0:
         log("    FAIL  could not determine the current branch")
@@ -210,7 +217,7 @@ def check_history(repo, remote, branch, force=False):
     if current != branch:
         log(f"    FAIL  on branch '{current}', expected '{branch}'")
         return False
-    code, out = git("merge-base", "--is-ancestor", f"{remote}/{branch}", "HEAD",
+    code, out = git("merge-base", "--is-ancestor", reference, "HEAD",
                     repo=repo)
     if code != 0:
         if code != 1:
@@ -222,10 +229,11 @@ def check_history(repo, remote, branch, force=False):
             log("    ok: continuing; the push will rewrite "
                 f"{remote}/{branch}")
         else:
-            log(f"    FAIL  the branch is behind {remote}/{branch}.")
-            log("          git fetch && git rebase " + f"{remote}/{branch}")
-            log("          (or --force, if you are deliberately rewriting "
-                "history)")
+            log(f"    FAIL  the branch is behind {label}.")
+            log("          git fetch && git rebase " + label)
+            if base is None:
+                log("          (or --force, if you are deliberately rewriting "
+                    "history)")
             return False
     if force:
         # the range now spans the whole existing trunk, whose merge commits
@@ -234,22 +242,22 @@ def check_history(repo, remote, branch, force=False):
             "existing trunk")
     else:
         code, out = git("log", "--merges", "--oneline",
-                        f"{remote}/{branch}..HEAD", repo=repo)
+                        f"{reference}..HEAD", repo=repo)
         if code != 0:
             log("    FAIL  could not scan merge commits")
             return False
         merges = [ln for ln in out.strip().splitlines() if ln.strip()]
         if merges:
             log(f"    FAIL  {len(merges)} merge commit(s) in the range; rebase "
-                f"instead of merging {remote}/{branch} into your branch")
+                f"instead of merging {label} into your branch")
             for m in merges[:5]:
                 log(f"          {m}")
             return False
-    code, out = git("rev-list", "--count", f"{remote}/{branch}..HEAD", repo=repo)
+    code, out = git("rev-list", "--count", f"{reference}..HEAD", repo=repo)
     if code != 0:
         log("    FAIL  could not count branch commits")
         return False
-    log(f"    ok: {out.strip()} commit(s) ahead of {remote}/{branch}, linear")
+    log(f"    ok: {out.strip()} commit(s) ahead of {label}, linear")
     return True
 
 
@@ -385,6 +393,46 @@ def capture_force_lease(repo, remote, branch):
     return destination, fields[0]
 
 
+def capture_creation(repo, remote, branch, base):
+    """Pin an absent destination and a freshly fetched named remote base."""
+    base_remote, separator, base_branch = base.partition("/")
+    if not separator or not base_remote or not base_branch:
+        log("    FAIL  --create-from requires REMOTE/BRANCH")
+        return None
+    for name in (branch, base_branch):
+        code, _ = git("check-ref-format", f"refs/heads/{name}", repo=repo)
+        if code != 0:
+            log("    FAIL  invalid creation or base branch name")
+            return None
+    code, out = git("remote", "get-url", "--push", "--all", remote, repo=repo)
+    destinations = out.strip().splitlines()
+    if code != 0 or len(destinations) != 1:
+        log("    FAIL  creation requires exactly one push destination")
+        return None
+    destination = destinations[0]
+    code, out = git("ls-remote", "--exit-code", "--refs", destination,
+                    f"refs/heads/{branch}", repo=repo, check=False)
+    if code != 2 or out.strip():
+        log("    FAIL  creation requires a confirmed absent remote branch")
+        return None
+    code, _ = git("remote", "get-url", base_remote, repo=repo)
+    if code != 0:
+        log("    FAIL  creation base must use a configured remote")
+        return None
+    code, _ = git("fetch", "--no-tags", base_remote,
+                  f"refs/heads/{base_branch}", repo=repo)
+    if code != 0:
+        log("    FAIL  could not fetch the creation base")
+        return None
+    code, out = git("rev-parse", "--verify", "FETCH_HEAD^{commit}", repo=repo)
+    commit = out.strip()
+    if code != 0 or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", commit) is None:
+        log("    FAIL  invalid creation base commit")
+        return None
+    log(f"    creation base: {base} at {commit}")
+    return (destination, ""), (commit, base)
+
+
 def publish_snapshot(repo, branch, require_clean=True):
     if require_clean:
         code, out = git("status", "--porcelain=v1", "-z", "--untracked-files=all",
@@ -405,9 +453,12 @@ def publish_snapshot(repo, branch, require_clean=True):
     return reference, commit
 
 
-def do_push(repo, remote, branch, force=False, lease=None, commit=None):
-    if force and lease is None:
-        log("    FAIL  refusing a rewrite without a captured remote tip")
+def do_push(repo, remote, branch, force=False, lease=None, commit=None, create=False):
+    if (force or create) and lease is None:
+        log("    FAIL  refusing a conditional push without a captured remote state")
+        return False
+    if create and (force or lease[1] != ""):
+        log("    FAIL  creation requires an absent-branch lease without --force")
         return False
     if os.environ.get("FFTA_PUSH_DRY"):
         log("\nFFTA_PUSH_DRY set - not pushing")
@@ -417,7 +468,7 @@ def do_push(repo, remote, branch, force=False, lease=None, commit=None):
         return False
     verb = "force-pushing" if force else "pushing"
     log(f"\n{verb} to {remote}/{branch} ...")
-    if force:
+    if force or create:
         destination, expected = lease
         command = [f"--force-with-lease=refs/heads/{branch}:{expected}",
                    destination, f"{commit}:refs/heads/{branch}"]
@@ -456,7 +507,12 @@ def main():
                          "pushes with an explicit expected-tip lease. Every "
                          "other check still runs. Never "
                          "use this for ordinary work - rebase instead.")
+    ap.add_argument("--create-from", metavar="REMOTE/BRANCH",
+                    help="create an absent destination after checking linear history "
+                         "against a freshly fetched base; refuses concurrent creation")
     args = ap.parse_args()
+    if args.create_from and args.force:
+        ap.error("--create-from cannot be combined with --force")
     if args.worker_processes and (args.kit or args.jobs != 1):
         ap.error("--worker-processes requires game mode and --jobs 1")
     process_options = {"worker_processes": args.worker_processes} if args.worker_processes else {}
@@ -472,6 +528,16 @@ def main():
     if args.force and lease is None:
         log("\nNOTHING PUSHED - could not establish a rewrite lease.")
         return 1
+    history_options = {}
+    creation_options = {}
+    if args.create_from:
+        creation = capture_creation(repo, args.remote, args.branch, args.create_from)
+        if creation is None:
+            log("\nNOTHING PUSHED - could not establish a creation lease and base.")
+            return 1
+        lease, base = creation
+        history_options["base"] = base
+        creation_options["create"] = True
     publishing = not args.check_only and not os.environ.get("FFTA_PUSH_DRY")
     use_committed = not (args.kit or args.working_tree)
     snapshot = publish_snapshot(repo, args.branch, require_clean=not use_committed) \
@@ -480,7 +546,7 @@ def main():
         log("\nNOTHING PUSHED - could not establish a publication snapshot.")
         return 1
     checks = (
-        check_history(repo, args.remote, args.branch, force=args.force),
+        check_history(repo, args.remote, args.branch, force=args.force, **history_options),
         check_no_rom_data(repo, commit=snapshot[1] if use_committed else None),
     )
     tree = committed_tree(repo, snapshot[1]) if use_committed else repo
@@ -517,7 +583,8 @@ def main():
         return 1
     return 0 if do_push(repo, args.remote, args.branch,
                          force=args.force, lease=lease,
-                         commit=snapshot[1] if snapshot else None) else 1
+                         commit=snapshot[1] if snapshot else None,
+                         **creation_options) else 1
 
 
 if __name__ == "__main__":
