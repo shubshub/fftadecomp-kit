@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "d8ba70dc3dd0855f260efe63a1b9ea5503dbecc516c5aa1f0caa83de8f59a03a",
-        "acknowledged_cursor": 6827849103,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "d8ba70dc3dd0855f260efe63a1b9ea5503dbecc516c5aa1f0caa83de8f59a03a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811C018\",\"who\":\"match-native-0811C018\",\"note\":\"Native plausible C recovery for statically qualified complete owner; isolated address scope\"}",
-          "created_at": "2026-11-12T15:27:34Z",
-          "id": 6827849103,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:27:34Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "70677096d32b7257d5315a6e564e73afc08f6b237ed6a0e5cec39012007cb925",
-        "result": {
-          "address": "0x0811C018",
-          "claim_id": 6827849103,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6827849103,
-          "status": "accepted",
-          "who": "match-native-0811C018"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "604dc87cda4f09902e2cc53a4d3802aebc11917135a34bb332d037f107c2fcb0",
-        "acknowledged_cursor": 6828184497,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "604dc87cda4f09902e2cc53a4d3802aebc11917135a34bb332d037f107c2fcb0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811C018\",\"who\":\"match-native-0811C018\",\"claim_id\":6827849103,\"reason\":\"Plausible recovery remains722bytes versus718; one terminal-state register copy plus alignment changes later offsets. Full failed evidence retained.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural control-flow and state formulations\"}",
-          "created_at": "2026-11-12T15:40:36Z",
-          "id": 6828184497,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:40:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3320236ebf0ba9721b7e14ef95c258896846c60ae58e51ccef69fd4f1e8b0fde",
-        "result": {
-          "address": "0x0811C018",
-          "claim_id": 6827849103,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6828184497,
-          "status": "accepted",
-          "who": "match-native-0811C018"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d51ca1ad92927c364e676a7909b31b0fc8ba63565ea0fbf3598f85bd0245014e",
         "acknowledged_cursor": 6828210507,
         "body_provenance": "acceptance-time",
