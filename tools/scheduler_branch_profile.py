@@ -23,12 +23,17 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def phases(edges, calls, *, following_calls=False, wide_targets=False):
+def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False):
     require(type(following_calls) is bool, 'following-call selection must be Boolean')
     require(type(wide_targets) is bool and not (following_calls and wide_targets),
             'wide-target selection must be Boolean and separate from following calls')
+    require(type(twenty_four_targets) is bool and
+            not (twenty_four_targets and (following_calls or wide_targets)),
+            'twenty-four-target selection must be Boolean and exclusive')
     target_budget = WIDE_ORDINARY_TARGETS if wide_targets else MAX_ORDINARY_TARGETS
     call_budget = WIDE_CALL_SITES if wide_targets else MAX_CALL_SITES
+    if twenty_four_targets:
+        target_budget, call_budget = 24, 32
     schedulers = sorted(site for site, target in calls.items() if target == SCHEDULER)
     ordinary = sorted(set(calls.values()) - {SCHEDULER})
     require(1 <= len(schedulers) <= MAX_SCHEDULER_SITES and
@@ -60,8 +65,8 @@ def phases(edges, calls, *, following_calls=False, wide_targets=False):
     return result
 
 
-def bind(proof, edges, calls, *, following_calls=False, wide_targets=False):
-    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets)
+def bind(proof, edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False):
+    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets, twenty_four_targets=twenty_four_targets)
     for target in result['ordinary_targets']:
         require(not match.function_thunk.reserved(target) and
                 target not in match.RUNTIME_HELPERS.values(),
