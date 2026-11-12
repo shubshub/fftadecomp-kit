@@ -59,6 +59,38 @@
           "who": "match-native-081419C0"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1c8ae4aca4b7f3c9683a1da85fc36eeae66d603f5fe5414623d5f2fb4a21bbcd",
+        "acknowledged_cursor": 6832169667,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1c8ae4aca4b7f3c9683a1da85fc36eeae66d603f5fe5414623d5f2fb4a21bbcd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08137CC4\",\"who\":\"match-native-08137CC4\",\"note\":\"Recover qualified display initialization with bounded BIOS fill source profile.\"}",
+          "created_at": "2026-11-12T18:21:06Z",
+          "id": 6832169667,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T18:21:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eda270319cf1cd1860b8d7f443bde1569f1bcefdccd95d7952e8ffb20a04d48a",
+        "result": {
+          "address": "0x08137CC4",
+          "claim_id": 6832169667,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6832169667,
+          "status": "accepted",
+          "who": "match-native-08137CC4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
