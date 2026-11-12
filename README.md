@@ -2934,3 +2934,15 @@ nonretention checks. Both pointer-storage words must be readable, aligned and
 separate from caller stack storage; the final manager must satisfy the existing
 scheduler contract. Those are explicit conditions, not inferred memory facts.
 The existing scheduler-entry selector and default policies are unchanged.
+
+The separate `conditional-scheduler-manager-offset-v1` profile follows the
+actual low-register definitions through a finite straight-line load chain.
+Its first pointer dereference has offset zero; its final word load can use
+an aligned Thumb immediate field offset from 0 through 124 bytes. The report
+records both load sites, their registers and the field offset. Branch joins,
+intervening calls, overwritten provenance, indexed loads, other access widths
+and additional dereferences are rejected. The literal must have one exact
+typed zero-addend data binding. Existing descriptor and frame checks still
+apply. Readability, address arithmetic without wraparound, storage separation,
+the final manager contract and callback effects remain explicit conditions;
+intervening writes do not imply that memory values remain unchanged.
