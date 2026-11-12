@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "4e18d3e1303a267bd4e903706d36cd7863c34120c83f21dcbb2f2f32022f4c7f",
-        "acknowledged_cursor": 6838803334,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4e18d3e1303a267bd4e903706d36cd7863c34120c83f21dcbb2f2f32022f4c7f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810DE24\",\"who\":\"native-0810de24\",\"note\":\"Recover plausible complete C after native 24-target scheduler qualification; isolated source with parent-owned integration.\"}",
-          "created_at": "2026-11-12T23:20:35Z",
-          "id": 6838803334,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T23:20:35Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cc2aad6f9957e53db5e2ad0dfbbf2b7072751cf7d1b51e4b51bd97f448e35f75",
-        "result": {
-          "address": "0x0810DE24",
-          "claim_id": 6838803334,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6838803334,
-          "status": "accepted",
-          "who": "native-0810de24"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "a7a12b4be25b0fbd362c5513a026ae9ceb006ffc8a9a116cf59af08ff3ed6530",
-        "acknowledged_cursor": 6839010999,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a7a12b4be25b0fbd362c5513a026ae9ceb006ffc8a9a116cf59af08ff3ed6530",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810DE24\",\"who\":\"native-0810de24\",\"claim_id\":6838803334,\"reason\":\"Bounded natural C emits 632 bytes with 26 remaining register-allocation differences. Native rejection and candidate preserved privately in Parked.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural formulations\"}",
-          "created_at": "2026-11-12T23:29:31Z",
-          "id": 6839010999,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T23:29:31Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "07c08b3248a7490b8753fd6636c5a1bfcb9804d6af1dff9da1b157f9684a4765",
-        "result": {
-          "address": "0x0810DE24",
-          "claim_id": 6838803334,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6839010999,
-          "status": "accepted",
-          "who": "native-0810de24"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "47ba53842822428e384302ab8e9c0245b281ddd53f4358593fce5a8e2f6f12d0",
         "acknowledged_cursor": 6839033204,
         "body_provenance": "acceptance-time",
