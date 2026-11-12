@@ -90,7 +90,35 @@
           "who": "primary"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "cdee273977f48685de6d40ee8d3f1555117ab8deef5eac6455eb294111bb8e66",
+        "acknowledged_cursor": 6817432761,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cdee273977f48685de6d40ee8d3f1555117ab8deef5eac6455eb294111bb8e66",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813ECC4\",\"who\":\"primary\",\"claim_id\":6816907976,\"reason\":\"Complete complementary 80-byte source passes native compiler-signed-runtime-data-v1 and the source-bound volatile semantic gate; integrated for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T07:22:35Z",
+          "id": 6817432761,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T07:22:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e02ca53c921f2a5b98da755ecdf2102c842970c63da06769a7511cf5e35a1c1",
+        "result": {
+          "address": "0x0813ECC4",
+          "claim_id": 6816907976,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6817432761,
+          "status": "accepted",
+          "who": "primary"
+        }
+      }
     },
     {
       "claim": {
