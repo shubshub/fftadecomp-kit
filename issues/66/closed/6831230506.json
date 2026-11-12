@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dfdd88496ba0f05650b039bc84930b3b7a39af4ebb37e0747df77b0c21d76db0",
+    "acknowledged_cursor": 6831230506,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dfdd88496ba0f05650b039bc84930b3b7a39af4ebb37e0747df77b0c21d76db0",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813FC8C\",\"who\":\"match-native-0813FC8C\",\"note\":\"Recover plausible C for complete 100-byte indexed function; original structural/frame qualification passed.\"}",
+      "created_at": "2026-11-12T17:40:12Z",
+      "id": 6831230506,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T17:40:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f4e4a0af92a6647b042b6c08b53a4d62d27b269d23e7963e00003329b9c09a67",
+    "result": {
+      "address": "0x0813FC8C",
+      "claim_id": 6831230506,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6831230506,
+      "status": "accepted",
+      "who": "match-native-0813FC8C"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a9794f1f63b42193af3ff4419e482945f73545e868473cf6903d2b776ded9718",
+    "acknowledged_cursor": 6831369683,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a9794f1f63b42193af3ff4419e482945f73545e868473cf6903d2b776ded9718",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813FC8C\",\"who\":\"match-native-0813FC8C\",\"claim_id\":6831230506,\"reason\":\"Complete100-byte natural C native MATCH; three-source combined-map verification also passed; queued for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T17:46:09Z",
+      "id": 6831369683,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T17:46:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a8fc13b7804a2e63e5274142009183570ef74255855d1805c655d80b07455808",
+    "result": {
+      "address": "0x0813FC8C",
+      "claim_id": 6831230506,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6831369683,
+      "status": "accepted",
+      "who": "match-native-0813FC8C"
+    }
+  }
+}
