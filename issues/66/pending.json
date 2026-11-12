@@ -30,7 +30,35 @@
           "who": "match-native-080213DC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "910262c2693c5fa927b469a674481672db8abff47220dc02887a4569742b5610",
+        "acknowledged_cursor": 6823263761,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "910262c2693c5fa927b469a674481672db8abff47220dc02887a4569742b5610",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080213DC\",\"who\":\"match-native-080213DC\",\"claim_id\":6822560282,\"reason\":\"Complete166-byte diagnostic equality; native remains rejected at RAM-installed callback identity after bounded entry-alias and scratch-prefix proof extensions; no native MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; explicit native restoring and scratch-prefix profiles;131 targeted toolkit tests\"}",
+          "created_at": "2026-11-12T12:11:57Z",
+          "id": 6823263761,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T12:11:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6e290ff3b7a50386f92624a2c128928a6474d57d3100b0ff3db9d4fbd5696211",
+        "result": {
+          "address": "0x080213DC",
+          "claim_id": 6822560282,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6823263761,
+          "status": "accepted",
+          "who": "match-native-080213DC"
+        }
+      }
     },
     {
       "claim": {
