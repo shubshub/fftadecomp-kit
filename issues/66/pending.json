@@ -123,6 +123,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "db118018f95e801ae113b07b691da7e7c5e35f434834116dbbaa480752cc28ce",
+        "acknowledged_cursor": 6837502730,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "db118018f95e801ae113b07b691da7e7c5e35f434834116dbbaa480752cc28ce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08042D4C\",\"who\":\"native-08042d4c\",\"note\":\"Recover complete mixed CpuFastSet caller after explicit native qualification\"}",
+          "created_at": "2026-11-12T22:19:52Z",
+          "id": 6837502730,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T22:19:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "19faf58f40aa03a6de43ebe09fe6be0e5fff3411bc00f465be43359d0c26a288",
+        "result": {
+          "address": "0x08042D4C",
+          "claim_id": 6837502730,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6837502730,
+          "status": "accepted",
+          "who": "native-08042d4c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
