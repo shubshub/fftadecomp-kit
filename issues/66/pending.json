@@ -91,6 +91,38 @@
           "who": "match-native-080d8604"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "60062cba43f353baaf8476c6ac83e57bef11039586d63c2b2bf94b8e3241650e",
+        "acknowledged_cursor": 6835485965,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "60062cba43f353baaf8476c6ac83e57bef11039586d63c2b2bf94b8e3241650e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EF37C\",\"who\":\"match-native-080ef37c\",\"note\":\"Plausible complete C recovery with tested explicit scheduler profile and qualified private maps; unchanged extent\"}",
+          "created_at": "2026-11-12T20:45:50Z",
+          "id": 6835485965,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T20:45:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ccf0150816fd42209862ec6afe458227bfe485ef6f637ced88835399fc0c77ef",
+        "result": {
+          "address": "0x080EF37C",
+          "claim_id": 6835485965,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6835485965,
+          "status": "accepted",
+          "who": "match-native-080ef37c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
