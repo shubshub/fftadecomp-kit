@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "b64d659d02d33d82bdeb4d465dccb4b03ddc3cb99bdf46f79943a96d249dce3e",
-        "acknowledged_cursor": 6833493445,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b64d659d02d33d82bdeb4d465dccb4b03ddc3cb99bdf46f79943a96d249dce3e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127B80\",\"who\":\"match-native-08127b80\",\"note\":\"Recover plausible C for complete natively qualified body; source, compiler artifacts and exact matching gate required.\"}",
-          "created_at": "2026-11-12T19:17:05Z",
-          "id": 6833493445,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T19:17:05Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "73d876ad74ae94b5842d3867e4f0c967d6f3f70ac42be3882f4ed9c5c10abdc9",
-        "result": {
-          "address": "0x08127B80",
-          "claim_id": 6833493445,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6833493445,
-          "status": "accepted",
-          "who": "match-native-08127b80"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "6c8257fe77f52efc9a7a6212755677cf6a316ad56f61b75e901ebc02a6da74ab",
-        "acknowledged_cursor": 6833654518,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "6c8257fe77f52efc9a7a6212755677cf6a316ad56f61b75e901ebc02a6da74ab",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08127B80\",\"who\":\"match-native-08127b80\",\"claim_id\":6833493445,\"reason\":\"Six natural variants; extra MOV SP alias and halfword extraction registers; generated72 versus68 bytes.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural source variants\"}",
-          "created_at": "2026-11-12T19:24:09Z",
-          "id": 6833654518,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T19:24:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "97189aba5cd01ff24071687a4dd4af0ded843216e009e4377d8aa73e9f2c62d8",
-        "result": {
-          "address": "0x08127B80",
-          "claim_id": 6833493445,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6833654518,
-          "status": "accepted",
-          "who": "match-native-08127b80"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "9ecf167733c230b0700164b46732138528f8d20a68085d46cc15e653d29b7701",
         "acknowledged_cursor": 6833542255,
         "body_provenance": "acceptance-time",
