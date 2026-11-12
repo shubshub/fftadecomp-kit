@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dbc35745fb27e20e9131aa0763a0a3304242be9b6f24a4c1e65dc33c2c87da08",
+    "acknowledged_cursor": 6818268407,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dbc35745fb27e20e9131aa0763a0a3304242be9b6f24a4c1e65dc33c2c87da08",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801D818\",\"who\":\"match-0801D818\",\"note\":\"Recover one complete indexed Thumb function as plausible C; native full-byte equality required.\"}",
+      "created_at": "2026-11-12T08:07:29Z",
+      "id": 6818262157,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T08:07:29Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "268df097a16d91daa555fd33e4a6c4f7031b49a5d26422a16a0cac86ea40d132",
+    "result": {
+      "address": "0x0801D818",
+      "claim_id": 6818262157,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6818262157,
+      "status": "accepted",
+      "who": "match-0801D818"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1426bde7a55758f75a3a0e51f299f499e353e243a7902cc104be801bb28f2f98",
+    "acknowledged_cursor": 6818309462,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1426bde7a55758f75a3a0e51f299f499e353e243a7902cc104be801bb28f2f98",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801D818\",\"who\":\"match-0801D818\",\"claim_id\":6818262157,\"reason\":\"Plausible complete candidate retained in scratch. Native buffer callee proof rejects nested stack-alias escape in 0801AF08; no admitted match.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T08:09:57Z",
+      "id": 6818309462,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T08:09:57Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d1cb8fbc062855400d420b1bd2afefd25dca29770193759398001f5a8dc5e749",
+    "result": {
+      "address": "0x0801D818",
+      "claim_id": 6818262157,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6818309462,
+      "status": "accepted",
+      "who": "match-0801D818"
+    }
+  }
+}

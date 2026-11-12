@@ -62,7 +62,35 @@
           "who": "match-0801D818"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "1426bde7a55758f75a3a0e51f299f499e353e243a7902cc104be801bb28f2f98",
+        "acknowledged_cursor": 6818309462,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1426bde7a55758f75a3a0e51f299f499e353e243a7902cc104be801bb28f2f98",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801D818\",\"who\":\"match-0801D818\",\"claim_id\":6818262157,\"reason\":\"Plausible complete candidate retained in scratch. Native buffer callee proof rejects nested stack-alias escape in 0801AF08; no admitted match.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T08:09:57Z",
+          "id": 6818309462,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T08:09:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d1cb8fbc062855400d420b1bd2afefd25dca29770193759398001f5a8dc5e749",
+        "result": {
+          "address": "0x0801D818",
+          "claim_id": 6818262157,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6818309462,
+          "status": "accepted",
+          "who": "match-0801D818"
+        }
+      }
     },
     {
       "claim": {
