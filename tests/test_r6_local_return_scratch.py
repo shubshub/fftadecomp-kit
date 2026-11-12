@@ -34,7 +34,9 @@ class LocalScratchTests(unittest.TestCase):
                             for row in evidence['normal_return_scratch']))
         row = next(row for row in evidence['observations'] if row['target'] == L)
         self.assertEqual(row['frame']['discarded_exit_scratch']['registers'], [2, 3])
-        for selector in policy.ALIGNED_POLICIES[:-1]:
+        for selector in policy.ALIGNED_POLICIES:
+            if selector in policy.LOCAL_SCRATCH_POLICIES:
+                continue
             with self.subTest(selector=selector), self.assertRaisesRegex(ValueError, 'local stack pointer escapes'):
                 owner.verify(**dict(values, selector=selector))
 

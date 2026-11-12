@@ -544,8 +544,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                 observations=restorations, **{'callback_observations' if selector in r6_buffer.TARGET_POLICIES else 'r7_observations': callbacks})
             if selector in r6_buffer.TARGET_POLICIES:
                 proof['buffers']['r6_restoration']['normal_return_scratch'] = buffers.scratch_return_observations()
-            if selector == r6_buffer.COMPACT_CLOSURE_SELECTOR:
+            if selector in r6_buffer.COMPACT_CLOSURE_POLICIES:
                 proof['buffers']['r6_restoration']['compact_dependency_closure'] = buffers.compact_dependency_closure()
+            if selector == r6_buffer.SCRATCH_PREFIX_SELECTOR:
+                proof['buffers']['r6_restoration']['scratch_prefix_kills'] = buffers.scratch_prefix_observations()
         if selector == word_buffer.SELECTOR:
             proof['buffers']['word_result_callback'] = buffers.effect_manifest()
         if selector in formal_spill.SELECTORS:
