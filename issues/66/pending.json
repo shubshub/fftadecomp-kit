@@ -95,6 +95,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "195d953f3c12c41cc4b303034c8bbec574f64767f80dc607f932f04bdf6930bd",
+        "acknowledged_cursor": 6833863152,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "195d953f3c12c41cc4b303034c8bbec574f64767f80dc607f932f04bdf6930bd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800058C\",\"who\":\"match-native-0800058c\",\"note\":\"Recover plausible C for complete early fixed-frame function; existing named literal/callback identities and exact native gate required.\"}",
+          "created_at": "2026-11-12T19:33:17Z",
+          "id": 6833863152,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T19:33:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b7a4897c2e763f9990bdf8e3fb4292e059b53a4d67733a4191097a04a304323c",
+        "result": {
+          "address": "0x0800058C",
+          "claim_id": 6833863152,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6833863152,
+          "status": "accepted",
+          "who": "match-native-0800058c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
