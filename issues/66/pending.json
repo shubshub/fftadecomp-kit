@@ -30,7 +30,35 @@
           "who": "match-native-08016A98"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "34c4fae2cb138fe4ff599be1136dcf8f62842d6fae94e0bbc3a2d1f4f1b2dc23",
+        "acknowledged_cursor": 6821844370,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "34c4fae2cb138fe4ff599be1136dcf8f62842d6fae94e0bbc3a2d1f4f1b2dc23",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08016A98\",\"who\":\"match-native-08016A98\",\"claim_id\":6821513036,\"reason\":\"Best plausible source92 bytes versus84; zero hoist into sl changes save/restore and register allocation; all attempts retained\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; scalar pointer and array sources; counter types and loop forms\"}",
+          "created_at": "2026-11-12T11:04:12Z",
+          "id": 6821844370,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T11:04:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "00321c0a81358a529cf7b6861605abbb8b4b8aac19806e295fe82e1ce6721ec5",
+        "result": {
+          "address": "0x08016A98",
+          "claim_id": 6821513036,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6821844370,
+          "status": "accepted",
+          "who": "match-native-08016A98"
+        }
+      }
     },
     {
       "claim": {
