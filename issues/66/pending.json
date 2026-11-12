@@ -62,7 +62,35 @@
           "who": "match-native-080F16C0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0a6d0c1ad188e943f3de1634fcd9150b0f5802ba8034e9e0d307f6153a046a47",
+        "acknowledged_cursor": 6820200598,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0a6d0c1ad188e943f3de1634fcd9150b0f5802ba8034e9e0d307f6153a046a47",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F16C0\",\"who\":\"match-native-080F16C0\",\"claim_id\":6820142011,\"reason\":\"Static qualification finds literal words at this indexed coordinate, loaded by code starting at 080F15C8; no C authored. Native owner inventory proof and index correction required before matching.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T09:44:21Z",
+          "id": 6820200598,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:44:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e14756f1cc02157016b357e99942b539a58b2f1376718dca588dc68bb3c7d3af",
+        "result": {
+          "address": "0x080F16C0",
+          "claim_id": 6820142011,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6820200598,
+          "status": "accepted",
+          "who": "match-native-080F16C0"
+        }
+      }
     },
     {
       "claim": {
