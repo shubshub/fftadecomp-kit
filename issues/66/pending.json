@@ -30,7 +30,35 @@
           "who": "match-native-08022DD0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "11a485d90fc05633d2660c962b54ece04387389a51480b431413aa5d19037246",
+        "acknowledged_cursor": 6822322031,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "11a485d90fc05633d2660c962b54ece04387389a51480b431413aa5d19037246",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08022DD0\",\"who\":\"match-native-08022DD0\",\"claim_id\":6822223270,\"reason\":\"Plausible84-byte candidate has one commutative ADD encoding difference; native buffer callee rejects memcpy target; explicit named-data profile rejects reserved runtime target; no native MATCH\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; scalar index and pointer forms; native default and named-data-buffer-v1\"}",
+          "created_at": "2026-11-12T11:27:10Z",
+          "id": 6822322031,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T11:27:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "29354c0b9b5c077a582ac8eff01fd8f280e2aba35c5306dbea9857269fa58ac2",
+        "result": {
+          "address": "0x08022DD0",
+          "claim_id": 6822223270,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6822322031,
+          "status": "accepted",
+          "who": "match-native-08022DD0"
+        }
+      }
     }
   ],
   "issue": 66,
