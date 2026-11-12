@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "0fbda20ee838cc30df9b853adfdd06cb7965c8e65b6fdab408d40940e66cf00a",
-        "acknowledged_cursor": 6832707926,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0fbda20ee838cc30df9b853adfdd06cb7965c8e65b6fdab408d40940e66cf00a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08000460\",\"who\":\"match-native-08000460-orphan\",\"note\":\"Validate unchanged 80-byte source through explicit fixed-O0 compiler orphan constant admission.\"}",
-          "created_at": "2026-11-12T18:44:11Z",
-          "id": 6832707926,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T18:44:11Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b3e323f8921ca8e43403d9e79e24bb05a9a0042623be76b49160646f8077cc90",
-        "result": {
-          "address": "0x08000460",
-          "claim_id": 6832707926,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6832707926,
-          "status": "accepted",
-          "who": "match-native-08000460-orphan"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4ea5edcdb29b76586f000c23591644fcfcd5a7401cbca68086bf974c38dada9c",
-        "acknowledged_cursor": 6833262644,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4ea5edcdb29b76586f000c23591644fcfcd5a7401cbca68086bf974c38dada9c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000460\",\"who\":\"match-native-08000460-orphan\",\"claim_id\":6832707926,\"reason\":\"Native MATCH: complete 80-byte source with fixed O0 compiler-orphan-address-constants profile; exact captured native proof retained for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T19:07:59Z",
-          "id": 6833262644,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T19:07:59Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c2d2e8be301eb0b861a452d5d22fc480877d67b328ef24347f1148415dce377e",
-        "result": {
-          "address": "0x08000460",
-          "claim_id": 6832707926,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6833262644,
-          "status": "accepted",
-          "who": "match-native-08000460-orphan"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e70719c01b2c10eb14845876f5a199282535ca78bfb76a93c98af3569303083d",
         "acknowledged_cursor": 6833428665,
         "body_provenance": "acceptance-time",
