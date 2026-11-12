@@ -126,7 +126,35 @@
           "who": "match-native-0800058c"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "274d32b3ac332f3cf1173f73175ce560cd344b063439b9f035fe6d32018f297b",
+        "acknowledged_cursor": 6834100861,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "274d32b3ac332f3cf1173f73175ce560cd344b063439b9f035fe6d32018f297b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800058C\",\"who\":\"match-native-0800058c\",\"claim_id\":6833863152,\"reason\":\"Complete 64-byte native MATCH with fixed O0 compiler, typed named-data linking and explicit orphan constant profile; source and replay evidence retained for integration.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T19:43:42Z",
+          "id": 6834100861,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T19:43:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f47ee5aeac00bb6452c68b9aee79b8792785571047a4af0369811e86bf6c7759",
+        "result": {
+          "address": "0x0800058C",
+          "claim_id": 6833863152,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6834100861,
+          "status": "accepted",
+          "who": "match-native-0800058c"
+        }
+      }
     }
   ],
   "issue": 66,
