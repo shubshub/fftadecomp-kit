@@ -32,6 +32,28 @@ FORWARDED_PREMISE = ('Authenticated ordinary control members are stable live ord
     'readability or termination is claimed.')
 
 
+DISJOINT_OBJECT_PREMISE = (FORWARDED_PREMISE +
+    ' An intervening nonpinned store may also be crossed only for one complete '
+    'plain scalar ordinary member of the same authenticated allowlisted object, '
+    'with exact declaration width and in-object bounds and an independently '
+    'disjoint byte interval from the candidate. That store survives unchanged '
+    'in the ordered correspondence. Different symbol names imply no disjointness.')
+
+
+def ordinary_members(symbol, size, pinned):
+    """Exact scalar ranges from the existing source-authenticated allowlist."""
+    import plausible
+    entries = [entry for entry in plausible.volatile_allow_entries() if entry['symbol'] == symbol]
+    require(len(entries) == 1, 'disjoint ordinary stores require one authenticated object declaration')
+    declaration = entries[0]['declaration']
+    layout, declared_size = semantics.members(declaration)
+    require(declared_size == size and semantics.pinned_members(declaration)[1] == pinned,
+            'disjoint ordinary store object layout differs from authenticated declaration')
+    return {offset:width for tokens, name, offset, width, qualified in layout
+            if not qualified and len(tokens) == 2 and width in (1,2,4) and
+            type(offset) is int and 0 <= offset <= size-width}
+
+
 def require(condition, message):
     if not condition:
         raise semantics.SemanticError(message)
@@ -46,7 +68,7 @@ def has_versions(value):
 
 
 def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
-              _forwarded_constant_controls=False):
+              _forwarded_constant_controls=False, _disjoint_ordinary_stores=False):
     """Retain order, delete only exact constant stores with local witnesses.
 
     Record/trace association is authenticated by exact ordered store tuples.
@@ -80,6 +102,11 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
                     type(row.value) is int and row.width == pinned_width(row.address) and
                     semantics.chained_reread(records, position, pinned_width)):
                 crossed_reads.add(position)
+    ordinary = {}
+    if _disjoint_ordinary_stores:
+        require(_typed_correspondence,
+                'disjoint ordinary stores require typed ordered correspondence')
+        # Resolve declaration evidence lazily only when crossing is needed.
     removed=[]
     for position,row in stores:
         offset=semantics.object_offset(row.address,symbol,size)
@@ -87,6 +114,7 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
             continue
         require(not row.self_assignment, 'overwritten-store cannot discharge load/store self-assignment')
         crossed = []
+        crossed_stores = []
         for other_position in range(position+1,len(records)):
             other=records[other_position]
             if other_position in crossed_reads:
@@ -97,8 +125,18 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
             if other.kind != 'store':
                 break
             other_offset=semantics.object_offset(other.address,symbol,size)
-            # Every intervening store must itself be an exact pinned ordinary
-            # member. Unknown destinations can observe/alias and are barriers.
+            # Permit only a complete authenticated scalar member in this same
+            # object, independently disjoint from the candidate's byte interval.
+            # Its event is retained; no observed store is reordered or folded.
+            if (_disjoint_ordinary_stores and other_offset not in pinned and
+                    other_offset is not None and not ordinary):
+                ordinary = ordinary_members(symbol, size, pinned)
+            if (other_offset in ordinary and other.width == ordinary[other_offset] and
+                    (other_offset + other.width <= offset or offset + row.width <= other_offset)):
+                crossed_stores.append(other.index)
+                continue
+            # Other stores must remain exact pinned members. Unknown
+            # destinations can observe/alias and are barriers.
             if other_offset not in pinned or other.width != pinned[other_offset]:
                 break
             if other.address == row.address:
@@ -106,6 +144,8 @@ def normalise(path, symbol, size, pinned, *, _typed_correspondence=False,
                     removed.append(dict(event=association[position],instruction=row.index,
                         offset=offset,width=row.width,value=row.value,
                         overwritten_by_instruction=other.index))
+                    if crossed_stores:
+                        removed[-1]['crossed_disjoint_ordinary_stores'] = crossed_stores
                     if crossed:
                         removed[-1]['crossed_forwarded_constant_reads'] = crossed
                 break

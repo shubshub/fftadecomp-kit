@@ -6,7 +6,7 @@ import volatile_semantics as semantics
 import overwritten_control_store_prerequisite as prerequisite
 
 SELECTOR = "conditional-classified-overwritten-control-stores-v1"
-PREMISE = prerequisite.FORWARDED_PREMISE
+PREMISE = prerequisite.DISJOINT_OBJECT_PREMISE
 
 
 def compare_function(name, real, stripped, permuted, signatures, symbol, size, pinned,
@@ -33,10 +33,12 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
             filtered._trace_origin = getattr(real_tail, '_trace_origin', 0)
         mine, removed = prerequisite.normalise(filtered, symbol, size, pinned,
                                                _typed_correspondence=True,
-                                               _forwarded_constant_controls=True)
+                                               _forwarded_constant_controls=True,
+                                               _disjoint_ordinary_stores=True)
         theirs, other_removed = prerequisite.normalise(stripped_tail, symbol, size, pinned,
                                                        _typed_correspondence=True,
-                                               _forwarded_constant_controls=True)
+                                               _forwarded_constant_controls=True,
+                                               _disjoint_ordinary_stores=True)
         correspondence = compare_survivors(filtered, stripped_tail, removed, other_removed,
             load_time_provenance=True)
         witnesses.append(dict(unchanged_fill_prefix=prefix, real_removed=removed, stripped_removed=other_removed,
