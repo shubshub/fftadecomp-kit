@@ -23,16 +23,21 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False):
+def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False):
     require(type(following_calls) is bool, 'following-call selection must be Boolean')
     require(type(wide_targets) is bool and not (following_calls and wide_targets),
             'wide-target selection must be Boolean and separate from following calls')
     require(type(twenty_four_targets) is bool and
             not (twenty_four_targets and (following_calls or wide_targets)),
             'twenty-four-target selection must be Boolean and exclusive')
+    require(type(twenty_four_following_calls) is bool and
+            not (twenty_four_following_calls and
+                 (following_calls or wide_targets or twenty_four_targets)),
+            'twenty-four-target following selection must be Boolean and exclusive')
+    allow_following = following_calls or twenty_four_following_calls
     target_budget = WIDE_ORDINARY_TARGETS if wide_targets else MAX_ORDINARY_TARGETS
     call_budget = WIDE_CALL_SITES if wide_targets else MAX_CALL_SITES
-    if twenty_four_targets:
+    if twenty_four_targets or twenty_four_following_calls:
         target_budget, call_budget = 24, 32
     schedulers = sorted(site for site, target in calls.items() if target == SCHEDULER)
     ordinary = sorted(set(calls.values()) - {SCHEDULER})
@@ -47,26 +52,26 @@ def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_fo
         # following-call selector permits only ordinary calls afterwards; each
         # such call still undergoes the complete frame/alias check.
         if after[site] and site in calls:
-            require(following_calls and calls[site] != SCHEDULER,
+            require(allow_following and calls[site] != SCHEDULER,
                     'scheduler branches exclude every call after a scheduler return')
             following_sites.append(site)
         scheduled = after[site] or calls.get(site) == SCHEDULER
         for target in edges[site]:
             after[target] |= scheduled
-    if following_calls:
+    if allow_following:
         require(len(schedulers) == 1 and following_sites,
                 'following-call contract requires one scheduler site and a reached following ordinary call')
     result = dict(scheduler_sites=schedulers, ordinary_targets=ordinary,
         scheduler_site_budget=MAX_SCHEDULER_SITES, call_site_budget=call_budget,
         ordinary_target_budget=target_budget,
         maximum_scheduler_calls_per_path=1, ordinary_calls_after_scheduler=bool(following_sites))
-    if following_calls:
+    if allow_following:
         result['following_ordinary_sites'] = sorted(following_sites)
     return result
 
 
-def bind(proof, edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False):
-    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets, twenty_four_targets=twenty_four_targets)
+def bind(proof, edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False):
+    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets, twenty_four_targets=twenty_four_targets, twenty_four_following_calls=twenty_four_following_calls)
     for target in result['ordinary_targets']:
         require(not match.function_thunk.reserved(target) and
                 target not in match.RUNTIME_HELPERS.values(),
