@@ -26,11 +26,15 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
         filtered = semantics.Path(real_tail.decisions, real_tail.conditions, real_tail.trace,
             [row for row in real_tail.records
              if not (row.kind == "load" and row.index in classified)])
+        if hasattr(real_tail, '_load_provenance'):
+            filtered._load_provenance = real_tail._load_provenance
+            filtered._trace_origin = getattr(real_tail, '_trace_origin', 0)
         mine, removed = prerequisite.normalise(filtered, symbol, size, pinned,
                                                _typed_correspondence=True)
         theirs, other_removed = prerequisite.normalise(stripped_tail, symbol, size, pinned,
                                                        _typed_correspondence=True)
-        correspondence = compare_survivors(filtered, stripped_tail, removed, other_removed)
+        correspondence = compare_survivors(filtered, stripped_tail, removed, other_removed,
+            load_time_provenance=True)
         witnesses.append(dict(unchanged_fill_prefix=prefix, real_removed=removed, stripped_removed=other_removed,
             correspondence=correspondence,
             real_path_sha256=prerequisite.path_fingerprint(real_path),
@@ -41,7 +45,7 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
         return correspondence["real"], correspondence["stripped"]
 
     result = semantics.compare_function(name, real, stripped, signatures, symbol, size,
-        pinned, interfaces, unloaded_all_ones=True, _ordered_trace_check=ordered)
+        pinned, interfaces, unloaded_all_ones=True, _ordered_trace_check=ordered, _capture_load_provenance=True)
     observed = dict(schema=SELECTOR, premise=premise, result=result, paths=witnesses,
                 adapter_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
                 producer_sha256={Path(module.__file__).name:
@@ -55,11 +59,14 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
     return observed
 
 
-def compare_survivors(real, stripped, removed, other_removed, *, manifest=None):
+def compare_survivors(real, stripped, removed, other_removed, *, manifest=None,
+                      load_time_provenance=False):
     """Typed ordered bijection, scoped to these exact two path instances.
 
     Only supported Executor term forms are translated; unknown forms refuse.
     Conditions stay strict and cannot contain event references in this subset.
+    The opt-in mode consumes fresh Executor load captures, retaining their conservative
+    load-time memory versions and full-trace identities across prefix views.
     """
     require = prerequisite.require
     require(real.conditions == stripped.conditions and real.decisions == stripped.decisions,
@@ -67,18 +74,37 @@ def compare_survivors(real, stripped, removed, other_removed, *, manifest=None):
     require(not any(prerequisite.has_versions(c) for c in real.conditions),
             "event correspondence excludes versioned conditions")
 
+    if load_time_provenance:
+        origins = [getattr(path, '_trace_origin', 0) for path in (real, stripped)]
+        require(origins[0] == origins[1] and origins[0] in (0, 5),
+                'load-time correspondence prefix origins differ')
+        if origins[0]:
+            proofs = [getattr(path, '_load_provenance', None) for path in (real, stripped)]
+            require(all(type(proof) is semantics.LoadProvenance for proof in proofs) and
+                    proofs[0].trace[:5] == proofs[1].trace[:5],
+                    'load-time correspondence preserved prefixes differ')
+
     def canonical(path, killed):
+        provenance = getattr(path, '_load_provenance', None) if load_time_provenance else None
+        if load_time_provenance:
+            require(type(provenance) is semantics.LoadProvenance,
+                    'load-time correspondence requires executor provenance')
+            origin = provenance.validate(path)
+            full_trace = provenance.trace
+        else:
+            origin, full_trace = 0, path.trace
         deleted = {row['event'] for row in killed}
         require(all(type(i) is int and 0 <= i < len(path.trace) and
                     path.trace[i][0] == 'store' for i in deleted),
                 "event correspondence malformed removal")
-        mapping = {old: new for new, old in enumerate(i for i in range(len(path.trace))
+        deleted = {i + origin for i in deleted}
+        mapping = {old: new for new, old in enumerate(i for i in range(len(full_trace))
                                                      if i not in deleted)}
 
         def reference(index, kind, before):
             require(type(index) is int and 0 <= index < before and index in mapping,
                     "event reference removed, foreign or forward")
-            require(path.trace[index][0] == kind, "event reference has wrong kind")
+            require(full_trace[index][0] == kind, "event reference has wrong kind")
             return mapping[index]
 
         def term(value, before):
@@ -89,21 +115,30 @@ def compare_survivors(real, stripped, removed, other_removed, *, manifest=None):
             if tag == 'load':
                 require(len(value) == 4 and value[1] in (1,2,4), "malformed load expression")
                 version = value[3]
+                capture = None
+                if provenance is not None:
+                    captures = [row for row in provenance.captures
+                                if row[0] == value and row[1] <= before]
+                    require(bool(captures), 'load expression lacks authenticated load-time capture')
+                    capture = captures[0]
                 if version == 'entry':
                     mapped = version
                 else:
                     require(isinstance(version, tuple) and len(version) == 2 and
                             version[0] in ('call','store'), "malformed memory version")
-                    mapped = (version[0], reference(version[1], version[0], before))
-                    require(not any(event[0] in ('call','store')
-                        for event in path.trace[version[1]+1:before]),
-                        'memory version is superseded or requires disjointness proof')
-                    if version[0] == 'store':
-                        event = path.trace[version[1]]
+                    mapped = (version[0], reference(version[1], version[0],
+                        capture[1] if capture is not None else before))
+                    if capture is None:
+                        require(not any(event[0] in ('call','store')
+                            for event in full_trace[version[1]+1:before]),
+                            'memory version is superseded or requires disjointness proof')
+                    if version[0] == 'store' and capture is None:
+                        event = full_trace[version[1]]
                         a, ta = semantics.linear(value[2]); b, tb = semantics.linear(event[2])
                         require(ta == tb and a < b + event[1] and b < a + value[1],
                                 "store version lacks overlap provenance")
-                return ('load',value[1],term(value[2],before),mapped)
+                return ('load',value[1],term(value[2],
+                    capture[1] if capture is not None else before),mapped)
             if tag in ('ret','clobber'):
                 require(len(value) in ((2,) if tag == 'ret' else (2,3)), "malformed call result")
                 identity = value[1]
@@ -131,7 +166,8 @@ def compare_survivors(real, stripped, removed, other_removed, *, manifest=None):
             return (tag,*(term(part,before) if isinstance(part,tuple) else part for part in value[1:]))
 
         events=[]
-        for index,event in enumerate(path.trace):
+        for index,event in enumerate(full_trace):
+            if index < origin: continue
             if index in deleted: continue
             tag=event[0]
             if tag == 'store' and len(event) == 4:
@@ -152,6 +188,12 @@ def compare_survivors(real, stripped, removed, other_removed, *, manifest=None):
         producer_sha256=hashlib.sha256(Path(semantics.__file__).read_bytes()).hexdigest(),
         real_path_sha256=prerequisite.path_fingerprint(real),
         stripped_path_sha256=prerequisite.path_fingerprint(stripped))
+    if load_time_provenance:
+        observed['load_time_provenance'] = dict(schema='executor-load-time-memory-version-v1',
+            real_origin=getattr(real, '_trace_origin', 0),
+            stripped_origin=getattr(stripped, '_trace_origin', 0),
+            real_captures_sha256=hashlib.sha256(repr(real._load_provenance.captures).encode()).hexdigest(),
+            stripped_captures_sha256=hashlib.sha256(repr(stripped._load_provenance.captures).encode()).hexdigest())
     require(manifest is None or manifest == observed, "event correspondence manifest is stale")
     return observed
 
@@ -207,10 +249,12 @@ def unchanged_fill_prefix(real, stripped, interfaces):
         require(not any(row.kind == 'store' and semantics.is_stack(row.address)
                         for row in tail_records), 'unchanged prefix excludes later frame mutation')
         tail = semantics.Path(path.decisions,path.conditions,path.trace[5:],tail_records)
-        # Event references retain full-trace indexes. This slice intentionally
-        # refuses them rather than rebasing through the preserved prefix.
-        require(not any(prerequisite.has_versions(event) for event in tail.trace),
-                'unchanged prefix excludes later raw or versioned dependencies')
+        provenance = getattr(path, '_load_provenance', None)
+        require(type(provenance) is semantics.LoadProvenance,
+                'unchanged prefix needs executor load provenance')
+        provenance.validate(path)
+        tail._load_provenance = provenance
+        tail._trace_origin = 5
         return path.trace[:5],tail
 
     a,left = split(real); b,right = split(stripped)

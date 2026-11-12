@@ -31,16 +31,22 @@ class NativeTests(unittest.TestCase):
 typedef unsigned short u16;
 #include "control_flags.h"
 extern u16 destination[];
+typedef struct { u16 first; u16 second; } Descriptor;
+extern Descriptor *descriptor;
 extern void func_0814186C(void *, void *, unsigned int);
 void func_08001000(void) {
     u16 first;
     u16 second;
+    Descriptor *captured;
     first = 0;
     func_0814186C(&first, destination, 0x01000100);
     second = 0;
     func_0814186C(&second, destination + 0x100, 0x01000100);
+    captured = descriptor;
     g_control_flags_03000940.win1h_lo = 0;
     g_control_flags_03000940.win1h_lo = 19;
+    destination[0] = captured->first;
+    destination[1] = captured->second;
 }
 '''
         (root/'src/08001000.c').write_text(source)
@@ -52,7 +58,7 @@ void func_08001000(void) {
             cls.rows=[dict(rom=f'0x{address:08X}',end=f'0x{address+size:08X}',mode='thumb',instrs=count)
                 for address,size,count in ((A,len(body),0),(bios.ADDRESS,4,2))]
             mapping=json.dumps(cls.rows).encode()
-            cls.objects=json.dumps({'g_control_flags_03000940':'0x03000940','destination':'0x03003860'}).encode()
+            cls.objects=json.dumps({'g_control_flags_03000940':'0x03000940','destination':'0x03003860','descriptor':'0x02001000'}).encode()
             rom=bytearray(bios.ADDRESS-match.ROM_BASE+4);rom[-4:]=b'\x0b\xdf\x70\x47'
             data,bindings=owner.object_bytes(runner,workspace,args,image,A,bytes(rom),mapping,cls.objects,selector=SELECTOR)
         rom[A-match.ROM_BASE:A-match.ROM_BASE+len(data)]=data
@@ -65,7 +71,7 @@ void func_08001000(void) {
         cls.env=patch.dict(os.environ,FFTA_ROM=str(root/'baserom.bin'));cls.env.start()
         cls.result=owner.build(root,A,selector=SELECTOR)
         cls.report=owner.render(A,cls.result)
-        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-stores-evidence'
+        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-store-versions-evidence'
         evidence.mkdir(exist_ok=True)
         (evidence/'native-synthetic-report.md').write_text(cls.report)
         (evidence/'native-synthetic-manifest.json').write_text(json.dumps(cls.result[1],sort_keys=True,indent=2)+'\n')
@@ -90,7 +96,7 @@ void func_08001000(void) {
         output=match._run_replay_process(command,self.root,120)
         self.assertEqual(output.returncode,0,output.stdout+output.stderr)
         self.assertIn('verdict MATCH - byte identical',output.stdout)
-        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-stores-evidence'
+        evidence=Path(__file__).resolve().parents[2]/'overwritten-control-store-versions-evidence'
         (evidence/'native-synthetic-cli.log').write_text(output.stdout+output.stderr)
 
     def test_missing_mutated_native_semantics_and_runtime_refuse(self):

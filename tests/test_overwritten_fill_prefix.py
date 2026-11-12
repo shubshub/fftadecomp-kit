@@ -47,7 +47,7 @@ class Tests(unittest.TestCase):
         function=v.parse_assembly(self.real)[0]['func_08028C34']
         original=v.explore('func_08028C34',function,
             {'func_08028C34':(False,0),bios.NAME:(False,3)},'real',
-            (fixtures.SYMBOL,size,pinned),self.interface)[0]
+            (fixtures.SYMBOL,size,pinned),self.interface, _capture_load_provenance=True)[0]
         for mutation in ('premise','stack','raw'):
             changed=copy.deepcopy(original)
             if mutation == 'premise':
