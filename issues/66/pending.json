@@ -30,7 +30,35 @@
           "who": "cellebrite-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4999991deff7385cae48a89cd04966c5ab37c419f99a971256c77abf227f039b",
+        "acknowledged_cursor": 6815501335,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4999991deff7385cae48a89cd04966c5ab37c419f99a971256c77abf227f039b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08024A24\",\"who\":\"cellebrite-ffta\",\"claim_id\":6815437741,\"reason\":\"Current main 3ada9b4 still refuses nested 08141898 interrupt in buffer proof before byte comparison; preserved original Parked source and fresh log. Continuing other addresses.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T05:26:29Z",
+          "id": 6815501335,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:26:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "816ee134e1dd9e0719341f6e953c30e79a38a16b9ad6cd1da52e8612028397f4",
+        "result": {
+          "address": "0x08024A24",
+          "claim_id": 6815437741,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6815501335,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      }
     }
   ],
   "issue": 66,
