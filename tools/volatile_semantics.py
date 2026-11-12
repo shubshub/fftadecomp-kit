@@ -469,17 +469,21 @@ def truncate(value, bits):
     if value[0] in ("lsr", "asr") and isinstance(value[2], int):
         amount = value[2]
         if 0 < amount < 32 and bits <= 32 - amount:
-            # For A divisible by 2**s, low n bits of (A mod 2**32) >> s
-            # equal low n bits of A / 2**s when n <= 32-s. Arithmetic
-            # right shift has the same low 32-s bits; its sign fill is
-            # outside that range. Require every affine term to divide
-            # exactly, so no discarded remainder or carry is assumed away.
+            # For A = 2**k * B with k <= s, low n bits of
+            # (A mod 2**32) >> s equal those of B >> (s-k) when n <= 32-s.
+            # Overflow and arithmetic sign fill lie above those observed
+            # bits. Divide every affine term exactly by the same power of
+            # two, so no discarded remainder or carry is assumed away.
             constant, terms = linear(value[1])
             divisor = 1 << amount
-            if constant % divisor == 0 and all(c % divisor == 0 for c in terms.values()):
+            while divisor > 1 and (constant % divisor or
+                                   any(c % divisor for c in terms.values())):
+                divisor >>= 1
+            if divisor > 1:
                 quotient = make_linear(constant // divisor,
                                        {term: c // divisor for term, c in terms.items()})
-                return truncate(quotient, bits)
+                remaining = amount - (divisor.bit_length() - 1)
+                return truncate(shift("lsr", quotient, remaining), bits)
     if value[0] == "lin":
         # Addition and constant scaling preserve congruence modulo 2**bits.
         # A narrower inner truncation or a shift remains an opaque term.

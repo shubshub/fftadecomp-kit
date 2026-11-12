@@ -124,5 +124,95 @@ class ShiftObservationTests(unittest.TestCase):
             fixtures.compare(real, stripped)
 
 
+class UnequalShiftTruncationTests(unittest.TestCase):
+    atom = ('arg', 0)
+
+    def test_loaded_halfword_high_byte_matches_08087F0C(self):
+        value = ('load', 2, ('sym', 'data_030027F0'), 'entry')
+        for right in ('lsr', 'asr'):
+            pair = semantics.shift(right, semantics.shift('lsl', value, 16), 24)
+            self.assertEqual(semantics.truncate(pair, 8),
+                             semantics.truncate(semantics.shift('lsr', value, 8), 8))
+
+    def test_partial_cancellation_only_observes_surviving_bits(self):
+        for left in range(1, 31):
+            for amount in range(left + 1, 32):
+                for bits in {1, 32 - amount}:
+                    for right in ('lsr', 'asr'):
+                        with self.subTest(left=left, right=right, amount=amount, bits=bits):
+                            pair = semantics.shift(right, semantics.shift('lsl', self.atom, left), amount)
+                            expected = semantics.shift('lsr', self.atom, amount - left)
+                            self.assertEqual(semantics.truncate(pair, bits),
+                                             semantics.truncate(expected, bits))
+
+    def test_overflow_sign_fill_and_changed_values_stay_distinct(self):
+        expected = semantics.shift('lsr', self.atom, 8)
+        for right in ('lsr', 'asr'):
+            pair = semantics.shift(right, semantics.shift('lsl', self.atom, 16), 24)
+            for bits in (9, 16, 32):
+                self.assertNotEqual(semantics.truncate(pair, bits),
+                                    semantics.truncate(expected, bits))
+            for inner in (semantics.add(semantics.shift('lsl', self.atom, 16), 1 << 24),
+                          semantics.shift('lsl', self.atom, 15),
+                          semantics.shift('lsl', ('arg', 1), 16)):
+                changed = semantics.shift(right, inner, 24)
+                self.assertNotEqual(semantics.truncate(changed, 8),
+                                    semantics.truncate(expected, 8))
+        # All but the input's low bit were lost before the right shift.
+        overflow = semantics.shift('lsr', semantics.shift('lsl', self.atom, 31), 31)
+        self.assertNotEqual(semantics.truncate(overflow, 8),
+                            semantics.truncate(self.atom, 8))
+
+    def test_concrete_32_bit_affine_overflow_and_sign_fill(self):
+        def evaluate(expression, value):
+            if isinstance(expression, int):
+                return expression
+            op = expression[0]
+            if op == 'arg':
+                return value
+            if op == 'lin':
+                return (expression[1] + sum(evaluate(term, value) * coefficient
+                                           for term, coefficient in expression[2])) & semantics.MASK
+            if op == 'trunc':
+                return evaluate(expression[2], value) & ((1 << expression[1]) - 1)
+            source = evaluate(expression[1], value)
+            if op == 'lsr':
+                return source >> expression[2]
+            if op == 'asr':
+                signed = source - (1 << 32) if source & (1 << 31) else source
+                return (signed >> expression[2]) & semantics.MASK
+            self.fail(f'unexpected expression {expression!r}')
+
+        values = [0, 1, 0x7f, 0x80, 0x7fff, 0x8000, 0xffff, 0x10000,
+                  0x7fffffff, 0x80000000, 0xffffffff]
+        for left in (1, 7, 8, 16, 24, 30):
+            for amount in {left + 1, 31}:
+                for bits in {1, 32 - amount, 33 - amount, 32}:
+                    for right in ('lsr', 'asr'):
+                        for coefficient, constant in ((1, 0), (-1, 17), (3, -1)):
+                            inner = semantics.add(semantics.scale(self.atom, coefficient), constant)
+                            pair = semantics.shift(right, semantics.shift('lsl', inner, left), amount)
+                            normalized = semantics.truncate(pair, bits)
+                            for value in values:
+                                source = ((((coefficient * value + constant) & semantics.MASK)
+                                           << left) & semantics.MASK)
+                                if right == 'asr' and source & (1 << 31):
+                                    source -= 1 << 32
+                                expected = (source >> amount) & ((1 << bits) - 1)
+                                self.assertEqual(evaluate(normalized, value), expected)
+
+    def test_byte_observation_accepts_but_wider_return_and_changed_byte_refuse(self):
+        real = fixtures.assembly('lsl\tr0, r0, #16', 'lsr\tr0, r0, #24',
+                                 'ldr\tr1, .L3', 'add\tr1, r1, #60',
+                                 'ldrb\tr2, [r1]', 'strb\tr0, [r1]', 'bx\tlr')
+        stripped = fixtures.assembly('lsr\tr0, r0, #8', 'ldr\tr1, .L3',
+                                     'add\tr1, r1, #60', 'strb\tr0, [r1]', 'bx\tlr')
+        self.assertEqual(fixtures.compare(real, stripped)[0][1], 1)
+        with self.assertRaises(semantics.SemanticError):
+            fixtures.compare(real, stripped, 'u32 func_08028C34(void);')
+        with self.assertRaises(semantics.SemanticError):
+            fixtures.compare(real, stripped.replace('r0, r0, #8', 'r0, r0, #7'))
+
+
 if __name__ == '__main__':
     unittest.main()
