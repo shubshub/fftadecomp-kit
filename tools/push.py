@@ -81,6 +81,17 @@ def git(*args, **kw):
     return run(["git", *args], cwd=repo, **kw)
 
 
+def is_checkout_root(repo):
+    """Require Git's actual non-bare working-tree root, including linked worktrees."""
+    if not os.path.isdir(repo):
+        return False
+    code, out = git("rev-parse", "--is-inside-work-tree", "--show-toplevel",
+                    repo=repo, check=False)
+    lines = out.splitlines()
+    return (code == 0 and len(lines) == 2 and lines[0] == "true" and
+            os.path.realpath(lines[1]) == os.path.realpath(repo))
+
+
 def committed_tree(repo, commit):
     """Materialize the captured commit under the repository's build directory."""
     import shutil
@@ -520,7 +531,7 @@ def main():
     repo = os.path.abspath(args.repo or (KIT_ROOT if args.kit else DEFAULT_REPO))
     if args.kit and os.path.realpath(repo) != KIT_ROOT:
         sys.exit("--kit accepts only the toolkit checkout containing this script")
-    if not os.path.isdir(os.path.join(repo, ".git")):
+    if not is_checkout_root(repo):
         sys.exit(f"{repo} is not a git repository")
 
     log(f"push gate for {repo} -> {args.remote}/{args.branch}\n")
