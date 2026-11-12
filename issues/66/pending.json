@@ -59,6 +59,38 @@
           "who": "match-native-080ed3b8"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "363763632face3a6b45c580763b95dabe30fbb945f29f29f622c4727f2a1b401",
+        "acknowledged_cursor": 6836268937,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "363763632face3a6b45c580763b95dabe30fbb945f29f29f622c4727f2a1b401",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A1A14\",\"who\":\"match-native-080a1a14\",\"note\":\"Recover complete plausible C with qualified native buffer profile and retained original compiler products.\"}",
+          "created_at": "2026-11-12T21:20:59Z",
+          "id": 6836268937,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T21:20:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d6b2aea13990095d0cae372ac1b512027cf934c4b25d9f731a6d29351f40b39e",
+        "result": {
+          "address": "0x080A1A14",
+          "claim_id": 6836268937,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6836268937,
+          "status": "accepted",
+          "who": "match-native-080a1a14"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
