@@ -122,7 +122,35 @@
           "who": "match-native-0800F93C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c99ea95057cef10f1181613eafea5072c4d4293960608425bcdfbf1a17e6501b",
+        "acknowledged_cursor": 6826339789,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c99ea95057cef10f1181613eafea5072c4d4293960608425bcdfbf1a17e6501b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800F93C\",\"who\":\"match-native-0800F93C\",\"claim_id\":6826047019,\"reason\":\"Candidate124 versus target132 bytes. Four discarded destination-byte loads are absent. No new volatile or artificial reads introduced; no native match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural variants\"}",
+          "created_at": "2026-11-12T14:27:34Z",
+          "id": 6826339789,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T14:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e898357681442cf557150465bedacfd86eab17aac6c06e4a23c0fefc95216001",
+        "result": {
+          "address": "0x0800F93C",
+          "claim_id": 6826047019,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6826339789,
+          "status": "accepted",
+          "who": "match-native-0800F93C"
+        }
+      }
     }
   ],
   "issue": 66,
