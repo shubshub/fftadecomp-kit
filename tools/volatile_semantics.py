@@ -653,6 +653,7 @@ class Record:
         self.flags_written = False
         self.guarded, self.derived = set(), None
         self.conditional_interface = None
+        self.local_fill_premise = None
         self.__dict__.update(fields)
 
 
@@ -972,6 +973,60 @@ class Executor:
         self.memory.append(("store", width, address, value, event, saved, derived))
         return value
 
+    def local_fill_arguments(self, target, arguments, text, record):
+        """Compare a bounded source read only under authenticated CpuSet premises.
+
+        This does not change the raw arguments used by opaque call outputs or
+        the call memory barrier. Saved slots and uninitialized bytes are never
+        accepted as source units. Generic callees retain exact pointer values.
+        """
+        from bios_cpuset_fill_profile import ConditionalVolatileInterfaces, NAME
+        if not isinstance(self.interfaces, ConditionalVolatileInterfaces) or not self.interfaces.local_fill_premise or target != NAME or \
+                not arguments or not carries(arguments[0], SP):
+            return arguments
+        if len(arguments) != 3 or not is_stack(arguments[0]):
+            self.fail(text, "bounded local fill source requires three exact arguments")
+        source, destination, control = arguments
+        if carries(destination, SP) or global_symbol(destination) is None or \
+                type(control) is not int or not control & (1 << 24) or \
+                control & ~0x051FFFFF or not control & 0x1FFFFF:
+            self.fail(text, "bounded local fill source requires known fill control and non-stack destination")
+        width = 4 if control & (1 << 26) else 2
+        start = signed32(linear(source)[0])
+        bottom = signed32(linear(self.regs["sp"])[0])
+        if not is_stack(self.regs["sp"]) or start % width or start < bottom or start + width > 0:
+            self.fail(text, "bounded local fill source is unaligned or outside the live frame")
+        content = {}
+        # Any saved area overlap refuses, including an overwritten saved slot.
+        for entry in self.memory:
+            if entry[0] == "store" and entry[5] and \
+                    self.relation(source, width, entry[2], entry[1], True) != "disjoint":
+                self.fail(text, "bounded local fill source overlaps a saved register slot")
+        for entry in reversed(self.memory):
+            if len(content) == width:
+                break
+            if entry[0] == "call":
+                break  # no local preservation or guaranteed initialization premise
+            if entry[0] != "store":
+                continue
+            _, size, address, value, _, saved, _ = entry
+            if not is_stack(address):
+                if self.escaped:
+                    break
+                continue
+            offset = signed32(linear(address)[0])
+            for byte in range(width):
+                at = start + byte - offset
+                if byte not in content and 0 <= at < size:
+                    if saved or type(value) is not int:
+                        self.fail(text, "bounded local fill source has unknown content")
+                    content[byte] = (value >> (at * 8)) & 255
+        if len(content) != width:
+            self.fail(text, "bounded local fill source is not provably initialized")
+        record.local_fill_premise = self.interfaces.local_fill_premise
+        return [("local-fill-source", self.observed(source), width,
+                 ("bytes", *(content[byte] for byte in range(width)))), destination, control]
+
     def call(self, target, text, record):
         if isinstance(target, str) and target in RUNTIME_ARITY:
             count, trusted = RUNTIME_ARITY[target], True
@@ -1010,13 +1065,18 @@ class Executor:
             self.fail(text, f"the address of {self.symbol} is passed to a call")
         self.escape(arguments, text)
         event = len(self.trace)
-        self.trace.append(("call", target, tuple(arguments)))
+        compared = self.local_fill_arguments(target, arguments, text, record)
+        self.trace.append(("call", target, tuple(compared)))
         self.memory.append(("call", event))
-        self.regs["r0"] = ("ret", event)
+        # The premise restricts source reads, not numeric return/clobber/flags
+        # values. Raw dependencies prevent their observations from equating
+        # calls whose physical source addresses differ.
+        opaque = ("raw-call", event, *arguments) if record.local_fill_premise else event
+        self.regs["r0"] = ("ret", opaque)
         for name in ("r1", "r2", "r3", "r12", "lr"):
-            self.regs[name] = ("clobber", event, name)
+            self.regs[name] = ("clobber", opaque, name)
         self.derived -= {"r0", "r1", "r2", "r3", "r12", "lr"}
-        self.flags, self.flags_derived = ("clobber", event), False
+        self.flags, self.flags_derived = ("clobber", opaque), False
         record.flags_written = True
         self.records.append(record)
 
@@ -1803,6 +1863,9 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional = (set() for _ in range(7))
     for number, path in enumerate(paths, 1):
         records = path.records
+        for call in records:
+            if call.local_fill_premise:
+                conditional.add(call.derived + ": " + call.local_fill_premise)
         # 4. a store must not write back the value it read from the same byte
         for record in records:
             if record.kind == "store" and pinned_width(record.address) and record.self_assignment:

@@ -296,7 +296,8 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
             interfaces = volatile_semantics.RomInterfaces(rom, json.loads(mapping))
         except ValueError:
             interfaces = None
-    if getattr(args, "owner_runtime_profile", None) == "bounded-buffer-bios-fill-source-v1":
+    if getattr(args, "owner_runtime_profile", None) in ("bounded-buffer-bios-fill-source-v1",
+            "bounded-buffer-bios-fill-local-source-semantics-v1"):
         from bios_cpuset_fill_profile import ConditionalVolatileInterfaces
         from inert_spin_profile import index_snapshot
         if rom is None or mapping is None:
@@ -306,7 +307,7 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
             raise ValueError("conditional CpuSet interface requires a complete indexed owner")
         data = rom[address-ROM_BASE:address-ROM_BASE+size]
         interfaces = ConditionalVolatileInterfaces(interfaces, data, address, rom,
-            mapping, index_snapshot(root), data_snapshot(root))
+            mapping, index_snapshot(root), data_snapshot(root), selector=args.owner_runtime_profile)
     with runner.workspace() as workspace:
         compile_object(runner, workspace, args, str(root), address, source)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
@@ -4458,6 +4459,7 @@ def main():
                                                       "bounded-buffer-discarded-return-scratch-v1",
                                                       "bounded-buffer-bios-sqrt-scratch-v1",
                                                       "bounded-buffer-bios-fill-source-v1",
+                                                      "bounded-buffer-bios-fill-local-source-semantics-v1",
                                                       "bounded-buffer-bios-fast-fill-source-v1",
                                                       "bounded-buffer-guarded-switch-v1",
                                                       "bounded-buffer-guarded-callee-aliases-v1",
