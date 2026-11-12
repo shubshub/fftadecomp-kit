@@ -30,7 +30,35 @@
           "who": "match-native-08126430"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0032684b696dbd30272fa2f2eda949dc5532051a3e8429bffa6c0f8db558f1a8",
+        "acknowledged_cursor": 6820821440,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0032684b696dbd30272fa2f2eda949dc5532051a3e8429bffa6c0f8db558f1a8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08126430\",\"who\":\"match-native-08126430\",\"claim_id\":6820142025,\"reason\":\"Native MATCH complete136 bytes on16 paths with unchanged C and isolated tested volatile forwarding fixes; retained for next batch\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T10:14:04Z",
+          "id": 6820819602,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T10:14:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "efcc2941689da3d6e6e63d23d9204a0abec46ca0e7ec47851f84e1a7ef739c1f",
+        "result": {
+          "address": "0x08126430",
+          "claim_id": 6820142025,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6820819602,
+          "status": "accepted",
+          "who": "match-native-08126430"
+        }
+      }
     },
     {
       "claim": {
@@ -120,6 +148,38 @@
           "request_id": 6820727827,
           "status": "accepted",
           "who": "match-native-0804DE8C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ef05096793640fa044678cdf8b3a37ca3e2d9a01445ed810fad65f0b76efdf0b",
+        "acknowledged_cursor": 6820821440,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef05096793640fa044678cdf8b3a37ca3e2d9a01445ed810fad65f0b76efdf0b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DDCC\",\"who\":\"match-native-0804DDCC\",\"note\":\"Recover complete192-byte display transition initializer with native verification\"}",
+          "created_at": "2026-11-12T10:14:10Z",
+          "id": 6820821440,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T10:14:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "efcc2941689da3d6e6e63d23d9204a0abec46ca0e7ec47851f84e1a7ef739c1f",
+        "result": {
+          "address": "0x0804DDCC",
+          "claim_id": 6820821440,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6820821440,
+          "status": "accepted",
+          "who": "match-native-0804DDCC"
         }
       },
       "release": null
