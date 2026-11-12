@@ -821,7 +821,10 @@ class CompiledSemanticTests(unittest.TestCase):
         (self.root / "src" / "08028C34.c").write_text(
             '#include "control_flags.h"\nextern void func_0802A2C0(u8, u8, u8, u8);\n' + prelude +
             f"void func_08028C34({parameters})\n{{\n" + body + "\n}\n")
-        return match.allowlisted_volatile_semantics(self.root, 0x08028C34)
+        # Each synthetic root owns its ROM, including the absence of one.
+        # An inherited development-ROM override must not supply its callees.
+        with mock.patch.dict(os.environ, FFTA_ROM=str(self.root / "baserom.bin")):
+            return match.allowlisted_volatile_semantics(self.root, 0x08028C34)
 
     def test_recovered_bodies_pass(self):
         s = SYMBOL
@@ -985,6 +988,15 @@ class CompiledSemanticTests(unittest.TestCase):
                              "does not follow its member|behaves differently|read back from memory")
 
     def test_dead_loads_live_into_calls_through_agbcc(self):
+        self.check_synthetic_callee_interfaces()
+
+    def test_synthetic_callees_ignore_and_restore_inherited_rom_override(self):
+        override = str(self.root / "unrelated-rom.bin")
+        with mock.patch.dict(os.environ, FFTA_ROM=override):
+            self.check_synthetic_callee_interfaces()
+            self.assertEqual(os.environ["FFTA_ROM"], override)
+
+    def check_synthetic_callee_interfaces(self):
         # the read-modify-write load leaves r3 live into the call; the
         # synthetic ROM's callee at 0x08000200 reads only r0, the one at
         # 0x08000210 reads r3

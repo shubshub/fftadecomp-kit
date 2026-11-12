@@ -466,6 +466,20 @@ def truncate(value, bits):
         return value
     if value[0] == "trunc" and value[1] >= bits:
         return truncate(value[2], bits)
+    if value[0] in ("lsr", "asr") and isinstance(value[2], int):
+        amount = value[2]
+        if 0 < amount < 32 and bits <= 32 - amount:
+            # For A divisible by 2**s, low n bits of (A mod 2**32) >> s
+            # equal low n bits of A / 2**s when n <= 32-s. Arithmetic
+            # right shift has the same low 32-s bits; its sign fill is
+            # outside that range. Require every affine term to divide
+            # exactly, so no discarded remainder or carry is assumed away.
+            constant, terms = linear(value[1])
+            divisor = 1 << amount
+            if constant % divisor == 0 and all(c % divisor == 0 for c in terms.values()):
+                quotient = make_linear(constant // divisor,
+                                       {term: c // divisor for term, c in terms.items()})
+                return truncate(quotient, bits)
     if value[0] == "lin":
         # Addition and constant scaling preserve congruence modulo 2**bits.
         # A narrower inner truncation or a shift remains an opaque term.
@@ -612,6 +626,7 @@ class Record:
         self.address = self.width = self.value_register = None
         self.signed = self.forwarded = self.copy = self.constant = self.self_assignment = False
         self.immediate = False
+        self.unconditional = False
         self.affine_source = None
         self.guarded, self.derived = set(), None
         self.__dict__.update(fields)
@@ -1170,6 +1185,7 @@ class Executor:
             if len(operands) != 1:
                 self.fail(text, "unsupported branch form")
             record.kind = "branch"
+            record.unconditional = mnemonic == "b"
             self.records.append(record)
             if mnemonic == "b" or self.decide(mnemonic[1:], text):
                 return self.target(operands[0], text)
@@ -1421,13 +1437,17 @@ def read_modify_write_store(records, position, address, width):
     `mov`, a copy or literal load must write a register whose value reaches
     the store's operands (its value or address register) through copies,
     and constant arithmetic must reach the store's value register.
+    Unconditional jumps may lead to a shared store along this already
+    executed path; they read no flags or registers and produce no effects.
     Anything else in between - arithmetic on unknown values, another memory
-    access, a call or a branch - means the load was not emitted by the
-    store.  The store must have the load's width and address.
+    access, a call or a conditional branch - refuses. The store must have
+    the load's width and address on every explored path.
     """
     between = []
     for later in range(position + 1, len(records)):
         record = records[later]
+        if record.kind == "branch" and record.unconditional:
+            continue
         if record.kind == "store":
             if record.width != width or record.address != address:
                 return None
