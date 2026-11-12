@@ -293,6 +293,14 @@ Use `--force` only for an intentional history rewrite. The gate captures the
 remote tip before validation and uses an explicit force-with-lease, so a remote
 change during verification rejects the push rather than being overwritten.
 
+For a new contribution branch, use `--create-from origin/main` with the intended
+`--remote` and `--branch`. The destination must be absent. The gate fetches and
+pins that named remote base, requires the current branch to contain it without
+new merge commits, and retains all ordinary content and publication checks.
+Its final push uses an empty expected-tip lease, so even a concurrent creation
+at an ancestor commit is refused. This option cannot be combined with `--force`;
+once the destination exists, use the ordinary publication command.
+
 ## Reference environment for report replay
 
 Reports from the runtime-bound profiles bind the environment that produced
