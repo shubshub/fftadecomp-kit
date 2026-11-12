@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "840414c8395bcfcb77ab94a2739978f2c600c1c4d19a5083ef4b0873e0fd5d27",
+        "acknowledged_cursor": 6830109520,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "840414c8395bcfcb77ab94a2739978f2c600c1c4d19a5083ef4b0873e0fd5d27",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08117B9C\",\"who\":\"match-native-08117B9C\",\"note\":\"Recover complete 1168-byte state function under named-data-buffer-v1; native original preflight and replay passed with exact literal identity evidence.\"}",
+          "created_at": "2026-11-12T16:54:55Z",
+          "id": 6830109520,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T16:54:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "598c35395728f101d7bc4cd76e43ca6a049aa5ffd27708c9640fb86bfc8e367a",
+        "result": {
+          "address": "0x08117B9C",
+          "claim_id": 6830109520,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6830109520,
+          "status": "accepted",
+          "who": "match-native-08117B9C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
