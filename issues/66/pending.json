@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "1b117817df02e044a825a1e6222041d0d6a9199aee55ad16865a5d6ce8548e98",
-        "acknowledged_cursor": 6821275122,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1b117817df02e044a825a1e6222041d0d6a9199aee55ad16865a5d6ce8548e98",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08126764\",\"who\":\"match-native-08126764\",\"note\":\"Recover complete 200-byte scheduler loop with native byte verification\"}",
-          "created_at": "2026-11-12T10:36:05Z",
-          "id": 6821275122,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T10:36:05Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "41d0ff746e218e09b88da800bca120719813003eacfdeb21ed58d4365b3e3834",
-        "result": {
-          "address": "0x08126764",
-          "claim_id": 6821275122,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6821275122,
-          "status": "accepted",
-          "who": "match-native-08126764"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "a47e174f568155805a6b300af968d48f7392b517494e7a8f26d0b3433e3d6544",
-        "acknowledged_cursor": 6821501849,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a47e174f568155805a6b300af968d48f7392b517494e7a8f26d0b3433e3d6544",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08126764\",\"who\":\"match-native-08126764\",\"claim_id\":6821275122,\"reason\":\"Plausible200-byte candidate differs at six record-selection halfwords; branch-specific reload not reproduced after17 native attempts; scratch preserves source and real errors\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; temporary and shared-read branch forms; native conditional thunk profile rejects complete-body mismatch\"}",
-          "created_at": "2026-11-12T10:47:16Z",
-          "id": 6821501849,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T10:47:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2483c5a95d04d357b664e931e49f84b371da193d404261319a81ddf03c5e9c89",
-        "result": {
-          "address": "0x08126764",
-          "claim_id": 6821275122,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6821501849,
-          "status": "accepted",
-          "who": "match-native-08126764"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1a1332f787a642665b92f7c8b2afbd9459c0371da54c05d9833bb8dc3c5645da",
         "acknowledged_cursor": 6821435433,
         "body_provenance": "acceptance-time",
