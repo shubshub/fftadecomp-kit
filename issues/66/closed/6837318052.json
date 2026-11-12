@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e57764f18783110c2bf4f1800ee5f4edbc2f84b4bd8a4860b8c3e7064b0cda30",
+    "acknowledged_cursor": 6837318052,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e57764f18783110c2bf4f1800ee5f4edbc2f84b4bd8a4860b8c3e7064b0cda30",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801E710\",\"who\":\"native-0801e710\",\"note\":\"Recover complete plausible C after native bounded-buffer qualification\"}",
+      "created_at": "2026-11-12T22:10:41Z",
+      "id": 6837318052,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:10:41Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "414ca925ea46894873c1df2590ae39f8858cfd56c180a26ef92c85e5d4aa245e",
+    "result": {
+      "address": "0x0801E710",
+      "claim_id": 6837318052,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6837318052,
+      "status": "accepted",
+      "who": "native-0801e710"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c30a69679650891fbf7977879631bf5426eb2025dece63bbe1082b17bd7b56be",
+    "acknowledged_cursor": 6837482945,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c30a69679650891fbf7977879631bf5426eb2025dece63bbe1082b17bd7b56be",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801E710\",\"who\":\"native-0801e710\",\"claim_id\":6837318052,\"reason\":\"Six natural formulations; complete 578-byte candidate has 13 differing bytes solely cyclic r8/r9/sl allocation. Preserved privately; no match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-11-12T22:19:05Z",
+      "id": 6837482945,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:19:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c1d1cdb6303c58b7a48c56be1d86084c993857ede15c61750d507dfea773748e",
+    "result": {
+      "address": "0x0801E710",
+      "claim_id": 6837318052,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6837482945,
+      "status": "accepted",
+      "who": "native-0801e710"
+    }
+  }
+}
