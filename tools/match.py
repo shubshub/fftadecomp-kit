@@ -3178,8 +3178,24 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              zero_aware_mixed_inventory_context=None,
                              zero_aware_unsigned_quotient_inventory_context=None,
                              addressed_signed_runtime_context=None, entry_recursive_calls=None,
-                             typed_switch_outgoing_frame=None, unsigned_quotient_profile=None):
+                             typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
+                             finite_small_copy_context=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+    if finite_small_copy_context is not None:
+        from finite_small_local_copy_profile import validate_context
+        validate_context(finite_small_copy_context, buffer_proof, data, address,
+            validated_calls, thumb, (call_resolver, switch_relocations, switch_data_relocations,
+                udivsi3_context, preloaded_switch, modsi3_context, divsi3_context,
+                inert_spin_context, double_context, function_thunk_context,
+                allow_switch_constants, allow_switch_scalar_frame, umodsi3_context,
+                ashldi3_context, float_context, acyclic_state_budget, ignored_leaf_alias_proof,
+                signed_quotient_profile, stack_pointer_compare_profile, signed_runtime_context,
+                remainder_inventory_context, remainder_ordinary_inventory_context,
+                remainder_shift_inventory_context, remainder_framed_shift_inventory_context,
+                remainder_byte_range_inventory_context, bounded_stack_output_inventory_context,
+                bounded_stack_output_zero_index_inventory_context, zero_aware_mixed_inventory_context,
+                zero_aware_unsigned_quotient_inventory_context, addressed_signed_runtime_context,
+                entry_recursive_calls, typed_switch_outgoing_frame, unsigned_quotient_profile))
     udivsi3_schema(unsigned_quotient_profile)
     if unsigned_quotient_profile is not None and (
             not thumb or udivsi3_context is None or preloaded_switch or
@@ -3583,6 +3599,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     pending = [address]
     path_states = None
     state_budget = acyclic_state_budget if acyclic_state_budget is not None else exact_alias_budget
+    if finite_small_copy_context is not None:
+        from finite_small_local_copy_profile import MAX_STATES
+        state_budget = MAX_STATES
     if state_budget is not None:
         path_states = {address: {states[address]}}
         pending = [(address, states[address])]
@@ -3850,6 +3869,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             successors = (operands[0].imm,)
             if not unconditional:
                 successors += (current + instruction.size,)
+            if finite_small_copy_context is not None and current == finite_small_copy_context.latch:
+                successors = finite_small_copy_context.successors(current, constants, aliases)
         elif switch is not None and current == address + (
                 switch["transfer"] if preloaded_switch else switch["dispatch"] + 8):
             successors = tuple(sorted({address + addend for offset, addend
@@ -4456,7 +4477,7 @@ def main():
                                                       "restoring-owner-r3-thunk-switch-v1", "restoring-owner-scalar-switch-v1", "restoring-owner-switch-entry-word-v1", "restoring-owner-switch-entry-two-words-data-v1",
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
-                                                      "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1",
+                                                      "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1",
                                                       "bounded-buffer-conditional-thunks-v1",
                                                       "bounded-buffer-conditional-thunks-discarded-scratch-v1",
                                                       "bounded-buffer-conditional-thunks-selective-scratch-v1",
