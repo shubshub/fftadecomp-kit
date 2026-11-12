@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "513197155ecda5512b311f7a9b5d79fd2b82b28f0d0ac361c4f1a29d74ea0515",
-        "acknowledged_cursor": 6822074146,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "513197155ecda5512b311f7a9b5d79fd2b82b28f0d0ac361c4f1a29d74ea0515",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800DAB8\",\"who\":\"match-native-0800DAB8\",\"note\":\"Recover plausible bounded halfword fill routine with complete native proof\"}",
-          "created_at": "2026-11-12T11:14:56Z",
-          "id": 6822067426,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T11:14:56Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e53d692965d12fb1ccb24154e41f7501e51fcba3cf5039e69679c98f7023bdae",
-        "result": {
-          "address": "0x0800DAB8",
-          "claim_id": 6822067426,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6822067426,
-          "status": "accepted",
-          "who": "match-native-0800DAB8"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "837d836ff6bb4025689fa274995808c9bb23f32131ae242c70d9815433a75a0e",
-        "acknowledged_cursor": 6822196641,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "837d836ff6bb4025689fa274995808c9bb23f32131ae242c70d9815433a75a0e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DAB8\",\"who\":\"match-native-0800DAB8\",\"claim_id\":6822067426,\"reason\":\"Plausible82-byte candidate differs only by MOV R2,SP scheduling relative to fill shift and OR; native gate rejected\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; scalar and one-element array initialization; operand and declaration forms\"}",
-          "created_at": "2026-11-12T11:21:10Z",
-          "id": 6822196641,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T11:21:10Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d8aac9e875bd066d97278b5c9da9455f3fdbbbc35f9e675631cf75cc0589c70d",
-        "result": {
-          "address": "0x0800DAB8",
-          "claim_id": 6822067426,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6822196641,
-          "status": "accepted",
-          "who": "match-native-0800DAB8"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "fb1fa4df6977ec1a99a9d9ba30a6f78a5dd8cf22d48886a3c50f23fd5c6b90d0",
         "acknowledged_cursor": 6822223270,
         "body_provenance": "acceptance-time",
