@@ -90,7 +90,35 @@
           "who": "match-native-0803A07C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "64a1f23ca91abd398c07b17ff320603128f8151e0468bd1ad54217ff736b8df0",
+        "acknowledged_cursor": 6829252699,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "64a1f23ca91abd398c07b17ff320603128f8151e0468bd1ad54217ff736b8df0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803A07C\",\"who\":\"match-native-0803A07C\",\"claim_id\":6829079327,\"reason\":\"Plausible C remains1804vs1860complete bytes; load/arithmetic ordering and shared reset/audio tails differ. Six bounded attempts and compiler artifacts preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural structure, signedness and state-machine formulations\"}",
+          "created_at": "2026-11-12T16:21:14Z",
+          "id": 6829252699,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T16:21:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "66fa596e012187d3a327b4fa5e0e7bd390b3bf73102cbc2cfa446dc8de8afe29",
+        "result": {
+          "address": "0x0803A07C",
+          "claim_id": 6829079327,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6829252699,
+          "status": "accepted",
+          "who": "match-native-0803A07C"
+        }
+      }
     }
   ],
   "issue": 66,
