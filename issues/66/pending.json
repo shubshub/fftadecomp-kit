@@ -122,7 +122,35 @@
           "who": "match-native-08035BD4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "09ecd4f1748d0d1ade0ddb84f9c971c360a4e37dbe3dfcfebc60f388e3a0f4df",
+        "acknowledged_cursor": 6824674866,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "09ecd4f1748d0d1ade0ddb84f9c971c360a4e37dbe3dfcfebc60f388e3a0f4df",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08035BD4\",\"who\":\"match-native-08035BD4\",\"claim_id\":6824563134,\"reason\":\"Plausible decimal tile output compiles112 bytes for116-byte owner; register allocation and count/SP copies differ. Native exact-span refusal; attempt parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T13:17:09Z",
+          "id": 6824674866,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T13:17:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6d081d427d8fd9b39b814d38b5b5e4502bad85ce89a7234a5324292adf245844",
+        "result": {
+          "address": "0x08035BD4",
+          "claim_id": 6824563134,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6824674866,
+          "status": "accepted",
+          "who": "match-native-08035BD4"
+        }
+      }
     }
   ],
   "issue": 66,
