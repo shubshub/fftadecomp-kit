@@ -30,7 +30,35 @@
           "who": "match-native-0811B888"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "05fa706e697954e6378f1f9ffb820b6153c98d4cf81da9a9448817aad674524d",
+        "acknowledged_cursor": 6828050253,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "05fa706e697954e6378f1f9ffb820b6153c98d4cf81da9a9448817aad674524d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811B888\",\"who\":\"match-native-0811B888\",\"claim_id\":6827748755,\"reason\":\"Plausible 638-byte state machine differs at54 exact byte positions; register allocation and cleanup scheduling remain.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; eight natural field, pointer and mask formulations\"}",
+          "created_at": "2026-11-12T15:35:24Z",
+          "id": 6828050253,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T15:35:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3b4d6c7175bd750ca1360cd6f06332ec5fd31b7638dd90d51dffeef59f7e3a91",
+        "result": {
+          "address": "0x0811B888",
+          "claim_id": 6827748755,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6828050253,
+          "status": "accepted",
+          "who": "match-native-0811B888"
+        }
+      }
     },
     {
       "claim": {
