@@ -52,6 +52,19 @@ symbolically along every path, and the check requires
      admitted. Later branches are refused because arithmetic flags are
      not tracked by the forwarding check. Constant-derived arithmetic
      remains refused;
+   * a plain forwarded re-read into one ordinary same-width memory store:
+     the immediately preceding memory access must be the exact pinned
+     member store, and only unchanged copies may consume the re-read.
+     All copies must feed that store; no other value, address or live flag
+     consumer is admitted (ordinary_store_reread). Arithmetic chains remain
+     confined to the pinned destinations described above;
+   * a same-member constant update: a pinned constant store is re-read and
+     feeds one non-neutral constant OR into the same member at the same
+     width. No intervening write/call or address-register mutation is
+     allowed before the re-read. Ordinary loads remain represented with
+     identical ordered provenance in both compiles. Only copies, the update
+     and the store's own dead insertion read may follow; no unrelated value,
+     address or flag use is allowed (forwarded_constant_update);
    * a counterpart of the stripped compile's loads of the object, matched
      in order with the same address and width;
 4. every access overlapping a pinned member to be exactly that member: its
@@ -632,6 +645,8 @@ class Record:
         self.immediate = False
         self.unconditional = False
         self.affine_source = None
+        self.alu_sources, self.alu_operation = (), None
+        self.flags_written = False
         self.guarded, self.derived = set(), None
         self.__dict__.update(fields)
 
@@ -995,6 +1010,7 @@ class Executor:
             self.regs[name] = ("clobber", event, name)
         self.derived -= {"r0", "r1", "r2", "r3", "r12", "lr"}
         self.flags, self.flags_derived = ("clobber", event), False
+        record.flags_written = True
         self.records.append(record)
 
     def finish(self, text, record):
@@ -1044,6 +1060,8 @@ class Executor:
             record.reads = {register(o) for o in sources if register(o)}
             record.writes = {destination}
             values = [self.value(o, text) for o in sources]
+            record.alu_operation = mnemonic
+            record.alu_sources = tuple((register(o), value) for o, value in zip(sources, values))
             sets_flags = destination not in ("sp",) and not any(register(o) in ("sp",) for o in sources)
             if mnemonic == "mov":
                 result = values[0]
@@ -1082,6 +1100,12 @@ class Executor:
                 if mnemonic == "bic":
                     b = add(scale(b, -1), 1, -1)
                 result = operation({"bic": "and"}.get(mnemonic, mnemonic), values[0], b)
+                # A register OR with a path-proven zero preserves the other
+                # register's value. Classify only its dataflow as a copy:
+                # reads, writes, derived provenance and N/Z remain unchanged.
+                record.copy = (mnemonic == "orr" and
+                               all(register(source) is not None for source in sources) and
+                               any(type(value) is int and value == 0 for value in values))
                 self.flags = ("nz", result)
             # arithmetic on known constants only (`mov r0, #128; lsl r0, r0, #1`
             # builds 0x100) is constant materialisation, like an immediate mov
@@ -1096,6 +1120,7 @@ class Executor:
             derived = bool(record.reads & self.derived)
             self.derived = (self.derived | {destination}) if derived else (self.derived - {destination})
             if self.flags is not flags:
+                record.flags_written = True
                 self.flags_derived = derived
             self.records.append(record)
             return None
@@ -1106,6 +1131,7 @@ class Executor:
             a, b = self.value(operands[0], text), self.value(operands[1], text)
             self.flags = ("nz", operation("and", a, b)) if mnemonic == "tst" else (mnemonic, a, b)
             self.flags_derived = bool(record.reads & self.derived)
+            record.flags_written = True
             self.records.append(record)
             return None
         if mnemonic in ("ldr", "ldrb", "ldrh", "ldrsb", "ldrsh", "str", "strb", "strh"):
@@ -1443,6 +1469,8 @@ def read_modify_write_store(records, position, address, width):
     and constant arithmetic must reach the store's value register.
     Unconditional jumps may lead to a shared store along this already
     executed path; they read no flags or registers and produce no effects.
+    Path-proven register OR with zero is a value-preserving copy; its register
+    reads and arithmetic flags remain live in the semantic replay.
     Anything else in between - arithmetic on unknown values, another memory
     access, a call or a conditional branch - refuses. The store must have
     the load's width and address on every explored path.
@@ -1550,6 +1578,159 @@ def chained_reread(records, position, pinned_width):
     return store is not None
 
 
+
+
+def ordinary_store_reread(records, position, pinned_width, ordinary_address):
+    """An exact forwarded pinned value copied into one ordinary store.
+
+    This plain assignment case does not extend arithmetic chains. The
+    immediately preceding memory access must be the exact forwarding store,
+    with no call, branch, other memory access or address-register mutation
+    between. Only unchanged register copies can consume the re-read, every
+    such copy must feed the one same-width ordinary destination, and neither
+    the value nor flags derived from a copy may have another consumer.
+    """
+    load = records[position]
+    earlier = position - 1
+    while earlier >= 0 and records[earlier].kind in ("alu", "literal"):
+        earlier -= 1
+    if earlier < 0:
+        return False
+    prior = records[earlier]
+    if prior.kind != "store" or prior.width != load.width or prior.address != load.address or \
+            load.width != pinned_width(load.address):
+        return False
+    address_registers = prior.reads - {prior.value_register}
+    if any(step.writes & address_registers for step in records[earlier + 1:position]):
+        return False
+    tracked, consumers, between = set(load.writes), set(), []
+    stored, flags_live = False, False
+    for step in records[position + 1:]:
+        uses = step.reads & tracked
+        if step.kind == "branch" and not step.unconditional and flags_live:
+            return False
+        if stored:
+            if uses:
+                return False
+        elif step.kind == "store":
+            if step.width != load.width or not ordinary_address(step.address) or \
+                    step.value_register not in tracked or \
+                    (step.reads - {step.value_register}) & tracked:
+                return False
+            live, feeding = {step.value_register}, set()
+            for dependency in reversed(between):
+                if dependency.writes & live:
+                    feeding.add(dependency.index)
+                    live = (live - dependency.writes) | dependency.reads
+            if not consumers <= feeding:
+                return False
+            stored = True
+        elif step.kind not in ("alu", "literal"):
+            return False
+        elif uses:
+            if not step.copy or not step.reads <= tracked:
+                return False
+            consumers.add(step.index)
+        if step.flags_written:
+            flags_live = bool(uses)
+        tracked -= step.writes
+        if uses and not stored:
+            tracked |= step.writes
+        if not stored:
+            between.append(step)
+    return stored
+
+def forwarded_constant_update(records, position, pinned_width):
+    """A forwarded constant may feed one actual OR update of the same member.
+
+    Unlike chained assignment, this is a same-member read/update/store. The
+    exact-width prior constant store must still be in force: no intervening
+    store or call, and its address registers cannot change. Ordinary loads
+    before the re-read remain full executor records and are checked normally
+    by provenance, replayed conditions and observable trace equality.
+
+    The re-read must feed one non-neutral constant OR, and only that update
+    and value copies may consume it before the exact same member is stored.
+    Every consumer must feed that store. Afterwards neither the value nor
+    its flags may be consumed. An independent flag writer can kill flags;
+    calls count with their actual conservative register interfaces.
+    """
+    load = records[position]
+    if type(load.value) is not int or load.width != pinned_width(load.address):
+        return False
+    earlier = position - 1
+    while earlier >= 0 and records[earlier].kind in ("alu", "literal", "load", "branch"):
+        earlier -= 1
+    if earlier < 0:
+        return False
+    prior = records[earlier]
+    if prior.kind != "store" or prior.address != load.address or prior.width != load.width or \
+            type(prior.value) is not int or prior.value != load.value:
+        return False
+    address_registers = prior.reads - {prior.value_register}
+    for step in records[earlier + 1:position]:
+        if step.writes & address_registers or \
+                (step.kind == "load" and pinned_width(step.address) is not None):
+            return False
+    tracked, consumers, between = set(load.writes), set(), []
+    updated, stored, flags_live, extra_loads = False, False, False, 0
+    for step in records[position + 1:]:
+        uses = step.reads & tracked
+        if step.kind == "branch" and not step.unconditional and flags_live:
+            return False
+        if stored:
+            if uses:
+                return False
+        elif step.kind == "store":
+            if not updated or step.address != load.address or step.width != load.width or \
+                    step.value_register not in tracked or \
+                    (step.reads - {step.value_register}) & tracked or step.value == load.value:
+                return False
+            live, feeding = {step.value_register}, set()
+            for dependency in reversed(between):
+                if dependency.writes & live:
+                    feeding.add(dependency.index)
+                    live = (live - dependency.writes) | dependency.reads
+            if not consumers <= feeding or extra_loads != 1:
+                return False
+            stored = True
+        elif step.kind == "load":
+            if step.address != load.address or step.width != load.width or step.signed or \
+                    uses or step.writes & tracked or extra_loads:
+                return False
+            # The member store's separate insertion read must really be dead.
+            here = records.index(step)
+            if dead(records, here, next(iter(step.writes)), set()) is not True or \
+                    read_modify_write_store(records, here, load.address, load.width) is None:
+                return False
+            extra_loads += 1
+        elif step.kind == "branch":
+            if not step.unconditional:
+                return False
+        elif step.kind not in ("alu", "literal"):
+            return False
+        elif uses:
+            sources = step.alu_sources
+            other = [value for reg, value in sources if reg not in tracked]
+            copy = step.copy and sources and all(type(value) is int and value == 0
+                                                 for value in other)
+            update = (not updated and step.alu_operation == "orr" and len(uses) == 1 and
+                      len(other) == 1 and type(other[0]) is int and
+                      0 < other[0] < (1 << (8 * load.width)) and
+                      (load.value | other[0]) != load.value)
+            if not copy and not update:
+                return False
+            updated |= update
+            consumers.add(step.index)
+        if step.flags_written:
+            flags_live = bool(uses)
+        tracked -= step.writes
+        if uses and not stored:
+            tracked |= step.writes
+        if not stored:
+            between.append(step)
+    return stored
+
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
                      interfaces=None, unloaded_all_ones=False):
     def pinned_width(address):
@@ -1561,7 +1742,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
 
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
-    read_modify_write, chained, unloaded, relied = set(), set(), set(), set()
+    read_modify_write, chained, unloaded, relied, updates, ordinary = (set() for _ in range(6))
     for number, path in enumerate(paths, 1):
         records = path.records
         # 4. a store must not write back the value it read from the same byte
@@ -1609,6 +1790,14 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 if record.forwarded and chained_reread(records, position, pinned_width):
                     chained.add(record.index)
                     continue
+                if record.forwarded and forwarded_constant_update(records, position, pinned_width):
+                    updates.add(record.index)
+                    continue
+                if record.forwarded and ordinary_store_reread(
+                        records, position, pinned_width,
+                        lambda address: object_offset(address, symbol, size) is None):
+                    ordinary.add(record.index)
+                    continue
             counterparts.append((record.width, record.signed, where(record.address), record))
         # 3. every store to a pinned member carries its read-modify-write load
         for position, record in enumerate(records):
@@ -1633,6 +1822,16 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 1. the stripped compile behaves the same on this path
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
                        interfaces)
+        if updates:
+            # Ordinary reads crossed by the distinct forwarding proof are not
+            # discarded: require their complete ordered provenance in both
+            # compiles, even when their destinations would otherwise be dead.
+            def ordinary_reads(candidate):
+                return [(r.width, r.signed, r.address, r.value) for r in candidate.records
+                        if r.kind == "load" and object_offset(r.address, symbol, size) is None]
+            if ordinary_reads(path) != ordinary_reads(other):
+                raise SemanticError(f"{name}: same-member constant update crosses different "
+                                    f"ordinary load provenance (path {number})")
         if other.conditions != path.conditions:
             raise SemanticError(f"{name}: the real and stripped compiles branch on different "
                                 f"conditions (path {number})")
@@ -1655,7 +1854,10 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                     "load there; the qualifier added a read")
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
-    return len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied)
+    result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    if ordinary:
+        return result + (sorted(updates), sorted(ordinary))
+    return result + (sorted(updates),) if updates else result
 
 
 def show_event(event):
@@ -1799,13 +2001,15 @@ def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
     for name, paths, read_modify_write, chained, *extra in results:
-        unloaded, relied = (extra + [[], []])[:2]
+        unloaded, relied, updates, ordinary = (extra + [[], [], [], []])[:4]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
                      f"chained re-reads at {list(n + 1 for n in chained)}" +
                      # only what a verdict relied on beyond #94's rules, so
                      # reports that need neither keep their text
                      (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
+                     (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
+                     (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
