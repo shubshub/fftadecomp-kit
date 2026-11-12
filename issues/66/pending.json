@@ -91,6 +91,38 @@
           "who": "match-native-08126B3C"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "cdab7c37ece8e12321986b6c239f55de1fe2c041c47b9c88ff3b70705283927b",
+        "acknowledged_cursor": 6820576688,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cdab7c37ece8e12321986b6c239f55de1fe2c041c47b9c88ff3b70705283927b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F15C8\",\"who\":\"match-native-080F15C8\",\"note\":\"Recover complete370-byte owner; native closed CFG partition and restoring frame already proven in isolated map proposal\"}",
+          "created_at": "2026-11-12T10:02:29Z",
+          "id": 6820576688,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T10:02:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf8cf33fa9eb4825b568e276dc46a79f95ce911250089812e24c757bb9554c11",
+        "result": {
+          "address": "0x080F15C8",
+          "claim_id": 6820576688,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6820576688,
+          "status": "accepted",
+          "who": "match-native-080F15C8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
