@@ -41,7 +41,11 @@ symbolically along every path, and the check requires
      the same width to the same member with only constant materialisation
      (immediate moves and arithmetic on known constants) and copies or
      literal loads into the store's operand registers in between
-     (read_modify_write_store);
+     (read_modify_write_store). One bounded exception permits the same-member
+     live OR update to occur after its separate dead insertion read: an
+     exact-width member read, immediate mask, insertion read, OR and exact
+     same-member store, with no additional value or flag consumer
+     (separated_or_store);
    * a forwarded re-read: the forwarding store of the same width to the
      same member is the immediately preceding memory access and the value
      feeds the next pinned member store through copies (chained_reread).
@@ -1458,6 +1462,52 @@ def dead(records, position, destination, relied=None):
     return True
 
 
+def separated_or_store(records, position, address, width):
+    """Recognise one live same-member OR scheduled after its insertion read.
+
+    The deliberately bounded shape is prior member read, immediate mask,
+    dead insertion read, OR, same-member store. The prior read is still an
+    ordinary counterpart of the stripped compile; this only explains the
+    separate dead insertion read. Trace replay and member permutation remain
+    mandatory in the public comparison path.
+    """
+    if position < 2 or position + 2 >= len(records):
+        return None
+    prior, mask, insertion, update, store = records[position - 2:position + 3]
+    if prior.kind != "load" or prior.signed or prior.address != address or prior.width != width or \
+            insertion.kind != "load" or insertion.signed or \
+            insertion.address != address or insertion.width != width or \
+            mask.kind != "alu" or not mask.immediate or \
+            update.kind != "alu" or update.alu_operation != "orr" or \
+            store.kind != "store" or store.address != address or store.width != width:
+        return None
+    source = next(iter(prior.writes))
+    discarded = next(iter(insertion.writes))
+    if mask.writes & prior.writes or insertion.writes & (prior.writes | mask.writes) or \
+            dead(records, position, discarded, set()) is not True or \
+            update.writes != {store.value_register} or \
+            update.writes & (store.reads - {store.value_register}):
+        return None
+    sources = update.alu_sources
+    other = [(reg, value) for reg, value in sources if reg != source]
+    if len(sources) != 2 or sum(reg == source for reg, _ in sources) != 1 or \
+            len(other) != 1 or other[0][0] not in mask.writes or \
+            type(other[0][1]) is not int or not 0 < other[0][1] < (1 << (8 * width)):
+        return None
+    # Neither the live member value nor the update result may have another
+    # consumer. In particular, an address or later store is not this update.
+    for reg in prior.writes | update.writes:
+        if dead(records, position + 2, reg, set()) is not True:
+            return None
+    flags_live = update.flags_written
+    for step in records[position + 3:]:
+        if flags_live and step.kind == "branch" and not step.unconditional:
+            return None
+        if step.flags_written:
+            flags_live = False
+    return position + 2
+
+
 def read_modify_write_store(records, position, address, width):
     """the position of the store this dead load belongs to, or None.
 
@@ -1474,10 +1524,15 @@ def read_modify_write_store(records, position, address, width):
     executed path; they read no flags or registers and produce no effects.
     Path-proven register OR with zero is a value-preserving copy; its register
     reads and arithmetic flags remain live in the semantic replay.
+    A same-member OR may follow its insertion read only under the separate
+    bounded authentication in separated_or_store.
     Anything else in between - arithmetic on unknown values, another memory
     access, a call or a conditional branch - refuses. The store must have
     the load's width and address on every explored path.
     """
+    separated = separated_or_store(records, position, address, width)
+    if separated is not None:
+        return separated
     between = []
     for later in range(position + 1, len(records)):
         record = records[later]

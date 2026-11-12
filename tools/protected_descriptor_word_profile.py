@@ -94,6 +94,13 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
                   'ldrsb':1, 'ldrsh':2}
         width = widths.get(instruction.mnemonic)
         base = sp_offset if memory.base == match.ARM_REG_SP else aliases.get(memory.base)
+        if writing and any(kind == 'pointer' for kind, _ in words.values()) and (
+                base is None or width is None or len(memories) != 1 or
+                memory.index and memory.index not in constants):
+            # Forgetting this fact would make a later real pointer reload look
+            # scalar and silently bypass bounds and return-alias verification.
+            # No separation premise proves that the opaque write misses it.
+            raise ValueError('unknown store can invalidate a live pointer word')
         if base is None or width is None or len(memories) != 1:
             if not reading:
                 words.clear()
@@ -129,6 +136,17 @@ class ProtectedDescriptorWordProof(callback.StaticCallbackBufferProof):
                 'frame':[list(word) for word in stack], 'root_frame':root_frame}
             return ((operands[0].reg, number) if kind == 'pointer' else None,
                     number if kind == 'constant' else None, True, False)
+        pointer_words = {slot for slot in overlapping
+                         if words.get(slot, (None, None))[0] == 'pointer'}
+        if writing and pointer_words and (
+                width != 4 or offset % 4 or pointer_words != {offset} or
+                instruction.mnemonic != 'str' or instruction.size != 2 or
+                instruction.cc not in (match.ARM_CC_AL, match.ARM_CC_INVALID) or
+                instruction.writeback or memory.index or len(operands) != 2 or
+                operands[0].type != match.ARM_OP_REG):
+            # A partial replacement can leave a pointer-derived value. Only
+            # an exact aligned whole-word store discharges the old provenance.
+            raise ValueError('partial or unsupported store overlaps a live pointer word')
         for slot in overlapping:
             words.pop(slot, None)
         if not writing:
