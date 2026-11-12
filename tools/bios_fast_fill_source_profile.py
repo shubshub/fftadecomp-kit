@@ -10,6 +10,7 @@ import owner_graph_profile as graph
 ADDRESS = 0x08141868
 WRAPPER = bytes.fromhex('0cdf7047')
 SCHEMA = 'conditional-bios-cpufastset-local-fill-source-v1'
+MIXED_SCHEMA = 'conditional-bios-cpufastset-mixed-local-fill-source-v1'
 CONTRACT = (
     'conditional returning GBA BIOS CpuFastSet fill boundary: control bit24 '
     'selects a repeated 32-bit source word; only the aligned local source span '
@@ -21,6 +22,10 @@ CONTRACT = (
 class FastFillSourceProof(buffers.NamedDataBufferProof):
     """Reuse closed CFG bit facts; keep CpuSet and every old selector unchanged."""
 
+    mixed_calls = False
+    schema = SCHEMA
+    contract = CONTRACT
+
     def bind_root(self, data, address, calls):
         import owner_admission_profile as owner
         if hasattr(self, '_root'):
@@ -29,7 +34,9 @@ class FastFillSourceProof(buffers.NamedDataBufferProof):
         refinement = owner.refine(data, address, self.mapping)
         instructions, edges, branches, actual, words = graph.graph(data, address, refinement)
         graph.partition(data, address, refinement, instructions, words)
-        if branches or words or calls != actual or set(calls.values()) != {ADDRESS}:
+        allowed = (ADDRESS in calls.values() if self.mixed_calls else
+                   set(calls.values()) == {ADDRESS})
+        if branches or words or calls != actual or not allowed:
             raise ValueError('CpuFastSet fill requires only its actual direct wrapper calls')
         wrapper = self.span(ADDRESS)
         if wrapper != WRAPPER:
@@ -58,7 +65,7 @@ class FastFillSourceProof(buffers.NamedDataBufferProof):
         self.records[address] = dict(address=address, end=address+4, bytes=4,
             body_sha256=hashlib.sha256(data).hexdigest(), **self.identities,
             structure=dict(kind=buffers.FAST_FILL_SCHEMA, instructions=2,
-                wrapper_hex=data.hex(), conditional_ABI=CONTRACT))
+                wrapper_hex=data.hex(), conditional_ABI=self.contract))
         self._observations.add((site, offset, 4, ones, zeros))
         return {}
 
@@ -66,10 +73,30 @@ class FastFillSourceProof(buffers.NamedDataBufferProof):
         if not hasattr(self, '_root') or not self._observations:
             raise ValueError('CpuFastSet fill requires an actual checked local source')
         address, data, _ = self._root
-        return dict(schema=SCHEMA, contract=CONTRACT,
+        return dict(schema=self.schema, contract=self.contract,
             owner=[address, len(data), hashlib.sha256(data).hexdigest()],
             dependency=[ADDRESS, len(WRAPPER), hashlib.sha256(WRAPPER).hexdigest()],
             sites=[list(row) for row in sorted(self._observations)],
             producer_sha256={Path(module.__file__).name:
                 hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
                 for module in (bits, buffers, __import__(__name__))})
+
+
+class MixedFastFillSourceProof(FastFillSourceProof):
+    """Compose root fill sites with unchanged ordinary local-buffer checks."""
+
+    mixed_calls = True
+    schema = MIXED_SCHEMA
+    contract = (CONTRACT + '; ordinary callees retain bounded-buffer checks; '
+                'callee-saved control bits survive under the conditional '
+                'ordinary returning ABI')
+
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None,
+                   site=None, words=None):
+        if not hasattr(self, '_root') or self._root[2].get(site) != address:
+            raise ValueError('mixed CpuFastSet requires its exact bound root call')
+        if address == ADDRESS:
+            return super().check_call(address, aliases, stack, slots,
+                constants=constants, site=site, words=words)
+        return buffers.NamedDataBufferProof.check_call(self, address, aliases,
+            stack, slots, constants=constants, site=site, words=words)
