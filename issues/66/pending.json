@@ -90,7 +90,35 @@
           "who": "match-native-080224E8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4b0f2e2a57547d6bf2054a28952cb5a9eae3b8d299f2040a1b4956c3b4a41d53",
+        "acknowledged_cursor": 6823590521,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4b0f2e2a57547d6bf2054a28952cb5a9eae3b8d299f2040a1b4956c3b4a41d53",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080224E8\",\"who\":\"match-native-080224E8\",\"claim_id\":6823420370,\"reason\":\"Original608-byte owner rejected because R0=SP crosses its callback at0802260A. Candidate472 bytes; extensive code-generation differences remain.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural typed structs and loops; original native verifier and complete linked diagnostics\"}",
+          "created_at": "2026-11-12T12:27:20Z",
+          "id": 6823590521,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T12:27:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d3298f2184a7a435fdcdc6ff15713da611375f93b1b5a20ea2f37c4afcc3b913",
+        "result": {
+          "address": "0x080224E8",
+          "claim_id": 6823420370,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6823590521,
+          "status": "accepted",
+          "who": "match-native-080224E8"
+        }
+      }
     }
   ],
   "issue": 66,
