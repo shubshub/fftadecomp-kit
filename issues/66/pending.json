@@ -59,66 +59,6 @@
           "who": "match-native-080012BC"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "e809e6a44cdd58dea3fa22ed5f6fa2e343db4d3bfe34125291fd6b6fe28a412a",
-        "acknowledged_cursor": 6827210457,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e809e6a44cdd58dea3fa22ed5f6fa2e343db4d3bfe34125291fd6b6fe28a412a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811AF98\",\"who\":\"match-native-0811AF98\",\"note\":\"Native plausible C recovery for qualified complete owner; isolated per-address implementation agent\"}",
-          "created_at": "2026-11-12T15:02:23Z",
-          "id": 6827210457,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:02:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "16027823c46c7c0baae3399f2d6a11230f82206764264ab105a727782887a191",
-        "result": {
-          "address": "0x0811AF98",
-          "claim_id": 6827210457,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6827210457,
-          "status": "accepted",
-          "who": "match-native-0811AF98"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "a837f6c0e178f1713f457c3ed847a9897ca96d75859c30aa011fc016c8d61974",
-        "acknowledged_cursor": 6827671888,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a837f6c0e178f1713f457c3ed847a9897ca96d75859c30aa011fc016c8d61974",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811AF98\",\"who\":\"match-native-0811AF98\",\"claim_id\":6827210457,\"reason\":\"Complete560-byte plausible candidate differs in table-base versus index-load scheduling; six natural formulations retained.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; six natural coordinate-table/index formulations\"}",
-          "created_at": "2026-11-12T15:20:38Z",
-          "id": 6827671888,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T15:20:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "003600f4d06c1ed32eebccd2fac0b3352bc6fbc6ea6ea834432ee28dedecbe67",
-        "result": {
-          "address": "0x0811AF98",
-          "claim_id": 6827210457,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6827671888,
-          "status": "accepted",
-          "who": "match-native-0811AF98"
-        }
-      }
     }
   ],
   "issue": 66,
