@@ -22,6 +22,12 @@ CONTRACT = ('conditional returning GBA BIOS CpuSet fill boundary: bit24 selects 
             'numeric result or termination theorem')
 MASK = 0xFFFFFFFF
 MAX_UPDATES = 4096
+LOCAL_SOURCE_CONTRACT = (
+    'bounded local fill source address is used only to read one initialized '
+    'unit; no numeric source-pointer observation or retention; exact source '
+    'content, destination and control; opaque outputs retain raw arguments; '
+    'no physical readability, physical nonalias, destination extent or '
+    'termination theorem')
 
 
 class ConditionalVolatileInterfaces:
@@ -30,16 +36,26 @@ class ConditionalVolatileInterfaces:
     The SWI bytes do not prove the BIOS register interface. No guaranteed
     overwrite is asserted, so a later read of r3 still keeps its value live.
     Complete original-ELF admission remains the selected profile's job.
+    The default/legacy selector authorizes only that register interface.
+    BIOS_LOCAL_FILL_SELECTOR separately opts in to LOCAL_SOURCE_CONTRACT and
+    authenticates its distinct native manifest before exposing that premise.
     """
 
-    def __init__(self, ordinary, data, address, rom, mapping, index, objects):
+    def __init__(self, ordinary, data, address, rom, mapping, index, objects, *,
+                 selector=None):
         import owner_admission_profile as owner
         import named_data_buffer_profile as named
+        selector = named.BIOS_FILL_SELECTOR if selector is None else selector
+        if selector not in (named.BIOS_FILL_SELECTOR, named.BIOS_LOCAL_FILL_SELECTOR):
+            raise ValueError('unknown conditional CpuSet semantic policy selector')
         manifest, _, _ = owner.preflight(data, address, rom, mapping, index,
-                                         objects, selector=named.BIOS_FILL_SELECTOR)
+                                         objects, selector=selector)
         fingerprint = hashlib.sha256(json.dumps(manifest, sort_keys=True,
             separators=(',', ':')).encode()).hexdigest()
         self.ordinary = ordinary
+        self.local_fill_premise = (LOCAL_SOURCE_CONTRACT +
+            '; native fill preflight SHA-256 ' + fingerprint
+            if selector == named.BIOS_LOCAL_FILL_SELECTOR else None)
         self.conditional_premises = {NAME:
             'conditional returning CpuSet consumes only r0-r2; no guaranteed '
             'register overwrite; native fill preflight SHA-256 ' + fingerprint}
