@@ -90,6 +90,66 @@
           "who": "cellebrite-ffta"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "2c98b52b894e61e2343c7411372ad88f05bf5d6a9e1fad556e234eba34525372",
+        "acknowledged_cursor": 6815551001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2c98b52b894e61e2343c7411372ad88f05bf5d6a9e1fad556e234eba34525372",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08031674\",\"who\":\"cellebrite-ffta\",\"claim_id\":6815532338,\"reason\":\"MATCH 36/36 complete bytes; plausibility and pinned register-shadow semantics passed; source and report retained.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T05:29:51Z",
+          "id": 6815551001,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:29:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a1fbdac1c10dc8f0a4fc1cb65b2d6f03add1599cd2e58b26bdfa6037c5121c4b",
+        "result": {
+          "address": "0x08031674",
+          "claim_id": 6815532338,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6815551001,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0f94d07c569466c4c187341efd14d540fb5e356c7c99ea647c62eb481a137409",
+        "acknowledged_cursor": 6815551001,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0f94d07c569466c4c187341efd14d540fb5e356c7c99ea647c62eb481a137409",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080096E0\",\"who\":\"cellebrite-ffta\",\"note\":\"Recover complete LCD window shadow setup using pinned control_flags.h, canonical compiler and semantic verification.\"}",
+          "created_at": "2026-11-12T05:29:41Z",
+          "id": 6815548510,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:29:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a1fbdac1c10dc8f0a4fc1cb65b2d6f03add1599cd2e58b26bdfa6037c5121c4b",
+        "result": {
+          "address": "0x080096E0",
+          "claim_id": 6815548510,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6815548510,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      },
       "release": null
     }
   ],
