@@ -94,7 +94,35 @@
           "who": "match-native-080014C8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "12747be5083aa8ee5eb267e012f332ad38b148175e1e89ea2c9cd375857f2d01",
+        "acknowledged_cursor": 6827624966,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "12747be5083aa8ee5eb267e012f332ad38b148175e1e89ea2c9cd375857f2d01",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080014C8\",\"who\":\"match-native-080014C8\",\"claim_id\":6827188997,\"reason\":\"Natural nonvolatile OAM candidates 452 and456 bytes versus524; discarded destination reads remain unexplained under current source admission.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; unsigned-short and unsigned-int bitfield forms\"}",
+          "created_at": "2026-11-12T15:18:45Z",
+          "id": 6827624966,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T15:18:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a588dbf844082d73f237fcfa1012bcddd25a6fcf9d85cd22bcb1016c35cc0ca",
+        "result": {
+          "address": "0x080014C8",
+          "claim_id": 6827188997,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6827624966,
+          "status": "accepted",
+          "who": "match-native-080014C8"
+        }
+      }
     },
     {
       "claim": {
