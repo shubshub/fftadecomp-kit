@@ -63,6 +63,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e26eb2e355fa2b6ddb34689d8dfc3bdeac3a464c42778f01843916765dfa8137",
+        "acknowledged_cursor": 6838534033,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e26eb2e355fa2b6ddb34689d8dfc3bdeac3a464c42778f01843916765dfa8137",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E87C0\",\"who\":\"native-080e87c0\",\"note\":\"Recover plausible complete C after native 24-target scheduler qualification; isolated source, parent-owned integration.\"}",
+          "created_at": "2026-11-12T23:10:10Z",
+          "id": 6838534033,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T23:10:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c2a227a1d01bdd299d4f0f4192da9a6058a964c91667406f7942ac935ace0f3d",
+        "result": {
+          "address": "0x080E87C0",
+          "claim_id": 6838534033,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6838534033,
+          "status": "accepted",
+          "who": "native-080e87c0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
