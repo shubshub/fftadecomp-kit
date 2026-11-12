@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fde7ba2662dfc40c210f604019da03f50b3b6ec358f4b3f74924a74e69da568b",
+        "acknowledged_cursor": 6835260902,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fde7ba2662dfc40c210f604019da03f50b3b6ec358f4b3f74924a74e69da568b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8604\",\"who\":\"match-native-080d8604\",\"note\":\"Complete plausible C recovery using bounded-buffer-datafree profile; exact private count repair, unchanged extent\"}",
+          "created_at": "2026-11-12T20:35:44Z",
+          "id": 6835260902,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T20:35:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6cbb063cfd0b4fc4059203ac51df8023cee6f1961ee20a33d7e9ecf98a44f3b2",
+        "result": {
+          "address": "0x080D8604",
+          "claim_id": 6835260902,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6835260902,
+          "status": "accepted",
+          "who": "match-native-080d8604"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
