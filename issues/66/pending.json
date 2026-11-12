@@ -31,6 +31,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0ca04ac6d9122a8848f29ff30de79004bf0faa6409765b4feb146d8904ca46dc",
+        "acknowledged_cursor": 6839050663,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0ca04ac6d9122a8848f29ff30de79004bf0faa6409765b4feb146d8904ca46dc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F38C4\",\"who\":\"native-080f38c4\",\"note\":\"Recover plausible complete C after native 24-target following-call qualification; isolated source with parent-owned integration.\"}",
+          "created_at": "2026-11-12T23:31:37Z",
+          "id": 6839050354,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T23:31:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "80a9bdb8c5923c9c8b324368b8c93d4c3211ab068f0341c84822174f38ba1f07",
+        "result": {
+          "address": "0x080F38C4",
+          "claim_id": 6839050354,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6839050354,
+          "status": "accepted",
+          "who": "native-080f38c4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "06bf16134b0bcfda0cce16f7f424da20c54ea848a3031ac609655f25057b0f35",
+        "acknowledged_cursor": 6839050663,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "06bf16134b0bcfda0cce16f7f424da20c54ea848a3031ac609655f25057b0f35",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FA384\",\"who\":\"native-080fa384\",\"note\":\"Recover plausible complete C after native 24-target scheduler qualification; isolated source with parent-owned integration.\"}",
+          "created_at": "2026-11-12T23:31:38Z",
+          "id": 6839050663,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T23:31:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "80a9bdb8c5923c9c8b324368b8c93d4c3211ab068f0341c84822174f38ba1f07",
+        "result": {
+          "address": "0x080FA384",
+          "claim_id": 6839050663,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6839050663,
+          "status": "accepted",
+          "who": "native-080fa384"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
