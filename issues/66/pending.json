@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "def4dbadf0bfa65a47d30e22499121f50fe83a555e019fef3752f192b3bbc239",
+        "acknowledged_cursor": 6822670818,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "def4dbadf0bfa65a47d30e22499121f50fe83a555e019fef3752f192b3bbc239",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080216F8\",\"who\":\"match-native-080216F8\",\"note\":\"Recover complete348-byte animation update; two ordinary calls; no literal pools; native proof required\"}",
+          "created_at": "2026-11-12T11:43:59Z",
+          "id": 6822670818,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T11:43:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a763b8fa2562ea41cbb79ffc4b65884eaf041a8e6ef276fd37d4369979cb6d6e",
+        "result": {
+          "address": "0x080216F8",
+          "claim_id": 6822670818,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6822670818,
+          "status": "accepted",
+          "who": "match-native-080216F8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
