@@ -1014,10 +1014,23 @@ def toolchain_fingerprint():
 
 def runtime_fingerprint():
     import capstone
+    library = Path(capstone._cs._name)
+    if not library.is_absolute():
+        # Some bindings load by soname through the dynamic loader. Fingerprint
+        # the mapped library rather than interpreting that soname under cwd.
+        loaded = set()
+        for line in Path('/proc/self/maps').read_text().splitlines():
+            fields = line.split(maxsplit=5)
+            if len(fields) == 6 and fields[5].startswith('/') and \
+                    Path(fields[5]).name == library.name:
+                loaded.add(fields[5])
+        if len(loaded) != 1:
+            raise ValueError('loaded Capstone library identity is unavailable or ambiguous')
+        library = Path(loaded.pop())
     return dict(system=platform.system(), kernel=platform.release(), machine=platform.machine(),
         python=platform.python_version(), python_sha256=sha(Path(sys.executable).read_bytes()),
         capstone=capstone.__version__, binding_sha256=sha(Path(capstone.__file__).read_bytes()),
-        capstone_native_sha256=sha(Path(capstone._cs._name).read_bytes()))
+        capstone_native_sha256=sha(library.read_bytes()))
 
 
 def build(root, address, args=None, expected=None, *, selector=SELECTOR):
