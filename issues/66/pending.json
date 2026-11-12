@@ -90,7 +90,35 @@
           "who": "match-team-08087F0C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9e3385fdff83b8110207d3fd99de7d3bea5865eefd2dfa96d6c660cc93ae7b15",
+        "acknowledged_cursor": 6819857470,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9e3385fdff83b8110207d3fd99de7d3bea5865eefd2dfa96d6c660cc93ae7b15",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08087F0C\",\"who\":\"match-team-08087F0C\",\"claim_id\":6819400992,\"reason\":\"Complete plausible 172-byte native MATCH with tested bounded shift-normalization fix; queued for leader integration and publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-12T09:27:32Z",
+          "id": 6819857470,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:27:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4146ddc718684ee5d67ca23537be6f2e681b963f901797d7cd1973195da8e5f9",
+        "result": {
+          "address": "0x08087F0C",
+          "claim_id": 6819400992,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6819857470,
+          "status": "accepted",
+          "who": "match-team-08087F0C"
+        }
+      }
     },
     {
       "claim": {
