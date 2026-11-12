@@ -106,6 +106,9 @@ def sha(raw):
 
 
 def selected(report):
+    import compiler_orphan_constants_native_profile as orphan_constants
+    if orphan_constants.selected(report):
+        return True
     verification = '\n'.join(line for line in report.splitlines()
                              if marker_text(line).startswith('* verification'))
     relevant = shadow_matrix.SCHEMA in verification or rom_table.SCHEMA in verification or numeric_switch.SCHEMA in verification or integer_pair.SCHEMA in verification or integer_three.SCHEMA in verification or integer_data.SCHEMA in verification or integer_locals.SCHEMA in verification or integer_aligned_two.SCHEMA in verification or integer_two.SCHEMA in verification or integer_words.SCHEMA in verification or integer_native.SCHEMA in verification or multiple_native.SCHEMA in verification or mutable_native.SCHEMA in verification or resident_word.SCHEMA in verification or any(schema in verification for schema in r6_buffer.SCHEMAS) or entry.NATIVE_SCHEMA in verification or SCHEMA in verification or ALIGNED_SCHEMA in verification or CYCLIC_SCHEMA in verification or THUNK_SWITCH_SCHEMA in verification or DIRECT_SWITCH_SCHEMA in verification or ENTRY_DATA_SWITCH_SCHEMA in verification or ENTRY_SWITCH_SCHEMA in verification or ACYCLIC_SCHEMA in verification or ignored_leaf.SCHEMA in verification or any(schema in verification for schema in named_buffer.SCHEMAS) or static_buffer.SCHEMA in verification or word_buffer.SCHEMA in verification or r7_buffer.SCHEMA in verification or descriptor.SCHEMA in verification or watched_switch.SCHEMA in verification or output_alias.SCHEMA in verification or single_store.SCHEMA in verification or any(schema in verification for schema in disjunctive.PROFILES.values()) or any(schema in verification for schema in callee_constant.PROFILES.values()) or cursor.SCHEMA in verification or any(schema in verification for schema in formal_spill.SCHEMAS) or any(marker_text(line).startswith('* owner runtime')
@@ -169,6 +172,9 @@ def selected(report):
 
 
 def selector_for_report(report):
+    import compiler_orphan_constants_native_profile as orphan_constants
+    if orphan_constants.selected(report):
+        return orphan_constants.SELECTOR
     if not selected(report):
         raise ValueError('not a complete-owner report')
     if f'* verification: `{copy_binding.SCHEMA}`' in report.splitlines():

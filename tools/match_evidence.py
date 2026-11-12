@@ -976,6 +976,9 @@ def report_matches(report, root, address):
             RuntimeError, subprocess.SubprocessError):
         return False
     try:
+        import compiler_orphan_constants_native_profile as orphan_constants
+        if orphan_constants.selected(report):
+            return orphan_constants.report_matches(report,root,address)
         import unsigned_divmod_profile
         if unsigned_divmod_profile.selected(report):
             return unsigned_divmod_profile.report_matches(report, root, address)
