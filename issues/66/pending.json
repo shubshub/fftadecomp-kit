@@ -91,6 +91,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dcac657923ace475f54596b99c6dbbdf45863a0ab677c2b43933a01c41ec0dd6",
+        "acknowledged_cursor": 6815599454,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dcac657923ace475f54596b99c6dbbdf45863a0ab677c2b43933a01c41ec0dd6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080917F8\",\"who\":\"cellebrite-ffta\",\"note\":\"Recover 100-byte display state transfer with ROM-derived object offsets 0x47C..0x481 and pinned register shadow.\"}",
+          "created_at": "2026-11-12T05:33:03Z",
+          "id": 6815599454,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T05:33:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b4d824c0366ddf4cab2ac12db5c14c5c2b19d3eb8827355b1fe38d466029ce66",
+        "result": {
+          "address": "0x080917F8",
+          "claim_id": 6815599454,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6815599454,
+          "status": "accepted",
+          "who": "cellebrite-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
