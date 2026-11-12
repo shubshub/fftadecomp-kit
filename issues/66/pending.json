@@ -59,66 +59,6 @@
           "who": "match-native-0804E128"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "28531301b2b7b59f78d196acdc24c29eceb8c606dbfa2812fca7ecae72c47af8",
-        "acknowledged_cursor": 6824747028,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "28531301b2b7b59f78d196acdc24c29eceb8c606dbfa2812fca7ecae72c47af8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DF08\",\"who\":\"match-native-0804DF08\",\"note\":\"Recover plausible C and verify complete native function body\"}",
-          "created_at": "2026-11-12T13:20:19Z",
-          "id": 6824747028,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T13:20:19Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "7ec932d883f212edd2c823ba475f4a8cb703ea76e9afd7522c9efdefabc1b14e",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6824747028,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6824747028,
-          "status": "accepted",
-          "who": "match-native-0804DF08"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0961ada95852c20dcc30e585eaee14ade17f07f6ef408f127759fb93719942ca",
-        "acknowledged_cursor": 6824897191,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0961ada95852c20dcc30e585eaee14ade17f07f6ef408f127759fb93719942ca",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DF08\",\"who\":\"match-native-0804DF08\",\"claim_id\":6824747028,\"reason\":\"Complete254-byte blend-alpha recovery has45 byte differences in loop induction, branches and allocation. Native signed-runtime-data proof fails exact bytes; parked.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T13:27:00Z",
-          "id": 6824897191,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T13:27:00Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e348e8d6b9cd1cc14d2142cef8f5e67df06ab1a03467a8296346087f0b0761cd",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6824747028,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6824897191,
-          "status": "accepted",
-          "who": "match-native-0804DF08"
-        }
-      }
     }
   ],
   "issue": 66,
