@@ -30,7 +30,35 @@
           "who": "match-native-080DA968"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6be19cc097e6f44870c902d1568c000a5e1dd6b7c2b07fdf5085a9a99e9762d1",
+        "acknowledged_cursor": 6826626442,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6be19cc097e6f44870c902d1568c000a5e1dd6b7c2b07fdf5085a9a99e9762d1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DA968\",\"who\":\"match-native-080DA968\",\"claim_id\":6826478860,\"reason\":\"Parked150-byte plausible candidate for166-byte target. Discarded destination reads and register allocation remain unexplained; no artificial reads or new volatile introduced.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; bounded natural variants\"}",
+          "created_at": "2026-11-12T14:39:14Z",
+          "id": 6826626442,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T14:39:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4aa7d25aff150619be68d6cace81a4bf8a142f6468b7634543752a14f4a83942",
+        "result": {
+          "address": "0x080DA968",
+          "claim_id": 6826478860,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6826626442,
+          "status": "accepted",
+          "who": "match-native-080DA968"
+        }
+      }
     },
     {
       "claim": {
