@@ -37,7 +37,13 @@ OPTIONAL_LOCAL_FRAME_SELECTOR = 'static-callback-restoring-r6-target-optional-lo
 OPTIONAL_LOCAL_FRAME_SCHEMA = 'elf-symbol-thumb-static-callback-restoring-r6-target-optional-local-frame-aligned-v1'
 COMPACT_CLOSURE_SELECTOR = 'static-callback-restoring-r6-target-compact-closure-aligned-v1'
 COMPACT_CLOSURE_SCHEMA = 'elf-symbol-thumb-static-callback-restoring-r6-target-compact-closure-aligned-v1'
-OPTIONAL_LOCAL_FRAME_POLICIES = (OPTIONAL_LOCAL_FRAME_SELECTOR, COMPACT_CLOSURE_SELECTOR)
+ENTRY_ALIAS_SELECTOR = 'static-callback-restoring-entry-aliases-aligned-v1'
+ENTRY_ALIAS_SCHEMA = 'elf-symbol-thumb-static-callback-restoring-entry-aliases-aligned-v1'
+SCRATCH_PREFIX_SELECTOR = 'static-callback-restoring-scratch-prefix-aligned-v1'
+SCRATCH_PREFIX_SCHEMA = 'elf-symbol-thumb-static-callback-restoring-scratch-prefix-aligned-v1'
+ENTRY_ALIAS_POLICIES = (ENTRY_ALIAS_SELECTOR, SCRATCH_PREFIX_SELECTOR)
+COMPACT_CLOSURE_POLICIES = (COMPACT_CLOSURE_SELECTOR, *ENTRY_ALIAS_POLICIES)
+OPTIONAL_LOCAL_FRAME_POLICIES = (OPTIONAL_LOCAL_FRAME_SELECTOR, *COMPACT_CLOSURE_POLICIES)
 SMALL_CONSTANT_FRAME_POLICIES = (MOVS_FRAME_SELECTOR, *OPTIONAL_LOCAL_FRAME_POLICIES)
 QUARANTINE_POLICIES = (QUARANTINE_SELECTOR, *SMALL_CONSTANT_FRAME_POLICIES)
 LOCAL_SCRATCH_POLICIES = (LOCAL_SCRATCH_SELECTOR, *QUARANTINE_POLICIES)
@@ -51,10 +57,12 @@ PROFILES = {SELECTOR: (SCHEMA, CONTROL_FLOW), TARGET_SELECTOR: (TARGET_SCHEMA, T
             QUARANTINE_SELECTOR: (QUARANTINE_SCHEMA, TARGET_CONTROL_FLOW),
             MOVS_FRAME_SELECTOR: (MOVS_FRAME_SCHEMA, TARGET_CONTROL_FLOW),
             OPTIONAL_LOCAL_FRAME_SELECTOR: (OPTIONAL_LOCAL_FRAME_SCHEMA, TARGET_CONTROL_FLOW),
-            COMPACT_CLOSURE_SELECTOR: (COMPACT_CLOSURE_SCHEMA, TARGET_CONTROL_FLOW)}
+            COMPACT_CLOSURE_SELECTOR: (COMPACT_CLOSURE_SCHEMA, TARGET_CONTROL_FLOW),
+            ENTRY_ALIAS_SELECTOR: (ENTRY_ALIAS_SCHEMA, TARGET_CONTROL_FLOW),
+            SCRATCH_PREFIX_SELECTOR: (SCRATCH_PREFIX_SCHEMA, TARGET_CONTROL_FLOW)}
 SCHEMAS = (SCHEMA, TARGET_SCHEMA, ALIGNED_TARGET_SCHEMA, LEAF_ALIAS_SCHEMA,
            LOCAL_SCRATCH_SCHEMA, QUARANTINE_SCHEMA, MOVS_FRAME_SCHEMA, OPTIONAL_LOCAL_FRAME_SCHEMA,
-           COMPACT_CLOSURE_SCHEMA)
+           COMPACT_CLOSURE_SCHEMA, ENTRY_ALIAS_SCHEMA, SCRATCH_PREFIX_SCHEMA)
 MAX_DEPENDENCIES = r7.MAX_DEPENDENCIES
 REGISTER = match.ARM_REG_R0 + 6
 PRESERVED = frozenset(range(match.ARM_REG_R0 + 4, match.ARM_REG_R0 + 12))
@@ -116,12 +124,24 @@ def policy_manifest(policy=SELECTOR):
             registers=[2, 3], exact_local_offsets=1,
             absent_local_alias=[0, False],
             scope='exit only; one established negative local offset optionally joined with no local alias; actual consumer remains unobserving; no scalar or nonescape theorem')
-    if policy == COMPACT_CLOSURE_SELECTOR:
+    if policy in COMPACT_CLOSURE_POLICIES:
         result['schema'] = 'thumb-static-callback-restoring-r6-target-compact-closure-aligned-policy-v1'
         result['compact_dependency_closure'] = dict(
             owners=named.GUARDED_ALIAS_MAX_DEPENDENCIES,
             aggregate_body_bytes=named.MAX_BYTES,
             scope='all unique requested complete bodies, including consumers and canonical thunks; every actual effect context still replays independently')
+    if policy in ENTRY_ALIAS_POLICIES:
+        result['schema'] = 'thumb-static-callback-restoring-entry-aliases-aligned-policy-v1'
+        result['entry_alias_restoration'] = dict(
+            registers='written watched R4-R10, including R6; R11 remains unwritten',
+            entry_values='opaque until killed; private PUSH/POP only; no reads, copies, stack addressing or calls while any relaxed entry value is live',
+            restoration='same completed fresh bounded effects and complete native frame with authenticated nested call certificates; every returning path restores all saved registers',
+            state_budget=4096, private_saved_words=64)
+    if policy == SCRATCH_PREFIX_SELECTOR:
+        result['schema'] = 'thumb-static-callback-restoring-scratch-prefix-aligned-policy-v1'
+        result['scratch_prefix_kill'] = dict(registers=[2, 3], state_budget=4096,
+            prefix='all paths kill every incoming scratch value at actual unconditional writes before any read, copy, save, call or return; non-killing cycles rejected',
+            completion='exact consumer owner/site/target and complete target bytes; same proof instance must complete fresh effects and authenticated native frame replay at that actual call; completion digest binds the ordinary restoration evidence')
     return result
 
 
@@ -195,7 +215,9 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
         self._scratch_leaf_kill_policy = policy in QUARANTINE_POLICIES
         self._small_constant_frame_policy = policy in SMALL_CONSTANT_FRAME_POLICIES
         self._optional_local_frame_policy = policy in OPTIONAL_LOCAL_FRAME_POLICIES
-        self._compact_closure_policy = policy == COMPACT_CLOSURE_SELECTOR
+        self._compact_closure_policy = policy in COMPACT_CLOSURE_POLICIES
+        self._entry_alias_policy = policy in ENTRY_ALIAS_POLICIES
+        self._scratch_prefix_policy = policy == SCRATCH_PREFIX_SELECTOR
         self._compact_spans = {}
         if self._compact_closure_policy:
             self.dependency_budget = named.GUARDED_ALIAS_MAX_DEPENDENCIES
@@ -208,6 +230,8 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
         self._ordinary_completed = {}
         self._leaf_completed = {}
         self._scratch_returns = {}
+        self._scratch_prefix_obligations = {}
+        self._scratch_prefix_completions = {}
 
     def span(self, address):
         data = super().span(address)
@@ -262,7 +286,9 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
                 if current in calls and live:
                     if not self._scratch_leaf_kill_policy:
                         raise ValueError('consumer observes projected return scratch before a killing write')
-                    quarantined[current] = self._scratch_leaf_kill(calls[current], live)
+                    quarantined[current] = (self._scratch_prefix_kill(calls[current], live,
+                        consumer=consumer, site=current) if self._scratch_prefix_policy else
+                        self._scratch_leaf_kill(calls[current], live))
                     live = frozenset()
                 live -= set(written)
                 pending.extend((target, live) for target in edges[current] if live)
@@ -273,8 +299,8 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
                            for register, offset in sorted(projected.items())],
                 continuation_states=len(seen))
             if quarantined:
-                receipt['scratch_leaf_kills'] = [dict(site=current, **quarantined[current])
-                                                 for current in sorted(quarantined)]
+                receipt['scratch_prefix_kills' if self._scratch_prefix_policy else 'scratch_leaf_kills'] = [
+                    dict(quarantined[current], site=current) for current in sorted(quarantined)]
             self._scratch_returns[json.dumps(receipt, sort_keys=True)] = receipt
         return {register: offset for register, offset in aliases.items() if register not in scratch}
 
@@ -322,6 +348,72 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
 
     def scratch_return_observations(self):
         return [self._scratch_returns[key] for key in sorted(self._scratch_returns)]
+
+    def _scratch_prefix_kill(self, address, registers, *, consumer, site):
+        """Prove actual killing writes; completion remains a separate obligation."""
+        if type(self) is not R6FrameCallbackProof or not self._scratch_prefix_policy or not registers or \
+                set(registers) - {match.ARM_REG_R0+2, match.ARM_REG_R0+3}:
+            raise ValueError('scratch prefix requires its exact explicit R2/R3 policy')
+        caller, _, _, calls, caller_partition = self._graph(consumer)
+        if calls.get(site) != address:
+            raise ValueError('scratch prefix differs from its exact consumer call')
+        data, ins, edges, calls, partition = self._graph(address)
+        start = (address, frozenset(registers))
+        pending, transitions, safe, kills = [start], {}, set(), set()
+        while pending:
+            state = pending.pop()
+            if state in transitions or state in safe:
+                continue
+            current, live = state
+            item = ins[current]
+            read, written = map(set, item.regs_access())
+            if read & live:
+                raise ValueError('scratch prefix observes or saves an incoming value before its killing write')
+            if current in calls:
+                raise ValueError('scratch prefix calls before killing every incoming value')
+            if written & live and item.cc not in (match.ARM_CC_AL, match.ARM_CC_INVALID):
+                raise ValueError('scratch prefix killing write is conditional')
+            kills.update((current, register-match.ARM_REG_R0) for register in written & live)
+            following = live - written
+            if not following:
+                safe.add(state)
+                continue
+            if not edges[current]:
+                raise ValueError('scratch prefix returns without killing every incoming value')
+            transitions[state] = [(target, frozenset(following)) for target in edges[current]]
+            pending.extend(transitions[state])
+            if len(transitions) + len(safe) > 4096:
+                raise ValueError('scratch prefix kill state budget exceeded')
+        while True:
+            added = {state for state, successors in transitions.items()
+                     if state not in safe and all(target in safe for target in successors)}
+            if not added:
+                break
+            safe.update(added)
+        if start not in safe:
+            raise ValueError('scratch prefix has a path without eventual killing writes')
+        record = dict(address=address, body_sha256=hashlib.sha256(data).hexdigest(),
+            partition=partition, consumer=consumer, consumer_sha256=hashlib.sha256(caller).hexdigest(),
+            consumer_partition=caller_partition, site=site,
+            registers=sorted(register-match.ARM_REG_R0 for register in registers),
+            states=len(safe), killing_writes=[list(row) for row in sorted(kills)])
+        self._scratch_prefix_obligations[json.dumps(record, sort_keys=True)] = record
+        return record
+
+    def scratch_prefix_observations(self):
+        """A prefix alone cannot authorize a report without its actual replay."""
+        if type(self) is not R6FrameCallbackProof or not self._scratch_prefix_policy:
+            raise ValueError('scratch prefix evidence requires its exact native proof instance')
+        observations = []
+        for key in sorted(self._scratch_prefix_obligations):
+            row = self._scratch_prefix_obligations[key]
+            identity = (row['consumer'], row['site'], row['address'],
+                        row['consumer_sha256'], row['body_sha256'])
+            completions = self._scratch_prefix_completions.get(identity)
+            if not completions:
+                raise ValueError('scratch prefix lacks its same-instance fresh complete effects and frame replay')
+            observations.append(dict(row, complete_effects_and_frames=sorted(completions)))
+        return observations
 
     def inspect(self, address, data):
         # The inherited preliminary instruction check has no entry constants.
@@ -383,7 +475,75 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
                                              for site in sorted(active['calls'])])
         if leaf is not None:
             result['leaf_alias_restoration'] = leaf
+        entry_aliases = active.get('entry_alias_restoration')
+        if entry_aliases is not None:
+            if entry_aliases['body_sha256'] != hashlib.sha256(data).hexdigest() or \
+                    entry_aliases['partition'] != partition:
+                raise ValueError('entry alias restoration differs from its exact completed body')
+            result['entry_alias_restoration'] = entry_aliases
         return result
+
+    def _restore_entry_aliases(self, address, watched, arguments):
+        """Discharge opaque watches only within a separately proved saving frame.
+
+        This pass proves non-observation, not restoration. The same ordinary
+        check_arguments invocation must still complete every nested effect and
+        _restoring_frame before it can return an authenticated receipt. Calls
+        are allowed only after killing every relaxed entry register value and
+        before restoring one. Saved values permit PUSH/POP only; no addressed
+        stack access can read, modify or expose their private slots.
+        """
+        if not self._entry_alias_policy:
+            return self._restore_leaf_aliases(address, watched, arguments)
+        data, ins, edges, calls, partition = self._graph(address)
+        written = set().union(*(set(item.regs_access()[1]) for item in ins.values()))
+        relaxed = (set(watched) & PRESERVED & written) - {REPLAY_GUARD}
+        if not relaxed:
+            return tuple(watched), None
+        if relaxed & set(arguments):
+            raise ValueError('entry alias restoration cannot hide an explicit pointer argument')
+        pending = [(address, frozenset(relaxed), ())]
+        seen = set()
+        while pending:
+            site, opaque, saved = pending.pop()
+            state = site, opaque, saved
+            if state in seen:
+                continue
+            seen.add(state)
+            if len(seen) > 4096:
+                raise ValueError('entry alias restoration state budget exceeded')
+            instruction = ins[site]
+            read, changed = map(set, instruction.regs_access())
+            registers = tuple(operand.reg for operand in instruction.operands
+                              if operand.type == match.ARM_OP_REG)
+            following_saved = saved
+            if instruction.mnemonic == 'push':
+                following = opaque
+                following_saved = tuple(register in opaque for register in registers) + saved
+                if len(following_saved) > 64:
+                    raise ValueError('entry alias private save-word budget exceeded')
+            elif instruction.mnemonic == 'pop':
+                if len(saved) < len(registers):
+                    raise ValueError('entry alias pop exceeds its private saved words')
+                following = (opaque-set(registers)) | {
+                    register for register, tainted in zip(registers, saved) if tainted}
+                following_saved = saved[len(registers):]
+            else:
+                if match.ARM_REG_SP in read or match.ARM_REG_SP in changed:
+                    raise ValueError('entry alias saves permit only private PUSH/POP stack access')
+                if read & opaque:
+                    raise ValueError('callee observes an opaque live entry alias')
+                if site in calls and opaque:
+                    raise ValueError('nested call crosses an opaque live entry alias')
+                following = opaque - changed
+            if not edges[site] and following - relaxed:
+                raise ValueError('opaque entry alias escapes through a return register')
+            pending.extend((target, frozenset(following), following_saved) for target in edges[site])
+        record = dict(address=address, body_sha256=hashlib.sha256(data).hexdigest(),
+            partition=partition, registers=sorted(register-match.ARM_REG_R0 for register in relaxed),
+            unobserved_entry_states=len(seen), calls_with_live_entry_values=[],
+            nested_calls=sorted(calls))
+        return tuple(sorted(set(watched)-relaxed)), record
 
     def _restore_leaf_aliases(self, address, watched, arguments):
         """Restore opaque caller aliases only after a complete no-call proof.
@@ -487,9 +647,9 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
         # no-buffer call; it does not infer callee-saved restoration itself.
         watched = tuple(sorted(set(context.get('watched', ())) | {REPLAY_GUARD}))
         active = dict(address=address, site=site, call_target=address, calls={})
-        watched, restoration = self._restore_leaf_aliases(address, watched, arguments)
+        watched, restoration = self._restore_entry_aliases(address, watched, arguments)
         if restoration is not None:
-            active['leaf_alias_restoration'] = restoration
+            active['entry_alias_restoration' if self._entry_alias_policy else 'leaf_alias_restoration'] = restoration
         self._frames.append(active)
         try:
             aliases = super().check_arguments(address, arguments, stack, incoming, protected,
@@ -534,6 +694,17 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
                 constants[REGISTER] = value
             key = json.dumps(receipt, sort_keys=True, separators=(',', ':'))
             self._restorations[key] = receipt
+            if self._scratch_prefix_policy:
+                owners = [row for row in self.entries if int(row['rom'], 16) <= site < int(row['end'], 16)]
+                if len(owners) != 1:
+                    raise ValueError('scratch prefix completion requires one exact consumer owner')
+                consumer = int(owners[0]['rom'], 16)
+                data, _, _, calls, _ = self._graph(consumer)
+                if calls.get(site) != target or self._frames and self._frames[-1]['address'] != consumer:
+                    raise ValueError('scratch prefix completion differs from its actual consumer call')
+                identity = (consumer, site, target, hashlib.sha256(data).hexdigest(), receipt['body_sha256'])
+                self._scratch_prefix_completions.setdefault(identity, set()).add(
+                    hashlib.sha256(key.encode()).hexdigest())
             if self._frames:
                 self._record_call(site, target, receipt, result)
         elif self._frames:

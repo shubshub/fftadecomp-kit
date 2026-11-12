@@ -4479,6 +4479,8 @@ def main():
                                                       "static-callback-restoring-r6-target-movs-frame-aligned-v1",
                                                       "static-callback-restoring-r6-target-optional-local-frame-aligned-v1",
                                                       "static-callback-restoring-r6-target-compact-closure-aligned-v1",
+                                                      "static-callback-restoring-entry-aliases-aligned-v1",
+                                                      "static-callback-restoring-scratch-prefix-aligned-v1",
                                                       "static-callback-local-output-word-return-r7-v1",
                                                       "standalone-local-output-word-return-v1",
                                                       "local-rom-halfword-table-v1",

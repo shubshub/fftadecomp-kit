@@ -2690,6 +2690,24 @@ including `static-callback-restoring-r6-v1` with its leaf R7 target, retain thei
 policies. No physical-memory, nominal C type, numeric or termination theorem
 follows. Synthetic boundaries are in `tests/test_static_callback_r6_target.py`.
 
+`static-callback-restoring-entry-aliases-aligned-v1` additionally permits watched
+R4-R10 entry values to be privately saved and restored. Those opaque values
+cannot be read, copied, addressed through the stack, or carried live across a
+nested call. A separate complete frame proof and fresh effects replay must
+prove restoration; entry values cannot escape through result registers. R11
+remains an unwritten replay guard. Earlier selectors retain their policies.
+
+`static-callback-restoring-scratch-prefix-aligned-v1` also permits an actual
+consumer call to kill projected R2/R3 scratch in its entry prefix. Every path
+must overwrite the incoming values before any observation, save, copy, call or
+return; cycles that can avoid the writes refuse. The prefix proof alone grants
+nothing: the same proof instance must finish fresh effects and authenticated
+frame replay for that exact consumer, call site, target and complete body.
+Both selectors retain the existing conditional ABI and memory premises and
+do not establish RAM installation identity. Synthetic boundaries are in
+`tests/test_r6_nested_entry_alias_restoration.py` and
+`tests/test_r6_scratch_prefix_kill.py`.
+
 ### Exact protected descriptor words
 
 `--owner-runtime-profile protected-descriptor-word-v1` selects
