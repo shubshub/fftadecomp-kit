@@ -49,18 +49,18 @@ def environment_fingerprint():
         producers={path.name:sha(path.read_bytes()) for path in Path(__file__).parent.glob('*.py')})
 
 
-def object_bytes(runner,workspace,args,original_elf,address,mapping,rom,objects,*,selector,policy=POLICY):
+def object_bytes(runner,workspace,args,original_elf,address,mapping,rom,objects,*,selector,policy=POLICY,index=None):
     fixed_configuration(args)
     if selector != SELECTOR or policy != POLICY:
         raise ValueError('orphan constants require their explicit isolated linker policy')
     preprocessed=runner.read_binary(workspace+'/f.i')
     if runner.read_binary(workspace+'/f.o') != original_elf:
         raise ValueError('orphan constants require unchanged actual original compiler object')
-    inventory=prerequisite.verify(original_elf,address,objects,preprocessed,selector=prerequisite.SELECTOR)
+    inventory=prerequisite.verify(original_elf,address,objects,preprocessed,selector=prerequisite.SELECTOR,mapping=mapping,index=index,rom=rom)
     original=match.elf_image(original_elf)
     entries=json.loads(mapping)
     names=match.parse_data_symbols(objects)
-    calls,targets,literals={}, {}, {}
+    calls,targets,literals,functions={}, {}, {}, {}
     bindings=dict(calls=[],data=[],functions=[],switches=[])
     for section_id in original['relocations']:
         section=original['sections'][section_id]
@@ -75,6 +75,10 @@ def object_bytes(runner,workspace,args,original_elf,address,mapping,rom,objects,
                 target=match.function_address_target(name,entries,address,len(original['text']),len(rom))
                 calls[address+site]=target;targets[name]=target
                 bindings['calls'].append([site,name])
+            elif name.startswith('func_'):
+                target=match.function_address_target(name,entries,address,len(original['text']),len(rom))
+                targets[name]=target;functions[site]=(name,target|1)
+                bindings['functions'].append([site,name])
             else:
                 addend=struct.unpack_from('<i',original['text'],site)[0]
                 targets[name]=names[name];literals[site]=(name,names[name]+addend)
@@ -117,7 +121,7 @@ def object_bytes(runner,workspace,args,original_elf,address,mapping,rom,objects,
                 definitions[0]['type'] != (1 if is_data else 2) or definitions[0]['bind'] != 1 or \
                 definitions[0]['size'] or definitions[0]['value'] != (target if is_data else target|1):
             raise ValueError('orphan linked identity is not the original unique typed absolute global')
-    data=match.linked_function_bytes(original,linked,f'func_{address:08X}',address,calls,targets,literals)
+    data=match.linked_function_bytes(original,linked,f'func_{address:08X}',address,calls,targets,literals,function_relocations=functions)
     decoder=match.Cs(match.CS_ARCH_ARM,match.CS_MODE_THUMB);decoder.detail=True
     for site,target in calls.items():
         offset=site-address
@@ -174,15 +178,17 @@ def build(root,address,args=None,expected=None,*,selector=SELECTOR,capture_dir=N
                 original,_,_=match.compile_object(runner,workspace,args,captured,address,
                     candidates[0].relative_to(root).as_posix())
                 data,bindings,transport=object_bytes(runner,workspace,args,original,address,mapping,rom,objects,
-                    selector=selector)
+                    selector=selector,index=index)
                 # No compiler or ELF policy is inherited here. Reuse only the
                 # existing full linked-byte native structural/frame/alias proof.
                 spans=[]
-                for target in sorted({address}|{int(name[5:],16) for _,name in bindings['calls']}):
+                for target in sorted({address}|{int(name[5:],16) for _,name in bindings['calls']+bindings['functions']}):
                     candidates=[row for row in entries if int(row['rom'],16) == target]
                     if len(candidates) != 1:
                         raise ValueError('orphan native requires unique dual-index call ownership')
                     end=int(candidates[0]['end'],16)
+                    if end % 2:
+                        raise ValueError('orphan target extent is not Thumb aligned')
                     row=span_record(target,end,entries,rows,rom)
                     spans.append(dict(address=target,end=end,instructions=row['instrs'],
                         body_sha256=sha(rom[target-match.ROM_BASE:end-match.ROM_BASE])))
@@ -224,6 +230,9 @@ def build(root,address,args=None,expected=None,*,selector=SELECTOR,capture_dir=N
             'Ordinary calls use conditional compatible returning ABI; native frame, alias and return '
             'provenance checks remain active. Named points grant no physical access, extent, '
             'nonaliasing, C semantic equivalence or termination theorem.')
+    if bindings['functions']:
+        manifest['typed_function_addresses_version'] = 2
+        manifest['callback_body_semantics_proved'] = False
     if expected is not None and text(manifest) != text(expected):
         raise ValueError('orphan native report differs from complete fresh compiler replay')
     if capture is not None:

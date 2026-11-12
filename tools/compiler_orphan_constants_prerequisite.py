@@ -1,5 +1,6 @@
 """Bounded original-ELF orphan-address inventory; never native admission or GC."""
 import hashlib
+import json
 from pathlib import Path
 import re
 import struct
@@ -93,12 +94,36 @@ def reachable_literals(data, address, calls):
     return loads, len(instructions)
 
 
-def verify(original_elf, address, objects, preprocessed_source, *, selector, manifest=None):
+def function_spans(address, size, names, mapping, index, rom):
+    """Bind owner and every addressed target to complete dual-index ROM spans."""
+    from software_double_profile import indices, span_record
+    require(all(type(raw) is bytes for raw in (mapping, index, rom)),
+            'orphan function addresses require immutable dual indexes and ROM')
+    entries, rows = indices(mapping, index)
+    targets = {address}
+    for name in names:
+        targets.add(match.function_address_target(name, entries, address, size, len(rom)))
+    spans = []
+    for start in sorted(targets):
+        candidates = [entry for entry in entries if int(entry['rom'],16) & ~1 == start]
+        require(len(candidates) == 1, 'orphan function requires unique indexed identity')
+        end = int(candidates[0]['end'],16)
+        require(end % 2 == 0 and (start != address or end == address+size),
+                'orphan function requires complete aligned owner/target span')
+        entry = span_record(start,end,entries,rows,rom)
+        spans.append(dict(address=start,end=end,instructions=entry['instrs'],
+            body_sha256=sha(rom[start-match.ROM_BASE:end-match.ROM_BASE])))
+    return spans
+
+
+def verify(original_elf, address, objects, preprocessed_source, *, selector, manifest=None,
+           mapping=None, index=None, rom=None):
     """Authenticate a prerequisite on immutable inputs without altering the ELF.
 
     Source and ELF hashes bind the supplied snapshots, not a proved compilation
     relationship. Neither exclusion nor a native profile is implemented here.
     """
+    function_index = index
     require(selector == SELECTOR and type(selector) is str, 'orphan prerequisite requires explicit selector')
     require(type(address) is int and match.ROM_BASE <= address < 0x09000000 and address%2 == 0 and
             all(type(value) is bytes for value in (original_elf,objects,preprocessed_source)),
@@ -169,6 +194,7 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
     data_symbols=match.parse_data_symbols(objects)
     relocations={image['text_index']: [], orphan: []}
     used=set()
+    function_names=set()
     for index in image['relocations']:
         row=image['sections'][index]
         require(row[1] == 9 and row[6] == table_index and row[7] in relocations and row[9] == 8 and
@@ -192,12 +218,21 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
                         re.fullmatch(r'func_[0-9A-F]{8}',target['name']), 'unsupported orphan prerequisite call identity')
                 addend=None
             else:
-                require(site%4 == 0 and target['type'] in (0,1) and target['name'] in data_symbols,
-                        'orphan address requires genuine aligned named-data identity')
+                require(site%4 == 0, 'orphan address requires aligned complete word')
                 addend=struct.unpack_from('<i',image['section_data'][row[7]],site)[0]
-                value=data_symbols[target['name']]+addend
-                require(0 <= value <= 0xFFFFFFFF and not address <= value < address+len(image['text']),
-                        'orphan named-data addend overflows or refers to owner')
+                is_function = re.fullmatch(r'func_[0-9A-F]{8}',target['name']) is not None
+                require(not (is_function and target['name'] in data_symbols),
+                        'orphan function/data identity is ambiguous')
+                if is_function:
+                    require(target['type'] in (0,2) and addend == 0,
+                            'orphan function address requires typed zero addend')
+                    function_names.add(target['name'])
+                else:
+                    require(target['type'] in (0,1) and target['name'] in data_symbols,
+                            'orphan address requires genuine aligned named-data identity')
+                    value=data_symbols[target['name']]+addend
+                    require(0 <= value <= 0xFFFFFFFF and not address <= value < address+len(image['text']),
+                            'orphan named-data addend overflows or refers to owner')
             relocations[row[7]].append((site,target['name'],addend))
     require(all(row['section'] or not row['name'] or row['name'] in used for row in symbols),
             'orphan prerequisite contains unresolved unused identity')
@@ -230,6 +265,13 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
             'explicit linker GC/exclusion, unchanged linked output, complete native frame/alias/return '
             'replay, typed call/index/ROM binding and distinct replayable admission remain required. '
             'No runtime unreachability, memory access, extent, nonaliasing or termination theorem.')
+    if function_names:
+        observed['schema'] = SCHEMA + '-typed-functions-v2'
+        observed['function_addresses'] = dict(
+            names=sorted(function_names),
+            spans=function_spans(address,len(image['text']),function_names,mapping,function_index,rom),
+            mapping_sha256=sha(mapping),index_sha256=sha(function_index),rom_sha256=sha(rom),
+            callback_body_semantics_proved=False)
     if manifest is not None:
         require(observed == manifest, 'orphan prerequisite manifest differs from fresh original replay')
     return observed
