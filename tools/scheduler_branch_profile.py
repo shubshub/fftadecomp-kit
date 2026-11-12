@@ -1,4 +1,4 @@
-"""Acyclic caller composition with one scheduler invocation per path.
+"""Explicit bounded acyclic scheduler compositions.
 
 Other calls use the existing ordinary indexed-call ABI summary. Their complete
 body identities are authenticated, but their effects and nested execution are
@@ -23,7 +23,7 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False):
+def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False, three_per_path_calls=False):
     require(type(following_calls) is bool, 'following-call selection must be Boolean')
     require(type(wide_targets) is bool and not (following_calls and wide_targets),
             'wide-target selection must be Boolean and separate from following calls')
@@ -34,44 +34,59 @@ def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_fo
             not (twenty_four_following_calls and
                  (following_calls or wide_targets or twenty_four_targets)),
             'twenty-four-target following selection must be Boolean and exclusive')
+    require(type(three_per_path_calls) is bool and
+            not (three_per_path_calls and (following_calls or wide_targets or
+                 twenty_four_targets or twenty_four_following_calls)),
+            'three-per-path selection must be Boolean and exclusive')
     allow_following = following_calls or twenty_four_following_calls
+    scheduler_budget, path_budget = (4, 3) if three_per_path_calls else (MAX_SCHEDULER_SITES, 1)
     target_budget = WIDE_ORDINARY_TARGETS if wide_targets else MAX_ORDINARY_TARGETS
     call_budget = WIDE_CALL_SITES if wide_targets else MAX_CALL_SITES
     if twenty_four_targets or twenty_four_following_calls:
         target_budget, call_budget = 24, 32
+    if three_per_path_calls:
+        target_budget, call_budget = 32, 40
     schedulers = sorted(site for site, target in calls.items() if target == SCHEDULER)
     ordinary = sorted(set(calls.values()) - {SCHEDULER})
-    require(1 <= len(schedulers) <= MAX_SCHEDULER_SITES and
+    require(1 <= len(schedulers) <= scheduler_budget and
             1 <= len(ordinary) <= target_budget and
             len(calls) <= call_budget and set(calls) <= set(edges),
             'scheduler branches exceed the explicit call-site or target bounds')
-    after = dict.fromkeys(edges, False)
+    after = dict.fromkeys(edges, 0)
+    maximum = 0
     following_sites = []
     for site in acyclic(edges):
-        # Union at joins retains every scheduler-return path. The separate
-        # following-call selector permits only ordinary calls afterwards; each
-        # such call still undergoes the complete frame/alias check.
+        # A maximum at every DAG join conservatively retains the longest
+        # scheduler path, even when a shorter arm is visited later. Calls are
+        # counted at their actual sites, independently of distinct targets.
         if after[site] and site in calls:
-            require(allow_following and calls[site] != SCHEDULER,
+            require(three_per_path_calls or (allow_following and calls[site] != SCHEDULER),
                     'scheduler branches exclude every call after a scheduler return')
-            following_sites.append(site)
-        scheduled = after[site] or calls.get(site) == SCHEDULER
+            if calls[site] != SCHEDULER:
+                following_sites.append(site)
+        scheduled = after[site] + (calls.get(site) == SCHEDULER)
+        require(scheduled <= path_budget,
+                'scheduler invocations exceed the explicit per-path bound')
+        maximum = max(maximum, scheduled)
         for target in edges[site]:
-            after[target] |= scheduled
+            after[target] = max(after[target], scheduled)
     if allow_following:
         require(len(schedulers) == 1 and following_sites,
                 'following-call contract requires one scheduler site and a reached following ordinary call')
     result = dict(scheduler_sites=schedulers, ordinary_targets=ordinary,
-        scheduler_site_budget=MAX_SCHEDULER_SITES, call_site_budget=call_budget,
+        scheduler_site_budget=scheduler_budget, call_site_budget=call_budget,
         ordinary_target_budget=target_budget,
-        maximum_scheduler_calls_per_path=1, ordinary_calls_after_scheduler=bool(following_sites))
+        maximum_scheduler_calls_per_path=maximum if three_per_path_calls else 1, ordinary_calls_after_scheduler=bool(following_sites))
+    if three_per_path_calls:
+        result['scheduler_calls_per_path_budget'] = path_budget
+        result['following_ordinary_sites'] = sorted(following_sites)
     if allow_following:
         result['following_ordinary_sites'] = sorted(following_sites)
     return result
 
 
-def bind(proof, edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False):
-    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets, twenty_four_targets=twenty_four_targets, twenty_four_following_calls=twenty_four_following_calls)
+def bind(proof, edges, calls, *, following_calls=False, wide_targets=False, twenty_four_targets=False, twenty_four_following_calls=False, three_per_path_calls=False):
+    result = phases(edges, calls, following_calls=following_calls, wide_targets=wide_targets, twenty_four_targets=twenty_four_targets, twenty_four_following_calls=twenty_four_following_calls, three_per_path_calls=three_per_path_calls)
     for target in result['ordinary_targets']:
         require(not match.function_thunk.reserved(target) and
                 target not in match.RUNTIME_HELPERS.values(),
