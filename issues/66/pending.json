@@ -59,6 +59,38 @@
           "who": "native-08042d4c"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4c4a2422b5b2bfa72713e4935be97dbb286a8cf4538434e812d06a5a235c846b",
+        "acknowledged_cursor": 6837750084,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4c4a2422b5b2bfa72713e4935be97dbb286a8cf4538434e812d06a5a235c846b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B4A1C\",\"who\":\"native-080b4a1c\",\"note\":\"Recover plausible C for complete 626-byte qualified bounded-buffer owner.\"}",
+          "created_at": "2026-11-12T22:32:14Z",
+          "id": 6837750084,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T22:32:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8fe701b8fae151b269146afa3b50a5c7e5d99f9724921a2581e95dd16aa405a1",
+        "result": {
+          "address": "0x080B4A1C",
+          "claim_id": 6837750084,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6837750084,
+          "status": "accepted",
+          "who": "native-080b4a1c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
