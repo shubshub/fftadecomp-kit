@@ -91,6 +91,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1a1332f787a642665b92f7c8b2afbd9459c0371da54c05d9833bb8dc3c5645da",
+        "acknowledged_cursor": 6821435433,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1a1332f787a642665b92f7c8b2afbd9459c0371da54c05d9833bb8dc3c5645da",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080430CC\",\"who\":\"match-native-080430CC\",\"note\":\"Recover complete84-byte row fill loop under native conditional BIOS fill bounds\"}",
+          "created_at": "2026-11-12T10:44:00Z",
+          "id": 6821435433,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T10:44:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "92c52d4b03c3a8988ef64c0b3b49605f16f75aff2a3ac55012f1c43bff45ccae",
+        "result": {
+          "address": "0x080430CC",
+          "claim_id": 6821435433,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6821435433,
+          "status": "accepted",
+          "who": "match-native-080430CC"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
