@@ -30,7 +30,35 @@
           "who": "match-native-08137CC4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "14590a84a959c0b3516b2d92f18f2a976e546045c0ffedd0259ad050a5fe97cd",
+        "acknowledged_cursor": 6833044119,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "14590a84a959c0b3516b2d92f18f2a976e546045c0ffedd0259ad050a5fe97cd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08137CC4\",\"who\":\"match-native-08137CC4\",\"claim_id\":6832169667,\"reason\":\"Candidate retained; explicit local CpuSet policy passes initial stack-source comparison but volatile semantic gate refuses changed store order at control offsets 0x43 and 0x41. No native match.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; explicit bounded-buffer-bios-fill-local-source-semantics-v1\"}",
+          "created_at": "2026-11-12T18:58:46Z",
+          "id": 6833044119,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T18:58:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6bbf7f0ad9e39a9d6f2ebc48baea07828e91968497a125dcd34d286856fc47ca",
+        "result": {
+          "address": "0x08137CC4",
+          "claim_id": 6832169667,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6833044119,
+          "status": "accepted",
+          "who": "match-native-08137CC4"
+        }
+      }
     },
     {
       "claim": {
