@@ -94,66 +94,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "c75a892d508625f2feb27415c22929e04b7ed7b98617dfc33103239dbfa9e650",
-        "acknowledged_cursor": 6836064477,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c75a892d508625f2feb27415c22929e04b7ed7b98617dfc33103239dbfa9e650",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08137CC4\",\"who\":\"match-native-08137cc4-forwarded\",\"note\":\"Single unchanged-source original native check after tested forwarded constant control-store composition and isolated fixtures.\"}",
-          "created_at": "2026-11-12T21:11:43Z",
-          "id": 6836064477,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T21:11:43Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a3a92286e82b46addcba1c014d8e0ec8bbd32db99dca6c88b5dce031ecafc6fa",
-        "result": {
-          "address": "0x08137CC4",
-          "claim_id": 6836064477,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6836064477,
-          "status": "accepted",
-          "who": "match-native-08137cc4-forwarded"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c40bb18124aac1f454650325c43e8dcbce3a969692463a647fa4f098e87b7f7e",
-        "acknowledged_cursor": 6836110072,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c40bb18124aac1f454650325c43e8dcbce3a969692463a647fa4f098e87b7f7e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08137CC4\",\"who\":\"match-native-08137cc4-forwarded\",\"claim_id\":6836064477,\"reason\":\"One unchanged-source native replay refused typed surviving ordered events after bounded forwarded-control prerequisite; source and original compiler products retained. No match credit.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T21:13:49Z",
-          "id": 6836110072,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T21:13:49Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "150d47bf12ee060cc5c793406786892f2bc3fd4ac3fa2e0db263d8e2ebddaf7f",
-        "result": {
-          "address": "0x08137CC4",
-          "claim_id": 6836064477,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6836110072,
-          "status": "accepted",
-          "who": "match-native-08137cc4-forwarded"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "3488388afc0627d7982094878d48b34a586145930267147ed0acbd92b850fc92",
         "acknowledged_cursor": 6836077340,
         "body_provenance": "acceptance-time",
