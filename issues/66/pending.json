@@ -90,7 +90,35 @@
           "who": "match-native-081419C0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ef4503bb9128e08b9b31f680abf70050d5ed37616637b0b84890ca60b8e525c3",
+        "acknowledged_cursor": 6831769449,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef4503bb9128e08b9b31f680abf70050d5ed37616637b0b84890ca60b8e525c3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081419C0\",\"who\":\"match-native-081419C0\",\"claim_id\":6831656753,\"reason\":\"Complete168-byte candidate differs at45 positions after three natural formulations; ordinary declarations do not establish asynchronous interrupt-register semantics.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; three natural nonvolatile formulations\"}",
+          "created_at": "2026-11-12T18:03:39Z",
+          "id": 6831769449,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T18:03:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ee44f2c413e0ac200a3ca260dc99a78b49d7ac5879bb45aa8fbcb484411c05a7",
+        "result": {
+          "address": "0x081419C0",
+          "claim_id": 6831656753,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6831769449,
+          "status": "accepted",
+          "who": "match-native-081419C0"
+        }
+      }
     }
   ],
   "issue": 66,
