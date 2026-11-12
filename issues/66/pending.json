@@ -90,6 +90,66 @@
           "who": "match-native-08000460"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "c186a79b51df1a44e62a95583a5fd9d04e53f978b885c4fe181052599ad6df6c",
+        "acknowledged_cursor": 6821858324,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c186a79b51df1a44e62a95583a5fd9d04e53f978b885c4fe181052599ad6df6c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000460\",\"who\":\"match-native-08000460\",\"claim_id\":6821657003,\"reason\":\"O0 complete80-byte text diagnostically identical but native ELF gate rejects8 extra allocated rodata bytes; two callee entries absent; no native MATCH\",\"unmatchable\":true,\"tried\":\"agbcc O0 O1 O2 and O0 -fexpensive-optimizations; named-data declarations and ordinary address forms\"}",
+          "created_at": "2026-11-12T11:04:41Z",
+          "id": 6821854202,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T11:04:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "acc5a9f1e3d0e53bba15f8e69ccd9f2c6d016497b1d93b7f480b1f8897269f6b",
+        "result": {
+          "address": "0x08000460",
+          "claim_id": 6821657003,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6821854202,
+          "status": "accepted",
+          "who": "match-native-08000460"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "25d2d3224d0cae2e573157cef829a30f40a4bcf4019291231247670a39ccac5c",
+        "acknowledged_cursor": 6821858324,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "25d2d3224d0cae2e573157cef829a30f40a4bcf4019291231247670a39ccac5c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08001CD0\",\"who\":\"match-native-08001CD0\",\"note\":\"Qualify indexed direct-call target and recover complete16-byte buffer selector toggle\"}",
+          "created_at": "2026-11-12T11:04:52Z",
+          "id": 6821858324,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T11:04:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "acc5a9f1e3d0e53bba15f8e69ccd9f2c6d016497b1d93b7f480b1f8897269f6b",
+        "result": {
+          "address": "0x08001CD0",
+          "claim_id": 6821858324,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6821858324,
+          "status": "accepted",
+          "who": "match-native-08001CD0"
+        }
+      },
       "release": null
     }
   ],
