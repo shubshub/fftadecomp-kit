@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "607d151e922e63172c89f4e798a0a6f7e0f47bc1b64142985558d50d46a6a431",
+        "acknowledged_cursor": 6816907976,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "607d151e922e63172c89f4e798a0a6f7e0f47bc1b64142985558d50d46a6a431",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813ECC4\",\"who\":\"primary\",\"note\":\"Recover the complementary alpha-blend update using the existing control-register declaration; validate complete bytes and the bounded arithmetic reread prerequisite.\"}",
+          "created_at": "2026-11-12T06:51:34Z",
+          "id": 6816907976,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T06:51:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "78d7c6fbdabcc741b67181d27d22ac06a2858bef6616d2843c1318b5afccd55d",
+        "result": {
+          "address": "0x0813ECC4",
+          "claim_id": 6816907976,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6816907976,
+          "status": "accepted",
+          "who": "primary"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
