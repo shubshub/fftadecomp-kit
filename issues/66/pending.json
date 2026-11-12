@@ -59,6 +59,102 @@
           "who": "match-team-0802A2C0"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bf3bf427da37dedda4fe9f2465eb4badbc6b9fb4ce48848c9c70bcc583986ddc",
+        "acknowledged_cursor": 6819996824,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bf3bf427da37dedda4fe9f2465eb4badbc6b9fb4ce48848c9c70bcc583986ddc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802A370\",\"who\":\"match-native-0802A370\",\"note\":\"Recover complete plausible function in an isolated single-address matching lane.\"}",
+          "created_at": "2026-11-12T09:34:33Z",
+          "id": 6819996549,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:34:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1bd49c1446cd9ccc41a8020ec588ba4a8c74616e2017ca1660af64f64591aef8",
+        "result": {
+          "address": "0x0802A370",
+          "claim_id": 6819996549,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6819996549,
+          "status": "accepted",
+          "who": "match-native-0802A370"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "41af531ce0580972262595d60d3d87628d95c0bb448eaf64e7b40c1fa68d6285",
+        "acknowledged_cursor": 6819996824,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "41af531ce0580972262595d60d3d87628d95c0bb448eaf64e7b40c1fa68d6285",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803155C\",\"who\":\"match-native-0803155C\",\"note\":\"Recover complete plausible function in an isolated single-address matching lane.\"}",
+          "created_at": "2026-11-12T09:34:33Z",
+          "id": 6819996666,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:34:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1bd49c1446cd9ccc41a8020ec588ba4a8c74616e2017ca1660af64f64591aef8",
+        "result": {
+          "address": "0x0803155C",
+          "claim_id": 6819996666,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6819996666,
+          "status": "accepted",
+          "who": "match-native-0803155C"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fb254a708bcacfc475c574b24b7b87565a9e122e0cd741bae9d5cdaa9430d71f",
+        "acknowledged_cursor": 6819996824,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fb254a708bcacfc475c574b24b7b87565a9e122e0cd741bae9d5cdaa9430d71f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804D91C\",\"who\":\"match-native-0804D91C\",\"note\":\"Recover complete plausible function in an isolated single-address matching lane.\"}",
+          "created_at": "2026-11-12T09:34:34Z",
+          "id": 6819996824,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T09:34:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1bd49c1446cd9ccc41a8020ec588ba4a8c74616e2017ca1660af64f64591aef8",
+        "result": {
+          "address": "0x0804D91C",
+          "claim_id": 6819996824,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6819996824,
+          "status": "accepted",
+          "who": "match-native-0804D91C"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
