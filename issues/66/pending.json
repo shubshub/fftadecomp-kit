@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "9de8b1b139bb722deda901bf6ae5167d1d14660f98e8cb21547ba29431bc1c64",
-        "acknowledged_cursor": 6831317306,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "9de8b1b139bb722deda901bf6ae5167d1d14660f98e8cb21547ba29431bc1c64",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0814513C\",\"who\":\"match-native-0814513C\",\"note\":\"Recover natural C for complete 120-byte library initialization routine; native structural qualification passed.\"}",
-          "created_at": "2026-11-12T17:43:55Z",
-          "id": 6831317306,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T17:43:55Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5b24e5225182161f60c1fc0a1c88d1ba7093bf3d455d77d8fe4b39c6a1a115b3",
-        "result": {
-          "address": "0x0814513C",
-          "claim_id": 6831317306,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6831317306,
-          "status": "accepted",
-          "who": "match-native-0814513C"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "b67f8840ba88ff4267d5b8712d871666e30e8680de8d81e5f24407c318d3caf6",
-        "acknowledged_cursor": 6831475398,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b67f8840ba88ff4267d5b8712d871666e30e8680de8d81e5f24407c318d3caf6",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814513C\",\"who\":\"match-native-0814513C\",\"claim_id\":6831317306,\"reason\":\"Pre-authoring boundary: reached code-copy literal08144595 clears to unindexed08144594; typed executable-copy identity unresolved. No C authored; structural qualification gives no source match credit.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T17:50:42Z",
-          "id": 6831475398,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T17:50:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a28ff0739fc4adb168f2f5b7419a93370ebc6ab19496b5dcb99079ac4536d144",
-        "result": {
-          "address": "0x0814513C",
-          "claim_id": 6831317306,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6831475398,
-          "status": "accepted",
-          "who": "match-native-0814513C"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "85410edfc1844c04820014ebe482055741abfa4763df7d648a7ac9137b30ac6c",
         "acknowledged_cursor": 6831636825,
         "body_provenance": "acceptance-time",
