@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "61fdb75b576ebeab0a2edee628ff57a204432cb79454efde1843d95d9ca35de6",
-        "acknowledged_cursor": 6823995419,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "61fdb75b576ebeab0a2edee628ff57a204432cb79454efde1843d95d9ca35de6",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08029DD4\",\"who\":\"match-team-08029DD4\",\"note\":\"Recover complete BIOS-filled decimal tile rendering routine with native verification\"}",
-          "created_at": "2026-11-12T12:46:24Z",
-          "id": 6823995419,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T12:46:24Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "531b89a917688054cde829a2868250558153c01061728a1529759ccabd32eeba",
-        "result": {
-          "address": "0x08029DD4",
-          "claim_id": 6823995419,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6823995419,
-          "status": "accepted",
-          "who": "match-team-08029DD4"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "5981053865b1be5816eeaa8fc393f5ad666b054b00314f05d9a783cf0e3b9604",
-        "acknowledged_cursor": 6824112847,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5981053865b1be5816eeaa8fc393f5ad666b054b00314f05d9a783cf0e3b9604",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08029DD4\",\"who\":\"match-team-08029DD4\",\"claim_id\":6823995419,\"reason\":\"Plausible decimal tile rendering recovered; complete ELF112 versus116 target. Natural variants exhausted in bounded attempt; codegen differences and native runtime dependency refusal preserved.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-12T12:51:51Z",
-          "id": 6824112847,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-12T12:51:51Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "95817aa38e6e90e77493710758432a92213eb73b87b57b8d756071c71724b49b",
-        "result": {
-          "address": "0x08029DD4",
-          "claim_id": 6823995419,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6824112847,
-          "status": "accepted",
-          "who": "match-team-08029DD4"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "5f1a8a92a3657e9db729d4b72a48c8aaa7ed33f1fad4a780718caeb62fa2f927",
         "acknowledged_cursor": 6824185842,
         "body_provenance": "acceptance-time",
