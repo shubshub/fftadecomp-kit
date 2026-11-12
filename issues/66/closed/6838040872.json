@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e82d75d52700934c7af6a2316ae2c6ea7bc5c47aa3ddf0ce3b09afef3f97b3bd",
+    "acknowledged_cursor": 6838040872,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e82d75d52700934c7af6a2316ae2c6ea7bc5c47aa3ddf0ce3b09afef3f97b3bd",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08043ECC\",\"who\":\"native-08043ecc\",\"note\":\"Recover complete 152-byte finite local-copy caller using tested genuine memcpy binding.\"}",
+      "created_at": "2026-11-12T22:47:03Z",
+      "id": 6838040872,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:47:03Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "07a3dce7e4ea9f708fb4991fb65416288be6d4daa64a04b9386d48df8a639de8",
+    "result": {
+      "address": "0x08043ECC",
+      "claim_id": 6838040872,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6838040872,
+      "status": "accepted",
+      "who": "native-08043ecc"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "683c99db148098a0dcf6fb74b6db793768f424ea551cf757b553c87445670511",
+    "acknowledged_cursor": 6838273571,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "683c99db148098a0dcf6fb74b6db793768f424ea551cf757b553c87445670511",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08043ECC\",\"who\":\"native-08043ecc\",\"claim_id\":6838040872,\"reason\":\"Complete native match of 152 bytes from plausible C; preserved genuine compiler memcpy identity and bounded local halfword cursor proof. Ready for integration.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-12T22:58:07Z",
+      "id": 6838273571,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-12T22:58:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3e55d3e4f2ca2cdc34c4702d18528284bf5ee81365efd83ff57b937195080078",
+    "result": {
+      "address": "0x08043ECC",
+      "claim_id": 6838040872,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6838273571,
+      "status": "accepted",
+      "who": "native-08043ecc"
+    }
+  }
+}
