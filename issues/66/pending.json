@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "39ce8623d7eef67800501c6d6d47125cfc4a73dee607dab0b9f35e4140b0fee0",
+        "acknowledged_cursor": 6835847565,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "39ce8623d7eef67800501c6d6d47125cfc4a73dee607dab0b9f35e4140b0fee0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810D470\",\"who\":\"match-native-0810d470\",\"note\":\"Recover complete plausible scheduler function using the qualified native profile and fixed extents.\"}",
+          "created_at": "2026-11-12T21:02:08Z",
+          "id": 6835847565,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-12T21:02:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a129c51572d0c584bf661db8c5fd411755d1d1e775d1da0f7155a6b697bcf8ed",
+        "result": {
+          "address": "0x0810D470",
+          "claim_id": 6835847565,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6835847565,
+          "status": "accepted",
+          "who": "match-native-0810d470"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
