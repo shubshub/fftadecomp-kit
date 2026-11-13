@@ -26,8 +26,12 @@ symbolically along every path, and the check requires
    stored value), every local frame byte, with the stores applied in order,
    joins the behaviour (incoming-argument slots included).  Every callee
    needs a file-scope prototype with a fixed list of one-word arguments;
-   no prototype, `()`, `...`, indirect calls and wider arguments fail
-   closed.  No prototype is trusted to name every register the callee
+   no prototype, `()`, `...` and wider arguments fail closed.  A
+   `bl _call_via_rN` is an opaque call like a named one when rN holds a
+   word loaded from a file-scope function-pointer object (or array) whose
+   declared type is such a prototype and whose every use in a body is a
+   direct call through that type (indirect_signature); any other indirect
+   call fails closed.  No prototype is trusted to name every register the callee
    reads, so every call counts as reading r0-r3, unless the callee is an
    indexed Thumb function whose ROM code shows which of them it reads
    (RomInterfaces, transitively through its own calls, failing closed);
@@ -469,6 +473,102 @@ def function_signature(scope, name):
     return found.pop() if found else (True, None)
 
 
+def callback_prototype(declaration, callback_types):
+    """(returns, arity) of one prototyped `R (*)(params)` of one-word arguments, or None"""
+    if callback_declaration(declaration) is None:
+        return None             # unprototyped `()`, variadic and unreadable types
+    result, parameters = re.fullmatch(r"([^()]+?)\s*\(\s*\*[^()]*\)\s*\((.*)\)",
+                                      declaration.strip(), re.S).groups()
+    result = [t for t in result.split() if t not in QUALIFIERS]
+    if result != ["void"] and argument_words(" ".join(result)) is None:
+        return None
+    if parameters.strip() == "void":
+        return result != ["void"], 0
+    parts = parameter_parts(parameters)
+    if any(argument_words(part, callback_types) != 1 for part in parts):
+        return None
+    return result != ["void"], len(parts)
+
+
+INDEX = r"(?:0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*"
+
+
+def indirect_signature(code, scope, name):
+    """(returns, arity, elements) of calls through the file-scope pointer object `name`.
+
+    elements is None for one pointer, else the array length (0 if unsized).
+    The type is the object's declared function-pointer type, read only from
+    a unique direct typedef or a direct `R (*name[N])(params)` declarator;
+    every declaration must agree. It is the type at each call site only
+    because every use of `name` inside a body must be a direct call
+    `name(...)` or `name[K](...)` with a literal K and exactly arity
+    arguments: a cast, copy, address or member use fails closed. Returns
+    the reason as a string when the object cannot be typed that way.
+    """
+    callback_types = callback_typedefs(scope)
+    found = set()
+    word = re.escape(name)
+    dimension = r"(\[\s*(" + INDEX + r")?\s*\])?"
+    for declaration in scope.split(";"):
+        if not re.search(r"\b" + word + r"\b", declaration):
+            continue
+        text = re.sub(r"\s+", " ", declaration).strip()
+        prototype = None
+        typed = re.fullmatch(r"(?:(?:extern|const|volatile) )*([A-Za-z_]\w*) (?:(?:const|volatile) )*" +
+                             word + r" ?" + dimension, text)
+        if typed and typed[1] in callback_types:
+            for body in scope.split(";"):
+                body = re.sub(r"^\s*typedef\s+", "", body) if re.match(r"\s*typedef\b", body) else None
+                if body is not None and callback_declaration(body) == typed[1]:
+                    prototype = callback_prototype(body, callback_types)
+            array = typed[2]
+        else:
+            direct = re.fullmatch(r"(?:extern )?([^()]+?) ?\( ?\* ?(?:(?:const|volatile) )*" + word +
+                                  r" ?" + dimension + r" ?\) ?\((.*)\)", text)
+            if direct:
+                prototype = callback_prototype(f"{direct[1]} (*)({direct[4]})", callback_types)
+                typed = direct
+            array = direct and direct[2]
+        if prototype is None:
+            return f"the declaration of {name} is not a prototyped function pointer of one-word arguments"
+        found.add(prototype + ((int(typed[3].rstrip("uUlL"), 0) if typed[3] else 0) if array else None,))
+    if not found:
+        return f"{name} has no file-scope declaration"
+    if len({entry[:2] + (entry[2] is None,) for entry in found}) != 1 or \
+            len({entry[2] for entry in found} - {None, 0}) > 1:
+        return f"the file-scope declarations of {name} disagree"
+    returns, arity, elements = max(found, key=lambda entry: entry[2] or 0)
+    depth, position = 0, 0
+    for use in re.finditer(r"\b" + word + r"\b", code):
+        depth += code.count("{", position, use.start()) - code.count("}", position, use.start())
+        position = use.start()
+        if depth <= 0:
+            continue
+        if code[:use.start()].rstrip().endswith((".", "->")):
+            return f"a member named {name} is used"
+        call = re.match(word + (r"\s*\[\s*(" + INDEX + r")\s*\]" if elements is not None else "()") +
+                        r"\s*\(", code[use.start():])
+        if call is None:
+            return f"{name} is used other than as a direct call through its declared type"
+        if elements and int(call[1].rstrip("uUlL"), 0) >= elements:
+            return f"a call through {name} indexes outside the array"
+        start, level = use.start() + call.end(), 1
+        for end in range(start, len(code)):
+            level += {"(": 1, ")": -1}.get(code[end], 0)
+            if not level:
+                break
+        else:
+            return f"a call through {name} is unterminated"
+        arguments = code[start:end].strip()
+        try:
+            count = len(parameter_parts(arguments)) if arguments else 0
+        except SemanticError:
+            return f"the arguments of a call through {name} cannot be read"
+        if count != arity:
+            return f"a call through {name} passes {count} arguments to its {arity}-argument prototype"
+    return returns, arity, elements
+
+
 # ---------------------------------------------------------------- expressions
 
 def contains(expression, atom):
@@ -756,6 +856,7 @@ class Record:
         self.guarded, self.derived = set(), None
         self.conditional_interface = None
         self.local_fill_premise = None
+        self.indirect = None
         self.__dict__.update(fields)
 
 
@@ -1176,11 +1277,34 @@ class Executor:
         return [("local-fill-source", self.observed(source), width,
                  ("bytes", *(content[byte] for byte in range(width)))), destination, control]
 
-    def call(self, target, text, record):
+    def indirect_arity(self, pointer, via, text):
+        """the arity of `bl _call_via_<via>` when <via> provably holds a word loaded from
+        a file-scope function-pointer object whose every use is a direct call
+        (indirect_signature); the callee itself stays opaque"""
+        name = global_symbol(pointer[2]) if isinstance(pointer, tuple) and \
+            pointer[0] == "load" and pointer[1] == 4 else None
+        if name is None or name == self.symbol:
+            self.fail(text, "the called pointer is not a word loaded from a typed function-pointer object")
+        signature = self.signatures.get(("via", name))
+        if not isinstance(signature, tuple):
+            self.fail(text, signature or f"{name} is not a typed function-pointer object")
+        _, arity, elements = signature
+        offset = signed32(linear(pointer[2])[0])
+        if offset < 0 or offset % 4 or (offset if elements is None else elements and offset >= 4 * elements):
+            self.fail(text, f"the called pointer {name}{offset:+#x} is not an element of its declaration")
+        if via in {f"r{n}" for n in range(min(arity, 4))}:
+            self.fail(text, f"the called pointer is in {via}, an argument register of the "
+                      f"{arity}-argument prototype of {name}")
+        return arity
+
+    def call(self, target, text, record, via=None):
         if isinstance(target, str) and target in RUNTIME_ARITY:
             count, trusted = RUNTIME_ARITY[target], True
         elif isinstance(target, tuple) and target[0] == "swi":
             count, trusted = 4, False        # BIOS calls take r0-r3 only
+        elif isinstance(target, tuple) and target[0] == "via":
+            count, trusted = self.indirect_arity(target[1], via, text), False
+            record.indirect = f"{global_symbol(target[1][2])} as {count} argument{'s' if count != 1 else ''}"
         elif isinstance(target, str) and self.signatures.get(target, (None, None))[1] is not None:
             count, trusted = self.signatures[target][1], False
         else:
@@ -1442,12 +1566,12 @@ class Executor:
             record.kind = "call"
             record.reads, record.writes = {"r0", "r1", "r2", "r3"}, {"r0", "r1", "r2", "r3", "r12", "lr"}
             via = re.fullmatch(r"_call_via_(r[0-9]|r1[0-2]|ip|fp|sl|sb|lr)", operands[0])
-            target = operands[0]
+            target, name = operands[0], None
             if via:
                 name = register(via[1])
                 record.reads.add(name)
                 target = ("via", regs[name])
-            self.call(target, text, record)
+            self.call(target, text, record, name)
             return None
         if mnemonic == "bx":
             if len(operands) != 1:
@@ -2079,12 +2203,15 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
 
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces,
                     _capture_load_provenance=_capture_load_provenance)
-    read_modify_write, chained, unloaded, relied, updates, ordinary, conditional = (set() for _ in range(7))
+    read_modify_write, chained, unloaded, relied, updates, ordinary, conditional, indirect = \
+        (set() for _ in range(8))
     for number, path in enumerate(paths, 1):
         records = path.records
         for call in records:
             if call.local_fill_premise:
                 conditional.add(call.derived + ": " + call.local_fill_premise)
+            if call.indirect:
+                indirect.add(call.indirect)
         # 4. a store must not write back the value it read from the same byte
         for record in records:
             if record.kind == "store" and pinned_width(record.address) and record.self_assignment:
@@ -2208,6 +2335,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    if indirect:
+        return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect))
     if conditional:
         return result + (sorted(updates), sorted(ordinary), sorted(conditional))
     if ordinary:
@@ -2336,6 +2465,15 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                 names.add(operands[0])
     scope = file_scope(preprocessed)
     signatures = {name: function_signature(scope, name) for name in names}
+    # `bl _call_via_rN`: the prototype is the pointer object's declared type,
+    # keyed ("via", object) for every literal-pool symbol (indirect_signature).
+    if any(name.startswith("_call_via_") for name in names):
+        for function in real.values():
+            for pool in function[2].values():
+                for word in pool:
+                    pointer = global_symbol(word) if not isinstance(word, int) and word[0] != "code" else None
+                    if pointer and ("via", pointer) not in signatures:
+                        signatures[("via", pointer)] = indirect_signature(code, scope, pointer)
     if perturbed_assembly is not None:
         _, mapping, _ = perturbed_declaration(declaration)
         perturbed, _ = parse_assembly(perturbed_assembly)
@@ -2364,7 +2502,7 @@ def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
     for name, paths, read_modify_write, chained, *extra in results:
-        unloaded, relied, updates, ordinary, conditional = (extra + [[], [], [], [], []])[:5]
+        unloaded, relied, updates, ordinary, conditional, indirect = (extra + [[], [], [], [], [], []])[:6]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
                      f"chained re-reads at {list(n + 1 for n in chained)}" +
@@ -2374,7 +2512,8 @@ def record(symbol, results, perturbed=False):
                      (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
-                     (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else ""))
+                     (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
+                     (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
             "; ".join(parts))
