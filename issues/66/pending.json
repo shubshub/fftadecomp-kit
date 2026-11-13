@@ -3330,66 +3330,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "2c399bbcdf5a0855f44df15a027bb00c6820351c79a47d462495a36024063963",
-        "acknowledged_cursor": 6865370496,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2c399bbcdf5a0855f44df15a027bb00c6820351c79a47d462495a36024063963",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081227F8\",\"who\":\"astra-retained-081227f8\",\"note\":\"Replay unchanged retained220-byte source under existing bounded-buffer-named-three-halfword-output-v1, which supports actual0801C918 output leaf; no source/tool edits.\"}",
-          "created_at": "2026-11-13T21:29:14Z",
-          "id": 6865370496,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T21:29:14Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "12f032a5eb310cbacd095b3e9cdfdb294a3730f83dd0717c3e03cf1c3ceeca49",
-        "result": {
-          "address": "0x081227F8",
-          "claim_id": 6865370496,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6865370496,
-          "status": "accepted",
-          "who": "astra-retained-081227f8"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "3c2bb9c19554b91b9bbddb15ddf7afa33bbf39bf50b2fcb61cff7e753a886c9b",
-        "acknowledged_cursor": 6865415612,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3c2bb9c19554b91b9bbddb15ddf7afa33bbf39bf50b2fcb61cff7e753a886c9b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081227F8\",\"who\":\"astra-retained-081227f8\",\"claim_id\":6865370496,\"reason\":\"Unchanged retained220-byte source; current named-three-halfword-output profile now reaches nested0801BA20 ->08141898 but refuses non-leaf calls and interrupts without linked CFG verification. Nativeexit1,no credit. Evidence direct-astra/081227F8; no source/tool changes.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; bounded-buffer-named-three-halfword-output-v1\"}",
-          "created_at": "2026-11-13T21:31:32Z",
-          "id": 6865415612,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T21:31:32Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "60e7dbbd94b76f08e15d0558cfde175e5662f0f37a12cf49b75c424df80a9201",
-        "result": {
-          "address": "0x081227F8",
-          "claim_id": 6865370496,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6865415612,
-          "status": "accepted",
-          "who": "astra-retained-081227f8"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "7f8d137fe934ccc0fa109129b8f77f97c60977cb4d53c64d6e3a6c7221c78e49",
         "acknowledged_cursor": 6865388620,
         "body_provenance": "acceptance-time",
