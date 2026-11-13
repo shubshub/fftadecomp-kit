@@ -47,6 +47,11 @@ SWITCH_U16_SCALAR_SELECTOR = "u16-scalars-v1"
 SWITCH_U16_SCALAR_SCHEMA = "elf-symbol-thumb-switch-data-u16-scalars-v1"
 SWITCH_U16_SCALAR_SUMMARY = "one guarded local Thumb table with complete mapped object and u16 scalar words"
 SWITCH_U16_SCALAR_POLICY = "complete-reachable-u16-scalar-words-v1"
+SWITCH_POOL_U16_SCALAR_SELECTOR = "u16-scalars-v2"
+SWITCH_POOL_U16_SCALAR_SCHEMA = "elf-symbol-thumb-switch-data-u16-scalars-v2"
+SWITCH_POOL_U16_SCALAR_SUMMARY = ("one guarded local Thumb table found by its dispatch load, "
+                                  "with complete mapped object and u16 scalar words")
+SWITCH_POOL_POLICY = "dispatch-identified-table-pointer-v1"
 PRELOADED_SWITCH_SCHEMA = "elf-symbol-thumb-preloaded-switch-v1"
 PRELOADED_SWITCH_SUMMARY = "one preloaded guarded local Thumb table; backward default loop; termination not proved"
 PRELOADED_SWITCH_CONTROL_FLOW = "closed leaf CFG; termination not proved"
@@ -460,6 +465,15 @@ def switch_u16_scalar_fingerprint(address, data, manifest):
     return digest.hexdigest()
 
 
+def switch_pool_u16_scalar_fingerprint(address, data, manifest):
+    digest = hashlib.sha256()
+    for payload in (SWITCH_POOL_U16_SCALAR_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
+                    data, switch_manifest(manifest).encode("ascii")):
+        digest.update(len(payload).to_bytes(8, "little"))
+        digest.update(payload)
+    return digest.hexdigest()
+
+
 def preloaded_switch_fingerprint(address, data, manifest):
     digest = hashlib.sha256()
     for payload in (PRELOADED_SWITCH_SCHEMA.encode("ascii"), address.to_bytes(4, "little"),
@@ -558,11 +572,14 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         mapping = mapping_snapshot(root)
         objects = data_snapshot(root) if data_profile else None
         outgoing_frame = data_profile and single("* verification: ") == f"`{typed_switch_frame.SCHEMA}`"
-        scalar_data = data_profile and \
+        pool_data = data_profile and \
+            single("* verification: ") == f"`{SWITCH_POOL_U16_SCALAR_SCHEMA}`"
+        scalar_data = pool_data or data_profile and \
             single("* verification: ") == f"`{SWITCH_U16_SCALAR_SCHEMA}`"
         multiple_data = outgoing_frame or scalar_data or data_profile and \
             single("* verification: ") == f"`{SWITCH_MULTIPLE_DATA_SCHEMA}`"
         summary = (typed_switch_frame.SUMMARY if outgoing_frame else
+                   SWITCH_POOL_U16_SCALAR_SUMMARY if pool_data else
                    SWITCH_U16_SCALAR_SUMMARY if scalar_data else
                    SWITCH_MULTIPLE_DATA_SUMMARY if multiple_data else
                    SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
@@ -575,6 +592,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
             excluded = excluded[1:]
         if data_profile:
             schema = (typed_switch_frame.SCHEMA if outgoing_frame else
+                      SWITCH_POOL_U16_SCALAR_SCHEMA if pool_data else
                       SWITCH_U16_SCALAR_SCHEMA if scalar_data else
                       SWITCH_MULTIPLE_DATA_SCHEMA if multiple_data else SWITCH_DATA_SCHEMA)
             if single("* verification: ") != f"`{schema}`":
@@ -613,10 +631,14 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         if scalar_data != (isinstance(manifest, dict) and
                            manifest.get("scalar_policy") == SWITCH_U16_SCALAR_POLICY):
             return False
+        if pool_data != (isinstance(manifest, dict) and
+                         manifest.get("pool_policy") == SWITCH_POOL_POLICY):
+            return False
         rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
                                          data_mapping=objects)
         fingerprint = (typed_switch_frame.fingerprint if outgoing_frame else
+                       switch_pool_u16_scalar_fingerprint if pool_data else
                        switch_u16_scalar_fingerprint if scalar_data else
                        switch_multiple_data_fingerprint if multiple_data else
                        switch_data_fingerprint if data_profile else switch_fingerprint)
@@ -1110,6 +1132,7 @@ def report_matches(report, root, address):
     if profiles in ([f"* verification: `{SWITCH_DATA_SCHEMA}`"],
                     [f"* verification: `{SWITCH_MULTIPLE_DATA_SCHEMA}`"],
                     [f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`"],
+                    [f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{typed_switch_frame.SCHEMA}`"]):
         return switch_report_matches(lines, root, address, data_profile=True)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:

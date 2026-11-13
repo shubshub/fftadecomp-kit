@@ -42,7 +42,8 @@ import subprocess
 import sys
 from threading import Lock, active_count
 from match_evidence import (report_matches, compiler_flags,
-                            SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR)
+                            SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
+                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -309,7 +310,12 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 owner_profile = owner_admission_profile.selected(saved_report)
                 constants_profile = switch_constants.selected_policy(saved_report)
                 typed_outgoing_profile = typed_switch_frame.selector_for_report(saved_report)
-                u16_switch_profile = f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in saved_report.splitlines()
+                u16_switch_profile = (
+                    SWITCH_U16_SCALAR_SELECTOR
+                    if f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
+                    SWITCH_POOL_U16_SCALAR_SELECTOR
+                    if f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
+                    False)
                 double_profile = software_double.selected(saved_report)
                 if double_profile:
                     target_remainder_profile = software_double.target_remainder_selected(saved_report)
@@ -376,7 +382,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             if typed_outgoing_profile:
                 command += ["--switch-data-profile", typed_outgoing_profile]
             if u16_switch_profile:
-                command += ["--switch-data-profile", SWITCH_U16_SCALAR_SELECTOR]
+                command += ["--switch-data-profile", u16_switch_profile]
             if unsigned_runtime_profile:
                 command += ["--unsigned-runtime-profile", unsigned_runtime_profile]
             if signed_runtime_profile:

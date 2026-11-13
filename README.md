@@ -2034,6 +2034,35 @@ mode are intentionally no longer accepted. Existing schema names are unchanged;
 complete valid Thumb and ARM reports remain supported. Provisional legacy
 mapping extents are not substituted for the complete compiled symbol.
 
+### Dispatch-identified switch pools
+
+`--switch-data-profile u16-scalars-v2` selects the separate
+`elf-symbol-thumb-switch-data-u16-scalars-v2` schema. It keeps every rule of
+`u16-scalars-v1` and changes only how the table pointer is found: by its use,
+not by its position. The pointer is the word loaded by the dispatch's
+PC-relative `ldr`, which is then indexed by the guarded, scaled selector. Any
+number of words (at most 255, the reach of that load) may sit between the
+dispatch and the pointer. The layout must still be unique, with the same
+exact unsigned guard, five-op dispatch, zero alignment halfword, complete
+in-function table and forward local cases.
+
+The interposed words gain nothing from their position. Each one is an
+ordinary reached literal and must be bound like any other: a typed object
+word through its named data binding, or an exact u16 scalar record under the
+existing complete-reachable-u16 policy. At least one interposed word is
+required; a word that is neither, or that no reached load reads, rejects. The
+dispatch load must be the only reader of the table pointer. The alignment and
+interposed words are reserved as data before decoding, so no reachable
+instruction may overlap them.
+
+The manifest adds `"pool_policy": "dispatch-identified-table-pointer-v1"`,
+and the fingerprint is domain-separated by the v2 schema. Replay requires
+both, and status forwards the saved selector. `u16-scalars-v1`, the other
+switch profiles and their reports are unchanged: they still accept only their
+fixed pool shapes. Frames, function literals, runtime thunks, signed or
+32-bit scalar words and owner-level selectors are not extended by this
+profile.
+
 ### Preloaded guarded Thumb switches
 
 The distinct `elf-symbol-thumb-preloaded-switch-v1` profile supports one

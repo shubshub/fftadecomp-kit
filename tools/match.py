@@ -70,6 +70,9 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SWITCH_U16_SCALAR_SELECTOR, SWITCH_U16_SCALAR_SCHEMA,
                             SWITCH_U16_SCALAR_SUMMARY, SWITCH_U16_SCALAR_POLICY,
                             switch_u16_scalar_fingerprint,
+                            SWITCH_POOL_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SCHEMA,
+                            SWITCH_POOL_U16_SCALAR_SUMMARY, SWITCH_POOL_POLICY,
+                            switch_pool_u16_scalar_fingerprint,
                             PRELOADED_SWITCH_SCHEMA, PRELOADED_SWITCH_SUMMARY,
                             PRELOADED_SWITCH_CONTROL_FLOW, preloaded_switch_fingerprint,
                             UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
@@ -617,7 +620,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                    allow_switch_constants=False, umodsi3_bindings=None,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                    allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
-                   allow_self_call=False):
+                   allow_self_call=False, switch_interposed_pool=False):
     """Bind external Thumb calls and explicitly mapped absolute data words.
 
     allow_self_call admits `bl <own entry>` relocations against the function's
@@ -626,6 +629,10 @@ def call_bindings(image, name, address, mapping, rom_size,
     """
     if type(allow_self_call) is not bool:
         raise ValueError("self-call opt-in must be Boolean")
+    check_switch_pool_opt_in(switch_interposed_pool, allow_switch_data,
+                             function_thunks, allow_switch_constants, multiple_switch_profile,
+                             double_bindings, signed_runtime_profile, unsigned_runtime_profile,
+                             umod_r1_profile)
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context
         check_context(multiple_switch_profile, switch_relocations,
@@ -1060,7 +1067,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                           bytes(relocated), address, switch_relocations,
                           data_relocations if data_relocations else None, allow_preloaded_switch,
                           allow_switch_constants=allow_switch_constants,
-                          multiple_switch_profile=multiple_switch_profile))
+                          multiple_switch_profile=multiple_switch_profile,
+                          interposed_pool=switch_interposed_pool))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if not (calls or data_relocations or function_relocations or switch_relocations) or \
@@ -1084,8 +1092,13 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_preloaded_switch=False, modsi3_bindings=None, divsi3_bindings=None,
                           double_bindings=None, function_thunks=False, *,
                           allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
-                          allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None):
+                          allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
+                          switch_interposed_pool=False):
     """Validate exact placement and the linker's complete modification surface."""
+    check_switch_pool_opt_in(switch_interposed_pool, allow_switch_data,
+                             function_thunks, allow_switch_constants, multiple_switch_profile,
+                             double_bindings, signed_runtime_profile, unsigned_runtime_profile,
+                             umod_r1_profile)
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context
         check_context(multiple_switch_profile, switch_relocations,
@@ -1334,7 +1347,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           linked["text"][:after["size"]], address, switch_relocations,
                           data_relocations if data_relocations else None, allow_preloaded_switch,
                           allow_switch_constants=allow_switch_constants,
-                          multiple_switch_profile=multiple_switch_profile))
+                          multiple_switch_profile=multiple_switch_profile,
+                          interposed_pool=switch_interposed_pool))
         if "preload" in layout and calls:
             raise ValueError("preloaded switches do not support calls")
     if any(before_byte != after_byte and position not in patched
@@ -1351,7 +1365,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None,
-               allow_self_call=False):
+               allow_self_call=False, switch_interposed_pool=False):
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_context
@@ -1375,7 +1389,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     signed_runtime_profile=signed_runtime_profile,
                                   unsigned_runtime_profile=unsigned_runtime_profile,
                                                     thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
-                                                    allow_self_call=allow_self_call)
+                                                    allow_self_call=allow_self_call,
+                                                    switch_interposed_pool=switch_interposed_pool)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -1415,7 +1430,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   allow_double_data=allow_double_data,
                                   signed_runtime_profile=signed_runtime_profile,
                                   unsigned_runtime_profile=unsigned_runtime_profile,
-                                  thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile),
+                                  thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
+                                  switch_interposed_pool=switch_interposed_pool),
             calls, data_relocations)
 
 
@@ -1946,9 +1962,23 @@ def preloaded_switch_encoding(data, address, literal):
     return dispatch, accumulator, selector, base, bound
 
 
+def check_switch_pool_opt_in(enabled, allow_switch_data, *incompatible):
+    """The interposed-pool layout is reachable only from its explicit switch-data selector."""
+    if type(enabled) is not bool:
+        raise ValueError("interposed switch pool opt-in must be Boolean")
+    if enabled and (allow_switch_data is not True or
+                    any(value is not None and value is not False for value in incompatible)):
+        raise ValueError("interposed switch pool requires isolated switch-data bindings")
+
+
 def selected_switch_layout(data, address, relocations, data_relocations=None,
                            allow_preloaded_switch=False, *, allow_switch_constants=False,
-                           multiple_switch_profile=None):
+                           multiple_switch_profile=None, interposed_pool=False):
+    check_switch_pool_opt_in(interposed_pool, True,
+                             allow_switch_constants, multiple_switch_profile)
+    if interposed_pool:
+        # Never a preloaded or fixed-gap layout: only the dispatch-identified pool.
+        return switch_layout(data, address, relocations, data_relocations, interposed_pool=True)
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context, layout
         check_context(multiple_switch_profile, relocations, (data_relocations,),
@@ -2154,7 +2184,7 @@ def verify_preloaded_switches(data, address, rom, mapping, data_mapping, manifes
 
 
 def switch_layout(data, address, relocations, data_relocations=None, *, interposed_words=0,
-                  allow_backward_cases=False):
+                  allow_backward_cases=False, interposed_pool=False):
     """Derive a guarded dispatch; the five-word pool needs separate reached-load proof.
 
     Case targets must follow the table unless allow_backward_cases. Only the
@@ -2162,10 +2192,19 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
     verify_leaf_instructions calls made with backward_switch_cases=True) opt in;
     every other caller keeps the forward rule by default. A backward target must
     still lie outside the guard, dispatch, pool and table bytes; the reached
-    block is then checked like any other by the CFG proof."""
+    block is then checked like any other by the CFG proof.
+
+    The explicit interposed-pool opt-in locates the dispatch by its use of the
+    table pointer instead of by a fixed pool position: any number of words may
+    sit between the dispatch and the pointer. It proves nothing about those
+    words; every caller must still bind each one as an ordinary reached
+    literal under its own numeric and typed-data rules.
+    """
     if type(interposed_words) is not int or interposed_words not in (0, 5) or \
             interposed_words and data_relocations is not None:
         raise ValueError("unsupported interposed switch pool")
+    if type(interposed_pool) is not bool or interposed_pool and interposed_words:
+        raise ValueError("interposed switch pool opt-in must be an isolated Boolean")
     if not isinstance(relocations, dict) or not 2 <= len(relocations) <= 257:
         raise ValueError("switch evidence requires one pointer and one bounded word table")
     for offset, addend in relocations.items():
@@ -2215,10 +2254,16 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
         return decoded.operands[0].imm - address
 
     candidates = []
-    pool_words = interposed_words + object_words_before_table
-    for dispatch in (literal - 10 - pool_words * 4,
-                     literal - 12 - pool_words * 4):
-        pool_start = literal - pool_words * 4
+    if interposed_pool:
+        # A Thumb PC-relative load reaches at most 1020 bytes, so the pool
+        # between the dispatch and its table pointer is at most 255 words.
+        placements = [(literal - 4 * words, gap)
+                      for words in range(256) for gap in (10, 12)]
+    else:
+        pool_words = interposed_words + object_words_before_table
+        placements = [(literal - pool_words * 4, gap) for gap in (10, 12)]
+    for pool_start, gap in placements:
+        dispatch = pool_start - gap
         if dispatch < 0 or (address + dispatch + 13) & ~3 != address + pool_start or \
                 any(data[dispatch + 10:pool_start]):
             continue
@@ -2327,6 +2372,9 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     complete_data = data_profile and isinstance(manifest, dict) and \
         manifest.get("data_policy") == SWITCH_MULTIPLE_DATA_POLICY
     scalar_data = complete_data and manifest.get("scalar_policy") == SWITCH_U16_SCALAR_POLICY
+    pool_data = scalar_data and "pool_policy" in manifest
+    if pool_data and manifest["pool_policy"] != SWITCH_POOL_POLICY:
+        raise ValueError("interposed switch pool requires its canonical policy marker")
     outgoing_frame = isinstance(manifest, dict) and "frame_policy" in manifest
     if outgoing_frame and (not complete_data or scalar_data or
             manifest["frame_policy"] != typed_switch_frame.SELECTOR):
@@ -2336,6 +2384,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.add("data_policy")
     if scalar_data:
         fields.update(("scalar_policy", "scalars"))
+    if pool_data:
+        fields.add("pool_policy")
     if outgoing_frame:
         fields.add("frame_policy")
     if mapping is None or not isinstance(manifest, dict) or set(manifest) != fields or \
@@ -2378,7 +2428,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         previous = record[0]
         relocations[record[0]] = record[1]
     if switch_layout(data, address, relocations, data_relocations,
-                     allow_backward_cases=True) != descriptor:
+                     allow_backward_cases=not pool_data, interposed_pool=pool_data) != descriptor:
         raise ValueError("switch descriptor does not match the guarded bytes")
     scalars = {}
     if scalar_data:
@@ -2433,7 +2483,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             switch_data_relocations=data_relocations,
                                             backward_switch_cases=True,
                                             typed_switch_outgoing_frame=typed_switch_frame.SELECTOR
-                                            if outgoing_frame else None)
+                                            if outgoing_frame else None,
+                                            switch_interposed_pool=pool_data)
     if complete_data:
         # The default policy still admits only the table pointer and typed
         # objects. The separate explicit policy binds every extra u16 word.
@@ -2450,6 +2501,22 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
             expected_literals.update(address + offset for offset in scalars)
         if reached_literals != expected_literals:
             raise ValueError("complete switch-data literal-word coverage is required")
+    if pool_data:
+        # The table pointer is identified by its use: the dispatch load is its
+        # only reader. Each interposed word is an ordinary reached literal,
+        # already bound above as a typed object or an exact u16 scalar.
+        pool_start = ((address + descriptor["dispatch"] + 13) & ~3) - address
+        pool = set(range(pool_start, descriptor["literal"], 4))
+        if not pool:
+            raise ValueError("interposed switch pool requires at least one interposed word")
+        if not pool <= set(data_relocations) | set(scalars):
+            raise ValueError("interposed switch pool words must be typed objects or u16 scalars")
+        pointer_loads = {
+            item.address for item in instructions for operand in item.operands
+            if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC and
+            ((item.address + 4) & ~3) + operand.mem.disp == address + descriptor["literal"]}
+        if pointer_loads != {address + descriptor["dispatch"] + 2}:
+            raise ValueError("switch table pointer must be read only by its dispatch load")
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
@@ -3516,7 +3583,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              addressed_signed_runtime_context=None, entry_recursive_calls=None,
                              typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
                              finite_small_copy_context=None, self_calls=None,
-                             backward_switch_cases=False, runtime_summaries=None):
+                             backward_switch_cases=False, runtime_summaries=None,
+                             switch_interposed_pool=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -3550,6 +3618,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 value is not None and value is not False
                 for name, value in locals().items() if name not in SELF_CALL_PARAMETERS):
             raise ValueError("self calls require the plain direct-call path and a nonempty site set")
+    if type(switch_interposed_pool) is not bool or switch_interposed_pool and (
+            switch_relocations is None or switch_data_relocations is None or
+            preloaded_switch or allow_switch_constants or allow_switch_scalar_frame or
+            buffer_proof is not None or function_thunk_context is not None or
+            double_context is not None or typed_switch_outgoing_frame is not None):
+        raise ValueError("interposed switch pool requires its isolated switch-data context")
     if finite_small_copy_context is not None:
         from finite_small_local_copy_profile import validate_context
         validate_context(finite_small_copy_context, buffer_proof, data, address,
@@ -3930,6 +4004,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             switch = (constants_layout(data, address, switch_relocations, switch_constants_policy)
                       if switch_constants_policy is not None else
                       constants_layout(data, address, switch_relocations))
+            reserved.update(range(address + switch["dispatch"] + 10,
+                                  address + switch["literal"]))
+        elif switch_interposed_pool:
+            switch = switch_layout(data, address, switch_relocations, switch_data_relocations,
+                                   interposed_pool=True)
+            # Alignment and every interposed word stay data; each word must
+            # still be bound by the caller as a reached literal.
             reserved.update(range(address + switch["dispatch"] + 10,
                                   address + switch["literal"]))
         else:
@@ -4855,7 +4936,8 @@ def plausibility_result(result, address):
 def switch_u16_scalar_configuration(args):
     if args.switch_data_profile is None:
         return
-    if args.switch_data_profile not in (SWITCH_U16_SCALAR_SELECTOR, typed_switch_frame.SELECTOR) or \
+    if args.switch_data_profile not in (SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
+                                        typed_switch_frame.SELECTOR) or \
             args.mode != "thumb" or args.control_flow_profile != "ordinary" or \
             any((args.signed_quotient_profile, args.signed_runtime_profile,
                  args.addressed_signed_runtime_profile, args.unsigned_runtime_profile, args.software_double_profile,
@@ -4887,7 +4969,8 @@ def main():
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=function_thunk.SELECTORS)
     ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1", "one-constant-frame-v1"))
-    ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR, typed_switch_frame.SELECTOR))
+    ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
+                                                      typed_switch_frame.SELECTOR))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
                                                          DEFAULT_WSL_PATH))
@@ -5164,7 +5247,9 @@ def main():
                                                           ashldi3_bindings=ashldi3_bindings,
                                                           ashldi3_index=empty_index,
                                                           float_bindings=float_bindings, float_index=empty_index,
-                                                          allow_self_call=True)
+                                                          allow_self_call=True,
+                                                          switch_interposed_pool=args.switch_data_profile ==
+                                                          SWITCH_POOL_U16_SCALAR_SELECTOR)
                 linked_profile = bool(calls)
                 self_sites = frozenset(site for site, target in calls.items() if target == addr)
             else:
@@ -5302,12 +5387,14 @@ def main():
                 verified_instructions = verify_udivsi3(
                     got, addr, rom, mapping, division_evidence, selector=args.unsigned_quotient_profile)
             elif switch_relocations:
+                pool_switch_profile = args.switch_data_profile == SWITCH_POOL_U16_SCALAR_SELECTOR
                 switch_evidence = {
                     "calls": [[site - addr, f"func_{target:08X}"]
                               for site, target in sorted(calls.items())],
                     "switch": selected_switch_layout(got, addr, switch_relocations,
                                                      data_relocations if data_relocations else None,
-                                                     allow_preloaded_switch=True)}
+                                                     allow_preloaded_switch=True,
+                                                     interposed_pool=pool_switch_profile)}
                 preloaded_profile = "preload" in switch_evidence["switch"]
                 if data_relocations:
                     objects = parse_data_symbols(data_mapping)
@@ -5326,9 +5413,12 @@ def main():
                         raise ValueError("u16 switch-data excludes preloaded switches")
                     scalar_instructions = verify_leaf_instructions(
                         got, addr, True, calls, switch_relocations=switch_relocations,
-                        switch_data_relocations=data_relocations, backward_switch_cases=True)
+                        switch_data_relocations=data_relocations, backward_switch_cases=True,
+                        switch_interposed_pool=pool_switch_profile)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                     switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
+                    if pool_switch_profile:
+                        switch_evidence["pool_policy"] = SWITCH_POOL_POLICY
                     switch_evidence["scalars"] = switch_u16_scalar_records(
                         got, addr, scalar_instructions, switch_evidence["switch"], data_relocations)
                 if preloaded_profile:
@@ -5403,6 +5493,7 @@ def main():
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   typed_switch_frame.SCHEMA if "frame_policy" in switch_evidence else
+                  SWITCH_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
                   SWITCH_U16_SCALAR_SCHEMA if "scalar_policy" in switch_evidence else
                   SWITCH_MULTIPLE_DATA_SCHEMA if "data_policy" in switch_evidence else
                   SWITCH_DATA_SCHEMA if data_profile else SWITCH_SCHEMA)
@@ -5657,6 +5748,7 @@ def main():
             if switch_relocations:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
                            typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else
+                           SWITCH_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
                            SWITCH_U16_SCALAR_SUMMARY if "scalar_policy" in switch_evidence else
                            SWITCH_MULTIPLE_DATA_SUMMARY if "data_policy" in switch_evidence else
                            SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
@@ -5664,6 +5756,7 @@ def main():
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
                                       typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else
+                                      switch_pool_u16_scalar_fingerprint if "pool_policy" in switch_evidence else
                                       switch_u16_scalar_fingerprint if "scalar_policy" in switch_evidence else
                                       switch_multiple_data_fingerprint if "data_policy" in switch_evidence else
                                       switch_data_fingerprint if data_profile else switch_fingerprint)

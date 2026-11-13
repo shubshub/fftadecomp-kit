@@ -462,7 +462,9 @@ class PinnedProfileTests(unittest.TestCase):
         self.assertEqual(sorted(found), sorted([
             ("match.py", "selected_switch_layout", "allow_backward_cases", "True"),
             ("match.py", "verify_leaf_instructions", "allow_backward_cases", "backward_switch_cases"),
-            ("match.py", "verify_switches", "allow_backward_cases", "True"),
+            # u16-scalars-v2 keeps forward cases; its descriptor must replay
+            # exactly as selected_switch_layout's interposed branch derived it.
+            ("match.py", "verify_switches", "allow_backward_cases", "not pool_data"),
             ("match.py", "verify_switches", "backward_switch_cases", "True"),
             ("match.py", "main", "backward_switch_cases", "True"),
             ("analyze.py", "refinement_word_switch", "allow_backward_cases", "backward"),
@@ -476,7 +478,9 @@ class PinnedProfileTests(unittest.TestCase):
                     function in ("selected_switch_layout", "verify_switches"):
                 opted = any(keyword.arg == "allow_backward_cases" for keyword in parent.keywords)
                 counts[(function, opted)] = counts.get((function, opted), 0) + 1
-        self.assertEqual(counts, {("selected_switch_layout", True): 1, ("verify_switches", True): 1})
+        # The dispatch-identified (interposed-pool) branch is forward-only.
+        self.assertEqual(counts, {("selected_switch_layout", True): 1, ("selected_switch_layout", False): 1,
+                                  ("verify_switches", True): 1})
         # Other than the three isolated qualified multi-switch calls, defaults stay forward-only.
         for file, function, kind, name, parent in self.references():
             if name == "switch_layout" and kind == "call" and \
