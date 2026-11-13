@@ -287,6 +287,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "03bd1515c98702b16ace202c0311edf5f55abd00d6672727aa0db8cb65de7983",
+        "acknowledged_cursor": 6841984993,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "03bd1515c98702b16ace202c0311edf5f55abd00d6672727aa0db8cb65de7983",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08126764\",\"who\":\"match-astra-08126764\",\"note\":\"Native Astra bounded revisit of retained plausible record-selection function and six-halfword branch residual.\"}",
+          "created_at": "2026-11-13T02:26:46Z",
+          "id": 6841984993,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:26:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "044fc0bc095fb77dd43f3cf78687ead76856d09fce5f0b5e6b4dee1ab23ea385",
+        "result": {
+          "address": "0x08126764",
+          "claim_id": 6841984993,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6841984993,
+          "status": "accepted",
+          "who": "match-astra-08126764"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
