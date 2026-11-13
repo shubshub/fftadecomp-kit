@@ -22,8 +22,10 @@ T1,T2,F,FG=0x080C7D18,0x080C7D70,0x0809AC00,0x080C7B78
 # Genuine tree-iterator bodies; their BL words reach the canonical R7 thunk.
 TREE={T1:'f0b50f1c161c846801225242251c002c1ed0e168002907d0914205d02069904211d0221c0c1cf2e7206990420bd0201c311c7af089fa00280ad02069002802d0221c041ce3e7ac4202d0221ca468dee7f0bc01bc0047',
       T2:'f0b50f1c161c846801225242251c002c1ed02169002907d0914205d0e068904211d0221c0c1cf2e7e06890420bd0201c311c7af05dfa00280ad0e068002802d0221c041ce3e7ac4202d0221ca468dee7f0bc01bc0047'}
+K=0x08006800  # trailing callee: movs r2,#0; bx lr
 ROOTS={  # form: (owner-load halfword, callback)
-    'private-state':(0x6900,S),'entry-object':(0x6910,X),'null':(0x6900,X)}
+    'private-state':(0x6900,S),'entry-object':(0x6910,X),'null':(0x6900,X),
+    'entry-byte':(0x6900,X),'owner-word-trailing-call':(0x6920,X)}
 
 
 def tree_graph(body,address=T1,count=42):
@@ -44,6 +46,9 @@ def root(form,callback,iterator=W,adapter=C):
     body=bytearray(bytes.fromhex(code.replace('xx','00')))
     struct.pack_into('<H',body,shape['owner'],load)
     body[shape['call']:shape['call']+4]=bl(A+shape['call'],iterator)
+    if 'trailing' in shape:
+        struct.pack_into('<H',body,shape['trailing']['reload'],load)
+        body[shape['trailing']['call']:shape['trailing']['call']+4]=bl(A+shape['trailing']['call'],K)
     return bytes(body)+struct.pack('<II',callback+1,adapter+1)
 
 
@@ -55,6 +60,8 @@ def fixture(form='private-state',changes=None,callback=None,iterator=W,framed=Fa
     bodies={A:root(form,callback,iterator,used),W:worker,G:bytes.fromhex('00687047'),
             S:bytes.fromhex(closure.STATE_CALLBACKS[S][1]),X:bytes.fromhex('01207047')}
     counts={A:closure.FORMS[form]['count'],W:16,G:2,S:8,X:2}
+    if 'trailing' in closure.FORMS[form]:
+        bodies[K]=bytes.fromhex('00227047');counts[K]=2
     if framed:
         bodies[F]=bytes.fromhex(closure.FRAMED_ADAPTERS[F]['body']);counts[F]=14
         bodies[FG]=bytes.fromhex(closure.FRAMED_ADAPTERS[F]['getter_body']);counts[FG]=5
@@ -78,7 +85,8 @@ def fixture(form='private-state',changes=None,callback=None,iterator=W,framed=Fa
     index=''.join(f'{int(row["rom"],16):08X} {int(row["end"],16):08X} {int(row["end"],16)-int(row["rom"],16)} {row["instrs"]} return\n'for row in rows).encode()
     shape=closure.FORMS[form]
     return dict(data=bodies[A],address=A,rom=bytes(rom),mapping=json.dumps(rows).encode(),index=index,objects=b'{}',selector=closure.SELECTOR,
-        bindings=dict(calls=[[shape['call'],f'func_{iterator:08X}']],data=[],
+        bindings=dict(calls=[[shape['call'],f'func_{iterator:08X}']]+(
+                          [[shape['trailing']['call'],f'func_{K:08X}']] if 'trailing' in shape else []),data=[],
                       functions=[[shape['callback'],f'func_{callback:08X}'],[shape['adapter'],f'func_{used:08X}']],switches=[]))
 
 
@@ -147,9 +155,124 @@ class LiteralClosureTests(unittest.TestCase):
     def test_templates_match_independent_genuine_roots(self):
         genuine={'private-state':'00b584b000220092019106496a46029202aa5160006904492df0e4ff009804b002bc084721ac0908e9ab0908',
                  'entry-object':'00b582b0011c80310a68054900900191106904496a462ef02ff902b001bc00476dad0908e9ab0908',
-                 'null':'00b582b0054a002100910192006904496a462df0dffa02b001bc0047b5ac0908e9ab0908'}
+                 'null':'00b582b0054a002100910192006904496a462df0dffa02b001bc0047b5ac0908e9ab0908',
+                 'entry-byte':'00b582b00906090e054a00910192006904496a462df0f2fa02b001bc00470000e5ac0908e9ab0908',
+                 'owner-word-trailing-call':'10b582b0041c074920690090019106496a462df049fe20692df00afe02b010bc01bc00476dac0908e9ab0908'}
         for form,raw in genuine.items():
             with self.subTest(form=form):self.assertEqual(closure.form_of(bytes.fromhex(raw)),form)
+
+    def test_entry_byte_form(self):
+        manifest,ins=owner.verify(**fixture('entry-byte'))
+        self.assertEqual(len(ins),14)
+        proof=manifest['proof']['literal_callback_closure']
+        self.assertEqual(proof['form'],'entry-byte')
+        self.assertEqual(manifest['proof']['partition']['alignment_bytes'],2)
+        self.assertEqual(proof['root_descriptor']['initialized_words'][0],
+                         dict(offset=-12,source='root entry R1 narrowed to its low 8 bits (u8)'))
+        self.assertEqual(proof['callback']['arguments'][1],'root entry R1 narrowed to its low 8 bits (u8)')
+        self.assertNotIn('trailing_call',proof)
+        self.assertEqual(proof['external_read_obligations'][0],dict(base='root entry R0',offset=16,width=4))
+
+    def test_owner_word_trailing_call_form(self):
+        manifest,ins=owner.verify(**fixture('owner-word-trailing-call'))
+        self.assertEqual(len(ins),16)
+        self.assertEqual(manifest['proof']['calls'],[[18,f'func_{W:08X}'],[24,f'func_{K:08X}']])
+        proof=manifest['proof']['literal_callback_closure']
+        self.assertEqual(proof['root_frame']['saved'],['entry R4','entry LR'])
+        self.assertEqual(proof['root_descriptor']['offset'],-16)
+        self.assertEqual(proof['root_descriptor']['initialized_words'][0]['source'],
+                         'owner word loaded from root entry R0 (the iterator list argument)')
+        trailing=proof['trailing_call']
+        self.assertEqual((trailing['site'],trailing['target'],trailing['entry_r2_overwritten_at']),(A+24,K,K))
+        self.assertEqual(trailing['arguments'],[dict(register=0,source='owner word reloaded from root entry R0',offset=16,site=A+22)])
+        self.assertFalse(trailing['descriptor_alias_passed']);self.assertEqual(trailing['effects'],'opaque')
+        self.assertEqual(proof['outward_expired_aliases'],[])
+        self.assertEqual(proof['live_aliases_to_trailing_callee'],[dict(register=2,origin='root descriptor on the empty-list path',
+                                                                        observed_by_trailing_callee=False,overwritten_at=K)])
+        self.assertIn('optional pinned opaque trailing call',closure.CONTROL_FLOW)
+        self.assertEqual(proof['external_read_obligations'][-1],
+                         dict(base='root entry R0, reloaded after the iterator returns',offset=16,width=4))
+        self.assertIn('provably overwrites entry R2 before reading it',' '.join(proof['explicit_conditions']))
+
+    def test_new_forms_refuse_wrong_narrowing_and_untrusted_words(self):
+        # asrs/lsrs #16 narrowing, a word load in place of the narrowing, an extra
+        # store into the frame, a stored R0 copy, and the R4 owner copy from R1.
+        for form,offset,value in (('entry-byte',6,0x1609),('entry-byte',6,0x0C09),('entry-byte',4,0x6809),
+                                  ('entry-byte',10,0x9102),('entry-byte',30,0x9102),
+                                  ('owner-word-trailing-call',10,0x9102),('owner-word-trailing-call',4,0x1C0C)):
+            with self.subTest(form=form,offset=offset),self.assertRaisesRegex(ValueError,'natural root form'):
+                owner.verify(**fixture(form,changes={(A,offset):value}))
+        # Owner word through untrusted R1/R2 instead of the entry-R0 copy.
+        for form,offset,value in (('entry-byte',14,0x6908),('entry-byte',14,0x6910),
+                                  ('owner-word-trailing-call',8,0x6908),('owner-word-trailing-call',8,0x6900)):
+            with self.subTest(form=form,offset=offset),self.assertRaisesRegex(ValueError,'aligned incoming object word load'):
+                owner.verify(**fixture(form,changes={(A,offset):value,(A,22):value} if 'trailing' in form else {(A,offset):value}))
+
+    def test_trailing_reload_must_be_the_same_owner_word(self):
+        # A different offset, a store of the stale descriptor alias and a read through R2.
+        for value in (0x6960,0x6122,0x6810):
+            with self.subTest(value=hex(value)),self.assertRaisesRegex(ValueError,'same owner word reload'):
+                owner.verify(**fixture('owner-word-trailing-call',changes={(A,22):value}))
+
+    def test_trailing_callee_must_not_observe_the_descriptor(self):
+        def killed(body):
+            raw=bytes.fromhex(body);rom=bytearray(K+len(raw)-match.ROM_BASE);rom[K-match.ROM_BASE:]=raw
+            return closure.entry_r2_killed(bytes(rom),K,K+len(raw))
+        # ldr r0,[r2]; push {r2}; a call; a conditional branch; return; a loop on itself; run off the end.
+        for body,error in (('10687047','may observe'),('04b47047','may observe'),
+                           (bl(K,G).hex()+'0022','may observe'),('00d00022','may observe'),
+                           ('70470022','may observe'),('fee70022','overwrite R2 on its entry path'),('00207047','may observe'),
+                           ('0020','may observe')):
+            with self.subTest(body=body),self.assertRaisesRegex(ValueError,error):killed(body)
+        # Not ARMv4T Thumb: IT, NOP hint, UXTH, BKPT, CPSID, UDF, low-low hi-format MOVs.
+        for body in ('08bf0022','00bf0022','80b20022','00be0022','72b60022','00de0022','0246','0a46'):
+            with self.subTest(body=body),self.assertRaisesRegex(ValueError,'may observe entry R2'):killed(body)
+        # The callee's entry SP is the descriptor: SP-derived overwrites at or above it,
+        # loads through SP, values loaded after an SP value was stored, and SP moves.
+        for body,error in (('6a46','at or above its entry SP'),('00aa','at or above its entry SP'),
+                           ('82b002aa','at or above its entry SP'),('009a','at or above its entry SP'),
+                           ('04bc','moves SP'),('81b00098021c','at or above its entry SP'),
+                           ('684608600a68','at or above its entry SP'),('8546','moves SP')):
+            with self.subTest(body=body),self.assertRaisesRegex(ValueError,error):killed(body)
+        # An unconditional branch is followed (over R2 reads that would refuse); the write may come after harmless work.
+        self.assertEqual(killed('00e0c0461f2201207047'),K+4)
+        self.assertEqual(killed('0020009001e0106810680022'),K+10)
+        # SP-derived overwrites strictly below entry SP are the callee's own frame (080C7C48's shape).
+        self.assertEqual(killed('f0b581b06a46'),K+4)
+        self.assertEqual(killed('f0b581b005aa'),K+4)
+        with self.assertRaisesRegex(ValueError,'at or above'):killed('f0b581b006aa')
+        values=fixture('owner-word-trailing-call',changes={(K,0):0x6810})
+        with self.assertRaisesRegex(ValueError,'may observe entry R2'):owner.verify(**values)
+
+    def test_trailing_call_binding_and_context(self):
+        values=fixture('owner-word-trailing-call');values['bindings']['calls'].pop()
+        with self.assertRaisesRegex(ValueError,'exact typed callback and adapter bindings'):owner.verify(**values)
+        context=closure._LiteralContextRead(b'',b'[]',A+18,W,'owner-word-trailing-call')
+        context.trailing_site,context.trailing_target=A+24,K
+        stack=[(False,False,True)]*4
+        self.assertEqual(context.check_call(K,{},stack,site=A+24),{})
+        with self.assertRaisesRegex(ValueError,'carries the descriptor'):
+            context.check_call(K,{match.ARM_REG_R0+2:-16},stack,site=A+24)
+        with self.assertRaisesRegex(ValueError,'carries the descriptor'):
+            context.check_call(K,{},stack,{-16:-16},site=A+24)
+        with self.assertRaisesRegex(ValueError,'complete initialized root context'):
+            context.check_call(G,{},stack,site=A+24)
+
+    def test_callback_must_be_a_mapped_function_literal(self):
+        for form in ('entry-byte','owner-word-trailing-call'):
+            shape=closure.FORMS[form]
+            for value in (0x08007001,X,0x02000001):
+                values=fixture(form);body=bytearray(values['data']);struct.pack_into('<I',body,shape['callback'],value)
+                values['data']=bytes(body);rom=bytearray(values['rom']);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(body)]=body
+                values['rom']=bytes(rom);values['bindings']['functions'][0][1]=f'func_{value&~1:08X}'
+                with self.subTest(form=form,value=hex(value)),self.assertRaises(ValueError):owner.verify(**values)
+
+    def test_tampered_trailing_record_refuses(self):
+        values=fixture('owner-word-trailing-call');report,_=owner.verify(**values)
+        for key,value in (('entry_r2_overwritten_at',K+2),('descriptor_alias_passed',True),('target',G)):
+            changed=copy.deepcopy(report);changed['proof']['literal_callback_closure']['trailing_call'][key]=value
+            with self.subTest(key=key),self.assertRaisesRegex(ValueError,'manifest differs'):
+                owner.verify(**values,manifest=changed)
 
     def test_call_to_other_iterator_refuses(self):
         values=fixture();body=bytearray(values['data']);body[24:28]=bl(A+24,G)
@@ -263,7 +386,7 @@ class LiteralClosureTests(unittest.TestCase):
                 with self.subTest(iterator=hex(iterator),form=form):
                     manifest,ins=owner.verify(**fixture(form,iterator=iterator))
                     proof=manifest['proof']['literal_callback_closure']
-                    self.assertEqual(manifest['proof']['calls'],[[closure.FORMS[form]['call'],f'func_{iterator:08X}']])
+                    self.assertEqual(manifest['proof']['calls'][0],[closure.FORMS[form]['call'],f'func_{iterator:08X}'])
                     it=proof['iterator']
                     self.assertEqual((it['address'],it['end'],it['instructions']),(iterator,iterator+86,42))
                     self.assertEqual((it['adapter_register'],it['descriptor_register'],it['call_site']),(7,6,iterator+50))
