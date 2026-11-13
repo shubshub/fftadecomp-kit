@@ -19,10 +19,11 @@ import test_volatile_semantics as fixtures
 
 SYMBOL = fixtures.SYMBOL
 TYPEDEF = 'typedef void (*Callback)(void *, u32);\nextern Callback g_cb[];\n'
+SCALARS = 'typedef unsigned char u8;\ntypedef unsigned short u16;\ntypedef unsigned int u32;\n'
 
 
-def source(declarations=TYPEDEF, call='g_cb[0](0, 5);'):
-    return declarations + 'void func_08028C34(void)\n{\n    ' + call + '\n}\n'
+def source(declarations=TYPEDEF, call='g_cb[0](0, 5);', scalars=SCALARS):
+    return scalars + declarations + 'void func_08028C34(void)\n{\n    ' + call + '\n}\n'
 
 
 def assembly(*body):
@@ -45,8 +46,9 @@ def compare(real=REAL, stripped=STRIPPED, preprocessed=None):
 
 class SignatureTests(unittest.TestCase):
     def signature(self, text):
-        code = plausible.strip_comments_and_strings(text)
-        return semantics.indirect_signature(code, semantics.file_scope(text), 'g_cb')
+        # the production path: the checked translation unit, then its file scope
+        code = semantics.translation_unit(text)
+        return semantics.indirect_signature(code, semantics.file_scope(code), 'g_cb')
 
     def test_declared_prototypes_are_read(self):
         for declarations, call, expected in (
@@ -177,6 +179,65 @@ class IndirectCallTests(unittest.TestCase):
         # a ';' inside a character literal does not split a declaration either
         quoted = "char d = ';';\n" + TYPEDEF
         self.assertEqual(compare(preprocessed=source(quoted))[0][1], 1)
+
+    FIVE = 'typedef void (*Five)(int, int, int, int, int);\n'
+
+    def test_digraphs_cannot_desynchronise_the_brace_structure(self):
+        # `<%` opens a body that `}` closes; the cast would sit at depth 0
+        forged = self.FIVE + 'int x;\nvoid g(void) <% x = 1; }\n'
+        text = source(TYPEDEF + forged, 'g_cb[0](0, 5); ((Five)g_cb[0])(1, 2, 3, 4, 5);')
+        self.refused('`<%` in the preprocessed text is not modelled', preprocessed=text)
+        for digraph in ('%>', '<:', ':>'):
+            with self.subTest(digraph=digraph), self.assertRaisesRegex(semantics.SemanticError, 'not modelled'):
+                semantics.translation_unit(f'int x{digraph};\n')
+        for unbalanced in ('void f(void) { }}\n', 'void f(void) {\n'):
+            with self.subTest(text=unbalanced), self.assertRaisesRegex(semantics.SemanticError, 'unbalanced'):
+                semantics.translation_unit(unbalanced)
+        # the named-callee prototype reader shares the structure
+        named = 'void g(void) <% x = 1; }\nextern void k(int, int);\n'
+        self.refused('`<%`', preprocessed=source(TYPEDEF + 'int x;\n' + named))
+
+    def test_directive_lines_cannot_open_a_literal(self):
+        # cpp passes `#pragma` through; its quote must not blank the rest of the file
+        text = source(TYPEDEF + self.FIVE + "#pragma weak '\n",
+                      'g_cb[0](0, 5); ((Five)g_cb[0])(1, 2, 3, 4, 5);')
+        self.refused('other than as a direct call', preprocessed=text)
+        self.assertEqual(semantics.translation_unit("#pragma x '\nint y;\n"), " " * 11 + "\nint y;\n")
+        for broken in ("char c = 'a\n';\n", 'char *s = "a\\\n";\n', 'char *s = "a', '/* open'):
+            with self.subTest(text=broken), self.assertRaises(semantics.SemanticError):
+                semantics.translation_unit(broken)
+
+    def test_assembler_labels_are_refused(self):
+        for spelling in ('__asm', 'asm', '__asm__'):
+            forged = self.FIVE + f'extern Five h[1] {spelling}("g_cb");\n'
+            with self.subTest(spelling=spelling):
+                self.refused(f'`{spelling}` in the preprocessed text is not modelled',
+                             preprocessed=source(TYPEDEF + forged, 'h[0](1, 2, 3, 4, 5);'))
+
+    def test_typedef_names_count_as_one_word_only_when_verified(self):
+        wide = 'typedef long long bool32;\ntypedef void (*Callback)(void *, bool32);\nextern Callback g_cb[];\n'
+        self.refused('not a prototyped function pointer', preprocessed=source(wide))
+        narrow = wide.replace('long long', 'u32')
+        self.assertEqual(compare(preprocessed=source(narrow))[0][1], 1)
+        # without its typedef a name is not trusted
+        self.refused('not a prototyped function pointer', preprocessed=source(scalars=''))
+        # the named-callee reader applies the same rule
+        scope = semantics.file_scope('typedef long long u32;\nextern void k(u32);\n')
+        self.assertRaisesRegex(semantics.SemanticError, 'not one scalar or pointer word',
+                               semantics.function_signature, scope, 'k')
+        scope = semantics.file_scope('typedef unsigned int u32;\ntypedef volatile u32 vu32;\n'
+                                     'extern void k(vu32, u32);\n')
+        self.assertEqual(semantics.function_signature(scope, 'k'), (False, 2))
+
+    def test_an_unreadable_unrelated_typedef_does_not_abort(self):
+        deep = 'typedef void (*Deep)(int (((((((((x))))))))));\nextern void k(int);\n'
+        scope = semantics.file_scope(semantics.translation_unit(source(TYPEDEF + deep)))
+        self.assertEqual(semantics.function_signature(scope, 'k'), (False, 1))
+        self.assertEqual(compare(preprocessed=source(TYPEDEF + deep))[0][1], 1)
+
+    def test_a_literal_dimension_is_not_unsized(self):
+        literal = "typedef void (*Callback)(void *, u32);\nextern Callback g_cb['a'];\n"
+        self.refused('not a prototyped function pointer', preprocessed=source(literal))
 
     def test_an_unreadable_unrelated_declaration_does_not_abort(self):
         deep = 'extern void (*other)(int (((((((((x))))))))));\n'

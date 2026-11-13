@@ -620,7 +620,8 @@ class SemanticDiffTests(unittest.TestCase):
         self.assertEqual(compare(moved, added)[0][1], 2)
 
     def test_signatures_come_from_consistent_file_scope_declarations(self):
-        scope = semantics.file_scope("extern void g(int);\nint f(u8 a, int b)\n{ if (x) { y(1, 2); } }\n"
+        scope = semantics.file_scope("typedef unsigned char u8;\nextern void g(int);\n"
+                                     "int f(u8 a, int b)\n{ if (x) { y(1, 2); } }\n"
                                      "void h(void);\n")
         self.assertEqual([semantics.function_signature(scope, name) for name in ("g", "f", "h", "y")],
                          [(False, 1), (True, 2), (False, 0), (True, None)])

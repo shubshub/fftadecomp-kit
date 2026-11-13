@@ -1941,7 +1941,12 @@ symbolically along every path, and the check requires:
   `name[K](...)` (or `name(...)`) with a literal index and the prototype's
   argument count, and rN is not one of those argument registers. Casts,
   copies, `(*name[K])`, computed indices and unprototyped or variadic
-  pointer types fail closed. The call stays opaque and an ordered barrier,
+  pointer types fail closed. Declarations are read from the preprocessed
+  text with directive lines, comments and literals blanked. Digraphs, `asm`
+  labels, unbalanced braces and literals that cross a line fail closed, and
+  a non-keyword scalar typedef name (`u32`, `bool32`, ...) counts as one
+  word only through a file-scope typedef to a one-word scalar. The call
+  stays opaque and an ordered barrier,
   and the report adds `indirect calls typed by declaration: name as N
   arguments`. Every parameter and return
   value must be one scalar or pointer word, so `long long`, `double` and
