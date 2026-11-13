@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
 import match
@@ -69,6 +70,11 @@ def changed(index, token, tokens=CALLER):
     return fixture(tokens)
 
 
+def straight(pre=(0x4669,), post=(), epilogue=(0xbc01, 0x4700), frame=0xb08d):
+    """push {r4-r6,lr}; sub sp; <pre>; bl Q; <post>; add sp; pop {r4-r6}; <epilogue>."""
+    return fixture([0xb570, frame, *pre, Q, *post, frame-0x80, 0xbc70, *epilogue])
+
+
 class KnownQueryStackBufferTests(unittest.TestCase):
     def test_stack_array_caller_executes_every_premised_count(self):
         manifest, _ = owner.verify(**fixture())
@@ -107,8 +113,69 @@ class KnownQueryStackBufferTests(unittest.TestCase):
         tokens[7] = 0x1c46  # adds r6, r0, #1
         with self.assertRaisesRegex(ValueError, 'uninitialized'):
             owner.verify(**fixture(tokens))
-        with self.assertRaisesRegex(ValueError, 'uninitialized|outside allocated'):
+        # With exactly 13 words, the first refused path is n = 13 reading word 13,
+        # which is the saved R4 slot.
+        with self.assertRaisesRegex(ValueError, 'outside allocated local words'):
             owner.verify(**changed(7, 0x1c46))
+
+    def test_straight_line_caller_is_admitted(self):
+        manifest, _ = owner.verify(**straight())
+        self.assertEqual(manifest['proof']['caller']['returned_counts'], list(range(14)))
+
+    def test_query_scratch_registers_are_undefined_afterwards(self):
+        # The pinned collector leaves R2 = out+4n; for n = 13 that is the saved R4 slot.
+        for post in ((0x2300, 0x6093),            # movs r3,#0; str r3,[r2,#8]
+                     (0x6808,),                   # ldr r0,[r1]
+                     (0x1c18,),                   # adds r0,r3,#0
+                     (0x4660,)):                  # mov r0,ip
+            with self.subTest(post=[hex(x) for x in post]), \
+                    self.assertRaisesRegex(ValueError, 'untracked register'):
+                owner.verify(**straight(post=post))
+
+    def test_ordinary_call_scratch_registers_are_undefined_afterwards(self):
+        tokens = list(CALLER); tokens[10] = 0x6809  # ldr r1,[r1] after bl B
+        with self.assertRaisesRegex(ValueError, 'untracked register'):
+            owner.verify(**fixture(tokens))
+
+    def test_private_address_stored_to_local_or_external_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'stored to a local word'):
+            owner.verify(**straight(post=(0x4668, 0x9001)))  # mov r0,sp; str r0,[sp,#4]
+        with self.assertRaisesRegex(ValueError, 'stored to external memory'):
+            # movs r1,#0x80; lsls r1,r1,#19; mov r0,sp; str r0,[r1]
+            owner.verify(**straight(post=(0x2180, 0x04c9, 0x4668, 0x6008)))
+
+    def test_misaligned_buffer_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'aligned private stack address'):
+            owner.verify(**straight(pre=(0x4669, 0x3102)))  # mov r1,sp; adds r1,#2
+
+    def test_private_address_in_other_query_arguments_refuses(self):
+        for register, move in (('r0', 0x4668), ('r2', 0x466a), ('r3', 0x466b)):
+            with self.subTest(register=register), \
+                    self.assertRaisesRegex(ValueError, 'passed to a call'):
+                owner.verify(**straight(pre=(0x4669, move)))
+
+    def test_private_address_in_return_register_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'escapes through a return register'):
+            # mov r0,sp before the frame release; pop {r1}; bx r1
+            owner.verify(**straight(post=(0x4668,), epilogue=(0xbc02, 0x4708)))
+
+    def test_subword_private_access_refuses(self):
+        for post in ((0x466b, 0x8818),            # mov r3,sp; ldrh r0,[r3]
+                     (0x466b, 0x2000, 0x7018)):   # mov r3,sp; movs r0,#0; strb r0,[r3]
+            with self.subTest(post=[hex(x) for x in post]), \
+                    self.assertRaisesRegex(ValueError, 'aligned word'):
+                owner.verify(**straight(post=post))
+
+    def test_state_budget_exhaustion_refuses(self):
+        with patch.object(stack, 'MAX_STATES', 8), \
+                self.assertRaisesRegex(ValueError, 'state budget exhausted'):
+            owner.verify(**fixture())
+
+    def test_saved_word_inside_the_buffer_window_refuses(self):
+        # 13 local words, then push {r3} and pass the new SP: word 0 is the saved R3.
+        tokens = [0xb570, 0xb08d, 0xb408, 0x4669, Q, 0xbc08, 0xb00d, 0xbc70, 0xbc01, 0x4700]
+        with self.assertRaisesRegex(ValueError, 'smaller than the premised 13-word'):
+            owner.verify(**fixture(tokens))
 
     def test_larger_array_is_admitted(self):
         tokens = list(CALLER); tokens[1] = 0xb08e; tokens[14] = 0xb00e
@@ -203,6 +270,8 @@ class QueryContractOracle(unittest.TestCase):
         cpu.reg_write(arm.UC_ARM_REG_SP, caller_sp)
         cpu.reg_write(arm.UC_ARM_REG_R0, owner_at); cpu.reg_write(arm.UC_ARM_REG_R1, buffer)
         cpu.reg_write(arm.UC_ARM_REG_LR, stop | 1)
+        cpu.reg_write(arm.UC_ARM_REG_R2, 0x2222); cpu.reg_write(arm.UC_ARM_REG_R3, 0x3333)
+        cpu.reg_write(arm.UC_ARM_REG_R12, 0xcccc)
         saved = {getattr(arm, f'UC_ARM_REG_R{n}'): 0x1000+n for n in range(4, 12)}
         for register, value in saved.items():
             cpu.reg_write(register, value)
@@ -220,6 +289,14 @@ class QueryContractOracle(unittest.TestCase):
         self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_SP), caller_sp)
         for register, value in saved.items():
             self.assertEqual(cpu.reg_read(register), value)
+        # Scratch results: R1 is the restored return, R3/R12 are untouched, and
+        # R2 is the collector cursor out+4n (or the expired root closure when
+        # n = 0). The profile therefore leaves R1-R3/R12/LR undefined.
+        self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R1), stop | 1)
+        self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R2),
+                         buffer+4*nodes if nodes else caller_sp-12)
+        self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R3), 0x3333)
+        self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R12), 0xcccc)
         return cpu.reg_read(arm.UC_ARM_REG_R0), writes, caller_sp-lowest[0]
 
     def test_query_writes_exactly_the_returned_prefix(self):
