@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "2fb632d53c17f05e700631d84cab853bfcf88b5429b03ce97f21ab8d42245d21",
-        "acknowledged_cursor": 6841305977,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2fb632d53c17f05e700631d84cab853bfcf88b5429b03ce97f21ab8d42245d21",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800DAB8\",\"who\":\"match-astra-0800DAB8\",\"note\":\"Revisit retained natural C and exact residual with a new native matching pass; previous attempts preserved.\"}",
-          "created_at": "2026-11-13T01:42:57Z",
-          "id": 6841305977,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T01:42:57Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c4fa1f6f6296dfa010a51194c4807c1fac5038cd6fc2d9df6ee94bfc1aeb637b",
-        "result": {
-          "address": "0x0800DAB8",
-          "claim_id": 6841305977,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6841305977,
-          "status": "accepted",
-          "who": "match-astra-0800DAB8"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "116aef8db1ba024f5ed1254a74aa12db556c6010c4b5c53a328da56318fab60d",
-        "acknowledged_cursor": 6841693281,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "116aef8db1ba024f5ed1254a74aa12db556c6010c4b5c53a328da56318fab60d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DAB8\",\"who\":\"match-astra-0800DAB8\",\"claim_id\":6841305977,\"reason\":\"Bounded natural-C revisit retained the complete 82-byte body with six scheduling-byte differences; source and genuine failures preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; packed byte union; scalar union\"}",
-          "created_at": "2026-11-13T02:08:07Z",
-          "id": 6841693281,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T02:08:07Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b9bfb69f97d81fb3fea17960b71d3a7b4cc459ddfd3563fb8ed1964b33041a40",
-        "result": {
-          "address": "0x0800DAB8",
-          "claim_id": 6841305977,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6841693281,
-          "status": "accepted",
-          "who": "match-astra-0800DAB8"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "83b96088f50cb5947efe87d8373433613de7b5c2d0ed4f30cba578473820c505",
         "acknowledged_cursor": 6841365332,
         "body_provenance": "acceptance-time",
