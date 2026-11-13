@@ -55,14 +55,19 @@ class BufferLoopReplayTests(unittest.TestCase):
         self.addCleanup(environment.stop)
 
     def fixture(self, callee, frame=8, child="bx lr", stack_arguments=False,
-                proof_type=match.BufferCallProof):
+                proof_type=match.BufferCallProof, extra=()):
         assembly = self.root / "fixture.s"
         assembly.write_text(
             ".syntax unified\n.arch armv5t\n.thumb\n.text\n"
             ".global caller, caller_end, callee, callee_end, child, child_end\n"
             f"caller:\n{caller(frame)}\ncaller_end:\n.org 0x100\n"
             f"callee:\n{callee}\ncallee_end:\n.org 0x200\n"
-            f"child:\n{child}\nchild_end:\n")
+            f"child:\n{child}\nchild_end:\n" + "".join(
+                f".org 0x{0x300 + 0x100 * index:x}\n{name}:\n{body}\n{name}_end:\n"
+                for index, (name, body) in enumerate(extra)))
+        for name, _ in extra:
+            assembly.write_text(assembly.read_text().replace(
+                ".global caller,", f".global {name}, {name}_end, caller,", 1))
         for command in (
             ["arm-none-eabi-as", "-mthumb-interwork", str(assembly),
              "-o", str(self.root / "fixture.o")],
@@ -76,7 +81,7 @@ class BufferLoopReplayTests(unittest.TestCase):
         symbols = {symbol["name"]: symbol["value"] for symbol in image["symbols"]}
         entries = [{"rom": f"0x{symbols[name]:08X}",
                     "end": f"0x{symbols[name + '_end']:08X}", "mode": "thumb"}
-                   for name in ("caller", "callee", "child")]
+                   for name in ("caller", "callee", "child", *(name for name, _ in extra))]
         rom = (self.root / "baserom.bin").read_bytes()
         self.mapping = json.dumps(entries).encode()
         self.body = rom[:symbols["caller_end"] - BASE]
@@ -178,7 +183,7 @@ class BufferLoopReplayTests(unittest.TestCase):
             if cls not in classes:
                 classes.add(cls)
                 pending.extend(cls.__subclasses__())
-        enabled = {cls for cls in classes if cls.__dict__.get("loop_replay") is True}
+        enabled = {cls for cls in classes if cls.__dict__.get("_loop_replay_opt_in") is True}
         self.assertEqual(enabled, {match.BufferCallProof, match.FunctionBufferCallProof})
         self.assertIn(named.NamedDataBufferProof, classes)
         # A real ineligible class (its ROM-ownership hooks stubbed) keeps the old refusal.
@@ -206,6 +211,78 @@ class BufferLoopReplayTests(unittest.TestCase):
         # A child that leaves R5 alone keeps the exact two-iteration bound.
         proof = self.fixture(callee, frame=8, child="movs r0, #0\nbx lr", stack_arguments=True)
         self.assertEqual(self.writes(proof), {(0, 2), (2, 2)})
+
+    # The probe callee: counter in R5, pointer in R6, two iterations, the buffer is
+    # passed to `child` (so `child` is inspected) in the first form and not in the second.
+    PROBE = ("push {r4, r5, r6, lr}\nadds r6, r1, #0\nmovs r5, #0\nloop:\n"
+             "adds r1, r6, #0\nmovs r0, #0\nbl child\nmovs r1, #0\n"
+             "strh r0, [r6]\nadds r6, #2\nadds r5, #1\ncmp r5, #1\nble loop\n"
+             "pop {r4, r5, r6}\npop {r1}\nbx r1")
+    RET = "pop {r4}\npop {r0}\nbx r0"
+
+    def test_inspected_callee_chains_that_clobber_the_counter_are_refused(self):
+        grand = "movs r5, #0\nbx lr"
+        refused = {
+            # A: an inspected grandchild zeroes R5.
+            "A": dict(child="push {r4, lr}\nmovs r0, #0\nbl grand\n" + self.RET,
+                      extra=[("grand", grand)]),
+            # B: the child pops a different value into R5.
+            "B": dict(child="push {r0, lr}\npop {r5}\npop {r2}\nmovs r0, #0\nbx r2"),
+            # C: the child writes R5 on one path only.
+            "C": dict(child="cmp r0, #0\nbne 1f\nmovs r5, #0\n1:\nmovs r0, #0\nbx lr"),
+            # G: the write is three inspected calls down.
+            "G": dict(child="push {r4, lr}\nbl grand\n" + self.RET,
+                      extra=[("grand", "push {r4, lr}\nbl great\n" + self.RET),
+                             ("great", "movs r5, #0\nmovs r0, #0\nbx lr")]),
+        }
+        for name, kwargs in refused.items():
+            with self.subTest(probe=name), self.assertRaisesRegex(ValueError, "bounded loop replay"):
+                self.fixture(self.PROBE, frame=4, stack_arguments=True, **kwargs)
+
+    def test_uninspected_callees_are_trusted_to_preserve_r4_to_r11(self):
+        # ABI premise, deliberately admitted: a callee that receives no buffer
+        # alias is not inspected, so its R4-R11 are assumed restored (as the alias
+        # tracking already assumes).  D and E below zero R5 in such a callee; the
+        # real loop would not end, yet replay admits it.  The premise is recorded
+        # (call target, register) in the replay record and so in the fingerprint,
+        # which is the only mitigation: it is visible and bound, not proved.
+        d = self.fixture(self.PROBE, frame=4, stack_arguments=True,
+                         child="push {r4, lr}\nmovs r1, #0\nbl grand\n" + self.RET,
+                         extra=[("grand", "movs r5, #0\nbx lr")])
+        e = self.fixture(self.PROBE.replace("adds r1, r6, #0\n", "movs r1, #0\n"), frame=4,
+                         stack_arguments=True, child="movs r5, #0\nbx lr")
+        for proof, target in ((d, BASE + 0x300), (e, BASE + 0x200)):
+            self.assertEqual(self.writes(proof), {(0, 2), (2, 2)})
+            trusted = {pair for records in proof.loop_replays.values()
+                       for record in records for pair in record[3]}
+            self.assertIn((target, match.ARM_REG_R0 + 5), trusted)
+        # The trusted pairs are bound by the fingerprint.
+        fingerprint = e.fingerprint()
+        callee = next(iter(e.loop_replays))
+        e.loop_replays[callee] = {record[:3] + ((),) + record[4:] for record in e.loop_replays[callee]}
+        self.assertNotEqual(fingerprint, e.fingerprint())
+
+    def test_pruned_branch_edges_are_bound_by_the_fingerprint(self):
+        proof = self.fixture(counted(4), frame=8)
+        pruned = {edge for records in proof.loop_replays.values()
+                  for record in records for edge in record[4]}
+        self.assertTrue(pruned)
+        fingerprint = proof.fingerprint()
+        callee = next(iter(proof.loop_replays))
+        proof.loop_replays[callee] = {record[:4] + ((),) + record[5:]
+                                      for record in proof.loop_replays[callee]}
+        self.assertNotEqual(fingerprint, proof.fingerprint())
+
+    def test_refusals_on_pruned_infeasible_edges_are_not_evaluated(self):
+        # Replay prunes branches its exact flags prove dead, so an out-of-bounds
+        # store there is admitted; the pruned edge is bound in the record instead.
+        dead = ("push {r4, r5, r6, lr}\nadds r6, r1, #0\nmovs r1, #0\nmovs r5, #0\nloop:\n"
+                "strh r1, [r6]\nadds r6, #2\nadds r5, #1\ncmp r5, #1\nble loop\n"
+                "cmp r5, #7\nbne done\nstrh r1, [r6, #30]\ndone:\npop {r4, r5, r6}\npop {r1}\nbx r1")
+        proof = self.fixture(dead, frame=4)
+        edges = {edge for records in proof.loop_replays.values()
+                 for record in records for edge in record[4]}
+        self.assertIn((match.ARM_CC_NE, 2, 7, True), {edge[1:] for edge in edges})
 
     def test_nested_replay_chain_records_each_inner_call(self):
         # The child writes out[0..2) in its own loop; the callee calls it twice,
