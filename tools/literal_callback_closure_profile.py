@@ -1,12 +1,16 @@
 """Initialized local descriptors whose callback word is a typed function literal.
 
-Three exact root forms reach one of a closed table of pinned read-only node
+Five exact root forms reach one of a closed table of pinned read-only node
 iterators (the 080C7CC0 list walk or the 080C7D18/080C7D70 in-order tree
 walks) and either the two-word scalar adapter admitted by
 conditional-two-word-callback-closure-v1 or a pinned framed two-output adapter
 whose getter effect is interpreted. Descriptor
-word zero is the constant zero, the entry R0 value, or the address of a private
-two-word state. Only the state form passes private-frame provenance, so only an
+word zero is the constant zero, the entry R0 value, the u8 narrowing of entry
+R1, the owner word that is also the iterator's list argument, or the address of
+a private two-word state. The owner-word form makes one more opaque typed call
+on the reloaded owner word; that callee must provably overwrite entry R2 (the
+descriptor address on the empty-list path) before reading it. Only the state
+form passes private-frame provenance, so only an
 exact pinned state callback is admitted there and its complete effect is
 interpreted; the root then returns the state word it reads back after the call.
 Opaque callbacks retain the explicit compatible returning ABI and memory
@@ -18,9 +22,13 @@ from pathlib import Path
 import struct
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+from capstone.arm_const import (ARM_CC_AL, ARM_INS_ADD, ARM_INS_B, ARM_INS_BL, ARM_INS_BX, ARM_INS_LDM,
+    ARM_INS_LDR, ARM_INS_LDRB, ARM_INS_LDRH, ARM_INS_LDRSB, ARM_INS_LDRSH, ARM_INS_MOV, ARM_INS_POP,
+    ARM_INS_PUSH, ARM_INS_STM, ARM_INS_STR, ARM_INS_STRB, ARM_INS_STRH, ARM_INS_SUB, ARM_OP_IMM, ARM_OP_REG)
 
 import match
 import owner_admission_profile as owner
+import callee_preservation_profile as preservation
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
 import local_long_branch_profile as frame
@@ -29,7 +37,7 @@ from software_double_profile import indices, span_record
 
 SELECTOR = 'conditional-two-word-literal-callback-closure-v1'
 SCHEMA = 'elf-symbol-thumb-conditional-two-word-literal-callback-closure-v1'
-CONTROL_FLOW = 'complete initialized two-word local descriptor with typed callback literal and read-only callback iterator; private state only through an interpreted pinned callback; compatible returning indirect ABI and memory noninterference conditional; termination unproved'
+CONTROL_FLOW = 'complete initialized two-word local descriptor with typed callback literal and read-only callback iterator; private state only through an interpreted pinned callback; compatible returning indirect ABI and memory noninterference conditional; termination unproved; optional pinned opaque trailing call that overwrites R2 before reading it'
 PRESERVED = adapter.PRESERVED
 # Closed table of read-only callback iterators. Each body is pinned by size,
 # refined count and SHA-256; the pin is the admission gate. The structure is
@@ -68,18 +76,35 @@ FRAMED_ADAPTERS = {
         getter=0x080C7B78, getter_count=5, getter_body='43680b60006810607047'),
 }
 FRAMED_SCHEMA = 'two-word-framed-two-output-callback-adapter-v1'
-# Exact root forms. 'xx' marks the one aligned owner word-load halfword, the
-# iterator BL and the two typed literal words; every other byte is fixed.
+# Exact root forms. 'xx' marks the aligned owner word-load halfword(s), the
+# BL(s) and the two typed literal words; every other byte is fixed, including
+# any zero alignment halfword before the pool. owner_base is the register the
+# owner word is loaded through (R0 or R4 are entry R0; R2 is the word at entry
+# R0+128). A form with 'trailing' makes one more ordinary typed call after the
+# iterator: its R0 is the owner word reloaded by the same pinned halfword, and
+# the callee must provably overwrite R2 before reading it (see entry_r2_killed).
 FORMS = {
-    'private-state': dict(size=44, count=17, call=24, owner=20, callback=36, adapter=40,
+    'private-state': dict(size=44, count=17, call=24, owner=20, callback=36, adapter=40, owner_base=0,
         stack_words=5, frame_bytes=16, descriptor=-12, state=-20, word0='address of private state at entry SP-20',
         code='00b584b000220092019106496a46029202aa5160xxxx0449xxxxxxxx009804b002bc0847'),
-    'entry-object': dict(size=40, count=15, call=22, owner=16, callback=32, adapter=36,
+    'entry-object': dict(size=40, count=15, call=22, owner=16, callback=32, adapter=36, owner_base=2,
         stack_words=3, frame_bytes=8, descriptor=-12, state=None, word0='root entry R0',
         code='00b582b0011c80310a68054900900191xxxx04496a46xxxxxxxx02b001bc0047'),
-    'null': dict(size=36, count=13, call=18, owner=12, callback=28, adapter=32,
+    'null': dict(size=36, count=13, call=18, owner=12, callback=28, adapter=32, owner_base=0,
         stack_words=3, frame_bytes=8, descriptor=-12, state=None, word0='constant zero',
         code='00b582b0054a002100910192xxxx04496a46xxxxxxxx02b001bc0047'),
+    # lsls r1,r1,#24; lsrs r1,r1,#24: word0 is the u8 narrowing of entry R1.
+    'entry-byte': dict(size=40, count=14, call=20, owner=14, callback=32, adapter=36, owner_base=0,
+        stack_words=3, frame_bytes=8, descriptor=-12, state=None, word0='root entry R1 narrowed to its low 8 bits (u8)',
+        alignment_bytes=2,
+        code='00b582b00906090e054a00910192xxxx04496a46xxxxxxxx02b001bc00470000'),
+    # adds r4,r0,#0 saves the owner; word0 is the owner word that is also the
+    # iterator's list argument, and the owner word is reloaded for one more call.
+    'owner-word-trailing-call': dict(size=44, count=16, call=18, owner=8, callback=36, adapter=40, owner_base=4,
+        stack_words=4, frame_bytes=8, descriptor=-16, state=None,
+        word0='owner word loaded from root entry R0 (the iterator list argument)',
+        saved=['entry R4', 'entry LR'], trailing=dict(reload=22, call=24),
+        code='10b582b0041c0749xxxx0090019106496a46xxxxxxxxxxxxxxxxxxxx02b010bc01bc0047'),
 }
 # The only private-state callback admitted: it receives the state address in
 # R1, so its complete body is pinned and interpreted below.
@@ -183,6 +208,64 @@ def state_callback_effects(body, address):
         relation='state word 0 becomes its incoming value plus 1 modulo 2**32; the object word is stored at the incoming state word 4 cursor, which then advances by 4; R0 is 1',
         frame_bytes=0, protected_registers=[], leaf=True,
         private_state_address_stored=False, all_paths_interpreted=True)
+
+
+def entry_r2_killed(rom, address, end):
+    """Prove a trailing callee overwrites entry R2 before anything can read it.
+
+    The callee is decoded as ARMv4T Thumb (callee_preservation_profile._decode)
+    from its entry along its only concrete path. Every instruction up to the
+    first R2 write must not read R2 or write PC, and must not be a call,
+    return or conditional branch; unconditional B is followed inside the
+    indexed span and a revisited address refuses. The callee's entry SP is the
+    root's descriptor address, so SP is tracked: only PUSH and SUB/ADD SP,#imm
+    may move it, and registers derived from SP (including anything loaded
+    through SP, which may be a stale frame word holding the descriptor
+    address) are tainted, as is any load after a tainted value was stored.
+    An SP-derived overwrite (MOV/ADD R2,SP[,#k]) is admitted only when
+    its value is strictly below entry SP, which is the callee's own frame and
+    not the descriptor. Returns the overwriting site.
+    """
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB); decoder.detail = True
+    r2, pc, sp = match.ARM_REG_R0+2, match.ARM_REG_PC, match.ARM_REG_SP
+    here, seen, depth, tainted, stored = address, set(), 0, set(), False
+    while True:
+        require(here not in seen, 'trailing callee must overwrite R2 on its entry path')
+        seen.add(here)
+        try:
+            item = preservation._decode(decoder, rom, here, address, end)
+        except ValueError as error:
+            raise ValueError(f'trailing callee may observe entry R2: {error}') from None
+        read, written = (set(regs) for regs in item.regs_access())
+        require(r2 not in read and pc not in written and item.id not in (ARM_INS_BL, ARM_INS_BX) and
+                (item.id != ARM_INS_B or item.cc == ARM_CC_AL), 'trailing callee may observe entry R2')
+        ops = item.operands
+        loads = item.id in (ARM_INS_LDR, ARM_INS_LDRB, ARM_INS_LDRH, ARM_INS_LDRSB, ARM_INS_LDRSH, ARM_INS_LDM, ARM_INS_POP)
+        values = [op.reg for op in ops if op.type == ARM_OP_REG] if item.id == ARM_INS_PUSH else \
+            [op.reg for op in ops[1:] if op.type == ARM_OP_REG] if item.id == ARM_INS_STM else \
+            [ops[0].reg] if item.id in (ARM_INS_STR, ARM_INS_STRB, ARM_INS_STRH) else []
+        if set(values) & (tainted | {sp}):
+            stored = True  # an SP-derived value is now in memory
+        if item.id == ARM_INS_PUSH:
+            depth -= 4*len(ops)
+        elif sp in written:
+            # Only SUB/ADD SP,#imm; capstone lists SP as destination and source.
+            require(item.id in (ARM_INS_SUB, ARM_INS_ADD) and ops[0].reg == sp and ops[-1].type == ARM_OP_IMM and
+                    all(op.type == ARM_OP_IMM or op.reg == sp for op in ops),
+                    'trailing callee moves SP outside PUSH/SUB/ADD SP,#imm')
+            depth += ops[-1].imm if item.id == ARM_INS_ADD else -ops[-1].imm
+        else:
+            # Loads may also return SP-derived values another frame left in memory.
+            derived = bool(read & (tainted | {sp})) or loads and stored
+            if r2 in written:
+                if derived:
+                    offset = sum(op.imm for op in ops[1:] if op.type == ARM_OP_IMM)
+                    require(item.id in (ARM_INS_MOV, ARM_INS_ADD) and ops[0].reg == r2 and
+                            [op.reg for op in ops[1:] if op.type == ARM_OP_REG] == [sp] and depth+offset < 0,
+                            'trailing callee overwrites R2 with an SP-derived value at or above its entry SP')
+                return here
+            tainted = (tainted - written) | (written if derived else set())
+        here = ops[0].imm if item.id == ARM_INS_B else here+item.size
 
 
 def iterator_structure(body, address, entry, ins, edges, calls):
@@ -402,11 +485,18 @@ class _LiteralContextRead(match.BufferCallProof):
     def __init__(self, rom, mapping, site, target, form):
         super().__init__(rom, mapping, stack_arguments=True)
         self.site, self.call_target, self.form = site, target, form
+        self.trailing_site = self.trailing_target = None
         self.observed = []
 
     def check_call(self, address, aliases, stack, slots=None, *, site=None, words=None, **kwargs):
         r2 = match.ARM_REG_R0+2
         form = FORMS[self.form]
+        if 'trailing' in form and site == self.trailing_site and address == self.trailing_target:
+            # The descriptor is complete and dead here: nothing may point at it.
+            if aliases or slots or words or len(stack) != form['stack_words']:
+                raise ValueError('literal closure trailing call carries the descriptor')
+            self.observed.append(dict(site=site, target=address, descriptor_alias_passed=False))
+            return {}
         expected = {} if form['state'] is None else {form['descriptor']: form['state']}
         if site != self.site or address != self.call_target or (slots or {}) != expected or words or \
                 aliases != {r2: form['descriptor']} or len(stack) != form['stack_words']:
@@ -429,16 +519,23 @@ def prove(data, address, rom, mapping, index, *, selector):
     body, ins, edges, calls, partition = complete(address, form['size'], form['count'], rom, mapping, index)
     r0, r1, r2 = match.ARM_REG_R0, match.ARM_REG_R0+1, match.ARM_REG_R0+2
     iterator = calls.get(address+form['call'])
-    require(data == body and len(calls) == 1 and iterator in ITERATORS and
-            partition['literal_and_table_bytes'] == 8 and not partition['alignment_bytes'] and
+    trailing = form.get('trailing')
+    require(data == body and len(calls) == (2 if trailing else 1) and iterator in ITERATORS and
+            (not trailing or set(calls) == {address+form['call'], address+trailing['call']}) and
+            partition['literal_and_table_bytes'] == 8 and
+            partition['alignment_bytes'] == form.get('alignment_bytes', 0) and
             sorted(row['address']-address for row in partition['words']) == [form['callback'], form['adapter']],
             'literal closure requires the exact iterator call and two complete literals')
     source = ins[address+form['owner']]
-    base = r2 if name == 'entry-object' else r0
+    base = r0+form['owner_base']
     require(len(source.operands) == 2 and source.operands[1].type == match.ARM_OP_MEM and
             adapter.load(source, r0, base, source.operands[1].mem.disp) and
             source.operands[1].mem.disp >= 0 and not source.operands[1].mem.disp % 4,
             'literal closure requires an aligned incoming object word load')
+    if trailing:
+        # Same halfword, so the trailing argument is the same owner word, read again.
+        require(data[trailing['reload']:trailing['reload']+2] == data[form['owner']:form['owner']+2],
+                'literal closure trailing call requires the same owner word reload')
     callback_value, adapter_value = (struct.unpack_from('<I', body, form[key])[0] for key in ('callback', 'adapter'))
     require(callback_value % 2 == 1 and adapter_value % 2 == 1,
             'literal closure literals must be typed odd Thumb pointers')
@@ -495,6 +592,22 @@ def prove(data, address, rom, mapping, index, *, selector):
     canonical, = thunk.dependencies([selected_name], rom)
     adapter_canonical, = thunk.dependencies(['_call_via_r2'], rom)
     addresses = [address, iterator, adapter_address, getter, callback, selected, thunk.ALIASES['_call_via_r2']]
+    trailing_record = None
+    if trailing:
+        follower = calls[address+trailing['call']]
+        match.function_address_target(f'func_{follower:08X}', entries, address, len(data), len(rom))
+        addresses.append(follower)
+        end = next((row['end'] for row in index_entries if int(row['rom'], 16) == follower), None)
+        require(end is not None, 'literal closure trailing callee requires its complete indexed span')
+        entry = span_record(follower, int(end, 16), index_entries, rows, rom)
+        fbody = rom[follower-match.ROM_BASE:int(entry['end'], 16)-match.ROM_BASE]
+        owner.validate_span(fbody, follower, rom, mapping, index)
+        trailing_record = dict(site=address+trailing['call'], target=follower, end=int(entry['end'], 16),
+            instructions=entry['instrs'], body_sha256=sha(fbody), effects='opaque',
+            arguments=[dict(register=0, source='owner word reloaded from root entry R0',
+                            offset=source.operands[1].mem.disp, site=address+trailing['reload'])],
+            entry_r2_overwritten_at=entry_r2_killed(rom, follower, int(entry['end'], 16)),
+            descriptor_alias_passed=False)
     require(len(set(addresses)) == len(addresses), 'literal closure requires distinct complete dependency owners')
     if form['state'] is None:
         require(callback not in STATE_CALLBACKS, 'pinned state callback requires the private-state root form')
@@ -521,6 +634,8 @@ def prove(data, address, rom, mapping, index, *, selector):
             alias_erasure='The adapter restores R4 and overwrites R1 with its saved return before BX R1; the iterator overwrites R0/R1 before any later callback. No private state address is stored outside the root\'s own expired frame.')
     worker_frame = frame.prove_frame(wi, we, iterator, {}, wc, call_preservation={site: PRESERVED for site in wc})
     context = _LiteralContextRead(rom, mapping, address+form['call'], iterator, name)
+    if trailing:
+        context.trailing_site, context.trailing_target = trailing_record['site'], trailing_record['target']
     verified = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=context)
     require({item.address for item in verified} == set(ins) and context.observed,
             'literal closure requires exact native root and descriptor access evidence')
@@ -537,6 +652,8 @@ def prove(data, address, rom, mapping, index, *, selector):
         'The getter word carries no tracked private-frame or saved-return provenance. Descriptor word zero is the private state address: the exact adapter loads it and passes it to the pinned callback in R1 without dereferencing it. The no-private-provenance adapter premise is replaced for that word by the interpreted callback effects, not asserted satisfied; ordinary memory noninterference remains a premise.']) + [
         'Every reached list/node load is aligned, live, initialized and physically readable at its recorded width; null is tested only as a word value.',
         'All private root, iterator, adapter and callback frames and continuation code satisfy compatible returning ABI validity and noninterference; external values carry no private-frame/saved-return provenance.']
+    if trailing:
+        conditions.append('The trailing callee is compatible returning Thumb code preserving R4-R11 and SP, the private frame and continuation code; its identity is pinned and it provably overwrites entry R2 before reading it, but its effects are not interpreted. Its R1 is a code or iterator value (the adapter literal on the empty path, otherwise the adapter\'s return into the iterator); its R3 and R12 are callback scratch or the root caller\'s entry values, assumed to carry no private-frame provenance while the root frame is live.')
     if form['state'] is None:
         conditions.append('The typed literal callback is compatible returning Thumb code preserving R4-R11 and SP, the private frames and continuation code; its identity is pinned but its effects are not interpreted.')
     else:
@@ -544,9 +661,9 @@ def prove(data, address, rom, mapping, index, *, selector):
             'The private state is reachable only through descriptor word zero; the iterator, getter and adapter pass it to the pinned callback without dereferencing it, and no ordinary call or external access reads or writes the state or descriptor.',
             'Each callback store through the state word-4 cursor is aligned, live and writable, and does not overlap the private state, descriptor, any active frame, saved return, reached list/node word or code. The incoming entry R1 cursor carries no private-frame provenance.']
     proof = dict(schema=SCHEMA, instructions=len(ins),
-        calls=[[form['call'], f'func_{iterator:08X}']], runtime_calls=[], partition=partition,
+        calls=[[site-address, f'func_{target:08X}'] for site, target in sorted(calls.items())], runtime_calls=[], partition=partition,
         literal_callback_closure=dict(schema=SELECTOR, form=name,
-            root_frame=dict(saved=['entry LR'], local_bytes=form['frame_bytes'],
+            root_frame=dict(saved=form.get('saved', ['entry LR']), local_bytes=form['frame_bytes'],
                             established_by='exact byte template, not the frame prover',
                             template_sha256=sha(form['code'].encode())),
             root_descriptor=dict(offset=form['descriptor'], width=8, initialized_words=stores,
@@ -572,7 +689,9 @@ def prove(data, address, rom, mapping, index, *, selector):
                 [dict(base='loaded list object' if base == 'list' else 'each node reached by the iterator',
                       offset=offset, width=4) for base, offset in shape['reads']] +
                 [dict(base='each nonnull current node passed to getter', offset=offset, width=4) for offset in getter_reads] +
-                ([dict(base='root entry R0', offset=128, width=4)] if name == 'entry-object' else []),
+                ([dict(base='root entry R0', offset=128, width=4)] if name == 'entry-object' else []) +
+                ([dict(base='root entry R0, reloaded after the iterator returns', offset=source.operands[1].mem.disp,
+                       width=4)] if trailing else []),
             outward_expired_aliases=[dict(register=2, origin='root descriptor on the empty-list path',
                 accessible_after_return=False, observed_by_root_continuation=False)]
                 if r2_survives else [],
@@ -582,4 +701,13 @@ def prove(data, address, rom, mapping, index, *, selector):
                 Path(__file__).name: sha(Path(__file__).read_bytes())},
             physical_memory_permission=False, numeric_nonalias_proved=False,
             actual_callback_ABI_established=False, termination_proved=False))
+    if trailing:
+        record = proof['literal_callback_closure']
+        record['trailing_call'] = trailing_record
+        # The empty-path R2 alias does not expire here: it reaches the live
+        # trailing callee, which overwrites it before any read.
+        record['live_aliases_to_trailing_callee'] = [dict(register=alias['register'], origin=alias['origin'],
+            observed_by_trailing_callee=False, overwritten_at=trailing_record['entry_r2_overwritten_at'])
+            for alias in record['outward_expired_aliases']]
+        record['outward_expired_aliases'] = []
     return proof

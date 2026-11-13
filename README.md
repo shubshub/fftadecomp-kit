@@ -1189,12 +1189,24 @@ selector:
 python tools/match.py --root ../fftadecomp 08099CDC --owner-runtime-profile conditional-two-word-literal-callback-closure-v1
 ```
 
-Three exact root forms are accepted. Only the aligned owner word load, the
-iterator BL and the two typed literals (callback, then adapter) may vary.
+Five exact root forms are accepted. Only the aligned owner word load, the
+BLs and the two typed literals (callback, then adapter) may vary.
 Descriptor word zero is the constant zero (36 bytes), the entry R0 value
-(40 bytes), or the address of a private two-word state (44 bytes). Bindings must
-be exactly the iterator call and the two function literals in pool order, with
-no data or switches. The iterator, adapter, getter and canonical thunks are
+(40 bytes), the u8 narrowing of entry R1 (`entry-byte`, 40 bytes with a zero
+alignment halfword), the owner word that is also the iterator's list argument
+(`owner-word-trailing-call`, 44 bytes, saves R4), or the address of a private
+two-word state (44 bytes). The owner-word form then reloads the owner word
+through the same pinned halfword and makes one ordinary typed call on it. That
+callee is opaque, but R2 still holds the descriptor address when the list
+iterator returns on an empty list. So the callee is decoded as ARMv4T Thumb
+(the `callee_preservation_profile` decoder) along its single entry path, and it
+must overwrite R2 before any R2 read, call, return or conditional branch. Its
+entry SP is the descriptor address, so SP moves are limited to PUSH and
+SUB/ADD SP,#imm. An overwrite derived from SP (directly, through a register,
+through an SP-based load, or through a load after an SP value was stored) is
+admitted only as MOV/ADD R2,SP[,#k] strictly below entry SP. The report records
+the overwriting site under `trailing_call` and `live_aliases_to_trailing_callee`. Bindings must be exactly the root's calls and the
+two function literals in pool order, with no data or switches. The iterator, adapter, getter and canonical thunks are
 checked as follows. The 28-byte profile's contract is unchanged.
 
 The iterator call must reach one entry of a closed table, `ITERATORS`. Each
