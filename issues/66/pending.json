@@ -3519,6 +3519,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "02b7bd94bbb65667b02c249d853c3136b8c2663f7273a5b23f862cae3978ac1a",
+        "acknowledged_cursor": 6865895183,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "02b7bd94bbb65667b02c249d853c3136b8c2663f7273a5b23f862cae3978ac1a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"astra-xhigh-curves-080dff8c\",\"note\":\"Native Astra xhigh recovery of complete 690-byte fixed-point control-point and curve-sampling controller; fresh ordinary CFG passes337 instructions. No new symbols or tooling changes.\"}",
+          "created_at": "2026-11-13T21:56:15Z",
+          "id": 6865895183,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:56:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "694d7390a44e81deda07be13e5c1edd9fdc222c6ad718ba0e4ff330dff63268f",
+        "result": {
+          "address": "0x080DFF8C",
+          "claim_id": 6865895183,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6865895183,
+          "status": "accepted",
+          "who": "astra-xhigh-curves-080dff8c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
