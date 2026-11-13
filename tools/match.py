@@ -2858,6 +2858,9 @@ class BufferCallProof:
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
     index_policy = None
+    # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
+    # entries become proved leaf calls; None keeps every runtime refused.
+    runtime_summaries = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2969,10 +2972,16 @@ class BufferCallProof:
                                     **self.word_context(words or {}, -4*len(stack), site,
                                         tuple(register for register in aliases if register not in CALLER_CLOBBERED)))
 
+    def resolve_call(self, address):
+        if self.runtime_summaries is not None and self.runtime_summaries.covers(address):
+            return None  # summarised by verify_leaf_instructions, never inspected as a callee
+        return self.target(address)
+
     def inspect(self, address, data):
         instructions = verify_leaf_instructions(data, address, True,
                                                 buffer_proof=self if self.stack_arguments else None,
-                                                call_resolver=self.target)
+                                                call_resolver=self.resolve_call,
+                                                runtime_summaries=self.runtime_summaries)
         return instructions, {}
 
     def loop_replay_eligible(self):
@@ -2982,6 +2991,9 @@ class BufferCallProof:
                  self.discarded_exit_scratch is not None or self.bios_fill_proof is not None)
 
     def check_arguments(self, address, arguments, stack, incoming, protected, **context):
+        if self.runtime_summaries is not None and self.runtime_summaries.covers(address):
+            return self.runtime_summaries.call(self, address, arguments, stack, incoming,
+                                               protected, **context)
         snapshot = ({callee: set(records) for callee, records in self.loop_replays.items()},
                     dict(self.dependencies), dict(self.callee_clobbers),
                     dict(self.callee_trusted))
@@ -3495,7 +3507,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              addressed_signed_runtime_context=None, entry_recursive_calls=None,
                              typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
                              finite_small_copy_context=None, self_calls=None,
-                             backward_switch_cases=False):
+                             backward_switch_cases=False, runtime_summaries=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -3503,6 +3515,26 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     the symbol being verified (partial correctness only: no termination or
     depth theorem).  It is accepted only on the plain direct-call path.
     """
+    if runtime_summaries is not None:
+        from runtime_summary_profile import RuntimeSummaries
+        if type(runtime_summaries) is not RuntimeSummaries or not thumb or any(
+                value is not None for value in (udivsi3_context, modsi3_context, divsi3_context,
+                    double_context, function_thunk_context, umodsi3_context, ashldi3_context, float_context,
+                    signed_quotient_profile, signed_runtime_context, remainder_inventory_context,
+                    remainder_ordinary_inventory_context, remainder_shift_inventory_context,
+                    remainder_framed_shift_inventory_context, remainder_byte_range_inventory_context,
+                    bounded_stack_output_inventory_context, bounded_stack_output_zero_index_inventory_context,
+                    zero_aware_mixed_inventory_context, zero_aware_unsigned_quotient_inventory_context,
+                    addressed_signed_runtime_context, entry_recursive_calls, unsigned_quotient_profile,
+                    self_calls, ignored_leaf_alias_proof, finite_small_copy_context,
+                    typed_switch_outgoing_frame, switch_relocations, switch_data_relocations,
+                    switch_constants_policy, inert_spin_context, acyclic_state_budget,
+                    stack_pointer_compare_profile)) or preloaded_switch or allow_switch_constants or \
+                allow_switch_scalar_frame or backward_switch_cases or buffer_proof is None or \
+                buffer_proof.runtime_summaries is not runtime_summaries:
+            # Only the owning buffer proof may apply the summary at a call site; every
+            # other call or alias context would route the call to a different check.
+            raise ValueError("runtime summaries exclude every other runtime, thunk, switch and alias context")
     if self_calls is not None:
         # parameters are the only locals here; no other context may combine
         if type(self_calls) is not frozenset or not self_calls or not thumb or any(
@@ -4029,7 +4061,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                                    calls.get(current) == address)):
                 raise ValueError("call is not a validated external direct Thumb BL")
             target = operands[0].imm
-            if software_float.reserved(target) and not (
+            summarized = runtime_summaries is not None and runtime_summaries.covers(target)
+            if summarized:
+                if bounded_output_proof is not None or division_constants is not None or \
+                        ignored_leaf_alias_proof is not None or buffer_proof.runtime_summaries is not runtime_summaries:
+                    raise ValueError("runtime summary call reached a foreign alias or division context")
+                runtime_summaries.observe(current, target)
+            if not summarized and software_float.reserved(target) and not (
                     double_context is not None and
                     software_double.shared_float_call(double_context[3].get(current), target) or
                     ashldi3_context is not None and
@@ -4037,15 +4075,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if float_context is None or current not in float_context[3] or \
                         software_float.OPERATIONS.get(float_context[3][current]) != target:
                     raise ValueError("software float requires its canonical runtime proof")
-            if ashldi3.reserved(target):
+            if not summarized and ashldi3.reserved(target):
                 if ashldi3_context is None or target != ashldi3.ADDRESS or current not in ashldi3_context[3]:
                     raise ValueError("ashldi3 requires its canonical target-machine proof")
-            if umodsi3.reserved(target) and not addressed_signed_runtime.binds_unsigned(
+            if not summarized and umodsi3.reserved(target) and not addressed_signed_runtime.binds_unsigned(
                     addressed_signed_runtime_context, current, target):
                 if umodsi3_context is None or target != umodsi3.ADDRESS or \
                         current not in umodsi3_context[2]:
                     raise ValueError("unsigned remainder requires its canonical constant-divisor proof")
-            if software_double.reserved(target) and not (
+            if not summarized and software_double.reserved(target) and not (
                     float_context is not None and
                     software_double.shared_float_call(float_context[3].get(current), target) or
                     ashldi3_context is not None and
@@ -4053,7 +4091,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if double_context is None or current not in double_context[3] or \
                         software_double.OPERATIONS.get(double_context[3][current]) != target:
                     raise ValueError("software double requires its canonical runtime proof")
-            if divsi3.reserved(target) and target != 0x0814274C and not (
+            if not summarized and divsi3.reserved(target) and target != 0x0814274C and not (
                     addressed_signed_runtime_context is not None and
                     addressed_signed_runtime_context[3].get(current) == 'func_081426B8' and
                     target == divsi3.ADDRESS or
@@ -4063,7 +4101,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     zero_aware_mixed_inventory_context[3].get(current) == '__divsi3'):
                 if divsi3_context is None or target != divsi3.ADDRESS or current not in divsi3_context[2]:
                     raise ValueError("signed quotient requires its canonical positive-constant proof")
-            if modsi3.reserved(target) and target != 0x0814274C and not (
+            if not summarized and modsi3.reserved(target) and target != 0x0814274C and not (
                     addressed_signed_runtime_context is not None and
                     addressed_signed_runtime_context[3].get(current) == modsi3.ADDRESSED_NAME and
                     target == modsi3.ADDRESS or
@@ -4076,7 +4114,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     raise ValueError("signed remainder interior targets are unsupported")
                 if target != modsi3.ADDRESS or current not in modsi3_context[2]:
                     raise ValueError("signed remainder call lacks a canonical binding")
-            if is_udivsi3_address(target):
+            if not summarized and is_udivsi3_address(target):
                 if addressed_signed_runtime.binds_unsigned(
                         addressed_signed_runtime_context, current, target):
                     pass  # prepare authenticated the exact conditional returning ABI entry.
@@ -4850,6 +4888,8 @@ def main():
                                                       "restoring-owner-r3-thunk-switch-v1", "restoring-owner-scalar-switch-v1", "restoring-owner-switch-entry-word-v1", "restoring-owner-switch-entry-two-words-data-v1",
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
+                                                      "bounded-buffer-runtime-summaries-v1",
+                                                      "bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1",
                                                       "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1",
                                                       "bounded-buffer-conditional-thunks-v1",
                                                       "bounded-buffer-conditional-thunks-discarded-scratch-v1",
