@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "fef5da8fe3c3df817d0418aae0b5a9a81a40c0f16a2b4c092fd2210a94451ed4",
+    "acknowledged_cursor": 6861564449,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fef5da8fe3c3df817d0418aae0b5a9a81a40c0f16a2b4c092fd2210a94451ed4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E8590\",\"who\":\"astra-xhigh-080e8590\",\"note\":\"Recover complete 560-byte scheduler callback with natural C under existing framed verifier.\"}",
+      "created_at": "2026-11-13T18:29:06Z",
+      "id": 6861552501,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T18:29:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "329d11f812a4c243663ae286d69d57946f15e30668c88b6b4116dda9eb08e125",
+    "result": {
+      "address": "0x080E8590",
+      "claim_id": 6861552501,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6861552501,
+      "status": "accepted",
+      "who": "astra-xhigh-080e8590"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "680ec8b39d8ee8674cecaf075f88444d7d3c9160dcc636528b1e7272a9e93c8d",
+    "acknowledged_cursor": 6861834978,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "680ec8b39d8ee8674cecaf075f88444d7d3c9160dcc636528b1e7272a9e93c8d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E8590\",\"who\":\"astra-xhigh-080e8590\",\"claim_id\":6861552501,\"reason\":\"Plausible complete C now byte exact: 560 bytes, existing ordinary framed data verifier\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T18:42:01Z",
+      "id": 6861830769,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T18:42:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "99ec08497edd66bb755b3bd74d311a46b0a4f381e8d73298ee770f18f527de74",
+    "result": {
+      "address": "0x080E8590",
+      "claim_id": 6861552501,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6861830769,
+      "status": "accepted",
+      "who": "astra-xhigh-080e8590"
+    }
+  }
+}
