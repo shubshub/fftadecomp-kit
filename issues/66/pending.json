@@ -3326,7 +3326,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "54f320a27aab1d4923029230268a211d441c08929cc67caea62be4fea037e8ae",
+        "acknowledged_cursor": 6862596460,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "54f320a27aab1d4923029230268a211d441c08929cc67caea62be4fea037e8ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0808F414\",\"who\":\"claude-ffta2\",\"claim_id\":6862210348,\"reason\":\"near miss parked: CSE merge in bounds loop\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T19:18:19Z",
+          "id": 6862593432,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T19:18:19Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3ee0bb9410f02c425179fcdce97d4fd97c3d51e7b3ba5c2d0496c63cf8023df9",
+        "result": {
+          "address": "0x0808F414",
+          "claim_id": 6862210348,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6862593432,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3422,7 +3450,35 @@
           "who": "astra-xhigh-08015858"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "46892fc3b6bffbdfe99c9423c365f49bd8723ce65ff426d60eb21a079c0aa361",
+        "acknowledged_cursor": 6862596460,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "46892fc3b6bffbdfe99c9423c365f49bd8723ce65ff426d60eb21a079c0aa361",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08015858\",\"who\":\"astra-xhigh-08015858\",\"claim_id\":6862290591,\"reason\":\"Complete tilemap setup now 1080/1080 bytes, 501 instructions, plausible native ordinary profile\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T19:18:28Z",
+          "id": 6862596460,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T19:18:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3ee0bb9410f02c425179fcdce97d4fd97c3d51e7b3ba5c2d0496c63cf8023df9",
+        "result": {
+          "address": "0x08015858",
+          "claim_id": 6862290591,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6862596460,
+          "status": "accepted",
+          "who": "astra-xhigh-08015858"
+        }
+      }
     },
     {
       "claim": {
