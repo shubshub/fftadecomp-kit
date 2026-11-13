@@ -63,8 +63,15 @@ THUNK_SCRATCH_CONTROL_FLOW = 'bounded buffer outputs with proven unobserved R2/R
 THUNK_PARTIAL_SELECTOR = 'bounded-buffer-conditional-thunks-selective-scratch-v1'
 THUNK_PARTIAL_SCHEMA = 'elf-symbol-thumb-bounded-buffer-conditional-thunks-selective-scratch-v1'
 THUNK_PARTIAL_CONTROL_FLOW = 'conditional canonical thunks with individually proved dead scratch and retained live pointer aliases'
-THUNK_SELECTORS = (THUNK_SELECTOR, THUNK_SCRATCH_SELECTOR, THUNK_PARTIAL_SELECTOR)
-THUNK_SCHEMAS = {THUNK_SELECTOR: THUNK_SCHEMA, THUNK_SCRATCH_SELECTOR: THUNK_SCRATCH_SCHEMA, THUNK_PARTIAL_SELECTOR: THUNK_PARTIAL_SCHEMA}
+THUNK_ROOT_SCRATCH_SELECTOR = 'bounded-buffer-conditional-thunks-root-return-scratch-v1'
+THUNK_ROOT_SCRATCH_SCHEMA = 'elf-symbol-thumb-bounded-buffer-conditional-thunks-root-return-scratch-v1'
+THUNK_ROOT_SCRATCH_CONTROL_FLOW = 'conditional canonical thunks with expired root-frame R2/R3 projected only at exact root normal returns'
+THUNK_SELECTORS = (THUNK_SELECTOR, THUNK_SCRATCH_SELECTOR, THUNK_PARTIAL_SELECTOR, THUNK_ROOT_SCRATCH_SELECTOR)
+THUNK_SCHEMAS = {THUNK_SELECTOR: THUNK_SCHEMA, THUNK_SCRATCH_SELECTOR: THUNK_SCRATCH_SCHEMA, THUNK_PARTIAL_SELECTOR: THUNK_PARTIAL_SCHEMA,
+                 THUNK_ROOT_SCRATCH_SELECTOR: THUNK_ROOT_SCRATCH_SCHEMA}
+ROOT_SCRATCH_SELECTOR = 'bounded-buffer-root-return-scratch-v1'
+ROOT_SCRATCH_SCHEMA = 'elf-symbol-thumb-bounded-buffer-root-return-scratch-v1'
+ROOT_SCRATCH_CONTROL_FLOW = 'bounded buffer calls with expired root-frame R2/R3 projected only at exact root normal returns'
 GUARDED_ALIAS_SELECTOR = 'bounded-buffer-guarded-callee-aliases-v1'
 GUARDED_ALIAS_SCHEMA = 'elf-symbol-thumb-bounded-buffer-guarded-callee-aliases-v1'
 GUARDED_ALIAS_CONTROL_FLOW = 'complete ordinary Thumb owner with guarded bounded-buffer callees and every native return alias retained'
@@ -117,8 +124,8 @@ RUNTIME_SUMMARY_SCHEMA = 'elf-symbol-thumb-bounded-buffer-runtime-summaries-v1'
 RUNTIME_SUMMARY_FAST_FILL_SELECTOR = 'bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1'
 RUNTIME_SUMMARY_FAST_FILL_SCHEMA = 'elf-symbol-thumb-bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1'
 BIOS_WORD_SWITCH_SCHEMA = 'elf-symbol-thumb-bios-word-switch-local-buffers-v1'
-SELECTORS = (RUNTIME_SUMMARY_SELECTOR, RUNTIME_SUMMARY_FAST_FILL_SELECTOR, BIOS_WORD_SWITCH_SELECTOR, SMALL_COPY_BINDING_SELECTOR, COPY_BINDING_SELECTOR, *LOCAL_CALL_SELECTORS, NAMED_THREE_OUTPUT_SELECTOR, SPILLED_LOOP_SELECTOR, FINITE_LOOP_SELECTOR, STACK_QUERY_SELECTOR, QUERY_CALLEE_SELECTOR, ROM_TABLE_COPY_SELECTOR, STACK_INDEX_SELECTOR, NESTED_QUERY_SELECTOR, QUERY_CONTINUATION_SELECTOR, THUNK_PARTIAL_SELECTOR, THUNK_SCRATCH_SELECTOR, THUNK_SELECTOR, KNOWN_LIST_QUERY_SELECTOR, KNOWN_QUERY_SELECTOR, TREE_CALLBACK_SELECTOR, CALLBACK_CLOSURE_SELECTOR, LITERAL_CALLBACK_SELECTOR, DIRECT_OUTPUT_SELECTOR, DYNAMIC_DIV_SELECTOR, THREE_OUTPUT_SELECTOR, BG_AFFINE_TRANSPARENT_SELECTOR, BG_AFFINE_SCRATCH_SELECTOR, BG_AFFINE_SELECTOR, MIXED_FAST_FILL_SELECTOR, FAST_FILL_SELECTOR, BIOS_DIV_GUARDED_SELECTOR, SELECTOR, SCRATCH_SELECTOR, BIOS_SQRT_SELECTOR, BIOS_FILL_SELECTOR, BIOS_LOCAL_FILL_SELECTOR, BIOS_OVERWRITE_SELECTOR, GUARDED_SWITCH_SELECTOR, NESTED_OUTPUT_SELECTOR, NESTED_SELECTIVE_SELECTOR, ROOT_SWITCH_SELECTOR, GUARDED_ALIAS_SELECTOR, DATAFREE_SELECTOR)
-SCHEMAS = (RUNTIME_SUMMARY_SCHEMA, RUNTIME_SUMMARY_FAST_FILL_SCHEMA, BIOS_WORD_SWITCH_SCHEMA, SMALL_COPY_BINDING_SCHEMA, COPY_BINDING_SCHEMA, *LOCAL_CALL_SCHEMAS, NAMED_THREE_OUTPUT_SCHEMA, SPILLED_LOOP_SCHEMA, FINITE_LOOP_SCHEMA, STACK_QUERY_SCHEMA, QUERY_CALLEE_SCHEMA, ROM_TABLE_COPY_SCHEMA, STACK_INDEX_SCHEMA, NESTED_QUERY_SCHEMA, QUERY_CONTINUATION_SCHEMA, THUNK_PARTIAL_SCHEMA, THUNK_SCRATCH_SCHEMA, THUNK_SCHEMA, KNOWN_LIST_QUERY_SCHEMA, KNOWN_QUERY_SCHEMA, TREE_CALLBACK_SCHEMA, CALLBACK_CLOSURE_SCHEMA, LITERAL_CALLBACK_SCHEMA, DIRECT_OUTPUT_SCHEMA, DYNAMIC_DIV_SCHEMA, THREE_OUTPUT_SCHEMA, BG_AFFINE_TRANSPARENT_SCHEMA, BG_AFFINE_SCRATCH_SCHEMA, BG_AFFINE_SCHEMA, MIXED_FAST_FILL_SCHEMA, FAST_FILL_SCHEMA, BIOS_DIV_GUARDED_SCHEMA, SCHEMA, SCRATCH_SCHEMA, BIOS_SQRT_SCHEMA, BIOS_FILL_SCHEMA, BIOS_LOCAL_FILL_SCHEMA, BIOS_OVERWRITE_SCHEMA, GUARDED_SWITCH_SCHEMA, NESTED_OUTPUT_SCHEMA, NESTED_SELECTIVE_SCHEMA, ROOT_SWITCH_SCHEMA, GUARDED_ALIAS_SCHEMA, DATAFREE_SCHEMA)
+SELECTORS = (ROOT_SCRATCH_SELECTOR, THUNK_ROOT_SCRATCH_SELECTOR, RUNTIME_SUMMARY_SELECTOR, RUNTIME_SUMMARY_FAST_FILL_SELECTOR, BIOS_WORD_SWITCH_SELECTOR, SMALL_COPY_BINDING_SELECTOR, COPY_BINDING_SELECTOR, *LOCAL_CALL_SELECTORS, NAMED_THREE_OUTPUT_SELECTOR, SPILLED_LOOP_SELECTOR, FINITE_LOOP_SELECTOR, STACK_QUERY_SELECTOR, QUERY_CALLEE_SELECTOR, ROM_TABLE_COPY_SELECTOR, STACK_INDEX_SELECTOR, NESTED_QUERY_SELECTOR, QUERY_CONTINUATION_SELECTOR, THUNK_PARTIAL_SELECTOR, THUNK_SCRATCH_SELECTOR, THUNK_SELECTOR, KNOWN_LIST_QUERY_SELECTOR, KNOWN_QUERY_SELECTOR, TREE_CALLBACK_SELECTOR, CALLBACK_CLOSURE_SELECTOR, LITERAL_CALLBACK_SELECTOR, DIRECT_OUTPUT_SELECTOR, DYNAMIC_DIV_SELECTOR, THREE_OUTPUT_SELECTOR, BG_AFFINE_TRANSPARENT_SELECTOR, BG_AFFINE_SCRATCH_SELECTOR, BG_AFFINE_SELECTOR, MIXED_FAST_FILL_SELECTOR, FAST_FILL_SELECTOR, BIOS_DIV_GUARDED_SELECTOR, SELECTOR, SCRATCH_SELECTOR, BIOS_SQRT_SELECTOR, BIOS_FILL_SELECTOR, BIOS_LOCAL_FILL_SELECTOR, BIOS_OVERWRITE_SELECTOR, GUARDED_SWITCH_SELECTOR, NESTED_OUTPUT_SELECTOR, NESTED_SELECTIVE_SELECTOR, ROOT_SWITCH_SELECTOR, GUARDED_ALIAS_SELECTOR, DATAFREE_SELECTOR)
+SCHEMAS = (ROOT_SCRATCH_SCHEMA, THUNK_ROOT_SCRATCH_SCHEMA, RUNTIME_SUMMARY_SCHEMA, RUNTIME_SUMMARY_FAST_FILL_SCHEMA, BIOS_WORD_SWITCH_SCHEMA, SMALL_COPY_BINDING_SCHEMA, COPY_BINDING_SCHEMA, *LOCAL_CALL_SCHEMAS, NAMED_THREE_OUTPUT_SCHEMA, SPILLED_LOOP_SCHEMA, FINITE_LOOP_SCHEMA, STACK_QUERY_SCHEMA, QUERY_CALLEE_SCHEMA, ROM_TABLE_COPY_SCHEMA, STACK_INDEX_SCHEMA, NESTED_QUERY_SCHEMA, QUERY_CONTINUATION_SCHEMA, THUNK_PARTIAL_SCHEMA, THUNK_SCRATCH_SCHEMA, THUNK_SCHEMA, KNOWN_LIST_QUERY_SCHEMA, KNOWN_QUERY_SCHEMA, TREE_CALLBACK_SCHEMA, CALLBACK_CLOSURE_SCHEMA, LITERAL_CALLBACK_SCHEMA, DIRECT_OUTPUT_SCHEMA, DYNAMIC_DIV_SCHEMA, THREE_OUTPUT_SCHEMA, BG_AFFINE_TRANSPARENT_SCHEMA, BG_AFFINE_SCRATCH_SCHEMA, BG_AFFINE_SCHEMA, MIXED_FAST_FILL_SCHEMA, FAST_FILL_SCHEMA, BIOS_DIV_GUARDED_SCHEMA, SCHEMA, SCRATCH_SCHEMA, BIOS_SQRT_SCHEMA, BIOS_FILL_SCHEMA, BIOS_LOCAL_FILL_SCHEMA, BIOS_OVERWRITE_SCHEMA, GUARDED_SWITCH_SCHEMA, NESTED_OUTPUT_SCHEMA, NESTED_SELECTIVE_SCHEMA, ROOT_SWITCH_SCHEMA, GUARDED_ALIAS_SCHEMA, DATAFREE_SCHEMA)
 CONTROL_FLOW = 'complete Thumb owner with typed data literals and ROM-proved bounded buffer callees'
 MAX_DEPENDENCIES = 8
 MAX_BYTES = 4096
@@ -386,8 +393,103 @@ def conditional_thunk_replay(proof):
     from conditional_local_buffer_profile import ConditionalLocalBufferProof
     from known_list_query_continuation_profile import KnownListQueryContinuationProof
     from nested_known_query_profile import NestedKnownQueryProof
-    return type(proof) in (ConditionalLocalBufferProof, NestedKnownQueryProof, KnownListQueryContinuationProof, ConditionalThunkBufferProof, ConditionalThunkScratchBufferProof,
+    return type(proof) in (ConditionalLocalBufferProof, NestedKnownQueryProof, KnownListQueryContinuationProof, ConditionalThunkBufferProof, ConditionalThunkScratchBufferProof, ConditionalThunkRootScratchBufferProof,
                            ConditionalThunkSelectiveScratchBufferProof)
+
+
+class RootReturnScratchMixin:
+    """Project expired root-frame R2/R3 aliases only at the bound root's normal returns.
+
+    R2/R3 never carry results under the agbcc Thumb ABI (results use R0, or
+    R0:R1 for 64-bit values), so a root-frame address left there is dead at an
+    external return: the thumb-discarded-exit-scratch-v1 contract the kit
+    already applies at direct-output and bounded-disjunctive roots. R0/R1
+    keep the escape refusal. Inspected callee returns are untouched: there the
+    consumer is a known caller whose reads this projection does not check.
+    """
+
+    def bind_return_root(self, address, data):
+        import owner_admission_profile as owner
+        if getattr(self, '_return_root', None) is not None or self.span(address) != data:
+            raise ValueError('root return scratch requires its exact unique complete body')
+        refinement = owner.refine(data, address, self.mapping)
+        _, edges, branches, _, words = graph.graph(data, address, refinement)
+        returns = frozenset(int(site, 16) for site in refinement['returns'])
+        if branches or words or not returns or any(edges[site] for site in returns):
+            raise ValueError('root return scratch requires complete normal returns without local BL or switches')
+        self._return_root = (address, bytes(data), returns)
+        # Return site -> projected (register, offset) pairs. Each evaluation of a
+        # site overwrites its entry, so after the worklist fixpoint every entry is
+        # the projection made from that return's final state.
+        self._return_scratch = {}
+        self._return_scratch_joins = set()
+
+    def root_return_aliases(self, data, address, site, aliases):
+        root = getattr(self, '_return_root', None)
+        if root is None:
+            raise ValueError('root return scratch requires its bound root context')
+        # A nested callee return, a different body or a non-return site keeps
+        # the original refusal: only the bound root's own frame expires here.
+        if self.active or address != root[0] or data != root[1] or site not in root[2]:
+            return aliases
+        scratch = {match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3}
+        projected = {register: offset for register, offset in aliases.items() if register in scratch}
+        if any(type(offset) is not int or offset >= 0 for offset in projected.values()):
+            return aliases  # only addresses inside the expired root frame are projected
+        self._return_scratch[site] = tuple(sorted((register - match.ARM_REG_R0, offset)
+                                                  for register, offset in projected.items()))
+        return {register: offset for register, offset in aliases.items() if register not in scratch}
+
+    def root_scratch_manifest(self):
+        from local_long_branch_profile import DISCARDED_SCRATCH_SCHEMA, DISCARDED_SCRATCH_CONTRACT
+        root = getattr(self, '_return_root', None)
+        # Only final-state return projections satisfy the guard; a join drop seen
+        # in an intermediate fixpoint state never does on its own.
+        if root is None or not any(self._return_scratch.values()):
+            raise ValueError('root return scratch requires an actual projected root-frame alias')
+        return dict(schema=DISCARDED_SCRATCH_SCHEMA, registers=[2, 3],
+            contract=DISCARDED_SCRATCH_CONTRACT,
+            address=root[0], body_sha256=hashlib.sha256(root[1]).hexdigest(),
+            return_sites=sorted(site - root[0] for site in root[2]),
+            observations=[[site - root[0], register, offset]
+                          for site, pairs in sorted(self._return_scratch.items())
+                          for register, offset in pairs],
+            dead_joins=[[site - root[0], register, low, high]
+                        for site, register, low, high in sorted(self._return_scratch_joins)],
+            dead_joins_scope='every root-rule join drop evaluated during the fixpoint, '
+                             'including intermediate states; observations are final-state only',
+            limits='only exact root normal returns after the complete frame is restored; '
+                   'R0/R1, R4-R11, LR and every inspected callee return retain the escape refusal')
+
+
+class RootReturnScratchBufferProof(RootReturnScratchMixin, NamedDataBufferProof):
+    """Ordinary bounded buffer proof plus the closed root-return projection."""
+
+
+def root_scratch_join_dead(proof, data, address, successor, register, previous, incoming, decoder):
+    """A differing R2/R3 root-frame alias at a root join is dead if every path
+    from the join kills it or reaches an exact bound root normal return with no
+    read and no call in between (the same boundary the return projection uses)."""
+    if type(proof) not in (RootReturnScratchBufferProof, ConditionalThunkRootScratchBufferProof):
+        return False
+    root = getattr(proof, '_return_root', None)
+    if root is None or proof.active or address != root[0] or data != root[1] or \
+            register not in (match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3) or \
+            any(type(offset) is not int or offset >= 0 for offset in (previous, incoming)):
+        return False
+    if not match.stack_alias_overwritten_before_use(data, address, successor, register,
+                                                    decoder, exit_sites=root[2]):
+        return False
+    proof._return_scratch_joins.add((successor, register - match.ARM_REG_R0,
+                                     *sorted((previous, incoming))))
+    return True
+
+
+def root_return_scratch_aliases(proof, data, address, site, aliases):
+    """Closed root-only hook; arbitrary subclasses receive no projection."""
+    if type(proof) not in (RootReturnScratchBufferProof, ConditionalThunkRootScratchBufferProof):
+        return aliases
+    return proof.root_return_aliases(data, address, site, aliases)
 
 
 class DiscardedReturnScratchProof(NamedDataBufferProof):
@@ -482,6 +584,10 @@ class DiscardedReturnScratchProof(NamedDataBufferProof):
 
 class ConditionalThunkScratchBufferProof(ConditionalThunkBufferProof, DiscardedReturnScratchProof):
     """Compose exact thunk checks with actual consumer scratch nonobservation."""
+
+
+class ConditionalThunkRootScratchBufferProof(RootReturnScratchMixin, ConditionalThunkBufferProof):
+    """Exact conditional thunk checks plus the closed root-return projection."""
 
 
 class ConditionalThunkSelectiveScratchBufferProof(ConditionalThunkScratchBufferProof):
