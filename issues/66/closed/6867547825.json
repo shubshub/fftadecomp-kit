@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8adc9b41a452e2d5f64fab76e206184dbe8f326301c759d5b4a3baefaf5c189b",
+    "acknowledged_cursor": 6867555794,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8adc9b41a452e2d5f64fab76e206184dbe8f326301c759d5b4a3baefaf5c189b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08125A5C\",\"who\":\"astra-xhigh-125a5c\",\"note\":\"Recover complete 908-byte portrait presentation callback with existing named-data-buffer-v1\"}",
+      "created_at": "2026-11-13T23:29:25Z",
+      "id": 6867547825,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:29:25Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5ed4980c57273d03ead25b7761160fcfe7e5635d78ae5c902da6688abf4cff92",
+    "result": {
+      "address": "0x08125A5C",
+      "claim_id": 6867547825,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6867547825,
+      "status": "accepted",
+      "who": "astra-xhigh-125a5c"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0e1c1ca53b33d098da69e0ff981a4d96a9c2e52319848360bc4255cfd387365b",
+    "acknowledged_cursor": 6867697478,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0e1c1ca53b33d098da69e0ff981a4d96a9c2e52319848360bc4255cfd387365b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08125A5C\",\"who\":\"astra-xhigh-125a5c\",\"claim_id\":6867547825,\"reason\":\"Current pinned control-shadow plausibility forbids required 0x50-byte whole-object copy and member address-taking. Recovered916byte397instruction candidate vs target908/392 retained with native exit1 IMPLAUSIBLE; no toolkit changes or match credit.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; named-data-buffer-v1; typed callback payload and packed-position decoder\"}",
+      "created_at": "2026-11-13T23:38:21Z",
+      "id": 6867697478,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:38:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d95d51bb94ac40b3ef49339fad5dcfdaba096b0aa8f45b3e1e27a3cdf6663479",
+    "result": {
+      "address": "0x08125A5C",
+      "claim_id": 6867547825,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6867697478,
+      "status": "accepted",
+      "who": "astra-xhigh-125a5c"
+    }
+  }
+}

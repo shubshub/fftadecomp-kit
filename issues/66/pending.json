@@ -186,7 +186,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "991f94fe2d6cdc8d950cab2505748b6ae403bb57a0c4d9d62e928356ab4db494",
+        "acknowledged_cursor": 6867697478,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "991f94fe2d6cdc8d950cab2505748b6ae403bb57a0c4d9d62e928356ab4db494",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C68EC\",\"who\":\"claude-ffta2\",\"claim_id\":6848917746,\"reason\":\"parked: verifier gap or near miss; see local notes\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:38:06Z",
+          "id": 6867693134,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:38:06Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d95d51bb94ac40b3ef49339fad5dcfdaba096b0aa8f45b3e1e27a3cdf6663479",
+        "result": {
+          "address": "0x080C68EC",
+          "claim_id": 6848917746,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867693134,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1050,7 +1078,35 @@
           "who": "astra-xhigh-125a5c"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0e1c1ca53b33d098da69e0ff981a4d96a9c2e52319848360bc4255cfd387365b",
+        "acknowledged_cursor": 6867697478,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0e1c1ca53b33d098da69e0ff981a4d96a9c2e52319848360bc4255cfd387365b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08125A5C\",\"who\":\"astra-xhigh-125a5c\",\"claim_id\":6867547825,\"reason\":\"Current pinned control-shadow plausibility forbids required 0x50-byte whole-object copy and member address-taking. Recovered916byte397instruction candidate vs target908/392 retained with native exit1 IMPLAUSIBLE; no toolkit changes or match credit.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; named-data-buffer-v1; typed callback payload and packed-position decoder\"}",
+          "created_at": "2026-11-13T23:38:21Z",
+          "id": 6867697478,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:38:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d95d51bb94ac40b3ef49339fad5dcfdaba096b0aa8f45b3e1e27a3cdf6663479",
+        "result": {
+          "address": "0x08125A5C",
+          "claim_id": 6867547825,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6867697478,
+          "status": "accepted",
+          "who": "astra-xhigh-125a5c"
+        }
+      }
     },
     {
       "claim": {
