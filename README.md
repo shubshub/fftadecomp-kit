@@ -1199,8 +1199,12 @@ others unchanged. Any read of an uninitialized private word refuses. So do a
 private address in any argument register (other than the query's R1 buffer)
 or stored anywhere, an unknown private index, sub-word private access, an
 unbalanced or unrestored frame, an uncovered instruction, or more than 65,536
-abstract states. Ordinary calls and external accesses keep the usual returning
-ABI and noninterference premises. The report records the contract identities,
+abstract states. After any call only R0 is defined (the query's count or an
+ordinary result): reading R1-R3, R12 or LR before redefining it refuses,
+because the pinned collector leaves R2 at out+4n, which for n = 13 addresses
+the word after the buffer. Ordinary calls and external accesses keep the usual
+returning ABI and noninterference premises; an ordinary callee may read the
+caller frame only as its own stack-passed arguments, which is a premise. The report records the contract identities,
 each query site and buffer offset, the counts executed and the private reads
 and writes. The list bound, physical memory permission and termination are
 not proved.

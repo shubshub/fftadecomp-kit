@@ -27,13 +27,15 @@ from pathlib import Path
 import match
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
+import software_double_profile as software_double
 from software_double_profile import indices, span_record
 from capstone.arm import ARM_OP_IMM, ARM_OP_REG, ARM_OP_MEM, ARM_REG_SP, ARM_REG_PC, ARM_REG_LR
 
 SELECTOR = 'conditional-known-query-stack-buffer-v1'
 SCHEMA = 'elf-symbol-thumb-' + SELECTOR
-CONTROL_FLOW = ('complete Thumb caller passing a private stack array of at least the premised '
-                'list bound to a pinned known list query; every returned count 0..bound executed; '
+CONTROL_FLOW = ('complete Thumb caller passing a private stack array of at least 13 words to a '
+                'pinned known list query; list length n <= 13 is an unproved premise; every '
+                'returned count 0..13 executed; '
                 'conditional returning ABI and memory noninterference; termination unproved')
 ROM_BASE = 0x08000000
 CAPACITY_WORDS = 13
@@ -61,6 +63,7 @@ R12 = match.ARM_REG_R12
 PRESERVED = tuple(range(R0+4, R0+12))
 CLOBBERED = (R0, R0+1, R0+2, R0+3, R12, ARM_REG_LR)
 EXT = ('ext',)
+DEAD = ('dead',)  # a pushed register that held no defined value; popping it leaves it undefined
 CONDITIONS = {
     'beq': lambda n, z, c, v: z, 'bne': lambda n, z, c, v: not z,
     'bhs': lambda n, z, c, v: c, 'blo': lambda n, z, c, v: not c,
@@ -79,8 +82,10 @@ EXPLICIT_CONDITIONS = [
     'no list node or loaded value overlaps an active stack frame, saved return or code.',
     'The pinned query, iterator, adapter, collector, getter and thunks run as their exact ROM bytes: each '
     'returns to its caller, restores R4-R11 and SP, and uses at most 44 bytes of stack below the caller SP.',
-    'Each ordinary direct call returns preserving R4-R11 and SP and does not read or write the caller frame, '
-    'including the query buffer, through any argument, ambient state or hidden alias.',
+    'Each ordinary direct call returns preserving R4-R11 and SP and does not write the caller frame, including '
+    'the query buffer, through any argument, ambient state or hidden alias. Its only reads of the caller frame '
+    'are its own stack-passed arguments: initialized words starting at the caller SP at the call, as many as its '
+    'actual prototype passes (not checked here). It reads no saved word and no uninitialized word.',
     'External reads and writes in the caller are to valid aligned live storage that does not overlap the caller '
     'frame, saved returns or code; their values carry no private-frame provenance.',
     'C object layout, function compatibility, effective types and initialized external scalars remain source '
@@ -195,6 +200,10 @@ def execute(data, address, instructions, edges, calls):
             require(number in regs, 'known-query caller reads PC or an untracked register as a value')
             return regs[number]
 
+        def held(number, default=EXT):
+            # Inspection only: an undefined register is not a private address.
+            return regs.get(number, default)
+
         def scalar(*values):
             for v in values:
                 require(not saved(v), 'saved register value used in arithmetic')
@@ -216,10 +225,10 @@ def execute(data, address, instructions, edges, calls):
         if site in calls:
             target = calls[site]
             require(op == 'bl', 'known-query caller call is not a direct BL')
-            require(not any(is_sp(regs[r]) or saved(regs[r]) for r in (R0, R0+2, R0+3, R12)),
+            require(not any(is_sp(held(r)) or saved(held(r)) for r in (R0, R0+2, R0+3, R12)),
                     'private stack address or saved value passed to a call')
             if target in QUERIES:
-                base = regs[R0+1]
+                base = held(R0+1)
                 require(is_sp(base) and base[1] % 4 == 0, 'query buffer must be an aligned private stack address')
                 buffer = [base[1]+4*k for k in range(CAPACITY_WORDS)]
                 require(all(sp <= at and at+4 <= 0 and at not in protected for at in buffer),
@@ -232,20 +241,21 @@ def execute(data, address, instructions, edges, calls):
                     after = dict(cells)
                     for at in buffer[:n]:
                         after[at] = EXT
-                    out = dict(regs)
-                    for r in CLOBBERED:
-                        out[r] = EXT
+                    # Only R0 is defined after the query. In particular the pinned
+                    # collector leaves R2 = out+4n, which may address a saved word.
+                    out = {r: v for r, v in regs.items() if r not in CLOBBERED}
                     out[R0] = ('c', n)
                     counts_returned.add(n)
                     require(site+4 in edges[site], 'query continuation differs from the complete CFG')
                     push((site+4, tuple(sorted(out.items())), sp, tuple(sorted(after.items())),
                           tuple(sorted(protected)), None))
                 continue
-            require(not is_sp(regs[R0+1]) and not saved(regs[R0+1]),
+            require(not is_sp(held(R0+1)) and not saved(held(R0+1)),
                     'private stack address passed to a call outside the pinned query contract')
             ordinary_calls.add((site, target))
             for r in CLOBBERED:
-                regs[r] = EXT
+                regs.pop(r, None)
+            regs[R0] = EXT
             flags = None
         elif op == 'push':
             require(rr and ARM_REG_SP not in rr and ARM_REG_PC not in rr, 'unsupported push')
@@ -253,7 +263,7 @@ def execute(data, address, instructions, edges, calls):
             for k, r in enumerate(rr):
                 at = new+4*k
                 require(at not in cells, 'push overlaps live private storage')
-                cells[at] = regs[r]; protected.add(at)
+                cells[at] = held(r, DEAD); protected.add(at)
             sp = new
         elif op == 'pop':
             require(rr and ARM_REG_SP not in rr, 'unsupported pop')
@@ -261,13 +271,14 @@ def execute(data, address, instructions, edges, calls):
                 at = sp+4*k
                 require(at in protected, 'pop must consume a protected saved word')
                 protected.remove(at)
-                if r == ARM_REG_PC:
-                    regs[ARM_REG_PC] = cells.pop(at)
+                restored = cells.pop(at)
+                if restored == DEAD:
+                    regs.pop(r, None)
                 else:
-                    regs[r] = cells.pop(at)
+                    regs[r] = restored
             sp += 4*len(rr)
             if ARM_REG_PC in rr:
-                require(regs.pop(ARM_REG_PC) == ('lr',), 'pop to PC lacks entry return provenance')
+                require(regs.pop(ARM_REG_PC, None) == ('lr',), 'pop to PC lacks entry return provenance')
                 following = None
         elif op in ('add', 'sub') and rr and rr[0] == ARM_REG_SP and len(ops) == 2:
             require(ops[1].type == ARM_OP_IMM and ops[1].imm > 0 and ops[1].imm % 4 == 0,
@@ -381,9 +392,9 @@ def execute(data, address, instructions, edges, calls):
             raise ValueError('unsupported known-query caller instruction at %08X: %s' % (site, op))
         if following is None:
             require(sp == 0 and not protected and not cells and
-                    all(regs[r] == ('entry', r-R0) for r in PRESERVED),
+                    all(regs.get(r) == ('entry', r-R0) for r in PRESERVED),
                     'return does not restore the complete entry frame')
-            require(not any(is_sp(regs[r]) for r in (R0, R0+1, R0+2, R0+3, R12)),
+            require(not any(is_sp(held(r)) for r in (R0, R0+1, R0+2, R0+3, R12)),
                     'private stack address escapes through a return register')
             returns.add(site)
             continue
@@ -429,4 +440,4 @@ def prove(data, address, rom, mapping, index, objects, bindings):
         list_bound_proved_from_ROM=False, physical_memory_permission=False,
         actual_C_function_compatibility_proved=False, termination_proved=False,
         producer_sha256={Path(m.__file__).name: sha(Path(m.__file__).read_bytes())
-                         for m in (match, graph, thunk, __import__(__name__))})
+                         for m in (match, graph, thunk, owner, software_double, __import__(__name__))})
