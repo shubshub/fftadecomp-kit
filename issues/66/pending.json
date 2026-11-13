@@ -3134,7 +3134,35 @@
           "who": "astra-multiple-switch-cb64"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b7a21ed42c716b8e04f2b4162d3b876c3e715a966fd48f8559961c03ddcbb891",
+        "acknowledged_cursor": 6856399798,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b7a21ed42c716b8e04f2b4162d3b876c3e715a966fd48f8559961c03ddcbb891",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812CB64\",\"who\":\"astra-multiple-switch-cb64\",\"claim_id\":6856109300,\"reason\":\"Complete1302-byte plausible C native MATCH exit0; one source-bound replay passed; prepared for integration\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T14:49:22Z",
+          "id": 6856399798,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:49:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9c7b7c11d847cbde58cd73bbf881bc406fd848b04cb73c864b877524869dd4e0",
+        "result": {
+          "address": "0x0812CB64",
+          "claim_id": 6856109300,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6856399798,
+          "status": "accepted",
+          "who": "astra-multiple-switch-cb64"
+        }
+      }
     },
     {
       "claim": {
