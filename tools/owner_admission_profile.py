@@ -178,7 +178,7 @@ def selected(report):
                       [f'* verification: `{entry.NATIVE_SCHEMA}`'],
                       [f'* verification: `{mutable_native.SCHEMA}`']) or any(marker_text(line).startswith((
             '* function-address', '* unsigned division', '* software double', '* software float',
-            '* inert spin', '* switches', '* buffer calls', '* signed quotient', '* signed remainder'))
+            '* inert spin', '* switches', '* buffer', '* signed quotient', '* signed remainder'))
             for line in report.splitlines()):
         raise ValueError('mixed or malformed complete-owner profile')
     return True
