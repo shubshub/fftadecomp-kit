@@ -30,7 +30,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "509ad76667f6dd600e2b541eb1239ae2b2e677085a072452a85e56ff4d6f3a3f",
+        "acknowledged_cursor": 6843171809,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "509ad76667f6dd600e2b541eb1239ae2b2e677085a072452a85e56ff4d6f3a3f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C224\",\"who\":\"claude-ffta2\",\"claim_id\":6842455578,\"reason\":\"matched; merged in decomp PR #59\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T03:45:19Z",
+          "id": 6843171809,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T03:45:19Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "840294ccdbc44e386ab4f1e16eceb2c7b88e90aaddf3dcb2e72b69f6d365d94a",
+        "result": {
+          "address": "0x0800C224",
+          "claim_id": 6842455578,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6843171809,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -126,7 +154,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d3dd2e64a46fdc04667a067fb0bae638a7697812efac2617fe6db4fc947e1bd0",
+        "acknowledged_cursor": 6843171809,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d3dd2e64a46fdc04667a067fb0bae638a7697812efac2617fe6db4fc947e1bd0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DD54\",\"who\":\"claude-ffta2\",\"claim_id\":6842496667,\"reason\":\"matched; merged in decomp PR #59\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T03:44:40Z",
+          "id": 6843160505,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T03:44:40Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "840294ccdbc44e386ab4f1e16eceb2c7b88e90aaddf3dcb2e72b69f6d365d94a",
+        "result": {
+          "address": "0x0804DD54",
+          "claim_id": 6842496667,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6843160505,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -728,6 +784,38 @@
           "request_id": 6843126256,
           "status": "accepted",
           "who": "match-astra-0802ED88-full"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "74b38a4fd6a1fab803518e98f16ae578296c45eb832484bfc7bd1754de921448",
+        "acknowledged_cursor": 6843171809,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "74b38a4fd6a1fab803518e98f16ae578296c45eb832484bfc7bd1754de921448",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08148A0C\",\"who\":\"match-astra-08148A0C-full\",\"note\":\"Match complete 140-byte leaf after native CFG, full partition and dual-index extent repair qualification; private maps only.\"}",
+          "created_at": "2026-11-13T03:44:43Z",
+          "id": 6843161373,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T03:44:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "840294ccdbc44e386ab4f1e16eceb2c7b88e90aaddf3dcb2e72b69f6d365d94a",
+        "result": {
+          "address": "0x08148A0C",
+          "claim_id": 6843161373,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6843161373,
+          "status": "accepted",
+          "who": "match-astra-08148A0C-full"
         }
       },
       "release": null
