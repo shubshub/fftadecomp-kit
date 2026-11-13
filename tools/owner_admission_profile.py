@@ -1233,7 +1233,7 @@ def issue(root,address,args):
             args.software_double_profile or args.software_double_remainder_profile or \
             args.function_address_profile or args.switch_profile or args.label or \
             args.wsl!='Ubuntu' or args.wsl_path!=match.DEFAULT_WSL_PATH:
-        raise ValueError('owner profile requires its isolated fixed Thumb selector')
+        raise match.Refusal('owner profile requires its isolated fixed Thumb selector')
     if args.owner_runtime_profile in (*r6_buffer.PROFILES, r7_buffer.SELECTOR, word_buffer.SELECTOR, resident_word.SELECTOR) and any(
             getattr(args, name, None) for name in ('signed_quotient_profile',
                 'signed_runtime_profile', 'addressed_signed_runtime_profile',

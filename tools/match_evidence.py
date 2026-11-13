@@ -996,8 +996,9 @@ def report_matches(report, root, address):
         stated = report.splitlines()
         plain = [f"* verification: `{schema}`" for schema in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA)]
         data = [f"* verification: `{schema}`" for schema in (DATA_SCHEMA, FRAMED_DATA_SCHEMA)]
-        if not (any(line in stated for line in plain) or
-                any(line in stated for line in data) and f"* control flow: {CALL_SUMMARY}" in stated):
+        verdicts = [line for line in stated if line.startswith("* verification:")]
+        if len(verdicts) != 1 or not (verdicts[0] in plain or
+                verdicts[0] in data and f"* control flow: {CALL_SUMMARY}" in stated):
             return False
     import plausible
     try:
