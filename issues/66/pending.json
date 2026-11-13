@@ -3199,6 +3199,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1bbaad0ad856e174aad896f30fb8b6a7517e43a5167bdf2ce7811c14606b046f",
+        "acknowledged_cursor": 6856109300,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1bbaad0ad856e174aad896f30fb8b6a7517e43a5167bdf2ce7811c14606b046f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08142AB0\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
+          "created_at": "2026-11-13T14:38:13Z",
+          "id": 6856095818,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:38:13Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3aaffed0173bb73d6e001602c6fc86c1b2fe2382b0509ad59653b833cacd5e1b",
+        "result": {
+          "address": "0x08142AB0",
+          "claim_id": 6856095818,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6856095818,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "adc80b372ec1b4014d2ef3e4d60fcc54baa35552378a16783c761f7d15cda3f1",
+        "acknowledged_cursor": 6856109300,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "adc80b372ec1b4014d2ef3e4d60fcc54baa35552378a16783c761f7d15cda3f1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812CB64\",\"who\":\"astra-multiple-switch-cb64\",\"note\":\"Complete 1302-byte multi-switch reconstruction using tested acyclic backward-case support\"}",
+          "created_at": "2026-11-13T14:38:43Z",
+          "id": 6856109300,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:38:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3aaffed0173bb73d6e001602c6fc86c1b2fe2382b0509ad59653b833cacd5e1b",
+        "result": {
+          "address": "0x0812CB64",
+          "claim_id": 6856109300,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6856109300,
+          "status": "accepted",
+          "who": "astra-multiple-switch-cb64"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
