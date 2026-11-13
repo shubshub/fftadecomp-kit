@@ -3671,6 +3671,37 @@ retained descriptor pointer remain explicit premises across iterations. No
 callback effect, memory permission, actual count, or unconditional termination
 claim follows. Existing acyclic scheduler selectors retain their strict guards.
 
+### Sequential live-alias scheduler compositions with counted loops
+
+`--owner-runtime-profile conditional-scheduler-sequential-live-alias-counted-loops-v1`
+composes the three-per-path phase rule (at most four scheduler sites, at most
+three invocations on any path outside loops, ordinary calls after a scheduler
+return), the live private-local alias rule for ordinary calls exactly as in
+`conditional-scheduler-live-local-alias-calls-v1`, and the unchanged 28-byte
+descriptor contract at every scheduler call; a scheduler site inside a loop
+admits no local alias besides the R2 descriptor, not even a preserved-register
+one. At most 24 ordinary targets leave dependency room for live-alias nested
+callees; the owner has at most 256 instructions. It additionally admits CFG cycles,
+but only as narrowed counted loops; an owner without cycles is admitted too.
+
+A loop is one strongly connected component with a single entry (its header),
+one conditional backward edge into the header and no other cycle. The back
+edge closes a straight tail whose instructions each have a sole predecessor:
+`adds rT, rC, #1`, `lsls rT, rT, #S`, `lsrs rC, rT, #S` with S = 24 (u8) or
+16 (u16), then either a fresh zero-extending `ldrb`/`ldrh` of rL no wider than
+the counter, `cmp rC, rL`, `bcc header`, or `cmp rC, #imm` with `bcc` (imm at
+most the counter range) or `bls` (imm at most range minus one). rC is R4-R7
+and no other instruction of the component writes it. Taking the back edge
+therefore implies rC <= 2**W - 2, the next narrowed successor is rC + 1 without
+wrap, and the header is entered at most 2**W times per execution, for any
+incoming counter value. The bound depends on R4-R7 surviving each call (the
+returning ARM ABI premise). A loop with k scheduler sites records at most
+k * 2**W invocations (a looped site runs at most once per iteration); each
+invocation reuses the same unrewritten descriptor frame and reapplies every per-invocation premise,
+including that no earlier invocation or callback retains the reused descriptor
+or any local pointer. Actual counts, capacities, callee effects and
+termination remain unproved.
+
 ### Conditional coordinate outputs before a scheduler call
 
 `--owner-runtime-profile conditional-scheduler-projected-outputs-v1` composes
