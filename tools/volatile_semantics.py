@@ -324,8 +324,9 @@ def translation_unit(preprocessed):
     """the preprocessed text as the checks read it, offsets kept.
 
     Directive lines (linemarkers, `#pragma`, `#ident`) are blanked first,
-    so a quote inside one cannot open a literal; then comments and string
-    and character literals are blanked. A literal that crosses a line or
+    so a quote inside one cannot open a literal; then comments are blanked
+    and each string or character literal becomes `0` and spaces, one token
+    of the same length, so `f(0, 'a')` still has two arguments. A literal that crosses a line or
     the end of the text, an unterminated comment, a digraph (`<%`, `%>`,
     `<:`, `:>`, which agbcc reads as braces and brackets), `asm` in any
     spelling (an assembler label can rename a declaration) and unbalanced
@@ -354,7 +355,8 @@ def translation_unit(preprocessed):
                 j += 2 if text[j] == "\\" else 1
             if j >= n:
                 raise SemanticError("an unterminated string or character literal")
-            out[i:j + 1] = " " * (j + 1 - i)
+            # a literal is one token: `0` and spaces, keeping offsets
+            out[i:j + 1] = "0" + " " * (j - i)
             i = j + 1
         else:
             i += 1
@@ -388,21 +390,28 @@ INTEGER_WORDS = {"unsigned", "signed", "char", "short", "int", "long"}
 
 
 def verified_scalars(scope):
-    """the SCALAR_TYPES names that are not keywords and have a file-scope typedef
-    to a one-word scalar. agbcc refuses a second file-scope typedef of a name,
-    so that typedef is the name's only file-scope meaning."""
-    verified, typedefs = set(), []
-    for declaration in scope.split(";"):
+    """{name: index of its typedef among scope.split(";")} for the SCALAR_TYPES
+    names that are not keywords and have a file-scope typedef to a one-word
+    scalar, built only from names verified before it. agbcc refuses a second
+    file-scope typedef of a name, so from that index on the typedef is the
+    name's only file-scope meaning; before it the name is not a type (a
+    declaration using it is an old-style identifier list), so a declaration
+    may rely only on names verified at an earlier index (declared_before)."""
+    verified = {}
+    for index, declaration in enumerate(scope.split(";")):
         found = re.fullmatch(r"\s*typedef\s+(.+?)\s+([A-Za-z_]\w*)\s*", declaration)
-        if found and found[2] in SCALAR_TYPES - INTEGER_WORDS - {"float"}:
-            typedefs.append((found[2], [t for t in found[1].split() if t not in QUALIFIERS]))
-    while True:
-        more = {name for name, body in typedefs if
-                body and all(t in INTEGER_WORDS for t in body) and body.count("long") <= 1 or
-                body == ["float"] or len(body) == 1 and body[0] in verified}
-        if more <= verified:
-            return verified
-        verified |= more
+        if not found or found[2] not in SCALAR_TYPES - INTEGER_WORDS - {"float"}:
+            continue
+        body = [t for t in found[1].split() if t not in QUALIFIERS]
+        if body and all(t in INTEGER_WORDS for t in body) and body.count("long") <= 1 or \
+                body == ["float"] or len(body) == 1 and body[0] in verified:
+            verified.setdefault(found[2], index)
+    return verified
+
+
+def declared_before(names, index):
+    """the names of {name: index} declared before the declaration at index"""
+    return {name for name, at in names.items() if at < index}
 
 
 def parameter_parts(text):
@@ -502,9 +511,11 @@ def argument_words(declaration, callback_types=(), scalars=None):
 
 
 def callback_typedefs(scope):
-    """Only unique direct function-pointer typedefs; no typedef-chain inference."""
-    candidates = {}
-    for declaration in scope.split(";"):
+    """{name: index among scope.split(";")} of the unique direct function-pointer
+    typedefs; no typedef-chain inference. A declaration may rely only on one
+    declared at an earlier index (declared_before)."""
+    candidates, where = {}, {}
+    for index, declaration in enumerate(scope.split(";")):
         if not re.match(r"\s*typedef\b", declaration):
             continue
         body = re.sub(r"^\s*typedef\s+", "", declaration)
@@ -514,8 +525,9 @@ def callback_typedefs(scope):
             continue        # unreadable: never a callback type, so its uses fail closed
         if name:
             candidates[name] = candidates.get(name, 0) + 1
+            where[name] = index
     # Any other typedef mentioning the candidate makes its meaning ambiguous.
-    return {name for name, count in candidates.items() if count == 1 and
+    return {name: where[name] for name, count in candidates.items() if count == 1 and
             sum(bool(re.search(r"\b" + re.escape(name) + r"\b", declaration))
                 for declaration in scope.split(";")
                 if re.match(r"\s*typedef\b", declaration)) == 1}
@@ -530,10 +542,11 @@ def function_signature(scope, name):
     found = set()
     callback_types = callback_typedefs(scope)
     scalars = verified_scalars(scope)
-    for declaration in scope.split(";"):
+    for index, declaration in enumerate(scope.split(";")):
         matched = re.search(r"\b" + re.escape(name) + r"\s*\(", declaration)
         if not matched:
             continue
+        known, words_known = declared_before(callback_types, index), declared_before(scalars, index)
         prefix = declaration[:matched.start()].strip()
         rest = declaration[matched.end():].strip()
         if not rest.endswith(")") or "(" in prefix or "typedef" in prefix.split():
@@ -543,7 +556,7 @@ def function_signature(scope, name):
         parameters = rest[:-1].strip()
         returns = bool(prefix.split() and
                        [t for t in prefix.split() if t not in QUALIFIERS] != ["void"])
-        if returns and argument_words(prefix, scalars=scalars) is None:
+        if returns and argument_words(prefix, scalars=words_known) is None:
             raise SemanticError(f"{name} returns a value that is not one scalar or pointer word")
         if parameters == "void":
             arity = 0
@@ -555,7 +568,7 @@ def function_signature(scope, name):
                 parts, arity = parts[:-1], None
             else:
                 arity = len(parts)
-            words = [argument_words(parameter, callback_types, scalars) for parameter in parts]
+            words = [argument_words(parameter, known, words_known) for parameter in parts]
             if None in words:
                 raise SemanticError(f"a parameter of {name} is not one scalar or pointer word")
         found.add((returns, arity))
@@ -601,38 +614,47 @@ def indirect_signature(code, scope, name):
     every declaration must agree. It is the type at each call site only
     because every use of `name` inside a body must be a direct call
     `name(...)` or `name[K](...)` with a literal K and exactly arity
-    arguments: a cast, copy, address or member use fails closed. Returns
+    arguments: a cast, copy, address or member use fails closed. A
+    parameter of callback-typedef type in the pointer's own prototype is
+    refused (callback_declaration reads it without callback types). Returns
     the reason as a string when the object cannot be typed that way.
     """
     callback_types = callback_typedefs(scope)
     scalars = verified_scalars(scope)
     found = set()
     word = re.escape(name)
-    # `[]` exactly: a blanked literal (`['a']`) leaves spaces between the brackets
+    # `[]` exactly; a blanked literal (`['a']`) reads `[0  ]`, a zero size, refused below
     dimension = r"(\[\s*(" + INDEX + r")\s*\]|\[\])?"
-    for declaration in scope.split(";"):
+    fragments = scope.split(";")
+    for index, declaration in enumerate(fragments):
         if not re.search(r"\b" + word + r"\b", declaration):
             continue
         text = re.sub(r"\s+", " ", declaration).strip()
         prototype = None
         typed = re.fullmatch(r"(?:(?:extern|const|volatile) )*([A-Za-z_]\w*) (?:(?:const|volatile) )*" +
                              word + r" ?" + dimension, text)
-        if typed and typed[1] in callback_types:
-            for body in scope.split(";"):
-                # callback_typedefs counted exactly one readable typedef of the name
-                if re.match(r"\s*typedef\b", body) and re.search(r"\b" + typed[1] + r"\b", body):
-                    prototype = callback_prototype(re.sub(r"^\s*typedef\s+", "", body),
-                                                   callback_types, scalars)
+        if typed and typed[1] in declared_before(callback_types, index):
+            # callback_typedefs counted exactly one readable typedef of the name;
+            # its own parameters may rely only on what precedes it
+            at = callback_types[typed[1]]
+            prototype = callback_prototype(re.sub(r"^\s*typedef\s+", "", fragments[at]),
+                                           declared_before(callback_types, at),
+                                           declared_before(scalars, at))
             array = typed[2]
         else:
             direct = re.fullmatch(r"(?:extern )?([^()]+?) ?\( ?\* ?(?:(?:const|volatile) )*" + word +
                                   r" ?" + dimension + r" ?\) ?\((.*)\)", text)
             if direct:
-                prototype = callback_prototype(f"{direct[1]} (*)({direct[4]})", callback_types, scalars)
+                prototype = callback_prototype(f"{direct[1]} (*)({direct[4]})",
+                                               declared_before(callback_types, index),
+                                               declared_before(scalars, index))
                 typed = direct
             array = direct and direct[2]
         if prototype is None:
             return f"the declaration of {name} is not a prototyped function pointer of one-word arguments"
+        if array and typed[3] and not c_integer(typed[3]):
+            # `[0]` is not C; a blanked literal (`['a']`) reads as one
+            return f"the declaration of {name} has a zero or unreadable array size"
         found.add(prototype + ((c_integer(typed[3]) if typed[3] else 0) if array else None,))
     if not found:
         return f"{name} has no file-scope declaration"
@@ -646,7 +668,10 @@ def indirect_signature(code, scope, name):
         position = use.start()
         if depth <= 0:
             continue
-        if code[:use.start()].rstrip().endswith((".", "->")):
+        before = use.start()
+        while before and code[before - 1].isspace():
+            before -= 1
+        if code[max(before - 1, 0):before] == "." or code[max(before - 2, 0):before] == "->":
             return f"a member named {name} is used"
         call = re.match(word + (r"\s*\[\s*(" + INDEX + r")\s*\]" if elements is not None else "()") +
                         r"\s*\(", code[use.start():])

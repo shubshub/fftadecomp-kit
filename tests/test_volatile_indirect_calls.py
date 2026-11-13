@@ -44,11 +44,15 @@ def compare(real=REAL, stripped=STRIPPED, preprocessed=None):
                                        fixtures.DECLARATION)
 
 
+def signature(text):
+    # the production path: the checked translation unit, then its file scope
+    code = semantics.translation_unit(text)
+    return semantics.indirect_signature(code, semantics.file_scope(code), 'g_cb')
+
+
 class SignatureTests(unittest.TestCase):
     def signature(self, text):
-        # the production path: the checked translation unit, then its file scope
-        code = semantics.translation_unit(text)
-        return semantics.indirect_signature(code, semantics.file_scope(code), 'g_cb')
+        return signature(text)
 
     def test_declared_prototypes_are_read(self):
         for declarations, call, expected in (
@@ -237,7 +241,35 @@ class IndirectCallTests(unittest.TestCase):
 
     def test_a_literal_dimension_is_not_unsized(self):
         literal = "typedef void (*Callback)(void *, u32);\nextern Callback g_cb['a'];\n"
-        self.refused('not a prototyped function pointer', preprocessed=source(literal))
+        self.refused('zero or unreadable array size', preprocessed=source(literal))
+        self.refused('zero or unreadable array size', preprocessed=source(literal.replace("'a'", '0')))
+
+    def test_a_literal_argument_is_one_argument(self):
+        self.assertEqual(compare(preprocessed=source(call="g_cb[0](0, 'a');"))[0][1], 1)
+        self.assertEqual(compare(preprocessed=source(call='g_cb[0]("x", 5);'))[0][1], 1)
+
+    def test_typedefs_count_only_after_their_declaration(self):
+        # before `typedef int s32;` cc1 reads `(s32, ...)` as an identifier list:
+        # g_cb is unprototyped and g_cb(1, 2, 3, 4.0) passes five words
+        late = 'extern void (*g_cb)(s32, s32, s32, s32);\ntypedef int s32;\n'
+        self.refused('not a prototyped function pointer',
+                     preprocessed=source(late, 'g_cb(1, 2, 3, 4.0);'))
+        early = 'typedef int s32;\nextern void (*g_cb)(s32, s32, s32, s32);\n'
+        self.assertEqual(signature(source(early, 'g_cb(1, 2, 3, 4);')), (False, 4, None))
+        # a callback typedef's own parameters, and the typedef itself, too
+        for declarations in ('typedef void (*Callback)(void *, s32);\ntypedef int s32;\nextern Callback g_cb[];\n',
+                             'extern Callback g_cb[];\ntypedef void (*Callback)(void *, u32);\n'):
+            with self.subTest(declarations=declarations):
+                self.refused('not a prototyped function pointer', preprocessed=source(declarations))
+        # named callees: `k(1, 2, 3, 4.0, 5, 6)` compiles against either late form
+        for late, early in (('extern void k(s32, s32, s32, s32);\ntypedef int s32;\n',
+                             'typedef int s32;\nextern void k(s32, s32, s32, s32);\n'),
+                            ('extern void k(Cb, Cb, Cb, Cb);\ntypedef void (*Cb)(int);\n',
+                             'typedef void (*Cb)(int);\nextern void k(Cb, Cb, Cb, Cb);\n')):
+            with self.subTest(late=late):
+                self.assertRaisesRegex(semantics.SemanticError, 'not one scalar or pointer word',
+                                       semantics.function_signature, semantics.file_scope(late), 'k')
+                self.assertEqual(semantics.function_signature(semantics.file_scope(early), 'k'), (False, 4))
 
     def test_an_unreadable_unrelated_declaration_does_not_abort(self):
         deep = 'extern void (*other)(int (((((((((x))))))))));\n'
@@ -304,6 +336,12 @@ class CompiledIndirectCallTests(unittest.TestCase):
             'extern u8 g_buffer[];\nvoid func_08028C34(void)\n{\n' + body + '\n}\n')
         with mock.patch.dict(os.environ, FFTA_ROM=str(self.root / 'baserom.bin')):
             return match.allowlisted_volatile_semantics(self.root, 0x08028C34)
+
+    def test_an_unprototyped_identifier_list_is_refused(self):
+        # agbcc warns "parameter names (without types)" and passes 4.0 in r3 and [sp]
+        with self.assertRaisesRegex(ValueError, 'unprototyped identifier list'):
+            self.check('extern void (*g_cb)(s32, s32, s32, s32);\ntypedef int s32;\n',
+                       f'{SYMBOL}.bldy_lo = 0x10; g_cb(1, 2, 3, 4.0);')
 
     def test_typed_callback_tables(self):
         s = SYMBOL

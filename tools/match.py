@@ -237,8 +237,10 @@ class Runner:
             self.sh(f"rm -f -- {outputs} && rmdir -- {shlex.quote(path)}")
 
 
-def compile_object(runner, workspace, args, root, address, source, thumb=True, rewrite=None):
-    """cpp -> cc1 -> as -> objcopy; rewrite, if given, maps the verified .i text first"""
+def compile_object(runner, workspace, args, root, address, source, thumb=True, rewrite=None,
+                   diagnostics=None):
+    """cpp -> cc1 -> as -> objcopy; rewrite, if given, maps the verified .i text first.
+    diagnostics, if given, is a list that receives cc1's warning output."""
     temporary = shlex.quote(workspace)
     environment = f"export TMPDIR={temporary}; "
     runner.sh(f"{environment}{args.cpp} -nostdinc -undef -I include {shlex.quote(source)} "
@@ -247,7 +249,10 @@ def compile_object(runner, workspace, args, root, address, source, thumb=True, r
     verify_dependencies(preprocessed, root, address)
     if rewrite is not None:
         runner.write_text(f"{workspace}/f.i", rewrite(preprocessed))
-    runner.sh(f"{environment}{args.cc} {args.flags} {temporary}/f.i -o {temporary}/f.s")
+    output = runner.sh(f"{environment}{args.cc} {args.flags} {temporary}/f.i -o {temporary}/f.s" +
+                       (" 2>&1" if diagnostics is not None else ""))
+    if diagnostics is not None:
+        diagnostics.append(output)
     assembler_flags = "-mthumb-interwork" if thumb else ""
     runner.sh(f"{environment}{args.assembler} {assembler_flags} {temporary}/f.s -o {temporary}/f.o")
     runner.sh(f"{args.objcopy} -O binary --only-section=.text {temporary}/f.o {temporary}/f.bin")
@@ -310,9 +315,16 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
         interfaces = ConditionalVolatileInterfaces(interfaces, data, address, rom,
             mapping, index_snapshot(root), data_snapshot(root), selector=args.owner_runtime_profile)
     with runner.workspace() as workspace:
-        compile_object(runner, workspace, args, str(root), address, source)
+        diagnostics = []
+        compile_object(runner, workspace, args, str(root), address, source, diagnostics=diagnostics)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
         real = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
+        # cc1 reads `T f(a, b)` with a not-yet-declared type name as an
+        # old-style identifier list: f is then unprototyped, so no argument
+        # count read from the text may be trusted (volatile_semantics only
+        # counts typedefs that precede their use; this is defence in depth).
+        if any("parameter names (without types)" in text for text in diagnostics):
+            raise ValueError("cc1 reads a declaration as an unprototyped identifier list")
         for entry in used:
             declaration = entry["declaration"]
             compile_object(runner, workspace, args, str(root), address, source,

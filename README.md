@@ -1934,21 +1934,24 @@ symbolically along every path, and the check requires:
   in the incoming-argument area. Every callee needs a file-scope prototype
   with a fixed argument list. A callee with no prototype, `()` or `...`
   fails closed. An indirect call (`bl _call_via_rN`) is compared like a
-  named one only when rN holds a word loaded from an element of a
-  file-scope function-pointer object or array whose declared type (a
-  unique direct typedef or a direct `R (*name[N])(params)` declarator) is
-  such a prototype, every use of that object in a body is a direct call
+  named one only when rN holds a word loaded from an element of a file-scope
+  function-pointer object or array whose declared type (a unique direct
+  typedef or a direct `R (*name[N])(params)` declarator) is such a
+  prototype, every use of that object in a body is a direct call
   `name[K](...)` (or `name(...)`) with a literal index and the prototype's
   argument count, and rN is not one of those argument registers. Casts,
-  copies, `(*name[K])`, computed indices and unprototyped or variadic
-  pointer types fail closed. Declarations are read from the preprocessed
-  text with directive lines, comments and literals blanked. Digraphs, `asm`
-  labels, unbalanced braces and literals that cross a line fail closed, and
-  a non-keyword scalar typedef name (`u32`, `bool32`, ...) counts as one
+  copies, `(*name[K])`, computed indices, unprototyped or variadic pointer
+  types and callback-typed parameters of the pointer's own prototype fail
+  closed. Declarations are read from the preprocessed text with directive
+  lines and comments blanked and each literal reduced to `0`. Digraphs,
+  `asm` labels, unbalanced braces and literals that cross a line fail
+  closed. A declaration may rely only on typedefs that precede it (before
+  its typedef, cc1 reads a type name as an old-style identifier list, and
+  match.py also refuses cc1's "parameter names (without types)" warning),
+  and a non-keyword scalar typedef name (`u32`, `bool32`, ...) counts as one
   word only through a file-scope typedef to a one-word scalar. The call
-  stays opaque and an ordered barrier,
-  and the report adds `indirect calls typed by declaration: name as N
-  arguments`. Every parameter and return
+  stays opaque and an ordered barrier, and the report adds `indirect calls
+  typed by declaration: name as N arguments`. Every parameter and return
   value must be one scalar or pointer word, so `long long`, `double` and
   struct-by-value fail closed. The arguments, stack words included, are
   compared by that count. No prototype is trusted to name every register
