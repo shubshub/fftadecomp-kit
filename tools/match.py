@@ -4611,7 +4611,7 @@ def main():
                                                       "bounded-buffer-guarded-switch-v1",
                                                       "bounded-buffer-guarded-callee-aliases-v1",
                                                       "bounded-buffer-guarded-bios-division-v1",
-                                                      "bounded-buffer-nested-halfword-output-v1",
+                                                      "bounded-buffer-nested-halfword-output-v1", "bounded-buffer-nested-halfword-output-selective-scratch-v1",
                                                       "bounded-buffer-direct-halfword-output-v1",
                                                       "bounded-buffer-three-halfword-output-v1",
                                                       "bounded-buffer-named-three-halfword-output-v1",
