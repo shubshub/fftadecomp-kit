@@ -4507,6 +4507,7 @@ def main():
                                                       "bounded-buffer-named-three-halfword-output-v1",
                                                       "bounded-buffer-three-output-dynamic-division-v1",
                                                       "bounded-buffer-root-guarded-switch-v1",
+                                                      "bios-word-switch-local-buffers-v1",
                                                       "static-callback-buffer-v1",
                                                       "static-callback-unwritten-r7-v1",
                                                       "static-callback-restoring-r6-v1",
