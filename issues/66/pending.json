@@ -3294,7 +3294,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "14a384dc6811149dd4e256a9ff11c845dd5e820c25e1e94a397daa877df92b86",
+        "acknowledged_cursor": 6858475007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "14a384dc6811149dd4e256a9ff11c845dd5e820c25e1e94a397daa877df92b86",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F5710\",\"who\":\"claude-ffta2\",\"claim_id\":6858377909,\"reason\":\"bytes identical; verifier gap (081443FC copies), parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T16:14:06Z",
+          "id": 6858470677,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T16:14:06Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "88a458bb25e70e3a8f9da59c0791b3b0ab737c1edd5362007810503527c93220",
+        "result": {
+          "address": "0x080F5710",
+          "claim_id": 6858377909,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6858470677,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3324,6 +3352,38 @@
           "request_id": 6858380730,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ca955ca1c49cf7cc4f80e9d8caba28fc971da5db78127099f884e5689c531e0d",
+        "acknowledged_cursor": 6858475007,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ca955ca1c49cf7cc4f80e9d8caba28fc971da5db78127099f884e5689c531e0d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800B0AC\",\"who\":\"astra-bg-affine-b0ac\",\"note\":\"Recover complete affine-transform preparation using the merged bounded BIOS local-buffer profile\"}",
+          "created_at": "2026-11-13T16:14:18Z",
+          "id": 6858475007,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T16:14:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "88a458bb25e70e3a8f9da59c0791b3b0ab737c1edd5362007810503527c93220",
+        "result": {
+          "address": "0x0800B0AC",
+          "claim_id": 6858475007,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6858475007,
+          "status": "accepted",
+          "who": "astra-bg-affine-b0ac"
         }
       },
       "release": null
