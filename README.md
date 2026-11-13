@@ -2041,7 +2041,7 @@ mapping extents are not substituted for the complete compiled symbol.
 `u16-scalars-v1` and changes only how the table pointer is found: by its use,
 not by its position. The pointer is the word loaded by the dispatch's
 PC-relative `ldr`, which is then indexed by the guarded, scaled selector. Any
-number of words (at most 255, the reach of that load) may sit between the
+number of words, bounded by the reach of that load, may sit between the
 dispatch and the pointer. The layout must still be unique, with the same
 exact unsigned guard, five-op dispatch, zero alignment halfword, complete
 in-function table and forward local cases.
