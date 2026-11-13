@@ -378,7 +378,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "72a84f0714e938ffb0491a2e3e3f85ee82e67f9e47b1e64e41e36ae9d07be039",
+        "acknowledged_cursor": 6867463962,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "72a84f0714e938ffb0491a2e3e3f85ee82e67f9e47b1e64e41e36ae9d07be039",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DE33C\",\"who\":\"claude-ffta2\",\"claim_id\":6847446791,\"reason\":\"parked: Instruction-identical C refused. Copies 4-byte ROM table g_object_08149B70 (needs data symbol 0x08149B70) to u16[2] via func_081443FC, then 3 ordinary\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:23:52Z",
+          "id": 6867457118,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:23:52Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a03257f77c054a8aaf443ad2e4784648d5e25386de160578313a828f72facd76",
+        "result": {
+          "address": "0x080DE33C",
+          "claim_id": 6847446791,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867457118,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1946,7 +1974,35 @@
           "who": "astra-xhigh-a0014-live"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "99641fb52a00b7f6cab137262d9723e3f499b7b8b7aeb38151431de964cabc87",
+        "acknowledged_cursor": 6867463962,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "99641fb52a00b7f6cab137262d9723e3f499b7b8b7aeb38151431de964cabc87",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A0014\",\"who\":\"astra-xhigh-a0014-live\",\"claim_id\":6867224672,\"reason\":\"Plausible complete 574-byte candidate improved to 572/574 exact linked bytes; two diagonal-distance temporary register instructions differ at 080A01DE and 080A01F0; retained in direct-astra/080A0014\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; typed height/range and natural scalar lifetime forms\"}",
+          "created_at": "2026-11-13T23:24:16Z",
+          "id": 6867463962,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:24:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a03257f77c054a8aaf443ad2e4784648d5e25386de160578313a828f72facd76",
+        "result": {
+          "address": "0x080A0014",
+          "claim_id": 6867224672,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6867463962,
+          "status": "accepted",
+          "who": "astra-xhigh-a0014-live"
+        }
+      }
     },
     {
       "claim": {
