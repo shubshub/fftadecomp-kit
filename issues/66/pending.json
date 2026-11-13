@@ -858,7 +858,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ee4e0907582d51a186c4b8cae8c1e015e78b0de728af63fef69545310c60224f",
+        "acknowledged_cursor": 6867255874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ee4e0907582d51a186c4b8cae8c1e015e78b0de728af63fef69545310c60224f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08087B30\",\"who\":\"claude-ffta2\",\"claim_id\":6848240704,\"reason\":\"parked: Near miss: induction-variable register roles swapped in loop prologue (r8=(i-8)*640, r7=i*640 in target). Needs data_06011000, data_06015300, data_083\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:10:59Z",
+          "id": 6867245553,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:10:59Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d31f4f5e50ac8dd59b9fc9a0e1e6418d7e4909bfc63ae9878e6ed17e2f8d637b",
+        "result": {
+          "address": "0x08087B30",
+          "claim_id": 6848240704,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867245553,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -2776,6 +2804,38 @@
           "request_id": 6867239446,
           "status": "accepted",
           "who": "astra-xhigh-dff8c-live"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "65886a2c74b6f89a26fdbf1774a7ee9c7af5f691c8e46abb3d17ef6ace46cbd1",
+        "acknowledged_cursor": 6867255874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "65886a2c74b6f89a26fdbf1774a7ee9c7af5f691c8e46abb3d17ef6ace46cbd1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4DEC\",\"who\":\"astra-xhigh-d4dec-live\",\"note\":\"Native Astra xhigh recovery of 828-byte timed effect lifecycle; ordinary semantic C, no tooling edits\"}",
+          "created_at": "2026-11-13T23:11:37Z",
+          "id": 6867255874,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:11:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d31f4f5e50ac8dd59b9fc9a0e1e6418d7e4909bfc63ae9878e6ed17e2f8d637b",
+        "result": {
+          "address": "0x080D4DEC",
+          "claim_id": 6867255874,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6867255874,
+          "status": "accepted",
+          "who": "astra-xhigh-d4dec-live"
         }
       },
       "release": null
