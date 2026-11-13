@@ -3547,6 +3547,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e411e84eaa3767a5ce829bdae8c6e3a9724ae13c68415c3fdf9ef1752a9c039b",
+        "acknowledged_cursor": 6864871278,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e411e84eaa3767a5ce829bdae8c6e3a9724ae13c68415c3fdf9ef1752a9c039b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B8100\",\"who\":\"astra-xhigh-080b8100\",\"note\":\"Native Astra xhigh matching 788-byte record and UI initializer; no toolkit edits.\"}",
+          "created_at": "2026-11-13T21:03:56Z",
+          "id": 6864871278,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:03:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "17bdf2a372df6d9fcc33c54fa1f6d16c35fd5f37871906c4b8c3ef2131b6e722",
+        "result": {
+          "address": "0x080B8100",
+          "claim_id": 6864871278,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6864871278,
+          "status": "accepted",
+          "who": "astra-xhigh-080b8100"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
