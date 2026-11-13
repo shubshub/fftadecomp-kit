@@ -3600,3 +3600,20 @@ parent, aligned 28-byte descriptor, frame and scheduler dependency checks apply.
 Readability, separation, arithmetic without wraparound, valid manager, ABI and
 callback effects remain explicit premises; no equality of loaded values between
 paths follows. Prior straight-line selectors retain their existing boundaries.
+
+
+The explicit
+`--owner-runtime-profile bounded-buffer-bios-bg-affine-set-transparent-leaf-scratch-v1`
+composition can continue an R2/R3 nonobservation check across an exact ordinary
+call only when the independently authenticated complete callee is a bounded,
+acyclic, noncalling Thumb leaf that never reads or writes those registers.
+The registers remain live after the call; every later consumer path must still
+reach a genuine overwrite or normal return without observing them. Its closed
+effect table adds only register-offset LDRSH to the existing restricted leaf
+effects. Selected-register writes, nested calls, unknown effects and incoming
+flag dependence remain refused. This is conditional on the ordinary returning
+ABI and the existing local BgAffineSet contract; it does not prove physical
+readability, initialization or termination. The distinct source-replayed report
+requires actual transparent-call observations and binds caller/callee bytes,
+partitions, exact call sites, input snapshots, all producers, runtime and selected
+toolchain binaries. Earlier selectors retain their existing refusal boundaries.
