@@ -59,6 +59,38 @@
           "who": "native-080e3c0c"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "47ec895dc3bd9585f9c369b019b557019169c7db40713ca64dd8bb8bad799fd7",
+        "acknowledged_cursor": 6839556878,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "47ec895dc3bd9585f9c369b019b557019169c7db40713ca64dd8bb8bad799fd7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EAD88\",\"who\":\"native-080ead88\",\"note\":\"Recover complete plausible C after verified sequential scheduler qualification; private exact input maps and native profile.\"}",
+          "created_at": "2026-11-13T00:00:24Z",
+          "id": 6839556878,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T00:00:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "96dad758a9da1dcb2250330851ee625d9992f5eeda0950ccf1a971a1040c59e7",
+        "result": {
+          "address": "0x080EAD88",
+          "claim_id": 6839556878,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6839556878,
+          "status": "accepted",
+          "who": "native-080ead88"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
