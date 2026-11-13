@@ -605,7 +605,82 @@ def c_integer(text):
     return int(digits, 8) if digits.startswith("0") else int(digits)
 
 
-def indirect_signature(code, scope, name):
+def body_uses(code, word):
+    """[(offset of the use, offset of the outermost `{` holding it)] for `word` inside bodies"""
+    uses, depth, outer = [], 0, 0
+    position = 0
+    for use in re.finditer(r"\b" + word + r"\b", code):
+        for at in range(position, use.start()):
+            if code[at] == "{":
+                outer, depth = (at if not depth else outer), depth + 1
+            elif code[at] == "}":
+                depth -= 1
+        position = use.start()
+        if depth > 0:
+            uses.append((use.start(), outer))
+    return uses
+
+
+def call_uses(code, word, elements, arity, original=None):
+    """None if every use of `word` inside a body is a direct call `word(...)` (or
+    `word[K](...)` for an array) with exactly arity arguments; else the reason,
+    with `{name}` for the object. A cast, copy, address or member use fails
+    closed. original, the text before literals were blanked, has the same
+    offsets: an index that was not written as digits (`['\\x02']`) is refused."""
+    for start, _ in body_uses(code, word):
+        before = start
+        while before and code[before - 1].isspace():
+            before -= 1
+        if code[max(before - 1, 0):before] == "." or code[max(before - 2, 0):before] == "->":
+            return "a member named {name} is used"
+        call = re.match(word + (r"\s*\[\s*(" + INDEX + r")\s*\]" if elements is not None else "()") +
+                        r"\s*\(", code[start:])
+        if call is None:
+            return "{name} is used other than as a direct call through its declared type"
+        if elements is not None and original is not None and not original[start + call.start(1)].isdigit():
+            return "a call through {name} has an index that is not written as digits"
+        if elements and c_integer(call[1]) >= elements:
+            return "a call through {name} indexes outside the array"
+        first, level = start + call.end(), 1
+        for end in range(first, len(code)):
+            level += {"(": 1, ")": -1}.get(code[end], 0)
+            if not level:
+                break
+        else:
+            return "a call through {name} is unterminated"
+        arguments = code[first:end].strip()
+        try:
+            count = len(parameter_parts(arguments)) if arguments else 0
+        except SemanticError:
+            return "the arguments of a call through {name} cannot be read"
+        if count != arity:
+            return f"a call through {{name}} passes {count} arguments to its {arity}-argument prototype"
+    return None
+
+
+def named_callee_uses(code, scope, name, arity):
+    """Refuse a named callee whose prototype the call site may not see.
+
+    function_signature reads the file-scope declarations of `name`, but the
+    compiler types a call by the declaration in scope at that call: a block
+    `extern` redeclaration, an implicit declaration before a later prototype,
+    or a cast to an unprototyped type can each differ. So every use of `name`
+    inside a body must be `name(` with exactly the declared argument count
+    (call_uses), and the earliest file-scope declaration must be at or before
+    the fragment of the body holding the use (a function's own header
+    precedes its body). Offsets of the fragments are those of file_scope.
+    """
+    reason = call_uses(code, re.escape(name), None, arity)
+    if reason:
+        raise SemanticError(reason.format(name=name))
+    earliest = next((index for index, declaration in enumerate(scope.split(";"))
+                     if re.search(r"\b" + re.escape(name) + r"\s*\(", declaration)), None)
+    for _, outer in body_uses(code, re.escape(name)):
+        if earliest is None or earliest > file_scope(code[:outer]).count(";"):
+            raise SemanticError(f"{name} is called before its file-scope prototype")
+
+
+def indirect_signature(code, scope, name, original=None):
     """(returns, arity, elements) of calls through the file-scope pointer object `name`.
 
     elements is None for one pointer, else the array length (0 if unsized).
@@ -662,37 +737,9 @@ def indirect_signature(code, scope, name):
             len({entry[2] for entry in found} - {None, 0}) > 1:
         return f"the file-scope declarations of {name} disagree"
     returns, arity, elements = max(found, key=lambda entry: entry[2] or 0)
-    depth, position = 0, 0
-    for use in re.finditer(r"\b" + word + r"\b", code):
-        depth += code.count("{", position, use.start()) - code.count("}", position, use.start())
-        position = use.start()
-        if depth <= 0:
-            continue
-        before = use.start()
-        while before and code[before - 1].isspace():
-            before -= 1
-        if code[max(before - 1, 0):before] == "." or code[max(before - 2, 0):before] == "->":
-            return f"a member named {name} is used"
-        call = re.match(word + (r"\s*\[\s*(" + INDEX + r")\s*\]" if elements is not None else "()") +
-                        r"\s*\(", code[use.start():])
-        if call is None:
-            return f"{name} is used other than as a direct call through its declared type"
-        if elements and c_integer(call[1]) >= elements:
-            return f"a call through {name} indexes outside the array"
-        start, level = use.start() + call.end(), 1
-        for end in range(start, len(code)):
-            level += {"(": 1, ")": -1}.get(code[end], 0)
-            if not level:
-                break
-        else:
-            return f"a call through {name} is unterminated"
-        arguments = code[start:end].strip()
-        try:
-            count = len(parameter_parts(arguments)) if arguments else 0
-        except SemanticError:
-            return f"the arguments of a call through {name} cannot be read"
-        if count != arity:
-            return f"a call through {name} passes {count} arguments to its {arity}-argument prototype"
+    reason = call_uses(code, word, elements, arity, original)
+    if reason:
+        return reason.format(name=name)
     return returns, arity, elements
 
 
@@ -2576,10 +2623,13 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                      perturbed_assembly=None, interfaces=None, *, _ordinary_overwrite=False):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
-    from plausible import member_provenance, whole_object_uses
+    from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
     code = translation_unit(preprocessed)
-    for _, message in whole_object_uses(code, symbol) + member_provenance(
-            code, {"symbol": symbol, "declaration": declaration}):
+    # the member checks read the literals blanked to spaces, not to `0`: a
+    # character index (`unknown_48['\x02']`) must not read as `unknown_48[0]`
+    plain = strip_comments_and_strings(preprocessed)
+    for _, message in whole_object_uses(plain, symbol) + member_provenance(
+            plain, {"symbol": symbol, "declaration": declaration}):
         raise SemanticError(f"after preprocessing: {message}")
     real, real_outside = parse_assembly(real_assembly)
     stripped, stripped_outside = parse_assembly(stripped_assembly)
@@ -2597,6 +2647,9 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     # away or expose a forged one.
     scope = file_scope(code)
     signatures = {name: function_signature(scope, name) for name in names}
+    for name, (_, arity) in list(signatures.items()):
+        if arity is not None and not name.startswith("_call_via_"):
+            named_callee_uses(code, scope, name, arity)
     # `bl _call_via_rN`: the prototype is the pointer object's declared type,
     # keyed ("via", object) for every literal-pool symbol (indirect_signature).
     if any(name.startswith("_call_via_") for name in names):
@@ -2606,7 +2659,7 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                     pointer = global_symbol(word) if not isinstance(word, int) and word[0] != "code" else None
                     if pointer and ("via", pointer) not in signatures:
                         try:
-                            signatures[("via", pointer)] = indirect_signature(code, scope, pointer)
+                            signatures[("via", pointer)] = indirect_signature(code, scope, pointer, preprocessed)
                         except SemanticError as error:
                             # kept as the reason, raised only if a call uses it
                             signatures[("via", pointer)] = str(error)

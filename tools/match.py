@@ -316,7 +316,13 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
             mapping, index_snapshot(root), data_snapshot(root), selector=args.owner_runtime_profile)
     with runner.workspace() as workspace:
         diagnostics = []
-        compile_object(runner, workspace, args, str(root), address, source, diagnostics=diagnostics)
+        # the diagnostics are not the user's to silence: drop any -w and ask
+        # for the two warnings that mean a call is typed by a declaration the
+        # prototype reader does not see (output is byte-identical)
+        checked = argparse.Namespace(**{**vars(args), "flags": " ".join(
+            [flag for flag in args.flags.split() if flag != "-w"] +
+            ["-Wimplicit-function-declaration", "-Wnested-externs"])})
+        compile_object(runner, workspace, checked, str(root), address, source, diagnostics=diagnostics)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
         real = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
         # cc1 reads `T f(a, b)` with a not-yet-declared type name as an
@@ -325,6 +331,9 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
         # counts typedefs that precede their use; this is defence in depth).
         if any("parameter names (without types)" in text for text in diagnostics):
             raise ValueError("cc1 reads a declaration as an unprototyped identifier list")
+        for message in ("implicit declaration of function", "nested extern declaration"):
+            if any(message in text for text in diagnostics):
+                raise ValueError(f"cc1 reports a {message}")
         for entry in used:
             declaration = entry["declaration"]
             compile_object(runner, workspace, args, str(root), address, source,
