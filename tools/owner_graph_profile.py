@@ -5,7 +5,8 @@ import analyze as original_analyze
 import local_long_branch_profile as local
 import match
 def graph(data, address, refinement, *, one_object_word_switch=False,
-          two_constant_word_switch=False, one_numeric_word_switch=False):
+          two_constant_word_switch=False, one_numeric_word_switch=False,
+          multiple_switch_profile=None):
     """Replay exact decoded boundaries and native switch/local-BL descriptors."""
     if type(one_object_word_switch) is not bool:
         raise ValueError('one-object-word graph opt-in must be Boolean')
@@ -15,6 +16,11 @@ def graph(data, address, refinement, *, one_object_word_switch=False,
         raise ValueError('one-numeric-word graph opt-in must be Boolean')
     if one_numeric_word_switch and (one_object_word_switch or two_constant_word_switch):
         raise ValueError('numeric graph opt-in cannot combine object or two-constant layouts')
+    from multiple_switch_owner_prerequisite import check_backward_context
+    backward = check_backward_context(multiple_switch_profile,
+        (one_object_word_switch, two_constant_word_switch, one_numeric_word_switch))
+    if refinement.get('multiple_switch_profile') != multiple_switch_profile:
+        raise ValueError('multiple-switch graph qualification differs from refinement')
     if not refinement['cfg_closed'] or refinement['partial_reasons']:
         raise ValueError('structural inventory is not closed')
     end = address + len(data)
@@ -55,7 +61,8 @@ def graph(data, address, refinement, *, one_object_word_switch=False,
             from switch_constants_profile import layout as constants_layout
             layout = constants_layout(data, address, words)
         else:
-            layout = match.switch_layout(data, address, words, data_words)
+            layout = match.switch_layout(data, address, words, data_words,
+                                         allow_backward_cases=backward)
         if any(layout[key] != switch[key] for key in layout):
             raise ValueError('switch layout differs from native byte-exact replay')
         transfer = address + layout['dispatch'] + 8

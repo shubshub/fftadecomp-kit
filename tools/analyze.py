@@ -201,7 +201,8 @@ def refinement_ranges(intervals):
 
 def refinement_word_switch(data, address, position, end, engine, *,
                            same_owner_long_branches=False, one_object_word_switch=False,
-                           two_constant_word_switch=False, one_numeric_word_switch=False):
+                           two_constant_word_switch=False, one_numeric_word_switch=False,
+                           multiple_switch_profile=None):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
@@ -210,6 +211,9 @@ def refinement_word_switch(data, address, position, end, engine, *,
     if type(one_numeric_word_switch) is not bool or one_numeric_word_switch and (
             one_object_word_switch or two_constant_word_switch):
         raise ValueError('numeric switch requires an isolated Boolean layout opt-in')
+    from multiple_switch_owner_prerequisite import check_backward_context
+    backward = check_backward_context(multiple_switch_profile,
+        (one_object_word_switch, two_constant_word_switch, one_numeric_word_switch))
     dispatch = position - address - 8
     if dispatch < 0:
         return None
@@ -242,12 +246,13 @@ def refinement_word_switch(data, address, position, end, engine, *,
         relocations = {offset: struct.unpack_from("<I", data, offset)[0] - address
                        for offset in range(literal, table_end, 4)}
         from match import switch_layout
-        for interposed_words in (0, 5):
+        for interposed_words in ((0,) if backward else (0, 5)):
             if interposed_words and guard_size != 6:
                 continue
             try:
                 descriptor = switch_layout(data[:end - address], address, relocations,
-                                           interposed_words=interposed_words)
+                                           interposed_words=interposed_words,
+                                           allow_backward_cases=backward)
             except ValueError:
                 continue
             if descriptor["dispatch"] == dispatch and \
@@ -363,7 +368,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     rom_end=CODE_END, *, stack_adjusted_returns=False,
                     same_owner_long_branches=False, full_rom_inventory=False,
                     arm_inventory=False, one_object_word_switch=False,
-                    two_constant_word_switch=False, one_numeric_word_switch=False):
+                    two_constant_word_switch=False, one_numeric_word_switch=False,
+                    multiple_switch_profile=None):
     """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -374,6 +380,10 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
     Full-ROM inventory only extends the diagnostic address ceiling, bounded by
     the supplied ROM end and the original 16 MiB image, never its mirrors.
     """
+    from multiple_switch_owner_prerequisite import check_backward_context
+    backward = check_backward_context(multiple_switch_profile,
+        (one_object_word_switch, two_constant_word_switch, one_numeric_word_switch,
+         arm_inventory, stack_adjusted_returns))
     result = {
         "profile": "bounded-thumb-cfg-inventory-v1",
         "rom": f"0x{address:08X}" if type(address) is int else None,
@@ -396,6 +406,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         "returns": [],
         "partial_reasons": [],
     }
+    if backward:
+        result["multiple_switch_profile"] = multiple_switch_profile
     reasons = set()
 
     def fail(reason, position=None):
@@ -651,7 +663,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     same_owner_long_branches=same_owner_long_branches,
                     one_object_word_switch=one_object_word_switch,
                     two_constant_word_switch=two_constant_word_switch,
-                    one_numeric_word_switch=one_numeric_word_switch)
+                    one_numeric_word_switch=one_numeric_word_switch,
+                    multiple_switch_profile=multiple_switch_profile)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue
