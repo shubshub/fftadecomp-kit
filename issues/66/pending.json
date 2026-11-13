@@ -670,7 +670,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "16d3458151ad72da02cbd51c881aba78e48ccb093499c27cf3c7978ac140fe80",
+        "acknowledged_cursor": 6867503986,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "16d3458151ad72da02cbd51c881aba78e48ccb093499c27cf3c7978ac140fe80",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118C4C\",\"who\":\"claude-ffta2\",\"claim_id\":6849187076,\"reason\":\"parked: Bytes identical. Needs data_083A6208. Same cluster as 08118B94: BIOS CpuSet fill with stack zero source + &pos stack word passed to 080E03F8 (pc write\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:26:43Z",
+          "id": 6867503986,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:26:43Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "30fb6085c9855c6d2bd9c053062e931fdb3f1dfa10996397e5427e89bfdc13b2",
+        "result": {
+          "address": "0x08118C4C",
+          "claim_id": 6849187076,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867503986,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
