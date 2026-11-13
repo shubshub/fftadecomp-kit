@@ -3067,6 +3067,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8f3418077edcfb8679742c0549c704bc84c99ea0655ced983d5a4727dbb709e5",
+        "acknowledged_cursor": 6853104098,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8f3418077edcfb8679742c0549c704bc84c99ea0655ced983d5a4727dbb709e5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FA614\",\"who\":\"astra-scheduler-fa614\",\"note\":\"Complete C matching using the supported twenty-four-target scheduler profile\"}",
+          "created_at": "2026-11-13T12:36:48Z",
+          "id": 6853104098,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T12:36:48Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91da7ca849744a9b1496fef2da58957f94de1f462d105312f589e32158cb3915",
+        "result": {
+          "address": "0x080FA614",
+          "claim_id": 6853104098,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6853104098,
+          "status": "accepted",
+          "who": "astra-scheduler-fa614"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
