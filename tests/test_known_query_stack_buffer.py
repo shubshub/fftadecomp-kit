@@ -127,10 +127,23 @@ class KnownQueryStackBufferTests(unittest.TestCase):
         for post in ((0x2300, 0x6093),            # movs r3,#0; str r3,[r2,#8]
                      (0x6808,),                   # ldr r0,[r1]
                      (0x1c18,),                   # adds r0,r3,#0
-                     (0x4660,)):                  # mov r0,ip
+                     (0x4660,),                   # mov r0,ip
+                     (0x9100,)):                  # str r1,[sp]
             with self.subTest(post=[hex(x) for x in post]), \
                     self.assertRaisesRegex(ValueError, 'untracked register'):
                 owner.verify(**straight(post=post))
+
+    def test_direct_call_to_pinned_dependency_refuses(self):
+        for target in (0x0809AC20, 0x080C7CC0):
+            with self.subTest(target=hex(target)), \
+                    self.assertRaisesRegex(ValueError, 'pinned query dependency'):
+                owner.verify(**changed(9, target))
+
+    def test_ordinary_call_stack_words_are_recorded(self):
+        manifest, _ = owner.verify(**fixture())
+        # The loop call at A+20 sees the initialized prefix of the buffer at SP.
+        self.assertEqual(manifest['proof']['caller']['ordinary_call_initialized_words_at_SP'],
+                         [[A+20, list(range(1, 14))]])
 
     def test_ordinary_call_scratch_registers_are_undefined_afterwards(self):
         tokens = list(CALLER); tokens[10] = 0x6809  # ldr r1,[r1] after bl B
@@ -277,7 +290,10 @@ class QueryContractOracle(unittest.TestCase):
             cpu.reg_write(register, value)
         writes, lowest = [], [caller_sp]
 
+        everywhere = []
+
         def write(uc, access, at, size, value, user):
+            everywhere.append((at, size))
             if at >= caller_sp:
                 writes.append((at-buffer, size, value & 0xffffffff))
 
@@ -297,6 +313,11 @@ class QueryContractOracle(unittest.TestCase):
                          buffer+4*nodes if nodes else caller_sp-12)
         self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R3), 0x3333)
         self.assertEqual(cpu.reg_read(arm.UC_ARM_REG_R12), 0xcccc)
+        # Every store is in the query's own 44-byte frame below the caller SP
+        # or in out[0..n-1].
+        for at, size in everywhere:
+            self.assertTrue(caller_sp-stack.QUERY_FRAME_BYTES <= at and at+size <= caller_sp or
+                            buffer <= at and at+size <= buffer+4*nodes, hex(at))
         return cpu.reg_read(arm.UC_ARM_REG_R0), writes, caller_sp-lowest[0]
 
     def test_query_writes_exactly_the_returned_prefix(self):
