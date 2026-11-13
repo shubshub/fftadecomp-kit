@@ -59,6 +59,38 @@
           "who": "native-081120cc"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5c0095704b01dff4b9f2f0f2db239f71f00a8fd09b15c6a8e56696fdf0943a3d",
+        "acknowledged_cursor": 6840142008,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5c0095704b01dff4b9f2f0f2db239f71f00a8fd09b15c6a8e56696fdf0943a3d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080EB1D4\",\"who\":\"native-080eb1d4\",\"note\":\"Recover complete scheduler leaf-output caller with tested native profile\"}",
+          "created_at": "2026-11-13T00:33:55Z",
+          "id": 6840142008,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T00:33:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "671cdd44b608c4d6516b44ccb202a641e0c1942028dc769ad9e4a6806bcdbea1",
+        "result": {
+          "address": "0x080EB1D4",
+          "claim_id": 6840142008,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6840142008,
+          "status": "accepted",
+          "who": "native-080eb1d4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
