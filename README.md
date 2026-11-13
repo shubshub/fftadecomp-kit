@@ -1211,6 +1211,42 @@ dependencies refuse. The report records the contract identities, each query
 site and buffer offset, the counts executed and the private reads and writes.
 The list bound, physical memory permission and termination are not proved.
 
+### Buffer owners whose callees run the known list queries
+
+`--owner-runtime-profile named-data-buffer-known-query-callee-v1` admits an
+owner whose stack buffers reach a callee that itself passes a 13-word array to
+`08099CDC`, `08099D08` or `08099D34`:
+
+```sh
+python tools/match.py --root ../fftadecomp 0802C270 --owner-runtime-profile named-data-buffer-known-query-callee-v1
+```
+
+It is `named-data-buffer-v1` with two steps replaced. Data literals stay
+optional; function literals and switches refuse.
+
+* A callee that directly calls a pinned query root is inspected by the
+  stack-buffer executor above instead of the leaf verifier, under the same
+  pinned contract and the same premise of at most 13 nodes. The owner's
+  aliases are then walked over that callee's instructions by the unchanged
+  buffer walk, so every access through them is still bounded against the
+  owner's frame.
+* agbcc leaves the owner's pointers in R2/R3 when such a callee calls a list
+  query. A call to a pinned family root (the three queries, the search
+  `08099560` and the predicate query `08099544`) is summarized when owner
+  aliases sit only in R2, R3 or R12. The bytes, extents and counts of every
+  body the family can run are pinned, and three facts are checked on those
+  bytes: no instruction reads or writes R3 or R12, the root writes R2 before
+  reading it or reaching a call or branch, and every direct BL and code
+  literal stays inside the family. R3/R12 aliases are returned unchanged; the
+  R2 alias is dead. That the thunks reach only the family's literal visitors
+  is the hand-derived relation of the pinned bytes, as in the contract above.
+
+An alias in R0, R1 or LR at a family call, a stack-passed pointer word, or a
+query call outside a callee run under the executor refuses. The report records
+the contract, each executed callee, each family's identities and facts, each
+summarized call with its dead and retained registers, and the explicit
+conditions.
+
 
 ### Named data literals
 
