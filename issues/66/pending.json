@@ -3202,66 +3202,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "a2f5a09395758393161aacd3cd5f2bd6a9c4602d604cbad08b6e814d4b7402f2",
-        "acknowledged_cursor": 6864022980,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "a2f5a09395758393161aacd3cd5f2bd6a9c4602d604cbad08b6e814d4b7402f2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B8100\",\"who\":\"astra-xhigh-080b8100\",\"note\":\"Recover full graphical state function using existing native profiles and ROM-proven named table bindings. No toolkit changes.\"}",
-          "created_at": "2026-11-13T20:26:44Z",
-          "id": 6864022336,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T20:26:44Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "91b70d46c44a74016eb904bdcfc8a6faf6bf0c87a86bfa5ebae2758e6413c254",
-        "result": {
-          "address": "0x080B8100",
-          "claim_id": 6864022336,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6864022336,
-          "status": "accepted",
-          "who": "astra-xhigh-080b8100"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0936a43fdd57e3587265dac7bc1918480f4cbc2aa65a8050deae82943259b703",
-        "acknowledged_cursor": 6864689928,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0936a43fdd57e3587265dac7bc1918480f4cbc2aa65a8050deae82943259b703",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B8100\",\"who\":\"astra-xhigh-080b8100\",\"claim_id\":6864022336,\"reason\":\"Executor not started; no C authored and no matchability refusal. Complete target and ROM-proven table evidence retained. Releasing unused claim for other contributors.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T20:54:52Z",
-          "id": 6864689709,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T20:54:52Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6067496a1add00b08409af9105619560b0c28cb0cf19cef205f643bbef250774",
-        "result": {
-          "address": "0x080B8100",
-          "claim_id": 6864022336,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6864689709,
-          "status": "accepted",
-          "who": "astra-xhigh-080b8100"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d5749ed33a36b0c0fe4ca2f1c8063a9b9da2bda2c74d4473faf7059ff668b4f5",
         "acknowledged_cursor": 6864022980,
         "body_provenance": "acceptance-time",
