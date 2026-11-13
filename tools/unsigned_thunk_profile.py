@@ -6,6 +6,12 @@ closure.  This selector adds the typed original-ELF relocation and
 canonical-thunk source/report lifecycle.  Indirect destinations keep the
 conditional ABI of the existing thunk selectors: no callback value, body or
 effect is inferred, and no arithmetic or memory equivalence is claimed.
+
+``unsigned-divmod-thunks-frame-v1`` is the same admission over the framed
+inventory: a fixed Thumb frame with direct SP words and read-only incoming
+words.  Its manifest binds that frame evidence, and each verification
+re-proves it.  Existing ``unsigned-divmod-thunks-v1`` reports keep their
+saved-only meaning.
 """
 import hashlib
 import json
@@ -14,6 +20,10 @@ import re
 
 SELECTOR = 'unsigned-divmod-thunks-v1'
 SCHEMA = 'elf-symbol-thumb-function-address-thunks-unsigned-divmod-v1'
+FRAME_SELECTOR = 'unsigned-divmod-thunks-frame-v1'
+FRAME_SCHEMA = 'elf-symbol-thumb-function-address-thunks-unsigned-divmod-frame-v1'
+SELECTORS = (SELECTOR, FRAME_SELECTOR)
+FRAME_EVIDENCE = 'thumb-unsigned-divmod-thunk-fixed-frame-evidence-v1'
 HARDWARE = (0x04000000, 0x08000000)
 # Identifiers only the compiler may emit.  The raw preprocessed text is also
 # scanned, so an asm label string such as __asm("_call_via_r2") cannot give
@@ -60,7 +70,7 @@ def compiled(assembly, image, address):
 
 
 def check_link_context(selector, thunks, words, functions, switches, quotient, remainder, flags, contexts):
-    if type(selector) is not str or selector != SELECTOR or thunks is not True or \
+    if type(selector) is not str or selector not in SELECTORS or thunks is not True or \
             type(words) is not int or words != 5 or type(functions) is not dict or functions or \
             type(switches) is not dict or switches or type(quotient) is not dict or \
             type(remainder) is not dict or any(value is not False for value in flags) or \
@@ -93,14 +103,27 @@ def check_link_bindings(calls, targets, literals, functions, switches, quotient,
         raise ValueError('unsigned thunk call targets differ from their aliases')
 
 
-def prove(data, address, rom, mapping, index, calls):
+def prove(data, address, rom, mapping, index, calls, *, selector=SELECTOR):
     import unsigned_divmod_thunk_inventory as inventory
+    if type(selector) is not str or selector not in SELECTORS:
+        raise ValueError('unsigned thunks require their explicit source selector')
     bindings = inventory.bind_calls(calls, mapping, address, len(data), len(rom))
     return inventory.verify(data, address, rom, mapping, index, calls, bindings,
-                            selector=inventory.SELECTOR)
+                            selector=inventory.FRAME_SELECTOR if selector == FRAME_SELECTOR else inventory.SELECTOR)
 
 
-def producer_sources():
+def frame_evidence(proof):
+    """The fresh fixed-frame proof a framed manifest must carry exactly."""
+    import unsigned_divmod_thunk_inventory as inventory
+    if type(proof) is not dict or proof.get('selector') != inventory.FRAME_SELECTOR or \
+            proof.get('schema') != inventory.FRAME_SCHEMA:
+        raise ValueError('unsigned thunk frame evidence requires the framed inventory proof')
+    return {'schema': FRAME_EVIDENCE, 'frame': proof['frame'], 'stack_adjustments': proof['stack_adjustments'],
+            'stack_words': proof['stack_words'], 'caller_frame_policy': proof['caller_frame_policy'],
+            'entry_stack_contract': proof['entry_stack_contract']}
+
+
+def producer_sources(framed=False):
     import analyze
     import function_thunk_profile
     import local_long_branch_profile
@@ -114,11 +137,14 @@ def producer_sources():
     import umod_only_ordinary_inventory
     import umodsi3_profile
     import unsigned_divmod_ordinary_inventory
+    import readonly_entry_stack_profile
+    import readonly_entry_stack_words_profile
     import unsigned_divmod_thunk_inventory
     import unsigned_remainder_closure_inventory
     import zero_aware_unsigned_quotient_inventory
     modules = (analyze, function_thunk_profile, local_long_branch_profile, match,
         owner_admission_profile, owner_graph_profile, owner_runtime_profile, plausible,
+        *((readonly_entry_stack_profile, readonly_entry_stack_words_profile) if framed else ()),
         software_double_profile, software_float_profile, umod_only_ordinary_inventory,
         umodsi3_profile, unsigned_divmod_ordinary_inventory, unsigned_divmod_thunk_inventory,
         unsigned_remainder_closure_inventory, zero_aware_unsigned_quotient_inventory)
@@ -150,12 +176,14 @@ def numeric_words(data, address, instructions, literals, rom_size):
     return hardware
 
 
-def make_manifest(calls, functions, literals, address, rom, objects, instructions):
+def make_manifest(calls, functions, literals, address, rom, objects, instructions, *, selector=SELECTOR, frame_proof=None):
     import function_thunk_profile as thunks
     import match
     import unsigned_divmod_thunk_inventory as inventory
     if functions:
         raise ValueError('unsigned thunks exclude typed function literals')
+    if type(selector) is not str or selector not in SELECTORS or (selector == FRAME_SELECTOR) != (frame_proof is not None):
+        raise ValueError('unsigned thunk manifests require their selector and, when framed, its fresh frame proof')
     runtimes = {target: name for name, target in inventory.OPERATIONS.items()}
     aliases = {target: name for name, target in thunks.ALIASES.items()}
     names = match.parse_data_symbols(objects) if literals else {}
@@ -165,7 +193,7 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
             if item.mnemonic == 'ldr' and operand.type == match.ARM_OP_MEM and operand.mem.base == match.ARM_REG_PC:
                 end = max(end, ((item.address+4) & ~3)+operand.mem.disp+4)
     data = rom[address-match.ROM_BASE:end-match.ROM_BASE]
-    return {'selector': SELECTOR, 'runtime': thunks.RUNTIME, 'abi': thunks.ABI,
+    manifest = {'selector': selector, 'runtime': thunks.RUNTIME, 'abi': thunks.ABI,
         'frame': match.uses_stack_frame(instructions),
         'calls': [[site-address, f'func_{target:08X}'] for site, target in sorted(calls.items())
                   if target not in runtimes and target not in aliases],
@@ -176,7 +204,10 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
         'data': [[offset, name, value-names[name]] for offset, (name, value) in sorted(literals.items())],
         'numeric_hardware_words': numeric_words(data, address, instructions, literals, len(rom)),
         'dependencies': thunks.dependencies({aliases[target] for target in calls.values() if target in aliases}, rom),
-        'producer_source_sha256': producer_sources()}
+        'producer_source_sha256': producer_sources(selector == FRAME_SELECTOR)}
+    if frame_proof is not None:
+        manifest['stack_frame'] = frame_evidence(frame_proof)
+    return manifest
 
 
 def verify(data, address, rom, mapping, index, objects, manifest):
@@ -185,10 +216,13 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     import unsigned_divmod_thunk_inventory as inventory
     keys = {'selector', 'runtime', 'abi', 'frame', 'calls', 'functions', 'thunks', 'unsigned_runtime',
             'data', 'numeric_hardware_words', 'dependencies', 'producer_source_sha256'}
-    if type(manifest) is not dict or set(manifest) != keys or \
-            manifest['selector'] != SELECTOR or manifest['runtime'] != thunks.RUNTIME or \
+    selector = manifest.get('selector') if type(manifest) is dict else None
+    framed = selector == FRAME_SELECTOR
+    if type(manifest) is not dict or type(selector) is not str or selector not in SELECTORS or \
+            set(manifest) != (keys | {'stack_frame'} if framed else keys) or \
+            manifest['runtime'] != thunks.RUNTIME or \
             manifest['abi'] != thunks.ABI or type(manifest['frame']) is not bool or \
-            manifest['functions'] != [] or manifest['producer_source_sha256'] != producer_sources():
+            manifest['functions'] != [] or manifest['producer_source_sha256'] != producer_sources(framed):
         raise ValueError('unsigned thunk source manifest or producer source bytes differ')
     calls, literals = match.function_address_bindings(data, address, rom, mapping, objects,
         {'calls': manifest['calls'], 'functions': [], 'data': manifest['data']}, allow_empty_functions=True)
@@ -214,7 +248,10 @@ def verify(data, address, rom, mapping, index, objects, manifest):
             occupied.update(range(offset, offset+4))
     if manifest['dependencies'] != thunks.dependencies({name for _, name in manifest['thunks']}, rom):
         raise ValueError('unsigned thunk canonical dependencies differ')
-    proof, instructions = prove(data, address, rom, mapping, index, calls)
+    proof, instructions = prove(data, address, rom, mapping, index, calls, selector=selector)
+    if framed and (manifest['frame'] is not True or json.dumps(manifest['stack_frame'], sort_keys=True) !=
+                   json.dumps(frame_evidence(proof), sort_keys=True)):
+        raise ValueError('unsigned thunk frame evidence differs from the fresh fixed-frame proof')
     thunks.verify_data_bindings(calls, literals, match.parse_data_symbols(objects) if literals else {},
                                 json.loads(mapping))
     match.verify_data_literals(instructions, address, literals)

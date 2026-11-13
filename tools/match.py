@@ -5332,9 +5332,10 @@ def main():
                 if args.function_address_profile == function_thunk.UMOD_R1_SELECTOR:
                     from umod_r1_thunk_profile import prove
                     _, verified_instructions = prove(got, addr, rom, mapping, function_index, calls)
-                elif args.function_address_profile == function_thunk.UNSIGNED_SELECTOR:
+                elif args.function_address_profile in function_thunk.UNSIGNED_SELECTORS:
                     from unsigned_thunk_profile import prove as prove_unsigned_thunks
-                    _, verified_instructions = prove_unsigned_thunks(got, addr, rom, mapping, function_index, calls)
+                    unsigned_proof, verified_instructions = prove_unsigned_thunks(got, addr, rom, mapping,
+                        function_index, calls, selector=args.function_address_profile)
                 else:
                     verified_instructions = verify_leaf_instructions(got, addr, True, calls,
                         function_thunk_context={"interposed_words": function_thunk.pool_words(args.function_address_profile)}
@@ -5342,7 +5343,8 @@ def main():
                             else {})
                 thunk_evidence = function_thunk.make_manifest(calls, function_relocations, data_relocations,
                                                              addr, rom, data_mapping, verified_instructions,
-                                                             selector=args.function_address_profile)
+                                                             selector=args.function_address_profile,
+                    frame_proof=unsigned_proof if args.function_address_profile == function_thunk.UNSIGNED_FRAME_SELECTOR else None)
                 verified_instructions = function_thunk.verify(got, addr, rom, mapping, function_index,
                                                                data_mapping, thunk_evidence)
             elif double_profile:
