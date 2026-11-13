@@ -872,7 +872,8 @@ admit a caller whose later stale-argument or local-buffer calls cannot be proved
 
 A callee that stores `*out++` inside a loop reaches its loop head with different
 offsets for the same pointer register, and the join above refuses it. When that
-join conflict is the only obstacle, the callee is replayed path by path instead
+join conflict is the only obstacle (any difference between the two incoming alias
+maps at equal depth, including a register present on only one path), the callee is replayed path by path instead
 of joined: every reachable state is kept separately, so each store is checked at
 its exact offset against the caller's allocated local words with the same
 alignment, saved-slot, overlap and escape rules. A replayed path that reaches a
@@ -886,14 +887,22 @@ Loops end only through exact facts. The replay tracks R0-R12 values produced by
 unconditional 16-bit `mov`, `add` and `sub` of known values and immediates (32-bit
 wrap), and the operand pair of the last `cmp` whose operands are both known.
 A conditional branch with known flags follows only its taken or fallthrough
-side. Any other write forgets the register; any other flag-setting instruction,
+side; the other edge is pruned as infeasible, and its instructions are never
+analysed, so a store that would be refused there is not. Each pruned edge (site,
+condition, flag operands, side) is bound into the evidence. Any other write forgets the register; any other flag-setting instruction,
 call or software interrupt forgets the flags; a call forgets R0-R3, R12 and LR.
 After a call to an inspected buffer callee, every R4-R11 register that callee,
 or an inspected callee of it, writes anywhere (including its restoring pops) is
 also forgotten. Values in R4-R11 survive uninspected calls only under the
-returning-ABI premise this proof already uses for aliases. Nothing is widened: if no exact counter bounds the loop, the pointer
+returning-ABI premise this proof already uses for aliases, so a callee that
+breaks the premise (for example by zeroing a counter and never restoring it) is
+admitted. This is not proved: every un-inspected call target whose R4-R11
+survival the replay relied on, and the register, is recorded and bound by the
+fingerprint, and `match.py` prints it when it writes the report. Nothing is widened: if no exact counter bounds the loop, the pointer
 keeps moving until a store leaves the buffer, or the replay exhausts its budget
-(4,096 states per callee, 65,536 per proof) and refuses. Different stack depths
+(4,096 states per callee, 65,536 per proof) and refuses. The per-proof counter
+only increases (states are never refunded) and joined passes, including nested
+ones, are not counted. Different stack depths
 at the same address still refuse.
 
 Replay is opt-in per class and is not inherited: only the plain register and
@@ -901,8 +910,9 @@ stack buffer proofs (`BufferCallProof`, `FunctionBufferCallProof`) enable it,
 and not when they carry a discarded-scratch or BIOS-fill policy. Every profile
 subclass keeps the join refusal. Records of the aborted joined pass are
 discarded before the replay. Only replayed callees change the evidence: the
-buffer proof fingerprint then also binds each replayed callee's call site,
-argument offsets and the exact set of caller-frame bytes written by its own
+buffer proof fingerprint (`bounded-loop-replay-v2`) then also binds each replayed
+callee's call site, argument offsets, the trusted (call target, register) pairs,
+the pruned branch edges and the exact set of caller-frame bytes written by its own
 stores (stores of nested callees that are not replayed are checked but not
 listed), so report replay recomputes it. Proofs without a replay keep their
 previous fingerprint.

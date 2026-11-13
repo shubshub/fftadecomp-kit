@@ -2770,6 +2770,9 @@ class _LoopReplayRequired(Exception):
 
 
 LOOP_REPLAY_STATE_BUDGET = 4096
+# The per-proof counter only ever increases: states are never refunded, not even
+# for a replay that later refuses or is discarded.  Normal (joined) passes,
+# including nested ones, are not counted.
 LOOP_REPLAY_TOTAL_BUDGET = 65536
 _WORD = 0xFFFFFFFF
 
@@ -2850,6 +2853,9 @@ class BufferCallProof:
     callee_frames = False
     single_word_stores = False
     exact_alias_state_budget = None
+    # Opt-in per class (read from the class's own __dict__, never inherited): a
+    # subclass's hooks and ledgers have not been reviewed against per-state exploration.
+    _loop_replay_opt_in = True
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -2880,6 +2886,9 @@ class BufferCallProof:
         self.loop_replay_states = 0
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
+        # Targets of un-inspected calls an inspected callee (transitively) relies on
+        # to preserve R4-R11.
+        self.callee_trusted = {}
 
     def target(self, address):
         if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or ashldi3.reserved(address) or software_double.reserved(address) or software_float.reserved(address):
@@ -2960,25 +2969,22 @@ class BufferCallProof:
                                                 call_resolver=self.target)
         return instructions, {}
 
-    loop_replay = True
-
     def loop_replay_eligible(self):
-        # Opt-in per class: a subclass does not inherit replay, because its own
-        # hooks and ledgers have not been reviewed against per-state exploration.
-        return type(self).__dict__.get("loop_replay", False) is True and \
+        return type(self).__dict__.get("_loop_replay_opt_in", False) is True and \
             not (self.callee_frames or self.word_provenance or self.single_word_stores or
                  self.exact_alias_state_budget is not None or
                  self.discarded_exit_scratch is not None or self.bios_fill_proof is not None)
 
     def check_arguments(self, address, arguments, stack, incoming, protected, **context):
         snapshot = ({callee: set(records) for callee, records in self.loop_replays.items()},
-                    dict(self.dependencies), dict(self.callee_clobbers))
+                    dict(self.dependencies), dict(self.callee_clobbers),
+                    dict(self.callee_trusted))
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
         except _LoopReplayRequired:
             # Records of the aborted joined pass never enter the evidence.
-            for ledger, saved in zip((self.loop_replays, self.dependencies, self.callee_clobbers),
+            for ledger, saved in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
                                      snapshot):
                 ledger.clear()
                 ledger.update(saved)
@@ -3005,6 +3011,7 @@ class BufferCallProof:
             instructions, finite_transfers = self.inspect(address, data)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
+            trusted_targets = set()
             callee_saved = range(ARM_REG_R0 + 4, ARM_REG_R0 + 12)
             clobbered = {register for instruction in instructions
                          for register in instruction.regs_access()[1] if register in callee_saved}
@@ -3026,6 +3033,11 @@ class BufferCallProof:
                 states[address] += ((), None)
                 replay_states = {address: {states[address]}}
                 replay_writes = set()
+                # Facts the replay relied on without checking them in bytes: R4-R11
+                # values assumed to survive un-inspected calls, and branch edges
+                # pruned as infeasible (whose refusals are never evaluated).
+                replay_trusted = set()
+                replay_pruned = set()
                 replay_count = 1
             pending = [(address, states[address])] if path_states is not None or replay else [address]
             current = None
@@ -3104,9 +3116,15 @@ class BufferCallProof:
                     # to be restored; uninspected calls keep the ABI premise.
                     nested_clobbers = self.callee_clobbers.get(operands[0].imm, ())
                     clobbered.update(nested_clobbers)
+                    relied_on = self.callee_trusted.get(operands[0].imm, frozenset()) \
+                        if operands[0].imm in self.callee_clobbers else frozenset({operands[0].imm})
+                    trusted_targets.update(relied_on)
                     if replay:
                         next_known = tuple((register, value) for register, value in next_known
                                            if register not in nested_clobbers)
+                        replay_trusted.update((target, register) for target in relied_on
+                                              for register, _ in next_known
+                                              if ARM_REG_R0 + 4 <= register <= ARM_REG_R0 + 11)
                 elif self.single_word_stores and self.apply_single_store(
                         instruction, aliases, constants, stack, words, root_frame=root_frame,
                         context={'address':address, 'call_site':site, 'frame_base':frame_base,
@@ -3245,8 +3263,10 @@ class BufferCallProof:
                     successors = (operands[0].imm,)
                     if instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID):
                         if replay and flags is not None:
-                            if not loop_replay_condition(instruction.cc, flags):
+                            taken = loop_replay_condition(instruction.cc, flags)
+                            if not taken:
                                 successors = (current + instruction.size,)
+                            replay_pruned.add((current, instruction.cc, flags[0], flags[1], taken))
                         else:
                             successors += (current + instruction.size,)
                 else:
@@ -3333,9 +3353,11 @@ class BufferCallProof:
             if path_states is not None:
                 return self.alternative_result([exact_returns[key] for key in sorted(exact_returns)])
             self.callee_clobbers[address] = frozenset(clobbered)
+            self.callee_trusted[address] = frozenset(trusted_targets)
             if replay:
                 self.loop_replays.setdefault(address, set()).add(
                     (site, tuple(sorted(arguments.items())), tuple(sorted(incoming.items())),
+                     tuple(sorted(replay_trusted)), tuple(sorted(replay_pruned)),
                      tuple(sorted(replay_writes))))
             return self.word_result(returned, returned_words or {})
         except ValueError as error:
@@ -3375,12 +3397,15 @@ class BufferCallProof:
             digest.update(struct.pack("<II", address, len(data)))
             digest.update(data)
         if self.loop_replays:
-            # Bind every replayed callee's exact caller-frame writes; reports
-            # without a replay keep their earlier fingerprint.
-            digest.update(json.dumps(["bounded-loop-replay-v1", sorted(
+            # Bind every replayed callee's exact caller-frame writes, the (call target,
+            # register) pairs trusted across un-inspected calls and the pruned branch
+            # edges (site, condition, flag operands, whether the branch was taken);
+            # reports without a replay keep their earlier fingerprint.
+            digest.update(json.dumps(["bounded-loop-replay-v2", sorted(
                 [address, sorted([[site, [list(pair) for pair in arguments], [list(pair) for pair in incoming],
+                                   [list(pair) for pair in trusted], [list(edge) for edge in pruned],
                                    [list(write) for write in writes]]
-                                  for site, arguments, incoming, writes in records],
+                                  for site, arguments, incoming, trusted, pruned, writes in records],
                                  key=lambda item: json.dumps(item))]
                 for address, records in self.loop_replays.items())],
                 separators=(",", ":")).encode())
@@ -3388,7 +3413,7 @@ class BufferCallProof:
 
 
 class FunctionBufferCallProof(BufferCallProof):
-    loop_replay = True
+    _loop_replay_opt_in = True
 
     def target(self, address):
         if address in RUNTIME_HELPERS.values():
@@ -5474,6 +5499,13 @@ def main():
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
+                for callee, records in sorted(buffer_proof.loop_replays.items()):
+                    for record in sorted(records):
+                        if record[3]:
+                            trusted = ", ".join(f"0x{target:08X}:r{register - ARM_REG_R0}"
+                                                for target, register in record[3])
+                            print(f"note: bounded loop replay of 0x{callee:08X} trusts un-inspected "
+                                  f"calls to preserve (target:register) {trusted}")
             if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
