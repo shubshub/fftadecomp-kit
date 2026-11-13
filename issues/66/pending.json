@@ -3198,7 +3198,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "bf5d6755da8bbac56e30f185bdbffa65632a2b23dae48c41cc956e93bafa1061",
+        "acknowledged_cursor": 6856433682,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bf5d6755da8bbac56e30f185bdbffa65632a2b23dae48c41cc956e93bafa1061",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080001E4\",\"who\":\"claude-ffta2\",\"claim_id\":6856368411,\"reason\":\"hand-written ARM-mode IRQ dispatcher (crt0), inner entry of 0800018C row; not compiled Thumb C\",\"unmatchable\":true,\"tried\":\"-O2 (not attempted: ARM asm)\"}",
+          "created_at": "2026-11-13T14:50:35Z",
+          "id": 6856433682,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:50:35Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "48c0a5e4d623e6b9cca6a76c411bd21f08dfd3b35dbe6547e6c38ad116887ae1",
+        "result": {
+          "address": "0x080001E4",
+          "claim_id": 6856368411,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6856433682,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
