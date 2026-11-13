@@ -3266,66 +3266,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "ca955ca1c49cf7cc4f80e9d8caba28fc971da5db78127099f884e5689c531e0d",
-        "acknowledged_cursor": 6858475007,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ca955ca1c49cf7cc4f80e9d8caba28fc971da5db78127099f884e5689c531e0d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800B0AC\",\"who\":\"astra-bg-affine-b0ac\",\"note\":\"Recover complete affine-transform preparation using the merged bounded BIOS local-buffer profile\"}",
-          "created_at": "2026-11-13T16:14:18Z",
-          "id": 6858475007,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T16:14:18Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "88a458bb25e70e3a8f9da59c0791b3b0ab737c1edd5362007810503527c93220",
-        "result": {
-          "address": "0x0800B0AC",
-          "claim_id": 6858475007,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6858475007,
-          "status": "accepted",
-          "who": "astra-bg-affine-b0ac"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "cf0b66d424b2f58e37553fb0530abccb99f387dbd0f48d8e9559b4ef4d6d21fc",
-        "acknowledged_cursor": 6858542989,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cf0b66d424b2f58e37553fb0530abccb99f387dbd0f48d8e9559b4ef4d6d21fc",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800B0AC\",\"who\":\"astra-bg-affine-b0ac\",\"claim_id\":6858475007,\"reason\":\"Native qualification refused local stack pointer escapes through a return register; no C authored, exact proof boundary retained for toolkit composition\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T16:17:16Z",
-          "id": 6858542989,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T16:17:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "dc65e7bd01802cce97a49bb4582625f481133c1bf4702e5525022b95bbddb37a",
-        "result": {
-          "address": "0x0800B0AC",
-          "claim_id": 6858475007,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6858542989,
-          "status": "accepted",
-          "who": "astra-bg-affine-b0ac"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1685ae228eea0b181624227bff1812cb94ad6f7cbc393e4529bdfca01598039c",
         "acknowledged_cursor": 6858489076,
         "body_provenance": "acceptance-time",
