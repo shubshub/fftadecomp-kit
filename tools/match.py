@@ -2255,8 +2255,9 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
 
     candidates = []
     if interposed_pool:
-        # A Thumb PC-relative load reaches at most 1020 bytes, so the pool
-        # between the dispatch and its table pointer is at most 255 words.
+        # A Thumb PC-relative load reaches at most 1020 bytes, which bounds
+        # the pool between the dispatch and its table pointer (254 words with
+        # a 10-byte gap, 253 with 12); the ldr displacement check enforces it.
         placements = [(literal - 4 * words, gap)
                       for words in range(256) for gap in (10, 12)]
     else:
