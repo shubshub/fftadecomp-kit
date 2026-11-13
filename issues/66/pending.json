@@ -3327,6 +3327,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "db99a222d303070e7ef9e4d0e5ae9c1a5398a47f7d8556216f98036900213247",
+        "acknowledged_cursor": 6864022980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "db99a222d303070e7ef9e4d0e5ae9c1a5398a47f7d8556216f98036900213247",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C034C\",\"who\":\"claude-ffta2\",\"note\":\"sweep match\"}",
+          "created_at": "2026-11-13T20:26:44Z",
+          "id": 6864022300,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:26:44Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91b70d46c44a74016eb904bdcfc8a6faf6bf0c87a86bfa5ebae2758e6413c254",
+        "result": {
+          "address": "0x080C034C",
+          "claim_id": 6864022300,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6864022300,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a2f5a09395758393161aacd3cd5f2bd6a9c4602d604cbad08b6e814d4b7402f2",
+        "acknowledged_cursor": 6864022980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a2f5a09395758393161aacd3cd5f2bd6a9c4602d604cbad08b6e814d4b7402f2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B8100\",\"who\":\"astra-xhigh-080b8100\",\"note\":\"Recover full graphical state function using existing native profiles and ROM-proven named table bindings. No toolkit changes.\"}",
+          "created_at": "2026-11-13T20:26:44Z",
+          "id": 6864022336,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:26:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91b70d46c44a74016eb904bdcfc8a6faf6bf0c87a86bfa5ebae2758e6413c254",
+        "result": {
+          "address": "0x080B8100",
+          "claim_id": 6864022336,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6864022336,
+          "status": "accepted",
+          "who": "astra-xhigh-080b8100"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d5749ed33a36b0c0fe4ca2f1c8063a9b9da2bda2c74d4473faf7059ff668b4f5",
+        "acknowledged_cursor": 6864022980,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d5749ed33a36b0c0fe4ca2f1c8063a9b9da2bda2c74d4473faf7059ff668b4f5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08114F1C\",\"who\":\"astra-xhigh-08114f1c\",\"note\":\"Recover full graphical state function using existing native profiles and ROM-proven named table bindings. No toolkit changes.\"}",
+          "created_at": "2026-11-13T20:26:46Z",
+          "id": 6864022980,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:26:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "91b70d46c44a74016eb904bdcfc8a6faf6bf0c87a86bfa5ebae2758e6413c254",
+        "result": {
+          "address": "0x08114F1C",
+          "claim_id": 6864022980,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6864022980,
+          "status": "accepted",
+          "who": "astra-xhigh-08114f1c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
