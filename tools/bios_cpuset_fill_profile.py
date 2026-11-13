@@ -199,6 +199,27 @@ def transfer(instruction, incoming, data, address):
         destination, source = ARM_REG_R0 + (code & 7), ARM_REG_R0 + ((code >> 3) & 7)
         if (op[0].reg, op[1].reg) == (destination, source):
             return destination, incoming.get(source, (0, 0))
+    # ADDS/SUBS Rd, Rs, #imm3 and ADDS/SUBS Rd, #imm8: a carry can reach any
+    # higher bit, so only an exact input gives a fact; anything else is unknown.
+    kind = code & 0xFE00
+    if kind in (0x1C00, 0x1E00) and name == ('adds' if kind == 0x1C00 else 'subs') and \
+            len(op) == 3 and op[0].type == op[1].type == ARM_OP_REG and op[2].type == ARM_OP_IMM:
+        destination, source = ARM_REG_R0 + (code & 7), ARM_REG_R0 + ((code >> 3) & 7)
+        immediate, subtract = (code >> 6) & 7, kind == 0x1E00
+    elif code & 0xF000 == 0x3000 and name == ('subs' if code & 0x0800 else 'adds') and \
+            len(op) == 2 and op[0].type == ARM_OP_REG and op[1].type == ARM_OP_IMM:
+        destination = source = ARM_REG_R0 + ((code >> 8) & 7)
+        immediate, subtract = code & 255, bool(code & 0x0800)
+    else:
+        destination = None
+    if destination is not None:
+        if (op[0].reg, op[1].reg if len(op) == 3 else source, op[-1].imm) != \
+                (destination, source, immediate):
+            return None
+        ones, zeros = incoming.get(source, (0, 0))
+        if ones | zeros != MASK or ones & zeros:
+            return destination, (0, 0)
+        return destination, exact(ones - immediate if subtract else ones + immediate)
     kind = code & 0xF800
     if kind in (0x0000, 0x0800) and name in ('lsls', 'lsrs') and len(op) == 3 and \
             op[0].type == op[1].type == ARM_OP_REG and op[2].type == ARM_OP_IMM:
