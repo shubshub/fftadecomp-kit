@@ -512,6 +512,7 @@ def elf_image(object_data):
     return {"type": object_type, "sections": sections,
             "section_data": [section_data(section) for section in sections],
             "text_index": text_index, "text": section_data(sections[text_index]),
+            "section_names": [string_at(section_names, section[0]) for section in sections],
             "symbol_tables": symbol_tables,
             "symbols": [symbol for symbols in symbol_tables.values() for symbol in symbols],
             "relocations": [index for index, section in enumerate(sections)
@@ -4838,6 +4839,7 @@ def main():
                                                       "conditional-known-query-stack-buffer-v1",
                                                       "conditional-known-query-stack-buffer-unsigned-quotient-v1",
                                                       "named-data-buffer-known-query-callee-v1",
+                                                      "named-data-buffer-rom-table-copy-v1",
                                                       "conditional-finite-spilled-scalar-loops-v1",
                                                       "bounded-buffer-discarded-return-scratch-v1",
                                                       "bounded-buffer-bios-sqrt-scratch-v1",
