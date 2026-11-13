@@ -83,7 +83,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 discarded_exit_scratch=None, formal_stack_callee_proof=None,
                 formal_stack_alias_constant_policy=None, formal_stack_entry_word_policy=None,
                 formal_stack_entry_words_policy=None, mutable_stack_index_policy=None,
-                consumer_scratch_proof=None, entry_recursive_calls=None, native_three_call_policy=None):
+                consumer_scratch_proof=None, entry_recursive_calls=None, native_three_call_policy=None,
+                returned_local_alias_policy=None):
     """Prove saved registers, fixed SP, and entry-LR return on every CFG path.
 
     Caller-clobbered registers lose provenance only on actual external calls.
@@ -94,7 +95,19 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     """
     from match import thumb_stack_adjustment, stack_alias_assignment, BufferCallProof
     from named_data_buffer_profile import RootGuardedSwitchBufferProof
-    root_switch_buffer = type(buffer_proof) is RootGuardedSwitchBufferProof
+    from bios_word_switch_buffer_profile import BiosWordSwitchBufferProof, RETURN_POLICY
+    returned_local_aliases = type(buffer_proof) is BiosWordSwitchBufferProof
+    if returned_local_alias_policy is not None or returned_local_aliases:
+        if returned_local_alias_policy != RETURN_POLICY or not returned_local_aliases or not stack_aliases or any(
+                value is not None for value in (runtime_calls, call_preservation, bounded_output_proof,
+                    zero_index_profile, entry_stack_policy, local_alias_slot_policy, finite_stack_index_policy,
+                    entry_stack_alias_slot_policy, discarded_exit_scratch, formal_stack_callee_proof,
+                    formal_stack_alias_constant_policy, formal_stack_entry_word_policy,
+                    formal_stack_entry_words_policy, mutable_stack_index_policy, consumer_scratch_proof,
+                    entry_recursive_calls, native_three_call_policy)):
+            raise ValueError('returned local aliases require their exclusive explicit native composition')
+        buffer_proof.validate_frame(instructions,edges,address,branches,calls)
+    root_switch_buffer = type(buffer_proof) is RootGuardedSwitchBufferProof or returned_local_aliases
     from static_callback_r6_frame_profile import RestoringLocalBufferProof
     restoring_local_buffer = type(buffer_proof) is RestoringLocalBufferProof
     from two_word_callback_closure_profile import _ContextRead
@@ -409,6 +422,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             registers.pop(ARM_REG_LR, None)
             aliases.pop(ARM_REG_LR, None)
         elif site in calls:
+            returned_aliases = {}
             if discarded_exit_scratch is not None and aliases and not restoring_local_buffer:
                 raise ValueError('discarded scratch local aliases cannot cross calls')
             if runtime_calls is not None and site in runtime_calls:
@@ -450,11 +464,15 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                            for register in clobbered if register in aliases}
                 native_stack = [(False, kind == "saved", kind == "local")
                                 for kind, _ in stack]
-                if (bounded_output_proof.check_call(calls[site],offsets,native_stack,site=site)
+                returned_aliases = (bounded_output_proof.check_call(calls[site],offsets,native_stack,site=site)
                         if bounded_output_proof is not None else
                         buffer_proof.check_call(calls[site], offsets, native_stack,
-                            **({'site':site} if root_switch_buffer or restoring_local_buffer or callback_context_buffer or buffer_proof.bios_fill_proof is not None else {}))):
+                            **({'site':site} if root_switch_buffer or restoring_local_buffer or callback_context_buffer or buffer_proof.bios_fill_proof is not None else {})))
+                if returned_aliases and not returned_local_aliases:
                     raise ValueError("local alias return requires a separate provenance policy")
+                if returned_local_aliases:
+                    for register, offset in returned_aliases.items():
+                        access(offset, 1, stack)
                 # A proved callee may write through any passed local buffer.
                 # Do not retain a saved-register token in potentially changed bytes.
                 stack = [(kind, None if kind == "local" else value) for kind, value in stack]
@@ -465,6 +483,9 @@ def prove_frame(instructions, edges, address, branches, calls, *,
             for register in destroyed:
                 registers.pop(register, None)
                 aliases.pop(register, None)
+            if returned_local_aliases:
+                aliases.update({register:frozenset(((offset,True),))
+                                for register,offset in returned_aliases.items()})
         else:
             read, written = instruction.regs_access()
             assignment = None
@@ -808,6 +829,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     proof = {"schema": SCHEMA, "instructions": len(instructions), "maximum_frame_bytes": maximum,
             "returns": sorted(returns), "preserved": "r4-r11,sp,entry-lr",
             "external_calls": "existing-direct-call-ABI-summary"}
+    if returned_local_aliases:
+        proof["returned_local_alias_policy"] = RETURN_POLICY
     if entry_recursive_calls is not None:
         proof["entry_calls"] = entry_recursive_calls.record()
     if call_preservation is not None:

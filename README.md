@@ -2808,6 +2808,40 @@ C with a retained original ET_REL object; a dependency is the exact read-only
 original switch body. This test proves verifier capability, not authorship or
 admission of any actual game owner.
 
+### Explicit BIOS word-switch local buffers
+
+`python3 tools/match.py --root <game> --owner-runtime-profile bios-word-switch-local-buffers-v1 <address>`
+selects `elf-symbol-thumb-bios-word-switch-local-buffers-v1`. The structural API
+is `owner_admission_profile.preflight(..., selector="bios-word-switch-local-buffers-v1")`;
+preflight itself gives no C or ELF admission credit. Native matching still
+requires genuine complete original ELF relocations, typed linking, exact ROM
+bytes, plausible source and fresh report replay.
+
+This route composes one existing unsigned-guarded word switch with one reached
+interposed RAM/ROM object literal, a fixed restoring frame, existing bounded
+ordinary-buffer effects and the exact indexed CpuSet `SWI 0x0B; BX LR` wrapper.
+Named object and function literals retain their existing typed binding rules.
+Every CpuSet call must carry a checked local R0 fill source and no other local
+argument alias. Bit24 must select fill on every path; bit26 selects one aligned
+halfword or word. Unknown width conservatively requires a complete aligned word.
+The count does not expand the one-unit fill source; zero count is permitted.
+Destination extent, physical readability/nonalias, initialization, numeric
+results and termination are not proved. Returning BIOS semantics and ordinary
+returning-call ABI remain explicit premises. There is no ordinary-ABI fallback
+for an unchecked CpuSet site.
+
+The exclusive `native-returned-local-aliases-v1` frame policy transports only
+actual aliases returned by native bounded-callee replay. Later calls replay
+those aliases again until native instructions kill them. Local bounds,
+alignment, lifetime, joins, saved-register restoration and escape checks stay
+active. No arbitrary return facts, scratch projection, pointer slots, incoming
+stack-word permissions, local BL or indirect runtime calls are added. The
+4096-byte owner/dependency and eight-dependency limits remain unchanged.
+Default and older selectors still refuse this composition and returned aliases
+at the strict frame seam. `test_bios_word_switch_buffers.py` and
+`test_bios_word_switch_native.py` cover synthetic hostile inputs and real agbcc,
+CLI, forged-report and stale-source replay. These tests confer no game credit.
+
 ### Exact register callback buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile static-callback-buffer-v1 <address>`

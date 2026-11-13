@@ -293,14 +293,24 @@ def prove_bits(instructions, edges, address, data):
 
 
 class BiosFillProof:
-    def __init__(self, data, address, rom, mapping, index, calls):
+    def __init__(self, data, address, rom, mapping, index, calls, *, one_object_word_switch=False):
         import match
         import owner_admission_profile as owner
         import owner_graph_profile as graph
         owner.validate_span(data, address, rom, mapping, index)
-        refinement = owner.refine(data, address, mapping)
-        instructions, edges, branches, actual, words = graph.graph(data, address, refinement)
-        if branches or words or calls != actual or ADDRESS not in calls.values():
+        if type(one_object_word_switch) is not bool:
+            raise ValueError('BIOS word-switch opt-in must be Boolean')
+        if one_object_word_switch:
+            from bios_word_switch_buffer_profile import refine
+            refinement = refine(data, address, mapping)
+            switches = refinement['word_switches']
+            if len(switches) != 1 or switches[0].get('interposed_words') != 1:
+                raise ValueError('BIOS fill requires one exact one-object-word switch')
+        else:
+            refinement = owner.refine(data, address, mapping)
+        instructions, edges, branches, actual, words = graph.graph(data, address, refinement,
+            one_object_word_switch=one_object_word_switch)
+        if branches or words and not one_object_word_switch or calls != actual or ADDRESS not in calls.values():
             raise ValueError('BIOS fill requires an actual direct call in its closed owner')
         graph.partition(data, address, refinement, instructions, words)
         offset = ADDRESS - match.ROM_BASE
