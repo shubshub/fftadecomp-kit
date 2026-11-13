@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "a0f710d3f2a4005e441ebb6daf4235446461fdcba58ff2fcac52afd0366dd87d",
+    "acknowledged_cursor": 6863655284,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a0f710d3f2a4005e441ebb6daf4235446461fdcba58ff2fcac52afd0366dd87d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805E354\",\"who\":\"astra-xhigh-0805e354\",\"note\":\"Recover complete hard function with unchanged existing native profile; fully mapped data, no toolkit edits.\"}",
+      "created_at": "2026-11-13T20:08:56Z",
+      "id": 6863642076,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T20:08:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+    "result": {
+      "address": "0x0805E354",
+      "claim_id": 6863642076,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6863642076,
+      "status": "accepted",
+      "who": "astra-xhigh-0805e354"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c32a6a090196e642248b55c4997661b158fe3851119780ae4e6f19bf6a54470c",
+    "acknowledged_cursor": 6864257892,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c32a6a090196e642248b55c4997661b158fe3851119780ae4e6f19bf6a54470c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805E354\",\"who\":\"astra-xhigh-0805e354\",\"claim_id\":6863642076,\"reason\":\"Complete620-byte menu event handler exact under u16-scalars-v1,217instructions,native exit0 and plausible source; queued for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T20:35:38Z",
+      "id": 6864254662,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T20:35:38Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b043d20250cf2092aa71d234b92f2e0c69d10e8a4a06e895c55d7caf082663bf",
+    "result": {
+      "address": "0x0805E354",
+      "claim_id": 6863642076,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6864254662,
+      "status": "accepted",
+      "who": "astra-xhigh-0805e354"
+    }
+  }
+}
