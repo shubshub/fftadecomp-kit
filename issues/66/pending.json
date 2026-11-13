@@ -862,7 +862,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2efd6b726f0d3a7eb57aae706873b45902a671d5ff0e57ad40af26decdf781fb",
+        "acknowledged_cursor": 6867841718,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2efd6b726f0d3a7eb57aae706873b45902a671d5ff0e57ad40af26decdf781fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08110FE0\",\"who\":\"claude-ffta2\",\"claim_id\":6867526198,\"reason\":\"parked: near miss (case 0x101 register allocation)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:47:15Z",
+          "id": 6867840255,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:47:15Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "34ec26c0e4e24c8933003f22024683b82b21bbf857374bd4eac74fcbdf87558f",
+        "result": {
+          "address": "0x08110FE0",
+          "claim_id": 6867526198,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867840255,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -894,7 +922,35 @@
           "who": "astra-xhigh-1208c8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f4132fd36f3e91d6d625e9b00a9c119d944544b485853726cbde2d8b095d209a",
+        "acknowledged_cursor": 6867841718,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f4132fd36f3e91d6d625e9b00a9c119d944544b485853726cbde2d8b095d209a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081208C8\",\"who\":\"astra-xhigh-1208c8\",\"claim_id\":6867558935,\"reason\":\"Natural candidate804bytes337instructions vs812/342. Exact-span native refusal; remaining early destination calculation and three unused ROM instructions repeat in08110FE0. Preserveddirect-astra/081208C8, no matchcredit.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; natural typed control-flow and lifetime reconstruction\"}",
+          "created_at": "2026-11-13T23:47:20Z",
+          "id": 6867841718,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:47:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "34ec26c0e4e24c8933003f22024683b82b21bbf857374bd4eac74fcbdf87558f",
+        "result": {
+          "address": "0x081208C8",
+          "claim_id": 6867558935,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6867841718,
+          "status": "accepted",
+          "who": "astra-xhigh-1208c8"
+        }
+      }
     },
     {
       "claim": {
