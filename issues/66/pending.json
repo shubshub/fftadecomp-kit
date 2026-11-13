@@ -3326,7 +3326,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ccec820fcd350b068ec16a97710505d10674bbd590abd497ea8ce044c3dd5189",
+        "acknowledged_cursor": 6865738969,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ccec820fcd350b068ec16a97710505d10674bbd590abd497ea8ce044c3dd5189",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811FD74\",\"who\":\"claude-ffta2\",\"claim_id\":6865604543,\"reason\":\"parked: volatile HDMA buffer policy + loop path cap\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T21:47:32Z",
+          "id": 6865732002,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:47:32Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e664bec5fdbbd9a107e1c2c897c8d76e0c96e8051202e49b643dcd7d16e19214",
+        "result": {
+          "address": "0x0811FD74",
+          "claim_id": 6865604543,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6865732002,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3416,6 +3444,70 @@
           "request_id": 6865612527,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f76ad6dbb68d8a7462e8fbdd6b24cce2ed42ae829f9a863798bbb5b7420c4116",
+        "acknowledged_cursor": 6865738969,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f76ad6dbb68d8a7462e8fbdd6b24cce2ed42ae829f9a863798bbb5b7420c4116",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E7D20\",\"who\":\"astra-xhigh-effect-080e7d20\",\"note\":\"Native Astra xhigh: recover complete 556-byte staged graphical handler; existing default CFG supports all 227 instructions and 17 calls. No toolkit changes.\"}",
+          "created_at": "2026-11-13T21:47:21Z",
+          "id": 6865728213,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:47:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e664bec5fdbbd9a107e1c2c897c8d76e0c96e8051202e49b643dcd7d16e19214",
+        "result": {
+          "address": "0x080E7D20",
+          "claim_id": 6865728213,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6865728213,
+          "status": "accepted",
+          "who": "astra-xhigh-effect-080e7d20"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c39d796e3d7db2c45958171fbeb672adbbf31fb2e98f5cf27d89b2185fb9958e",
+        "acknowledged_cursor": 6865738969,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c39d796e3d7db2c45958171fbeb672adbbf31fb2e98f5cf27d89b2185fb9958e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002524\",\"who\":\"astra-xhigh-sort-08002524\",\"note\":\"Native Astra xhigh: finish complete 492-byte partition/insertion sort; canonical-thunks-v1 supports full ROM CFG. Existing retained candidate 482/492 diagnostic bytes. No tooling changes.\"}",
+          "created_at": "2026-11-13T21:47:54Z",
+          "id": 6865738969,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:47:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e664bec5fdbbd9a107e1c2c897c8d76e0c96e8051202e49b643dcd7d16e19214",
+        "result": {
+          "address": "0x08002524",
+          "claim_id": 6865738969,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6865738969,
+          "status": "accepted",
+          "who": "astra-xhigh-sort-08002524"
         }
       },
       "release": null
