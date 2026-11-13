@@ -317,6 +317,10 @@ gate diagnostics. `verified` and `progress-stale` events include `status_block`,
 operator may write that exact block to README and `docs/status.md`, commit it,
 and submit the new HEAD. Only `verified` authorizes the session's `push` command.
 The session does not rebase, edit game files, commit, or load saved success JSON.
+After a successful real push, the session remains available for subsequent
+additive candidates and advances its destination lease only to the exact pushed
+commit. Every later push still checks the destination and upstream and uses an
+atomic expected-tip lease. Dry runs retain the prior destination lease.
 EOF or `quit` discards its memory. A new process verifies everything again.
 
 Every candidate is archived and checks source/index uniqueness, complete-body

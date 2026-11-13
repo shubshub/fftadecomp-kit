@@ -327,6 +327,78 @@ class PublicationSessionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "process boundary"):
                 self.verify()
 
+    def test_two_push_protocol_reuses_results_and_advances_exact_lease(self):
+        self.accept_progress()
+        first = self.head
+        second = "d" * 40
+        destination = ["destination", "b" * 40]
+        pushed = []
+
+        def publish(*args, **kwargs):
+            self.assertEqual(kwargs["lease"], tuple(destination))
+            destination[1] = kwargs["commit"]
+            pushed.append(kwargs["commit"])
+            return True
+
+        def commands():
+            yield f"push {first}\n"
+            self.add_source("08000010")
+            self.head = second
+            yield f"verify {second}\n"
+            event = events[-1]
+            self.assertEqual((event["fresh"], event["reused"]), (1, 1))
+            (self.repo / "README.md").write_text(event["status_block"])
+            (self.repo / "docs/status.md").write_text(event["status_block"])
+            yield f"verify {second}\n"
+            yield f"push {second}\n"
+            yield "quit\n"
+
+        from types import SimpleNamespace
+        args = SimpleNamespace(repo=str(self.repo), branch="topic", remote="fork",
+                               session_base="origin/main", jobs=1, worker_processes=0)
+        events = []
+        with patch.object(push, "is_checkout_root", return_value=True), \
+                patch.object(push, "capture_force_lease", side_effect=lambda *a: tuple(destination)), \
+                patch.object(push, "do_push", side_effect=publish), \
+                patch.object(publication, "emit", side_effect=events.append), \
+                patch.object(sys, "stdin", commands()):
+            self.assertEqual(publication.run_session(args), 0)
+        self.assertEqual(pushed, [first, second])
+        self.assertEqual([e["commit"] for e in events if e["event"] == "pushed"], [first, second])
+        self.assertEqual(self.calls, ["08000000", "08000000", "08000010"])
+
+    def test_after_push_stale_destination_and_atomic_failure_keep_lease(self):
+        self.accept_progress()
+        with patch.object(push, "do_push", return_value=True):
+            self.session.publish(self.head)
+        lease = ("destination", self.head)
+        self.assertEqual(self.session.lease, lease)
+        for remote_tip in ("b" * 40, "e" * 40):
+            with patch.object(push, "capture_force_lease", return_value=("destination", remote_tip)), \
+                    patch.object(push, "do_push") as publish:
+                with self.assertRaisesRegex(ValueError, "destination changed"):
+                    self.session.publish(self.head)
+                publish.assert_not_called()
+            self.assertEqual(self.session.lease, lease)
+        self.head = "d" * 40
+        self.accept_progress()
+        with patch.object(push, "capture_force_lease", return_value=lease), \
+                patch.object(push, "do_push", return_value=False):
+            with self.assertRaisesRegex(ValueError, "conditional native push failed"):
+                self.session.publish(self.head)
+        self.assertEqual(self.session.lease, lease)
+
+    def test_dry_push_does_not_advance_destination_lease(self):
+        with patch.dict(os.environ, {"FFTA_PUSH_DRY": "1"}):
+            self.session = publication.VerificationSession(str(self.repo), "topic", "fork", "origin/main")
+            self.accept_progress()
+            lease = self.session.lease
+            with patch.object(push, "do_push", return_value=True) as publish:
+                self.session.publish(self.head)
+                self.session.publish(self.head)
+                self.assertEqual(publish.call_count, 2)
+            self.assertEqual(self.session.lease, lease)
+
     def test_actual_stdin_protocol_routes_through_live_session(self):
         self.accept_progress()
         from types import SimpleNamespace
