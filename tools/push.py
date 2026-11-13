@@ -521,7 +521,20 @@ def main():
     ap.add_argument("--create-from", metavar="REMOTE/BRANCH",
                     help="create an absent destination after checking linear history "
                          "against a freshly fetched base; refuses concurrent creation")
+    ap.add_argument("--publication-session", action="store_true",
+                    help="keep live verification across additive committed candidates; stdin protocol")
+    ap.add_argument("--session-base", metavar="REMOTE/BRANCH",
+                    help="required upstream base for --publication-session")
     args = ap.parse_args()
+    if args.publication_session:
+        if not args.force or not args.session_base or args.kit or args.working_tree or args.create_from or args.check_only:
+            ap.error("--publication-session requires --force --session-base and committed game publication")
+        if args.worker_processes and args.jobs != 1:
+            ap.error("--worker-processes requires --jobs 1")
+        from publication_session import run_session
+        return run_session(args)
+    if args.session_base:
+        ap.error("--session-base requires --publication-session")
     if args.create_from and args.force:
         ap.error("--create-from cannot be combined with --force")
     if args.worker_processes and (args.kit or args.jobs != 1):
