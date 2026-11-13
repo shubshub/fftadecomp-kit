@@ -830,7 +830,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "427b1797cd090b34cbd6d1c4eb0a0ed3fcfe8f47984c7afceb63182913e05e26",
+        "acknowledged_cursor": 6867151680,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "427b1797cd090b34cbd6d1c4eb0a0ed3fcfe8f47984c7afceb63182913e05e26",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801F438\",\"who\":\"claude-ffta2\",\"claim_id\":6847487310,\"reason\":\"parked: Recursive tile-data decoder. Refused: self-recursive call 'call target must be an undefined addressed function'; entry-recursive-ordinary-call-v1 cras\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:04:39Z",
+          "id": 6867135942,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:04:39Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8afa4fa5eafabae9b4fe3c8c27c0566f601f4da500ad9716f03be724eb87014c",
+        "result": {
+          "address": "0x0801F438",
+          "claim_id": 6847487310,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867135942,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -958,7 +986,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "fc8ffd15874b1767a9ada50c67ea84a81440f3527369d4cff1c2e4a11ead95ad",
+        "acknowledged_cursor": 6867151680,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fc8ffd15874b1767a9ada50c67ea84a81440f3527369d4cff1c2e4a11ead95ad",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021854\",\"who\":\"claude-ffta2\",\"claim_id\":6848021797,\"reason\":\"parked: Near miss: prologue copy order (adds r4,r1 before adds r7,r0 in target) and extra adds r1,r0,0 before str [r5,4] after second func_08007138. ~18 shape\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:05:33Z",
+          "id": 6867151680,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:05:33Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8afa4fa5eafabae9b4fe3c8c27c0566f601f4da500ad9716f03be724eb87014c",
+        "result": {
+          "address": "0x08021854",
+          "claim_id": 6848021797,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867151680,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3030,6 +3086,38 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6867109412,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6e71ffd9b87905ab762482a199b4bd69ff7af4ee23131863024f0f316f04a689",
+        "acknowledged_cursor": 6867151680,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6e71ffd9b87905ab762482a199b4bd69ff7af4ee23131863024f0f316f04a689",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FDF90\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
+          "created_at": "2026-11-13T23:04:55Z",
+          "id": 6867139992,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:04:55Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8afa4fa5eafabae9b4fe3c8c27c0566f601f4da500ad9716f03be724eb87014c",
+        "result": {
+          "address": "0x080FDF90",
+          "claim_id": 6867139992,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6867139992,
           "status": "accepted",
           "who": "claude-ffta2"
         }
