@@ -766,7 +766,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "724f0a1965e829646660f9c6e3c28b78defbf880f24b3aa5d10655e60226672e",
+        "acknowledged_cursor": 6851118566,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "724f0a1965e829646660f9c6e3c28b78defbf880f24b3aa5d10655e60226672e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813F934\",\"who\":\"claude-ffta2\",\"claim_id\":6846487236,\"reason\":\"merged in shubshub/fftadecomp#84\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T11:10:34Z",
+          "id": 6851113632,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T11:10:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "11e95ece9e83234ae609d45b538c7790d2832ed77b37c5c84d78582266f753c1",
+        "result": {
+          "address": "0x0813F934",
+          "claim_id": 6846487236,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6851113632,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3000,6 +3028,38 @@
           "request_id": 6851009964,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "03a35b2a8a320cb8dc0b90fc8c78b2a8951742f36aea52acb587a67125ce16de",
+        "acknowledged_cursor": 6851118566,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "03a35b2a8a320cb8dc0b90fc8c78b2a8951742f36aea52acb587a67125ce16de",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812260C\",\"who\":\"astra-query-buffer\",\"note\":\"Complete 354-byte caller under existing conditional-known-query-stack-buffer-v1; new supported native qualification then plausible C\"}",
+          "created_at": "2026-11-13T11:10:49Z",
+          "id": 6851118566,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T11:10:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "11e95ece9e83234ae609d45b538c7790d2832ed77b37c5c84d78582266f753c1",
+        "result": {
+          "address": "0x0812260C",
+          "claim_id": 6851118566,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6851118566,
+          "status": "accepted",
+          "who": "astra-query-buffer"
         }
       },
       "release": null
