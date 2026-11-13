@@ -283,66 +283,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "631fbb52ed1de2129920a3f219ef21055cdfeb52036803b9656f7a83804cb0eb",
-        "acknowledged_cursor": 6842218819,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "631fbb52ed1de2129920a3f219ef21055cdfeb52036803b9656f7a83804cb0eb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811B888\",\"who\":\"match-astra-0811B888\",\"note\":\"Bounded natural C recovery of preserved complete 638-byte event handler; prior attempts retained\"}",
-          "created_at": "2026-11-13T02:42:17Z",
-          "id": 6842218819,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T02:42:17Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ec864009e02c0ffaaba4ab188ac06c1b4f097f3a79b284ad922af416828bd18b",
-        "result": {
-          "address": "0x0811B888",
-          "claim_id": 6842218819,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6842218819,
-          "status": "accepted",
-          "who": "match-astra-0811B888"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "8aad911d67b79ecc840e31cfd426924f4b571affc948868098ccdd52fc402e6d",
-        "acknowledged_cursor": 6842301784,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8aad911d67b79ecc840e31cfd426924f4b571affc948868098ccdd52fc402e6d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811B888\",\"who\":\"match-astra-0811B888\",\"claim_id\":6842218819,\"reason\":\"Complete 638-byte plausible candidate still differs at54 byte positions in state/control base allocation and cleanup scheduling after four additional natural formulations; all evidence preserved\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; natural cast, early-return and state-transition formulations; prior variants preserved\"}",
-          "created_at": "2026-11-13T02:47:40Z",
-          "id": 6842301784,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T02:47:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4dba6cf606ffaf17dfb9b171a6a2430d60aa2b4b03a21897c468551b4502c815",
-        "result": {
-          "address": "0x0811B888",
-          "claim_id": 6842218819,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6842301784,
-          "status": "accepted",
-          "who": "match-astra-0811B888"
-        }
-      }
     }
   ],
   "issue": 66,
