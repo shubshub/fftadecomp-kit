@@ -3515,6 +3515,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "05b9293eddb02dc183630e5c33f36619c6497e4b739ffde3553941b37280a439",
+        "acknowledged_cursor": 6864853829,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "05b9293eddb02dc183630e5c33f36619c6497e4b739ffde3553941b37280a439",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08114F1C\",\"who\":\"astra-xhigh-08114f1c\",\"note\":\"Native Astra xhigh matching 644-byte staged effect controller; parent coordinates publication; no toolkit edits.\"}",
+          "created_at": "2026-11-13T21:03:03Z",
+          "id": 6864853829,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:03:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "571ce4a697ea72aa0c6690f12af478499f9eb71cf5b818bfc68012a70b161a7b",
+        "result": {
+          "address": "0x08114F1C",
+          "claim_id": 6864853829,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6864853829,
+          "status": "accepted",
+          "who": "astra-xhigh-08114f1c"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
