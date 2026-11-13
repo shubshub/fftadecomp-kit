@@ -3294,7 +3294,35 @@
           "who": "astra-080cbdc0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9bd98eb82e99db2ed80117944a9cecc5f94dc2e2aff09116b44019ae995ce171",
+        "acknowledged_cursor": 6861659939,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9bd98eb82e99db2ed80117944a9cecc5f94dc2e2aff09116b44019ae995ce171",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CBDC0\",\"who\":\"astra-080cbdc0\",\"claim_id\":6861415026,\"reason\":\"MATCH: all 370 complete bytes and 167 instructions; natural output array access and byte-sized flag mask.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:33:44Z",
+          "id": 6861654597,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:33:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3a83c04c643f04e63c060119f09b25fbfd27c2044c88d4a66950c3f46450c206",
+        "result": {
+          "address": "0x080CBDC0",
+          "claim_id": 6861415026,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6861654597,
+          "status": "accepted",
+          "who": "astra-080cbdc0"
+        }
+      }
     },
     {
       "claim": {
@@ -3326,7 +3354,35 @@
           "who": "astra-08066ad0"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c163c7dfa1cce5ddef95d7b4c1bd172b2da4ad98b645fd036ca4ec7edfc5e20a",
+        "acknowledged_cursor": 6861659939,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c163c7dfa1cce5ddef95d7b4c1bd172b2da4ad98b645fd036ca4ec7edfc5e20a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08066AD0\",\"who\":\"astra-08066ad0\",\"claim_id\":6861415727,\"reason\":\"Preserved plausible 242/244 match; cancel OR and store register choice remain different after focused natural C variants.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:33:44Z",
+          "id": 6861654586,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:33:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3a83c04c643f04e63c060119f09b25fbfd27c2044c88d4a66950c3f46450c206",
+        "result": {
+          "address": "0x08066AD0",
+          "claim_id": 6861415727,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6861654586,
+          "status": "accepted",
+          "who": "astra-08066ad0"
+        }
+      }
     },
     {
       "claim": {
@@ -3544,6 +3600,38 @@
           "request_id": 6861552501,
           "status": "accepted",
           "who": "astra-xhigh-080e8590"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b59a42dffd5a88b7f05bde1d156249f985f6ace0c4d21331a94e3db73b207681",
+        "acknowledged_cursor": 6861659939,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b59a42dffd5a88b7f05bde1d156249f985f6ace0c4d21331a94e3db73b207681",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08020BA0\",\"who\":\"astra-xhigh-08020ba0\",\"note\":\"Recover complete 512-byte DMA transfer routine; natural lifetime and register allocation matching.\"}",
+          "created_at": "2026-11-13T18:34:00Z",
+          "id": 6861659939,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:34:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3a83c04c643f04e63c060119f09b25fbfd27c2044c88d4a66950c3f46450c206",
+        "result": {
+          "address": "0x08020BA0",
+          "claim_id": 6861659939,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6861659939,
+          "status": "accepted",
+          "who": "astra-xhigh-08020ba0"
         }
       },
       "release": null
