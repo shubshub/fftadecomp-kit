@@ -3514,7 +3514,35 @@
           "who": "astra-xhigh-08028824"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7ddc96cbaa10e539f557a537f3041b194c424efb45f7fe17b86fdc23cc08a801",
+        "acknowledged_cursor": 6862452392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7ddc96cbaa10e539f557a537f3041b194c424efb45f7fe17b86fdc23cc08a801",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08028824\",\"who\":\"astra-xhigh-08028824\",\"claim_id\":6862290762,\"reason\":\"Complete plausible lookup-record handler matched 330 bytes and all 116 instructions using ordinary profile\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T19:11:31Z",
+          "id": 6862452392,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T19:11:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4bdae33b0e8008329de3d833454497b56aabfff82ce0656102238769406a7a30",
+        "result": {
+          "address": "0x08028824",
+          "claim_id": 6862290762,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6862452392,
+          "status": "accepted",
+          "who": "astra-xhigh-08028824"
+        }
+      }
     }
   ],
   "issue": 66,
