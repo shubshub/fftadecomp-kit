@@ -1854,66 +1854,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "be3742622d6d893be76ac34d720562e281990a2d6b41ff3852fb447d97684441",
-        "acknowledged_cursor": 6845931738,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "be3742622d6d893be76ac34d720562e281990a2d6b41ff3852fb447d97684441",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806FABC\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
-          "created_at": "2026-11-13T06:28:28Z",
-          "id": 6845931513,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T06:28:28Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "de348f967b87da3e02b69e6062abdb41ee0935d5b3881333e02d147fba24c878",
-        "result": {
-          "address": "0x0806FABC",
-          "claim_id": 6845931513,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6845931513,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "09aa74599e09237fdb8b8121698c6849807ee3522465484eeb486dcfa9f0c53a",
-        "acknowledged_cursor": 6849253946,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "09aa74599e09237fdb8b8121698c6849807ee3522465484eeb486dcfa9f0c53a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806FABC\",\"who\":\"claude-ffta2\",\"claim_id\":6845931513,\"reason\":\"parked: verifier gap or near miss; recovered C and notes kept for a later kit selector\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T09:31:20Z",
-          "id": 6849253946,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T09:31:20Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6de9c527a44b77d6f48a43ab0f24636e676dd804b69fa6a79f2e51a862f0ed81",
-        "result": {
-          "address": "0x0806FABC",
-          "claim_id": 6845931513,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6849253946,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "c5575122bcf53a09ad19c11a8434b12fc6d9303a0264182b46716b82cf1dcc9e",
         "acknowledged_cursor": 6845931738,
         "body_provenance": "acceptance-time",
