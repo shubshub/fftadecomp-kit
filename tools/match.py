@@ -621,7 +621,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                    allow_switch_constants=False, umodsi3_bindings=None,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                    allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
-                   allow_self_call=False, switch_interposed_pool=False):
+                   allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None):
     """Bind external Thumb calls and explicitly mapped absolute data words.
 
     allow_self_call admits `bl <own entry>` relocations against the function's
@@ -633,13 +633,14 @@ def call_bindings(image, name, address, mapping, rom_size,
     check_switch_pool_opt_in(switch_interposed_pool, allow_switch_data,
                              function_thunks, allow_switch_constants, multiple_switch_profile,
                              double_bindings, signed_runtime_profile, unsigned_runtime_profile,
-                             umod_r1_profile)
+                             umod_r1_profile, unsigned_thunk_profile)
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context
         check_context(multiple_switch_profile, switch_relocations,
             (data_mapping, function_relocations, udivsi3_bindings, modsi3_bindings, divsi3_bindings,
              double_bindings, umodsi3_bindings, ashldi3_bindings, float_bindings,
-             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile, double_index, ashldi3_index, float_index),
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile, double_index, ashldi3_index, float_index,
+             unsigned_thunk_profile),
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants,
              function_thunks, allow_double_data), thunk_pool_words)
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
@@ -649,7 +650,15 @@ def call_bindings(image, name, address, mapping, rom_size,
             function_relocations, switch_relocations, umodsi3_bindings,
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
             (udivsi3_bindings, modsi3_bindings, divsi3_bindings, double_bindings,
-             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile))
+             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile,
+             unsigned_thunk_profile))
+    if unsigned_thunk_profile is not None:
+        from unsigned_thunk_profile import check_link_context as check_unsigned_thunk_context
+        check_unsigned_thunk_context(unsigned_thunk_profile, function_thunks, thunk_pool_words,
+            function_relocations, switch_relocations, udivsi3_bindings, umodsi3_bindings,
+            (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
+            (modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile))
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
                  function_relocations, allow_switch_data, udivsi3_bindings,
@@ -659,7 +668,7 @@ def call_bindings(image, name, address, mapping, rom_size,
     unsigned_divmod.check_link_selector(unsigned_runtime_profile, udivsi3_bindings, umodsi3_bindings,
         (data_mapping, function_relocations, switch_relocations, modsi3_bindings, divsi3_bindings,
          double_bindings, double_index, ashldi3_bindings, ashldi3_index, float_bindings, float_index,
-         signed_runtime_profile, umod_r1_profile),
+         signed_runtime_profile, umod_r1_profile, unsigned_thunk_profile),
         (allow_switch_data, allow_preloaded_switch, allow_switch_constants, function_thunks, allow_double_data))
     if signed_runtime_profile is not None and (
             signed_runtime_profile not in signed_divmod.SCHEMAS or
@@ -673,7 +682,8 @@ def call_bindings(image, name, address, mapping, rom_size,
         raise ValueError("linked calls require a relocatable object and config/functions.json")
     if type(function_thunks) is not bool or function_thunks and (
             function_relocations is None or allow_switch_data or
-            allow_preloaded_switch or udivsi3_bindings is not None or modsi3_bindings is not None or
+            allow_preloaded_switch or udivsi3_bindings is not None and unsigned_thunk_profile is None or
+            modsi3_bindings is not None or
             divsi3_bindings is not None or double_bindings is not None or double_index is not None):
         raise ValueError("function thunks require isolated typed function bindings")
     if type(allow_switch_data) is not bool:
@@ -985,9 +995,11 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
                 raise ValueError("ashldi3 calls require unique undefined global functions")
     if umodsi3_bindings:
-        if udivsi3_bindings and unsigned_runtime_profile is None or modsi3_bindings or divsi3_bindings or double_bindings is not None or \
+        if udivsi3_bindings and unsigned_runtime_profile is None and unsigned_thunk_profile is None or \
+                modsi3_bindings or divsi3_bindings or double_bindings is not None or \
                 (function_relocations or switch_relocations or function_thunks or
-                 any(target in RUNTIME_HELPERS.values() for target in targets.values())) and umod_r1_profile is None:
+                 any(target in RUNTIME_HELPERS.values() for target in targets.values())) and \
+                umod_r1_profile is None and unsigned_thunk_profile is None:
             raise ValueError("unsigned remainder excludes other runtime, switch, function and thunk profiles")
         for target_name in set(targets) - {value[0] for value in data_relocations.values()}:
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
@@ -1027,10 +1039,10 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["bind"] != 1 or definitions[0]["type"] not in (0, 2):
                 raise ValueError("signed remainder calls require unique undefined globals")
     if udivsi3_bindings:
-        if data_relocations or function_relocations or switch_relocations or \
-                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+        if (data_relocations or function_relocations or switch_relocations or
+                any(target in RUNTIME_HELPERS.values() for target in targets.values())) and unsigned_thunk_profile is None:
             raise ValueError("division evidence excludes literal, switch and thunk combinations")
-        for target_name in targets:
+        for target_name in set(targets) - {value[0] for value in data_relocations.values()}:
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
             if len(definitions) != 1 or definitions[0]["value"] or \
                     definitions[0]["section"] or definitions[0]["bind"] != 1 or \
@@ -1084,6 +1096,10 @@ def call_bindings(image, name, address, mapping, rom_size,
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_bindings
         check_link_bindings(calls, targets, data_relocations, function_relocations, switch_relocations, umodsi3_bindings)
+    if unsigned_thunk_profile is not None:
+        from unsigned_thunk_profile import check_link_bindings as check_unsigned_thunk_bindings
+        check_unsigned_thunk_bindings(calls, targets, data_relocations, function_relocations, switch_relocations,
+                                      udivsi3_bindings, umodsi3_bindings)
     return calls, targets, data_relocations
 
 
@@ -1094,25 +1110,25 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           double_bindings=None, function_thunks=False, *,
                           allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
                           allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
-                          switch_interposed_pool=False):
+                          switch_interposed_pool=False, unsigned_thunk_profile=None):
     """Validate exact placement and the linker's complete modification surface."""
     check_switch_pool_opt_in(switch_interposed_pool, allow_switch_data,
                              function_thunks, allow_switch_constants, multiple_switch_profile,
                              double_bindings, signed_runtime_profile, unsigned_runtime_profile,
-                             umod_r1_profile)
+                             umod_r1_profile, unsigned_thunk_profile)
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context
         check_context(multiple_switch_profile, switch_relocations,
             (data_relocations, function_relocations, udivsi3_bindings, modsi3_bindings, divsi3_bindings,
              double_bindings, umodsi3_bindings, ashldi3_bindings, float_bindings,
-             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile),
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile, unsigned_thunk_profile),
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants,
              function_thunks, allow_double_data), thunk_pool_words)
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     unsigned_divmod.check_link_selector(unsigned_runtime_profile, udivsi3_bindings, umodsi3_bindings,
         (data_relocations or None, function_relocations or None, switch_relocations or None,
          modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
-         signed_runtime_profile, umod_r1_profile),
+         signed_runtime_profile, umod_r1_profile, unsigned_thunk_profile),
         (allow_switch_data, allow_preloaded_switch, allow_switch_constants, function_thunks, allow_double_data))
     if unsigned_runtime_profile is not None:
         unsigned_divmod.require_calls(calls, udivsi3_bindings | umodsi3_bindings)
@@ -1122,7 +1138,15 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             function_relocations, switch_relocations, umodsi3_bindings,
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
             (udivsi3_bindings, modsi3_bindings, divsi3_bindings, double_bindings,
-             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile))
+             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile,
+             unsigned_thunk_profile))
+    if unsigned_thunk_profile is not None:
+        from unsigned_thunk_profile import check_link_context as check_unsigned_thunk_context
+        check_unsigned_thunk_context(unsigned_thunk_profile, function_thunks, thunk_pool_words,
+            function_relocations, switch_relocations, udivsi3_bindings, umodsi3_bindings,
+            (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
+            (modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile))
     if signed_runtime_profile is not None and (
             signed_runtime_profile not in signed_divmod.SCHEMAS or
             not divsi3_bindings or not modsi3_bindings or
@@ -1157,7 +1181,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if function_thunks:
         if type(function_thunks) is not bool or \
                 not any(name in function_thunk.ALIASES for name in targets) or \
-                allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None or \
+                allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None and unsigned_thunk_profile is None or \
                 modsi3_bindings is not None or divsi3_bindings is not None or double_bindings is not None:
             raise ValueError("linked function-thunk bindings are incomplete or mixed")
     elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
@@ -1201,6 +1225,10 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_bindings
         check_link_bindings(calls, targets, data_relocations, function_relocations, switch_relocations, umodsi3_bindings)
+    if unsigned_thunk_profile is not None:
+        from unsigned_thunk_profile import check_link_bindings as check_unsigned_thunk_bindings
+        check_unsigned_thunk_bindings(calls, targets, data_relocations, function_relocations, switch_relocations,
+                                      udivsi3_bindings, umodsi3_bindings)
     unsigned_remainder_targets = {name: target for name, target in targets.items()
                                   if umodsi3.reserved(target)}
     if unsigned_remainder_targets:
@@ -1209,9 +1237,11 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                 any(alias != "__umodsi3" or calls.get(site) != umodsi3.ADDRESS
                     for site, alias in umodsi3_bindings.items()) or \
                 set(umodsi3_bindings) != {site for site, target in calls.items() if umodsi3.reserved(target)} or \
-                udivsi3_bindings and unsigned_runtime_profile is None or modsi3_bindings or divsi3_bindings or double_bindings is not None or \
+                udivsi3_bindings and unsigned_runtime_profile is None and unsigned_thunk_profile is None or \
+                modsi3_bindings or divsi3_bindings or double_bindings is not None or \
                 (function_relocations or switch_relocations or function_thunks or
-                 any(target in RUNTIME_HELPERS.values() for target in targets.values())) and umod_r1_profile is None:
+                 any(target in RUNTIME_HELPERS.values() for target in targets.values())) and \
+                umod_r1_profile is None and unsigned_thunk_profile is None:
             raise ValueError("linked unsigned remainder bindings are incomplete or mixed")
     elif umodsi3_bindings:
         raise ValueError("unsigned remainder bindings have no linked runtime")
@@ -1271,14 +1301,15 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                     for site, alias in udivsi3_bindings.items()) or \
                 set(udivsi3_bindings) != {site for site, target in calls.items()
                                           if target == UDIVSI3_ADDRESS} or \
-                data_relocations or function_relocations or switch_relocations:
+                data_relocations and unsigned_thunk_profile is None or function_relocations or switch_relocations:
             raise ValueError("linked division call bindings are incomplete or mixed")
     elif udivsi3_bindings:
         raise ValueError("division bindings have no linked runtime")
     if any(is_udivsi3_address(target) and
            (target_name != "__udivsi3" or target != UDIVSI3_ADDRESS or not udivsi3_bindings)
            for target_name, target in targets.items()) or \
-            udivsi3_bindings and any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+            udivsi3_bindings and unsigned_thunk_profile is None and \
+            any(target in RUNTIME_HELPERS.values() for target in targets.values()):
         raise ValueError("linked division aliases or thunk combinations are unsupported")
     if type(allow_switch_data) is not bool:
         raise ValueError("switch-data binding opt-in must be Boolean")
@@ -1367,7 +1398,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None,
-               allow_self_call=False, switch_interposed_pool=False):
+               allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None):
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_context
@@ -1375,7 +1406,15 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
             function_relocations, switch_relocations, umodsi3_bindings,
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
             (udivsi3_bindings, modsi3_bindings, divsi3_bindings, double_bindings,
-             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile))
+             ashldi3_bindings, float_bindings, signed_runtime_profile, unsigned_runtime_profile,
+             unsigned_thunk_profile))
+    if unsigned_thunk_profile is not None:
+        from unsigned_thunk_profile import check_link_context as check_unsigned_thunk_context
+        check_unsigned_thunk_context(unsigned_thunk_profile, function_thunks, thunk_pool_words,
+            function_relocations, switch_relocations, udivsi3_bindings, umodsi3_bindings,
+            (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
+            (modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile))
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,
@@ -1392,7 +1431,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   unsigned_runtime_profile=unsigned_runtime_profile,
                                                     thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
                                                     allow_self_call=allow_self_call,
-                                                    switch_interposed_pool=switch_interposed_pool)
+                                                    switch_interposed_pool=switch_interposed_pool,
+                                                    unsigned_thunk_profile=unsigned_thunk_profile)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -1433,7 +1473,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   signed_runtime_profile=signed_runtime_profile,
                                   unsigned_runtime_profile=unsigned_runtime_profile,
                                   thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
-                                  switch_interposed_pool=switch_interposed_pool),
+                                  switch_interposed_pool=switch_interposed_pool,
+                                  unsigned_thunk_profile=unsigned_thunk_profile),
             calls, data_relocations)
 
 
@@ -5289,6 +5330,9 @@ def main():
                 if args.function_address_profile == function_thunk.UMOD_R1_SELECTOR:
                     from umod_r1_thunk_profile import prove
                     _, verified_instructions = prove(got, addr, rom, mapping, function_index, calls)
+                elif args.function_address_profile == function_thunk.UNSIGNED_SELECTOR:
+                    from unsigned_thunk_profile import prove as prove_unsigned_thunks
+                    _, verified_instructions = prove_unsigned_thunks(got, addr, rom, mapping, function_index, calls)
                 else:
                     verified_instructions = verify_leaf_instructions(got, addr, True, calls,
                         function_thunk_context={"interposed_words": function_thunk.pool_words(args.function_address_profile)}
