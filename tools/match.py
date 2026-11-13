@@ -2857,6 +2857,7 @@ class BufferCallProof:
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
+    index_policy = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -3924,6 +3925,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     alignment = 2 if thumb else 4
     states = {address: (frozenset({ARM_REG_LR}), (), (), (), (), ())}
     stack_arguments = buffer_proof is not None and buffer_proof.stack_arguments
+    # Variable stack indices are deferred only in the owner a selector's policy names.
+    bounded_index = buffer_proof.index_policy if buffer_proof is not None and thumb and \
+        buffer_proof.index_policy is not None and buffer_proof.index_policy.applies(address, data) else None
     from named_data_buffer_profile import (GuardedAliasBufferProof,
         ConditionalThunkSelectiveScratchBufferProof)
     from nested_formal_output_buffer_profile import NestedSelectiveOutputBufferProof
@@ -3982,6 +3986,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         pointer_slots = dict(states[current][4])
         words = dict(states[current][5])
         word_mode = buffer_proof is not None and buffer_proof.word_provenance
+        if bounded_index is not None and (pointer_slots or words or any(
+                saved_return and not saved_slot for saved_return, saved_slot, _ in stack)):
+            raise ValueError("variable stack indices exclude pointer-bearing or return-carrying local words")
         call_alternatives = None
         operands = instruction.operands
         registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
@@ -4252,10 +4259,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         literal_stack_constants.add(current)
                         alias_constants = {**constants, literal[0]: literal[1]}
                 assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) if thumb else None
+                deferred_derivation = False
                 if ARM_REG_SP in registers and assignment is None:
-                    if stack_pointer_compare_profile is None:
+                    if bounded_index is not None and bounded_index.defer_derivation(instruction, aliases):
+                        deferred_derivation = True
+                    elif stack_pointer_compare_profile is None:
                         raise ValueError("unsupported stack-address materialization")
-                    sp_compare.verify_instruction(instruction)
+                    else:
+                        sp_compare.verify_instruction(instruction)
                 if ARM_REG_PC in registers:
                     raise ValueError("unsupported program-counter materialization")
                 allowed_aliases = {assignment[2]} if assignment is not None else set()
@@ -4328,7 +4339,19 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         offset = aliases[operand.mem.base] + operand.mem.disp
                         if operand.mem.index:
                             if operand.mem.index not in constants:
-                                raise ValueError("stack-alias index is not a known constant")
+                                if bounded_index is None or not bounded_index.defer_access(instruction):
+                                    raise ValueError("stack-alias index is not a known constant")
+                                # Bounds, alignment, initialisation and the recorded runtime
+                                # premise are proved by the stack-index analysis after the CFG.
+                                # The access names no slot, so it skips the per-slot facts below:
+                                # the loop head refuses pointer-bearing and return-carrying local
+                                # words under this policy, a stored return value would need one,
+                                # and no slot-content buffer proof is combined with the policy.
+                                if guarded_live_aliases or instruction.mnemonic.startswith("str") and \
+                                        registers[0] in return_registers:
+                                    raise ValueError("variable stack index store would bypass frame-content facts")
+                                allowed_aliases.add(operand.mem.base)
+                                continue
                             offset += constants[operand.mem.index]
                         if offset % width or not -4 * len(stack) <= offset or offset + width > 0:
                             raise ValueError("stack-alias access is unaligned or outside the tracked frame")
@@ -4383,7 +4406,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                     loaded_alias = (registers[0], pointer_slots[offset])
                         elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
-                if (set(read) & aliases.keys()) - allowed_aliases:
+                if (set(read) & aliases.keys()) - allowed_aliases and not deferred_derivation and not (
+                        bounded_index is not None and bounded_index.defer_derivation(instruction, aliases)):
                     raise ValueError("unsupported stack-alias use or escape")
                 constant = None
                 if thumb and unconditional and instruction.size == 2 and \
@@ -4618,6 +4642,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("software-double runtime cannot be materialized as a literal")
     if switch_data_relocations is not None:
         verify_data_literals(instructions.values(), address, switch_data_relocations)
+    if bounded_index is not None:
+        bounded_index.finish(data, address, instructions.values(), buffer_proof.index_copies())
     if unsigned_quotient_profile is not None:
         if not any((thumb_stack_adjustment(item) or
                     thumb_literal_stack_adjustment(item, data, address) or 0) < 0
@@ -4839,7 +4865,7 @@ def main():
                                                       "conditional-known-query-stack-buffer-v1",
                                                       "conditional-known-query-stack-buffer-unsigned-quotient-v1",
                                                       "named-data-buffer-known-query-callee-v1",
-                                                      "named-data-buffer-rom-table-copy-v1",
+                                                      "named-data-buffer-rom-table-copy-v1", "named-data-buffer-stack-index-v1",
                                                       "conditional-finite-spilled-scalar-loops-v1",
                                                       "bounded-buffer-discarded-return-scratch-v1",
                                                       "bounded-buffer-bios-sqrt-scratch-v1",

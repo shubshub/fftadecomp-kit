@@ -40,6 +40,9 @@ from local_rom_halfword_table_profile import COPY_PATH, COPY_SHA256
 
 SELECTOR = named.ROM_TABLE_COPY_SELECTOR
 SCHEMA = named.ROM_TABLE_COPY_SCHEMA
+# The stack-index selector is this walk plus the explicit variable-index premise contract.
+SELECTORS = (SELECTOR, named.STACK_INDEX_SELECTOR)
+SCHEMAS = (SCHEMA, named.STACK_INDEX_SCHEMA)
 CONTROL_FLOW = ('complete named-data owner with ROM-proved bounded buffer callees and '
                 'constant ROM tables copied into private stack objects by the pinned copy helper')
 HELPER = 0x081443FC

@@ -1370,10 +1370,122 @@ object are ordinary private-frame accesses under the unchanged buffer rules,
 and the object may still be passed to callees that the buffer proof bounds.
 Variable indexing of the stack object is not admitted by this profile: an
 index that is not a known constant still refuses ("unsupported stack-alias use
-or escape"). The report states the conditional premises: immutable source
+or escape"); `named-data-buffer-stack-index-v1` below adds it under reviewed,
+recorded runtime premises. The report states the conditional premises: immutable source
 bytes, live ordinary destination and helper save frame, mutual disjointness and
 no asynchronous modification. No physical stack, readability or C lifetime fact
 is proved.
+
+### Buffer owners that index private stack arrays under reviewed runtime premises
+
+`--owner-runtime-profile named-data-buffer-stack-index-v1` is
+`named-data-buffer-rom-table-copy-v1` plus one rule: a variable index into a
+private stack array. Most such indices are a `u8` parameter, a struct field or
+a callee result, so only the callers bound them and no in-function value range
+can. The ordinary rules refuse them ("unsupported stack-alias use or escape",
+"unsupported stack-address materialization"). The precedent is
+`local-rom-halfword-table-v1`, which proves its owner under the explicit premise
+`(entry_R0 & 255) < 4`. This profile generalises that contract.
+
+```sh
+python tools/match.py --root ../fftadecomp 0x080E3E84 --owner-runtime-profile named-data-buffer-stack-index-v1
+```
+
+**The bound is an unproved runtime premise.** Nothing is inferred from types,
+callers or the callee's contract. For every variable-index access the verifier
+tries, in order:
+
+1. **Proof.** Unsigned intervals with a power-of-two congruence, `cmp` plus
+   conditional-branch refinement and loop widening (the analysis used by
+   `bounded-local-index-v1`) show every byte the access can touch is inside
+   the array. Nothing is assumed and the access is listed under `accesses`.
+2. **Premise.** Otherwise the index must have a *defined source*: an entry
+   register R0-R3, a load through a defined address (a struct field), the value
+   a call returned in R0, or a constant, combined by masks, shifts, adds,
+   subtracts, ors and multiplies. The verifier then records one premise for the
+   site, "whenever this site executes, the unsigned index is below K", and
+   proves the access in bounds *under that premise*. An index reached through a
+   join of different derivations, through a stack slot or through an unmodelled
+   instruction has no defined source and refuses.
+
+A premise constrains the value the index register holds when the site executes.
+Its expression records where that value came from: `u8[(entry_R2 + 1)]@0x080E3FBA`
+is the byte the instruction at 0x080E3FBA read through the entry R2 plus one.
+It is not a claim about memory at any other time, and not necessarily about
+the caller: a row is marked `may be owner-written` when a store through a
+non-stack address, or a call, in the owner can run before one of its loads, so
+the owner itself (or a callee) may have set the value.
+
+**A premise admits nothing until it is reviewed.** The decomp root's
+`config/stack_index_premises.json` holds one entry per function address with a
+written review and the exact rows (site, expression, bound) the reviewer
+checked against the callers:
+
+```json
+{
+  "0x080E3E84": {
+    "review": "phase 0 stores the selector, always 0..2; every caller ...",
+    "rows": [
+      {"site": "0x080E3FC2", "expression": "u8[(entry_R2 + 1)]@0x080E3FBA", "bound": 3},
+      {"site": "0x080E3FD2", "expression": "u8[(entry_R2 + 1)]@0x080E3FCC", "bound": 3}
+    ]
+  }
+}
+```
+
+Without an entry, or with one whose rows differ in any way, the selector
+refuses and prints the generated entry to review and copy. A review that is
+still the `<...>` placeholder, or that says `SCRATCH` or `TODO` in any case,
+refuses, so a validation entry cannot ship. An entry for a
+function that needs no premise refuses too. The accepted entry is bound in the
+evidence and every row carries `premise_proved: false` and
+`discharged_by: config/stack_index_premises.json`; replay re-reads the file, so
+changing the entry, its review text included, invalidates the report.
+
+The report carries one line per premise and the same rows in the evidence JSON.
+Both are part of the fingerprint and replay re-derives them exactly, so a
+removed, edited or duplicated line fails:
+
+```
+* stack index premise: site 0x080E3FC2 index u8[(entry_R2 + 1)]@0x080E3FBA < 3, array sp+0x10..+0x1c (entry_SP-0x30..-0x24) s=4, load width 4, unproved runtime premise, may be owner-written, accepted by config/stack_index_premises.json
+```
+
+The array is the object the compiler addressed. Its start is the
+entry-SP-relative address the access has at index zero. Its end is the nearest
+of the next origin in the function or the top of the frame's local words and,
+for a load, the end of the run of bytes initialised on every path from that
+start: a ROM table copy, an `stm` copy or plain stores. Origins are the
+address-of-local forms `add Rd,sp,#k` and `mov Rd,sp`, ROM copy destinations,
+and every local reloaded at a fixed offset, by `ldr Rd,[sp,#k]`, by a load
+through an exact stack alias (`mov r2,sp; ldrh r1,[r2,#4]`) or by an `ldm`
+from one: a spilled scalar is its own object and no premise may let an index
+range over it. A store alone is not an origin, because agbcc at `-O2` reloads every spill it makes, while
+constant-index element stores (`a[1] = x`) and aggregate copy tails write array
+words through `str Rd,[sp,#k]`. The index of a scaled access (`lsls #2`) is
+stated unscaled with the element size `s`. Every byte of the array must be an
+allocated local word (never a saved register, an incoming argument or below
+SP), and for loads initialised. Every address an admitted index reaches must be
+the index-zero address plus a multiple of the access width, so an access that
+is misaligned on every path refuses even when a premise could bound it. Reads
+and writes are both allowed under the premise; a write through a variable
+address initialises nothing, and it may not store a return-carrying value.
+
+A variable stack address may be copied, moved by an immediate, combined with
+further scalar indices or used as the base of one load or store. It may not be
+stored, pushed, compared, passed in R0-R3 or be live in a return-visible
+register at a return. Escapes of an array's exact address are still the buffer
+proof's business and refuse unless a callee is proved to bound them. Functions
+with pointer-bearing, word-provenance or return-carrying local words are
+outside the policy. The policy applies only to the owner itself, never to
+walked callees.
+
+What the report does not claim: that any caller satisfies a premise (the
+review records that a person checked, nothing proves it; discharging rows at
+the call sites is future work), that the premise is the C array's declared
+length (the extent is the compiler's object, so a source array shorter than its
+object is not detected), the physical stack, source readability or
+termination. The premise lines are the reviewable list of what must hold
+whenever each site runs.
 
 ### Buffer owners whose callees run the known list queries
 
