@@ -3198,7 +3198,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e612786061b4a94da658ab2064e18d2c3cc0137a5ab2e05f49811d0bcde928c3",
+        "acknowledged_cursor": 6856116766,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e612786061b4a94da658ab2064e18d2c3cc0137a5ab2e05f49811d0bcde928c3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081426B8\",\"who\":\"claude-ffta2\",\"claim_id\":6856063596,\"reason\":\"libgcc __divsi3 hand-written assembly (lib1funcs.asm): uses ip, mov pc,lr return, __div0 stub; not compiler output\",\"unmatchable\":true,\"tried\":\"-O2 (not attempted: not compiled C)\"}",
+          "created_at": "2026-11-13T14:39:00Z",
+          "id": 6856116766,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:39:00Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b5b4b3dbbf7a70e287312ffab46ef9744e460e244387417d4ccb7f1b50626031",
+        "result": {
+          "address": "0x081426B8",
+          "claim_id": 6856063596,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6856116766,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
