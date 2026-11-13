@@ -1278,7 +1278,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a741e2d3ce296028f1d45aa5840087d8bc80770dba84814d5e52961b14356bff",
+        "acknowledged_cursor": 6848683771,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a741e2d3ce296028f1d45aa5840087d8bc80770dba84814d5e52961b14356bff",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025584\",\"who\":\"claude-ffta2\",\"claim_id\":6845214695,\"reason\":\"parked: verifier gap or near miss; recovered C and notes kept for a later kit selector\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:04:44Z",
+          "id": 6848674392,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:04:44Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1c730b39f48dc7bdcb09c22fe2404b254b2629827d6e3e2a119becbb6f06a430",
+        "result": {
+          "address": "0x08025584",
+          "claim_id": 6845214695,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6848674392,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -5946,7 +5974,35 @@
           "who": "astra-byvalue-08127bc4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d68fdbdf0e59a0061f9cbee327ad869ef1dc1373f85d7cf12f3222f3d4f73b91",
+        "acknowledged_cursor": 6848683771,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d68fdbdf0e59a0061f9cbee327ad869ef1dc1373f85d7cf12f3222f3d4f73b91",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08127BC4\",\"who\":\"astra-byvalue-08127bc4\",\"claim_id\":6848554513,\"reason\":\"Read-only by-value matching task prepared; no new C authored. Releasing while verified publication completes so the address is not held idle.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:05:07Z",
+          "id": 6848683771,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:05:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1c730b39f48dc7bdcb09c22fe2404b254b2629827d6e3e2a119becbb6f06a430",
+        "result": {
+          "address": "0x08127BC4",
+          "claim_id": 6848554513,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6848683771,
+          "status": "accepted",
+          "who": "astra-byvalue-08127bc4"
+        }
+      }
     },
     {
       "claim": {
@@ -5978,7 +6034,35 @@
           "who": "astra-byvalue-08127c54"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "1e46701b513933d5a64ae91509af0bea28d311613e8d2a666efe6fc7b08a338e",
+        "acknowledged_cursor": 6848683771,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1e46701b513933d5a64ae91509af0bea28d311613e8d2a666efe6fc7b08a338e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08127C54\",\"who\":\"astra-byvalue-08127c54\",\"claim_id\":6848558342,\"reason\":\"Read-only by-value matching task prepared; no new C authored. Releasing while verified publication completes so the address is not held idle.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:05:07Z",
+          "id": 6848683709,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:05:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1c730b39f48dc7bdcb09c22fe2404b254b2629827d6e3e2a119becbb6f06a430",
+        "result": {
+          "address": "0x08127C54",
+          "claim_id": 6848558342,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6848683709,
+          "status": "accepted",
+          "who": "astra-byvalue-08127c54"
+        }
+      }
     },
     {
       "claim": {
