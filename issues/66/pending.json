@@ -1882,7 +1882,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8c5ceba0d03bb1317a070c372968bd3fc8e16c6876edb2dabef0b52a1f1293c2",
+        "acknowledged_cursor": 6867102605,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8c5ceba0d03bb1317a070c372968bd3fc8e16c6876edb2dabef0b52a1f1293c2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DAB8\",\"who\":\"claude-ffta2\",\"claim_id\":6849152790,\"reason\":\"parked: Bytes identical. CpuSet fill from local u16 + one incoming stack word. addressed-native-bios-fill-readonly-two-words-v1 (used by sibling 0800D95C) req\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:02:03Z",
+          "id": 6867093227,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:02:03Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b75039d74c128899df85f416935085afc46989ff87ce9a536c330ca2f4f00c67",
+        "result": {
+          "address": "0x0800DAB8",
+          "claim_id": 6849152790,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867093227,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3162,7 +3190,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a4d5ab85c36be02db72ea3eb7d5507856ade0fc3cf327aaf58481d6c73788b78",
+        "acknowledged_cursor": 6867102605,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a4d5ab85c36be02db72ea3eb7d5507856ade0fc3cf327aaf58481d6c73788b78",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FEBDC\",\"who\":\"claude-ffta2\",\"claim_id\":6867025231,\"reason\":\"parked: byte-identical, verifier gap (stack-index + buffer callee 080DBDC8)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:02:38Z",
+          "id": 6867102605,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:02:38Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b75039d74c128899df85f416935085afc46989ff87ce9a536c330ca2f4f00c67",
+        "result": {
+          "address": "0x080FEBDC",
+          "claim_id": 6867025231,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867102605,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
