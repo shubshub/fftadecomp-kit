@@ -853,8 +853,8 @@ The existing local-word bounds, alignment, pointer-slot overlap and escape
 checks still apply. Version 1 continues to reject all register-indexed accesses.
 
 Register and slot joins conservatively retain a pointer that is present on
-either path. Different possible offsets for the same register or slot remain
-unsupported. Inspected callees may return buffer aliases in `r0`–`r3` or `r12`;
+either path. Different possible offsets for the same register cannot be
+joined; the callee is then replayed path by path (below). Inspected callees may return buffer aliases in `r0`–`r3` or `r12`;
 the caller receives those possible aliases instead of treating those registers
 as pointer-free. Subsequent uses require the same bounds and escape checks.
 Aliases in unrestored callee-saved registers, local-frame pointer returns,
@@ -867,6 +867,50 @@ bound and replayed as above. The ordinary ABI assumptions still apply, and
 combined named data relocations, block transfers, interrupts and indirect-call
 dependencies remain unsupported. A proved output-buffer call alone does not
 admit a caller whose later stale-argument or local-buffer calls cannot be proved.
+
+### Bounded loop replay of buffer callees
+
+A callee that stores `*out++` inside a loop reaches its loop head with different
+offsets for the same pointer register, and the join above refuses it. When that
+join conflict is the only obstacle, the callee is replayed path by path instead
+of joined: every reachable state is kept separately, so each store is checked at
+its exact offset against the caller's allocated local words with the same
+alignment, saved-slot, overlap and escape rules. A replayed path that reaches a
+store outside the allocation refuses, naming the store and caller SP offset:
+
+```
+buffer callee 0x0812E4F4: bounded loop replay at 0x0812E540: 2-byte strh at caller sp+4: buffer access is unaligned or outside allocated local words
+```
+
+Loops end only through exact facts. The replay tracks R0-R12 values produced by
+unconditional 16-bit `mov`, `add` and `sub` of known values and immediates (32-bit
+wrap), and the operand pair of the last `cmp` whose operands are both known.
+A conditional branch with known flags follows only its taken or fallthrough
+side. Any other write forgets the register; any other flag-setting instruction
+or call forgets the flags; a call forgets R0-R3, R12 and LR. Values in R4-R11
+survive calls under the returning-ABI premise this proof already uses for
+aliases. Nothing is widened: if no exact counter bounds the loop, the pointer
+keeps moving until a store leaves the buffer, or the replay exhausts its budget
+(4,096 states per callee, 65,536 per proof) and refuses. Different stack depths
+at the same address still refuse.
+
+The replay applies only to the plain buffer proofs. Profiles with callee frames,
+word provenance, single-word stores or exact alternatives keep the join
+refusal. Only replayed callees change the evidence: the buffer proof fingerprint
+then also binds each replayed callee's call site, argument offsets and the exact
+set of caller-frame bytes it may write, so report replay recomputes it. Proofs
+without a replay keep their previous fingerprint.
+
+The ROM bounds a loop's trip count, not the data that decides each iteration.
+`0812E4F4` runs five iterations and may store up to five halfwords
+(`out[0..5)`, ten bytes). Its stack callers pass a `u16[2]`; when that array is
+the top allocated word (`0812F5E0`, `0812C8DC`, `080BDECC` and others) the third
+store would reach a saved register and the caller is refused. That at most two
+entries pass the filter is a property of game data and is not proved here. A
+caller with ten allocated bytes from the array (`080BE8E0`, array at `sp+0x14` of
+a 44-byte frame) is admitted, and the bound write set then covers its spilled
+locals at `sp+0x18` and `sp+0x1C`. As stated above, the bounds are allocated
+stack words, not C objects.
 
 ### Function literals with bounded buffer calls
 
