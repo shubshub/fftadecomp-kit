@@ -1935,11 +1935,16 @@ symbolically along every path, and the check requires:
     may also move unrelated register operations in (0813F934, 0813F9F8:
     `movs r0, #0; mov r8, r0` for a later value): an operation outside the
     backward slice of the store's operands is admitted if it touches no
-    memory beyond a literal pool, is live (its result reaches a store
-    outside the frame, a named call argument or a branch's flags) and
-    writes neither a register the store reads nor sp/pc (an immediate `mov`, as before, may write one that the
-    store's own operands later overwrite). Nothing in between may read the loaded value, and no
-    memory access, call or conditional branch may intervene;
+    memory beyond a literal pool, is live on every explored path (its
+    result reaches a store outside the frame, a named call argument or a
+    branch's flags) and writes neither a register the store reads nor sp/pc
+    (an immediate `mov`, as before, may write one that the store's own
+    operands later overwrite). Nothing in between may read the loaded value,
+    and no memory access, call or conditional branch may intervene. Before
+    a store of the member's all-ones value, once the permuted compile allows
+    such a store to lack its load, the window keeps only the narrower forms:
+    agbcc may fold that store's own load away (081175D4 keeps it), so a
+    dead load before one may be planted;
   - a **chained re-read** for `a = (b = v)`: a load of the member, at its
     width, whose store is the immediately preceding memory access, with only
     register arithmetic in between, whose value reaches, through copies only,

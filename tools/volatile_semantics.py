@@ -1736,8 +1736,11 @@ def live(records, position, step):
         if later.kind == "branch" and not later.unconditional and flags:
             return True
         uses = later.reads & tainted
-        if later.kind == "call" and uses - later.guarded:
-            return True                  # only the prototype's arguments are compared
+        # only the prototype's arguments are compared; an authenticated
+        # local fill compares the bytes behind r0, not the pointer
+        unseen = later.guarded | ({"r0"} if later.local_fill_premise else set())
+        if later.kind == "call" and uses - unseen:
+            return True
         if later.kind == "store" and uses and not is_stack(later.address):
             return True                  # a frame slot is no use unless it escapes
         tainted -= later.writes
@@ -1750,7 +1753,7 @@ def live(records, position, step):
     return False
 
 
-def read_modify_write_store(records, position, address, width):
+def read_modify_write_store(records, position, address, width, unloaded_all_ones=False):
     """the position of the store this dead load belongs to, or None.
 
     agbcc computes a volatile bit-field store's value before the
@@ -1771,9 +1774,14 @@ def read_modify_write_store(records, position, address, width):
     an operation outside the backward slice of the store's operands is
     admitted if it is register-only, live (its result reaches a store, a
     call or a conditional branch along the path - see live) and writes
-    neither a register the store reads nor sp/pc. No instruction in between may read the dead value before
-    it is overwritten, and every operation in the slice must still be one of
-    the forms above, so the store's value and address are built before the load.
+    neither a register the store reads nor sp/pc. No instruction in between
+    may read the dead value before it is overwritten, and every operation in
+    the slice must still be one of the forms above, so the store's value and
+    address are built before the load.
+    Not before a store of the member's all-ones value once unloaded_all_ones
+    holds, though: agbcc may fold that store's own load away (081175D4 keeps
+    it), so a dead load before one may be planted, and the window keeps the
+    narrower rules above rather than admitting scheduled-in work.
     A same-member OR may follow its insertion read only under the separate
     bounded authentication in separated_or_store.
     Anything else in between - arithmetic on unknown values feeding the
@@ -1783,7 +1791,7 @@ def read_modify_write_store(records, position, address, width):
     separated = separated_or_store(records, position, address, width)
     if separated is not None:
         return separated
-    between, loaded = [], set(records[position].writes)
+    between, places, loaded = [], [], set(records[position].writes)
     for later in range(position + 1, len(records)):
         record = records[later]
         if record.kind == "branch" and record.unconditional:
@@ -1804,7 +1812,8 @@ def read_modify_write_store(records, position, address, width):
                 return found
             operands, value = feeding(record.reads), feeding({record.value_register})
             slice_ = feeding(record.reads, through_all=True)
-            for step in between:
+            all_ones = unloaded_all_ones and record.value == (1 << 8 * width) - 1
+            for place, step in zip(places, between):
                 if step.immediate:
                     continue
                 if step.index not in slice_:
@@ -1812,8 +1821,8 @@ def read_modify_write_store(records, position, address, width):
                     # mov r8, r0`): a pure register operation that feeds no
                     # operand of the store, leaves its registers alone and
                     # is live - its result or its flags have a later reader
-                    if step.writes & (record.reads | {"sp", "pc"}) or \
-                            not live(records, records.index(step), step):
+                    if all_ones or step.writes & (record.reads | {"sp", "pc"}) or \
+                            not live(records, place, step):
                         return None
                 elif not (step.kind == "literal" or step.copy or step.constant):
                     return None                      # the store's operands are built before the load
@@ -1830,6 +1839,7 @@ def read_modify_write_store(records, position, address, width):
             return None
         loaded -= record.writes
         between.append(record)
+        places.append(later)
     return None
 
 
@@ -2111,7 +2121,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         "prototype does not name; no prototype is trusted to list every argument, "
                         "so the load must be overwritten before the call")
                 if verdict:
-                    store = read_modify_write_store(records, position, record.address, record.width)
+                    store = read_modify_write_store(records, position, record.address, record.width,
+                                                    unloaded_all_ones)
                     # one store explains one load; a second dead load in the
                     # window already refuses, so the second test is defence in depth
                     if store is None or store in explained_stores:
