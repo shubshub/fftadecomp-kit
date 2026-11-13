@@ -1933,7 +1933,17 @@ symbolically along every path, and the check requires:
   escaping pointer and re-snapshotted at each escape. That includes slots
   in the incoming-argument area. Every callee needs a file-scope prototype
   with a fixed argument list. A callee with no prototype, `()` or `...`
-  fails closed, and so does an indirect call. Every parameter and return
+  fails closed. An indirect call (`bl _call_via_rN`) is compared like a
+  named one only when rN holds a word loaded from an element of a
+  file-scope function-pointer object or array whose declared type (a
+  unique direct typedef or a direct `R (*name[N])(params)` declarator) is
+  such a prototype, every use of that object in a body is a direct call
+  `name[K](...)` (or `name(...)`) with a literal index and the prototype's
+  argument count, and rN is not one of those argument registers. Casts,
+  copies, `(*name[K])`, computed indices and unprototyped or variadic
+  pointer types fail closed. The call stays opaque and an ordered barrier,
+  and the report adds `indirect calls typed by declaration: name as N
+  arguments`. Every parameter and return
   value must be one scalar or pointer word, so `long long`, `double` and
   struct-by-value fail closed. The arguments, stack words included, are
   compared by that count. No prototype is trusted to name every register
@@ -2081,7 +2091,7 @@ out-of-bounds subscript store, which is not adjacent to its store;
 `g(sym.x - sym.x)` and `sym.y = sym.x` long after `sym.x` was stored, which
 add a read; and `sym.x |= 0;`, `sym.x = sym.x;`, `sym.x ^= 0;` and
 `sym.x &= 0xFF;`, which are self-assignments. Code the executor does not
-model fails closed with a reason: ARM code, computed jumps, indirect calls,
+model fails closed with a reason: ARM code, computed jumps, untyped indirect calls,
 loops whose exit depends on unknown values, more than 256 paths, and
 prototypes that are missing, `()`, variadic, inconsistent, not one word per
 parameter, or too complex to read at file scope. Because the
@@ -2200,7 +2210,8 @@ has these gaps:
   addressing forms and transfers fail closed.
 
 Focused checks: `PYTHONDONTWRITEBYTECODE=1 python tests/test_plausible_volatile_allowlist.py` and
-`PYTHONDONTWRITEBYTECODE=1 python tests/test_volatile_semantics.py` (the latter compiles with agbcc when it is installed).
+`PYTHONDONTWRITEBYTECODE=1 python tests/test_volatile_semantics.py` (the latter compiles with agbcc when it is installed);
+`python -m unittest discover -s tests -p 'test_volatile_indirect_calls.py'` covers typed indirect calls.
 
 It handles the compiler stage as `cc -> .s`, so it works with a classic cc1
 (GCC 2.9 / agbcc), with modern gcc and with clang:
