@@ -109,7 +109,8 @@ class UnsignedRuntimeCoexistenceTests(unittest.TestCase):
         self.assertEqual(right['match.py'], digest)
         self.assertIn('umod_r1_thunk_profile.py', left)
         self.assertIn('unsigned_divmod_profile.py', right)
-        self.assertEqual(set(thunks.SELECTORS), {thunks.SELECTOR, thunks.ZERO_SELECTOR, r1.SELECTOR})
+        self.assertEqual(set(thunks.SELECTORS), {thunks.SELECTOR, thunks.ZERO_SELECTOR, r1.SELECTOR,
+                                                thunks.INTERPOSED_SELECTOR, thunks.UNSIGNED_SELECTOR})
         self.assertEqual(thunks.schema_for(thunks.SELECTOR), thunks.SCHEMA)
         self.assertEqual(thunks.schema_for(thunks.ZERO_SELECTOR), thunks.ZERO_SCHEMA)
         # Both forwarding paths remain in actual integrated lifecycle sources.

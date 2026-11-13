@@ -658,7 +658,8 @@ def call_bindings(image, name, address, mapping, rom_size,
             function_relocations, switch_relocations, udivsi3_bindings, umodsi3_bindings,
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
             (modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
-             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile))
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile,
+             double_index, ashldi3_index, float_index))
     from switch_constants_profile import check_opt_in
     check_opt_in(allow_switch_constants, switch_relocations, data_mapping,
                  function_relocations, allow_switch_data, udivsi3_bindings,
@@ -1414,7 +1415,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
             function_relocations, switch_relocations, udivsi3_bindings, umodsi3_bindings,
             (allow_switch_data, allow_preloaded_switch, allow_switch_constants, allow_double_data),
             (modsi3_bindings, divsi3_bindings, double_bindings, ashldi3_bindings, float_bindings,
-             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile))
+             signed_runtime_profile, unsigned_runtime_profile, umod_r1_profile,
+             double_index, ashldi3_index, float_index))
     name = f"func_{address:08X}"
     calls, targets, data_relocations = call_bindings(original, name, address, mapping,
                                                     rom_size, rom_image, data_mapping,

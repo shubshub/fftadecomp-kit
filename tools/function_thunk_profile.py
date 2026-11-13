@@ -273,8 +273,9 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, objec
     preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
     namespace(preprocessed)
     if selector == UNSIGNED_SELECTOR:
-        from unsigned_thunk_profile import namespace as unsigned_namespace
+        from unsigned_thunk_profile import namespace as unsigned_namespace, compiled as unsigned_compiled
         unsigned_namespace(preprocessed)
+        unsigned_compiled(runner.read_binary(f"{workspace}/f.s").decode("utf-8"), original, address)
     expected_switch = {}
     expected_calls, expected_functions, expected_literals = original_bindings(
         original, address, mapping, rom, objects, switch_relocations=expected_switch, selector=selector)

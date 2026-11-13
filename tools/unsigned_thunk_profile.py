@@ -20,6 +20,13 @@ HARDWARE = (0x04000000, 0x08000000)
 # an ordinary declaration a reserved ELF symbol name.
 RESERVED = r'_call_via_|\b(?:__udivsi3|__umodsi3|__divsi3|__modsi3)\b'
 ASM = r'\b(?:__asm__|__asm|asm)\b'
+# alias and weak attributes let a declaration take another symbol's ELF
+# identity; the compiler then emits it as an assembler symbol assignment.
+ATTRIBUTE = r'\b__attribute(?:__)?\b'
+ALIASING = r'\b_*(?:alias|weak)_*\b'
+# Symbol assignment and weak directives in the compiler's assembly, so an
+# alias is refused however the C spells it.
+DIRECTIVE = r'(?:^|[\s;:])\.(?:set|thumb_set|equ|equiv|eqv|weak|weakref)\b'
 
 
 def namespace(preprocessed):
@@ -29,6 +36,27 @@ def namespace(preprocessed):
     if type(preprocessed) is not str or '\0' in preprocessed or \
             re.search(RESERVED, preprocessed) or re.search(ASM, strip_comments_and_strings(preprocessed)):
         raise ValueError('unsigned thunk runtime, call-via and asm-label spellings are reserved for compiler emission')
+    code = strip_comments_and_strings(preprocessed)
+    for attribute in re.finditer(ATTRIBUTE, code):
+        start = position = attribute.end()
+        depth = 0
+        while position < len(code):
+            depth += {'(': 1, ')': -1}.get(code[position], 0)
+            position += 1
+            if depth == 0 and code[start:position].strip():
+                break
+        if re.search(ALIASING, code[start:position]):
+            raise ValueError('unsigned thunk sources cannot use alias or weak attributes')
+
+
+def compiled(assembly, image, address):
+    """The compiler's assembly assigns no symbols and the object defines only the caller."""
+    name = f'func_{address:08X}'
+    if type(assembly) is not str or re.search(DIRECTIVE, assembly, re.M):
+        raise ValueError('unsigned thunk assembly cannot assign or weaken symbols')
+    exported = [symbol['name'] for symbol in image['symbols'] if symbol['section'] and symbol['bind'] != 0]
+    if exported != [name]:
+        raise ValueError('unsigned thunk object must define only its caller as a global symbol')
 
 
 def check_link_context(selector, thunks, words, functions, switches, quotient, remainder, flags, contexts):
