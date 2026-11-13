@@ -3134,66 +3134,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "b76ceb51356bf137961305c5d44142f7b40c1c5977cca218e56bd91f00a9c428",
-        "acknowledged_cursor": 6863410167,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b76ceb51356bf137961305c5d44142f7b40c1c5977cca218e56bd91f00a9c428",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080012BC\",\"who\":\"astra-xhigh-080012bc\",\"note\":\"Recover complete 524-byte DMA/OAM setup, existing hardware register types and native ordinary profile only; no toolkit edits.\"}",
-          "created_at": "2026-11-13T19:57:53Z",
-          "id": 6863410161,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T19:57:53Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4ab7c1904526247a8c1abdb49f29e47ac74e29f93b3d6754443a0eeb48857b8f",
-        "result": {
-          "address": "0x080012BC",
-          "claim_id": 6863410161,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6863410161,
-          "status": "accepted",
-          "who": "astra-xhigh-080012bc"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "e7f49e4ee159ee5390a1cc02be701d53b45cf73f261ba35c8f5228f034da05d0",
-        "acknowledged_cursor": 6863786962,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e7f49e4ee159ee5390a1cc02be701d53b45cf73f261ba35c8f5228f034da05d0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080012BC\",\"who\":\"astra-xhigh-080012bc\",\"claim_id\":6863410161,\"reason\":\"Complete plausible524-byte DMA body retained; native mismatch416/524 positionalbytes, DMA register lifetimes/instruction ordering remain after21natural attempts. No verifier or tool change.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-11-13T20:15:39Z",
-          "id": 6863786962,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T20:15:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0fa7f9600ee4cb2e371297c55a7a9d9048a0f21ea35f0dcc710b538dbf178db2",
-        "result": {
-          "address": "0x080012BC",
-          "claim_id": 6863410161,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6863786962,
-          "status": "accepted",
-          "who": "astra-xhigh-080012bc"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "80ce1a838668f75ac3f9c853d7b099459d36e1d7b29cc4f1a7f02f09ec99a0cb",
         "acknowledged_cursor": 6863460380,
         "body_provenance": "acceptance-time",
