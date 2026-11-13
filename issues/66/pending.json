@@ -222,7 +222,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "86d7cdd498c4c82db4dd02c60dcee7d74accedbffb8e934af77993c6180283c3",
+        "acknowledged_cursor": 6867617740,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "86d7cdd498c4c82db4dd02c60dcee7d74accedbffb8e934af77993c6180283c3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814553C\",\"who\":\"claude-ffta2\",\"claim_id\":6848542553,\"reason\":\"parked: Bytes identical (sound-state init). Needs index row 081465E4 081465E8 4 2 return (bx lr stub as function literal) and data_02008E60. Refused: 'stack a\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:33:39Z",
+          "id": 6867617740,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:33:39Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "941fe65836fa2c26cac5425ef3c555e6867aab54ae3c1aaed97c65da60db4543",
+        "result": {
+          "address": "0x0814553C",
+          "claim_id": 6848542553,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867617740,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
