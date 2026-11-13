@@ -3234,66 +3234,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "40e1ed0ff339035630aa08af6bae83c4ba03193a706411408836ec60978c22e3",
-        "acknowledged_cursor": 6862044835,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "40e1ed0ff339035630aa08af6bae83c4ba03193a706411408836ec60978c22e3",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811CA70\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
-          "created_at": "2026-11-13T18:51:28Z",
-          "id": 6862029566,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T18:51:28Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6c697ed62a5aea3520cc8451e33779e0e50e562ffac1c872852bad1f075a2126",
-        "result": {
-          "address": "0x0811CA70",
-          "claim_id": 6862029566,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6862029566,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "98483d1cecb2a3d5dbfa6d8156da749e83f9c37253f84b776cfdc37cadfb8948",
-        "acknowledged_cursor": 6862112377,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "98483d1cecb2a3d5dbfa6d8156da749e83f9c37253f84b776cfdc37cadfb8948",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811CA70\",\"who\":\"claude-ffta2\",\"claim_id\":6862029566,\"reason\":\"byte-identical, parked on stack-index+BgAffineSet composition gap\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T18:55:22Z",
-          "id": 6862112377,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T18:55:22Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5066e364b90fa86376ce8b285840abfb33dd5a868efa7bc54faf5337e4df47a1",
-        "result": {
-          "address": "0x0811CA70",
-          "claim_id": 6862029566,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6862112377,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "5c3cbae5ddb621a41785ff0ddb86aa9bf415df293a58dbe557fb454273259e89",
         "acknowledged_cursor": 6862044835,
         "body_provenance": "acceptance-time",
