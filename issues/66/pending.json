@@ -958,7 +958,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9aab1f9c5c3b09d9ffb7627074e2133ba457ffcdc69bc8824b6bdf4d031d6b24",
+        "acknowledged_cursor": 6867376522,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9aab1f9c5c3b09d9ffb7627074e2133ba457ffcdc69bc8824b6bdf4d031d6b24",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3508\",\"who\":\"claude-ffta2\",\"claim_id\":6849012152,\"reason\":\"parked: Bytes identical. Needs data_08395280. Scheduler caller: two table paths into one shared func_08005954 call + function literal func_080E2398 on one pat\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:18:59Z",
+          "id": 6867376522,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:18:59Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "327537565b7f10b75cd5fd49616ee2111116dc5b4979db49419dfa54a766ec55",
+        "result": {
+          "address": "0x080D3508",
+          "claim_id": 6849012152,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867376522,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
