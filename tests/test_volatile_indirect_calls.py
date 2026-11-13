@@ -86,6 +86,33 @@ class SignatureTests(unittest.TestCase):
                 self.assertIn(reason, self.signature(source(call=call)))
         sized = 'typedef void (*Callback)(void *, u32);\nextern Callback g_cb[2];\n'
         self.assertIn('outside the array', self.signature(source(sized, 'g_cb[2](0, 5);')))
+        # a block-scope redeclaration could carry another type
+        self.assertIn('other than as a direct call', self.signature(source(
+            call='{ extern void (*g_cb[])(void *, u32, u32); g_cb[0](0, 5, 6); }')))
+
+    def test_multiword_arguments_are_refused(self):
+        for parameters in ('double', 'void *, long long', 'unsigned long long', 'S', 'struct s'):
+            for declarations in (f'typedef struct {{ int a; }} S;\ntypedef void (*Callback)({parameters});\n'
+                                 'extern Callback g_cb[];\n',
+                                 f'typedef struct {{ int a; }} S;\nextern void (*g_cb[])({parameters});\n'):
+                with self.subTest(declarations=declarations):
+                    self.assertIn('not a prototyped function pointer',
+                                  self.signature(source(declarations, 'g_cb[0](x);')))
+
+    def test_indices_are_read_as_c_reads_them(self):
+        octal = 'typedef void (*Callback)(void *, u32);\nextern Callback g_cb[010];\n'
+        self.assertEqual(self.signature(source(octal, 'g_cb[07](0, 5);')), (False, 2, 8))
+        self.assertEqual(self.signature(source(octal, 'g_cb[0x7u](0, 5);')), (False, 2, 8))
+        self.assertIn('outside the array', self.signature(source(octal, 'g_cb[010](0, 5);')))
+        self.assertIn('other than as a direct call', self.signature(source(octal, 'g_cb[08](0, 5);')))
+        self.assertIsInstance(self.signature(source(octal.replace('010', '09'))), str)
+
+    def test_argument_commas_are_counted_only_at_the_outer_level(self):
+        self.assertEqual(self.signature(source(call='g_cb[0](t[0, 1], 5);')), (False, 2, 0))
+        self.assertEqual(self.signature(source(call='g_cb[0]((T){0, 1}, 5);')), (False, 2, 0))
+        self.assertEqual(self.signature(source(call='g_cb[0]((c ? 1, 2 : 3), 5);')), (False, 2, 0))
+        self.assertIn('cannot be read', self.signature(source(call='g_cb[0](c ? 0, 5 : 6);')))
+        self.assertIn('cannot be read', self.signature(source(call='g_cb[0](t[0, 5);')))
         disagree = TYPEDEF + 'extern void (*g_cb[])(void *, u32, u32);\n'
         self.assertIn('disagree', self.signature(source(disagree)))
 
@@ -132,6 +159,38 @@ class IndirectCallTests(unittest.TestCase):
                      preprocessed=source(three, 'g_cb[0](0, 5, 6);'))
         self.refused('passes 1 arguments to its 2-argument prototype',
                      preprocessed=source(call='g_cb[0](0);'))
+
+    def test_string_literals_cannot_hide_or_forge_a_declaration(self):
+        # agbcc reads `(double, int)`: three words; the literals would show `(int, int)`
+        forged = ('char a[] = "{"; extern void (*g_cb[4])(double, int); '
+                  'char b[] = "}; extern void (*g_cb[4])(int, int); char c[] = ";\n')
+        self.refused('not a prototyped function pointer', preprocessed=source(forged, 'g_cb[0](0, 5);'))
+        # the same for a named callee's prototype
+        named = assembly('push\t{lr}', *STORE, 'mov\tr0, #0', 'mov\tr1, #5', 'bl\tk', 'pop\t{r0}', 'bx\tr0')
+        text = ('char a[] = "{"; extern void k(double, int); '
+                'char b[] = "}; extern void k(int, int); char c[] = ";\n'
+                'void func_08028C34(void)\n{\n    k(0, 5);\n}\n')
+        self.refused('not one scalar or pointer word', named,
+                     named.replace('ldrb\tr1, [r3]\n\t', ''), text)
+        self.assertEqual(compare(named, named.replace('ldrb\tr1, [r3]\n\t', ''),
+                                 text.replace('double', 'int'))[0][1], 1)
+        # a ';' inside a character literal does not split a declaration either
+        quoted = "char d = ';';\n" + TYPEDEF
+        self.assertEqual(compare(preprocessed=source(quoted))[0][1], 1)
+
+    def test_an_unreadable_unrelated_declaration_does_not_abort(self):
+        deep = 'extern void (*other)(int (((((((((x))))))))));\n'
+        real = REAL.replace('.word\tg_cb\n', '.word\tg_cb\n\t.word\tother\n')
+        self.assertEqual(compare(real, real.replace('ldrb\tr1, [r3]\n\t', ''),
+                                 source(TYPEDEF + deep))[0][1], 1)
+        called = real.replace('.L3+4', '.L3+8')
+        self.refused('nesting exceeds bound', called, called.replace('ldrb\tr1, [r3]\n\t', ''),
+                     source(TYPEDEF + deep))
+
+    def test_call_via_lr_is_refused(self):
+        real = REAL.replace('ldr\tr2, [r2]', 'ldr\tr2, [r2]\n\tmov\tlr, r2').replace(
+            '_call_via_r2', '_call_via_lr')
+        self.refused('through lr is not modelled', real, real.replace('ldrb\tr1, [r3]\n\t', ''))
 
     def test_the_thunk_register_must_hold_the_pointer_value(self):
         for replacement in ('ldr\tr2, .L3+4\n\tadd\tr2, r2, #0',      # the table address itself
