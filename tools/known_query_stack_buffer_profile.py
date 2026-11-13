@@ -85,7 +85,10 @@ EXPLICIT_CONDITIONS = [
     'Each ordinary direct call returns preserving R4-R11 and SP and does not write the caller frame, including '
     'the query buffer, through any argument, ambient state or hidden alias. Its only reads of the caller frame '
     'are its own stack-passed arguments: initialized words starting at the caller SP at the call, as many as its '
-    'actual prototype passes (not checked here). It reads no saved word and no uninitialized word.',
+    'actual prototype passes (not checked here). It reads no saved word and no uninitialized word. A callee may '
+    'store into its own stack-passed parameter slots (gcc 2.95 can home a parameter there), so after each '
+    'ordinary call the contiguous initialized unprotected words from the caller SP become unknown values; it '
+    'stores nothing else in the caller frame.',
     'External reads and writes in the caller are to valid aligned live storage that does not overlap the caller '
     'frame, saved returns or code; their values carry no private-frame provenance.',
     'C object layout, function compatibility, effective types and initialized external scalars remain source '
@@ -167,6 +170,7 @@ def execute(data, address, instructions, edges, calls):
     pending, seen = [initial], {initial}
     reached, local_reads, local_writes = set(), set(), set()
     external, query_calls, ordinary_calls, returns = set(), {}, set(), set()
+    stack_words = {}
     counts_returned = set()
     minimum = 0
 
@@ -252,7 +256,15 @@ def execute(data, address, instructions, edges, calls):
                 continue
             require(not is_sp(held(R0+1)) and not saved(held(R0+1)),
                     'private stack address passed to a call outside the pinned query contract')
+            require(target not in DEPENDENCIES, 'direct call to a pinned query dependency')
             ordinary_calls.add((site, target))
+            # Stack-argument evidence: the initialized unprotected words from SP,
+            # which a callee may read and may overwrite as homed parameters.
+            run = 0
+            while sp+4*run < 0 and sp+4*run in cells and sp+4*run not in protected:
+                cells[sp+4*run] = EXT
+                run += 1
+            stack_words.setdefault(site, set()).add(run)
             for r in CLOBBERED:
                 regs.pop(r, None)
             regs[R0] = EXT
@@ -379,12 +391,12 @@ def execute(data, address, instructions, edges, calls):
                         regs[rr[0]] = local(at, width, True)
                     else:
                         require(op == 'str', 'known-query caller private access must be an aligned word')
-                        local(at, width, False, regs[rr[0]])
+                        local(at, width, False, register(rr[0]))
                 else:
                     if loading:
                         regs[rr[0]] = EXT
                     else:
-                        payload = regs[rr[0]]
+                        payload = register(rr[0])
                         require(not is_sp(payload) and not saved(payload),
                                 'private address or saved value stored to external memory')
                     external.add((site, 'read' if loading else 'write', width))
@@ -408,6 +420,7 @@ def execute(data, address, instructions, edges, calls):
     return dict(states=len(seen), returned_counts=sorted(counts_returned),
                 query_calls=[query_calls[s] for s in sorted(query_calls)],
                 ordinary_calls=sorted([s, t] for s, t in ordinary_calls),
+                ordinary_call_initialized_words_at_SP=[[s, sorted(stack_words[s])] for s in sorted(stack_words)],
                 local_reads=sorted([s, a] for s, a in local_reads),
                 local_writes=sorted([s, a] for s, a in local_writes),
                 external_accesses=sorted([s, k, w] for s, k, w in external),
