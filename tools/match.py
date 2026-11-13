@@ -1075,7 +1075,7 @@ def call_bindings(image, name, address, mapping, rom_size,
             any(item["name"] and not item["section"] and item["name"] not in targets
                 for item in image["symbols"]):
         raise ValueError("unresolved symbols outside the permitted bindings")
-    if thunk_pool_words == 0:
+    if thunk_pool_words != 5:
         function_thunk.verify_pool_calls(calls, thunk_pool_words)
         if not switch_relocations:
             raise ValueError("zero-pool linking requires its complete local switch")
@@ -1162,7 +1162,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
         raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
-    if thunk_pool_words == 0:
+    if thunk_pool_words != 5:
         function_thunk.verify_pool_calls(calls, thunk_pool_words)
         if not switch_relocations:
             raise ValueError("zero-pool linking requires its complete local switch")
@@ -1340,7 +1340,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             # against the fully linked complete symbol, not linear decoding.
             verify_leaf_instructions(linked["text"][:after["size"]], address, True, calls,
                                      function_thunk_context={"pool_switch": switch_relocations,
-                                         **({"interposed_words": 0} if thunk_pool_words == 0 else {})})
+                                         **({"interposed_words": thunk_pool_words} if thunk_pool_words != 5 else {})})
         else:
             layout = (switch_layout(linked["text"][:after["size"]], address, switch_relocations)
                       if double_bindings is not None else selected_switch_layout(
@@ -4023,19 +4023,21 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         reserved.update({address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
                     for position in range(offset, offset + 4)})
-    if function_thunk_context == {} or function_thunk_context == {'interposed_words': 0}:
+    if function_thunk_context is not None and set(function_thunk_context) <= {'interposed_words'}:
         # This is already an explicit canonical-thunk profile. Discover only the
-        # exact finite five-word shape; failure grants no indirect-jump edge.
+        # selected finite pool shape (five, zero or dispatch-identified words);
+        # failure grants no indirect-jump edge.
         from thunk_pool_switch import discover as pool_discover
         try:
             pool_relocations = pool_discover(data, address, list(decoder.disasm(data, address)),
                 interposed_words=function_thunk.context_words(function_thunk_context))
         except ValueError:
-            if function_thunk.context_words(function_thunk_context) == 0:
+            if function_thunk.context_words(function_thunk_context) != 5:
                 raise
         else:
+            words = function_thunk.context_words(function_thunk_context)
             function_thunk_context = {'pool_switch': pool_relocations,
-                **({'interposed_words': 0} if function_thunk.context_words(function_thunk_context) == 0 else {})}
+                **({'interposed_words': words} if words != 5 else {})}
     if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
         from thunk_pool_switch import layout as pool_layout
         switch_relocations = function_thunk_context['pool_switch']
@@ -5273,7 +5275,8 @@ def main():
                     _, verified_instructions = prove(got, addr, rom, mapping, function_index, calls)
                 else:
                     verified_instructions = verify_leaf_instructions(got, addr, True, calls,
-                        function_thunk_context={"interposed_words": 0} if args.function_address_profile == function_thunk.ZERO_SELECTOR else {})
+                        function_thunk_context={"interposed_words": function_thunk.pool_words(args.function_address_profile)}
+                            if function_thunk.pool_words(args.function_address_profile) != 5 else {})
                 thunk_evidence = function_thunk.make_manifest(calls, function_relocations, data_relocations,
                                                              addr, rom, data_mapping, verified_instructions,
                                                              selector=args.function_address_profile)

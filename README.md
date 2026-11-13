@@ -3080,6 +3080,31 @@ report and text-index snapshots through output publication and cleans owned
 output on failure. No source or Parked promotion follows from installing this
 tool capability; source review and the complete publication gates remain separate.
 
+### Canonical-thunk callers with dispatch-identified switch pools
+
+`--function-address-profile canonical-thunks-interposed-pool-v1` selects
+`elf-symbol-thumb-function-address-thunks-interposed-pool-v1`. It keeps every
+rule of `canonical-thunks-v1` and changes only how the caller's one local
+switch is found. `canonical-thunks-v1` takes exactly five words between the
+dispatch and the table pointer, and the zero-pool selector none; this selector
+finds the table pointer by the dispatch's own PC-relative `ldr`, as
+`u16-scalars-v2` does, so any nonzero number of words may sit between them.
+The guard must be the adjacent `cmp; bhi` or `cmp; bls; b`; the local
+long-branch default is not admitted. Cases must lie after the table, and the
+layout must be unique.
+
+The interposed words gain nothing from their position. Each must be a complete
+word read by a reached PC-relative load, and the halfword before them may only
+be zero alignment. They are then bound like every other literal of a thunk
+caller: a mapped object word through its typed data relocation, a function
+literal through its canonical function relocation, and any other word is a
+number, which may not equal an indexed code entry or the thunk table. The
+alignment and the words are reserved as data before decoding. The manifest
+carries the selector and the producer-source digests, its pool record uses the
+`canonical-thunk-interposed-pool-switch-v1` schema, and replay refuses a
+report relabelled to or from another thunk selector. Status and rebuild
+forward the saved selector.
+
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
   swallows the one after it.

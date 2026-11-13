@@ -2,18 +2,37 @@
 
 This is ROM/CFG composition only. It grants no ELF relocation, source or call ABI
 permission; the enclosing canonical-thunk profile retains those separate gates.
+
+The explicit INTERPOSED policy finds the table pointer by the dispatch's own
+PC-relative load instead of a fixed pool size, so one or more words may sit
+between the dispatch and the pointer.  Each of them must still be a complete
+word read by a reached PC-relative load and is then bound by the enclosing
+profile's ordinary literal rules; its position grants it nothing.
 """
 import hashlib
 import struct
 
 SCHEMA = 'canonical-thunk-five-word-pool-switch-v1'
 ZERO_SCHEMA = 'canonical-thunk-zero-word-pool-switch-v1'
+INTERPOSED_SCHEMA = 'canonical-thunk-interposed-pool-switch-v1'
+INTERPOSED = 'dispatch-identified'
 
 
 def pool_words(value):
+    if type(value) is str and value == INTERPOSED:
+        return value
     if type(value) is not int or value not in (0, 5):
         raise ValueError('canonical pool policy requires exactly zero or five interposed words')
     return value
+
+
+def pool_range(descriptor, address, interposed_words):
+    """Offsets of the interposed words between the dispatch and the table pointer."""
+    if pool_words(interposed_words) == INTERPOSED:
+        start = descriptor['dispatch'] + 10
+        start += (address + start) % 4
+        return range(start, descriptor['literal'], 4)
+    return range(descriptor['literal'] - 4 * interposed_words, descriptor['literal'], 4)
 
 
 def discover(data, address, instructions, *, interposed_words=5):
@@ -27,27 +46,31 @@ def discover(data, address, instructions, *, interposed_words=5):
                 item.operands[0].type != ARM_OP_REG or item.operands[0].reg != ARM_REG_PC:
             continue
         load = by_address.get(item.address - 6)
-        compare = by_address.get(item.address - 14)
-        if load is None or compare is None or load.mnemonic != 'ldr' or \
+        if load is None or load.mnemonic != 'ldr' or \
                 len(load.operands) != 2 or load.operands[1].type != ARM_OP_MEM or \
                 load.operands[1].mem.base != ARM_REG_PC or load.operands[1].mem.index:
             continue
         from match import ARM_OP_IMM
-        if compare.mnemonic != 'cmp' or len(compare.operands) != 2 or \
-                compare.operands[1].type != ARM_OP_IMM or not 0 <= compare.operands[1].imm <= 255:
-            continue
-        literal = (((load.address + 4) & ~3) + load.operands[1].mem.disp) - address
-        end = literal + 4 + 4 * (compare.operands[1].imm + 1)
-        if literal < 4 * interposed_words or (address + literal) % 4 or end > len(data):
-            continue
-        relocations = {offset: struct.unpack_from('<I', data, offset)[0] - address
-                       for offset in range(literal, end, 4)}
-        try:
-            descriptor = layout(data, address, relocations, interposed_words=interposed_words)
-        except ValueError:
-            continue
-        if descriptor['dispatch'] + 8 == item.address - address:
-            result.append(relocations)
+        # The fixed pools keep the CMP; BLS; B guard. The interposed policy
+        # also tries the adjacent CMP; BHI guard; layout decides either way.
+        for distance in ((12, 14) if interposed_words == INTERPOSED else (14,)):
+            compare = by_address.get(item.address - distance)
+            if compare is None or compare.mnemonic != 'cmp' or len(compare.operands) != 2 or \
+                    compare.operands[1].type != ARM_OP_IMM or not 0 <= compare.operands[1].imm <= 255:
+                continue
+            literal = (((load.address + 4) & ~3) + load.operands[1].mem.disp) - address
+            end = literal + 4 + 4 * (compare.operands[1].imm + 1)
+            if interposed_words != INTERPOSED and literal < 4 * interposed_words or \
+                    literal < 0 or (address + literal) % 4 or end > len(data):
+                continue
+            relocations = {offset: struct.unpack_from('<I', data, offset)[0] - address
+                           for offset in range(literal, end, 4)}
+            try:
+                descriptor = layout(data, address, relocations, interposed_words=interposed_words)
+            except ValueError:
+                continue
+            if descriptor['dispatch'] + 8 == item.address - address and relocations not in result:
+                result.append(relocations)
     if len(result) != 1:
         raise ValueError('canonical pool requires one exact guarded switch')
     return result[0]
@@ -55,9 +78,18 @@ def discover(data, address, instructions, *, interposed_words=5):
 
 def layout(data, address, relocations, *, interposed_words=5):
     from match import switch_layout
+    if pool_words(interposed_words) == INTERPOSED:
+        # Forward cases only; the guard is CMP; BHI or CMP; BLS; B, never the
+        # local long-branch default.
+        descriptor = switch_layout(data, address, relocations, interposed_pool=True)
+        if descriptor['dispatch'] - descriptor['comparison'] not in (4, 6):
+            raise ValueError('interposed canonical pool requires an adjacent narrow unsigned guard')
+        if not pool_range(descriptor, address, interposed_words):
+            raise ValueError('interposed canonical pool requires at least one interposed word')
+        return descriptor
     # The real encoding uses CMP; BLS dispatch; B default. Other guard
     # encodings remain outside this optional composition.
-    descriptor = switch_layout(data, address, relocations, interposed_words=pool_words(interposed_words))
+    descriptor = switch_layout(data, address, relocations, interposed_words=interposed_words)
     if descriptor['dispatch'] - descriptor['comparison'] != 6:
         raise ValueError('canonical pool requires adjacent unsigned low guard and default branch')
     return descriptor
@@ -78,7 +110,7 @@ def record(data, address, relocations, instructions, *, interposed_words=5):
                 if offset < 0 or (address + offset) % 4 or offset + 4 > len(data):
                     raise ValueError('five-word pool requires complete local literal words')
                 loads.setdefault(offset, []).append(item.address - address)
-    pool = range(descriptor['literal'] - 4 * interposed_words, descriptor['literal'], 4)
+    pool = pool_range(descriptor, address, interposed_words)
     if any(offset not in loads for offset in pool):
         raise ValueError('every interposed pool word requires a reached PC-relative load')
     if any(addend not in starts for offset, addend in relocations.items()
@@ -99,7 +131,9 @@ def record(data, address, relocations, instructions, *, interposed_words=5):
             raise ValueError('pool switch has unclassified complete-body bytes')
     if any(offset & 1 and offset - 1 not in missing for offset in missing):
         raise ValueError('pool switch has unclassified odd byte')
-    return {'schema': ZERO_SCHEMA if interposed_words == 0 else SCHEMA, 'layout': descriptor,
+    schema = INTERPOSED_SCHEMA if interposed_words == INTERPOSED else \
+        ZERO_SCHEMA if interposed_words == 0 else SCHEMA
+    return {'schema': schema, 'layout': descriptor,
             'body_sha256': hashlib.sha256(data).hexdigest(),
             'table_sha256': hashlib.sha256(data[descriptor['literal']:
                                descriptor['table'] + 4 * (descriptor['bound'] + 1)]).hexdigest(),

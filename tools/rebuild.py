@@ -98,7 +98,7 @@ def saved_profile_arguments(report, root, address):
     if constants_policy is not None:
         arguments += ["--switch-profile", constants_policy.selector]
     if function_thunk.selected(report):
-        arguments += ["--function-address-profile", function_thunk.SELECTOR]
+        arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
     if software_double.selected(report):
         arguments += ["--software-double-profile", software_double.SELECTOR]
         if software_double.target_remainder_selected(report):
