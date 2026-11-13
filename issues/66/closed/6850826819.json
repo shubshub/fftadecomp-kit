@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "abac9756755e82ed028bbda10a7e63b3eaa20f1c76afe16764e41af24a08359d",
+    "acknowledged_cursor": 6850826819,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "abac9756755e82ed028bbda10a7e63b3eaa20f1c76afe16764e41af24a08359d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811B888\",\"who\":\"astra-cleanup-order\",\"note\":\"One grounded cleanup-order formulation from matched adjacent functions; preserve complete 638-byte target\"}",
+      "created_at": "2026-11-13T10:56:07Z",
+      "id": 6850826819,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T10:56:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "30082ca6d88a7ebb98a32ba6cb13cad98440c35029dd0be6d95308574aeb08af",
+    "result": {
+      "address": "0x0811B888",
+      "claim_id": 6850826819,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6850826819,
+      "status": "accepted",
+      "who": "astra-cleanup-order"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "506b44ba741b051db09a1a2d2e77b3591e6561bd00bdae532815302dd3193ed3",
+    "acknowledged_cursor": 6850908047,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "506b44ba741b051db09a1a2d2e77b3591e6561bd00bdae532815302dd3193ed3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811B888\",\"who\":\"astra-cleanup-order\",\"claim_id\":6850826819,\"reason\":\"One cleanup-order formulation remains 638 bytes but increases differences from 54 to 80; previous best and report restored, true native exit 1 and artifacts retained\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; split display masks around blend-control clear\"}",
+      "created_at": "2026-11-13T10:59:13Z",
+      "id": 6850898091,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T10:59:13Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2e6f10d31a4e2db27040f3384cb7c415c39b2dea3b5ae9b6d7ca0d625fb67cbd",
+    "result": {
+      "address": "0x0811B888",
+      "claim_id": 6850826819,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6850898091,
+      "status": "accepted",
+      "who": "astra-cleanup-order"
+    }
+  }
+}
