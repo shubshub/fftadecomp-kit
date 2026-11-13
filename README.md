@@ -3044,6 +3044,30 @@ at the strict frame seam. `test_bios_word_switch_buffers.py` and
 `test_bios_word_switch_native.py` cover synthetic hostile inputs and real agbcc,
 CLI, forged-report and stale-source replay. These tests confer no game credit.
 
+### Explicit BIOS BgAffineSet local buffers
+
+`python3 tools/match.py --root <game> --owner-runtime-profile bounded-buffer-bios-bg-affine-set-v1 <address>`
+selects `elf-symbol-thumb-bounded-buffer-bios-bg-affine-set-v1`. The owner is a
+complete named-data Thumb owner whose ordinary calls keep the existing
+bounded-buffer checks; it must contain at least one direct call to the exact
+indexed BgAffineSet wrapper `func_08141864` (`SWI 0x0E; BX LR`, bytes
+`0edf7047`). Each such call must pass exactly two tracked frame aliases (R0
+source, R1 destination), no pointer slots or words, and a count in R2 that the
+caller proves as a constant in 1..255 on every reaching path. BgAffineSet reads
+`count` 20-byte source records and writes `count` 16-byte destination records
+(GBATEK), so the profile requires both spans to be whole, word-aligned,
+allocated local frame words (not saved registers or the return slot) and
+disjoint. Nothing else is read or written under that premise. Named-data or
+external operands are refused: `config/data_symbols.json` carries no object
+sizes to bound them. Returning BIOS semantics and the ordinary returning ABI
+for r0-r3 remain explicit premises; source initialization, numeric results and
+termination are not proved. The profile does not compose with CpuSet fills or
+the discarded-return-scratch projection: a local alias left in R3 by an
+ordinary callee that is still live across a later call is refused as before.
+`test_bios_bg_affine_set.py` covers counts, bounds, overlap, wrapper and index
+tampering and manifest forgery on synthetic bytes;
+`test_bios_bg_affine_set_native.py` covers real agbcc, CLI and report replay.
+
 ### Exact register callback buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile static-callback-buffer-v1 <address>`
