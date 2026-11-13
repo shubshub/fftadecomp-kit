@@ -768,18 +768,25 @@ the same verified bytes and adds no unproved callee. The linker resolves it
 against that symbol and the linked `BL` must still decode to the exact entry.
 The call is summarised like any other ordinary call, and the same verifier
 proves the body that makes the summary hold. This is partial correctness: there
-is no termination or recursion-depth theorem. Mutual or indirect recursion,
-calls to non-entry addresses of the function, and any combination with the
-division, float, switch, function-address, thunk, buffer or owner selectors are
-still refused. A report that uses it keeps its normal schema and adds two
+is no termination or recursion-depth theorem. Refused: a second function in
+the object, a self address taken as data (a literal-pool word naming the
+function), non-entry self targets, and any combination with the division,
+float, switch, function-address, thunk (`_call_via_rN`), buffer or owner
+selectors. Mutual or indirect recursion through external or register calls is
+not a self call: it is covered only by the ordinary call summary, as before.
+Framed functions are not excluded; a self call in a frame-calls profile is
+admitted unless another proof (for example a stack alias crossing a call) fails.
+A report that uses it keeps its normal schema and adds two
 lines, `* self calls:` (a fixed summary) and `* self call sites:` (the sorted
 site offsets as canonical JSON). Replay accepts a self call only when both
 lines are present and the offsets equal the `bl` sites the bytes reproduce, so a
 report that drops or edits them is rejected, and a report without them is
 rejected if the bytes contain a self call.
 
-Selector refusals (a `ValueError`) are reported by `match.py` on the command line
-as `refused: <reason>` with status 1, not as a traceback.
+Selector refusals (a `ValueError`; `refusal.Refusal` is the subclass used for
+the clean ones) are reported by `match.py` on the command line as
+`refused: <reason>` (`refused (<type>): <reason>` for any other `ValueError`)
+with status 1, not as a traceback. `FFTA_TRACEBACK=1` restores the traceback.
 
 ### Bounded register buffer calls
 
