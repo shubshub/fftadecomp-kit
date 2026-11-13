@@ -703,6 +703,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0c71463f5c7d33eb1391f4bd46cf518407dbd74bcbed4cf7ac8746fa11f049d8",
+        "acknowledged_cursor": 6843126256,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0c71463f5c7d33eb1391f4bd46cf518407dbd74bcbed4cf7ac8746fa11f049d8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802ED88\",\"who\":\"match-astra-0802ED88-full\",\"note\":\"Match complete 368-byte owner after native CFG, full partition and dual-index extent repair qualification; private maps only.\"}",
+          "created_at": "2026-11-13T03:42:39Z",
+          "id": 6843126256,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T03:42:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ba2f6d9dc3e5624180a55ed5b5a77104c5a59c03f6cecde69560218e319bbe14",
+        "result": {
+          "address": "0x0802ED88",
+          "claim_id": 6843126256,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6843126256,
+          "status": "accepted",
+          "who": "match-astra-0802ED88-full"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
