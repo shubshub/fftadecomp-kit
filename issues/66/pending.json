@@ -3259,6 +3259,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b76ceb51356bf137961305c5d44142f7b40c1c5977cca218e56bd91f00a9c428",
+        "acknowledged_cursor": 6863410167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b76ceb51356bf137961305c5d44142f7b40c1c5977cca218e56bd91f00a9c428",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080012BC\",\"who\":\"astra-xhigh-080012bc\",\"note\":\"Recover complete 524-byte DMA/OAM setup, existing hardware register types and native ordinary profile only; no toolkit edits.\"}",
+          "created_at": "2026-11-13T19:57:53Z",
+          "id": 6863410161,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T19:57:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4ab7c1904526247a8c1abdb49f29e47ac74e29f93b3d6754443a0eeb48857b8f",
+        "result": {
+          "address": "0x080012BC",
+          "claim_id": 6863410161,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6863410161,
+          "status": "accepted",
+          "who": "astra-xhigh-080012bc"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7e540afe64fff93c9d0080cda0c350fb3a140eb945437e159062e695a4e49fe8",
+        "acknowledged_cursor": 6863410167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7e540afe64fff93c9d0080cda0c350fb3a140eb945437e159062e695a4e49fe8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C720\",\"who\":\"astra-xhigh-0800c720\",\"note\":\"Recover complete 226-byte packed scanline transform using ordinary native verification; no toolkit edits.\"}",
+          "created_at": "2026-11-13T19:57:53Z",
+          "id": 6863410167,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T19:57:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4ab7c1904526247a8c1abdb49f29e47ac74e29f93b3d6754443a0eeb48857b8f",
+        "result": {
+          "address": "0x0800C720",
+          "claim_id": 6863410167,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6863410167,
+          "status": "accepted",
+          "who": "astra-xhigh-0800c720"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
