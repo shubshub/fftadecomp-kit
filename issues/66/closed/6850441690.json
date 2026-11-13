@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "6c62cd84f6151f592d2867fd07bf58116dd71a971889815cc20bc6741ca90302",
+    "acknowledged_cursor": 6850441690,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6c62cd84f6151f592d2867fd07bf58116dd71a971889815cc20bc6741ca90302",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080241B4\",\"who\":\"astra-control-flags\",\"note\":\"Test one new natural operand-order formulation from retained complete-body near match\"}",
+      "created_at": "2026-11-13T10:35:34Z",
+      "id": 6850441690,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T10:35:34Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ce3f810cdbbedd876b45ceccf6bc8f9effa6194bbc880349adbdc177c7f719cf",
+    "result": {
+      "address": "0x080241B4",
+      "claim_id": 6850441690,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6850441690,
+      "status": "accepted",
+      "who": "astra-control-flags"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "43021ecd5391b5a0cf116b41d1bef54e14626a1eaa5a69358dff7c63d9b62481",
+    "acknowledged_cursor": 6850531719,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "43021ecd5391b5a0cf116b41d1bef54e14626a1eaa5a69358dff7c63d9b62481",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080241B4\",\"who\":\"astra-control-flags\",\"claim_id\":6850441690,\"reason\":\"One new snapshot-plus-constant-first OR formulation remains two bytes short of exactness across the complete 1064-byte body; prior best and all real failures preserved\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; explicit flags snapshot with 0x1C40 | flags\"}",
+      "created_at": "2026-11-13T10:40:27Z",
+      "id": 6850531719,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T10:40:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2d70c0a49a99ba8c1d2d99a5780a9b7443058d5846641f6a698fa81c7612bcb2",
+    "result": {
+      "address": "0x080241B4",
+      "claim_id": 6850441690,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6850531719,
+      "status": "accepted",
+      "who": "astra-control-flags"
+    }
+  }
+}
