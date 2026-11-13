@@ -4,6 +4,8 @@ Synthetic bytes only: no game ROM or compiler.  The call to the exact own entry
 binds to the function's own complete verified symbol; every other recursion
 shape stays refused.
 """
+import contextlib
+import io
 import json
 import os
 import subprocess
@@ -17,7 +19,7 @@ import match
 import match_evidence as evidence
 import entry_recursive_ordinary_call_profile as entry
 from synthetic_entry_owner import ADDRESS as A, HELPER as H, body, bl, snapshots
-from test_entry_native import elf, environment
+from test_entry_native import EntryBuildRoutingTests, elf, environment
 
 NAME = f'func_{A:08X}'
 HELPER_NAME = f'func_{H:08X}'
@@ -99,6 +101,32 @@ class SelfCallVerifierTests(unittest.TestCase):
         data[8:12] = bytes.fromhex('98470000')  # blx r3; a halfword of padding
         with self.assertRaises(ValueError):
             self.verify(bytes(data), {A + 14: H}, self_calls=frozenset({A + 8}))
+
+    def test_framed_self_call_is_admitted(self):
+        # push {r4,lr}; sub sp,#8; frame without an alias crossing the call
+        data = (bytes.fromhex('10b5' '82b0' '0028' '04d0' '041c' '0138') +
+                bl(A + 12, A) + bytes.fromhex('0019' '02b0' '10bc' '02bc' '0847'))
+        self.assertTrue(self.verify(data, {A + 12: A}, self_calls=frozenset({A + 12})))
+        with self.assertRaisesRegex(ValueError, 'validated external direct Thumb BL'):
+            self.verify(data, {A + 12: A})
+
+    def test_framed_self_call_with_stack_alias_across_call_is_refused(self):
+        # add r0,sp,#0 (the 0801F438 refusal) passes a stack address into the recursive call
+        data = (bytes.fromhex('10b5' '82b0' '0028' '04d0' '041c' '00a8') +
+                bl(A + 12, A) + bytes.fromhex('0019' '02b0' '10bc' '02bc' '0847'))
+        with self.assertRaisesRegex(ValueError, 'stack aliases cannot cross calls'):
+            self.verify(data, {A + 12: A}, self_calls=frozenset({A + 12}))
+
+    def test_parameter_defaults_cannot_hide_a_new_context(self):
+        # the self-call guard rejects any parameter outside SELF_CALL_PARAMETERS
+        # whose value is not None or False, so every default must be one of those
+        import inspect
+        for name, parameter in inspect.signature(match.verify_leaf_instructions).parameters.items():
+            if name not in match.SELF_CALL_PARAMETERS:
+                with self.subTest(parameter=name):
+                    self.assertIn(parameter.default, (None, False))
+        self.assertLessEqual(set(match.SELF_CALL_PARAMETERS),
+                             set(inspect.signature(match.verify_leaf_instructions).parameters))
 
     def test_resolver_path_requires_the_site_set(self):
         resolved = []
@@ -187,6 +215,12 @@ class SelfCallReportTests(unittest.TestCase):
     def test_claim_under_a_non_call_schema_is_rejected(self):
         self.assertFalse(evidence.report_matches(self.report(schema=evidence.SCHEMA), self.root, A))
 
+    def test_stray_self_call_lines_on_other_profiles_are_rejected(self):
+        for schema in (evidence.SCHEMA, evidence.FRAMED_SCHEMA, evidence.BUFFER_SCHEMA,
+                       evidence.FUNCTION_ADDRESS_SCHEMA, evidence.SWITCH_SCHEMA):
+            with self.subTest(schema=schema):
+                self.assertFalse(evidence.report_matches(self.report(schema=schema), self.root, A))
+
     def test_changed_mapping_or_rom_is_rejected(self):
         good = self.report()
         rom = bytearray(self.rom)
@@ -231,7 +265,53 @@ class RefusalTests(unittest.TestCase):
                                  capture_output=True, text=True)
         self.assertEqual(run.returncode, 1)
         self.assertNotIn('Traceback', run.stderr)
-        self.assertTrue(run.stderr.startswith('refused: '))
+        self.assertTrue(run.stderr.startswith('refused'))
+
+    def test_command_line_labels_the_exception_type_and_can_traceback(self):
+        with tempfile.TemporaryDirectory() as root:
+            Path(root, 'src').mkdir()
+            Path(root, 'src', f'{A:08X}.c').write_text('void f(void){}\n')
+            argv = [sys.executable, str(TOOLS / 'match.py'), '--root', root, '--no-write',
+                    '--label', 'x', '--owner-runtime-profile', entry.SELECTOR, f'0x{A:08X}']
+            plain = subprocess.run(argv, capture_output=True, text=True)
+            loud = subprocess.run(argv, capture_output=True, text=True,
+                                  env={**os.environ, 'FFTA_TRACEBACK': '1'})
+        self.assertEqual(plain.returncode, 1)
+        self.assertTrue(plain.stderr.startswith('refused (ValueError): '))
+        self.assertEqual(loud.returncode, 1)
+        self.assertIn('Traceback', loud.stderr)
+
+    def test_refusal_is_a_value_error_and_reported_without_a_type_label(self):
+        self.assertTrue(issubclass(match.Refusal, ValueError))
+        rom, mapping, _ = environment()
+        thunk = next(iter(match.RUNTIME_HELPERS.values()))
+        with self.assertRaises(match.Refusal):
+            match.function_address_target(f'func_{thunk:08X}', json.loads(mapping), A, 2, len(rom))
+
+
+class ProducerRefusalTests(unittest.TestCase):
+    """main() must not admit a self call replay would refuse."""
+    tree = EntryBuildRoutingTests.tree
+    build_mocks = EntryBuildRoutingTests.build_mocks
+
+    def run_main(self, calls):
+        with self.tree() as root, self.build_mocks(), \
+                patch.object(match, 'link_calls', return_value=(body(), calls, {})), \
+                patch('sys.argv', ['match.py', '--root', str(root), '--no-write', f'0x{A:08X}']), \
+                contextlib.redirect_stdout(io.StringIO()):
+            return match.main()
+
+    def test_self_call_with_a_runtime_helper_call_is_refused(self):
+        thunk = next(iter(match.RUNTIME_HELPERS.values()))
+        with self.assertRaises(SystemExit) as caught:
+            self.run_main({A + 8: A, A + 14: thunk})
+        self.assertIn('self calls are admitted only', str(caught.exception))
+
+    def test_self_call_with_an_ordinary_call_passes_that_guard(self):
+        try:
+            self.run_main({A + 8: A, A + 14: H})
+        except (ValueError, SystemExit) as error:
+            self.assertNotIn('self calls are admitted only', str(error))
 
 
 if __name__ == '__main__':

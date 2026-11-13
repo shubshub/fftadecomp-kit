@@ -52,6 +52,7 @@ import volatile_semantics
 import signal
 from contextvars import ContextVar
 from rompath import rom_path
+from refusal import Refusal
 from contextlib import contextmanager
 from pathlib import Path
 from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SCHEMA,
@@ -106,6 +107,7 @@ ROM_BASE = 0x08000000
 # not addressed functions, so call_bindings cannot find them in the index.
 # They are real code with a checkable shape, so recognise them by name and
 # verify the thunk against the ROM rather than trusting the name.
+
 RUNTIME_HELPERS = {f"_call_via_r{n}": 0x08142244 + n * 4
                    for n in range(0, 15)}
 UDIVSI3_ADDRESS = 0x08142AB0
@@ -591,7 +593,7 @@ def function_address_target(name, entries, address, size, rom_size):
     if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target) or software_float.reserved(target):
         raise ValueError("division runtime requires its canonical versioned proof")
     if target in RUNTIME_HELPERS.values():
-        raise ValueError("function-address evidence does not support runtime call thunks")
+        raise Refusal("function-address evidence does not support runtime call thunks")
     candidates = [entry for entry in entries
                   if int(entry["rom"], 16) & ~1 == target & ~1]
     if target % 2 or len(candidates) != 1 or candidates[0].get("mode") != "thumb" or \
@@ -1023,7 +1025,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["type"] not in (0, 2):
                 raise ValueError("division profile calls require unique undefined global functions")
     if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets):
-        raise ValueError("function-address evidence does not support runtime call thunks")
+        raise Refusal("function-address evidence does not support runtime call thunks")
     if switch_relocations:
         if not function_thunks and ((data_relocations and not (
                 allow_switch_data or double_bindings is not None and allow_double_data)) or function_relocations or \
@@ -3197,6 +3199,10 @@ def _ordinary_call_replay(proof, address=None):
                                       function_thunk.reserved(address or 0))
 
 
+# the only verify_leaf_instructions parameters a self-calling function may set
+SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")
+
+
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              buffer_proof=None, call_resolver=None, switch_relocations=None,
                              switch_data_relocations=None, udivsi3_context=None,
@@ -3229,8 +3235,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # parameters are the only locals here; no other context may combine
         if type(self_calls) is not frozenset or not self_calls or not thumb or any(
                 value is not None and value is not False
-                for name, value in locals().items()
-                if name not in ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")):
+                for name, value in locals().items() if name not in SELF_CALL_PARAMETERS):
             raise ValueError("self calls require the plain direct-call path and a nonempty site set")
     if finite_small_copy_context is not None:
         from finite_small_local_copy_profile import validate_context
@@ -4798,7 +4803,8 @@ def main():
             if self_sites and (float_bindings or ashldi3_bindings or umodsi3_bindings or divsi3_bindings or
                                modsi3_bindings or udivsi3_bindings or switch_relocations or function_relocations or
                                args.signed_quotient_profile or args.unsigned_quotient_profile or
-                               args.switch_data_profile):
+                               args.switch_data_profile or
+                               any(t in RUNTIME_HELPERS.values() for t in calls.values())):
                 raise ValueError("self calls are admitted only on the plain direct-call path")
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
             if thunk_profile:
@@ -5397,5 +5403,9 @@ if __name__ == "__main__":
         sys.exit(main())
     except ValueError as refusal:
         # selectors refuse with ValueError; the command line reports it
-        # as a refusal rather than a traceback, with the same nonzero status
-        sys.exit(f"refused: {refusal}")
+        # as a refusal rather than a traceback, with the same nonzero status.
+        # FFTA_TRACEBACK=1 restores the traceback.
+        if os.environ.get("FFTA_TRACEBACK"):
+            raise
+        sys.exit(f"refused: {refusal}" if type(refusal) is Refusal else
+                 f"refused ({type(refusal).__name__}): {refusal}")

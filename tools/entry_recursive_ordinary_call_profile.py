@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import hashlib
 import json
 from pathlib import Path
+from refusal import Refusal
 
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_CALL, CS_GRP_JUMP
 from capstone.arm import (ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_CC_AL,
@@ -62,10 +63,10 @@ def _decode(data, address):
     cursor = address
     for site, instruction in result.items():
         if site != cursor:
-            raise ValueError('entry owner has an undecoded gap')
+            raise Refusal('entry owner has an undecoded gap')
         cursor += instruction.size
     if cursor != address + len(data):
-        raise ValueError('entry owner has an undecoded tail')
+        raise Refusal('entry owner has an undecoded tail')
     return result
 
 
@@ -153,7 +154,7 @@ class EntryCalls:
         for op in instruction.operands:
             if op.type == ARM_OP_MEM and (instruction.mnemonic != 'ldr' or instruction.size != 2 or
                     op.mem.base in (ARM_REG_SP, ARM_REG_PC) or op.mem.index or instruction.writeback):
-                raise ValueError('entry owner permits only ordinary object-word loads without stack or PC provenance')
+                raise Refusal('entry owner permits only ordinary object-word loads without stack or PC provenance')
         if instruction.mnemonic == 'pop' and any(
                 op.type == ARM_OP_REG and op.reg == ARM_REG_PC for op in instruction.operands):
             raise ValueError('entry saved-only owner requires an explicit restored-register BX return')

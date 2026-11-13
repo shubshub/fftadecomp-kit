@@ -27,9 +27,6 @@ SELF_CALL_SUMMARY = ("exact-entry Thumb BL to this same verified complete ELF sy
                      "summary; partial correctness only, no termination or recursion-depth theorem")
 
 
-def self_call_sites_text(sites, address):
-    """Canonical text of the self-call site offsets bound into a report."""
-    return json.dumps(sorted(site - address for site in sites), separators=(",", ":"))
 FRAMED_SCHEMA = "elf-symbol-thumb-frame-v1"
 FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
 STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return provenance"
@@ -63,6 +60,11 @@ UDIVSI3_RUNTIME = "agbcc-thumb-udivsi3-v1"
 UDIVSI3_FRAMED_SELECTOR = "positive-constant-frame-v1"
 UDIVSI3_FRAMED_SCHEMA = "elf-symbol-thumb-udivsi3-positive-constant-frame-v1"
 UDIVSI3_FRAMED_SUMMARY = UDIVSI3_SUMMARY + " and a verified caller stack frame"
+
+
+def self_call_sites_text(sites, address):
+    """Canonical text of the self-call site offsets bound into a report."""
+    return json.dumps(sorted(site - address for site in sites), separators=(",", ":"))
 
 
 def udivsi3_schema(selector=None):
@@ -988,6 +990,15 @@ def strip_volatile_records(report, records):
 def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
+    if any(line.lstrip().startswith("* self call") for line in report.splitlines()):
+        # self-call lines belong to the plain call profiles only; anything
+        # else carrying them is a forged or misplaced claim
+        stated = report.splitlines()
+        plain = [f"* verification: `{schema}`" for schema in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA)]
+        data = [f"* verification: `{schema}`" for schema in (DATA_SCHEMA, FRAMED_DATA_SCHEMA)]
+        if not (any(line in stated for line in plain) or
+                any(line in stated for line in data) and f"* control flow: {CALL_SUMMARY}" in stated):
+            return False
     import plausible
     try:
         records = plausible.allowlisted_volatile_uses(root, address)
