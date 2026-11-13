@@ -23,6 +23,13 @@ import re
 SCHEMA = "elf-symbol-cfg-leaf-v2"
 LINKED_SCHEMA = "elf-symbol-thumb-calls-v1"
 CALL_SUMMARY = "direct Thumb BL with ordinary ARM ABI call summaries"
+SELF_CALL_SUMMARY = ("exact-entry Thumb BL to this same verified complete ELF symbol under the ordinary ARM ABI "
+                     "summary; partial correctness only, no termination or recursion-depth theorem")
+
+
+def self_call_sites_text(sites, address):
+    """Canonical text of the self-call site offsets bound into a report."""
+    return json.dumps(sorted(site - address for site in sites), separators=(",", ":"))
 FRAMED_SCHEMA = "elf-symbol-thumb-frame-v1"
 FRAMED_LINKED_SCHEMA = "elf-symbol-thumb-frame-calls-v1"
 STACK_SUMMARY = "fixed Thumb frames and bounded stack aliases with return provenance"
@@ -877,8 +884,25 @@ def legacy_report_control_flow(lines, root, address, profile):
         calls = profile in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or \
             profile in (DATA_SCHEMA, FRAMED_DATA_SCHEMA) and single("* control flow: ") == CALL_SUMMARY
 
+        self_sites = None
+        self_lines = [line for line in lines if line.startswith("* self call")]
+        if self_lines:
+            # a self-call claim needs the plain direct-call path and exactly
+            # the two canonical lines, with sites that the bytes reproduce
+            sites_text = [line for line in self_lines if line.startswith("* self call sites: ")]
+            if not calls or len(self_lines) != 2 or "* self calls: " + SELF_CALL_SUMMARY not in self_lines or \
+                    len(sites_text) != 1 or re.fullmatch(r"`\[[0-9]+(?:,[0-9]+)*\]`", sites_text[0][19:]) is None:
+                return False
+            offsets = json.loads(sites_text[0][20:-1])
+            if self_call_sites_text([address + offset for offset in offsets], address) != sites_text[0][20:-1] or \
+                    len(set(offsets)) != len(offsets) or any(offset % 2 or offset + 4 > len(data) for offset in offsets):
+                return False
+            self_sites = frozenset(address + offset for offset in offsets)
+
         thunk_calls = set()
         def resolve(target):
+            if target == address and self_sites is not None:
+                return
             if target in RUNTIME_HELPERS.values():
                 thunk_calls.add(target)
                 register = (target - RUNTIME_HELPERS["_call_via_r0"]) // 4
@@ -888,9 +912,13 @@ def legacy_report_control_flow(lines, root, address, profile):
                 function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom))
 
         try:
-            verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None)
+            reached = verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None,
+                                               self_calls=self_sites)
+            if self_sites is not None and {item.address for item in reached
+                    if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
+                return False
         except modsi3.AddressedRemainderRequired:
-            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA):
+            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None:
                 return False
             verify_addressed_modsi3_source(
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
