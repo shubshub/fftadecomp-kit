@@ -126,7 +126,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "58dde5517eaf9ee4e5e9a52437d897b0f51746978d7101715d7a573bd6f9ad9d",
+        "acknowledged_cursor": 6849758119,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "58dde5517eaf9ee4e5e9a52437d897b0f51746978d7101715d7a573bd6f9ad9d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F9838\",\"who\":\"claude-ffta2\",\"claim_id\":6844018862,\"reason\":\"parked: verifier gap or near miss; recovered C and notes kept for a later kit selector\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:59:47Z",
+          "id": 6849758046,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:59:47Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f9963d367373abff10ec3fe7eeb27b4640ff3f22dae5ee2d2502d1a8fac40975",
+        "result": {
+          "address": "0x080F9838",
+          "claim_id": 6844018862,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6849758046,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3738,7 +3766,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2e662e5b0fd70a976a589537c2905ae03211bbf9b3eda0e0c4273bc5de0a78fa",
+        "acknowledged_cursor": 6849758119,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2e662e5b0fd70a976a589537c2905ae03211bbf9b3eda0e0c4273bc5de0a78fa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08122A00\",\"who\":\"claude-ffta2\",\"claim_id\":6849458142,\"reason\":\"matched, merged in shubshub/fftadecomp#82\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:59:47Z",
+          "id": 6849758119,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:59:47Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f9963d367373abff10ec3fe7eeb27b4640ff3f22dae5ee2d2502d1a8fac40975",
+        "result": {
+          "address": "0x08122A00",
+          "claim_id": 6849458142,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6849758119,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     }
   ],
   "issue": 66,
