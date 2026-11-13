@@ -3482,7 +3482,35 @@
           "who": "astra-xhigh-effects-080d4dec"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2278e08484b13cbe859737b256133a7bfc6ec021806f99bd0c4a34c979c5e773",
+        "acknowledged_cursor": 6865985426,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2278e08484b13cbe859737b256133a7bfc6ec021806f99bd0c4a34c979c5e773",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D4DEC\",\"who\":\"astra-xhigh-effects-080d4dec\",\"claim_id\":6865905720,\"reason\":\"Released unused: native worker dispatch became unavailable before assignment. No C work started;828-byte candidate remains supported. Reclaim before future work.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T22:00:59Z",
+          "id": 6865985426,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T22:00:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fe294aac638c7e607851b583a69f95a8a60e7544694a0997573ad06a503bc911",
+        "result": {
+          "address": "0x080D4DEC",
+          "claim_id": 6865905720,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6865985426,
+          "status": "accepted",
+          "who": "astra-xhigh-effects-080d4dec"
+        }
+      }
     }
   ],
   "issue": 66,
