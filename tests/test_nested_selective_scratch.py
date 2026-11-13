@@ -17,7 +17,7 @@ class NestedSelectiveScratchTests(unittest.TestCase):
     setUp = base.NestedOutputTests.setUp
     fixture = base.NestedOutputTests.fixture
 
-    def owner_inputs(self, body):
+    def owner_inputs(self, body, helper='bx lr'):
         inputs, identities = self.fixture()
         context = patch.multiple(nested, **identities)
         context.start()
@@ -27,7 +27,7 @@ class NestedSelectiveScratchTests(unittest.TestCase):
             '.incbin "' + str(self.root/'helpers.bin') + '"\n.org 0x200\n'
             '.global func_08010200, caller_end\n.thumb_func\nfunc_08010200:\n' + body +
             '\ncaller_end:\n.thumb_set wrapper, func_08010200-0x100\n'
-            '.org 0x300\n.global helper, helper_end\n.thumb_func\nhelper:\nbx lr\nhelper_end:\n')
+            '.org 0x300\n.global helper, helper_end\n.thumb_func\nhelper:\n' + helper + '\nhelper_end:\n')
         for command in (
             ['arm-none-eabi-as', '-mthumb-interwork', str(self.root/'caller.s'), '-o', str(self.root/'caller.o')],
             ['arm-none-eabi-ld', f'-Ttext=0x{A:08X}', '-e', 'func_08010200',
@@ -57,8 +57,8 @@ class NestedSelectiveScratchTests(unittest.TestCase):
     SINGLE = PREFIX + 'movs r3, #0' + SUFFIX
     OBSERVED = PREFIX + 'bl helper' + SUFFIX
 
-    def verify(self, body, selector, manifest=None):
-        args, bindings, _ = self.owner_inputs(body)
+    def verify(self, body, selector, manifest=None, helper='bx lr'):
+        args, bindings, _ = self.owner_inputs(body, helper)
         owner = base.leaf_fixtures.fixtures.owner
         return owner.verify(*args, *( (manifest,) if manifest else ()), bindings=bindings, selector=selector)
 
@@ -70,6 +70,13 @@ class NestedSelectiveScratchTests(unittest.TestCase):
         scratch = manifest['proof']['buffers']['normal_return_scratch']
         self.assertEqual(scratch['selection'], 'each R2/R3 independently; observed aliases remain tracked')
         self.assertTrue(any(row['retained'] for row in scratch['observations']))
+
+    def test_saved_lr_read_through_retained_alias_is_refused(self):
+        # offset 8 is the saved-LR slot of the caller frame; the exact-type guard must cover this class
+        for access in ('ldr r0, [r3, #8]', 'str r0, [r3, #8]'):
+            with self.subTest(access=access), self.assertRaisesRegex(ValueError, 'access|escape|outside'):
+                self.verify(self.PREFIX + access + '\nmovs r3, #0' + self.SUFFIX, nested.SELECTIVE_SELECTOR)
+        self.verify(self.PREFIX + 'ldr r0, [r3, #4]\nmovs r3, #0' + self.SUFFIX, nested.SELECTIVE_SELECTOR)
 
     def test_unobserved_case_keeps_both_selectors_and_distinct_schemas(self):
         old, _ = self.verify(self.SINGLE, nested.SELECTOR)
