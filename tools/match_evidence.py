@@ -221,12 +221,23 @@ def compiler_flags(report):
 
 
 def source_paths(root, address):
+    import os
+
     root = Path(root)
-    paths = {q for q in (root / "src").rglob(f"{address:08X}.c")}
-    include = root / "include"
-    if include.is_dir():
-        paths.update(path for path in include.rglob("*") if path.is_file())
-    paths.update((root / "src").rglob("*.h"))
+    target = os.path.normcase(f"{address:08X}.c")
+    paths = set()
+    # Match directory entries too, as pathlib glob does, but do not descend
+    # through directory symlinks. Each source directory is scanned only once.
+    for directory, directories, files in os.walk(root / "src"):
+        for name in directories + files:
+            normalized = os.path.normcase(name)
+            if normalized == target or normalized.endswith(".h"):
+                paths.add(Path(directory) / name)
+    for directory, _, files in os.walk(root / "include"):
+        for name in files:
+            path = Path(directory) / name
+            if path.is_file():
+                paths.add(path)
     return sorted(paths)
 
 
