@@ -3266,66 +3266,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "b335f3e84e09ebd8a03db5eb7c7df0f18f3e7d7cf3e1a5f171985a7a17e7b345",
-        "acknowledged_cursor": 6862083924,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b335f3e84e09ebd8a03db5eb7c7df0f18f3e7d7cf3e1a5f171985a7a17e7b345",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802D0B0\",\"who\":\"astra-xhigh-0802d0b0\",\"note\":\"Recover 1136-byte sixteen-phase panel controller; current canonical thunk profile; four nonrelocation mismatch bytes\"}",
-          "created_at": "2026-11-13T18:53:59Z",
-          "id": 6862083915,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T18:53:59Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cc82bb80b55497441465cbf1d34d65ccab4d199684ed0e8a50395331ea81e295",
-        "result": {
-          "address": "0x0802D0B0",
-          "claim_id": 6862083915,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6862083915,
-          "status": "accepted",
-          "who": "astra-xhigh-0802d0b0"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "cc0b27fb350241b6223b9a050f72c1e517135d8e9b29a6728f3c71140c70a95a",
-        "acknowledged_cursor": 6862263658,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cc0b27fb350241b6223b9a050f72c1e517135d8e9b29a6728f3c71140c70a95a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802D0B0\",\"who\":\"astra-xhigh-0802d0b0\",\"claim_id\":6862083915,\"reason\":\"Plausible sixteen-phase panel controller exact: 1136 bytes, 461 instructions with canonical-thunks-v1\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T19:02:39Z",
-          "id": 6862263658,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T19:02:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a4468f142a68c1cdc56dfc9c2599ba438d65e6fe002d4b596c2d493bcf446a05",
-        "result": {
-          "address": "0x0802D0B0",
-          "claim_id": 6862083915,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6862263658,
-          "status": "accepted",
-          "who": "astra-xhigh-0802d0b0"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "ff21a4947e1c36685c295f71aecf6d5813b390de76a2d8b7cc42b79a9529a5e0",
         "acknowledged_cursor": 6862217706,
         "body_provenance": "acceptance-time",
