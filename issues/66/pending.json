@@ -3166,7 +3166,35 @@
           "who": "astra-xhigh-080b5278"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f7ce8beb0350163cb4e734291ee32c40a41c298642ee5154a443a2f80bd9d0c7",
+        "acknowledged_cursor": 6864164435,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f7ce8beb0350163cb4e734291ee32c40a41c298642ee5154a443a2f80bd9d0c7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B5278\",\"who\":\"astra-xhigh-080b5278\",\"claim_id\":6863642110,\"reason\":\"Exact672-byte complete action context initializer recovered;308instructions,native canonical-thunks-v1 exit0,plausible source queued.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T20:31:54Z",
+          "id": 6864155961,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:31:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9db8943df97fb169843bd3d5e354c48069ae27d5993af43020fa78c90f3c4e31",
+        "result": {
+          "address": "0x080B5278",
+          "claim_id": 6863642110,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6864155961,
+          "status": "accepted",
+          "who": "astra-xhigh-080b5278"
+        }
+      }
     },
     {
       "claim": {
@@ -3514,6 +3542,38 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6864140594,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3653581712b5250249cf09658583b1948b1e345ab357998eef37908aad81fc65",
+        "acknowledged_cursor": 6864164435,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3653581712b5250249cf09658583b1948b1e345ab357998eef37908aad81fc65",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08136DEC\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
+          "created_at": "2026-11-13T20:32:11Z",
+          "id": 6864164435,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:32:11Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9db8943df97fb169843bd3d5e354c48069ae27d5993af43020fa78c90f3c4e31",
+        "result": {
+          "address": "0x08136DEC",
+          "claim_id": 6864164435,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6864164435,
           "status": "accepted",
           "who": "claude-ffta2"
         }
