@@ -3170,66 +3170,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "99e8c7a55256c918f3135ba81bdc2dfa99261e977879dff4379acaf468059f03",
-        "acknowledged_cursor": 6859082951,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "99e8c7a55256c918f3135ba81bdc2dfa99261e977879dff4379acaf468059f03",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E8B24\",\"who\":\"astra-scheduler-080e8b24\",\"note\":\"Fresh native qualification after corrected static screen: actual LDRB kills local r1 alias before080DD4A4. Prior static rejection retained. Complete body, current24-target scheduler profile.\"}",
-          "created_at": "2026-11-13T16:40:39Z",
-          "id": 6859072048,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T16:40:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8ca2f4baaeec0467d4247a4428cb250127ab966ecd82717d08431a70ea3b7e6f",
-        "result": {
-          "address": "0x080E8B24",
-          "claim_id": 6859072048,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6859072048,
-          "status": "accepted",
-          "who": "astra-scheduler-080e8b24"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "ba91d096d9956a8b33c60c2443e0cdbfa5df79f5d51b7bc4a36c0150854405ba",
-        "acknowledged_cursor": 6859273834,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ba91d096d9956a8b33c60c2443e0cdbfa5df79f5d51b7bc4a36c0150854405ba",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E8B24\",\"who\":\"astra-scheduler-080e8b24\",\"claim_id\":6859072048,\"reason\":\"Complete538-byte native MATCH and exactly one source-bound report replay passed. SourceSHA2561125bf2a909a2c832d6d26b2a046abe3b7bb3462f8f2e1309518edd8ce28cf8e; preserved products ready for integration.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T16:49:27Z",
-          "id": 6859273834,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T16:49:27Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "109e1d516c355ab6fa813cbc8a21c205789b3693a0ac807ebb75d11505ee8492",
-        "result": {
-          "address": "0x080E8B24",
-          "claim_id": 6859072048,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6859273834,
-          "status": "accepted",
-          "who": "astra-scheduler-080e8b24"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "d2eccf90405847d9fde2ab15b1241221d9ad46726337180a2547bfb20882c269",
         "acknowledged_cursor": 6859132562,
         "body_provenance": "acceptance-time",
