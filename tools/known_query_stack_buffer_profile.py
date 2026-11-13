@@ -33,10 +33,13 @@ from capstone.arm import ARM_OP_IMM, ARM_OP_REG, ARM_OP_MEM, ARM_REG_SP, ARM_REG
 
 SELECTOR = 'conditional-known-query-stack-buffer-v1'
 SCHEMA = 'elf-symbol-thumb-' + SELECTOR
+DIVISION_SELECTOR = 'conditional-known-query-stack-buffer-unsigned-quotient-v1'
+DIVISION_SCHEMA = 'elf-symbol-thumb-' + DIVISION_SELECTOR
 CONTROL_FLOW = ('complete Thumb caller passing a private stack array of at least 13 words to a '
                 'pinned known list query; list length n <= 13 is an unproved premise; every '
                 'returned count 0..13 executed; '
                 'conditional returning ABI and memory noninterference; termination unproved')
+DIVISION_CONTROL_FLOW = CONTROL_FLOW + '; exact canonical unsigned quotient and zero-hook closure'
 ROM_BASE = 0x08000000
 CAPACITY_WORDS = 13
 MAX_STATES = 65536
@@ -160,7 +163,7 @@ def saved(value):
     return value[0] in ('entry', 'lr')
 
 
-def execute(data, address, instructions, edges, calls):
+def execute(data, address, instructions, edges, calls, *, unsigned_quotient=False):
     """Explore every path for every premised count; return a deterministic summary."""
     registers = {r: EXT for r in range(R0, R0+4)}
     registers.update({r: ('entry', r-R0) for r in PRESERVED})
@@ -257,6 +260,19 @@ def execute(data, address, instructions, edges, calls):
             require(not is_sp(held(R0+1)) and not saved(held(R0+1)),
                     'private stack address passed to a call outside the pinned query contract')
             require(target not in DEPENDENCIES, 'direct call to a pinned query dependency')
+            if unsigned_quotient and target == match.UDIVSI3_ADDRESS:
+                # Only the two defined scalar ABI operands are consumed. The
+                # native closure has no caller-frame reads or writes. Do not
+                # manufacture quotient/flags facts or retain scratch values.
+                scalar(register(R0), register(R0+1))
+                for r in CLOBBERED:
+                    regs.pop(r, None)
+                regs[R0] = EXT
+                flags = None
+                require(site+4 in edges[site], 'quotient continuation differs from the complete CFG')
+                push((site+4, tuple(sorted(regs.items())), sp, tuple(sorted(cells.items())),
+                      tuple(sorted(protected)), flags))
+                continue
             ordinary_calls.add((site, target))
             # Stack-argument evidence: the initialized unprotected words from SP,
             # which a callee may read and may overwrite as homed parameters.
@@ -428,10 +444,46 @@ def execute(data, address, instructions, edges, calls):
                 uninitialized_private_reads=0, all_paths_interpreted=True)
 
 
-def prove(data, address, rom, mapping, index, objects, bindings):
+def quotient_contract(rom, mapping, index):
+    """Canonical versioned identity, native closure and independent frame proof."""
+    import zero_aware_unsigned_quotient_inventory as quotient
+    import local_long_branch_profile as frame
+    import owner_admission_profile as owner
+    zero, address, end = 0x0814274C, quotient.UDIV, 0x08142B28
+    proofs = quotient.prove_quotient_closure(rom, mapping, index)
+    require(set(proofs) == {zero, address} and
+            not any(p['writes'] or p['stack_reads'] for p in proofs.values()) and
+            proofs[address]['returns'] == [0x08142B1C, 0x08142B26] and
+            proofs[zero]['returns'] == [zero],
+            'unsigned quotient requires both complete native runtime cases')
+    data = rom[address-ROM_BASE:end-ROM_BASE]
+    instructions, edges, branches, calls, words = graph.graph(
+        data, address, owner.refine(data, address, mapping))
+    require(not branches and not words and calls == {0x08142B20: zero} and not any(
+        operand.mem.base != ARM_REG_SP or operand.mem.index
+        for ins in instructions.values() for operand in ins.operands if operand.type == ARM_OP_MEM),
+        'unsigned quotient requires stack-only runtime accesses and exact zero call')
+    restored = frame.prove_frame(instructions, edges, address, {}, calls,
+        call_preservation={site: frozenset(PRESERVED) for site in calls})
+    require(restored['returns'] == proofs[address]['returns'],
+            'unsigned quotient independent frame return coverage differs')
+    return dict(identities=[list(row) for row in match.UDIVSI3_IDENTITIES],
+        native_runtime_closure=[[site, proof] for site, proof in sorted(proofs.items())],
+        frame=restored, maximum_additional_stack_bytes=restored['maximum_frame_bytes'],
+        caller_memory_writes=[], caller_stack_reads=[], restores='r4-r11,sp,entry-lr',
+        nonzero='exact canonical unsigned 32-bit quotient; no signed-overflow case',
+        zero='exact returning zero hook 0814274C; R0 is zero',
+        operands='defined scalar R0/R1, no private-frame or saved-value provenance',
+        result='unknown scalar R0; no quotient or flags facts; R1-R3/R12/LR undefined',
+        source_obligation='C division requires a nonzero divisor; runtime zero behavior does not discharge it')
+
+
+def prove(data, address, rom, mapping, index, objects, bindings, *, selector=SELECTOR):
     import owner_admission_profile as owner
     require(all(type(raw) is bytes for raw in (data, rom, mapping, index)),
             'known-query stack buffer requires immutable complete inputs')
+    require(selector in (SELECTOR, DIVISION_SELECTOR), 'unknown known-query stack buffer selector')
+    division = selector == DIVISION_SELECTOR
     refinement = owner.refine(data, address, mapping)
     instructions, edges, local_calls, calls, words = graph.graph(data, address, refinement)
     require(not local_calls and not words, 'known-query stack buffer excludes local BL and word switches')
@@ -441,16 +493,33 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     # Legacy index counts are bounded annotations (named_data_buffer.validate_owner);
     # the complete structural CFG interpreted below establishes the real count.
     require(address not in QUERIES and address not in DEPENDENCIES, 'pinned query bodies are not callers')
+    runtime = quotient_contract(rom, mapping, index) if division else None
+    if division:
+        require(match.UDIVSI3_ADDRESS in calls.values(), 'quotient composition requires an actual canonical division call')
     for site, target in calls.items():
+        if division and target == match.UDIVSI3_ADDRESS:
+            continue
         match.function_address_target(f'func_{target:08X}', rows, address, len(data), len(rom))
-    names = [[site-address, f'func_{target:08X}'] for site, target in sorted(calls.items())]
+    names = [[site-address, '__udivsi3' if division and target == match.UDIVSI3_ADDRESS
+              else f'func_{target:08X}'] for site, target in sorted(calls.items())]
     require(bindings['calls'] == names, 'known-query caller original call identities differ')
     pinned = contract(rom, mapping, index)
-    result = execute(data, address, instructions, edges, calls)
-    return dict(schema=SCHEMA, instructions=len(instructions), calls=names, runtime_calls=[],
+    result = execute(data, address, instructions, edges, calls, unsigned_quotient=division)
+    proof = dict(schema=DIVISION_SCHEMA if division else SCHEMA, instructions=len(instructions),
+        calls=[row for row in names if row[1] != '__udivsi3'],
+        runtime_calls=[row for row in names if row[1] == '__udivsi3'],
         partition=graph.partition(data, address, refinement, instructions, words),
         query_contract=pinned, caller=result, explicit_conditions=list(EXPLICIT_CONDITIONS),
         list_bound_proved_from_ROM=False, physical_memory_permission=False,
         actual_C_function_compatibility_proved=False, termination_proved=False,
         producer_sha256={Path(m.__file__).name: sha(Path(m.__file__).read_bytes())
                          for m in (match, graph, thunk, owner, software_double, __import__(__name__))})
+
+    if division:
+        import zero_aware_unsigned_quotient_inventory as quotient
+        import local_long_branch_profile as frame
+        import software_float_profile as software_float
+        proof['unsigned_quotient'] = runtime
+        proof['producer_sha256'].update({Path(m.__file__).name: sha(Path(m.__file__).read_bytes())
+            for m in (quotient, frame, software_float)})
+    return proof
