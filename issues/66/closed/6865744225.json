@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "29af4c38b9e344f17c6b7fc4ee13349644c9415d2e4910aa314731233ceb1a95",
+    "acknowledged_cursor": 6865744225,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "29af4c38b9e344f17c6b7fc4ee13349644c9415d2e4910aa314731233ceb1a95",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A0014\",\"who\":\"astra-xhigh-terrain-080a0014\",\"note\":\"Native Astra xhigh: finish 574-byte coordinate terrain height and distance eligibility routine; full ordinary CFG supported. Retained 554/574 diagnostic bytes. No tooling changes.\"}",
+      "created_at": "2026-11-13T21:48:09Z",
+      "id": 6865744225,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T21:48:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ae304334e6940df6591568fc628fb76087f4e3b73c4e5ddf9a8e40246a501e0d",
+    "result": {
+      "address": "0x080A0014",
+      "claim_id": 6865744225,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6865744225,
+      "status": "accepted",
+      "who": "astra-xhigh-terrain-080a0014"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "04748f2f65e8cbc188bd4ede385f0f0c6e575d077f759e6fecb119ccfe1070e6",
+    "acknowledged_cursor": 6865957997,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "04748f2f65e8cbc188bd4ede385f0f0c6e575d077f759e6fecb119ccfe1070e6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A0014\",\"who\":\"astra-xhigh-terrain-080a0014\",\"claim_id\":6865744225,\"reason\":\"Released unused: native worker dispatch became unavailable before assignment. No C work started; ordinary CFG candidate remains supported. Reclaim before future work.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T21:59:32Z",
+      "id": 6865957997,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T21:59:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2d80331eb1df789abd06f84f5623b118c4e1fcdbe0da331a520cb2395a246fe7",
+    "result": {
+      "address": "0x080A0014",
+      "claim_id": 6865744225,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6865957997,
+      "status": "accepted",
+      "who": "astra-xhigh-terrain-080a0014"
+    }
+  }
+}
