@@ -1982,7 +1982,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b5c170f710896c402ca70c08c29ce6fdaca694131a49ebab1214481f306abfcf",
+        "acknowledged_cursor": 6849343556,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b5c170f710896c402ca70c08c29ce6fdaca694131a49ebab1214481f306abfcf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08098A88\",\"who\":\"claude-ffta2\",\"claim_id\":6846268198,\"reason\":\"parked: verifier gap or near miss; recovered C and notes kept for a later kit selector\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T09:35:47Z",
+          "id": 6849339947,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:35:47Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "153d09619a29768f277d7eea5c1d9058b5df3d7bceee6a184ab552368e54c31c",
+        "result": {
+          "address": "0x08098A88",
+          "claim_id": 6846268198,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6849339947,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -4860,6 +4888,38 @@
           "request_id": 6849331407,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0957aa17e057dc773d73b374f2582d5f52c4b03b644c5dd269c34f41966312f9",
+        "acknowledged_cursor": 6849343556,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0957aa17e057dc773d73b374f2582d5f52c4b03b644c5dd269c34f41966312f9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08127C54\",\"who\":\"astra-byvalue-08127c54\",\"note\":\"Execute prepared bounded by-value argument hypothesis, based on the adjacent upstream complete match; one address, complete native verification.\"}",
+          "created_at": "2026-11-13T09:35:58Z",
+          "id": 6849343556,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T09:35:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "153d09619a29768f277d7eea5c1d9058b5df3d7bceee6a184ab552368e54c31c",
+        "result": {
+          "address": "0x08127C54",
+          "claim_id": 6849343556,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6849343556,
+          "status": "accepted",
+          "who": "astra-byvalue-08127c54"
         }
       },
       "release": null
