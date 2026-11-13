@@ -3551,6 +3551,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "08e276c600bc750ee2fbe5cc67ac94821d2a4b3a2dcc2646ad04bfad7f6a433b",
+        "acknowledged_cursor": 6865905720,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "08e276c600bc750ee2fbe5cc67ac94821d2a4b3a2dcc2646ad04bfad7f6a433b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4DEC\",\"who\":\"astra-xhigh-effects-080d4dec\",\"note\":\"Native Astra xhigh recovery of complete828-byte timed-effect lifecycle controller; fresh ordinary CFG passes404 instructions. No new symbols or tooling changes.\"}",
+          "created_at": "2026-11-13T21:56:50Z",
+          "id": 6865905720,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:56:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3004cb2261bdc966209205f95b1b7d10990b4c74ef1535dfb506e7b00abae0f7",
+        "result": {
+          "address": "0x080D4DEC",
+          "claim_id": 6865905720,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6865905720,
+          "status": "accepted",
+          "who": "astra-xhigh-effects-080d4dec"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
