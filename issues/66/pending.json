@@ -3386,7 +3386,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "fe7f0280345d721156e27e65e54b86062fe46be064942fb1b47a93a90462f770",
+        "acknowledged_cursor": 6857323630,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fe7f0280345d721156e27e65e54b86062fe46be064942fb1b47a93a90462f770",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081457FC\",\"who\":\"claude-ffta2\",\"claim_id\":6857189559,\"reason\":\"bytes identical only with volatile (m4a vu8 pcmDmaCounter); needs maintainer allowlist decision, parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T15:24:29Z",
+          "id": 6857323630,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T15:24:29Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5f708b7d6e72dc667acc132b9ab2ec2e7f15479afdb854af09fbcaf66a62377a",
+        "result": {
+          "address": "0x081457FC",
+          "claim_id": 6857189559,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6857323630,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     }
   ],
   "issue": 66,
