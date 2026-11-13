@@ -3002,7 +3002,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0454fa4325657280032602f29dac4e6b0a39c5cfc9b8511058ace7310fb9c31d",
+        "acknowledged_cursor": 6852693464,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0454fa4325657280032602f29dac4e6b0a39c5cfc9b8511058ace7310fb9c31d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081102F4\",\"who\":\"claude-ffta2\",\"claim_id\":6852529878,\"reason\":\"parked: verifier gap\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T12:19:33Z",
+          "id": 6852687882,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T12:19:33Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eea67591dba7ab375c42b5880e861c266e3f5933ade75b2a91cd6a8f2a293873",
+        "result": {
+          "address": "0x081102F4",
+          "claim_id": 6852529878,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6852687882,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3034,7 +3062,35 @@
           "who": "astra-scheduler-e6e10"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "36152145bb36715a21273a34ac90caaa940897a270ae72321b0eac9e766636fe",
+        "acknowledged_cursor": 6852693464,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "36152145bb36715a21273a34ac90caaa940897a270ae72321b0eac9e766636fe",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E6E10\",\"who\":\"astra-scheduler-e6e10\",\"claim_id\":6852531218,\"reason\":\"Complete 400-byte plausible C match; native exit 0 and source-bound report replay passed; queued for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T12:19:47Z",
+          "id": 6852693464,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T12:19:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "eea67591dba7ab375c42b5880e861c266e3f5933ade75b2a91cd6a8f2a293873",
+        "result": {
+          "address": "0x080E6E10",
+          "claim_id": 6852531218,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6852693464,
+          "status": "accepted",
+          "who": "astra-scheduler-e6e10"
+        }
+      }
     },
     {
       "claim": {

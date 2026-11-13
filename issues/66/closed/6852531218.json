@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9a7022b5fdc996a7fb97175c5d56750996bbdbb7c75851199e8f5cf4cd45a864",
+    "acknowledged_cursor": 6852546142,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9a7022b5fdc996a7fb97175c5d56750996bbdbb7c75851199e8f5cf4cd45a864",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E6E10\",\"who\":\"astra-scheduler-e6e10\",\"note\":\"Complete C matching with the supported three-per-path scheduler profile\"}",
+      "created_at": "2026-11-13T12:12:59Z",
+      "id": 6852531218,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T12:12:59Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5da8632eb2b67515442b59393d872e5583bfe58aacfd9ddbf9877d60f66e3f19",
+    "result": {
+      "address": "0x080E6E10",
+      "claim_id": 6852531218,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6852531218,
+      "status": "accepted",
+      "who": "astra-scheduler-e6e10"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "36152145bb36715a21273a34ac90caaa940897a270ae72321b0eac9e766636fe",
+    "acknowledged_cursor": 6852693464,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "36152145bb36715a21273a34ac90caaa940897a270ae72321b0eac9e766636fe",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E6E10\",\"who\":\"astra-scheduler-e6e10\",\"claim_id\":6852531218,\"reason\":\"Complete 400-byte plausible C match; native exit 0 and source-bound report replay passed; queued for publication\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T12:19:47Z",
+      "id": 6852693464,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T12:19:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "eea67591dba7ab375c42b5880e861c266e3f5933ade75b2a91cd6a8f2a293873",
+    "result": {
+      "address": "0x080E6E10",
+      "claim_id": 6852531218,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6852693464,
+      "status": "accepted",
+      "who": "astra-scheduler-e6e10"
+    }
+  }
+}
