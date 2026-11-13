@@ -3546,7 +3546,35 @@
           "who": "astra-xhigh-080b8100"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "922054de38dcd35fa87d3c531343cc86dd8a1a834679671d61082220b076198a",
+        "acknowledged_cursor": 6865021040,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "922054de38dcd35fa87d3c531343cc86dd8a1a834679671d61082220b076198a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B8100\",\"who\":\"astra-xhigh-080b8100\",\"claim_id\":6864871278,\"reason\":\"Exact complete native canonical-thunks-v1 match: 788/788 bytes,363/363 instructions,plausible source; preparing publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T21:11:33Z",
+          "id": 6865021040,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T21:11:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "44eb2cca00f9c8b78ac7014c1f7d5541177acbe89a9524e45df8ac92295a39a1",
+        "result": {
+          "address": "0x080B8100",
+          "claim_id": 6864871278,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6865021040,
+          "status": "accepted",
+          "who": "astra-xhigh-080b8100"
+        }
+      }
     },
     {
       "claim": {
