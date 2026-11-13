@@ -211,7 +211,7 @@ def _process_results(paths, check_source, workers):
 
 
 def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_processes=0,
-            *, progress=None):
+            *, progress=None, _publication_results=None):
     """progress, when a dict, receives index_progress() for the matched functions."""
     if not 1 <= jobs <= 64:
         raise ValueError("jobs must be between 1 and 64")
@@ -437,12 +437,21 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         with report_locks.get(path.stem.upper(), nullcontext()):
             return check_source(path)
 
+    # Only the live native publication session supplies this private map. It
+    # authenticates the complete snapshot/runtime before and after collection.
+    prior = _publication_results if _publication_results is not None else {}
+    pending = [path for path in paths if str(path.relative_to(root)) not in prior]
     verified_bodies = []
     with ThreadPoolExecutor(max_workers=jobs) if verify and jobs > 1 else nullcontext() as executor:
         if worker_processes:
-            results = _process_results(paths, check_source, worker_processes)
+            results = _process_results(pending, check_source, worker_processes)
         else:
-            results = executor.map(check_locked_source, paths) if executor else map(check_source, paths)
+            results = executor.map(check_locked_source, pending) if executor else map(check_source, pending)
+        fresh = dict(zip((str(path.relative_to(root)) for path in pending), results))
+        if _publication_results is not None:
+            _publication_results.update(fresh)
+        results = (prior.get(str(path.relative_to(root)), fresh.get(str(path.relative_to(root))))
+                   for path in paths)
         # map yields source order even when subprocesses finish out of order.
         for source_f, source_b, source_problems, source_bodies in results:
             matched_f += source_f

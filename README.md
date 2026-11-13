@@ -301,6 +301,43 @@ Its final push uses an empty expected-tip lease, so even a concurrent creation
 at an ancestor commit is refused. This option cannot be combined with `--force`;
 once the destination exists, use the ordinary publication command.
 
+For an existing contribution branch repeatedly overtaken by disjoint upstream
+matches, an explicit Linux-only live session can retain its own fresh native
+results while the operator rebases between candidates:
+
+```sh
+python tools/push.py --repo ../fftadecomp --remote fork --branch contribution \
+  --force --publication-session --session-base origin/main --worker-processes 4
+```
+
+Startup verifies the captured HEAD, then reads `verify FULL_COMMIT`,
+`push FULL_COMMIT`, or `quit` from stdin. JSON event lines accompany ordinary
+gate diagnostics. `verified` and `progress-stale` events include `status_block`,
+`fresh`, `reused`, and snapshot/runtime/ROM digests. After `progress-stale`, the
+operator may write that exact block to README and `docs/status.md`, commit it,
+and submit the new HEAD. Only `verified` authorizes the session's `push` command.
+The session does not rebase, edit game files, commit, or load saved success JSON.
+EOF or `quit` discards its memory. A new process verifies everything again.
+
+Every candidate is archived and checks source/index uniqueness, complete-body
+overlap, native plausibility, reports, and progress. Added functions compile
+freshly. Changing an existing source or report invalidates all retained results;
+removing a source/report or changing any shared committed input refuses reuse.
+A newly added match may remove only its `Parked/ADDRESS/README.md` and
+`Parked/ADDRESS/ADDRESS.c`. Context-dependent preprocessing (file-presence/time
+macros and token synthesis) is refused in session mode, including spliced forms.
+Headers, both indexes, mappings, profile artifacts, ROM, toolkit, Python,
+capstone, selected compiler/binutils and libraries, search paths and environment
+are bound before and after verification. Unknown/broad Python search paths,
+committed symlinks and build inputs are refused. Pinning never substitutes old
+JSON evidence for a current native verifier result.
+
+Publication rechecks the exact branch HEAD, current linear upstream ancestry,
+and both remote tips, then uses the original exact destination lease. A racing
+destination update is rejected atomically by Git. The separate upstream branch
+cannot be locked by that lease; an update after its last check can still require
+another rebase and CI run. The ordinary one-shot gate remains unchanged.
+
 ## Reference environment for report replay
 
 Reports from the runtime-bound profiles bind the environment that produced
