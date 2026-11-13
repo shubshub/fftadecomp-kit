@@ -3138,66 +3138,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "7e540afe64fff93c9d0080cda0c350fb3a140eb945437e159062e695a4e49fe8",
-        "acknowledged_cursor": 6863410167,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7e540afe64fff93c9d0080cda0c350fb3a140eb945437e159062e695a4e49fe8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C720\",\"who\":\"astra-xhigh-0800c720\",\"note\":\"Recover complete 226-byte packed scanline transform using ordinary native verification; no toolkit edits.\"}",
-          "created_at": "2026-11-13T19:57:53Z",
-          "id": 6863410167,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T19:57:53Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4ab7c1904526247a8c1abdb49f29e47ac74e29f93b3d6754443a0eeb48857b8f",
-        "result": {
-          "address": "0x0800C720",
-          "claim_id": 6863410167,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6863410167,
-          "status": "accepted",
-          "who": "astra-xhigh-0800c720"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "dec824e23b9c94cd030a3b8979d697e388f1f0687765324270fff7ae5f608e71",
-        "acknowledged_cursor": 6863655284,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "dec824e23b9c94cd030a3b8979d697e388f1f0687765324270fff7ae5f608e71",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C720\",\"who\":\"astra-xhigh-0800c720\",\"claim_id\":6863410167,\"reason\":\"Six natural packed forms yield208bytes versus226 target: missing six read-before-write destination loads plus middle-loop narrowing/register difference. No volatile introduced. Native mismatch exit1; evidence retained.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
-          "created_at": "2026-11-13T20:08:39Z",
-          "id": 6863636126,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T20:08:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
-        "result": {
-          "address": "0x0800C720",
-          "claim_id": 6863410167,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6863636126,
-          "status": "accepted",
-          "who": "astra-xhigh-0800c720"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "80ce1a838668f75ac3f9c853d7b099459d36e1d7b29cc4f1a7f02f09ec99a0cb",
         "acknowledged_cursor": 6863460380,
         "body_provenance": "acceptance-time",
