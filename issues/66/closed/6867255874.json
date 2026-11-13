@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "65886a2c74b6f89a26fdbf1774a7ee9c7af5f691c8e46abb3d17ef6ace46cbd1",
+    "acknowledged_cursor": 6867255874,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "65886a2c74b6f89a26fdbf1774a7ee9c7af5f691c8e46abb3d17ef6ace46cbd1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D4DEC\",\"who\":\"astra-xhigh-d4dec-live\",\"note\":\"Native Astra xhigh recovery of 828-byte timed effect lifecycle; ordinary semantic C, no tooling edits\"}",
+      "created_at": "2026-11-13T23:11:37Z",
+      "id": 6867255874,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:11:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d31f4f5e50ac8dd59b9fc9a0e1e6418d7e4909bfc63ae9878e6ed17e2f8d637b",
+    "result": {
+      "address": "0x080D4DEC",
+      "claim_id": 6867255874,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6867255874,
+      "status": "accepted",
+      "who": "astra-xhigh-d4dec-live"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f1ed4b10b882c0793235ffa7a313b1beaf6c7137e0c9d07d03a525019dea9504",
+    "acknowledged_cursor": 6867374321,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f1ed4b10b882c0793235ffa7a313b1beaf6c7137e0c9d07d03a525019dea9504",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D4DEC\",\"who\":\"astra-xhigh-d4dec-live\",\"claim_id\":6867255874,\"reason\":\"Claim unused: no matching C was authored or changed; parent continues active workers and publication\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T23:18:50Z",
+      "id": 6867374321,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:18:50Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "93348cd36e940413ac2137f8e62fcc7e91c87be5ca44758a7b6002ebbb69d749",
+    "result": {
+      "address": "0x080D4DEC",
+      "claim_id": 6867255874,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6867374321,
+      "status": "accepted",
+      "who": "astra-xhigh-d4dec-live"
+    }
+  }
+}
