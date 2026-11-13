@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f57c1f7d624820406af0460bb3b37e2c25219ed37bd7f30f5b0cacae7b2e09a3",
+    "acknowledged_cursor": 6865149080,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f57c1f7d624820406af0460bb3b37e2c25219ed37bd7f30f5b0cacae7b2e09a3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804FFB8\",\"who\":\"astra-retained-0804ffb8\",\"note\":\"Replay retained byte-exact source unchanged under existing addressed-unsigned-runtime-readonly-word0-v1; no C iteration or toolkit edits.\"}",
+      "created_at": "2026-11-13T21:18:03Z",
+      "id": 6865149080,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T21:18:03Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "036d9a7d865328b8596b2a86dca8db4be2a1d5523c65b7ff10738d0ba754e864",
+    "result": {
+      "address": "0x0804FFB8",
+      "claim_id": 6865149080,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6865149080,
+      "status": "accepted",
+      "who": "astra-retained-0804ffb8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d2379b19bea7b4c9648ecd1070608b93dc09dd819cb0d3f015b4214639163372",
+    "acknowledged_cursor": 6865180457,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d2379b19bea7b4c9648ecd1070608b93dc09dd819cb0d3f015b4214639163372",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804FFB8\",\"who\":\"astra-retained-0804ffb8\",\"claim_id\":6865149080,\"reason\":\"Retained C unchanged now passes native addressed-unsigned-runtime-readonly-word0-v1: complete164/164bytes,plausible; source SHA e9b93ddc6ca3186e8b2cc67416c3121fd007342d8a941ace404930b6512982cd. Added to following publication batch.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T21:19:40Z",
+      "id": 6865180457,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T21:19:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b21d59e756ac5c21908db704a0f6dd8f53e025a476f9df343d0f3a1a5539038e",
+    "result": {
+      "address": "0x0804FFB8",
+      "claim_id": 6865149080,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6865180457,
+      "status": "accepted",
+      "who": "astra-retained-0804ffb8"
+    }
+  }
+}
