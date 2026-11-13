@@ -830,7 +830,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5d2684ab0ce5b27ee27fdfefc6d610e9bdcb90678adb88b30b7e60c8778dedb6",
+        "acknowledged_cursor": 6867265506,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5d2684ab0ce5b27ee27fdfefc6d610e9bdcb90678adb88b30b7e60c8778dedb6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080989AC\",\"who\":\"claude-ffta2\",\"claim_id\":6848350226,\"reason\":\"parked: Near miss: loop register rotation (cell ptr r6/x r5/z r4 in target; ours r4/r5/r6). ~30 compiles. Permuter candidate. Sibling 08099F58 uses static-cal\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:11:50Z",
+          "id": 6867259311,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:11:50Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1903be068750d260f3d7e8e3678f5f4562aceaf204d184ed0b67c70e7bc13a1f",
+        "result": {
+          "address": "0x080989AC",
+          "claim_id": 6848350226,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867259311,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -2590,7 +2618,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a2b98969e94476e10169d185efa7df900bf8581f821f0efd2f2df947e8dd588f",
+        "acknowledged_cursor": 6867265506,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a2b98969e94476e10169d185efa7df900bf8581f821f0efd2f2df947e8dd588f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FDF90\",\"who\":\"claude-ffta2\",\"claim_id\":6867139992,\"reason\":\"parked: byte-identical, verifier gap (stack-index + thunks + BIOS runtimes)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:12:13Z",
+          "id": 6867265506,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:12:13Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1903be068750d260f3d7e8e3678f5f4562aceaf204d184ed0b67c70e7bc13a1f",
+        "result": {
+          "address": "0x080FDF90",
+          "claim_id": 6867139992,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867265506,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
