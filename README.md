@@ -1193,13 +1193,19 @@ selector:
 python tools/match.py --root ../fftadecomp 08099CDC --owner-runtime-profile conditional-two-word-literal-callback-closure-v1
 ```
 
-Five exact root forms are accepted. Only the aligned owner word load, the
+Seven exact root forms are accepted. Only the aligned owner word load, the
 BLs and the two typed literals (callback, then adapter) may vary.
 Descriptor word zero is the constant zero (36 bytes), the entry R0 value
 (40 bytes), the u8 narrowing of entry R1 (`entry-byte`, 40 bytes with a zero
 alignment halfword), the owner word that is also the iterator's list argument
-(`owner-word-trailing-call`, 44 bytes, saves R4), or the address of a private
-two-word state (44 bytes). The owner-word form then reloads the owner word
+(`owner-word-trailing-call`, 44 bytes, saves R4), the address of a private
+two-word state initialized to zero and entry R1 (44 bytes, returns state word
+zero) or to entry R1 and entry R2 (`entry-state`, 40 bytes, returns nothing),
+or the address of a private flag byte initialized to zero (`local-byte-flag`,
+56 bytes). The flag root reads the byte back after the iterator and returns 1
+if it is nonzero, else 0; its literal pool sits between that branch and the
+`movs r0,#1` arm, so its template spans the whole function with the pool
+masked. The owner-word form then reloads the owner word
 through the same pinned halfword and makes one ordinary typed call on it. That
 callee is opaque, but R2 still holds the descriptor address when the list
 iterator returns on an empty list. So the callee is decoded as ARMv4T Thumb
@@ -1263,24 +1269,61 @@ premises:
 * the local area is a valid private frame, and the out-pointers stay inside it;
 * the getter and the target use the returning ABI.
 
-In the zero and entry-R0 forms no private address is passed to the callback as
+In the opaque forms no private address is passed to the callback as
 an argument. Its
 identity is pinned, but its effects stay opaque under the same compatible
 returning ABI and noninterference premises as the 28-byte profile. In the
-private-state form the callback receives a private-frame address. It must be the
-pinned complete `0809AC20` body, and its effects are interpreted: it reads and
-writes only the two state words, increments word zero, and stores the getter
-word through the word-four cursor before advancing it by four. The root's
-read-back of state word zero after the call is reported as zero plus one per
-returning callback, modulo 2^32. The adapter's no-private-provenance premise is
-replaced for that word, not asserted satisfied. Cursor-store validity and
-nonoverlap and list liveness remain explicit conditions; no iteration bound is
-assumed and termination is unproved. The root frame is fixed by the exact byte
-template rather than the frame prover.
+two state forms and the flag form the callback receives a private-frame
+address, so it must be a pinned callback paired with that one root form, and
+its effects are interpreted.
+
+* **State callbacks** (`STATE_CALLBACKS`) are complete straight-line leaves
+  pinned byte for byte. The interpreter derives the effect and compares it
+  with the pinned one. `0809AC20` (private-state form) reads and writes only
+  the two state words, increments word zero, and stores the getter word
+  through the word-four cursor before advancing it by four; the root's
+  read-back of state word zero is reported as zero plus one per returning
+  callback, modulo 2^32. `0809ACA4` (`entry-state`) reads the two state words
+  without writing them and replaces the getter object's word at +0x30 with
+  `(word & ~state[0]) | state[4]`.
+* **Flag callbacks** (`FLAG_CALLBACKS`) pass the flag address on, so the whole
+  closed call tree is pinned by size, refined count and SHA-256: `0809AD48`,
+  `08098BB0` and the six leaf predicates it calls. Every body is completed
+  against the index and interpreted over its whole instruction graph, with
+  calls interpreted in their caller's context. Through the flag address the
+  tree may only read bytes 0 and 1 and store to byte 0 that byte's value, read
+  since the last store or call, plus one. Otherwise it may only copy the
+  address (a callee-saved copy is followed too); a copy also sets the
+  condition flags, so it may select among interpreted paths. It may not store
+  or push the address, compute with it or use it as any other base. Byte 0
+  may only be copied, incremented and stored back; byte 1 may only be masked
+  by a constant and tested. No flag byte value may be left in R0-R3/R12 when
+  the callback returns. The tree makes no other store and no SP-relative
+  access beyond PUSH/POP of its own frame. Every function restores R4-R11 and
+  SP and returns through its entry LR, leaving none of its own callee-saved
+  values in scratch registers, and the callback returns 1. The scratch
+  registers that may still hold the address on return are iterated to a
+  fixed point (re-seeding them at entry until the set is stable; R3 for
+  `0809AD48`) and recorded. A graph walk then shows that the iterator,
+  adapter, getter and root continuation never read them before overwriting
+  them, and they are reported as expired aliases. The flag form admits only
+  the scalar adapter. The root's read-back is reported as 1 if flag byte 0 is
+  nonzero, flag byte 0 being zero plus one per interpreted increment, modulo
+  2^8. The root never initializes flag byte 1. The callback's two reads of it
+  are reported as indeterminate reads that only select among interpreted
+  paths.
+
+The adapter's no-private-provenance premise is
+replaced for that word, not asserted satisfied. Store validity and nonoverlap,
+external-read validity and list liveness remain explicit conditions; no
+iteration bound is assumed and termination is unproved. The root frame is
+fixed by the exact byte template rather than the frame prover.
 
 The profile requires the **refined** instruction count for the root in both
 `config/functions.json` and `symbols/functions.txt`: 17 for the 44-byte form,
-15 for the 40-byte form and 13 for the 36-byte form. This is the
+15 for the 40-byte form and 13 for the 36-byte form (14 for `entry-byte`, 16
+for `owner-word-trailing-call`, 15 for `entry-state` and 23 for
+`local-byte-flag`). This is the
 reachable-instruction count reported by `analyze.refine_function`, which
 excludes the literal pool. The analyzer's raw rows count pool halfwords as
 instructions (22, 20 and 18). With today's index only `08099CDC` reaches the

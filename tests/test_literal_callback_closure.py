@@ -23,9 +23,20 @@ T1,T2,F,FG=0x080C7D18,0x080C7D70,0x0809AC00,0x080C7B78
 TREE={T1:'f0b50f1c161c846801225242251c002c1ed0e168002907d0914205d02069904211d0221c0c1cf2e7206990420bd0201c311c7af089fa00280ad02069002802d0221c041ce3e7ac4202d0221ca468dee7f0bc01bc0047',
       T2:'f0b50f1c161c846801225242251c002c1ed02169002907d0914205d0e068904211d0221c0c1cf2e7e06890420bd0201c311c7af05dfa00280ad0e068002802d0221c041ce3e7ac4202d0221ca468dee7f0bc01bc0047'}
 K=0x08006800  # trailing callee: movs r2,#0; bx lr
+E,FL=0x0809ACA4,0x0809AD48  # entry-state callback; flag callback (root of the pinned tree)
+# Genuine bodies of the pinned flag callback tree, at their own addresses.
+FLAGTREE={FL:'00b5021c0b1c1068018d8020c0010840002804d0101c191cfdf726ff00e0012002bc0847',
+    0x08098BB0:'30b5041c0d1c20682ff062fb0006002805d0206834f082fe0006002824d0206834f0acfe000600281ed1206835f086f80006002818d1697801200840002805d020682ff035fb000600280dd1697802200840002805d020682ff05afc0006002802d0287801302870012030bc02bc0847',
+    0x080C8280:'00b50021002803d0008b002800d10121081c02bc0847',
+    0x080CD8CC:'00b5e830042100780840002801d0012000e0002002bc0847',
+    0x080CD92C:'00b5e830402100780840002801d0012000e0002002bc0847',
+    0x080CDCEC:'00b5ed30402100780840002801d0012000e0002002bc0847',
+    0x080C8260:'00b50021002807d0018d8020800108400004000c4042c10f081c02bc0847',
+    0x080C84C0:'00b50022002811d00079011c52290cd054290ad0532908d01e2906d01f2904d039380006000e0d2800d80122101c02bc0847'}
 ROOTS={  # form: (owner-load halfword, callback)
     'private-state':(0x6900,S),'entry-object':(0x6910,X),'null':(0x6900,X),
-    'entry-byte':(0x6900,X),'owner-word-trailing-call':(0x6920,X)}
+    'entry-byte':(0x6900,X),'owner-word-trailing-call':(0x6920,X),
+    'entry-state':(0x6900,E),'local-byte-flag':(0x6940,FL)}
 
 
 def tree_graph(body,address=T1,count=42):
@@ -49,6 +60,9 @@ def root(form,callback,iterator=W,adapter=C):
     if 'trailing' in shape:
         struct.pack_into('<H',body,shape['trailing']['reload'],load)
         body[shape['trailing']['call']:shape['trailing']['call']+4]=bl(A+shape['trailing']['call'],K)
+    if len(body)==shape['size']:  # whole-function template with an interior pool
+        struct.pack_into('<II',body,shape['callback'],callback+1,adapter+1)
+        return bytes(body)
     return bytes(body)+struct.pack('<II',callback+1,adapter+1)
 
 
@@ -58,8 +72,12 @@ def fixture(form='private-state',changes=None,callback=None,iterator=W,framed=Fa
     adapter=bytes.fromhex('10b50c1c')+bl(C+4,G)+bytes.fromhex('21686268')+bl(C+12,thunk.ALIASES['_call_via_r2'])+bytes.fromhex('10bc02bc0847')
     used=F if framed else C
     bodies={A:root(form,callback,iterator,used),W:worker,G:bytes.fromhex('00687047'),
-            S:bytes.fromhex(closure.STATE_CALLBACKS[S][1]),X:bytes.fromhex('01207047')}
-    counts={A:closure.FORMS[form]['count'],W:16,G:2,S:8,X:2}
+            X:bytes.fromhex('01207047')}
+    counts={A:closure.FORMS[form]['count'],W:16,G:2,X:2}
+    for target,pinned in closure.STATE_CALLBACKS.items():
+        bodies[target]=bytes.fromhex(pinned['body']);counts[target]=pinned['count']
+    for target,body in FLAGTREE.items():
+        bodies[target]=bytes.fromhex(body);counts[target]=closure.FLAG_CALLBACKS[FL]['tree'][target][1]
     if 'trailing' in closure.FORMS[form]:
         bodies[K]=bytes.fromhex('00227047');counts[K]=2
     if framed:
@@ -302,7 +320,7 @@ class LiteralClosureTests(unittest.TestCase):
         for offset,value in ((0,0x688A),(4,0x6809),(6,0x3002),(8,0x6088),(12,0x2000)):
             with self.subTest(offset=offset),self.assertRaises(ValueError):
                 owner.verify(**fixture(changes={(S,offset):value}))
-        raw=bytearray.fromhex(closure.STATE_CALLBACKS[S][1]);raw[8:10]=bytes.fromhex('0960')
+        raw=bytearray.fromhex(closure.STATE_CALLBACKS[S]['body']);raw[8:10]=bytes.fromhex('0960')
         with self.assertRaisesRegex(ValueError,'pinned state callback body differs'):
             closure.state_callback_effects(bytes(raw),S)
 
@@ -312,7 +330,7 @@ class LiteralClosureTests(unittest.TestCase):
                            ((0,'8a68'),'leaves the private two-word state'),((6,'0230'),'effect relation')):
             changed=bytearray(raw);changed[edit[0]:edit[0]+2]=bytes.fromhex(edit[1])
             with self.subTest(edit=edit),self.assertRaisesRegex(ValueError,error),\
-                    patch.dict(closure.STATE_CALLBACKS,{S:(8,changed.hex())}):
+                    patch.dict(closure.STATE_CALLBACKS,{S:dict(closure.STATE_CALLBACKS[S],body=changed.hex())}):
                 closure.state_callback_effects(bytes(changed),S)
 
     def test_private_state_requires_pinned_callback(self):
@@ -394,7 +412,7 @@ class LiteralClosureTests(unittest.TestCase):
                     self.assertIn(f'node+{first} subtree visited before',it['kind'])
                     self.assertEqual(sorted(r['offset'] for r in it['reads'] if r['base']=='current node'),[8,12,16])
                     self.assertEqual([r['offset'] for r in it['reads'] if r['base']=='list object'],[8])
-                    self.assertEqual(proof['outward_expired_aliases'],[])
+                    self.assertEqual([row for row in proof['outward_expired_aliases'] if row['register']==2],[])
                     self.assertFalse(it['termination_proved'])
 
     def test_list_iterator_record_is_bound(self):
@@ -440,6 +458,10 @@ class LiteralClosureTests(unittest.TestCase):
         for iterator in (W,T1,T2):
             for form in closure.FORMS:
                 with self.subTest(iterator=hex(iterator),form=form):
+                    if form=='local-byte-flag':
+                        with self.assertRaisesRegex(ValueError,'private flag requires the scalar adapter'):
+                            owner.verify(**fixture(form,iterator=iterator,framed=True))
+                        continue
                     manifest,_=owner.verify(**fixture(form,iterator=iterator,framed=True))
                     proof=manifest['proof']['literal_callback_closure']
                     self.assertEqual(proof['adapter_shape'],'framed-two-output')
@@ -546,6 +568,188 @@ class LiteralClosureTests(unittest.TestCase):
         entry=dict(closure.ITERATORS[W],sha256=closure.sha(bytes(worker)),reads=(('list',4),('list',8)))
         with self.assertRaisesRegex(ValueError,'outside the list object'):
             closure.iterator_structure(bytes(worker),W,entry,*tree_graph(bytes(worker),W,16))
+
+    def test_entry_state_form(self):
+        manifest,ins=owner.verify(**fixture('entry-state'))
+        self.assertEqual(len(ins),15)
+        proof=manifest['proof']['literal_callback_closure']
+        self.assertEqual(proof['form'],'entry-state')
+        self.assertEqual(proof['private_state'],dict(offset=-20,width=8,result=None,
+            initialized=[dict(offset=0,entry_register=1),dict(offset=4,entry_register=2)]))
+        self.assertEqual([(w['offset'],w['source']) for w in proof['root_descriptor']['initialized_words']],
+                         [(-20,'root entry R1'),(-16,'root entry R2'),(-12,'address of private state'),(-8,'typed callback literal')])
+        effects=proof['callback']
+        self.assertEqual(effects['address'],E);self.assertTrue(effects['private_provenance_passed'])
+        self.assertEqual([row[1] for row in effects['state_reads']],[0,4]);self.assertEqual(effects['state_writes'],[])
+        self.assertEqual(effects['external_reads'],[[E+2,'getter object',48,4]])
+        self.assertEqual(effects['external_writes'],[[E+10,'getter object',48,4,'((object word 48 & ~state word 0) | state word 4)']])
+        conditions=' '.join(proof['explicit_conditions'])
+        self.assertIn('getter object word at offset 48',conditions);self.assertNotIn('word-4 cursor',conditions)
+        self.assertNotIn('Loaded input words carry no tracked private-frame',conditions)
+        # The private-state form keeps its own record and cursor premise.
+        state=owner.verify(**fixture())[0]['proof']['literal_callback_closure']
+        self.assertNotIn('external_reads',state['callback'])
+        self.assertIn('word-4 cursor',' '.join(state['explicit_conditions']))
+
+    def test_local_byte_flag_form(self):
+        manifest,ins=owner.verify(**fixture('local-byte-flag'))
+        self.assertEqual(len(ins),23)
+        self.assertEqual(manifest['proof']['partition']['alignment_bytes'],0)
+        proof=manifest['proof']['literal_callback_closure']
+        self.assertEqual(proof['form'],'local-byte-flag')
+        self.assertEqual(proof['root_frame']['local_bytes'],12)
+        self.assertEqual(proof['root_descriptor']['initialized_words'][0],dict(offset=-16,width=1,source='constant zero'))
+        self.assertEqual(proof['root_descriptor']['actual_buffer_checks'][0]['pointer_slots'],[[-12,-16]])
+        state=proof['private_state']
+        self.assertEqual((state['offset'],state['width'],state['initialized'],state['uninitialized_bytes']),
+                         (-16,1,[dict(offset=0,width=1,value=0)],[1,2,3]))
+        self.assertEqual(state['result']['site'],A+30)
+        self.assertIn('1 if flag byte 0 is nonzero',state['result']['relation'])
+        self.assertEqual([row['site'] for row in state['indeterminate_reads']],[0x08098BE6,0x08098BFC])
+        effects=proof['callback']
+        self.assertEqual([row['address'] for row in effects['tree']],sorted(FLAGTREE))
+        self.assertEqual(effects['flag_reads'],[[0x08098BE6,1,1],[0x08098BFC,1,1],[0x08098C12,0,1]])
+        self.assertEqual([row[:3] for row in effects['flag_writes']],[[0x08098C16,0,1]])
+        self.assertEqual((effects['return_value'],effects['external_writes'],effects['flag_address_stored']),(1,[],False))
+        self.assertEqual(effects['flag_aliases_on_return'],[3])
+        self.assertEqual([row['register'] for row in proof['outward_expired_aliases']],[2,3])
+        conditions=' '.join(proof['explicit_conditions'])
+        self.assertIn('private flag address',conditions);self.assertIn('interpreted callback tree',conditions)
+        self.assertNotIn('its effects are not interpreted',conditions)
+        self.assertNotIn('Loaded input words carry no tracked private-frame',conditions)
+
+    def test_new_genuine_roots_and_refined_counts(self):
+        for form,raw in (('entry-state','00b584b00091019205496a46029202aa5160006903492df0affb04b001bc0047a5ac0908e9ab0908'),
+                         ('local-byte-flag','00b583b0002269460a7007496a46019201aa5160406905492df00afa68460078002805d1002004e049ad0908e9ab0908012003b002bc0847'),
+                         ('local-byte-flag','00b583b0002269460a7007496a46019201aa5160806905492df0eef968460078002805d1002004e049ad0908e9ab0908012003b002bc0847')):
+            with self.subTest(form=form):self.assertEqual(closure.form_of(bytes.fromhex(raw)),form)
+        # The unrefined rows (pool halfwords and both BL halves counted) refuse.
+        for form,count in (('entry-state',20),('local-byte-flag',28)):
+            values=fixture(form);rows=json.loads(values['mapping'])
+            next(row for row in rows if int(row['rom'],16)==A)['instrs']=count
+            values['mapping']=json.dumps(rows).encode()
+            values['index']=values['index'].replace(f' {closure.FORMS[form]["count"]} return'.encode(),f' {count} return'.encode(),1)
+            with self.subTest(form=form),self.assertRaisesRegex(ValueError,'exact complete owner/count'):owner.verify(**values)
+
+    def test_new_root_templates_refuse_other_shapes(self):
+        for form,offset,value in (
+                ('local-byte-flag',4,0x2201),   # flag initialized to one, not zero
+                ('local-byte-flag',8,0x46C0),   # flag never initialized
+                ('local-byte-flag',8,0x600A),   # a word store over the flag slot
+                ('local-byte-flag',28,0x9800),  # flag word read instead of the byte
+                ('local-byte-flag',30,0x8800),  # halfword read
+                ('local-byte-flag',34,0xD005),  # beq: inverted result
+                ('local-byte-flag',36,0x2001),  # both arms return one
+                ('local-byte-flag',38,0xE005),  # branch past the epilogue
+                ('local-byte-flag',2,0xB084),   # frame size
+                ('local-byte-flag',14,0x9100),  # extra store of the literal over the flag
+                ('entry-state',4,0x9300),       # state word zero from R3
+                ('entry-state',6,0x9102),       # state word four from R1
+                ('entry-state',26,0x9802)):     # result read-back
+            with self.subTest(form=form,offset=offset),self.assertRaisesRegex(ValueError,'natural root form'):
+                owner.verify(**fixture(form,changes={(A,offset):value}))
+        # Reading the flag before the call is not a pinned shape either.
+        data=bytearray(fixture('local-byte-flag')['data']);data[22:24]=bytes.fromhex('0078')
+        with self.assertRaisesRegex(ValueError,'natural root form'):closure.form_of(bytes(data))
+
+    def test_private_callbacks_pair_with_their_own_root_form(self):
+        for form,callback,error in (('local-byte-flag',X,'pinned flag callback'),('local-byte-flag',S,'pinned flag callback'),
+                                    ('local-byte-flag',E,'pinned flag callback'),('entry-state',S,'pinned state callback'),
+                                    ('entry-state',X,'pinned state callback'),('entry-state',FL,'pinned state callback'),
+                                    ('private-state',E,'pinned state callback'),('null',FL,'local-byte-flag root form'),
+                                    ('entry-byte',FL,'local-byte-flag root form'),('null',E,'private-state root form')):
+            with self.subTest(form=form,callback=hex(callback)),self.assertRaisesRegex(ValueError,error):
+                owner.verify(**fixture(form,callback=callback))
+
+    def test_entry_state_callback_changes_refuse(self):
+        for offset,value in ((2,0x6A82),(8,0x438A),(2,0x6301),(12,0x2000)):
+            with self.subTest(offset=offset),self.assertRaises(ValueError):
+                owner.verify(**fixture('entry-state',changes={(E,offset):value}))
+        raw=bytes.fromhex(closure.STATE_CALLBACKS[E]['body'])
+        # str r1,[r0,#48] stores the state address; ldr r1,[r1,#8] leaves the state;
+        # orrs in place of bics; and a second store through the object.
+        for edit,error in (((2,0x6301),'stores the private state address'),((6,0x6889),'leaves the private two-word state'),
+                           ((4,0x431A),'effect relation'),((10,0x6301),'effect relation'),((12,0x6302),'return/frame differs'),
+                           ((4,0x438A),'computes with the private state')):
+            changed=bytearray(raw);struct.pack_into('<H',changed,*edit)
+            with self.subTest(edit=edit),self.assertRaisesRegex(ValueError,error),\
+                    patch.dict(closure.STATE_CALLBACKS,{E:dict(closure.STATE_CALLBACKS[E],body=changed.hex())}):
+                closure.state_callback_effects(bytes(changed),E)
+
+    def flag_effects(self,target,offset,value):
+        """Interpret the flag tree with one halfword changed and its pin updated."""
+        values=fixture('local-byte-flag',changes={(target,offset):value})
+        body=values['rom'][target-match.ROM_BASE:target-match.ROM_BASE+len(FLAGTREE[target])//2]
+        tree=dict(closure.FLAG_CALLBACKS[FL]['tree']);size,count,_=tree[target];tree[target]=(size,count,closure.sha(body))
+        with patch.dict(closure.FLAG_CALLBACKS,{FL:dict(closure.FLAG_CALLBACKS[FL],tree=tree)}):
+            return closure.flag_callback_effects(FL,values['rom'],values['mapping'],values['index'])
+
+    def test_flag_tree_pins_and_counts(self):
+        effects,aliases=closure.flag_callback_effects(FL,*(fixture('local-byte-flag')[k] for k in ('rom','mapping','index')))
+        self.assertEqual(aliases,[3]);self.assertEqual(effects['return_value'],1)
+        for target,offset,value in ((FL,6,0x6811),(0x08098BB0,0x64,0x3002),(0x080C84C0,2,0x2201)):
+            with self.subTest(target=hex(target)),self.assertRaisesRegex(ValueError,'pinned flag callback tree differs'):
+                owner.verify(**fixture('local-byte-flag',changes={(target,offset):value}))
+        values=fixture('local-byte-flag');rows=json.loads(values['mapping'])
+        next(row for row in rows if int(row['rom'],16)==0x080C8280)['instrs']+=1
+        values['mapping']=json.dumps(rows).encode()
+        with self.assertRaises(ValueError):owner.verify(**values)
+
+    def test_flag_tree_interpreter_refuses_escapes(self):
+        B=0x08098BB0
+        for target,offset,value,error in (
+                (B,0x66,0x7068,'access through the flag address differs'),   # strb r0,[r5,#1]
+                (B,0x36,0x78A9,'access through the flag address differs'),   # ldrb r1,[r5,#2]
+                (B,0x66,0x6028,'access through the flag address differs'),   # word store
+                (B,0x64,0x3002,'computes with a tracked'),                  # adds r0,#2 on the flag byte
+                (B,0x64,0x0000,'access through the flag address differs'),   # stores the byte unchanged
+                (FL,6,0x6013,'stores outside the private flag byte'),        # str r3,[r2]: flag address to memory
+                (FL,0,0xB502,'stores the flag address'),                     # push {r1,lr}
+                (FL,4,0x1C4B,'computes with a tracked'),              # adds r3,r1,#1
+                (FL,30,0x1C18,'return/frame differs'),                       # returns the flag address
+                (0x080C8280,8,0x8B18,'access through the flag address differs'),  # ldrh r0,[r3,#24]: the R3 alias
+                (0x080C8280,2,0x2400,'return/frame differs'),                # clobbers R4
+                (0x080C8280,0,0xB410,'return/frame differs'),               # push {r4}: returns through the saved R4, not LR
+                # Review attacks: the caller's R5 flag address copied out of a
+                # callee-saved register, a callee-saved value returned, and
+                # uninitialized flag byte 1 used other than as a tested bit.
+                (0x080C8280,10,0x1C2A,'return/frame differs'),              # adds r2,r5,#0 in a leaf
+                (0x080C8280,16,0x1C20,'return/frame differs'),              # adds r0,r4,#0: the leaf's own R4 returned
+                (B,0x38,0x6808,'computes with a tracked'),                  # ldr r0,[r1]: byte 1 as a load base
+                (B,0x3A,0x4308,'computes with a tracked'),                  # orrs r0,r1: byte 1 as data
+                (B,0x38,0x4048,'computes with a tracked'),                  # eors r0,r1: byte 1 mixed with a constant
+                (B,0x3C,0x1C0A,'return/frame differs'),                     # adds r2,r1,#0: byte 1 left in R2
+                (B,0x3E,0x1C0A,'return/frame differs'),                     # same, as the beq is replaced
+                (B,0x3C,0x782A,'return/frame differs')):                    # ldrb r2,[r5]: byte 0 left in R2
+            with self.subTest(target=hex(target),offset=offset),self.assertRaisesRegex(ValueError,error):
+                self.flag_effects(target,offset,value)
+
+    def test_scratch_alias_must_not_reach_a_reader(self):
+        def check(body,registers=(3,)):
+            rows=json.dumps([dict(rom=f'0x{G:08X}',end=f'0x{G+len(body):08X}',mode='thumb',instrs=len(body)//2),
+                             dict(rom=f'0x{X:08X}',end=f'0x{X+4:08X}',mode='thumb',instrs=2)]).encode()
+            ins,edges,_,calls,_=graph.graph(body,G,owner.refine(body,G,rows))
+            closure.scratch_aliases_unread(ins,edges,calls,G,registers)
+        check(bytes.fromhex('00687047'))          # the genuine getter
+        check(bytes.fromhex('00231b687047'))      # movs r3,#0 then ldr r3,[r3]: overwritten first
+        for body in (bytes.fromhex('18687047'),bytes.fromhex('1846'+'7047'),bytes.fromhex('0023')+bl(G+2,X)+bytes.fromhex('18687047')):
+            with self.subTest(body=body.hex()),self.assertRaisesRegex(ValueError,'alias reaches a reader'):check(body)
+        with self.assertRaisesRegex(ValueError,'alias reaches a reader'):check(bytes.fromhex('6046'+'7047'),(12,))
+
+    def test_tampered_private_records_refuse(self):
+        for form,path,value in (('local-byte-flag',('callback','flag_writes'),[]),
+                                ('local-byte-flag',('callback','flag_aliases_on_return'),[]),
+                                ('local-byte-flag',('private_state','result','relation'),'zero'),
+                                ('local-byte-flag',('private_state','indeterminate_reads'),[]),
+                                ('local-byte-flag',('outward_expired_aliases',),[]),
+                                ('entry-state',('callback','external_writes'),[]),
+                                ('entry-state',('private_state','initialized'),[])):
+            values=fixture(form);report,_=owner.verify(**values)
+            changed=copy.deepcopy(report);target=changed['proof']['literal_callback_closure']
+            for key in path[:-1]:target=target[key]
+            target[path[-1]]=value
+            with self.subTest(form=form,path=path),self.assertRaisesRegex(ValueError,'manifest differs'):
+                owner.verify(**values,manifest=changed)
 
 
 if __name__=='__main__':

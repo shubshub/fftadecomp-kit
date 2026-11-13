@@ -1,18 +1,22 @@
 """Initialized local descriptors whose callback word is a typed function literal.
 
-Five exact root forms reach one of a closed table of pinned read-only node
+Seven exact root forms reach one of a closed table of pinned read-only node
 iterators (the 080C7CC0 list walk or the 080C7D18/080C7D70 in-order tree
 walks) and either the two-word scalar adapter admitted by
 conditional-two-word-callback-closure-v1 or a pinned framed two-output adapter
 whose getter effect is interpreted. Descriptor
 word zero is the constant zero, the entry R0 value, the u8 narrowing of entry
-R1, the owner word that is also the iterator's list argument, or the address of
-a private two-word state. The owner-word form makes one more opaque typed call
+R1, the owner word that is also the iterator's list argument, the address of
+a private two-word state (initialized to zero and entry R1, or to entry R1 and
+entry R2), or the address of a private flag byte initialized to zero. The
+owner-word form makes one more opaque typed call
 on the reloaded owner word; that callee must provably overwrite entry R2 (the
 descriptor address on the empty-list path) before reading it. Only the state
-form passes private-frame provenance, so only an
-exact pinned state callback is admitted there and its complete effect is
-interpreted; the root then returns the state word it reads back after the call.
+and flag forms pass private-frame provenance, so only an exact pinned callback
+is admitted there and its complete effect is interpreted: a state callback is
+one straight-line leaf, a flag callback a pinned closed call tree. The
+private-state root returns the state word it reads back after the call; the
+flag root returns whether the flag byte it reads back is nonzero.
 Opaque callbacks retain the explicit compatible returning ABI and memory
 noninterference premises. No iteration bound or termination is assumed.
 """
@@ -105,10 +109,54 @@ FORMS = {
         word0='owner word loaded from root entry R0 (the iterator list argument)',
         saved=['entry R4', 'entry LR'], trailing=dict(reload=22, call=24),
         code='10b582b0041c0749xxxx0090019106496a46xxxxxxxxxxxxxxxxxxxx02b010bc01bc0047'),
+    # str r1,[sp]; str r2,[sp,#4]: the private state is entry R1 and entry R2;
+    # the root returns nothing after the iterator.
+    'entry-state': dict(size=40, count=15, call=22, owner=18, callback=32, adapter=36, owner_base=0,
+        stack_words=5, frame_bytes=16, descriptor=-12, state=-20, word0='address of private state at entry SP-20',
+        state_sources=['root entry R1', 'root entry R2'],
+        code='00b584b00091019205496a46029202aa5160xxxx0349xxxxxxxx04b001bc0047'),
+    # strb of zero at SP+0: a private flag byte; after the iterator the root
+    # returns 1 if the byte it reads back is nonzero, else 0. The literal pool
+    # sits between the branch and the `movs r0,#1` arm, so this template spans
+    # the whole function with the two literal words masked.
+    'local-byte-flag': dict(size=56, count=23, call=24, owner=20, callback=40, adapter=44, owner_base=0,
+        stack_words=4, frame_bytes=12, descriptor=-12, state=-16, flag=True,
+        word0='address of private flag byte at entry SP-16',
+        code='00b583b0002269460a7007496a46019201aa5160xxxx0549xxxxxxxx' +
+             '68460078002805d1002004e0xxxxxxxxxxxxxxxx012003b002bc0847'),
 }
-# The only private-state callback admitted: it receives the state address in
-# R1, so its complete body is pinned and interpreted below.
-STATE_CALLBACKS = {0x0809AC20: (8, '4a6801c20868013008604a6001207047')}
+# The only private-state callbacks admitted: each receives the state address
+# in R1, so its complete body is pinned, interpreted below and compared with
+# the pinned effect, and it is paired with the one root form whose state it
+# was written for.
+STATE_CALLBACKS = {
+    0x0809AC20: dict(count=8, body='4a6801c20868013008604a6001207047', form='private-state',
+        state={0: ('state-word-0-plus', 1), 4: ('cursor-plus', 4)}, reads=[0, 4], writes=[0, 4],
+        external=[['state word 4 on entry', 0, 4, ('object',)]], external_reads=None,
+        relation='state word 0 becomes its incoming value plus 1 modulo 2**32; the object word is stored at the incoming state word 4 cursor, which then advances by 4; R0 is 1',
+        condition='Each callback store through the state word-4 cursor is aligned, live and writable, and does not overlap the private state, descriptor, any active frame, saved return, reached list/node word or code. The incoming entry R1 cursor carries no private-frame provenance.'),
+    # flags = (flags & ~state word 0) | state word 4 on the getter object's word +0x30.
+    0x0809ACA4: dict(count=8, body='0b68026b9a4349680a43026301207047', form='entry-state',
+        state={0: ('state-word', 0), 4: ('state-word', 4)}, reads=[0, 4], writes=[],
+        external=[['getter object', 48, 4, ('orr', ('bic', ('object-word', 48), ('state-word', 0)), ('state-word', 4))]],
+        external_reads=[['getter object', 48, 4]],
+        relation='the getter object word at offset 48 becomes its incoming value with the state word 0 bits cleared and the state word 4 bits set; the state is unchanged; R0 is 1',
+        condition='Each callback read and store of the getter object word at offset 48 is aligned, live and writable, and does not overlap the private state, descriptor, any active frame, saved return, reached list/node word or code. Entry R1 and R2 are plain values with no private-frame provenance.'),
+}
+# The only private-flag callback admitted. It passes the flag address on to
+# one more function, so every body of its closed call tree is pinned by size,
+# refined count and SHA-256 and interpreted by flag_callback_effects.
+FLAG_CALLBACKS = {
+    0x0809AD48: dict(form='local-byte-flag', tree={
+        0x0809AD48: (36, 17, '18141579ff95f6859544bcdcea3fe138acdf664c73032f5675d426fad69a2c27'),
+        0x08098BB0: (112, 50, '4b56b7d9e7ba587ee64a6d4da1eb3b51b2e6eb7cfcb989a8534fa86a7602c3cc'),
+        0x080C8280: (22, 11, '33e067dc316794030f84309a4c8d18596a7fe650cb28b690d0492074a005519a'),
+        0x080CD8CC: (24, 12, '180dcaecef3658e1414a89afae835b169bdd66126effd096e051010923a0ae20'),
+        0x080CD92C: (24, 12, 'c4bfad5ce6d700a044e870c096ac8925ba21c0463ef0cbefdc821f6a2284107f'),
+        0x080CDCEC: (24, 12, '21d87689aa4d78d95f69dc245241dc0a9a288d44c410cd9c172fce7ee3c4dd04'),
+        0x080C8260: (30, 15, '012eb195abb4b4bc794cee97ed92e2a292332e31b3012d9765ffc822079c4140'),
+        0x080C84C0: (50, 25, '27b070e82b5721ceb1acd1a8863b243d1056416caf5474c5026b53689793d874')}),
+}
 
 
 def sha(data): return hashlib.sha256(data).hexdigest()
@@ -137,34 +185,51 @@ def form_of(data):
     """Return the unique exact root form; masked halfwords are decoded later."""
     found = []
     for name, form in FORMS.items():
+        # A template ends before the trailing pool, or spans the whole function
+        # with an interior pool masked. A whole-function template must pin
+        # every branch that could reach the masked bytes, so that the pool is
+        # never executed (the local-byte-flag template pins both).
         code = form['code']
-        if len(data) == form['size'] and len(code) == 2*(form['size']-8) and all(
+        compared = form['size'] if len(code) == 2*form['size'] else form['size']-8
+        if len(data) == form['size'] and len(code) == 2*compared and all(
                 code[2*n:2*n+2] == 'xx' or bytes.fromhex(code[2*n:2*n+2])[0] == data[n]
-                for n in range(form['size']-8)):
+                for n in range(compared)):
             found.append(name)
     require(len(found) == 1, 'literal closure requires one complete natural root form')
     return found[0]
 
 
+def _token(value):
+    """Render a symbolic state-callback value for the report."""
+    if value == ('object',):
+        return 'object'
+    if value[0] in ('bic', 'orr'):
+        return f"({_token(value[1])} {'& ~' if value[0] == 'bic' else '| '}{_token(value[2])})"
+    return f"{value[0].replace('-', ' ')} {value[1]}"
+
+
 def state_callback_effects(body, address):
     """Interpret the complete straight-line state callback on symbolic tokens.
 
-    R0 is the getter word, R1 the private state address. State words 0 and 4
-    hold their entry tokens. Every access through R1 must be an aligned word
-    of the two-word state; the only other store is through the value loaded
-    from state word 4. The callback must return 1 by BX LR with R4-R11, SP and
-    LR unchanged and no state address stored in memory.
+    R0 is the getter word (object), R1 the private state address. State words
+    0 and 4 hold their entry tokens. Every access through R1 must be an aligned
+    word of the two-word state; the only other accesses are word accesses
+    through the getter object and a store through the value loaded from state
+    word 4. The callback must return 1 by BX LR with R4-R11, SP and LR
+    unchanged and no state address stored in memory, and its effect must be
+    the one pinned for its address.
     """
     require(type(body) is bytes and type(address) is int and address in STATE_CALLBACKS and
-            body == bytes.fromhex(STATE_CALLBACKS[address][1]), 'pinned state callback body differs')
+            body == bytes.fromhex(STATE_CALLBACKS[address]['body']), 'pinned state callback body differs')
+    pinned = STATE_CALLBACKS[address]
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB); decoder.detail = True
     code = list(decoder.disasm(body, address))
-    require(sum(item.size for item in code) == len(body) and len(code) == STATE_CALLBACKS[address][0],
+    require(sum(item.size for item in code) == len(body) and len(code) == pinned['count'],
             'complete code-only state callback required')
     regs = {n: ('entry', n) for n in range(13)}
     regs[0], regs[1], regs[14] = ('object',), ('state',), ('return',)
     state = {0: ('state-word', 0), 4: ('state-word', 4)}
-    reads, writes, external = [], [], []
+    reads, writes, external, external_reads = [], [], [], []
     for number, item in enumerate(code):
         raw = int.from_bytes(item.bytes, 'little')
         last = number == len(code)-1
@@ -174,12 +239,18 @@ def state_callback_effects(body, address):
             break
         if raw & 0xf000 == 0x6000:  # LDR/STR Rd,[Rb,#imm5*4]
             rd, rb, offset = raw & 7, (raw >> 3) & 7, 4*((raw >> 6) & 31)
+            require(regs[rd] != ('state',) or raw & 0x800, 'state callback stores the private state address')
+            if regs[rb] == ('object',):
+                if raw & 0x800:
+                    regs[rd] = ('object-word', offset); external_reads.append([item.address, 'getter object', offset, 4])
+                else:
+                    external.append([item.address, 'getter object', offset, 4, regs[rd]])
+                continue
             require(regs[rb] == ('state',) and offset in state,
                     'state callback word access leaves the private two-word state')
             if raw & 0x800:
                 regs[rd] = state[offset]; reads.append([item.address, offset, 4])
             else:
-                require(regs[rd] != ('state',), 'state callback stores the private state address')
                 state[offset] = regs[rd]; writes.append([item.address, offset, 4])
         elif raw & 0xf800 == 0xc000:  # STMIA Rb!,{Rlist}
             rb, rlist = (raw >> 8) & 7, raw & 255
@@ -187,7 +258,7 @@ def state_callback_effects(body, address):
                     bin(rlist).count('1') == 1, 'state callback external store requires the loaded cursor')
             rs = rlist.bit_length()-1
             require(regs[rs] == ('object',), 'state callback external store must be the getter word')
-            external.append([item.address, 'state word 4 on entry', 0, 4, regs[rs][0]])
+            external.append([item.address, 'state word 4 on entry', 0, 4, regs[rs]])
             regs[rb] = ('cursor-plus', 4)
         elif raw & 0xf800 == 0x3000:  # ADDS Rd,#imm8
             rd = (raw >> 8) & 7
@@ -195,17 +266,25 @@ def state_callback_effects(body, address):
             regs[rd] = ('state-word-0-plus', raw & 255)
         elif raw & 0xf800 == 0x2000:  # MOVS Rd,#imm8
             regs[(raw >> 8) & 7] = ('constant', raw & 255)
+        elif raw & 0xffc0 in (0x4380, 0x4300):  # BICS/ORRS Rd,Rm
+            rd, rm = raw & 7, (raw >> 3) & 7
+            require(('state',) not in (regs[rd], regs[rm]), 'state callback computes with the private state address')
+            regs[rd] = ('bic' if raw & 0xffc0 == 0x4380 else 'orr', regs[rd], regs[rm])
         else:
             raise ValueError('unsupported state callback instruction')
     require(regs[0] == ('constant', 1) and regs[14] == ('return',) and
             all(regs[n] == ('entry', n) for n in range(4, 12)),
             'state callback return/frame differs')
-    require(state == {0: ('state-word-0-plus', 1), 4: ('cursor-plus', 4)} and
-            sorted(row[1] for row in reads) == [0, 4] and sorted(row[1] for row in writes) == [0, 4] and
-            len(external) == 1, 'state callback effect relation differs')
-    return dict(address=address, end=address+len(body), instructions=len(code), body_sha256=sha(body),
-        state_reads=reads, state_writes=writes, external_writes=external, return_value=1,
-        relation='state word 0 becomes its incoming value plus 1 modulo 2**32; the object word is stored at the incoming state word 4 cursor, which then advances by 4; R0 is 1',
+    require(state == pinned['state'] and sorted(row[1] for row in reads) == pinned['reads'] and
+            sorted(row[1] for row in writes) == pinned['writes'] and
+            [row[1:] for row in external] == pinned['external'] and
+            [row[1:] for row in external_reads] == (pinned['external_reads'] or []),
+            'state callback effect relation differs')
+    record = dict(address=address, end=address+len(body), instructions=len(code), body_sha256=sha(body),
+        state_reads=reads, state_writes=writes, external_writes=[row[:4]+[_token(row[4])] for row in external])
+    if pinned['external_reads'] is not None:
+        record['external_reads'] = external_reads
+    return dict(record, return_value=1, relation=pinned['relation'],
         frame_bytes=0, protected_registers=[], leaf=True,
         private_state_address_stored=False, all_paths_interpreted=True)
 
@@ -266,6 +345,222 @@ def entry_r2_killed(rom, address, end):
                 return here
             tainted = (tainted - written) | (written if derived else set())
         here = ops[0].imm if item.id == ARM_INS_B else here+item.size
+
+
+OTHER, FLAG, BYTE0, INCREMENT = ('value',), ('flag',), ('flag-byte-0',), ('flag-byte-0-plus-1',)
+# Flag byte 1 (never initialized by the root) and its bits masked by a constant:
+# these may only feed the condition flags (ANDS with a constant, then CMP/TST).
+BYTE1, BITS1 = ('flag-byte-1',), ('flag-byte-1-bits',)
+# A flag byte 0 value read before a later store or call: still flag data, but
+# no longer the current byte, so it can never feed the increment store.
+STALE = ('flag-byte-0-stale',)
+FLAG_BYTES = {BYTE0, INCREMENT, BYTE1, BITS1, STALE}
+# Tokens that may not be computed with or dereferenced except as admitted
+# below: the flag address, its byte values in flight, and the callee-saved and
+# return values every interpreted function must give back.
+_TRACKED = lambda token: token[0] in ('flag', 'flag-byte-0', 'flag-byte-0-plus-1', 'flag-byte-1',
+                                      'flag-byte-1-bits', 'flag-byte-0-stale', 'preserved', 'return',
+                                      'expired-return')
+_CONSTANT = lambda values: bool(values) and all(token[0] == 'constant' for token in values)
+
+
+def flag_callback_effects(callback, rom, mapping, index, seeds=()):
+    """Interpret the complete pinned call tree of a private-flag callback.
+
+    Entry R1 is the private flag address; R0 and R2 are ordinary values, and
+    the scratch registers in seeds may also hold the flag address (left there
+    by an earlier invocation). Each pinned body is completed against the index
+    and walked over its whole instruction graph with a forward may-analysis;
+    calls are only to tree members and are interpreted in their caller's
+    context. A callee's R4-R11 start as fresh preserved tokens that also carry
+    the flag address when the caller's register may hold it, so the address
+    is followed through every copy. The analysis refuses any access through
+    the flag address other than a byte read of flag byte 0 or 1 and a byte
+    store to flag byte 0 of that byte's value plus one, and any store or push
+    of the flag address. The only operation admitted on the flag address or a
+    callee-saved or return value is a register copy (which also sets the
+    condition flags); any other use, including as a load base, refuses. Flag
+    byte 1 may only be masked by a constant with ANDS and the result only
+    tested by CMP/TST with a constant, so it only selects paths. Any other
+    store, any SP-relative access other than PUSH/POP of the function's own
+    frame, any return that does not restore R4-R11 and SP and leave through
+    the entry LR, and any callee-saved token of the returning function left
+    in R0-R3/R12 also refuses; its return address left there stays tracked.
+    A flag byte value read before a later store or call stays tracked as
+    stale, and no flag byte value may be left in R0-R3/R12 when the callback
+    returns. Returns the effect record and the scratch registers that may
+    still hold the flag address on return.
+    """
+    pinned = FLAG_CALLBACKS[callback]['tree']
+    graphs = {}
+    for address, (size, count, digest) in pinned.items():
+        body, ins, edges, calls, partition = complete(address, size, count, rom, mapping, index)
+        require(sha(body) == digest and not partition['literal_and_table_bytes'] and
+                not partition['alignment_bytes'] and set(calls.values()) <= set(pinned),
+                'pinned flag callback tree differs')
+        graphs[address] = (ins, edges, calls)
+    reads, writes, external = set(), set(), set()
+    active = []
+
+    def run(address, entry):
+        require(address not in active, 'flag callback tree must not recurse')
+        active.append(address)
+        depth = len(active)
+        ins, edges, calls = graphs[address]
+        caller = entry
+        regs = {n: entry[n] for n in (0, 1, 2, 3, 12)}
+        # FLAG membership travels with the callee-saved value, so a copy of it
+        # out of R4-R11 is still followed.
+        regs.update({n: frozenset({('preserved', depth, n)}) | (caller.get(n, frozenset()) & {FLAG})
+                     for n in range(4, 12)})
+        start = dict(regs)
+        regs[14] = frozenset({('return', depth)})
+        states, pending, exits = {address: (regs, 0, {})}, [address], []
+        while pending:
+            site = pending.pop()
+            regs, sp, frame = states[site]
+            regs, frame = dict(regs), dict(frame)
+            item = ins[site]
+            raw = struct.unpack_from('<H', item.bytes)[0]
+            def value(n):
+                require(not any(_TRACKED(token) for token in regs[n]),
+                        'flag callback computes with a tracked flag, byte or preserved value')
+                return regs[n]
+            def forget():
+                # A store or call ends every byte value read before it.
+                for table in (regs, frame):
+                    for key in table:
+                        if table[key] & {BYTE0, INCREMENT}:
+                            table[key] = (table[key] - {BYTE0, INCREMENT}) | {STALE}
+            if site in calls:
+                result = run(calls[site], {n: regs[n] for n in (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)})
+                regs.update(result); regs[14] = frozenset({OTHER})
+                forget()
+            elif raw & 0xFE00 in (0xB400, 0xBC00):  # PUSH/POP {Rlist[,LR|PC]}
+                listed = [n for n in range(8) if raw >> n & 1]
+                if raw & 0xFE00 == 0xB400:
+                    listed += [14] if raw & 0x100 else []
+                    require(not any(FLAG in regs[n] for n in listed), 'flag callback stores the flag address')
+                    sp -= 4*len(listed)
+                    for number, n in enumerate(listed): frame[sp+4*number] = regs[n]
+                else:
+                    require(not raw & 0x100, 'flag callback must not pop PC')
+                    for n in listed:
+                        require(sp in frame, 'flag callback pops a word it did not push')
+                        regs[n] = frame.pop(sp); sp += 4
+            elif raw & 0xFE00 == 0x1C00 and not raw & 0x1C0 or raw & 0xFFC0 == 0x0000:  # ADDS Rd,Rn,#0 / MOVS Rd,Rm
+                regs[raw & 7] = regs[raw >> 3 & 7]
+            elif raw & 0xF800 == 0x3000 and regs[raw >> 8 & 7] == frozenset({BYTE0}) and raw & 0xFF == 1:
+                regs[raw >> 8 & 7] = frozenset({INCREMENT})  # ADDS Rd,#1 on flag byte 0
+            elif raw & 0xF800 == 0x2000:  # MOVS Rd,#imm8
+                regs[raw >> 8 & 7] = frozenset({('constant', raw & 0xFF)})
+            elif raw & 0xE000 == 0x6000 or raw & 0xF000 == 0x8000:  # LDR/STR(B/H) Rd,[Rb,#imm]
+                rd, rb = raw & 7, raw >> 3 & 7
+                width = 4 if raw & 0xF000 == 0x6000 else 1 if raw & 0xF000 == 0x7000 else 2
+                offset, load = width*(raw >> 6 & 31), bool(raw & 0x800)
+                if FLAG in regs[rb]:
+                    require(regs[rb] == frozenset({FLAG}) and width == 1 and
+                            (offset in (0, 1) if load else offset == 0 and regs[rd] == frozenset({INCREMENT})),
+                            'flag callback access through the flag address differs')
+                    (reads if load else writes).add((site, offset))
+                    if load:
+                        regs[rd] = frozenset({BYTE0 if offset == 0 else BYTE1})
+                    else:
+                        forget()
+                else:
+                    value(rb)
+                    require(load, 'flag callback stores outside the private flag byte')
+                    external.add((site, offset, width))
+                    regs[rd] = frozenset({OTHER})
+            elif raw & 0xF000 == 0xD000 and raw & 0x0E00 != 0x0E00 or raw & 0xF800 == 0xE000:  # B<cond> / B
+                pass
+            elif raw & 0xFF87 == 0x4700:  # BX Rm
+                rm = raw >> 3 & 15
+                require(rm in regs and regs[rm] == frozenset({('return', depth)}) and sp == 0 and not frame and
+                        all(regs[n] == start[n] for n in range(4, 12)) and
+                        not any(token[0] == 'preserved' and token[1] == depth
+                                for n in (0, 1, 2, 3, 12) for token in regs[n]),
+                        'flag callback return/frame differs')
+                # The popped return address (POP {R1}; BX R1) stays tracked in the caller.
+                exits.append({n: frozenset(('expired-return',) if token == ('return', depth) else token
+                                           for token in regs[n]) for n in regs})
+            else:
+                # Remaining ARMv4T data processing on ordinary values only.
+                if raw & 0xE000 == 0x0000 and raw & 0x1800 != 0x1800:  # LSLS/LSRS/ASRS Rd,Rm,#imm5
+                    value(raw >> 3 & 7); regs[raw & 7] = frozenset({OTHER})
+                elif raw & 0xF800 == 0x2800 and regs[raw >> 8 & 7] <= {BYTE1, BITS1}:
+                    pass  # CMP of flag byte 1 (bits) with a constant: condition flags only
+                elif raw & 0xE000 == 0x2000:  # MOVS/CMP/ADDS/SUBS Rd,#imm8
+                    value(raw >> 8 & 7)
+                    if raw & 0x1800 != 0x0800: regs[raw >> 8 & 7] = frozenset({OTHER})
+                elif raw & 0xFC00 == 0x1800 or raw & 0xFC00 == 0x1C00:  # ADDS/SUBS Rd,Rn,Rm|#imm3
+                    value(raw >> 3 & 7)
+                    if not raw & 0x400: value(raw >> 6 & 7)
+                    regs[raw & 7] = frozenset({OTHER})
+                elif raw & 0xFC00 == 0x4000 and (raw >> 6 & 15) in (0, 8) and \
+                        {regs[raw & 7], regs[raw >> 3 & 7]} & {frozenset({BYTE1}), frozenset({BITS1})} and \
+                        any(_CONSTANT(regs[n]) for n in (raw & 7, raw >> 3 & 7)):
+                    # ANDS/TST of flag byte 1 with a constant: the result is still flag byte 1 bits.
+                    if not raw >> 6 & 15: regs[raw & 7] = frozenset({BITS1})
+                elif raw & 0xFC00 == 0x4000:  # ALU Rd,Rm
+                    op, rd, rm = raw >> 6 & 15, raw & 7, raw >> 3 & 7
+                    value(rm)
+                    if op not in (9, 15): value(rd)
+                    if op not in (8, 10, 11): regs[rd] = frozenset({OTHER})
+                else:
+                    raise ValueError('unsupported flag callback instruction')
+            for target in edges[site]:
+                old = states.get(target)
+                if old is None:
+                    states[target] = (regs, sp, frame); pending.append(target); continue
+                require(old[1] == sp and set(old[2]) == set(frame), 'flag callback frame differs between paths')
+                merged = ({n: old[0][n] | regs[n] for n in regs}, sp, {k: old[2][k] | frame[k] for k in frame})
+                if merged != old:
+                    states[target] = merged; pending.append(target)
+        require(exits, 'flag callback tree must return')
+        active.pop()
+        return {n: frozenset().union(*(state[n] for state in exits)) for n in (0, 1, 2, 3, 12)}
+
+    entry = {n: frozenset({OTHER}) for n in (0, 2, 3, 12)}
+    entry[1] = frozenset({FLAG})
+    for n in seeds:
+        entry[n] = entry[n] | {FLAG}
+    result = run(callback, entry)
+    # No flag byte value (read, incremented or masked) may leave the tree: the
+    # recorded uses of the flag bytes are all the tree makes of them.
+    require(result[0] == frozenset({('constant', 1)}) and not any(FLAG in result[n] for n in (0, 1, 2)) and
+            not any(result[n] & FLAG_BYTES for n in (0, 1, 2, 3, 12)),
+            'flag callback return/frame differs')
+    require(writes, 'flag callback effect relation differs')
+    tree = [dict(address=address, end=address+size, instructions=count, body_sha256=digest)
+            for address, (size, count, digest) in sorted(pinned.items())]
+    return dict(address=callback, end=callback+pinned[callback][0], tree=tree, flag_reads=[[site, offset, 1] for site, offset in sorted(reads)],
+        flag_writes=[[site, offset, 1, 'flag byte 0 read since the last store or call, plus 1 modulo 2**8']
+                     for site, offset in sorted(writes)],
+        external_reads=[list(row) for row in sorted(external)], external_writes=[], return_value=1,
+        relation='flag byte 0 is only ever replaced by its current value plus 1 modulo 2**8; flag byte 1 is only read, masked by constants and tested, so it only selects paths; nothing else is stored; R0 is 1',
+        flag_address_stored=False, all_paths_interpreted=True), \
+        sorted(n for n in (3, 12) if FLAG in result[n])
+
+
+def scratch_aliases_unread(ins, edges, calls, start, registers):
+    """No path from start reads a scratch register that may hold the flag address.
+
+    The registers may hold it at start and again after every call (the
+    interpreted callback can leave it there); an instruction that writes one
+    without reading it ends that register's alias on the path.
+    """
+    numbers = {match.ARM_REG_R0+n for n in registers}
+    live, pending = {start: frozenset(numbers)}, [start]
+    while pending:
+        site = pending.pop()
+        read, written = (set(regs) for regs in ins[site].regs_access())
+        require(not read & live[site], 'flag address alias reaches a reader outside the interpreted callback')
+        after = numbers if site in calls else live[site] - written
+        for target in edges[site]:
+            merged = live.get(target, frozenset()) | after
+            if target not in live or merged != live[target]:
+                live[target] = merged; pending.append(target)
 
 
 def iterator_structure(body, address, entry, ins, edges, calls):
@@ -503,7 +798,11 @@ class _LiteralContextRead(match.BufferCallProof):
             raise ValueError('literal closure call differs from its complete initialized root context')
         self.access(form['descriptor'], 4, stack)
         self.access(form['descriptor']+4, 4, stack)
-        if form['state'] is not None:
+        if form.get('flag'):
+            # The interpreted callback tree reads flag bytes 0 and 1 only.
+            self.access(form['state'], 1, stack)
+            self.access(form['state']+1, 1, stack)
+        elif form['state'] is not None:
             self.access(form['state'], 4, stack)
             self.access(form['state']+4, 4, stack)
         self.observed.append(dict(site=site, target=address, descriptor_offset=form['descriptor'], width=8,
@@ -609,8 +908,10 @@ def prove(data, address, rom, mapping, index, *, selector):
             entry_r2_overwritten_at=entry_r2_killed(rom, follower, int(entry['end'], 16)),
             descriptor_alias_passed=False)
     require(len(set(addresses)) == len(addresses), 'literal closure requires distinct complete dependency owners')
+    flag_aliases = []
     if form['state'] is None:
         require(callback not in STATE_CALLBACKS, 'pinned state callback requires the private-state root form')
+        require(callback not in FLAG_CALLBACKS, 'pinned flag callback requires the local-byte-flag root form')
         end = next((row['end'] for row in index_entries if int(row['rom'], 16) == callback), None)
         require(end is not None, 'literal closure callback requires its complete indexed span')
         entry = span_record(callback, int(end, 16), index_entries, rows, rom)
@@ -619,13 +920,42 @@ def prove(data, address, rom, mapping, index, *, selector):
             body_sha256=sha(cbody), effects='opaque',
             arguments=['word loaded by getter from each node', form['word0']],
             private_provenance_passed=False)
+    elif form.get('flag'):
+        require(callback in FLAG_CALLBACKS and FLAG_CALLBACKS[callback]['form'] == name,
+                'private flag requires its pinned flag callback')
+        # Only the scalar adapter's flow (R1 from descriptor word zero, scratch
+        # untouched between invocations) is what the flag records describe.
+        require(adapter_shape == 'scalar-inventory', 'private flag requires the scalar adapter')
+        # An alias left by one invocation may be live at the next one: iterate
+        # the seeded scratch set until it is stable (it only grows within {R3, R12}).
+        seeds = []
+        while True:
+            effects, flag_aliases = flag_callback_effects(callback, rom, mapping, index, seeds=seeds)
+            flag_aliases = sorted(set(flag_aliases) | set(seeds))
+            if flag_aliases == seeds:
+                break
+            seeds = flag_aliases
+        # Outside the interpreted tree nothing may read a register that may still
+        # hold the flag address: the iterator, adapter and getter run between
+        # invocations, and the root continuation after the last.
+        gend = next((row['end'] for row in index_entries if int(row['rom'], 16) == getter), None)
+        require(gend is not None, 'literal closure getter requires its complete indexed span')
+        gentry = span_record(getter, int(gend, 16), index_entries, rows, rom)
+        _, gins, gedges, gcalls, _ = complete(getter, int(gend, 16)-getter, gentry['instrs'], rom, mapping, index)
+        for gins_, gedges_, gcalls_, start in ((wi, we, wc, iterator), (ai, ae, ac, adapter_address),
+                                              (gins, gedges, gcalls, getter), (ins, edges, calls, address+form['call'])):
+            scratch_aliases_unread(gins_, gedges_, gcalls_, start, flag_aliases)
+        callback_record = dict(effects, arguments=['word loaded by getter from each node', form['word0']],
+            private_provenance_passed=True, flag_aliases_on_return=flag_aliases,
+            alias_erasure='The interpreted tree never stores or pushes the flag address and leaves it only in the listed scratch registers, which the iterator, adapter, getter and root continuation never read before overwriting. No flag address is stored outside the root\'s own expired frame.')
     else:
-        require(callback in STATE_CALLBACKS and adapter_data[-4:] == bytes.fromhex('02bc0847'),
+        require(callback in STATE_CALLBACKS and STATE_CALLBACKS[callback]['form'] == name and
+                adapter_data[-4:] == bytes.fromhex('02bc0847'),
                 'private state requires a pinned state callback and adapter return through R1')
         require(adapter_proof['descriptor_register'] == 4,
                 'private state requires the adapter descriptor in R4')
-        count = STATE_CALLBACKS[callback][0]
-        size = len(bytes.fromhex(STATE_CALLBACKS[callback][1]))
+        count = STATE_CALLBACKS[callback]['count']
+        size = len(bytes.fromhex(STATE_CALLBACKS[callback]['body']))
         cbody, _, _, ccalls, cpartition = complete(callback, size, count, rom, mapping, index)
         require(not ccalls and not cpartition['literal_and_table_bytes'], 'state callback must be a code-only leaf')
         callback_record = dict(state_callback_effects(cbody, callback), partition=cpartition,
@@ -639,27 +969,37 @@ def prove(data, address, rom, mapping, index, *, selector):
     verified = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=context)
     require({item.address for item in verified} == set(ins) and context.observed,
             'literal closure requires exact native root and descriptor access evidence')
-    stores = ([dict(offset=form['state'], source='constant zero'), dict(offset=form['state']+4, source='root entry R1'),
-               dict(offset=form['descriptor'], source='address of private state'),
+    stores = ([dict(offset=form['state'], width=1, source='constant zero'),
+               dict(offset=form['descriptor'], source='address of private flag byte'),
+               dict(offset=form['descriptor']+4, source='typed callback literal')]
+              if form.get('flag') else
+              [dict(offset=form['state']+4*n, source=value)
+               for n, value in enumerate(form.get('state_sources', ['constant zero', 'root entry R1']))] +
+              [dict(offset=form['descriptor'], source='address of private state'),
                dict(offset=form['descriptor']+4, source='typed callback literal')]
               if form['state'] is not None else
               [dict(offset=form['descriptor'], source=form['word0']),
                dict(offset=form['descriptor']+4, source='typed callback literal')])
     lifted = 'Loaded input words carry no tracked private-frame or saved-return provenance; ordinary memory noninterference remains a premise.'
     require(lifted in adapter_proof['explicit_conditions'], 'literal closure adapter premise differs')
+    private = 'flag' if form.get('flag') else 'state'
     conditions = [condition for condition in adapter_proof['explicit_conditions']
                   if form['state'] is None or condition != lifted] + ([] if form['state'] is None else [
-        'The getter word carries no tracked private-frame or saved-return provenance. Descriptor word zero is the private state address: the exact adapter loads it and passes it to the pinned callback in R1 without dereferencing it. The no-private-provenance adapter premise is replaced for that word by the interpreted callback effects, not asserted satisfied; ordinary memory noninterference remains a premise.']) + [
+        f'The getter word carries no tracked private-frame or saved-return provenance. Descriptor word zero is the private {private} address: the exact adapter loads it and passes it to the pinned callback in R1 without dereferencing it. The no-private-provenance adapter premise is replaced for that word by the interpreted callback {"tree " if form.get("flag") else ""}effects, not asserted satisfied; ordinary memory noninterference remains a premise.']) + [
         'Every reached list/node load is aligned, live, initialized and physically readable at its recorded width; null is tested only as a word value.',
         'All private root, iterator, adapter and callback frames and continuation code satisfy compatible returning ABI validity and noninterference; external values carry no private-frame/saved-return provenance.']
     if trailing:
         conditions.append('The trailing callee is compatible returning Thumb code preserving R4-R11 and SP, the private frame and continuation code; its identity is pinned and it provably overwrites entry R2 before reading it, but its effects are not interpreted. Its R1 is a code or iterator value (the adapter literal on the empty path, otherwise the adapter\'s return into the iterator); its R3 and R12 are callback scratch or the root caller\'s entry values, assumed to carry no private-frame provenance while the root frame is live.')
     if form['state'] is None:
         conditions.append('The typed literal callback is compatible returning Thumb code preserving R4-R11 and SP, the private frames and continuation code; its identity is pinned but its effects are not interpreted.')
+    elif form.get('flag'):
+        conditions += [
+            'The private flag word is reachable only through descriptor word zero and the scratch registers the interpreted callback tree leaves it in; the iterator, getter and adapter pass it to the pinned callback without dereferencing it, and no ordinary call or external access reads or writes the flag word or descriptor.',
+            'Every external load in the interpreted callback tree is aligned, live, initialized and physically readable at its width, and loads no private-frame or saved-return address.']
     else:
         conditions += [
             'The private state is reachable only through descriptor word zero; the iterator, getter and adapter pass it to the pinned callback without dereferencing it, and no ordinary call or external access reads or writes the state or descriptor.',
-            'Each callback store through the state word-4 cursor is aligned, live and writable, and does not overlap the private state, descriptor, any active frame, saved return, reached list/node word or code. The incoming entry R1 cursor carries no private-frame provenance.']
+            STATE_CALLBACKS[callback]['condition']]
     proof = dict(schema=SCHEMA, instructions=len(ins),
         calls=[[site-address, f'func_{target:08X}'] for site, target in sorted(calls.items())], runtime_calls=[], partition=partition,
         literal_callback_closure=dict(schema=SELECTOR, form=name,
@@ -668,7 +1008,17 @@ def prove(data, address, rom, mapping, index, *, selector):
                             template_sha256=sha(form['code'].encode())),
             root_descriptor=dict(offset=form['descriptor'], width=8, initialized_words=stores,
                 actual_buffer_checks=context.observed),
-            private_state=None if form['state'] is None else dict(offset=form['state'], width=8,
+            private_state=None if form['state'] is None else dict(offset=form['state'], width=1,
+                initialized=[dict(offset=0, width=1, value=0)], uninitialized_bytes=[1, 2, 3],
+                indeterminate_reads=[dict(site=row[0], offset=row[1], width=1,
+                    effect='the root never initializes this byte; its value only selects among interpreted paths')
+                    for row in callback_record['flag_reads'] if row[1]],
+                result=dict(site=address+form['call']+6, offset=0, width=1, register=0,
+                    relation='1 if flag byte 0 is nonzero after the iterator returns, otherwise 0; flag byte 0 is zero plus one per interpreted increment, modulo 2**8'))
+                if form.get('flag') else
+                dict(offset=form['state'], width=8,
+                initialized=[dict(offset=0, entry_register=1), dict(offset=4, entry_register=2)], result=None)
+                if 'state_sources' in form else dict(offset=form['state'], width=8,
                 initialized=[dict(offset=0, value=0), dict(offset=4, entry_register=1)],
                 result=dict(site=address+form['call']+4, offset=0, width=4, register=0,
                     relation='zero plus one per returning callback invocation, modulo 2**32')),
@@ -692,9 +1042,10 @@ def prove(data, address, rom, mapping, index, *, selector):
                 ([dict(base='root entry R0', offset=128, width=4)] if name == 'entry-object' else []) +
                 ([dict(base='root entry R0, reloaded after the iterator returns', offset=source.operands[1].mem.disp,
                        width=4)] if trailing else []),
-            outward_expired_aliases=[dict(register=2, origin='root descriptor on the empty-list path',
+            outward_expired_aliases=([dict(register=2, origin='root descriptor on the empty-list path',
                 accessible_after_return=False, observed_by_root_continuation=False)]
-                if r2_survives else [],
+                if r2_survives else []) + [dict(register=n, origin='private flag address left by the interpreted callback tree',
+                accessible_after_return=False, observed_by_root_continuation=False) for n in flag_aliases],
             explicit_conditions=conditions,
             source_sha256={**{Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
                 for module in (match, owner, graph, thunk, frame, adapter)},
