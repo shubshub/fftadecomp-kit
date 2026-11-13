@@ -50,6 +50,60 @@ def prefix_effects(instruction):
     return reads, writes
 
 
+def authenticate_ordinary(rom, mapping, index, objects, caller, size, target):
+    """Reuse existing complete-owner and ordinary-call guards, never a leaf exemption."""
+    import match
+    import named_data_buffer_profile as named
+    import owner_admission_profile as owner
+    import owner_graph_profile as graph
+    entries = json.loads(mapping)
+    match.function_address_target(f'func_{target:08X}', entries,
+                                  caller, size, len(rom))
+    row = next(row for row in entries if int(row['rom'], 16) == target)
+    end = int(row['end'], 16)
+    if not 0 < end - target <= MAX_BYTES:
+        raise ValueError('scratch overwrite callee exceeds its complete-owner budget')
+    data = rom[target-match.ROM_BASE:end-match.ROM_BASE]
+    # This existing validator preserves legacy bounded numeric count hints;
+    # the complete graph independently establishes the actual instruction count.
+    named.validate_owner(data, target, rom, mapping, index)
+    refinement = owner.refine(data, target, mapping)
+    instructions, edges, branches, calls, words = graph.graph(data, target, refinement)
+    if branches or words:
+        raise ValueError('scratch overwrite ordinary callee excludes local BL and switches')
+    for destination in calls.values():
+        match.function_address_target(f'func_{destination:08X}', entries,
+                                      target, len(data), len(rom))
+    verified = match.verify_leaf_instructions(data, target, True, calls)
+    if {item.address for item in verified} != set(instructions):
+        raise ValueError('scratch overwrite ordinary proof does not cover the complete callee')
+    partition = graph.partition(data, target, refinement, instructions, words)
+    object_names = match.parse_data_symbols(objects)
+    bindings = {'calls': [[site-target, f'func_{callee:08X}']
+                         for site, callee in sorted(calls.items())], 'data': [], 'functions': []}
+    address_words = set()
+    for word in partition['words']:
+        value, offset = word['value'], word['address'] - target
+        if not word['load_sites'] or not 0x02000000 <= value < 0x09000000:
+            continue
+        names = sorted(name for name, address in object_names.items() if address == value)
+        if not names:
+            raise ValueError('scratch overwrite literal requires genuine mapped object identity')
+        address_words.add(offset)
+        bindings['data'].append([offset, names[0], 0])
+    _, literals = match.function_address_bindings(data, target, rom,
+        mapping, objects, bindings, allow_empty_functions=True)
+    match.verify_data_literals(instructions.values(), target, literals)
+    if set(literals) != address_words:
+        raise ValueError('scratch overwrite typed literals do not cover every actual address word')
+    record = {'schema': SCHEMA, 'address': target, 'end': end,
+        'body_sha256': sha(data), 'instructions': len(instructions),
+        'partition': partition, 'calls': bindings['calls'], 'bindings': bindings,
+        'ordinary_boundary': 'conditional ordinary ARM ABI; no transitive effect or termination proof',
+        **{name+'_sha256': sha(value) for name,value in (('rom',rom),('mapping',mapping),('index',index),('objects',objects))}}
+    return instructions, edges, record
+
+
 class IncomingScratchOverwriteProof:
     """One exact caller and an explicit subset of its original direct BL sites."""
     def __init__(self, rom, mapping, index, objects, caller, size, calls, sites, *, policy):
@@ -86,57 +140,8 @@ class IncomingScratchOverwriteProof:
             raise ValueError('scratch overwrite requires the exact authenticated caller CFG and inputs')
 
     def ordinary(self, target):
-        """Reuse existing complete-owner and ordinary-call guards, never a leaf exemption."""
-        import match
-        import named_data_buffer_profile as named
-        import owner_admission_profile as owner
-        import owner_graph_profile as graph
-        entries = json.loads(self.mapping)
-        match.function_address_target(f'func_{target:08X}', entries,
-                                      self.caller, self.size, len(self.rom))
-        row = next(row for row in entries if int(row['rom'], 16) == target)
-        end = int(row['end'], 16)
-        if not 0 < end - target <= MAX_BYTES:
-            raise ValueError('scratch overwrite callee exceeds its complete-owner budget')
-        data = self.rom[target-match.ROM_BASE:end-match.ROM_BASE]
-        # This existing validator preserves legacy bounded numeric count hints;
-        # the complete graph independently establishes the actual instruction count.
-        named.validate_owner(data, target, self.rom, self.mapping, self.index)
-        refinement = owner.refine(data, target, self.mapping)
-        instructions, edges, branches, calls, words = graph.graph(data, target, refinement)
-        if branches or words:
-            raise ValueError('scratch overwrite ordinary callee excludes local BL and switches')
-        for destination in calls.values():
-            match.function_address_target(f'func_{destination:08X}', entries,
-                                          target, len(data), len(self.rom))
-        verified = match.verify_leaf_instructions(data, target, True, calls)
-        if {item.address for item in verified} != set(instructions):
-            raise ValueError('scratch overwrite ordinary proof does not cover the complete callee')
-        partition = graph.partition(data, target, refinement, instructions, words)
-        objects = match.parse_data_symbols(self.objects)
-        bindings = {'calls': [[site-target, f'func_{callee:08X}']
-                             for site, callee in sorted(calls.items())], 'data': [], 'functions': []}
-        address_words = set()
-        for word in partition['words']:
-            value, offset = word['value'], word['address'] - target
-            if not word['load_sites'] or not 0x02000000 <= value < 0x09000000:
-                continue
-            names = sorted(name for name, address in objects.items() if address == value)
-            if not names:
-                raise ValueError('scratch overwrite literal requires genuine mapped object identity')
-            address_words.add(offset)
-            bindings['data'].append([offset, names[0], 0])
-        _, literals = match.function_address_bindings(data, target, self.rom,
-            self.mapping, self.objects, bindings, allow_empty_functions=True)
-        match.verify_data_literals(instructions.values(), target, literals)
-        if set(literals) != address_words:
-            raise ValueError('scratch overwrite typed literals do not cover every actual address word')
-        record = {'schema': SCHEMA, 'address': target, 'end': end,
-            'body_sha256': sha(data), 'instructions': len(instructions),
-            'partition': partition, 'calls': bindings['calls'], 'bindings': bindings,
-            'ordinary_boundary': 'conditional ordinary ARM ABI; no transitive effect or termination proof',
-            **self.identities}
-        return instructions, edges, record
+        return authenticate_ordinary(self.rom, self.mapping, self.index, self.objects,
+                                     self.caller, self.size, target)
 
     def check_call(self, site, target, aliases, stack, pointer_slots, initialized):
         import match
