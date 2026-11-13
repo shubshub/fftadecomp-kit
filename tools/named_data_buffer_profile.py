@@ -194,10 +194,12 @@ class NamedDataBufferProof(match.BufferCallProof):
             structure = {'kind': 'existing-complete-read-only-preloaded-switch-v1',
                          'switch': switch, 'instructions': len(instructions),
                          'object_word_sha256': hashlib.sha256(data[literal-4:literal]).hexdigest()}
-        elif self._switch_refinement(data, address) is not None:
+        elif (refinement := self._switch_refinement(data, address)) is not None:
             # A compiler jump table is followed only through the existing
             # guarded-switch layout (canonical dispatch, bound covering the
             # table, in-span forward cases). Its record carries the table hash.
+            if refinement['calls']:
+                raise ValueError('jump-table buffer callee excludes calls and local BL control')
             inspector = GuardedSwitchBufferProof(self.rom, self.mapping, self.index, self.objects)
             inspector._delegated = True
             instructions, transfers = inspector.inspect(address, data)
@@ -368,7 +370,6 @@ def conditional_thunk_replay(proof):
 
 
 class DiscardedReturnScratchProof(NamedDataBufferProof):
-    jump_table_callees = True
     """Project R2/R3 only after checking their complete actual continuation."""
 
     def __init__(self, rom, mapping, index, objects):

@@ -136,6 +136,7 @@ def prove_wrapper_origins(instructions, edges, calls, address, data, child):
 
 class NestedOutputBufferProof(named.DiscardedReturnScratchProof):
     dependency_budget = MAX_DEPENDENCIES
+    manifest_schema = SCHEMA
 
     def __init__(self, rom, mapping, index, objects):
         super().__init__(rom, mapping, index, objects)
@@ -206,15 +207,21 @@ class NestedOutputBufferProof(named.DiscardedReturnScratchProof):
     def nested_manifest(self):
         if not self._calls or self._native is None:
             raise ValueError('nested output profile requires an actual bounded caller composition')
-        return dict(schema=SCHEMA, native_helpers=self._native, calls=self._calls,
+        return dict(schema=self.manifest_schema, native_helpers=self._native, calls=self._calls,
                     named_read_policy=effects.named_policy(), physical_nonalias_claim=False)
 
 
 class NestedSelectiveOutputBufferProof(NestedOutputBufferProof):
     """Same nested outputs; observed R2/R3 scratch stays tracked instead of being refused."""
+    manifest_schema = SELECTIVE_SCHEMA
+    # Opt-in: the only nested family whose callees may follow a compiler jump table.
+    jump_table_callees = True
     normal_return_aliases = named.ConditionalThunkSelectiveScratchBufferProof.normal_return_aliases
 
     def scratch_manifest(self):
         manifest = super().scratch_manifest()
         manifest['selection'] = 'each R2/R3 independently; observed aliases remain tracked'
+        manifest['contract'] += ('; observed R2/R3 aliases are retained unchanged for every '
+            'ordinary buffer bound, nested call, indirect argument and root return check; '
+            'root alias memory accesses are limited to allocated local words, excluding saves')
         return manifest
