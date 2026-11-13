@@ -2746,7 +2746,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "02ea5aa326579492d1211ea052fedfd93ef643b93188b410eeb09ef321b961f7",
+        "acknowledged_cursor": 6853809158,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "02ea5aa326579492d1211ea052fedfd93ef643b93188b410eeb09ef321b961f7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E3E84\",\"who\":\"claude-ffta2\",\"claim_id\":6852246493,\"reason\":\"parked: needs bounded variable stack indexing (kit #135)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T13:06:02Z",
+          "id": 6853809158,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T13:06:02Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f11f31dc0c01c42d09c021fddce931246ef1805a29407a74721f47a1aa50af3c",
+        "result": {
+          "address": "0x080E3E84",
+          "claim_id": 6852246493,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6853809158,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
