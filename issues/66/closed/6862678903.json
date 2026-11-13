@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5dd18b49c0da176216d33a8c5e5311c6b3e65eeddee1d1435d5285c566d5666b",
+    "acknowledged_cursor": 6862697471,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5dd18b49c0da176216d33a8c5e5311c6b3e65eeddee1d1435d5285c566d5666b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CD1FC\",\"who\":\"astra-xhigh-080cd1fc\",\"note\":\"Recover 200-byte effect record search; retained C differs only in two-instruction scheduling\"}",
+      "created_at": "2026-11-13T19:22:19Z",
+      "id": 6862678903,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T19:22:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2628da74f732f84f0b5f25b1eed60d0f2b26271295d67313fce410953ac8b0e2",
+    "result": {
+      "address": "0x080CD1FC",
+      "claim_id": 6862678903,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6862678903,
+      "status": "accepted",
+      "who": "astra-xhigh-080cd1fc"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "049b8f487128fae6c2d3d82527a54f6b3d4ac3673b3d51e9516ab73cd49e8da8",
+    "acknowledged_cursor": 6862862890,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "049b8f487128fae6c2d3d82527a54f6b3d4ac3673b3d51e9516ab73cd49e8da8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CD1FC\",\"who\":\"astra-xhigh-080cd1fc\",\"claim_id\":6862678903,\"reason\":\"Nine natural loop forms retain swapped adds/mov instructions; complete plausible 200-byte body, 196 positional bytes exact\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+      "created_at": "2026-11-13T19:30:40Z",
+      "id": 6862856366,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T19:30:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7d41e338bf05a13540ed7c9bd1bafcc2ab56d1355043776f212b069802d779cd",
+    "result": {
+      "address": "0x080CD1FC",
+      "claim_id": 6862678903,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6862856366,
+      "status": "accepted",
+      "who": "astra-xhigh-080cd1fc"
+    }
+  }
+}
