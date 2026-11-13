@@ -1168,6 +1168,43 @@ owner/count` until the matching decomp commit corrects their rows. The six
 tree-walk closures `08099D60`, `08099D8C`, `08099DB8`, `08099DE4`, `08099E10`
 and `08099E3C` need the same correction (17).
 
+### Stack arrays passed to the known list queries
+
+`--owner-runtime-profile conditional-known-query-stack-buffer-v1` admits a
+caller that passes a private stack array to `08099CDC`, `08099D08` or
+`08099D34` and reads it back:
+
+```sh
+python tools/match.py --root ../fftadecomp 08023130 --owner-runtime-profile conditional-known-query-stack-buffer-v1
+```
+
+The default buffer verifier still refuses these callers, because it re-derives
+each callee's CFG and stops at the `_call_via_r6` thunk. This profile instead
+applies a contract to the query family, and pins the bytes, extents and refined
+counts of the three roots (17 each), the iterator `080C7CC0`, the adapter
+`0809ABE8`, the collector `0809AC20`, the getter `080C7B74`, both thunks and
+their unowned padding. The contract is: with n list nodes the query stores
+node value k at out+4k for k = 0..n-1, returns n, writes no other caller
+memory, preserves R4-R11/SP and uses at most 44 bytes below the caller's SP.
+The only visitors are the adapter (through `_call_via_r6`) and the collector
+(through `_call_via_r2`). `tests/test_known_query_stack_buffer.py` runs the
+pinned bytes on a CPU for n = 0..13 against this relation when `unicorn` is
+installed.
+
+The ROM does not bound n. The profile takes one fixed premise, at most 13
+nodes, and requires every query buffer to be 13 allocated private words (no
+saved word inside it). The caller is executed abstractly on every path for
+each n from 0 through 13, with the first n buffer words initialized and the
+others unchanged. Any read of an uninitialized private word refuses. So do a
+private address in any argument register (other than the query's R1 buffer)
+or stored anywhere, an unknown private index, sub-word private access, an
+unbalanced or unrestored frame, an uncovered instruction, or more than 65,536
+abstract states. Ordinary calls and external accesses keep the usual returning
+ABI and noninterference premises. The report records the contract identities,
+each query site and buffer offset, the counts executed and the private reads
+and writes. The list bound, physical memory permission and termination are
+not proved.
+
 
 ### Named data literals
 
