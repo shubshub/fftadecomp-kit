@@ -47,7 +47,7 @@ def compare(real=REAL, stripped=STRIPPED, preprocessed=None):
 def signature(text):
     # the production path: the checked translation unit, then its file scope
     code = semantics.translation_unit(text)
-    return semantics.indirect_signature(code, semantics.file_scope(code), 'g_cb')
+    return semantics.indirect_signature(code, semantics.file_scope(code), 'g_cb', text)
 
 
 class SignatureTests(unittest.TestCase):
@@ -311,6 +311,41 @@ class IndirectCallTests(unittest.TestCase):
 @unittest.skipUnless(Path(os.path.expandvars(match.DEFAULT_CC)).is_file() and
                      shutil.which('cpp') and shutil.which('arm-none-eabi-as') and
                      shutil.which('arm-none-eabi-objcopy'), 'fixed compiler required')
+class NamedCalleeTests(unittest.TestCase):
+    def uses(self, text, arity=2):
+        code = semantics.translation_unit(text)
+        semantics.named_callee_uses(code, semantics.file_scope(code), 'k', arity)
+
+    def test_every_use_must_be_a_call_with_the_declared_count(self):
+        proto = 'extern void k(u32, u32);\n'
+        self.uses(source(proto, 'k(1, 2);'))
+        for call in ('k(1, 2, 3);', 'k();', '((void (*)())k)(1, 2);', 'extern void k(); k(1, 2);',
+                     'void (*f)(u32, u32) = k;', 's.k(1, 2);', '(k)(1, 2);'):
+            with self.subTest(call=call), self.assertRaises(semantics.SemanticError):
+                self.uses(source(proto, call))
+
+    def test_the_prototype_must_come_before_the_body_that_calls(self):
+        with self.assertRaisesRegex(semantics.SemanticError, 'before its file-scope prototype'):
+            self.uses(source('', 'k(1, 2);') + 'extern void k(u32, u32);\n')
+        with self.assertRaisesRegex(semantics.SemanticError, 'before its file-scope prototype'):
+            self.uses(source('', 'k(1, 2);'))
+        # a prototype before an earlier body and the use in a later one
+        self.uses(source('extern void k(u32, u32);\n', 'k(1, 2);') + 'void g(void)\n{\n k(3, 4);\n}\n')
+
+    def test_a_literal_index_is_read_from_the_original_text(self):
+        for index in ("'\\x02'", "'a'"):
+            with self.subTest(index=index):
+                self.assertIn('not written as digits', signature(source(
+                    'typedef void (*Callback)(void *, u32);\nextern Callback g_cb[4];\n',
+                    f'g_cb[{index}](0, 5);')))
+        self.assertEqual(signature(source(call='g_cb[0 ](0, 5);')), (False, 2, 0))
+
+    def test_member_checks_read_literals_as_blanks(self):
+        # `[0 ]` after translation_unit would pass as index 0; blanked it is refused
+        with self.assertRaisesRegex(semantics.SemanticError, 'literal'):
+            compare(preprocessed=source(call=f"{SYMBOL}.unknown_02['\\x02'] = 1;"))
+
+
 class CompiledIndirectCallTests(unittest.TestCase):
     """through agbcc: the recovered 0x0802F400 shape passes, the untyped ones do not"""
 
@@ -330,12 +365,28 @@ class CompiledIndirectCallTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.directory.cleanup()
 
-    def check(self, declarations, body):
+    def check(self, declarations, body, after=''):
         (self.root / 'src' / '08028C34.c').write_text(
             '#include "control_flags.h"\ntypedef unsigned int u32;\n' + declarations +
-            'extern u8 g_buffer[];\nvoid func_08028C34(void)\n{\n' + body + '\n}\n')
+            'extern u8 g_buffer[];\nvoid func_08028C34(void)\n{\n' + body + '\n}\n' + after)
         with mock.patch.dict(os.environ, FFTA_ROM=str(self.root / 'baserom.bin')):
             return match.allowlisted_volatile_semantics(self.root, 0x08028C34)
+
+    def test_a_named_callee_must_be_typed_by_the_prototype_the_call_sees(self):
+        # each of these compiles a 5-word call (the fifth on the stack) that
+        # the file-scope prototype's four words do not describe
+        proto = 'extern void k(u32, u32, u32, u32);\n'
+        store = f'{SYMBOL}.bldy_lo = 0x10; '
+        self.check(proto, store + 'k(1, 2, 3, 4);')
+        for declarations, body, after, reason in (
+                (proto, 'extern void k(); ' + store + 'k(1, 2, 3, 4.0);', '', 'nested extern declaration'),
+                ('', store + 'k(1, 2, 3, 4.0);', 'int k(u32, u32, u32, u32);\n',
+                 'implicit declaration of function'),
+                (proto + 'typedef void (*Any)();\n', store + '((Any)k)(1, 2, 3, 4.0);', '',
+                 'other than as a direct call')):
+            with self.subTest(body=body):
+                with self.assertRaisesRegex((ValueError, semantics.SemanticError), reason):
+                    self.check(declarations, body, after)
 
     def test_an_unprototyped_identifier_list_is_refused(self):
         # agbcc warns "parameter names (without types)" and passes 4.0 in r3 and [sp]

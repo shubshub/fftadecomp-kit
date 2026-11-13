@@ -1942,8 +1942,16 @@ symbolically along every path, and the check requires:
   argument count, and rN is not one of those argument registers. Casts,
   copies, `(*name[K])`, computed indices, unprototyped or variadic pointer
   types and callback-typed parameters of the pointer's own prototype fail
-  closed. Declarations are read from the preprocessed text with directive
-  lines and comments blanked and each literal reduced to `0`. Digraphs,
+  closed. A named callee is held to the same use rule: every use of it in
+  a body is `name(` with its declared argument count, so a cast or a block
+  `extern` redeclaration fails closed, and its prototype must come before the
+  body that calls it. match.py also compiles with
+  `-Wimplicit-function-declaration -Wnested-externs` (any `-w` dropped) and
+  refuses those two warnings; agbcc's output is unchanged. A call-site
+  index must be written as digits. Declarations are read from the preprocessed
+  text with directive lines and comments blanked and each literal reduced to
+  `0`; the object's member checks (whole-object uses, array indices) still read it
+  with literals blanked to spaces, so `unknown_48['\x02']` is refused. Digraphs,
   `asm` labels, unbalanced braces and literals that cross a line fail
   closed. A declaration may rely only on typedefs that precede it (before
   its typedef, cc1 reads a type name as an old-style identifier list, and
