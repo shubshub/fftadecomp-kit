@@ -28,7 +28,7 @@ class NumericThunkSwitchAlignedTests(unittest.TestCase):
         self.root = Path(temporary.name)
 
     def fixture(self, *, numeric='0x68C', tail='', case0_exit='b .Ldone', successor=2,
-                selector=SELECTOR):
+                selector=SELECTOR, gap=b'\0\0'):
         assembly = f'''.syntax unified
 .arch armv4t
 .thumb
@@ -118,6 +118,8 @@ bx r1
         rom = bytearray(0x142254)
         rom[A-match.ROM_BASE:A-match.ROM_BASE+len(data)] = data
         rom[follow-match.ROM_BASE:follow-match.ROM_BASE+2] = b'\x70\x47'
+        if successor == 2:
+            rom[A+len(data)-match.ROM_BASE:follow-match.ROM_BASE] = gap
         rom[0x1000:0x1002] = b'\x70\x47'
         rom[0x142250:0x142254] = b'\x18\x47\xc0\x46'
         values = dict(data=data, address=A, rom=bytes(rom), mapping=mapping, index=index,
@@ -220,6 +222,26 @@ bx r1
             end=f'0x{A+len(values["data"])+2:08X}', mode='thumb', instrs=1))
         with self.assertRaises(ValueError):
             owner.verify(**dict(values, mapping=json.dumps(rows).encode()), bindings=bindings)
+
+    def test_rom_gap_must_be_zero_or_nop_and_is_bound(self):
+        original, _, values = self.fixture()
+        bindings = self.bindings(original, values)
+        for gap in (b'\0\0', b'\xc0\x46'):
+            _, _, allowed = self.fixture(gap=gap)
+            manifest, _ = owner.verify(**allowed, bindings=bindings)
+            self.assertEqual(manifest['proof']['terminal_alignment_policy']['rom_gap_bytes'], gap.hex())
+        for gap in (b'\xff\xff', b'\xfe\xe7', b'\x70\x47', b'\x00\x46'):
+            _, _, mutated = self.fixture(gap=gap)
+            with self.subTest(gap=gap.hex()), self.assertRaisesRegex(ValueError, 'zero or NOP two-byte gap'):
+                owner.verify(**mutated, bindings=bindings)
+        manifest, _ = owner.verify(**values, bindings=bindings)
+        altered = copy.deepcopy(manifest)
+        altered['proof']['terminal_alignment_policy']['rom_gap_bytes'] = 'c046'
+        with self.assertRaisesRegex(ValueError, 'manifest differs'):
+            owner.verify(**values, bindings=bindings, manifest=altered)
+        _, _, nop = self.fixture(gap=b'\xc0\x46')
+        with self.assertRaisesRegex(ValueError, 'manifest differs'):
+            owner.verify(**nop, bindings=bindings, manifest=manifest)
 
     def test_numeric_word_must_be_a_reached_u16(self):
         original, _, values = self.fixture(numeric='0x12345')

@@ -798,17 +798,21 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         entries = json.loads(mapping)
         rows = [line.split() for line in index.decode().splitlines()
                 if line.split() and not line.lstrip().startswith('#')]
-        if len(data)%4 != 2 or following%4 or following > match.ROM_BASE+len(rom) or \
-                any(site >= end for site in ins) or \
+        # The pad is unreached: refinement must close its CFG and graph() refuses any
+        # code range past the sized function, so no reached instruction lies at or after end.
+        gap_bytes = rom[end-match.ROM_BASE:following-match.ROM_BASE]
+        if len(data)%4 != 2 or following%4 or following >= match.ROM_BASE+len(rom) or \
+                gap_bytes not in (b'\0\0', b'\xc0\x46') or \
                 min((int(row['rom'],16)&~1 for row in entries if int(row['rom'],16)&~1 >= end), default=None) != following or \
                 min((int(row[0],16)&~1 for row in rows if int(row[0],16)&~1 >= end), default=None) != following or \
                 any(int(row['rom'],16) < following and int(row['end'],16) > end for row in entries) or \
                 any(int(row[0],16) < following and int(row[1],16) > end for row in rows):
-            raise ValueError('aligned R3 thunk switch requires an unreached unowned two-byte gap before an aligned next function')
+            raise ValueError('aligned R3 thunk switch requires an unreached unowned zero or NOP two-byte gap before an aligned next function')
         proof['terminal_alignment_policy'] = dict(
             schema='canonical-external-two-byte-thumb-nop-aligned-successor-v1',
             scope='external assembler alignment only; complete sized FUNC remains unchanged',
             gap=[f'0x{end:08X}',f'0x{following:08X}'],
+            rom_gap_bytes=gap_bytes.hex(),
             producer_sha256=sha(Path(alignment.__file__).read_bytes()))
     observed={'profile':schema,
               'proof':proof,'bindings':bindings}
