@@ -40,12 +40,13 @@ symbolically along every path, and the check requires
      destination is overwritten before any use, followed by its store of
      the same width to the same member with only constant materialisation
      (immediate moves and arithmetic on known constants) and copies or
-     literal loads into the store's operand registers in between
-     (read_modify_write_store). One bounded exception permits the same-member
-     live OR update to occur after its separate dead insertion read: an
-     exact-width member read, immediate mask, insertion read, OR and exact
-     same-member store, with no additional value or flag consumer
-     (separated_or_store);
+     literal loads into the store's operand registers in between, plus
+     live register-only operations that neither read the loaded value nor
+     feed or overwrite the store's operands (read_modify_write_store). One
+     bounded exception permits the same-member live OR update to occur
+     after its separate dead insertion read: an exact-width member read,
+     immediate mask, insertion read, OR and exact same-member store, with
+     no additional value or flag consumer (separated_or_store);
    * a forwarded re-read: the forwarding store of the same width to the
      same member is the immediately preceding memory access and the value
      feeds the next pinned member store through copies (chained_reread).
@@ -1719,6 +1720,36 @@ def separated_or_store(records, position, address, width):
     return position + 2
 
 
+def live(records, position, step):
+    """does what step computes reach a use along this path?
+
+    Its registers are followed forward through register operations and
+    loads until one reaches a store outside the frame (value or address), an
+    argument register a call's prototype names, or a conditional branch
+    (through flags). A frame store, a push, a return, an overwrite or the
+    end of the path ends a value's life, so a read that is itself dead does
+    not make step live (a returned or spilled value is refused,
+    conservatively).
+    """
+    tainted, flags = set(step.writes), step.flags_written
+    for later in records[position + 1:]:
+        if later.kind == "branch" and not later.unconditional and flags:
+            return True
+        uses = later.reads & tainted
+        if later.kind == "call" and uses - later.guarded:
+            return True                  # only the prototype's arguments are compared
+        if later.kind == "store" and uses and not is_stack(later.address):
+            return True                  # a frame slot is no use unless it escapes
+        tainted -= later.writes
+        if uses and later.kind in ("alu", "load"):
+            tainted |= later.writes
+        if later.flags_written:
+            flags = bool(uses) and later.kind == "alu"
+        if not tainted and not flags:
+            return False
+    return False
+
+
 def read_modify_write_store(records, position, address, width):
     """the position of the store this dead load belongs to, or None.
 
@@ -1735,16 +1766,24 @@ def read_modify_write_store(records, position, address, width):
     executed path; they read no flags or registers and produce no effects.
     Path-proven register OR with zero is a value-preserving copy; its register
     reads and arithmetic flags remain live in the semantic replay.
+    The scheduler may also move unrelated register operations in (0813F934:
+    `movs r0, #0; mov r8, r0` for a later value, then the store's literal):
+    an operation outside the backward slice of the store's operands is
+    admitted if it is register-only, live (its result reaches a store, a
+    call or a conditional branch along the path - see live) and writes
+    neither a register the store reads nor sp/pc. No instruction in between may read the dead value before
+    it is overwritten, and every operation in the slice must still be one of
+    the forms above, so the store's value and address are built before the load.
     A same-member OR may follow its insertion read only under the separate
     bounded authentication in separated_or_store.
-    Anything else in between - arithmetic on unknown values, another memory
-    access, a call or a conditional branch - refuses. The store must have
-    the load's width and address on every explored path.
+    Anything else in between - arithmetic on unknown values feeding the
+    store, another memory access, a call or a conditional branch - refuses.
+    The store must have the load's width and address on every explored path.
     """
     separated = separated_or_store(records, position, address, width)
     if separated is not None:
         return separated
-    between = []
+    between, loaded = [], set(records[position].writes)
     for later in range(position + 1, len(records)):
         record = records[later]
         if record.kind == "branch" and record.unconditional:
@@ -1752,28 +1791,44 @@ def read_modify_write_store(records, position, address, width):
         if record.kind == "store":
             if record.width != width or record.address != address:
                 return None
-            def feeding(registers):
-                """the steps whose result reaches registers through copies"""
+            def feeding(registers, through_all=False):
+                """the steps whose result reaches registers through copies
+                (through any register operation if through_all)"""
                 live, found = set(registers), set()
                 for step in reversed(between):
                     if step.writes & live:
                         found.add(step.index)
                         live -= step.writes
-                        if step.copy:
+                        if step.copy or through_all:
                             live |= step.reads
                 return found
             operands, value = feeding(record.reads), feeding({record.value_register})
+            slice_ = feeding(record.reads, through_all=True)
             for step in between:
                 if step.immediate:
                     continue
-                if step.constant and not step.copy and step.kind != "literal":
+                if step.index not in slice_:
+                    # scheduled in from unrelated code (0813F934: `movs r0, #0;
+                    # mov r8, r0`): a pure register operation that feeds no
+                    # operand of the store, leaves its registers alone and
+                    # is live - its result or its flags have a later reader
+                    if step.writes & (record.reads | {"sp", "pc"}) or \
+                            not live(records, records.index(step), step):
+                        return None
+                elif not (step.kind == "literal" or step.copy or step.constant):
+                    return None                      # the store's operands are built before the load
+                elif step.constant and not step.copy and step.kind != "literal":
                     if step.index not in value:      # constant arithmetic builds the stored value
                         return None
                 elif step.index not in operands:
                     return None
             return later
-        if not (record.kind == "literal" or record.copy or record.constant):
+        # no memory access but a literal-pool load, no call or conditional
+        # branch, and the dead value is never read, even by unrelated code
+        # (dead() already ensures that; this is defence in depth)
+        if record.kind not in ("alu", "literal") or record.reads & loaded:
             return None
+        loaded -= record.writes
         between.append(record)
     return None
 
@@ -2057,11 +2112,14 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         "so the load must be overwritten before the call")
                 if verdict:
                     store = read_modify_write_store(records, position, record.address, record.width)
-                    if store is None:
+                    # one store explains one load; a second dead load in the
+                    # window already refuses, so the second test is defence in depth
+                    if store is None or store in explained_stores:
                         raise SemanticError(
                             f"{name}: {describe(record)} is a dead load of {where(record.address)} "
                             "that is not directly followed by a store to the same member (only "
-                            "constants and the store's own operand copies may sit between "
+                            "constants, the store's own operand copies and register operations "
+                            "that neither read the load nor feed the store may sit between "
                             "them); only the read-modify-write load of a member store is the "
                             "qualifier's documented effect")
                     explained_stores.add(store)

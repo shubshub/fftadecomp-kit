@@ -1931,7 +1931,15 @@ symbolically along every path, and the check requires:
     store's value register through copies) and copies or literal loads whose
     result reaches the store's own operand registers through copies. agbcc computes any other stored
     value before the load, and 08028C34, 08050D50, 08050DA0, 08122C6C (bytes)
-    and 080034B8, 080032F8 (halfwords) show exactly this shape;
+    and 080034B8, 080032F8 (halfwords) show exactly this shape. The scheduler
+    may also move unrelated register operations in (0813F934, 0813F9F8:
+    `movs r0, #0; mov r8, r0` for a later value): an operation outside the
+    backward slice of the store's operands is admitted if it touches no
+    memory beyond a literal pool, is live (its result reaches a store
+    outside the frame, a named call argument or a branch's flags) and
+    writes neither a register the store reads nor sp/pc (an immediate `mov`, as before, may write one that the
+    store's own operands later overwrite). Nothing in between may read the loaded value, and no
+    memory access, call or conditional branch may intervene;
   - a **chained re-read** for `a = (b = v)`: a load of the member, at its
     width, whose store is the immediately preceding memory access, with only
     register arithmetic in between, whose value reaches, through copies only,

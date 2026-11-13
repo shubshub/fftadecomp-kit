@@ -39,6 +39,23 @@ class NeutralRmwTests(unittest.TestCase):
         with self.assertRaises(semantics.SemanticError):
             fixtures.compare(*self.bodies(operation='orr\tr4, r3'))
 
+    def test_unrelated_neutral_copy_with_a_dead_reader_refused(self):
+        # liveness of scheduled-in work is transitive: a dead copy after the
+        # store, or a push popped straight back, does not make the OR live
+        for suffix in (('mov\tr5, r4',), ('push\t{r4}', 'pop\t{r4}')):
+            with self.subTest(suffix=suffix), self.assertRaises(semantics.SemanticError):
+                fixtures.compare(*self.bodies(operation='orr\tr4, r3', suffix=suffix,
+                                              stripped_suffix=suffix))
+        # nor does a call register the prototype does not name, or a frame
+        # slot that is never read back or escaped
+        for operation, suffix in (
+                ('orr\tr0, r3\n\tmov\tr3, r5', ('mov\tr2, #0', 'push\t{lr}', 'bl\tfunc_0802A2C0',
+                                                 'pop\t{r2}', 'mov\tlr, r2')),
+                ('orr\tr0, r3\n\tmov\tr4, r5', ('sub\tsp, #4', 'str\tr4, [sp]', 'add\tsp, #4'))):
+            with self.subTest(operation=operation), self.assertRaises(semantics.SemanticError):
+                fixtures.compare(*self.bodies(operation=operation, suffix=suffix,
+                                              stripped_suffix=suffix))
+
     def test_dead_loaded_value_cannot_be_or_source(self):
         with self.assertRaises(semantics.SemanticError):
             fixtures.compare(*self.bodies(operation='orr\tr0, r2'))

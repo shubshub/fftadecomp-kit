@@ -344,6 +344,8 @@ class SemanticDiffTests(unittest.TestCase):
         for name, window, accepted in (
                 ("copied constant", "mov\tr3, #128\n\tlsl\tr3, r3, #1\n\tadd\tr0, r3, #0", True),
                 ("copied literal", "ldr\tr3, .L3+4\n\tadd\tr0, r3, #0", True),
+                ("unknown arithmetic on the value", "add\tr0, r3, #1", False),
+                # dead unrelated work; live scheduled-in work is admitted (0813F934)
                 ("unrelated constant", "mov\tr3, #128\n\tlsl\tr3, r3, #1\n\tmov\tr0, #1", False),
                 ("unrelated literal", "ldr\tr3, .L3+4\n\tmov\tr0, #1", False)):
             shaped = built.replace("mov\tr0, #128\n\tlsl\tr0, r0, #1", window).replace(
@@ -380,6 +382,76 @@ class SemanticDiffTests(unittest.TestCase):
             self.compare16(self_assign, assembly("ldr\tr1, .L3", "ldrh\tr0, [r1, #4]",
                                                  "strh\tr0, [r1, #4]", "bx\tlr"))
         self.assertIn("self-assignment", str(caught.exception))
+
+    def test_unrelated_scheduled_work_may_sit_between_load_and_store(self):
+        # 0813F934: `ldrh r0, [r1, #0xe]; movs r0, #0; mov r8, r0; ldr r0, =0xFFA8;
+        # strh r0, [r1, #0xe]` - a shared zero for later code is scheduled in
+        def shaped(*window, store="strh\tr0, [r1, #4]"):
+            return assembly("ldr\tr1, .L3", "add\tr3, r1, #0", "ldrh\tr0, [r1, #4]",
+                            *window, "ldr\tr0, .L3+4", store, "mov\tr0, r8", "str\tr0, [r5]",
+                            "bx\tlr").replace(
+                f".word\t{SYMBOL}\n", f".word\t{SYMBOL}\n\t.word\t0xFFA8\n")
+
+        def check(real):
+            return self.compare16(real, real.replace("ldrh\tr0, [r1, #4]\n\t", ""))
+
+        for name, window in (("shared zero", ("mov\tr0, #0", "mov\tr8, r0")),
+                             ("unknown arithmetic", ("mul\tr2, r2, r6", "mov\tr8, r2"))):
+            with self.subTest(accepted=name):
+                self.assertEqual(check(shaped(*window))[0][1:3], (1, [2]))
+        # flags set in the window and consumed after the store stay ordinary
+        # behaviour: both compiles must branch on the same condition
+        branching = shaped("cmp\tr2, #3").replace("mov\tr0, r8", "beq\t.L9\n\tmov\tr0, r8\n.L9:")
+        self.assertEqual(check(branching)[0][1:3], (2, [2]))
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.compare16(branching, branching.replace("ldrh\tr0, [r1, #4]\n\t", "").replace(
+                "cmp\tr2, #3", "cmp\tr2, #4"))
+        self.assertIn("different conditions", str(caught.exception))
+        # defence in depth behind dead(): the window itself refuses a read of
+        # the loaded value before it is overwritten
+        load = semantics.Record(0, "ldrh", "load", {"r1"}, {"r0"}, address=("sym", 4), width=2)
+        copy = semantics.Record(1, "mov", "alu", {"r0"}, {"r8"}, copy=True)
+        store = semantics.Record(2, "strh", "store", {"r0", "r1"}, (), address=("sym", 4), width=2,
+                                 value_register="r0")
+        overwrite = semantics.Record(1, "mov", "alu", (), {"r0"}, constant=True, immediate=True)
+        self.assertIsNone(semantics.read_modify_write_store([load, copy, store], 0, ("sym", 4), 2))
+        self.assertEqual(semantics.read_modify_write_store([load, overwrite, store], 0, ("sym", 4), 2), 2)
+        dead_load, unexplained = "is a dead load of", "without the read-modify-write load"
+        call = assembly("push\t{r4, lr}", "ldr\tr4, .L3", "ldrh\tr0, [r4, #4]", "mov\tr0, #0",
+                        "bl\tfunc_0802A2C0", "ldr\tr0, .L3+4", "strh\tr0, [r4, #4]", "pop\t{r4}",
+                        "pop\t{r0}", "bx\tr0").replace(
+            f".word\t{SYMBOL}\n", f".word\t{SYMBOL}\n\t.word\t0xFFA8\n")
+        for name, real, reason in (
+                ("memory access", shaped("mov\tr0, #0", "ldr\tr2, [r2]", "mov\tr8, r2"), dead_load),
+                ("call", call, dead_load),
+                ("conditional branch", shaped("mov\tr0, #0", "cmp\tr2, #0", "beq\t.L9", ".L9:"),
+                 dead_load),
+                # a read of the loaded value makes it live: no longer a dead
+                # load, so the store is left without its own load
+                ("loaded value copied (live load)", shaped("mov\tr8, r0"), unexplained),
+                ("loaded value in arithmetic (live load)", shaped("add\tr2, r2, r0", "mov\tr8, r2"),
+                 unexplained),
+                # the scheduler moves live work only: a dead result, or flags
+                # nothing reads, is not another statement's code
+                ("dead result", shaped("mov\tr0, #0", "mov\tr8, r0", "add\tr2, r2, r6"), dead_load),
+                ("unread flags", shaped("mov\tr0, #0", "mov\tr8, r0", "cmp\tr2, #3"), dead_load),
+                # liveness is transitive: a reader that is itself dead, or a
+                # push popped straight back, is no use
+                ("dead reader", shaped("mov\tr0, #0", "mov\tr8, r0", "add\tr2, r2, r6").replace(
+                    "mov\tr0, r8", "mov\tr0, r8\n\tmov\tr7, r2"), dead_load),
+                ("pushed and popped", shaped("mov\tr0, #0", "mov\tr8, r0", "add\tr2, r2, r6").replace(
+                    "mov\tr0, r8", "mov\tr0, r8\n\tpush\t{r2}\n\tpop\t{r2}"), dead_load),
+                ("store base redefined", shaped("add\tr1, r1, r2", "add\tr1, r3, #0"), dead_load),
+                ("store value computed", shaped("mov\tr0, #0", "mov\tr8, r0", "ldr\tr0, .L3+4",
+                                                "add\tr0, r0, r2", "mov\tr2, #0").replace(
+                    "ldr\tr0, .L3+4\n\tstrh", "strh"), dead_load),
+                ("other member stored", shaped("mov\tr0, #0", "mov\tr8, r0",
+                                               store="strh\tr0, [r1, #2]"), dead_load),
+                ("two dead loads, one store", shaped("mov\tr0, #0", "mov\tr8, r0",
+                                                     "ldrh\tr2, [r1, #4]"), dead_load)):
+            with self.subTest(refused=name), self.assertRaises(semantics.SemanticError) as caught:
+                check(real)
+            self.assertIn(reason, str(caught.exception), name)
 
     def test_halfword_chained_assignment_re_read(self):
         # `sym.bg0cnt = (sym.bg1cnt = 0);` re-reads +0x04 at its own width
