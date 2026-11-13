@@ -3166,7 +3166,35 @@
           "who": "astra-xhigh-0800c720"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "dec824e23b9c94cd030a3b8979d697e388f1f0687765324270fff7ae5f608e71",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dec824e23b9c94cd030a3b8979d697e388f1f0687765324270fff7ae5f608e71",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C720\",\"who\":\"astra-xhigh-0800c720\",\"claim_id\":6863410167,\"reason\":\"Six natural packed forms yield208bytes versus226 target: missing six read-before-write destination loads plus middle-loop narrowing/register difference. No volatile introduced. Native mismatch exit1; evidence retained.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-11-13T20:08:39Z",
+          "id": 6863636126,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:08:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x0800C720",
+          "claim_id": 6863410167,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6863636126,
+          "status": "accepted",
+          "who": "astra-xhigh-0800c720"
+        }
+      }
     },
     {
       "claim": {
@@ -3290,6 +3318,166 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6863621287,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "62ed486ce3bb444250d18c7a3daa0a1088747f38e40587c5f1f1acfac6350f1d",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "62ed486ce3bb444250d18c7a3daa0a1088747f38e40587c5f1f1acfac6350f1d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08084A98\",\"who\":\"claude-ffta2\",\"note\":\"dbl unblocked\"}",
+          "created_at": "2026-11-13T20:08:52Z",
+          "id": 6863640572,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:08:52Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x08084A98",
+          "claim_id": 6863640572,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6863640572,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a0f710d3f2a4005e441ebb6daf4235446461fdcba58ff2fcac52afd0366dd87d",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a0f710d3f2a4005e441ebb6daf4235446461fdcba58ff2fcac52afd0366dd87d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805E354\",\"who\":\"astra-xhigh-0805e354\",\"note\":\"Recover complete hard function with unchanged existing native profile; fully mapped data, no toolkit edits.\"}",
+          "created_at": "2026-11-13T20:08:56Z",
+          "id": 6863642076,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:08:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x0805E354",
+          "claim_id": 6863642076,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6863642076,
+          "status": "accepted",
+          "who": "astra-xhigh-0805e354"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "eeda9a0680844fee2adc9bb26887ac3950f6db990df1d4cf7c109eada81ce4a1",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "eeda9a0680844fee2adc9bb26887ac3950f6db990df1d4cf7c109eada81ce4a1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B5278\",\"who\":\"astra-xhigh-080b5278\",\"note\":\"Recover complete hard function with unchanged existing native profile; fully mapped data, no toolkit edits.\"}",
+          "created_at": "2026-11-13T20:08:56Z",
+          "id": 6863642110,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:08:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x080B5278",
+          "claim_id": 6863642110,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6863642110,
+          "status": "accepted",
+          "who": "astra-xhigh-080b5278"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "42ef88075311bea8353b085bd792758edd89d48f7dccae021754fb6f96593cde",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "42ef88075311bea8353b085bd792758edd89d48f7dccae021754fb6f96593cde",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080670B4\",\"who\":\"astra-xhigh-080670b4\",\"note\":\"Recover complete hard function with unchanged existing native profile; fully mapped data, no toolkit edits.\"}",
+          "created_at": "2026-11-13T20:08:58Z",
+          "id": 6863642524,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:08:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x080670B4",
+          "claim_id": 6863642524,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6863642524,
+          "status": "accepted",
+          "who": "astra-xhigh-080670b4"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2f9d9ea0f8bc5029fbfa7918db2151c989a225cb81695afd98cb35931e362aa5",
+        "acknowledged_cursor": 6863655284,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2f9d9ea0f8bc5029fbfa7918db2151c989a225cb81695afd98cb35931e362aa5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080835A4\",\"who\":\"claude-ffta2\",\"note\":\"dbl unblocked\"}",
+          "created_at": "2026-11-13T20:09:34Z",
+          "id": 6863655284,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T20:09:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "aa34262311fe203d6a58747d866ee760f190362d57f8af16f7fa5a70adc9613a",
+        "result": {
+          "address": "0x080835A4",
+          "claim_id": 6863655284,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6863655284,
           "status": "accepted",
           "who": "claude-ffta2"
         }
