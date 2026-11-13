@@ -901,10 +901,16 @@ survival the replay relied on, and the register, is recorded and bound by the
 fingerprint, and the report states it in a `* buffer loop replay:` line (one per
 replayed callee) as `proved` or `trusted`. `callee_preservation_profile.py` proves
 R7 and R8 for the callees of `0812E4F4` (`080C7EA4`, `080CA7A4` and its callee
-`080C95A8`) from pinned bytes: no instruction writes them, branches and dispatch
-entries stay inside the callee, and any unpinned call, interrupt or unpinned
-indirect jump refuses. Everything else stays `trusted`. The report check requires exactly the
-lines the recomputed proof states, and none for a proof without a replay.
+`080C95A8`) from pinned bytes: the span is decoded by reachability from the
+entry, no reached instruction writes them, code may not reach a literal word, a
+dispatch table or the end of the span, and PC is written only by `B`/`BL`,
+`bx lr`, `pop {..., pc}`, `pop {rX}` + `bx rX` (after a `push {..., lr}`) and the
+agbcc switch idiom, whose `cmp` bound must equal the pinned table length. Any
+unpinned call, interrupt or other indirect jump refuses. Everything else stays
+`trusted`. A callee left `trusted` is still admitted: only the disclosure line
+changes, nothing is refused because of it. The report check requires exactly the
+lines the recomputed proof states, refuses an indented or unrecognised `* buffer`
+line, and none for a proof without a replay.
 Nothing is widened: if no exact counter bounds the loop, the pointer
 keeps moving until a store leaves the buffer, or the replay exhausts its budget
 (4,096 states per callee, 65,536 per proof) and refuses. The per-proof counter

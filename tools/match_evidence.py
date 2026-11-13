@@ -133,7 +133,7 @@ def udivsi3_report_matches(lines, root, address):
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                any(line.lstrip().startswith(("* buffer calls", "* buffer proof SHA-256",
+                any(line.lstrip().startswith(("* buffer calls", "* buffer proof SHA-256", "* buffer loop replay",
                                               "* data symbols SHA-256", "* switches", "* switch manifest",
                                               "* switch proof SHA-256", "* function addresses",
                                               "* function address manifest", "* function address proof SHA-256"))
@@ -285,7 +285,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
                                  call_resolver=proof.target)
         return bool(proof.dependencies) and \
             fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and \
-            [line for line in lines if line.startswith("* buffer")
+            [line for line in lines if line.lstrip().startswith("* buffer")
              and not line.startswith(("* buffer calls:", "* buffer proof SHA-256:"))] == proof.loop_replay_lines()
     except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return False
@@ -352,7 +352,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                not buffer_profile and any(line.startswith(
+                not buffer_profile and any(line.lstrip().startswith(
                     ("* buffer calls:", "* buffer proof SHA-256:", "* buffer loop replay")) for line in lines):
             return False
         if buffer_profile and (
@@ -381,7 +381,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
                         address, data, manifest, source_digest, functions, proof.fingerprint()) or \
-                    [line for line in lines if line.startswith("* buffer loop replay")] != proof.loop_replay_lines():
+                    [line for line in lines if line.lstrip().startswith("* buffer loop replay")] != proof.loop_replay_lines():
                 return False
             control_flow = CALL_SUMMARY
         else:
@@ -485,7 +485,7 @@ def preloaded_switch_report_matches(lines, root, address):
     try:
         mapping = mapping_snapshot(root)
         objects = data_snapshot(root)
-        excluded = ("* stack frame", "* buffer calls", "* buffer proof SHA-256",
+        excluded = ("* stack frame", "* buffer calls", "* buffer proof SHA-256", "* buffer loop replay",
                     "* function addresses", "* function address manifest",
                     "* function address proof SHA-256", "* unsigned division")
         if mapping is None or objects is None or \
@@ -556,7 +556,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                    SWITCH_MULTIPLE_DATA_SUMMARY if multiple_data else
                    SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
         excluded = ("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:",
-                    "* function addresses:", "* function address manifest:",
+                    "* buffer loop replay:", "* function addresses:", "* function address manifest:",
                     "* function address proof SHA-256:")
         if outgoing_frame:
             if single("* stack frame: ") != STACK_SUMMARY:
@@ -576,7 +576,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                any((line.lstrip() if data_profile else line).startswith(excluded)
+                any(line.lstrip().startswith(excluded)
                     for line in lines):
             return False
         if data_profile:
@@ -656,7 +656,7 @@ def modsi3_report_matches(lines, root, address):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 any(line.lstrip().startswith(("* stack frame", "* buffer calls", "* buffer proof",
-                                              "* unsigned division", "* switches", "* switch manifest",
+                                              "* buffer loop replay", "* unsigned division", "* switches", "* switch manifest",
                                               "* switch proof", "* function addresses",
                                               "* function address manifest", "* function address proof"))
                     for line in lines):
@@ -729,7 +729,8 @@ def umodsi3_report_matches(lines, root, address):
                 single("* source plausibility: ") != "plausible" or \
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
-                any(line.lstrip().startswith(("* buffer calls", "* buffer proof", "* signed remainder", "* signed quotient",
+                any(line.lstrip().startswith(("* buffer calls", "* buffer proof", "* buffer loop replay",
+                                              "* signed remainder", "* signed quotient",
                                               "* unsigned division", "* switches", "* switch manifest",
                                               "* switch proof", "* function addresses",
                                               "* function address manifest", "* function address proof"))

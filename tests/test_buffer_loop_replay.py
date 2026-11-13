@@ -366,24 +366,46 @@ class BufferLoopReplayTests(unittest.TestCase):
             match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=match.BufferCallProof(
                 rom, self.mapping, stack_arguments=True), call_resolver=plain.target)
 
+    @staticmethod
+    def scan_opt_in(name, tree, found, violations):
+        import ast
+        classes = ("BufferCallProof", "FunctionBufferCallProof")
+        attributes = ("loop_replay", "_loop_replay_opt_in")
+
+        def visit(node, function):
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                function = node.name
+            if isinstance(node, ast.Call):
+                callee = getattr(node.func, "attr", getattr(node.func, "id", None))
+                if callee in classes:
+                    keywords = {keyword.arg: keyword.value for keyword in node.keywords}
+                    if None in keywords or any(isinstance(a, ast.Starred) for a in node.args):
+                        violations.append((name, function, "unpacked arguments"))
+                    value = keywords.get("loop_replay")
+                    if value is not None and not isinstance(value, ast.Constant):
+                        violations.append((name, function, "non-constant loop_replay"))
+                    found.add((name, function, getattr(value, "value", None) is True))
+                if callee == "setattr" and name != "match.py" and any(
+                        isinstance(a, ast.Constant) and a.value in attributes for a in node.args):
+                    violations.append((name, function, "setattr of the opt-in"))
+            targets = node.targets if isinstance(node, ast.Assign) else \
+                [node.target] if isinstance(node, (ast.AugAssign, ast.AnnAssign)) else []
+            for target in ast.walk(ast.Tuple(elts=targets)):
+                if isinstance(target, ast.Attribute) and target.attr in attributes and name != "match.py":
+                    violations.append((name, function, "assignment to the opt-in"))
+            if isinstance(node, ast.ImportFrom) and any(alias.name in classes and alias.asname
+                                                        for alias in node.names):
+                violations.append((name, function, "aliased import of a proof class"))
+            for child in ast.iter_child_nodes(node):
+                visit(child, function)
+        visit(tree, "<module>")
+
     def test_only_reviewed_construction_sites_request_replay(self):
         import ast
-        found = set()
+        found, violations = set(), []
         for path in sorted((ROOT / "tools").glob("*.py")):
-            tree = ast.parse(path.read_text())
-
-            def visit(node, function):
-                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
-                    function = node.name
-                if isinstance(node, ast.Call):
-                    name = getattr(node.func, "attr", getattr(node.func, "id", None))
-                    if name in ("BufferCallProof", "FunctionBufferCallProof"):
-                        replay = {keyword.arg: getattr(keyword.value, "value", None)
-                                  for keyword in node.keywords}.get("loop_replay") is True
-                        found.add((path.name, function, replay))
-                for child in ast.iter_child_nodes(node):
-                    visit(child, function)
-            visit(tree, "<module>")
+            self.scan_opt_in(path.name, ast.parse(path.read_text()), found, violations)
+        self.assertEqual(violations, [])
         self.assertEqual({site[:2] for site in found if site[2]}, {
             ("match.py", "verify_function_buffers"), ("match.py", "main"),
             ("function_thunk_profile.py", "verify_source"),
@@ -391,6 +413,39 @@ class BufferLoopReplayTests(unittest.TestCase):
         # Producers whose evidence neither states nor binds a replay stay plain.
         plain = {site[0] for site in found if not site[2]}
         self.assertTrue({"owner_runtime_profile.py", "match.py"} <= plain)
+
+    def test_opt_in_scan_flags_the_cases_it_used_to_miss(self):
+        import ast
+        for source in ("BufferCallProof(rom, m, **options)", "BufferCallProof(rom, m, loop_replay=flag)",
+                       "proof.loop_replay = True", "proof._loop_replay_opt_in = True",
+                       "setattr(proof, 'loop_replay', True)",
+                       "from match import BufferCallProof as P"):
+            with self.subTest(source=source):
+                violations = []
+                self.scan_opt_in("other.py", ast.parse(source), set(), violations)
+                self.assertTrue(violations)
+        violations = []
+        self.scan_opt_in("other.py", ast.parse("BufferCallProof(rom, m, loop_replay=True)"), set(), violations)
+        self.assertEqual(violations, [])
+
+    def test_replay_lines_are_refused_when_indented_or_in_other_reports(self):
+        import ast
+        proof = self.fixture(counted(4), frame=8)
+        (line,) = proof.loop_replay_lines()
+        self.assertFalse(self.accepted(self.report_lines(proof, " " + line)))
+        self.assertFalse(self.accepted(self.report_lines(proof, line, " " + line)))
+        self.assertFalse(self.accepted(self.report_lines(proof, line, "\t* buffer extra: x")))
+        marker = "* buffer loop replay"
+        tree = ast.parse((ROOT / "tools" / "match_evidence.py").read_text())
+        lists = [n for n in ast.walk(tree) if isinstance(n, ast.Tuple)
+                 and any(isinstance(e, ast.Constant) and isinstance(e.value, str)
+                         and e.value.startswith("* buffer proof") for e in n.elts) and len(n.elts) >= 5]
+        self.assertGreaterEqual(len(lists), 5)
+        for node in lists:
+            with self.subTest(line=node.lineno):
+                self.assertTrue(any(isinstance(e, ast.Constant) and isinstance(e.value, str)
+                                    and e.value.startswith(marker) for e in node.elts),
+                                "forbidden-marker list lacks the replay line")
 
     def test_pinned_preserving_callee_moves_a_pair_from_trusted_to_proved(self):
         import hashlib
@@ -424,16 +479,55 @@ class BufferLoopReplayTests(unittest.TestCase):
                     with patch.dict(preservation.PINS, pins, clear=True):
                         self.assertFalse(preservation.preserves_r7_r8(rom, int(entry["rom"], 16)))
 
+    def test_preservation_proof_follows_reachability_and_refuses_pc_escapes(self):
+        import hashlib
+        import struct
+        import callee_preservation_profile as preservation
+        words = lambda *w: b"".join(struct.pack("<H", x) for x in w)
+
+        def pinned(body, tables=(), rom_extra=b""):
+            rom = bytearray(0x400)
+            rom[0x100:0x100 + len(body)] = body
+            pin = {BASE + 0x100: (BASE + 0x100 + len(body), hashlib.sha256(body).hexdigest(), tables)}
+            with patch.dict(preservation.PINS, pin, clear=True):
+                return preservation.preserves_r7_r8(bytes(rom), BASE + 0x100)
+        self.assertFalse(pinned(words(0x4700)))                       # bx r0
+        self.assertFalse(pinned(words(0x4487, 0x4770)))               # add pc, r0
+        self.assertFalse(pinned(words(0xBD00)))                       # pop {pc} without a pushed lr
+        self.assertFalse(pinned(words(0x2000)))                       # falls off the span end
+        self.assertFalse(pinned(words(0x4800, 0x2000, 0x0000, 0x2700, 0x0000)))  # falls into a literal word
+        self.assertFalse(pinned(words(0x468F, 0x4770) + struct.pack("<I", BASE + 0x102),
+                                ((BASE + 0x104, 1),)))                # stray mov pc, r1 beside a table
+        self.assertFalse(pinned(words(0xB500, 0xBC08, 0x4708)))       # pop {r3}; bx r1
+        self.assertTrue(pinned(words(0xB500, 0xBD00)))                # push {lr}; pop {pc}
+        self.assertTrue(pinned(words(0xB500, 0xBC08, 0x4718)))        # push {lr}; pop {r3}; bx r3
+        self.assertFalse(pinned(words(0xB500, 0xBC08, 0xE7FD, 0x4718)))  # branch into the return pair
+        self.assertFalse(pinned(words(0x2700, 0x4770)))
+        self.assertTrue(pinned(words(0xE000, 0x2700, 0x4770)))        # dead r7 write is never reached
+
+    def test_preservation_switch_bound_must_agree_with_code_table_and_pin(self):
+        import callee_preservation_profile as preservation
+        path = ROOT.parent / "fftadecomp" / "baserom.bin"
+        if not path.exists():
+            self.skipTest("no real ROM next to the kit")
+        rom = path.read_bytes()
+        for address, table, count in ((0x080C7EA4, 0x080C7EC0, 69), (0x080CA7A4, 0x080CA7CC, 19)):
+            end, digest, _ = preservation.PINS[address]
+            for tables in (((table, count),), ((table, count - 1),), ((table, count + 1),), ((table + 4, count),), ()):
+                with self.subTest(address=address, tables=tables), \
+                        patch.dict(preservation.PINS, {address: (end, digest, tables)}):
+                    self.assertEqual(preservation.preserves_r7_r8(rom, address), tables == ((table, count),))
+
     def test_real_pinned_callees_are_proved_and_a_changed_byte_is_not(self):
         import callee_preservation_profile as preservation
         path = ROOT.parent / "fftadecomp" / "baserom.bin"
         if not path.exists():
             self.skipTest("no real ROM next to the kit")
         rom = path.read_bytes()
-        for address in (0x080C7EA4, 0x080CA7A4):
+        for address in (0x080C7EA4, 0x080CA7A4, 0x080C95A8):
             with self.subTest(address=address):
                 self.assertTrue(preservation.preserves_r7_r8(rom, address))
-                offset = address - match.ROM_BASE + 8
+                offset = address - match.ROM_BASE + 2
                 changed = rom[:offset] + bytes([rom[offset] ^ 1]) + rom[offset + 1:]
                 self.assertFalse(preservation.preserves_r7_r8(changed, address))
         self.assertFalse(preservation.preserves_r7_r8(rom, 0x0812E4F4))
