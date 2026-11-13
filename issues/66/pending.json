@@ -6174,7 +6174,35 @@
           "who": "astra-descriptor-copy"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0d38953e90454c4bcad12ab544ad565cb5d900b8e9339ed2ab3292134ecc51f5",
+        "acknowledged_cursor": 6847208600,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0d38953e90454c4bcad12ab544ad565cb5d900b8e9339ed2ab3292134ecc51f5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DAB8\",\"who\":\"astra-descriptor-copy\",\"claim_id\":6847168199,\"reason\":\"Grounded arithmetic-packing revisit unchanged: complete 82-byte symbol differs at offsets40-45; preserved candidate and real native failure\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2\"}",
+          "created_at": "2026-11-13T07:45:10Z",
+          "id": 6847208600,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T07:45:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7c3d8954e113e387c19c84c620303409a3b93daf79e820c44c35be3bff40d058",
+        "result": {
+          "address": "0x0800DAB8",
+          "claim_id": 6847168199,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6847208600,
+          "status": "accepted",
+          "who": "astra-descriptor-copy"
+        }
+      }
     }
   ],
   "issue": 66,
