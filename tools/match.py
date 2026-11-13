@@ -85,6 +85,9 @@ try:
                           CS_GRP_CALL, CS_GRP_JUMP, CS_GRP_INT, CS_AC_WRITE)
     from capstone.arm_const import (ARM_CC_AL, ARM_CC_INVALID, ARM_INS_ADR, ARM_INS_B,
                                     ARM_INS_BL, ARM_INS_CMP, ARM_INS_IT, ARM_OP_IMM, ARM_OP_MEM,
+                                    ARM_CC_EQ, ARM_CC_NE, ARM_CC_HS, ARM_CC_LO, ARM_CC_MI,
+                                    ARM_CC_PL, ARM_CC_VS, ARM_CC_VC, ARM_CC_HI, ARM_CC_LS,
+                                    ARM_CC_GE, ARM_CC_LT, ARM_CC_GT, ARM_CC_LE,
                                     ARM_OP_REG, ARM_REG_CPSR, ARM_REG_LR, ARM_REG_PC, ARM_REG_SP,
                                     ARM_REG_R0, ARM_REG_R1, ARM_REG_R2, ARM_REG_R3,
                                     ARM_REG_R12)
@@ -2759,6 +2762,89 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
         safe.update(newly_safe)
 
 
+class _LoopReplayRequired(Exception):
+    """A plain buffer-callee join disagreed; replay that callee path by path.
+
+    Deliberately not a ValueError, so it is never reported as a refusal.
+    """
+
+
+LOOP_REPLAY_STATE_BUDGET = 4096
+LOOP_REPLAY_TOTAL_BUDGET = 65536
+_WORD = 0xFFFFFFFF
+
+
+def loop_replay_transfer(instruction, known, flags):
+    """Exact effect of one Thumb instruction on known register values and CMP flags.
+
+    Only unconditional 16-bit MOV/ADD/SUB of exactly known R0-R12 values are
+    tracked; any other write forgets the register.  A call forgets R0-R3, R12
+    and LR (the returning-ABI premise the buffer proof already uses for aliases
+    in R4-R11).  ``flags`` is the exact operand pair of the last CMP whose two
+    operands were known; every other flag-setting instruction or call forgets it.
+    """
+    read, written = instruction.regs_access()
+    operands = instruction.operands
+    call = CS_GRP_CALL in instruction.groups
+    unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
+    value = None
+    if instruction.size == 2 and unconditional and operands and \
+            operands[0].type == ARM_OP_REG and ARM_REG_R0 <= operands[0].reg <= ARM_REG_R12 and \
+            all(not operand.shift.type and not operand.shift.value and not operand.subtracted
+                for operand in operands if operand.type == ARM_OP_REG):
+        mnemonic = instruction.mnemonic
+        def known_operand(operand):
+            if operand.type == ARM_OP_IMM:
+                return operand.imm
+            if operand.type == ARM_OP_REG:
+                return known.get(operand.reg)
+            return None
+        if mnemonic in ("mov", "movs") and len(operands) == 2:
+            value = known_operand(operands[1])
+        elif mnemonic in ("add", "adds", "sub", "subs") and len(operands) in (2, 3):
+            values = [known_operand(operand) for operand in operands]
+            if len(operands) == 2:
+                values = [values[0], values[1]]
+            else:
+                values = values[1:]
+            if None not in values:
+                value = values[0] + values[1] if mnemonic.startswith("add") else values[0] - values[1]
+    updated = {register: number for register, number in known.items()
+               if register not in written and not (call and register in CALLER_CLOBBERED)}
+    if value is not None:
+        updated[operands[0].reg] = value & _WORD
+    if instruction.id == ARM_INS_CMP and unconditional and instruction.size == 2 and \
+            len(operands) == 2 and operands[0].type == ARM_OP_REG:
+        left = known.get(operands[0].reg)
+        right = operands[1].imm if operands[1].type == ARM_OP_IMM else \
+            known.get(operands[1].reg) if operands[1].type == ARM_OP_REG else None
+        flags = (left, right & _WORD) if left is not None and right is not None else None
+    elif call or instruction.update_flags or ARM_REG_CPSR in written or \
+            instruction.mnemonic in ("cmp", "cmn", "tst"):
+        flags = None
+    return tuple(sorted(updated.items())), flags
+
+
+def loop_replay_condition(cc, flags):
+    """Evaluate a Thumb condition from the exact operands of a CMP."""
+    left, right = flags
+    result = (left - right) & _WORD
+    negative, zero = result >> 31, result == 0
+    carry = left >= right
+    overflow = ((left ^ right) & (left ^ result)) >> 31
+    conditions = {
+        ARM_CC_EQ: zero, ARM_CC_NE: not zero, ARM_CC_HS: carry, ARM_CC_LO: not carry,
+        ARM_CC_MI: negative == 1, ARM_CC_PL: negative == 0,
+        ARM_CC_VS: overflow == 1, ARM_CC_VC: overflow == 0,
+        ARM_CC_HI: carry and not zero, ARM_CC_LS: not carry or zero,
+        ARM_CC_GE: negative == overflow, ARM_CC_LT: negative != overflow,
+        ARM_CC_GT: not zero and negative == overflow, ARM_CC_LE: zero or negative != overflow,
+    }
+    if cc not in conditions:
+        raise ValueError("unsupported condition in bounded loop replay")
+    return conditions[cc]
+
+
 class BufferCallProof:
     word_provenance = False
     callee_frames = False
@@ -2790,6 +2876,8 @@ class BufferCallProof:
         self.dependencies = {}
         self.active = set()
         self.stack_arguments = stack_arguments
+        self.loop_replays = {}
+        self.loop_replay_states = 0
 
     def target(self, address):
         if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or ashldi3.reserved(address) or software_double.reserved(address) or software_float.reserved(address):
@@ -2870,8 +2958,22 @@ class BufferCallProof:
                                                 call_resolver=self.target)
         return instructions, {}
 
-    def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None,
-                        words=None, frame_base=None, root_frame=None, watched=()):
+    def loop_replay_eligible(self):
+        return not (self.callee_frames or self.word_provenance or self.single_word_stores or
+                    self.exact_alias_state_budget is not None)
+
+    def check_arguments(self, address, arguments, stack, incoming, protected, **context):
+        try:
+            return self._check_arguments(address, arguments, stack, incoming, protected,
+                                         replay=False, **context)
+        except _LoopReplayRequired:
+            return self._check_arguments(address, arguments, stack, incoming, protected,
+                                         replay=True, **context)
+
+    def _check_arguments(self, address, arguments, stack, incoming, protected, *, replay, constants=None, site=None,
+                         words=None, frame_base=None, root_frame=None, watched=()):
+        if replay and not self.loop_replay_eligible():
+            raise ValueError("bounded loop replay is outside this buffer profile")
         if not arguments and not incoming and not words and not watched and not self.resident_effect_replay(address):
             return self.word_result({}, {})
         if ARM_REG_LR in arguments:
@@ -2898,7 +3000,17 @@ class BufferCallProof:
                     not 1 <= exact_budget <= 4096 or not self.callee_frames):
                 raise ValueError("exact buffer alternatives require bounded callee frame states")
             path_states = {address: {states[address]}} if exact_budget is not None else None
-            pending = [(address, states[address])] if path_states is not None else [address]
+            replay_states = replay_writes = None
+            if replay:
+                # Exact path-by-path replay: no joins, known counters and CMP flags
+                # prune infeasible branches, so a loop is unrolled to its proven
+                # trip count or the state budget refuses it.
+                states[address] += ((), None)
+                replay_states = {address: {states[address]}}
+                replay_writes = set()
+                replay_count = 1
+            pending = [(address, states[address])] if path_states is not None or replay else [address]
+            current = None
             path_state_count = 1
             path_context = None
             if path_states is not None:
@@ -2909,12 +3021,15 @@ class BufferCallProof:
             exact_returns = {}
             returned_words = None
             while pending:
-                if path_states is None:
+                if path_states is None and not replay:
                     current = pending.pop()
                 else:
                     current, incoming_state = pending.pop()
                     states[current] = incoming_state
                 instruction = by_address[current]
+                if replay:
+                    known, flags = dict(states[current][4]), states[current][5]
+                    next_known, next_flags = loop_replay_transfer(instruction, known, flags)
                 aliases = dict(states[current][0])
                 depth = states[current][1]
                 constants = dict(states[current][2])
@@ -3029,7 +3144,16 @@ class BufferCallProof:
                             if operand.mem.index not in constants or operand.mem.index in aliases:
                                 raise ValueError("buffer index is not a known scalar constant")
                             offset += constants[operand.mem.index]
-                        self.access(offset, width, stack)
+                        if replay:
+                            try:
+                                self.access(offset, width, stack)
+                            except ValueError as error:
+                                raise ValueError(f"{width}-byte {instruction.mnemonic} at caller "
+                                                 f"sp+{offset + 4 * len(stack)}: {error}") from error
+                            if instruction.mnemonic.startswith("str"):
+                                replay_writes.add((offset + 4 * len(stack), width))
+                        else:
+                            self.access(offset, width, stack)
                         if any(offset < slot + 4 and offset + width > slot for slot in protected) and not word_load:
                             raise ValueError("buffer access overlaps a pointer-bearing argument slot")
                         if instruction.mnemonic.startswith("str") and registers[0] in aliases and not pointer_store:
@@ -3095,7 +3219,11 @@ class BufferCallProof:
                 elif instruction.id == ARM_INS_B:
                     successors = (operands[0].imm,)
                     if instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID):
-                        successors += (current + instruction.size,)
+                        if replay and flags is not None:
+                            if not loop_replay_condition(instruction.cc, flags):
+                                successors = (current + instruction.size,)
+                        else:
+                            successors += (current + instruction.size,)
                 else:
                     successors = (current + instruction.size,)
                 if self.callee_frames:
@@ -3105,6 +3233,8 @@ class BufferCallProof:
                 outgoing = (tuple(sorted(aliases.items())), depth, tuple(sorted(constants.items())), tuple(sorted(words.items())))
                 if self.callee_frames:
                     outgoing += (tuple(stack),)
+                if replay:
+                    outgoing += (next_known, next_flags)
                 if call_alternatives is not None:
                     if path_states is None:
                         raise ValueError("disjunctive call results require exact caller alternatives")
@@ -3119,6 +3249,20 @@ class BufferCallProof:
                 else:
                     outgoings = [outgoing]
                 for successor, outgoing in ((target, state) for target in successors for state in outgoings):
+                    if replay:
+                        seen = replay_states.setdefault(successor, set())
+                        if any(state[1] != depth for state in seen):
+                            raise ValueError("inconsistent stack depth at control-flow join")
+                        if outgoing not in seen:
+                            replay_count += 1
+                            self.loop_replay_states += 1
+                            if replay_count > LOOP_REPLAY_STATE_BUDGET or \
+                                    self.loop_replay_states > LOOP_REPLAY_TOTAL_BUDGET:
+                                raise ValueError("state budget exhausted: no proven bound on the "
+                                                 "paths that move a buffer pointer")
+                            seen.add(outgoing)
+                            pending.append((successor, outgoing))
+                        continue
                     if path_states is not None:
                         previous_paths = path_states.get(successor, set())
                         if previous_paths and any(state[1] != depth or state[4] != outgoing[4]
@@ -3139,10 +3283,18 @@ class BufferCallProof:
                     elif states[successor] != outgoing:
                         previous = states[successor]
                         if not self.stack_arguments or previous[1] != depth:
+                            if previous[1] == depth and self.loop_replay_eligible():
+                                raise _LoopReplayRequired()
                             raise ValueError("inconsistent buffer aliases at control-flow join")
                         if self.callee_frames and previous[4] != outgoing[4]:
                             raise ValueError("inconsistent live callee frame at control-flow join")
-                        merged = (merge_possible_aliases(previous[0], outgoing[0]), depth,
+                        try:
+                            merged_aliases = merge_possible_aliases(previous[0], outgoing[0])
+                        except ValueError:
+                            if self.loop_replay_eligible():
+                                raise _LoopReplayRequired() from None
+                            raise
+                        merged = (merged_aliases, depth,
                                   tuple((register, value) for register, value in previous[2]
                                         if constants.get(register) == value),
                                   tuple((slot,value) for slot,value in previous[3] if words.get(slot)==value))
@@ -3155,8 +3307,15 @@ class BufferCallProof:
                 self.complete_frame(address, data, instructions)
             if path_states is not None:
                 return self.alternative_result([exact_returns[key] for key in sorted(exact_returns)])
+            if replay:
+                self.loop_replays.setdefault(address, set()).add(
+                    (site, tuple(sorted(arguments.items())), tuple(sorted(incoming.items())),
+                     tuple(sorted(replay_writes))))
             return self.word_result(returned, returned_words or {})
         except ValueError as error:
+            if replay:
+                where = f" at 0x{current:08X}" if current is not None else ""
+                raise ValueError(f"buffer callee 0x{address:08X}: bounded loop replay{where}: {error}") from error
             raise ValueError(f"buffer callee 0x{address:08X}: {error}") from error
         finally:
             self.active.remove(address)
@@ -3189,6 +3348,16 @@ class BufferCallProof:
         for address, data in sorted(self.dependencies.items()):
             digest.update(struct.pack("<II", address, len(data)))
             digest.update(data)
+        if self.loop_replays:
+            # Bind every replayed callee's exact caller-frame writes; reports
+            # without a replay keep their earlier fingerprint.
+            digest.update(json.dumps(["bounded-loop-replay-v1", sorted(
+                [address, sorted([[site, [list(pair) for pair in arguments], [list(pair) for pair in incoming],
+                                   [list(write) for write in writes]]
+                                  for site, arguments, incoming, writes in records],
+                                 key=lambda item: json.dumps(item))]
+                for address, records in self.loop_replays.items())],
+                separators=(",", ":")).encode())
         return digest.hexdigest()
 
 

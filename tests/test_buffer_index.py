@@ -166,10 +166,17 @@ class BufferIndexTests(unittest.TestCase):
             with self.subTest(operation=operation), self.assertRaises(ValueError):
                 self.fixture(operation)
 
-    def test_conflicting_alias_offsets_and_conditional_escape_still_rejected(self):
-        with self.assertRaisesRegex(ValueError, "inconsistent possible pointer offsets"):
+    def test_conflicting_alias_offsets_replay_per_path_and_conditional_escape_rejected(self):
+        # A join of different offsets is replayed path by path: each access is
+        # checked at its exact offset, so the in-bounds pair is admitted ...
+        proof = self.fixture("cmp r0, #0\nbeq other\nmovs r3, r4\nb joined\n"
+                             "other:\nadds r3, r4, #2\njoined:\nmovs r2, #0\n"
+                             "ldrsh r0, [r3, r2]\nmovs r3, #0")
+        self.assertEqual(set(proof.loop_replays), {BASE + 0x100})
+        # ... and the path whose offset leaves the buffer is refused.
+        with self.assertRaisesRegex(ValueError, "bounded loop replay at .*outside allocated local words"):
             self.fixture("cmp r0, #0\nbeq other\nmovs r3, r4\nb joined\n"
-                         "other:\nadds r3, r4, #2\njoined:\nmovs r2, #0\n"
+                         "other:\nmovs r3, r4\nadds r3, #8\njoined:\nmovs r2, #0\n"
                          "ldrsh r0, [r3, r2]\nmovs r3, #0")
         caller = CALLER.replace("bl callee", "bl callee\nstr r2, [r3]")
         with self.assertRaisesRegex(ValueError, "alias use or escape"):
