@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "0c71463f5c7d33eb1391f4bd46cf518407dbd74bcbed4cf7ac8746fa11f049d8",
+    "acknowledged_cursor": 6843126256,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0c71463f5c7d33eb1391f4bd46cf518407dbd74bcbed4cf7ac8746fa11f049d8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802ED88\",\"who\":\"match-astra-0802ED88-full\",\"note\":\"Match complete 368-byte owner after native CFG, full partition and dual-index extent repair qualification; private maps only.\"}",
+      "created_at": "2026-11-13T03:42:39Z",
+      "id": 6843126256,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T03:42:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ba2f6d9dc3e5624180a55ed5b5a77104c5a59c03f6cecde69560218e319bbe14",
+    "result": {
+      "address": "0x0802ED88",
+      "claim_id": 6843126256,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6843126256,
+      "status": "accepted",
+      "who": "match-astra-0802ED88-full"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5201f7604d365b482870d9ea53af29a43e7017ffc465bd0908201c057083c2db",
+    "acknowledged_cursor": 6843261057,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5201f7604d365b482870d9ea53af29a43e7017ffc465bd0908201c057083c2db",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802ED88\",\"who\":\"match-astra-0802ED88-full\",\"claim_id\":6843126256,\"reason\":\"Six bounded natural C formulations; best complete symbol376 vs target368 bytes. Default native gate exits1; loop layout, register allocation and literal order differ. Candidate and genuine failures retained privately.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; typed arrays, while/for, early continue, structure assignment\"}",
+      "created_at": "2026-11-13T03:50:19Z",
+      "id": 6843261057,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T03:50:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a72cb09957d28a4b0132ca76b64178c8968e5925c22c1c430c2f2ccca024d242",
+    "result": {
+      "address": "0x0802ED88",
+      "claim_id": 6843126256,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6843261057,
+      "status": "accepted",
+      "who": "match-astra-0802ED88-full"
+    }
+  }
+}
