@@ -3038,7 +3038,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "14f6ee9c724c3338db459eff491f8f2de10f67b4d6b840b77db994a90695164b",
+        "acknowledged_cursor": 6859082951,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "14f6ee9c724c3338db459eff491f8f2de10f67b4d6b840b77db994a90695164b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A070\",\"who\":\"claude-ffta2\",\"claim_id\":6857951343,\"reason\":\"matched in shubshub/fftadecomp#92\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T16:40:19Z",
+          "id": 6859064493,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T16:40:19Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca2f4baaeec0467d4247a4428cb250127ab966ecd82717d08431a70ea3b7e6f",
+        "result": {
+          "address": "0x0809A070",
+          "claim_id": 6857951343,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6859064493,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3198,7 +3226,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "19aab3176a0e7e9379deb0f63817380ea80f7f7e69bc690f71309232f137b169",
+        "acknowledged_cursor": 6859082951,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "19aab3176a0e7e9379deb0f63817380ea80f7f7e69bc690f71309232f137b169",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A97EC\",\"who\":\"claude-ffta2\",\"claim_id\":6858877564,\"reason\":\"bytes identical; verifier gap, parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T16:41:07Z",
+          "id": 6859082951,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T16:41:07Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca2f4baaeec0467d4247a4428cb250127ab966ecd82717d08431a70ea3b7e6f",
+        "result": {
+          "address": "0x080A97EC",
+          "claim_id": 6858877564,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6859082951,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3324,6 +3380,38 @@
           "request_id": 6859046975,
           "status": "accepted",
           "who": "astra-scheduler-080e8384"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "99e8c7a55256c918f3135ba81bdc2dfa99261e977879dff4379acaf468059f03",
+        "acknowledged_cursor": 6859082951,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "99e8c7a55256c918f3135ba81bdc2dfa99261e977879dff4379acaf468059f03",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E8B24\",\"who\":\"astra-scheduler-080e8b24\",\"note\":\"Fresh native qualification after corrected static screen: actual LDRB kills local r1 alias before080DD4A4. Prior static rejection retained. Complete body, current24-target scheduler profile.\"}",
+          "created_at": "2026-11-13T16:40:39Z",
+          "id": 6859072048,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T16:40:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ca2f4baaeec0467d4247a4428cb250127ab966ecd82717d08431a70ea3b7e6f",
+        "result": {
+          "address": "0x080E8B24",
+          "claim_id": 6859072048,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6859072048,
+          "status": "accepted",
+          "who": "astra-scheduler-080e8b24"
         }
       },
       "release": null
