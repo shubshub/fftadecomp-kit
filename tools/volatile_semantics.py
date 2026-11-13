@@ -42,7 +42,8 @@ symbolically along every path, and the check requires
      (immediate moves and arithmetic on known constants) and copies or
      literal loads into the store's operand registers in between, plus
      live register-only operations that neither read the loaded value nor
-     feed or overwrite the store's operands (read_modify_write_store). One
+     feed or overwrite the store's operands (not before a store of the
+     member's all-ones value) (read_modify_write_store). One
      bounded exception permits the same-member live OR update to occur
      after its separate dead insertion read: an exact-width member read,
      immediate mask, insertion read, OR and exact same-member store, with
@@ -1753,7 +1754,7 @@ def live(records, position, step):
     return False
 
 
-def read_modify_write_store(records, position, address, width, unloaded_all_ones=False):
+def read_modify_write_store(records, position, address, width):
     """the position of the store this dead load belongs to, or None.
 
     agbcc computes a volatile bit-field store's value before the
@@ -1778,10 +1779,10 @@ def read_modify_write_store(records, position, address, width, unloaded_all_ones
     may read the dead value before it is overwritten, and every operation in
     the slice must still be one of the forms above, so the store's value and
     address are built before the load.
-    Not before a store of the member's all-ones value once unloaded_all_ones
-    holds, though: agbcc may fold that store's own load away (081175D4 keeps
-    it), so a dead load before one may be planted, and the window keeps the
-    narrower rules above rather than admitting scheduled-in work.
+    Not before a store of the member's all-ones value, though: agbcc may
+    fold that store's own load away (081175D4 keeps it), so a dead load
+    before one may be planted, and the window keeps the narrower rules above
+    rather than admitting scheduled-in work.
     A same-member OR may follow its insertion read only under the separate
     bounded authentication in separated_or_store.
     Anything else in between - arithmetic on unknown values feeding the
@@ -1812,7 +1813,7 @@ def read_modify_write_store(records, position, address, width, unloaded_all_ones
                 return found
             operands, value = feeding(record.reads), feeding({record.value_register})
             slice_ = feeding(record.reads, through_all=True)
-            all_ones = unloaded_all_ones and record.value == (1 << 8 * width) - 1
+            all_ones = record.value == (1 << 8 * width) - 1
             for place, step in zip(places, between):
                 if step.immediate:
                     continue
@@ -2121,8 +2122,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         "prototype does not name; no prototype is trusted to list every argument, "
                         "so the load must be overwritten before the call")
                 if verdict:
-                    store = read_modify_write_store(records, position, record.address, record.width,
-                                                    unloaded_all_ones)
+                    store = read_modify_write_store(records, position, record.address, record.width)
                     # one store explains one load; a second dead load in the
                     # window already refuses, so the second test is defence in depth
                     if store is None or store in explained_stores:

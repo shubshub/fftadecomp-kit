@@ -416,15 +416,29 @@ class SemanticDiffTests(unittest.TestCase):
 
         scheduled = shaped("mul\tr2, r2, r6", "mov\tr8, r2")
         self.assertEqual(permuted(scheduled)[0][1:3], (1, [2]))
-        with self.assertRaises(semantics.SemanticError) as caught:
-            permuted(scheduled.replace("0xFFA8", "0xFFFF"))
-        self.assertIn("is a dead load of", str(caught.exception))
+        # with or without the permuted compile
+        for name, run in (("permuted", permuted), ("not permuted", check)):
+            with self.subTest(all_ones=name), self.assertRaises(semantics.SemanticError) as caught:
+                run(scheduled.replace("0xFFA8", "0xFFFF"))
+            self.assertIn("is a dead load of", str(caught.exception))
+        # the byte and negated forms of the all-ones value, unpermuted
+        byte = assembly("ldr\tr1, .L3", "add\tr1, r1, #60", "ldrb\tr0, [r1]", "mul\tr2, r2, r6",
+                        "mov\tr8, r2", "mov\tr0, #255", "strb\tr0, [r1]", "mov\tr0, r8",
+                        "str\tr0, [r5]", "bx\tlr")
+        negated = byte.replace("mov\tr0, #255", "mov\tr0, #1\n\tneg\tr0, r0")
+        for name, real in (("byte", byte), ("negated", negated)):
+            with self.subTest(all_ones=name), self.assertRaises(semantics.SemanticError) as caught:
+                compare(real, real.replace("ldrb\tr0, [r1]\n\t", ""))
+            self.assertIn("is a dead load of", str(caught.exception))
+        self.assertEqual(compare(byte.replace("#255", "#254"),
+                                 byte.replace("#255", "#254").replace("ldrb\tr0, [r1]\n\t", ""))[0][1:3],
+                         (1, [2]))
         # defence in depth behind dead(): the window itself refuses a read of
         # the loaded value before it is overwritten
         load = semantics.Record(0, "ldrh", "load", {"r1"}, {"r0"}, address=("sym", 4), width=2)
         copy = semantics.Record(1, "mov", "alu", {"r0"}, {"r8"}, copy=True)
         store = semantics.Record(2, "strh", "store", {"r0", "r1"}, (), address=("sym", 4), width=2,
-                                 value_register="r0")
+                                 value_register="r0", value=0x1234)
         overwrite = semantics.Record(1, "mov", "alu", (), {"r0"}, constant=True, immediate=True)
         self.assertIsNone(semantics.read_modify_write_store([load, copy, store], 0, ("sym", 4), 2))
         self.assertEqual(semantics.read_modify_write_store([load, overwrite, store], 0, ("sym", 4), 2), 2)
