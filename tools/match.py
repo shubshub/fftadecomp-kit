@@ -5402,10 +5402,11 @@ if __name__ == "__main__":
     try:
         sys.exit(main())
     except ValueError as refusal:
-        # selectors refuse with ValueError; the command line reports it
-        # as a refusal rather than a traceback, with the same nonzero status.
-        # FFTA_TRACEBACK=1 restores the traceback.
-        if os.environ.get("FFTA_TRACEBACK"):
+        # Refusal is a deliberate refusal; any other ValueError is reported as
+        # an error with its type.  Both exit 1.  FFTA_TRACEBACK=1 restores the
+        # traceback (unset, empty and 0 leave it off).
+        if os.environ.get("FFTA_TRACEBACK") not in (None, "", "0"):
             raise
         sys.exit(f"refused: {refusal}" if type(refusal) is Refusal else
-                 f"refused ({type(refusal).__name__}): {refusal}")
+                 f"error ({type(refusal).__name__}): {refusal} "
+                 "(set FFTA_TRACEBACK=1 for a traceback)")

@@ -19,7 +19,8 @@ import match
 import match_evidence as evidence
 import entry_recursive_ordinary_call_profile as entry
 from synthetic_entry_owner import ADDRESS as A, HELPER as H, body, bl, snapshots
-from test_entry_native import EntryBuildRoutingTests, elf, environment
+import test_entry_native as native
+from test_entry_native import elf, environment
 
 NAME = f'func_{A:08X}'
 HELPER_NAME = f'func_{H:08X}'
@@ -221,6 +222,11 @@ class SelfCallReportTests(unittest.TestCase):
             with self.subTest(schema=schema):
                 self.assertFalse(evidence.report_matches(self.report(schema=schema), self.root, A))
 
+    def test_a_second_verification_line_is_rejected(self):
+        good = self.report()
+        extra = f'* verification: `{evidence.SCHEMA}`'
+        self.assertFalse(evidence.report_matches(good.replace('\n', f'\n{extra}\n', 1), self.root, A))
+
     def test_changed_mapping_or_rom_is_rejected(self):
         good = self.report()
         rom = bytearray(self.rom)
@@ -268,16 +274,26 @@ class RefusalTests(unittest.TestCase):
         self.assertTrue(run.stderr.startswith('refused'))
 
     def test_command_line_labels_the_exception_type_and_can_traceback(self):
-        with tempfile.TemporaryDirectory() as root:
-            Path(root, 'src').mkdir()
-            Path(root, 'src', f'{A:08X}.c').write_text('void f(void){}\n')
-            argv = [sys.executable, str(TOOLS / 'match.py'), '--root', root, '--no-write',
-                    '--label', 'x', '--owner-runtime-profile', entry.SELECTOR, f'0x{A:08X}']
-            plain = subprocess.run(argv, capture_output=True, text=True)
-            loud = subprocess.run(argv, capture_output=True, text=True,
-                                  env={**os.environ, 'FFTA_TRACEBACK': '1'})
+        # a plain ValueError (parse_args patched to raise one) is an error, not a refusal
+        code = ('import argparse, runpy, sys\n'
+                'def boom(*a, **k): raise ValueError("boom")\n'
+                'argparse.ArgumentParser.parse_args = boom\n'
+                f'sys.path.insert(0, {str(TOOLS)!r})\n'
+                f'runpy.run_path({str(TOOLS / "match.py")!r}, run_name="__main__")\n')
+
+        def run(**env):
+            return subprocess.run([sys.executable, '-c', code], capture_output=True, text=True,
+                                  env={k: v for k, v in {**os.environ, **env}.items() if v is not None})
+        plain = run(FFTA_TRACEBACK=None)
         self.assertEqual(plain.returncode, 1)
-        self.assertTrue(plain.stderr.startswith('refused (ValueError): '))
+        self.assertEqual(plain.stderr.strip(),
+                         'error (ValueError): boom (set FFTA_TRACEBACK=1 for a traceback)')
+        for off in ('', '0'):
+            with self.subTest(FFTA_TRACEBACK=off):
+                quiet = run(FFTA_TRACEBACK=off)
+                self.assertEqual(quiet.returncode, 1)
+                self.assertNotIn('Traceback', quiet.stderr)
+        loud = run(FFTA_TRACEBACK='1')
         self.assertEqual(loud.returncode, 1)
         self.assertIn('Traceback', loud.stderr)
 
@@ -291,8 +307,24 @@ class RefusalTests(unittest.TestCase):
 
 class ProducerRefusalTests(unittest.TestCase):
     """main() must not admit a self call replay would refuse."""
-    tree = EntryBuildRoutingTests.tree
-    build_mocks = EntryBuildRoutingTests.build_mocks
+    build_mocks = native.EntryBuildRoutingTests.build_mocks
+
+    @contextlib.contextmanager
+    def tree(self):
+        scratch = Path(os.environ.get('FFTA_TEST_SCRATCH', Path(__file__).resolve().parents[1] / 'build'))
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='producer_refusal_', dir=scratch) as folder:
+            root = Path(folder)
+            for name in ('src', 'include', 'config', 'symbols'):
+                (root / name).mkdir()
+            (root / 'src' / f'{A:08X}.c').write_bytes(b'synthetic compiler input fixture\n')
+            (root / 'include' / 'fixture.h').write_bytes(b'synthetic header input\n')
+            rom, mapping, index = environment()
+            (root / 'baserom.bin').write_bytes(rom)
+            (root / 'config/functions.json').write_bytes(mapping)
+            (root / 'config/data_symbols.json').write_bytes(b'{}')
+            (root / 'symbols/functions.txt').write_bytes(index)
+            yield root
 
     def run_main(self, calls):
         with self.tree() as root, self.build_mocks(), \
@@ -309,9 +341,11 @@ class ProducerRefusalTests(unittest.TestCase):
 
     def test_self_call_with_an_ordinary_call_passes_that_guard(self):
         try:
-            self.run_main({A + 8: A, A + 14: H})
+            result = self.run_main({A + 8: A, A + 14: H})
         except (ValueError, SystemExit) as error:
             self.assertNotIn('self calls are admitted only', str(error))
+        else:
+            self.assertIsNotNone(result)
 
 
 if __name__ == '__main__':

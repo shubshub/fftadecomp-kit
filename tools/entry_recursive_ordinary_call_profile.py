@@ -148,16 +148,16 @@ class EntryCalls:
         if instruction.mnemonic not in ('push', 'pop') and (
                 ARM_REG_SP in read or ARM_REG_SP in written or any(
                     op.type == ARM_OP_REG and op.reg == ARM_REG_SP for op in instruction.operands)):
-            raise ValueError('entry saved-only owner excludes local frames and stack-address materialization')
+            raise Refusal('entry saved-only owner excludes local frames and stack-address materialization')
         if instruction.mnemonic.startswith(('str', 'stm', 'ldm')):
-            raise ValueError('entry saved-only owner excludes memory stores and register-list transfers')
+            raise Refusal('entry saved-only owner excludes memory stores and register-list transfers')
         for op in instruction.operands:
             if op.type == ARM_OP_MEM and (instruction.mnemonic != 'ldr' or instruction.size != 2 or
                     op.mem.base in (ARM_REG_SP, ARM_REG_PC) or op.mem.index or instruction.writeback):
                 raise Refusal('entry owner permits only ordinary object-word loads without stack or PC provenance')
         if instruction.mnemonic == 'pop' and any(
                 op.type == ARM_OP_REG and op.reg == ARM_REG_PC for op in instruction.operands):
-            raise ValueError('entry saved-only owner requires an explicit restored-register BX return')
+            raise Refusal('entry saved-only owner requires an explicit restored-register BX return')
 
     @staticmethod
     def check_call(registers, stack):

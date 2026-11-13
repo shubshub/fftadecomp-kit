@@ -785,8 +785,9 @@ rejected if the bytes contain a self call.
 
 Selector refusals (a `ValueError`; `refusal.Refusal` is the subclass used for
 the clean ones) are reported by `match.py` on the command line as
-`refused: <reason>` (`refused (<type>): <reason>` for any other `ValueError`)
-with status 1, not as a traceback. `FFTA_TRACEBACK=1` restores the traceback.
+`refused: <reason>` (`error (<type>): <reason>` for any other `ValueError`)
+with status 1, not as a traceback. `FFTA_TRACEBACK=1` restores the traceback
+(unset, empty and `0` leave it off).
 
 ### Bounded register buffer calls
 
