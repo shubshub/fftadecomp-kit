@@ -3354,7 +3354,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ce0c79970ce9ee251cec9f7898f87ae1a30ea6e171375794a61103cf54686298",
+        "acknowledged_cursor": 6861407642,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ce0c79970ce9ee251cec9f7898f87ae1a30ea6e171375794a61103cf54686298",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A0DEC\",\"who\":\"claude-ffta2\",\"claim_id\":6861095221,\"reason\":\"near miss parked: 3 instructions\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:22:34Z",
+          "id": 6861407642,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:22:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a52bf73ef77f6481fc3cedb353a1bccfe17c51191985d469040c13c7c43179f6",
+        "result": {
+          "address": "0x080A0DEC",
+          "claim_id": 6861095221,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6861407642,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -3418,7 +3446,35 @@
           "who": "astra-0809915c"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4d396a3d8051c5a6e8148f9abaafdcbb15a761e9920144fbdb653705cba77d03",
+        "acknowledged_cursor": 6861407642,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4d396a3d8051c5a6e8148f9abaafdcbb15a761e9920144fbdb653705cba77d03",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809915C\",\"who\":\"astra-0809915c\",\"claim_id\":6861222394,\"reason\":\"MATCH: 174 complete bytes; natural swap-loop indexing recovered; source and native report preserved.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:22:25Z",
+          "id": 6861404119,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:22:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a52bf73ef77f6481fc3cedb353a1bccfe17c51191985d469040c13c7c43179f6",
+        "result": {
+          "address": "0x0809915C",
+          "claim_id": 6861222394,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6861404119,
+          "status": "accepted",
+          "who": "astra-0809915c"
+        }
+      }
     },
     {
       "claim": {
@@ -3450,7 +3506,35 @@
           "who": "astra-08005ef8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c4ba38feb8390d2c48cd8043c2d128e67f5fcca772020bc290f79a8b81d982e9",
+        "acknowledged_cursor": 6861407642,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c4ba38feb8390d2c48cd8043c2d128e67f5fcca772020bc290f79a8b81d982e9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08005EF8\",\"who\":\"astra-08005ef8\",\"claim_id\":6861222478,\"reason\":\"Preserved 204-byte plausible C at 200/204 positional bytes; two address-add scheduling differences remain; no new native match.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:22:25Z",
+          "id": 6861404172,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:22:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a52bf73ef77f6481fc3cedb353a1bccfe17c51191985d469040c13c7c43179f6",
+        "result": {
+          "address": "0x08005EF8",
+          "claim_id": 6861222478,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6861404172,
+          "status": "accepted",
+          "who": "astra-08005ef8"
+        }
+      }
     },
     {
       "claim": {
@@ -3482,7 +3566,35 @@
           "who": "astra-080d1b80"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a7bb8529c432d05e76cf39c1c1b51f416b3c2b8d1dc988a4c0bdd018d532bb64",
+        "acknowledged_cursor": 6861407642,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a7bb8529c432d05e76cf39c1c1b51f416b3c2b8d1dc988a4c0bdd018d532bb64",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D1B80\",\"who\":\"astra-080d1b80\",\"claim_id\":6861222504,\"reason\":\"MATCH: 276 complete bytes; plausible byte-reader expression recovered; source and native report preserved.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T18:22:25Z",
+          "id": 6861404179,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:22:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a52bf73ef77f6481fc3cedb353a1bccfe17c51191985d469040c13c7c43179f6",
+        "result": {
+          "address": "0x080D1B80",
+          "claim_id": 6861222504,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6861404179,
+          "status": "accepted",
+          "who": "astra-080d1b80"
+        }
+      }
     }
   ],
   "issue": 66,
