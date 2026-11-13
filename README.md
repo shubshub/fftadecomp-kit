@@ -1328,6 +1328,53 @@ dependencies refuse. The report records the contract identities, each query
 site and buffer offset, the counts executed and the private reads and writes.
 The list bound, physical memory permission and termination are not proved.
 
+### Buffer owners that copy constant ROM tables to the stack
+
+`--owner-runtime-profile named-data-buffer-rom-table-copy-v1` admits the
+natural initialised local array. agbcc lowers `u8 a[3] = {0, 20, 40};` to a
+constant in `.rodata` plus a call to its `memcpy`, which is the ROM routine
+`func_081443FC`; the explicit spelling `func_081443FC(a, data_XXXX, 3)` is
+admitted by the same rules.
+
+```sh
+python tools/match.py --root ../fftadecomp 0x0811E618 --owner-runtime-profile named-data-buffer-rom-table-copy-v1
+```
+
+It is `named-data-buffer-v1` with one step replaced: a call to the pinned copy
+helper is summarised instead of being walked into its word loop, where the
+destination alias meets alignment arithmetic. The summary requires
+
+* the helper is the exact indexed 98-byte routine, no instruction of it writes
+  a register above R5, and its byte path for counts up to 15 is pinned;
+* R0 is a tracked stack alias and the only alias passed, R2 is an exact
+  constant from 1 to 15 and R1 is a constant code literal of the owner or of a
+  walked callee;
+* the whole destination lies in allocated private words and clear of every
+  pointer-bearing word;
+* the source lies in ROM and is either the compiler's initialiser or a table
+  named exactly by a data symbol. Data symbols carry no size, so the next
+  named object is the only known end of a named table: a copy that runs into
+  it refuses.
+
+For the initialiser, the object may carry one plain `.rodata` section. The
+address its literals resolve to must agree over every literal, and the section
+bytes must equal the ROM bytes there; the linker places `.rodata` at that
+address, the linked text and table are compared with the ROM, and the report
+records the base, size, hash and literal sites. A tampered table byte therefore
+fails at admission, as does any other allocated section. The compiler's
+undefined `memcpy` symbol must be the unique undefined global and is bound to
+the pinned helper, as in the compiler-copy profiles.
+
+The destination alias is returned in R0; R1-R3 are dead. Later uses of the
+object are ordinary private-frame accesses under the unchanged buffer rules,
+and the object may still be passed to callees that the buffer proof bounds.
+Variable indexing of the stack object is not admitted by this profile: an
+index that is not a known constant still refuses ("unsupported stack-alias use
+or escape"). The report states the conditional premises: immutable source
+bytes, live ordinary destination and helper save frame, mutual disjointness and
+no asynchronous modification. No physical stack, readability or C lifetime fact
+is proved.
+
 ### Buffer owners whose callees run the known list queries
 
 `--owner-runtime-profile named-data-buffer-known-query-callee-v1` admits an
