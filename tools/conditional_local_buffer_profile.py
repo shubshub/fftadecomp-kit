@@ -18,6 +18,7 @@ SCHEDULER = 'conditional-scheduler-descriptor-calls-v1'
 SCHEDULER_BRANCH = 'conditional-scheduler-branch-descriptor-calls-v1'
 SCHEDULER_FOLLOWING = 'conditional-scheduler-following-call-v1'
 SCHEDULER_SEQUENTIAL = 'conditional-scheduler-three-per-path-calls-v1'
+SCHEDULER_KILLED_ALIAS = 'conditional-scheduler-sequential-killed-alias-calls-v1'
 SCHEDULER_LEAF_OUTPUT = 'conditional-scheduler-sequential-leaf-output-calls-v1'
 SCHEDULER_24_FOLLOWING = 'conditional-scheduler-twenty-four-target-following-calls-v1'
 SCHEDULER_24 = 'conditional-scheduler-twenty-four-target-branches-v1'
@@ -44,6 +45,7 @@ SCHEMAS = {
     SCHEDULER_FOLLOWING: 'elf-symbol-thumb-conditional-scheduler-following-call-v1',
     SCHEDULER_SEQUENTIAL: 'elf-symbol-thumb-' + SCHEDULER_SEQUENTIAL,
     SCHEDULER_LEAF_OUTPUT: 'elf-symbol-thumb-' + SCHEDULER_LEAF_OUTPUT,
+    SCHEDULER_KILLED_ALIAS: 'elf-symbol-thumb-' + SCHEDULER_KILLED_ALIAS,
     SCHEDULER_24_FOLLOWING: 'elf-symbol-thumb-' + SCHEDULER_24_FOLLOWING,
     SCHEDULER_24: 'elf-symbol-thumb-' + SCHEDULER_24,
     SCHEDULER_WIDE: 'elf-symbol-thumb-conditional-scheduler-eight-target-branches-v1',
@@ -89,7 +91,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         super().__init__(rom, mapping, index, objects)
         self.policy = policy
         self.observations = {}
-        if policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT):
+        if policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS):
             # Thirty-two ordinary bodies, two scheduler bodies and two thunks.
             self.dependency_budget = 36
         if policy in (SCHEDULER_24, SCHEDULER_24_FOLLOWING):
@@ -124,9 +126,15 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             self.branch_calls = counted.bind(self, ins, edges, calls, address)
             dependencies = (0x08005B6C, 0x08005954)
             runtime_names = ('_call_via_r2', '_call_via_r3')
-        elif self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT):
+        elif self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS):
             import scheduler_branch_profile as branch
-            self.branch_calls = branch.bind(self, edges, calls, following_calls=self.policy == SCHEDULER_FOLLOWING, wide_targets=self.policy == SCHEDULER_WIDE, twenty_four_targets=self.policy == SCHEDULER_24, twenty_four_following_calls=self.policy == SCHEDULER_24_FOLLOWING, three_per_path_calls=self.policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT))
+            self.branch_calls = branch.bind(self, edges, calls, following_calls=self.policy == SCHEDULER_FOLLOWING, wide_targets=self.policy == SCHEDULER_WIDE, twenty_four_targets=self.policy == SCHEDULER_24, twenty_four_following_calls=self.policy == SCHEDULER_24_FOLLOWING, three_per_path_calls=self.policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS))
+            if self.policy == SCHEDULER_KILLED_ALIAS:
+                self.branch_calls['ordinary_call_contract'] += (
+                    ' This explicit profile additionally admits complete leaf alias replay or '
+                    'incoming caller-clobbered aliases fully overwritten by a closed straight-line '
+                    'entry prefix before any observation. Only after that prefix do the ordinary '
+                    'returning-ABI premises apply; nested effects remain unproved.')
             dependencies = (0x08005B6C, 0x08005954)
             runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy == SCHEDULER_GUARDED:
@@ -206,6 +214,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
         require(self.calls.get(site) == address and not words,
                 'local-buffer call differs from its authenticated interface')
+        if self.policy == SCHEDULER_KILLED_ALIAS and address != 0x08005B6C:
+            import scheduler_killed_alias_profile as killed
+            return killed.check_call(self, address, aliases, stack, slots, site=site)
         if self.policy == SCHEDULER_LEAF_OUTPUT and address != 0x08005B6C:
             import scheduler_leaf_output_profile as output
             return output.check_call(self, address, aliases, stack, slots, site=site)
@@ -228,7 +239,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if self.policy == SCHEDULER_HALFWORD_PAYLOAD:
             import scheduler_halfword_payload_profile as halfword
             return halfword.check_call(self, address, aliases, stack, slots, site=site)
-        if self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_LOOP) and address != 0x08005B6C:
+        if self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS, SCHEDULER_LOOP) and address != 0x08005B6C:
             require(address in self.branch_calls['ordinary_targets'] and not aliases and not slots,
                     'ordinary branch calls exclude every live local alias and pointer word')
             self.observations[site] = dict(site=site, target=address, kind='conditional-ordinary-ABI-call')
@@ -240,7 +251,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return {}
         r0, r2 = match.ARM_REG_R0, match.ARM_REG_R0+2
         payload = None
-        if self.policy in (SCHEDULER, SCHEDULER_GUARDED, SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_LOOP):
+        if self.policy in (SCHEDULER, SCHEDULER_GUARDED, SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS, SCHEDULER_LOOP):
             require({reg for reg in aliases if reg in match.CALLER_CLOBBERED} == {r2} and not slots,
                     'scheduler contract excludes additional register or pointer-word aliases')
             offset, width = aliases[r2], 28
@@ -326,7 +337,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             environment=self.environment,
             **({'predicates': self.predicates} if self.policy == SCHEDULER_GUARDED else {}),
             **({'owner_list_load': self.owner_list_load} if self.policy == STATE else {}),
-            **({'branch_calls': self.branch_calls} if self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_LOOP) else {}),
+            **({'branch_calls': self.branch_calls} if self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS, SCHEDULER_LOOP) else {}),
             observations=[self.observations[s] for s in sorted(self.observations)],
             assumptions=[
                 'Actual calls return with compatible ARM ABI, exact SP and protected saved/caller words preserved.',
@@ -335,7 +346,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                  'descriptor is readable as representation bytes, its copied pointer values remain conditional, '
                  'and the returned allocation is separate from all caller stack words. Both the copied R1 '
                  'descriptor and ambient original R9 pointer are exposed to the callback; copying does not prove nonescape.'
-                 if self.policy in (SCHEDULER, SCHEDULER_GUARDED, SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_LOOP, *PAYLOAD_FIELDS) else
+                 if self.policy in (SCHEDULER, SCHEDULER_GUARDED, SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS, SCHEDULER_LOOP, *PAYLOAD_FIELDS) else
                  'The indexed output callee writes at most the single four-byte local result word through R2 and '
                  'accesses no other private/saved caller word. Its body identity is checked, but its stores are '
                  'not alias-analysed; ROM inspection shows two 16-bit stores at R2+0 (0x0807A046, 0x0807A05C). '
@@ -362,6 +373,6 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                     'callback frame noninterference and nonretention. The copied R1 descriptor and original '
                     'R9 exposure remain conditional at each invocation. No actual callee/callback effects, '
                     'physical safety, allocation lifetime or termination theorem is established.']
-                   if self.policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT) else []),
+                   if self.policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS) else []),
             actual_callback_effects_proved=False, nonescape_proved=False, termination_proved=False,
             source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
