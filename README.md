@@ -1235,14 +1235,18 @@ optional; function literals and switches refuse.
   `08099560` and the predicate query `08099544`) is summarized when owner
   aliases sit only in R2, R3 or R12. The bytes, extents and counts of every
   body the family can run are pinned, and three facts are checked on those
-  bytes: no instruction reads or writes R3 or R12, the root writes R2 before
-  reading it or reaching a call or branch, and every direct BL and code
-  literal stays inside the family. R3/R12 aliases are returned unchanged; the
-  R2 alias is dead. That the thunks reach only the family's literal visitors
-  is the hand-derived relation of the pinned bytes, as in the contract above.
+  bytes: no instruction reads or writes R3 or R12; the root writes R2 before
+  reading it or reaching any jump, call, return or PC write; every direct BL
+  stays inside the family; and every odd code-address literal (ROM, EWRAM or
+  IWRAM) names a family body. R3/R12 aliases are returned unchanged; the R2
+  alias is dead. That the thunks reach only the family's literal visitors is
+  the hand-derived relation of the pinned bytes, recorded per family in the
+  report, as in the contract above.
 
-An alias in R0, R1 or LR at a family call, a stack-passed pointer word, or a
-query call outside a callee run under the executor refuses. The report records
+An alias in R0, R1 or LR at a family call, or a stack-passed pointer word,
+refuses. A query call outside a callee run under the executor refuses whenever
+any owner alias is live at the call, because only the executor checks the
+13-word R1 bound and forbids reading R1-R3/R12 after the query. The report records
 the contract, each executed callee, each family's identities and facts, each
 summarized call with its dead and retained registers, and the explicit
 conditions.

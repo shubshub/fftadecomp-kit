@@ -132,6 +132,29 @@ class KnownQueryCalleeTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'live input of a pinned list-query family'):
             owner.verify(**fixture(f_code=callee_code(after=(0x1c30, ANY))))
 
+    def test_alias_kept_in_r4_across_query_stays_bounded(self):
+        # adds r4,r2,#0 before the query: R4 survives the pinned query unchanged.
+        manifest, _ = owner.verify(**fixture(f_code=callee_code(before=(0x1c14, 0x4669), after=(0x8020,))))
+        self.assertEqual(evidence(manifest)['callees'], [F])  # strh r0,[r4]: owner word 0
+        with self.assertRaisesRegex(ValueError, 'outside allocated local words'):
+            owner.verify(**fixture(f_code=callee_code(before=(0x1c14, 0x4669), after=(0x8120,))))  # [r4,#8]
+
+    def proof(self):
+        args = fixture()
+        return callee.KnownQueryCalleeBufferProof(args['rom'], args['mapping'], args['index'], args['objects'])
+
+    def test_family_call_register_rules(self):
+        stack = [(False, False, True)] * 4
+        r12, lr = match.ARM_REG_R12, match.ARM_REG_LR
+        self.assertEqual(dict(self.proof().check_arguments(ANY, {r12: -8}, stack, {}, frozenset(), site=F)),
+                         {r12: -8})
+        with self.assertRaisesRegex(ValueError, 'live input of a pinned list-query family'):
+            self.proof().check_arguments(ANY, {lr: -8}, stack, {}, frozenset(), site=F)
+        with self.assertRaisesRegex(ValueError, 'stack-passed pointer words'):
+            self.proof().check_arguments(ANY, {}, stack, {0: -8}, frozenset({0}), site=F)
+        with self.assertRaisesRegex(ValueError, 'outside a callee executed'):
+            self.proof().check_arguments(Q, {match.ARM_REG_R0 + 3: -8}, stack, {}, frozenset(), site=F)
+
     def test_query_called_by_the_owner_itself_refuses(self):
         # Owner: mov r1,sp; mov r2,sp; bl Q (stale R2 alias at a query outside an executed callee).
         code = [0xb510, 0xb08e, 0x4669, 0x466a, Q, 0xb00e, 0xbc10, 0xbc01, 0x4700]
@@ -188,7 +211,7 @@ class FamilyFactTests(unittest.TestCase):
         mapping = json.dumps(rows).encode()
         index = ''.join(f'{int(r["rom"],16):08X} {int(r["end"],16):08X} '
                         f'{int(r["end"],16)-int(r["rom"],16)} {r["instrs"]} return\n' for r in rows).encode()
-        with patch.dict(callee.FAMILIES, {self.ROOT: dict(kind='synthetic', bodies=bodies)}):
+        with patch.dict(callee.FAMILIES, {self.ROOT: dict(kind='synthetic', indirect_targets=[], bodies=bodies)}):
             return callee.family_facts(self.ROOT, bytes(rom), mapping, index)
 
     def test_clean_root_passes(self):
@@ -198,6 +221,25 @@ class FamilyFactTests(unittest.TestCase):
     def test_r3_access_refuses(self):
         with self.assertRaisesRegex(ValueError, 'accesses R3 or R12'):
             self.facts([0xb500, 0x2200, 0x1c18, 0xbc01, 0x4700])  # adds r0,r3,#0
+
+    def test_bics_before_r2_write_is_not_a_branch(self):
+        self.facts([0xb500, 0x4388, 0x2200, 0xbc01, 0x4700])  # bics r0,r1; movs r2,#0
+
+    def test_pc_write_before_r2_write_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'call or branch before writing R2'):
+            self.facts([0xb500, 0x46f7, 0x2200, 0xbc01, 0x4700])  # mov pc,lr
+
+    def test_odd_ram_code_literal_outside_family_refuses(self):
+        for word in ('01000003', '01000002'):  # IWRAM 0x03000001, EWRAM 0x02000001
+            raw = assemble(self.ROOT, [0xb500, 0x2200, 0xbc01, 0x4700]) + bytes.fromhex(word)
+            rom = bytearray(ROM_SIZE)
+            rom[self.ROOT-match.ROM_BASE:self.ROOT-match.ROM_BASE+len(raw)] = raw
+            rows = [dict(rom=f'0x{self.ROOT:08X}', end=f'0x{self.ROOT+len(raw):08X}', mode='thumb', instrs=4)]
+            index = f'{self.ROOT:08X} {self.ROOT+len(raw):08X} {len(raw)} 4 return\n'.encode()
+            family = dict(kind='synthetic', indirect_targets=[], bodies={self.ROOT: (4, raw.hex())})
+            with patch.dict(callee.FAMILIES, {self.ROOT: family}):
+                with self.assertRaisesRegex(ValueError, 'code literal leaves the family'):
+                    callee.family_facts(self.ROOT, bytes(rom), json.dumps(rows).encode(), index)
 
     def test_r12_access_refuses(self):
         with self.assertRaisesRegex(ValueError, 'accesses R3 or R12'):
@@ -222,7 +264,7 @@ class FamilyFactTests(unittest.TestCase):
         rom[self.ROOT-match.ROM_BASE:self.ROOT-match.ROM_BASE+len(raw)] = raw
         rows = [dict(rom=f'0x{self.ROOT:08X}', end=f'0x{self.ROOT+len(raw):08X}', mode='thumb', instrs=4)]
         index = f'{self.ROOT:08X} {self.ROOT+len(raw):08X} {len(raw)} 4 return\n'.encode()
-        with patch.dict(callee.FAMILIES, {self.ROOT: dict(kind='synthetic', bodies={self.ROOT: (4, raw.hex())})}):
+        with patch.dict(callee.FAMILIES, {self.ROOT: dict(kind='synthetic', indirect_targets=[], bodies={self.ROOT: (4, raw.hex())})}):
             with self.assertRaisesRegex(ValueError, 'code literal leaves the family'):
                 callee.family_facts(self.ROOT, bytes(rom), json.dumps(rows).encode(), index)
 
