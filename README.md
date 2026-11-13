@@ -323,51 +323,106 @@ gate) compares these exactly:
 
 A host that differs in any of these refuses otherwise valid reports from
 those profiles, for example with `invalid saved ... report`. The frozen
-`081475A4` lineage also requires the pinned tool hashes before compiling. The
-decomp's committed reports replay with no problems on the reference
-environment below: full `status.py --verify`, decomp `15092737a7`, kit
-`630fde57`. See [#78](https://github.com/shubshub/fftadecomp-kit/issues/78).
+`081475A4` lineage also requires the pinned tool hashes before compiling.
+The environment is part of each report's versioned evidence: an older
+reference environment does not automatically replay newer reports. See
+[#78](https://github.com/shubshub/fftadecomp-kit/issues/78).
 
-Report environment: Ubuntu 24.04 (noble) x86_64, on a VM rather than a
-container, because the kernel string is compared:
+### Report environment recorded since 12 November 2026
+
+Ubuntu 24.04.3 LTS (noble), Linux x86_64, with the following packages.
+Use a VM or a host booted into the pinned kernel; a container shares its
+host's kernel and cannot select the recorded kernel string independently.
 
 | fingerprint | reference package |
 |---|---|
-| kernel `6.17.0-14-generic` | `linux-image-6.17.0-14-generic` (HWE, `6.17.0-14.14~24.04.1`) |
+| kernel `6.8.0-142-generic` | `linux-image-6.8.0-142-generic` (GA, `6.8.0-142.142`) |
 | Python 3.12.3 | `python3.12-minimal 3.12.3-1ubuntu0.17` |
-| capstone 5.0.3 | PyPI `capstone==5.0.3` (manylinux wheel) |
+| capstone 5.0.6 | Ubuntu archive packages `python3-capstone` and `libcapstone5`, both `5.0.6-1`, **amd64** |
 | `cpp` | `cpp-13-x86-64-linux-gnu 13.3.0-6ubuntu2~24.04.1` |
 | `arm-none-eabi-*` | `binutils-arm-none-eabi 2.42-1ubuntu1+23` |
 | agbcc | SHA-256 `63deeb6946e16e5add66cc173fcaa925f58ae56983d4d5a4649389bf8a23776f` |
 
-Install the pinned packages, then capstone into a venv over the system
-Python. Noble refuses `pip install --user` (PEP 668), and its own capstone is
-4.x. A venv's `python` is a symlink, so the recorded executable hash is still
-that of `/usr/bin/python3.12`. Run the tools with `~/venv/bin/python`. Hold
-the pinned packages and the HWE metapackages, and disable
-unattended upgrades: a newer `python3.12-minimal` or HWE kernel (GRUB boots
-the newest) silently breaks replay. Superseded builds can leave the main
-archive; `snapshot.ubuntu.com` keeps them.
+Install the pinned system packages in a dedicated report environment. Keep
+them and the boot selection fixed: changing Python or the running kernel
+breaks replay. Superseded builds can leave the main archive;
+`snapshot.ubuntu.com` keeps them. The agbcc build recipe below is unchanged.
 
 ```sh
 V=3.12.3-1ubuntu0.17
-sudo apt-get install -y linux-image-6.17.0-14-generic \
-    linux-modules-6.17.0-14-generic python3.12-minimal=$V \
+sudo apt-get install -y linux-image-6.8.0-142-generic=6.8.0-142.142 \
+    linux-modules-6.8.0-142-generic=6.8.0-142.142 python3.12-minimal=$V \
     libpython3.12-minimal=$V python3.12=$V libpython3.12-stdlib=$V \
     python3.12-venv=$V cpp cpp-13=13.3.0-6ubuntu2~24.04.1 \
     cpp-13-x86-64-linux-gnu=13.3.0-6ubuntu2~24.04.1 \
     binutils-arm-none-eabi=2.42-1ubuntu1+23
 readlink -f "$(command -v cpp)"   # expect /usr/bin/x86_64-linux-gnu-cpp-13
-python3.12 -m venv ~/venv && ~/venv/bin/pip install capstone==5.0.3
-sudo apt-mark hold linux-image-6.17.0-14-generic python3.12-minimal \
-    cpp-13-x86-64-linux-gnu binutils-arm-none-eabi \
-    linux-generic-hwe-24.04 linux-image-generic-hwe-24.04
-sudo apt-get purge -y unattended-upgrades
 ```
 
-Boot the pinned kernel. If a newer one is installed, set
-`GRUB_DEFAULT="Advanced options for Ubuntu>Ubuntu, with Linux 6.17.0-14-generic"`
-in `/etc/default/grub`, then run `sudo update-grub`.
+Boot that kernel and confirm `uname -r` is `6.8.0-142-generic`.
+
+**Capstone comes from Ubuntu's `.deb` payloads, not PyPI.** Neither the PyPI
+5.0.6 wheel nor a local source build reproduces these fingerprints. The
+Ubuntu binding loads `libcapstone.so.5` by soname; the library is identified
+from the process's actual loaded mappings. Noble's own default Capstone is
+4.x. Extract the exact 5.0.6 packages into a separate directory instead of
+changing the system's package sources or replacing its libraries:
+
+```sh
+CAPSTONE_ROOT="$HOME/ffta-capstone-5.0.6"
+set -e
+mkdir -p "$CAPSTONE_ROOT"
+cd "$CAPSTONE_ROOT"
+ARCHIVE=https://archive.ubuntu.com/ubuntu/pool/universe/c/capstone
+curl -fLO "$ARCHIVE/libcapstone5_5.0.6-1_amd64.deb"
+curl -fLO "$ARCHIVE/python3-capstone_5.0.6-1_amd64.deb"
+sha256sum -c <<'EOF'
+f3355618bf327291a5e543e6d8c7a22f2afb98b999c09e6a2ba1fae6e6e9af81  libcapstone5_5.0.6-1_amd64.deb
+65c0a1d223a7b74eb4833f213925b2d93ebc379b7de3009885ff28d02de715b0  python3-capstone_5.0.6-1_amd64.deb
+EOF
+dpkg-deb -x libcapstone5_5.0.6-1_amd64.deb "$CAPSTONE_ROOT/root"
+dpkg-deb -x python3-capstone_5.0.6-1_amd64.deb "$CAPSTONE_ROOT/root"
+export PYTHONPATH="$CAPSTONE_ROOT/root/usr/lib/python3/dist-packages${PYTHONPATH:+:$PYTHONPATH}"
+export LD_LIBRARY_PATH="$CAPSTONE_ROOT/root/usr/lib/x86_64-linux-gnu${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+sha256sum -c <<'EOF'
+d08add40b3fb7a6d61c649a9cda8d21dcb660f69a1b78e9c75937eee20c4afdb  root/usr/lib/python3/dist-packages/capstone/__init__.py
+1b261c94046e905b77baa1ad37d8958f8f8923acdc2aa392568035e9909fa84d  root/usr/lib/x86_64-linux-gnu/libcapstone.so.5
+EOF
+```
+
+Both packages are `amd64`, including the Python binding. The library declares
+only `libc6 (>= 2.14)` as a dependency and runs on noble. These extracted
+payloads were compared byte for byte with the report-producing environment;
+a fresh Python process using them reproduced every field returned by
+`addressed_signed_runtime_profile.runtime_fingerprint()` and
+`toolchain_fingerprint()`. This checks environment reproduction, not a new
+full-game audit or compatibility with a different toolkit revision.
+
+From the kit checkout, with the variables above exported, inspect the actual
+loaded environment before attempting report replay:
+
+```sh
+PYTHONPATH="$PWD/tools:$PYTHONPATH" /usr/bin/python3.12 -c \
+    'import json; from addressed_signed_runtime_profile import runtime_fingerprint; print(json.dumps(runtime_fingerprint(), indent=2))'
+```
+
+The Python executable hash is
+`e50d468e8b0adfb05733f5b87b3cff34829c4a8c1aea50c865aa8bdfe4bb150f`.
+The binding/native hashes must equal the payload hashes above. Existing
+Python dependencies such as pyelftools are still required; keep any venv
+based on this exact system Python.
+
+### Historical report environment, 8 November 2026
+
+The previous full `status.py --verify` result (zero problems, decomp
+`15092737a7`, kit `630fde57`) used noble with HWE kernel
+`6.17.0-14-generic` (`6.17.0-14.14~24.04.1`) and the PyPI
+`capstone==5.0.3` manylinux wheel. Python, cpp, ARM binutils and agbcc had
+the same pins as above. That historical result remains valid for that
+snapshot; it does not establish replay of the newer reports with the old
+kernel and Capstone. Preserve old evidence instead of relabeling its runtime.
+
+### Reproducing the reference agbcc
 
 The reference agbcc is **not** what `tools/bootstrap.sh` produces on noble.
 Building with `-g` records the host compiler and the absolute build directory,
