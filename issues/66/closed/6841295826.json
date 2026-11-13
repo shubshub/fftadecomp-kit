@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "6d88b57a040bb147ad7c33ea9d084fba367d0d414e1cb216b44d2f8232cb85ed",
+    "acknowledged_cursor": 6841295826,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6d88b57a040bb147ad7c33ea9d084fba367d0d414e1cb216b44d2f8232cb85ed",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801E710\",\"who\":\"match-astra-0801E710\",\"note\":\"Revisit retained natural C and exact residual with a new native matching pass; previous attempts preserved.\"}",
+      "created_at": "2026-11-13T01:42:18Z",
+      "id": 6841295826,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T01:42:18Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5b317fa73a52a0710851bee37de5ffc0db8c1f7d6d06da3c5dfcf53d393bdb36",
+    "result": {
+      "address": "0x0801E710",
+      "claim_id": 6841295826,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6841295826,
+      "status": "accepted",
+      "who": "match-astra-0801E710"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "282d885218c5066e55ad34656c410bc7f7bf150fd811cfc72c2e48ac7ae5be82",
+    "acknowledged_cursor": 6841564946,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "282d885218c5066e55ad34656c410bc7f7bf150fd811cfc72c2e48ac7ae5be82",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801E710\",\"who\":\"match-astra-0801E710\",\"claim_id\":6841295826,\"reason\":\"Complete 578-byte native match with plausible source and source-bound report replay; integration pending.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-13T01:59:52Z",
+      "id": 6841564946,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T01:59:52Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "42e48f20ef339142227c2b37ada9cf57f765b24f4c0614934e16a3adf6eb88f2",
+    "result": {
+      "address": "0x0801E710",
+      "claim_id": 6841295826,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6841564946,
+      "status": "accepted",
+      "who": "match-astra-0801E710"
+    }
+  }
+}
