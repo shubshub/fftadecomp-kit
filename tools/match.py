@@ -55,6 +55,7 @@ from rompath import rom_path
 from contextlib import contextmanager
 from pathlib import Path
 from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SCHEMA,
+                            SELF_CALL_SUMMARY, self_call_sites_text,
                             FRAMED_DATA_SCHEMA,
                             FUNCTION_ADDRESS_SCHEMA, FRAMED_FUNCTION_ADDRESS_SCHEMA,
                             FUNCTION_ADDRESS_SUMMARY,
@@ -609,8 +610,16 @@ def call_bindings(image, name, address, mapping, rom_size,
                    double_bindings=None, double_index=None, function_thunks=False, *,
                    allow_switch_constants=False, umodsi3_bindings=None,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
-                   allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None):
-    """Bind external Thumb calls and explicitly mapped absolute data words."""
+                   allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
+                   allow_self_call=False):
+    """Bind external Thumb calls and explicitly mapped absolute data words.
+
+    allow_self_call admits `bl <own entry>` relocations against the function's
+    own complete defined symbol; the call binds to this same verified symbol,
+    not to an unproved callee.  Every other caller keeps the refusal.
+    """
+    if type(allow_self_call) is not bool:
+        raise ValueError("self-call opt-in must be Boolean")
     if multiple_switch_profile is not None:
         from multiple_switch_owner_prerequisite import check_context
         check_context(multiple_switch_profile, switch_relocations,
@@ -794,6 +803,10 @@ def call_bindings(image, name, address, mapping, rom_size,
             unsigned_remainder = target_symbol["name"] == "__umodsi3"
             quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
+            own_entry = allow_self_call and target_symbol["name"] == name and \
+                target_symbol["section"] == image["text_index"] and target_symbol["value"] == symbol["value"] and \
+                target_symbol["bind"] == 1 and target_symbol["type"] == 2 and \
+                sum(item["name"] == name for item in image["symbols"]) == 1
             double_operation = target_symbol["name"] in software_double.OPERATIONS or (
                 double_bindings is not None and
                 software_double.shared_division_call(target_symbol["name"], divsi3.ADDRESS))
@@ -883,11 +896,12 @@ def call_bindings(image, name, address, mapping, rom_size,
                 if not ROM_BASE <= target < ROM_BASE + len(rom_image):
                     raise ValueError("call target is outside the ROM")
             else:
-                if not match or target_symbol["section"] or \
-                        target_symbol["bind"] != 1 or \
-                        target_symbol["type"] not in (0, 2):
+                if not match or not own_entry and (target_symbol["section"] or
+                        target_symbol["bind"] != 1 or target_symbol["type"] not in (0, 2)):
                     raise ValueError("call target must be an undefined addressed function")
                 target = int(match[1], 16)
+                if own_entry and target != address:
+                    raise ValueError("self call must name the exact function entry")
                 if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or umodsi3.reserved(target) or ashldi3.reserved(target) or software_double.reserved(target) or software_float.reserved(target):
                     raise ValueError("division runtime requires its canonical compiler alias")
                 candidates = []
@@ -908,7 +922,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                 # Uniqueness, exact address, Thumb mode and ROM bounds are the
                 # real checks.
                 raise ValueError("call target is unknown, ambiguous, misaligned, or not Thumb ROM code")
-            if address <= target < address + symbol["size"]:
+            if address <= target < address + symbol["size"] and not (own_entry and target == address):
                 raise ValueError("recursive or intra-function calls are unsupported")
             instruction = next(decoder.disasm(image["text"][relocation:relocation + 4],
                                              address + relocation, count=1), None)
@@ -928,7 +942,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                 raise ValueError("overlapping call relocations")
             occupied.update(positions)
             calls[address + relocation] = target
-            targets[target_symbol["name"]] = target
+            if not own_entry:
+                targets[target_symbol["name"]] = target
     if signed_runtime_profile is not None and (not divsi3_bindings or not modsi3_bindings or
             set(modsi3_bindings.values()) != {'__modsi3'}):
         raise ValueError('signed divmod requires both canonical original runtime relocations')
@@ -1329,7 +1344,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                modsi3_bindings=None, divsi3_bindings=None, double_bindings=None, double_index=None,
                function_thunks=False, *, allow_switch_constants=False, umodsi3_bindings=None,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
-               allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None):
+               allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None,
+               allow_self_call=False):
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_context
@@ -1352,7 +1368,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     allow_double_data=allow_double_data,
                                                     signed_runtime_profile=signed_runtime_profile,
                                   unsigned_runtime_profile=unsigned_runtime_profile,
-                                                    thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile)
+                                                    thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
+                                                    allow_self_call=allow_self_call)
     data_names = {binding[0] for binding in data_relocations.values()}
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
@@ -3200,8 +3217,21 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              zero_aware_unsigned_quotient_inventory_context=None,
                              addressed_signed_runtime_context=None, entry_recursive_calls=None,
                              typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
-                             finite_small_copy_context=None):
-    """Verify a local CFG, optionally applying validated direct-call ABI summaries."""
+                             finite_small_copy_context=None, self_calls=None):
+    """Verify a local CFG, optionally applying validated direct-call ABI summaries.
+
+    self_calls is a frozenset of call-site addresses that may `bl` the exact
+    entry of this very function.  Such a call is an ordinary ARM ABI call to
+    the symbol being verified (partial correctness only: no termination or
+    depth theorem).  It is accepted only on the plain direct-call path.
+    """
+    if self_calls is not None:
+        # parameters are the only locals here; no other context may combine
+        if type(self_calls) is not frozenset or not self_calls or not thumb or any(
+                value is not None and value is not False
+                for name, value in locals().items()
+                if name not in ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")):
+            raise ValueError("self calls require the plain direct-call path and a nonempty site set")
     if finite_small_copy_context is not None:
         from finite_small_local_copy_profile import validate_context
         validate_context(finite_small_copy_context, buffer_proof, data, address,
@@ -3696,7 +3726,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     instruction.size != 4 or len(operands) != 1 or operands[0].type != ARM_OP_IMM or \
                     address <= operands[0].imm < end and not (
                         entry_recursive_calls is not None and operands[0].imm == address and
-                        dict(entry_recursive_calls.calls).get(current) == address):
+                        dict(entry_recursive_calls.calls).get(current) == address) and not (
+                        self_calls is not None and operands[0].imm == address and
+                        current in self_calls and (call_resolver is not None or
+                                                   calls.get(current) == address)):
                 raise ValueError("call is not a validated external direct Thumb BL")
             target = operands[0].imm
             if software_float.reserved(target) and not (
@@ -4720,6 +4753,7 @@ def main():
             double_evidence = None
             double_switch_relocations = {}
             thunk_evidence = None
+            self_sites = frozenset()
             if thunk_profile:
                 got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
                     runner, workspace, args, original, addr, mapping, rom, data_mapping,
@@ -4750,8 +4784,10 @@ def main():
                                                           umodsi3_bindings=umodsi3_bindings,
                                                           ashldi3_bindings=ashldi3_bindings,
                                                           ashldi3_index=empty_index,
-                                                          float_bindings=float_bindings, float_index=empty_index)
+                                                          float_bindings=float_bindings, float_index=empty_index,
+                                                          allow_self_call=True)
                 linked_profile = bool(calls)
+                self_sites = frozenset(site for site, target in calls.items() if target == addr)
             else:
                 got = function_bytes(object_data, text_data, f"func_{addr:08X}", addr, thumb)
             if args.switch_data_profile and (
@@ -4759,6 +4795,11 @@ def main():
                     any((float_bindings, ashldi3_bindings, umodsi3_bindings, divsi3_bindings,
                          modsi3_bindings, udivsi3_bindings))):
                 raise ValueError("u16 switch-data requires a mapped local switch without other runtimes or function literals")
+            if self_sites and (float_bindings or ashldi3_bindings or umodsi3_bindings or divsi3_bindings or
+                               modsi3_bindings or udivsi3_bindings or switch_relocations or function_relocations or
+                               args.signed_quotient_profile or args.unsigned_quotient_profile or
+                               args.switch_data_profile):
+                raise ValueError("self calls are admitted only on the plain direct-call path")
             buffer_proof = BufferCallProof(rom, mapping if calls else None)
             if thunk_profile:
                 if args.function_address_profile == function_thunk.UMOD_R1_SELECTOR:
@@ -4939,10 +4980,11 @@ def main():
                         raise ValueError(f"{address_error}; function-buffer proof: {buffer_error}") from buffer_error
             else:
                 try:
-                    verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
-                                                                      buffer_proof=buffer_proof)
+                    verified_instructions = (
+                        verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites) if self_sites else
+                        verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof))
                 except ValueError:
-                    if not thumb or not calls:
+                    if not thumb or not calls or self_sites:
                         raise
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True)
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
@@ -5212,6 +5254,9 @@ def main():
             if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
+                if self_sites:
+                    f.write(f"* self calls: {SELF_CALL_SUMMARY}\n")
+                    f.write(f"* self call sites: `{self_call_sites_text(self_sites, addr)}`\n")
             if data_profile:
                 f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
             if function_relocations and not thunk_profile:
@@ -5348,4 +5393,9 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ValueError as refusal:
+        # selectors refuse with ValueError; the command line reports it
+        # as a refusal rather than a traceback, with the same nonzero status
+        sys.exit(f"refused: {refusal}")

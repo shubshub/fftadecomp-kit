@@ -754,10 +754,32 @@ checks the caller's fallthrough paths, joins, saved-stack balance and return
 provenance; it does not certify the callee's behavior or whole-program return.
 
 Unmapped data relocations, cross-mode/ARM calls, `BLX`, indirect calls, local
-helper functions, self/intra-function calls, tail calls, linker veneers and
-extra allocated sections remain unsupported. These cases fail closed rather
+helper functions, intra-function and non-entry calls, tail calls, linker veneers
+and extra allocated sections remain unsupported. These cases fail closed rather
 than receiving a partial match. Existing relocation-free leaf functions retain
 their original verification profile.
+
+#### Self calls
+
+A `bl` to the function's own exact entry is admitted on this plain direct-call
+path only. The relocation must name the function's own complete defined global
+symbol (the one being matched and linked, at offset zero), so the call binds to
+the same verified bytes and adds no unproved callee. The linker resolves it
+against that symbol and the linked `BL` must still decode to the exact entry.
+The call is summarised like any other ordinary call, and the same verifier
+proves the body that makes the summary hold. This is partial correctness: there
+is no termination or recursion-depth theorem. Mutual or indirect recursion,
+calls to non-entry addresses of the function, and any combination with the
+division, float, switch, function-address, thunk, buffer or owner selectors are
+still refused. A report that uses it keeps its normal schema and adds two
+lines, `* self calls:` (a fixed summary) and `* self call sites:` (the sorted
+site offsets as canonical JSON). Replay accepts a self call only when both
+lines are present and the offsets equal the `bl` sites the bytes reproduce, so a
+report that drops or edits them is rejected, and a report without them is
+rejected if the bytes contain a self call.
+
+Selector refusals (a `ValueError`) are reported by `match.py` on the command line
+as `refused: <reason>` with status 1, not as a traceback.
 
 ### Bounded register buffer calls
 
