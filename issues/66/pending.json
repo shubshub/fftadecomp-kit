@@ -666,7 +666,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4569ad53580c48a2dbd70696d4cd45b05b2aff1d6b72f52d57dfd074d9dcea7c",
+        "acknowledged_cursor": 6867169169,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4569ad53580c48a2dbd70696d4cd45b05b2aff1d6b72f52d57dfd074d9dcea7c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802979C\",\"who\":\"claude-ffta2\",\"claim_id\":6846920325,\"reason\":\"parked:  0x0802979C: parked (udivsi3/umodsi3 + indexed local buffer + BIOS fill; kit 135 family)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:06:34Z",
+          "id": 6867169169,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:06:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c19c277e8446cf49cfbb25aa82196ff81aee1ea44091c69f7f0d909e2e7ac3b5",
+        "result": {
+          "address": "0x0802979C",
+          "claim_id": 6846920325,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867169169,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
