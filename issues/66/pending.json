@@ -3298,66 +3298,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "c39d796e3d7db2c45958171fbeb672adbbf31fb2e98f5cf27d89b2185fb9958e",
-        "acknowledged_cursor": 6865738969,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c39d796e3d7db2c45958171fbeb672adbbf31fb2e98f5cf27d89b2185fb9958e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08002524\",\"who\":\"astra-xhigh-sort-08002524\",\"note\":\"Native Astra xhigh: finish complete 492-byte partition/insertion sort; canonical-thunks-v1 supports full ROM CFG. Existing retained candidate 482/492 diagnostic bytes. No tooling changes.\"}",
-          "created_at": "2026-11-13T21:47:54Z",
-          "id": 6865738969,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T21:47:54Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e664bec5fdbbd9a107e1c2c897c8d76e0c96e8051202e49b643dcd7d16e19214",
-        "result": {
-          "address": "0x08002524",
-          "claim_id": 6865738969,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6865738969,
-          "status": "accepted",
-          "who": "astra-xhigh-sort-08002524"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "bcc2187a5ddc6232bc1c3c170fdc60a4318d881b7cdf14a25287e1a17ab6e1fd",
-        "acknowledged_cursor": 6865940350,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "bcc2187a5ddc6232bc1c3c170fdc60a4318d881b7cdf14a25287e1a17ab6e1fd",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08002524\",\"who\":\"astra-xhigh-sort-08002524\",\"claim_id\":6865738969,\"reason\":\"Matched complete492-byte partition/insertion sort:238/238 instructions, native canonical-thunks-v1 exit0 and plausible C. Ready for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T21:58:39Z",
-          "id": 6865940350,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T21:58:39Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e1d6de0afe88f1576ea7a9f2583f3927e839bb8d15b17781c6b7bb2cda796e25",
-        "result": {
-          "address": "0x08002524",
-          "claim_id": 6865738969,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6865940350,
-          "status": "accepted",
-          "who": "astra-xhigh-sort-08002524"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "29af4c38b9e344f17c6b7fc4ee13349644c9415d2e4910aa314731233ceb1a95",
         "acknowledged_cursor": 6865744225,
         "body_provenance": "acceptance-time",
