@@ -90,7 +90,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7c78c8dda398f1255f1ac6eb0e51bf1ac57ef8d6bca5575b535105b9aad1d873",
+        "acknowledged_cursor": 6842380695,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7c78c8dda398f1255f1ac6eb0e51bf1ac57ef8d6bca5575b535105b9aad1d873",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803FAA4\",\"who\":\"claude-ffta2\",\"claim_id\":6841399364,\"reason\":\"matched; merged in decomp PR #58\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T02:52:19Z",
+          "id": 6842371490,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:52:19Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9ae5ce9e925e117732bb74cb95c4a6d1d63eb36ef8f40d8e0f1cb7f9a373c124",
+        "result": {
+          "address": "0x0803FAA4",
+          "claim_id": 6841399364,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6842371490,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -122,7 +150,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3d06d90511007db4e23a3f48cc225b6f6ab301cf3d59bd4bd880a717c5405d8c",
+        "acknowledged_cursor": 6842380695,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3d06d90511007db4e23a3f48cc225b6f6ab301cf3d59bd4bd880a717c5405d8c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804018C\",\"who\":\"claude-ffta2\",\"claim_id\":6841410318,\"reason\":\"matched; merged in decomp PR #58\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T02:52:56Z",
+          "id": 6842380695,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:52:56Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9ae5ce9e925e117732bb74cb95c4a6d1d63eb36ef8f40d8e0f1cb7f9a373c124",
+        "result": {
+          "address": "0x0804018C",
+          "claim_id": 6841410318,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6842380695,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -248,6 +304,38 @@
           "request_id": 6841486534,
           "status": "accepted",
           "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4d0fbed01bdbfc9563459b748c4cd0507fcc5ac8e74fed22b39646fba9de9aa8",
+        "acknowledged_cursor": 6842380695,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4d0fbed01bdbfc9563459b748c4cd0507fcc5ac8e74fed22b39646fba9de9aa8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080ED3B8\",\"who\":\"match-astra-080ED3B8\",\"note\":\"Bounded natural signed-narrowing recovery of preserved302-byte function; prior artifacts retained\"}",
+          "created_at": "2026-11-13T02:52:49Z",
+          "id": 6842378987,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:52:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9ae5ce9e925e117732bb74cb95c4a6d1d63eb36ef8f40d8e0f1cb7f9a373c124",
+        "result": {
+          "address": "0x080ED3B8",
+          "claim_id": 6842378987,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6842378987,
+          "status": "accepted",
+          "who": "match-astra-080ED3B8"
         }
       },
       "release": null
