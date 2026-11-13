@@ -10,6 +10,14 @@ import formal_entry_word_halfword_effects as effects
 SELECTOR = 'bounded-buffer-nested-halfword-output-v1'
 SCHEMA = 'elf-symbol-thumb-bounded-buffer-nested-halfword-output-v1'
 CONTROL_FLOW = 'complete Thumb owner with bounded nested halfword outputs and exact return entry aliases'
+SELECTIVE_SELECTOR = 'bounded-buffer-nested-halfword-output-selective-scratch-v1'
+SELECTIVE_SCHEMA = 'elf-symbol-thumb-bounded-buffer-nested-halfword-output-selective-scratch-v1'
+SELECTIVE_CONTROL_FLOW = ('complete Thumb owner with bounded nested halfword outputs, exact return entry aliases '
+                          'and selectively retained observed R2/R3 scratch aliases')
+SELECTORS = (SELECTOR, SELECTIVE_SELECTOR)
+SCHEMAS = {SELECTOR: SCHEMA, SELECTIVE_SELECTOR: SELECTIVE_SCHEMA}
+CONTROL_FLOWS = {SELECTOR: CONTROL_FLOW, SELECTIVE_SELECTOR: SELECTIVE_CONTROL_FLOW}
+SELECTOR_BY_SCHEMA = {schema: selector for selector, schema in SCHEMAS.items()}
 MAX_DEPENDENCIES = 10
 WRAPPER = (0x080DBDC8, 36, 'eb5caf776705b40cad641d5fa4cdcb434daf87ef4104d1d0905737470b3b8e22')
 LEAF = (0x0801C984, 108, '47eb591d35b6ba7c424b639d7ce66e979b48c2c95441cd621ea2869070c596ee')
@@ -200,3 +208,13 @@ class NestedOutputBufferProof(named.DiscardedReturnScratchProof):
             raise ValueError('nested output profile requires an actual bounded caller composition')
         return dict(schema=SCHEMA, native_helpers=self._native, calls=self._calls,
                     named_read_policy=effects.named_policy(), physical_nonalias_claim=False)
+
+
+class NestedSelectiveOutputBufferProof(NestedOutputBufferProof):
+    """Same nested outputs; observed R2/R3 scratch stays tracked instead of being refused."""
+    normal_return_aliases = named.ConditionalThunkSelectiveScratchBufferProof.normal_return_aliases
+
+    def scratch_manifest(self):
+        manifest = super().scratch_manifest()
+        manifest['selection'] = 'each R2/R3 independently; observed aliases remain tracked'
+        return manifest
