@@ -2706,6 +2706,11 @@ CALLER_CLOBBERED = (ARM_REG_R0, ARM_REG_R1, ARM_REG_R2,
                     ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
 
 
+def root_scratch_join_dead(buffer_proof, data, address, successor, register, previous, incoming, decoder):
+    from named_data_buffer_profile import root_scratch_join_dead as dead
+    return dead(buffer_proof, data, address, successor, register, previous, incoming, decoder)
+
+
 def merge_possible_aliases(previous, incoming):
     merged = dict(previous)
     for register, offset in incoming:
@@ -2715,8 +2720,12 @@ def merge_possible_aliases(previous, incoming):
     return tuple(sorted(merged.items()))
 
 
-def stack_alias_overwritten_before_use(data, address, successor, register, decoder):
-    """Prove a differing Thumb join alias is killed on every path before observation."""
+def stack_alias_overwritten_before_use(data, address, successor, register, decoder, *, exit_sites=frozenset()):
+    """Prove a differing Thumb join alias is killed on every path before observation.
+
+    ``exit_sites`` are exact normal-return instructions a caller-selected policy
+    has already proved discard this register; by default no exit kills it.
+    """
     if not ARM_REG_R0 <= register <= ARM_REG_R12:
         return False
     end = address + len(data)
@@ -2737,7 +2746,7 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
         if register in read:
             return False
         unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
-        if register in written and unconditional:
+        if register in written and unconditional or current in exit_sites and unconditional:
             edges[current] = ()
             safe.add(current)
             continue
@@ -4201,6 +4210,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 aliases = query_return_aliases(buffer_proof, data, address, current, aliases)
                 from nested_known_query_profile import root_return_aliases as nested_query_return_aliases
                 aliases = nested_query_return_aliases(buffer_proof, data, address, current, aliases)
+                from named_data_buffer_profile import root_return_scratch_aliases
+                aliases = root_return_scratch_aliases(buffer_proof, data, address, current, aliases)
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
@@ -4532,8 +4543,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     dead_conflicts = {register for register, offset in incoming_aliases
                                       if register in previous_offsets and
                                       previous_offsets[register] != offset and
-                                      stack_alias_overwritten_before_use(
-                                          data, address, successor, register, decoder)}
+                                      (stack_alias_overwritten_before_use(
+                                          data, address, successor, register, decoder) or
+                                       root_scratch_join_dead(buffer_proof, data, address, successor,
+                                           register, previous_offsets[register], offset, decoder))}
                     # Only register facts die here. Pointer-bearing stack slots
                     # still require the unchanged exact offset merge below.
                     previous_register_aliases = tuple(
@@ -4894,6 +4907,8 @@ def main():
                                                       "bounded-buffer-conditional-thunks-v1",
                                                       "bounded-buffer-conditional-thunks-discarded-scratch-v1",
                                                       "bounded-buffer-conditional-thunks-selective-scratch-v1",
+                                                      "bounded-buffer-conditional-thunks-root-return-scratch-v1",
+                                                      "bounded-buffer-root-return-scratch-v1",
                                                       "conditional-two-word-callback-closure-v1",
                                                       "conditional-two-word-tree-callback-closure-v1",
                                                       "conditional-two-word-literal-callback-closure-v1",

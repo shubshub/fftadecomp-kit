@@ -3382,6 +3382,36 @@ ordinary callee that is still live across a later call is refused as before.
 tampering and manifest forgery on synthetic bytes;
 `test_bios_bg_affine_set_native.py` covers real agbcc, CLI and report replay.
 
+### Expired root-frame scratch at the root's own return
+
+`--owner-runtime-profile bounded-buffer-root-return-scratch-v1` (ordinary
+bounded buffer calls, named data optional) and
+`bounded-buffer-conditional-thunks-root-return-scratch-v1` (the conditional
+canonical thunk composition) select
+`elf-symbol-thumb-bounded-buffer-root-return-scratch-v1` and
+`elf-symbol-thumb-bounded-buffer-conditional-thunks-root-return-scratch-v1`.
+They admit one shape the default refuses with `local stack pointer escapes
+through a return register`: a root whose own frame address is still in R2 or
+R3 when it returns - typically a buffer pointer a callee left there, or a
+spilled local address no later instruction reads. Default selection and every
+earlier schema are unchanged.
+
+The projection uses the existing `thumb-discarded-exit-scratch-v1` premise
+(R2/R3 carry no results under the agbcc Thumb ABI) and only at the bound root:
+its exact body, with no inspected callee active, at an exact normal return after
+the frame is restored, for addresses strictly inside the expired root frame.
+A join whose R2/R3 offsets differ is dropped only when every path from it
+reaches such a return, or overwrites the register, with no read and no call in
+between. R0/R1, R4-R11 and LR still refuse, as does any inspected callee that
+returns its own frame address - there the consumer is a known caller this
+policy does not check. Every alias use before the return keeps its existing
+bounds, spill, escape and callee-replay checks. Reports bind the root hash,
+return sites, each projected `[site, register, offset]` taken from that
+return's final fixpoint state, and every dead join drop evaluated during the
+fixpoint (intermediate states included). A selection whose final return states
+project nothing refuses; a join drop alone never satisfies it. Synthetic boundaries are in
+`tests/test_root_return_scratch.py`.
+
 ### Exact register callback buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile static-callback-buffer-v1 <address>`
