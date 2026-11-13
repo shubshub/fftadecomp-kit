@@ -3145,6 +3145,30 @@ carries the selector and the producer-source digests, its pool record uses the
 report relabelled to or from another thunk selector. Status and rebuild
 forward the saved selector.
 
+### Unsigned DIV/MOD with canonical call thunks
+
+`--function-address-profile unsigned-divmod-thunks-v1` selects
+`elf-symbol-thumb-function-address-thunks-unsigned-divmod-v1`. It composes
+compiler-emitted `__udivsi3`/`__umodsi3` calls (either or both) with
+compiler-emitted `_call_via_r0`-`_call_via_r12` calls, ordinary mapped Thumb
+calls and typed mapped data. The caller must be acyclic, saved-only (no locals,
+entry words, SP exports or block transfers) and switch-free, and every runtime
+call must receive an all-path, nonzero unsigned32 constant in r1. The divisor
+can be any such constant. The structural inventory
+`unsigned-divmod-thunk-ordinary-structural-inventory-v1` reuses the complete
+native UDIV/UMOD/zero closure; indirect and ordinary callees keep the
+conditional returning ABI above. No callback value or effect and no arithmetic
+or memory equivalence is claimed. The divisors are re-proved from the ROM
+bytes on every verification and are not stored in the manifest.
+
+Every reached pool word in RAM or ROM needs typed ABS32 provenance. Only fixed
+hardware addresses (`0x04000000`-`0x07FFFFFF`) may stay numeric, and the
+manifest lists each one. Function literals, switches and other runtimes are
+refused. The preprocessed source must not spell `_call_via_`, `__udivsi3`,
+`__umodsi3`, `__divsi3` or `__modsi3` anywhere, string literals included, and
+must not use an `asm`, `__asm` or `__asm__` keyword, so an asm label cannot give
+a declaration a reserved ELF name.
+
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
   swallows the one after it.
