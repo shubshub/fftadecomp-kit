@@ -51,6 +51,13 @@ class JumpTableCalleeTests(base.NestedSelectiveScratchTests):
                 self.assertEqual(self.run_table(guard=guard, manifest=manifest)[0], manifest)
 
     def test_existing_selectors_and_plain_proof_still_refuse(self):
+        # The root calls the table callee directly with a frame buffer, so the refusal is
+        # the callee's own program-counter write and not an earlier `bl wrapper` refusal.
+        direct = 'push {lr}\nsub sp, #8\nmov r3, sp\nbl helper\nadd sp, #8\npop {r0}\nbx r0'
+        for selector in (nested.named.SCRATCH_SELECTOR, nested.named.SELECTOR):
+            with self.subTest(selector=selector), \
+                    self.assertRaisesRegex(ValueError, 'unresolved program-counter write'):
+                self.verify(direct, selector, helper=callee())
         for selector in (nested.SELECTOR, nested.named.SCRATCH_SELECTOR):
             with self.subTest(selector=selector), self.assertRaises(ValueError):
                 self.run_table(selector=selector)
@@ -103,6 +110,8 @@ class JumpTableCalleeTests(base.NestedSelectiveScratchTests):
         self.refused('requires one guarded table', cases=cases)
 
     def test_backward_case_is_refused(self):
+        # Refused by analyze (no word switch is recognised), so the callee falls to the plain
+        # CFG and its program-counter write; switch_layout is never reached.
         self.refused('unresolved program-counter write', table='table: .word case0, case1, before',
                      prefix='b skip\nbefore: ldrh r0, [r3, #4]\nb done\nskip:\n')
 
