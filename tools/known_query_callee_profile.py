@@ -28,9 +28,10 @@ steps.
    R2, R3 or R12 is summarized.  For each family the bytes, extents and
    instruction counts of every body that can run are pinned, and the following
    are checked mechanically on those bytes: no instruction in any body reads
-   or writes R3 or R12; the root writes R2 before it reads it and before its
-   first call or branch; every direct BL and every code-address literal stays
-   inside the family.  The aliases in R3/R12 are therefore returned unchanged
+   or writes R3 or R12; the root writes R2 before it reads it and before any
+   jump, call, return or PC write; every direct BL stays inside the family;
+   every odd code-address literal (ROM, EWRAM, IWRAM) names a family body; and
+   no pool word addresses EWRAM or IWRAM at all.  The aliases in R3/R12 are therefore returned unchanged
    and the one in R2 is dead.  The memory effects of the family are covered by
    the walk's ordinary premise for callees that receive no alias, which is
    exactly the situation once the dead registers are discounted.
@@ -41,8 +42,10 @@ the stack-buffer contract refuses whenever any owner alias is live in an
 argument register at the call: only the executor checks the 13-word R1 bound
 and forbids reading R1-R3/R12 after the query.
 
-Code-address literals are checked over every code-capable range (EWRAM, IWRAM
-and the ROM windows): an odd word there must name a family body.
+Pool words are checked over every code-capable range: an odd ROM, EWRAM or
+IWRAM word must name a family body, an even ROM word refuses, and any EWRAM or
+IWRAM word refuses (the pinned pools hold no RAM data symbols, and a `bx` to an
+even RAM address would enter ARM state).
 """
 import hashlib
 import json
@@ -70,7 +73,8 @@ MAX_DEPENDENCIES = named.MAX_DEPENDENCIES
 R0, R12, LR = match.ARM_REG_R0, match.ARM_REG_R12, match.ARM_REG_LR
 R2, R3 = R0 + 2, R0 + 3
 PC = match.ARM_REG_PC
-CODE_RANGES = ((0x02000000, 0x02040000), (0x03000000, 0x03008000), (0x08000000, 0x0E000000))
+RAM_RANGES = ((0x02000000, 0x02040000), (0x03000000, 0x03008000))
+CODE_RANGES = (*RAM_RANGES, (0x08000000, 0x0E000000))
 UNTOUCHED = (R3, R12)
 TRANSPARENT = (R2, R3, R12)
 
@@ -180,6 +184,8 @@ def family_facts(root, rom, mapping, index):
                         'pinned family direct call leaves the family')
         for offset in range(((code_end + 3) & ~3) - start, len(body) - 3, 4):
             word = int.from_bytes(body[offset:offset + 4], 'little')
+            require(not any(lo <= word < hi for lo, hi in RAM_RANGES),
+                    'pinned family pool word addresses EWRAM or IWRAM')
             rom_word = 0x08000000 <= word < 0x0E000000
             if rom_word or word & 1 and any(lo <= word < hi for lo, hi in CODE_RANGES):
                 require(word & 1 and word & ~1 in bodies,

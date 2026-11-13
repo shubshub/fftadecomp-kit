@@ -185,6 +185,7 @@ class KnownQueryCalleeTests(unittest.TestCase):
             lambda p: p['known_query_callees'].__setitem__('list_bound_proved_from_ROM', True),
             lambda p: p['known_query_callees']['family_calls'][0].__setitem__('dead', []),
             lambda p: p['known_query_callees']['families'][0].__setitem__('untouched_registers', ['r3']),
+            lambda p: p['known_query_callees'].__setitem__('premise', 'every list has at most 14 nodes'),
         ]
         for edit in edits:
             changed = copy.deepcopy(manifest)
@@ -229,8 +230,9 @@ class FamilyFactTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'call or branch before writing R2'):
             self.facts([0xb500, 0x46f7, 0x2200, 0xbc01, 0x4700])  # mov pc,lr
 
-    def test_odd_ram_code_literal_outside_family_refuses(self):
-        for word in ('01000003', '01000002'):  # IWRAM 0x03000001, EWRAM 0x02000001
+    def test_ram_pool_word_refuses(self):
+        # IWRAM/EWRAM, odd (Thumb code) and even (data or ARM-state code).
+        for word in ('01000003', '01000002', '00000003', '40000002'):
             raw = assemble(self.ROOT, [0xb500, 0x2200, 0xbc01, 0x4700]) + bytes.fromhex(word)
             rom = bytearray(ROM_SIZE)
             rom[self.ROOT-match.ROM_BASE:self.ROOT-match.ROM_BASE+len(raw)] = raw
@@ -238,7 +240,7 @@ class FamilyFactTests(unittest.TestCase):
             index = f'{self.ROOT:08X} {self.ROOT+len(raw):08X} {len(raw)} 4 return\n'.encode()
             family = dict(kind='synthetic', indirect_targets=[], bodies={self.ROOT: (4, raw.hex())})
             with patch.dict(callee.FAMILIES, {self.ROOT: family}):
-                with self.assertRaisesRegex(ValueError, 'code literal leaves the family'):
+                with self.assertRaisesRegex(ValueError, 'addresses EWRAM or IWRAM'):
                     callee.family_facts(self.ROOT, bytes(rom), json.dumps(rows).encode(), index)
 
     def test_r12_access_refuses(self):
