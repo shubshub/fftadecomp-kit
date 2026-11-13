@@ -320,14 +320,89 @@ SCALAR_TYPES = {"u8", "s8", "u16", "s16", "u32", "s32", "vu8", "vs8", "vu16", "v
 QUALIFIERS = {"const", "volatile", "register", "extern", "static", "inline", "__inline__"}
 
 
+def translation_unit(preprocessed):
+    """the preprocessed text as the checks read it, offsets kept.
+
+    Directive lines (linemarkers, `#pragma`, `#ident`) are blanked first,
+    so a quote inside one cannot open a literal; then comments and string
+    and character literals are blanked. A literal that crosses a line or
+    the end of the text, an unterminated comment, a digraph (`<%`, `%>`,
+    `<:`, `:>`, which agbcc reads as braces and brackets), `asm` in any
+    spelling (an assembler label can rename a declaration) and unbalanced
+    braces all fail closed, so the brace structure seen here is the
+    compiler's.
+    """
+    text = re.sub(r"(?m)^[ \t]*#.*$", lambda line: " " * len(line[0]), preprocessed)
+    out, i, n = list(text), 0, len(text)
+    while i < n:
+        if text.startswith("//", i) or text.startswith("/*", i):
+            if text[i + 1] == "/":
+                end = text.find("\n", i)
+                end = n if end < 0 else end
+            else:
+                end = text.find("*/", i + 2)
+                if end < 0:
+                    raise SemanticError("an unterminated comment in the preprocessed text")
+                end += 2
+            out[i:end] = [" " if c != "\n" else c for c in text[i:end]]
+            i = end
+        elif text[i] in "\"'":
+            j = i + 1
+            while j < n and text[j] != text[i]:
+                if text[j] == "\n" or text[j] == "\\" and text[j + 1:j + 2] in ("\n", ""):
+                    raise SemanticError("a string or character literal crosses a line")
+                j += 2 if text[j] == "\\" else 1
+            if j >= n:
+                raise SemanticError("an unterminated string or character literal")
+            out[i:j + 1] = " " * (j + 1 - i)
+            i = j + 1
+        else:
+            i += 1
+    code = "".join(out)
+    found = re.search(r"<%|%>|<:|:>|\b(?:asm|__asm|__asm__)\b", code)
+    if found:
+        raise SemanticError(f"`{found[0]}` in the preprocessed text is not modelled")
+    depth = 0
+    for brace in re.findall(r"[{}]", code):
+        depth += 1 if brace == "{" else -1
+        if depth < 0:
+            break
+    if depth:
+        raise SemanticError("unbalanced braces in the preprocessed text")
+    return code
+
+
 def file_scope(preprocessed):
     """file-scope text: directives and linemarkers dropped, brace bodies folded to `;`"""
     text = re.sub(r"(?m)^[ \t]*#.*$", ";", preprocessed)
     while True:
         folded = re.sub(r"\{[^{}]*\}", ";", text)
         if folded == text:
+            if "{" in text or "}" in text:
+                raise SemanticError("unbalanced braces at file scope")
             return text
         text = folded
+
+
+INTEGER_WORDS = {"unsigned", "signed", "char", "short", "int", "long"}
+
+
+def verified_scalars(scope):
+    """the SCALAR_TYPES names that are not keywords and have a file-scope typedef
+    to a one-word scalar. agbcc refuses a second file-scope typedef of a name,
+    so that typedef is the name's only file-scope meaning."""
+    verified, typedefs = set(), []
+    for declaration in scope.split(";"):
+        found = re.fullmatch(r"\s*typedef\s+(.+?)\s+([A-Za-z_]\w*)\s*", declaration)
+        if found and found[2] in SCALAR_TYPES - INTEGER_WORDS - {"float"}:
+            typedefs.append((found[2], [t for t in found[1].split() if t not in QUALIFIERS]))
+    while True:
+        more = {name for name, body in typedefs if
+                body and all(t in INTEGER_WORDS for t in body) and body.count("long") <= 1 or
+                body == ["float"] or len(body) == 1 and body[0] in verified}
+        if more <= verified:
+            return verified
+        verified |= more
 
 
 def parameter_parts(text):
@@ -385,8 +460,13 @@ def callback_declaration(declaration):
     return name or ""
 
 
-def argument_words(declaration, callback_types=()):
-    """One outer ABI word, or None; callback signatures are never ABI summaries."""
+def argument_words(declaration, callback_types=(), scalars=None):
+    """One outer ABI word, or None; callback signatures are never ABI summaries.
+
+    scalars, if given, are the typedef names verified as one-word scalars
+    (verified_scalars); any other non-keyword SCALAR_TYPES name is refused,
+    since the translation unit may typedef it wider.
+    """
     declaration = declaration.strip()
     if re.search(r"[^A-Za-z_0-9\s*(),]", declaration):
         return None
@@ -416,6 +496,8 @@ def argument_words(declaration, callback_types=()):
     types = names[:-1] if names and names[-1] not in SCALAR_TYPES else names
     if not types or any(t not in SCALAR_TYPES for t in types) or types.count("long") > 1:
         return None
+    if scalars is not None and any(t not in INTEGER_WORDS | {"float"} | set(scalars) for t in types):
+        return None
     return 1
 
 
@@ -426,7 +508,10 @@ def callback_typedefs(scope):
         if not re.match(r"\s*typedef\b", declaration):
             continue
         body = re.sub(r"^\s*typedef\s+", "", declaration)
-        name = callback_declaration(body)
+        try:
+            name = callback_declaration(body)
+        except SemanticError:
+            continue        # unreadable: never a callback type, so its uses fail closed
         if name:
             candidates[name] = candidates.get(name, 0) + 1
     # Any other typedef mentioning the candidate makes its meaning ambiguous.
@@ -444,6 +529,7 @@ def function_signature(scope, name):
     """
     found = set()
     callback_types = callback_typedefs(scope)
+    scalars = verified_scalars(scope)
     for declaration in scope.split(";"):
         matched = re.search(r"\b" + re.escape(name) + r"\s*\(", declaration)
         if not matched:
@@ -457,7 +543,7 @@ def function_signature(scope, name):
         parameters = rest[:-1].strip()
         returns = bool(prefix.split() and
                        [t for t in prefix.split() if t not in QUALIFIERS] != ["void"])
-        if returns and argument_words(prefix) is None:
+        if returns and argument_words(prefix, scalars=scalars) is None:
             raise SemanticError(f"{name} returns a value that is not one scalar or pointer word")
         if parameters == "void":
             arity = 0
@@ -469,7 +555,7 @@ def function_signature(scope, name):
                 parts, arity = parts[:-1], None
             else:
                 arity = len(parts)
-            words = [argument_words(parameter, callback_types) for parameter in parts]
+            words = [argument_words(parameter, callback_types, scalars) for parameter in parts]
             if None in words:
                 raise SemanticError(f"a parameter of {name} is not one scalar or pointer word")
         found.add((returns, arity))
@@ -478,19 +564,19 @@ def function_signature(scope, name):
     return found.pop() if found else (True, None)
 
 
-def callback_prototype(declaration, callback_types):
+def callback_prototype(declaration, callback_types, scalars):
     """(returns, arity) of one prototyped `R (*)(params)` of one-word arguments, or None"""
     if callback_declaration(declaration) is None:
         return None             # unprototyped `()`, variadic and unreadable types
     result, parameters = re.fullmatch(r"([^()]+?)\s*\(\s*\*[^()]*\)\s*\((.*)\)",
                                       declaration.strip(), re.S).groups()
     result = [t for t in result.split() if t not in QUALIFIERS]
-    if result != ["void"] and argument_words(" ".join(result)) is None:
+    if result != ["void"] and argument_words(" ".join(result), scalars=scalars) is None:
         return None
     if parameters.strip() == "void":
         return result != ["void"], 0
     parts = parameter_parts(parameters)
-    if any(argument_words(part, callback_types) != 1 for part in parts):
+    if any(argument_words(part, callback_types, scalars) != 1 for part in parts):
         return None
     return result != ["void"], len(parts)
 
@@ -519,9 +605,11 @@ def indirect_signature(code, scope, name):
     the reason as a string when the object cannot be typed that way.
     """
     callback_types = callback_typedefs(scope)
+    scalars = verified_scalars(scope)
     found = set()
     word = re.escape(name)
-    dimension = r"(\[\s*(" + INDEX + r")?\s*\])?"
+    # `[]` exactly: a blanked literal (`['a']`) leaves spaces between the brackets
+    dimension = r"(\[\s*(" + INDEX + r")\s*\]|\[\])?"
     for declaration in scope.split(";"):
         if not re.search(r"\b" + word + r"\b", declaration):
             continue
@@ -531,15 +619,16 @@ def indirect_signature(code, scope, name):
                              word + r" ?" + dimension, text)
         if typed and typed[1] in callback_types:
             for body in scope.split(";"):
-                body = re.sub(r"^\s*typedef\s+", "", body) if re.match(r"\s*typedef\b", body) else None
-                if body is not None and callback_declaration(body) == typed[1]:
-                    prototype = callback_prototype(body, callback_types)
+                # callback_typedefs counted exactly one readable typedef of the name
+                if re.match(r"\s*typedef\b", body) and re.search(r"\b" + typed[1] + r"\b", body):
+                    prototype = callback_prototype(re.sub(r"^\s*typedef\s+", "", body),
+                                                   callback_types, scalars)
             array = typed[2]
         else:
             direct = re.fullmatch(r"(?:extern )?([^()]+?) ?\( ?\* ?(?:(?:const|volatile) )*" + word +
                                   r" ?" + dimension + r" ?\) ?\((.*)\)", text)
             if direct:
-                prototype = callback_prototype(f"{direct[1]} (*)({direct[4]})", callback_types)
+                prototype = callback_prototype(f"{direct[1]} (*)({direct[4]})", callback_types, scalars)
                 typed = direct
             array = direct and direct[2]
         if prototype is None:
@@ -2462,8 +2551,8 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                      perturbed_assembly=None, interfaces=None, *, _ordinary_overwrite=False):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
-    from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
-    code = strip_comments_and_strings(preprocessed)
+    from plausible import member_provenance, whole_object_uses
+    code = translation_unit(preprocessed)
     for _, message in whole_object_uses(code, symbol) + member_provenance(
             code, {"symbol": symbol, "declaration": declaration}):
         raise SemanticError(f"after preprocessing: {message}")
