@@ -2970,6 +2970,66 @@
           "who": "claude-ffta2"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "ef380d0cc3099269852819373dcc49a27208bcb263a1b67a97ac7dbc04cc4a3f",
+        "acknowledged_cursor": 6852506669,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef380d0cc3099269852819373dcc49a27208bcb263a1b67a97ac7dbc04cc4a3f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08112AEC\",\"who\":\"claude-ffta2\",\"claim_id\":6852261238,\"reason\":\"parked near miss\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T12:11:51Z",
+          "id": 6852503925,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T12:11:51Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "71e22d09fc7ca0bb35c9e713faa9e3a3c174afe70023feed49c020aa9b0a593b",
+        "result": {
+          "address": "0x08112AEC",
+          "claim_id": 6852261238,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6852503925,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e5f02655c76aeb5f44c7e9ad1b0678fe377c048db3364f32f6535998b982b6ff",
+        "acknowledged_cursor": 6852506669,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e5f02655c76aeb5f44c7e9ad1b0678fe377c048db3364f32f6535998b982b6ff",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811DA64\",\"who\":\"astra-scheduler-da64\",\"note\":\"Complete C matching with the supported three-per-path scheduler profile\"}",
+          "created_at": "2026-11-13T12:11:58Z",
+          "id": 6852506669,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T12:11:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "71e22d09fc7ca0bb35c9e713faa9e3a3c174afe70023feed49c020aa9b0a593b",
+        "result": {
+          "address": "0x0811DA64",
+          "claim_id": 6852506669,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6852506669,
+          "status": "accepted",
+          "who": "astra-scheduler-da64"
+        }
+      },
       "release": null
     }
   ],
