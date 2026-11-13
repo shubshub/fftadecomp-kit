@@ -35,15 +35,20 @@ steps.
    the walk's ordinary premise for callees that receive no alias, which is
    exactly the situation once the dead registers are discounted.
 
-Any owner alias in R0, R1 or LR at a summarized call, or a stack-passed
-pointer word, refuses.  A pinned query called directly by the root owner
-refuses here (that is the stack-buffer selector's job).
+Any owner alias in R0, R1 or LR at a family call, or a stack-passed pointer
+word, refuses.  A pinned query call that is not inside a callee executed under
+the stack-buffer contract refuses whenever any owner alias is live in an
+argument register at the call: only the executor checks the 13-word R1 bound
+and forbids reading R1-R3/R12 after the query.
+
+Code-address literals are checked over every code-capable range (EWRAM, IWRAM
+and the ROM windows): an odd word there must name a family body.
 """
 import hashlib
 import json
 from pathlib import Path
 
-from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET
 from capstone.arm import ARM_OP_IMM
 
 import match
@@ -51,6 +56,7 @@ import named_data_buffer_profile as named
 import known_query_stack_buffer_profile as stack_query
 import known_list_query_closure_profile as closure
 import owner_graph_profile as graph
+import software_double_profile
 from software_double_profile import indices, span_record
 
 SELECTOR = named.QUERY_CALLEE_SELECTOR
@@ -63,6 +69,8 @@ CONTROL_FLOW = ('complete Thumb owner with typed data literals and ROM-proved bo
 MAX_DEPENDENCIES = named.MAX_DEPENDENCIES
 R0, R12, LR = match.ARM_REG_R0, match.ARM_REG_R12, match.ARM_REG_LR
 R2, R3 = R0 + 2, R0 + 3
+PC = match.ARM_REG_PC
+CODE_RANGES = ((0x02000000, 0x02040000), (0x03000000, 0x03008000), (0x08000000, 0x0E000000))
 UNTOUCHED = (R3, R12)
 TRANSPARENT = (R2, R3, R12)
 
@@ -83,14 +91,20 @@ FAMILIES = {}
 for _root in stack_query.QUERIES:
     FAMILIES[_root] = dict(
         kind='known-query-collect',
+        indirect_targets=['_call_via_r6 -> func_0809ABE8 (root literal, the iterator visitor)',
+                          '_call_via_r2 -> func_0809AC20 (root literal stored in the closure)'],
         bodies={_root: (17, stack_query.query_body(_root).hex()),
                 **{a: (c, code) for a, (c, code) in stack_query.DEPENDENCIES.items()}})
 FAMILIES[0x08099560] = dict(
     kind='known-list-query-search',
+    indirect_targets=['_call_via_r6 -> func_0809AB5C (root literal, the iterator visitor)'],
     bodies={0x08099560: _closure_root(0x08099560),
             **{a: closure.DEPENDENCIES[a] for a in (0x0809AB5C, 0x080C7CC0, 0x080C7B74, 0x0814225C)}})
 FAMILIES[0x08099544] = dict(
     kind='known-list-query-any',
+    indirect_targets=['_call_via_r6 -> func_0809ABE8 (func_08099840 literal, the iterator visitor)',
+                      '_call_via_r2 -> func_0809AB3C (func_08099544 literal passed through func_08099840 '
+                      'in the closure)'],
     bodies={0x08099544: (11, '00b581b00021009103496a4600f076f9009801b002bc08473dab0908'),
             0x08099840: (11, '00b582b000920191006903496a462ef037fa02b001bc0047e9ab0908'),
             0x0809AB3C: (15, '30b5041c0d1c20682df0a8fb0006002802d02c60002000e0012030bc02bc0847'),
@@ -137,7 +151,7 @@ def family_facts(root, rom, mapping, index):
         body = bytes.fromhex(code)
         end = start + len(body)
         row = span_record(start, end, entries, rows, rom)
-        require(row['instrs'] == count and rom[start - 0x08000000:end - 0x08000000] == body,
+        require(row['mode'] == 'thumb' and row['instrs'] == count and rom[start - 0x08000000:end - 0x08000000] == body,
                 'pinned list-query family bytes, extent or count differ')
         bodies[start] = body
         identities.append(dict(address=start, end=end, instructions=count, body_sha256=sha(body)))
@@ -145,7 +159,8 @@ def family_facts(root, rom, mapping, index):
         if thunk in bodies:
             lo = thunk + 2
             require(rom[lo - 0x08000000:lo + 2 - 0x08000000] == bytes.fromhex(padding) and
-                    not any(int(e['rom'], 16) < lo + 2 and int(e['end'], 16) > lo for e in entries),
+                    not any(int(e['rom'], 16) < lo + 2 and int(e['end'], 16) > lo for e in entries) and
+                    not any(int(r[0], 16) < lo + 2 and int(r[1], 16) > lo for r in rows),
                     'pinned family thunk padding must remain separate and unowned')
     decoder = _decoder()
     first = None
@@ -165,7 +180,8 @@ def family_facts(root, rom, mapping, index):
                         'pinned family direct call leaves the family')
         for offset in range(((code_end + 3) & ~3) - start, len(body) - 3, 4):
             word = int.from_bytes(body[offset:offset + 4], 'little')
-            if 0x08000000 <= word < 0x0A000000:
+            rom_word = 0x08000000 <= word < 0x0E000000
+            if rom_word or word & 1 and any(lo <= word < hi for lo, hi in CODE_RANGES):
                 require(word & 1 and word & ~1 in bodies,
                         'pinned family code literal leaves the family')
         if start == root:
@@ -177,10 +193,12 @@ def family_facts(root, rom, mapping, index):
         if R2 in written:
             written_first = True
             break
-        require(instruction.mnemonic != 'bl' and not instruction.mnemonic.startswith('b'),
+        require(not {CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET} & set(instruction.groups) and
+                PC not in written,
                 'pinned family root reaches a call or branch before writing R2')
     require(written_first, 'pinned family root never writes R2')
     return dict(root=root, kind=family['kind'], identities=identities,
+                indirect_targets=list(family['indirect_targets']),
                 untouched_registers=['r3', 'r12'], written_before_read=['r2'],
                 contract=TRANSPARENCY_CONTRACT)
 
@@ -261,17 +279,19 @@ class KnownQueryCalleeBufferProof(named.NamedDataBufferProof):
             root_frame=root_frame, watched=watched)
 
     def query_manifest(self):
+        import owner_admission_profile
         require(self.query_callers, 'known-query callee profile requires an executed known-query callee')
         return dict(
             selector=SELECTOR,
             query_contract=self.contract(),
             callees=sorted(self.query_callers),
             capacity_words=stack_query.CAPACITY_WORDS,
-            premise='every list reached by a pinned query from a summarized callee has at most 13 nodes',
+            premise='every list reached by a pinned query from an executed callee has at most 13 nodes',
             list_bound_proved_from_ROM=False,
             families=[self.families[root] for root in sorted(self.families)],
             family_calls=[self.summaries[key] for key in sorted(self.summaries, key=repr)],
             explicit_conditions=list(CALLEE_CONDITIONS),
             producer_sha256={Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
                              for module in (match, named, stack_query, closure, graph,
+                                            owner_admission_profile, software_double_profile,
                                             __import__(__name__))})
