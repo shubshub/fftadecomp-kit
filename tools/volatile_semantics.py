@@ -331,22 +331,27 @@ def file_scope(preprocessed):
 
 
 def parameter_parts(text):
-    """Split only outer commas; malformed or unbounded declarators fail closed."""
-    parts, start, depth = [], 0, 0
+    """Split only outer commas; malformed or unbounded declarators fail closed.
+
+    Parentheses, brackets and braces all nest. An outer `?` refuses, since
+    `a ? b, c : d` holds a comma that separates nothing.
+    """
+    parts, start, nesting = [], 0, []
     for position, character in enumerate(text):
-        if character == "(":
-            depth += 1
-            if depth > 8:
+        if character in "([{":
+            nesting.append({"(": ")", "[": "]", "{": "}"}[character])
+            if len(nesting) > 8:
                 raise SemanticError("callback declaration nesting exceeds bound")
-        elif character == ")":
-            depth -= 1
-            if depth < 0:
+        elif character in ")]}":
+            if not nesting or nesting.pop() != character:
                 raise SemanticError("unbalanced parameter declaration")
-        elif character == "," and depth == 0:
+        elif character == "?" and not nesting:
+            raise SemanticError("an outer conditional operator in a parameter or argument list")
+        elif character == "," and not nesting:
             parts.append(text[start:position].strip())
             start = position + 1
     parts.append(text[start:].strip())
-    if depth or any(not part for part in parts):
+    if nesting or any(not part for part in parts):
         raise SemanticError("malformed parameter declaration")
     return parts
 
@@ -490,7 +495,15 @@ def callback_prototype(declaration, callback_types):
     return result != ["void"], len(parts)
 
 
-INDEX = r"(?:0[xX][0-9A-Fa-f]+|[0-9]+)[uUlL]*"
+INDEX = r"(?:0[xX][0-9A-Fa-f]+|0[0-7]*|[1-9][0-9]*)[uUlL]*"
+
+
+def c_integer(text):
+    """an INDEX literal read as C reads it: hex, octal after a leading 0, else decimal"""
+    digits = text.rstrip("uUlL")
+    if digits[:2] in ("0x", "0X"):
+        return int(digits, 16)
+    return int(digits, 8) if digits.startswith("0") else int(digits)
 
 
 def indirect_signature(code, scope, name):
@@ -531,7 +544,7 @@ def indirect_signature(code, scope, name):
             array = direct and direct[2]
         if prototype is None:
             return f"the declaration of {name} is not a prototyped function pointer of one-word arguments"
-        found.add(prototype + ((int(typed[3].rstrip("uUlL"), 0) if typed[3] else 0) if array else None,))
+        found.add(prototype + ((c_integer(typed[3]) if typed[3] else 0) if array else None,))
     if not found:
         return f"{name} has no file-scope declaration"
     if len({entry[:2] + (entry[2] is None,) for entry in found}) != 1 or \
@@ -550,7 +563,7 @@ def indirect_signature(code, scope, name):
                         r"\s*\(", code[use.start():])
         if call is None:
             return f"{name} is used other than as a direct call through its declared type"
-        if elements and int(call[1].rstrip("uUlL"), 0) >= elements:
+        if elements and c_integer(call[1]) >= elements:
             return f"a call through {name} indexes outside the array"
         start, level = use.start() + call.end(), 1
         for end in range(start, len(code)):
@@ -1292,6 +1305,8 @@ class Executor:
         offset = signed32(linear(pointer[2])[0])
         if offset < 0 or offset % 4 or (offset if elements is None else elements and offset >= 4 * elements):
             self.fail(text, f"the called pointer {name}{offset:+#x} is not an element of its declaration")
+        if via not in {f"r{n}" for n in range(13)}:
+            self.fail(text, f"an indirect call through {via} is not modelled")
         if via in {f"r{n}" for n in range(min(arity, 4))}:
             self.fail(text, f"the called pointer is in {via}, an argument register of the "
                       f"{arity}-argument prototype of {name}")
@@ -2463,7 +2478,10 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
         for mnemonic, operands, _ in function[0]:
             if mnemonic == "bl" and operands:
                 names.add(operands[0])
-    scope = file_scope(preprocessed)
+    # Read declarations from the comment- and string-stripped text, so that
+    # braces or semicolons inside a literal cannot fold a real declaration
+    # away or expose a forged one.
+    scope = file_scope(code)
     signatures = {name: function_signature(scope, name) for name in names}
     # `bl _call_via_rN`: the prototype is the pointer object's declared type,
     # keyed ("via", object) for every literal-pool symbol (indirect_signature).
@@ -2473,7 +2491,11 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                 for word in pool:
                     pointer = global_symbol(word) if not isinstance(word, int) and word[0] != "code" else None
                     if pointer and ("via", pointer) not in signatures:
-                        signatures[("via", pointer)] = indirect_signature(code, scope, pointer)
+                        try:
+                            signatures[("via", pointer)] = indirect_signature(code, scope, pointer)
+                        except SemanticError as error:
+                            # kept as the reason, raised only if a call uses it
+                            signatures[("via", pointer)] = str(error)
     if perturbed_assembly is not None:
         _, mapping, _ = perturbed_declaration(declaration)
         perturbed, _ = parse_assembly(perturbed_assembly)
