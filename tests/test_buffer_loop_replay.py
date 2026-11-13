@@ -375,8 +375,8 @@ class BufferLoopReplayTests(unittest.TestCase):
         def visit(node, function):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 function = node.name
+            callee = getattr(getattr(node, "func", None), "attr", getattr(getattr(node, "func", None), "id", None))
             if isinstance(node, ast.Call):
-                callee = getattr(node.func, "attr", getattr(node.func, "id", None))
                 if callee in classes:
                     keywords = {keyword.arg: keyword.value for keyword in node.keywords}
                     if None in keywords or any(isinstance(a, ast.Starred) for a in node.args):
@@ -396,9 +396,52 @@ class BufferLoopReplayTests(unittest.TestCase):
             if isinstance(node, ast.ImportFrom) and any(alias.name in classes and alias.asname
                                                         for alias in node.names):
                 violations.append((name, function, "aliased import of a proof class"))
+            if isinstance(node, ast.ClassDef) and name != "match.py":
+                for statement in node.body:
+                    targets = statement.targets if isinstance(statement, ast.Assign) else \
+                        [statement.target] if isinstance(statement, (ast.AnnAssign, ast.AugAssign)) else []
+                    if any(isinstance(t, ast.Name) and t.id in attributes for t in targets):
+                        violations.append((name, function, "class body sets the opt-in"))
+            if isinstance(node, (ast.Assign, ast.AnnAssign)) and isinstance(
+                    node.value, (ast.Name, ast.Attribute)) and \
+                    getattr(node.value, "attr", getattr(node.value, "id", None)) in classes:
+                violations.append((name, function, "alias of a proof class"))
+            if isinstance(node, ast.Call) and callee == "partial" and (
+                    any(keyword.arg in attributes or keyword.arg is None for keyword in node.keywords)
+                    or any(getattr(a, "attr", getattr(a, "id", None)) in classes for a in node.args)):
+                violations.append((name, function, "partial of a proof class or its opt-in"))
+            if isinstance(node, ast.Subscript) and isinstance(node.ctx, (ast.Store, ast.Del)) and \
+                    isinstance(node.value, ast.Attribute) and node.value.attr == "__dict__" or (
+                    isinstance(node, ast.Call) and isinstance(node.func, ast.Attribute)
+                    and isinstance(node.func.value, ast.Attribute) and node.func.value.attr == "__dict__"
+                    and node.func.attr in ("update", "setdefault", "pop", "popitem", "clear", "__setitem__")):
+                # Reviewed: neither writes the opt-in (a fixed ledger key; fields of a volatile record).
+                if (name, function) not in (("named_data_buffer_profile.py", "inspect"),
+                                            ("volatile_semantics.py", "__init__")):
+                    violations.append((name, function, "__dict__ write"))
             for child in ast.iter_child_nodes(node):
                 visit(child, function)
         visit(tree, "<module>")
+
+    def test_every_loaded_subclass_that_sets_the_opt_in_is_enumerated(self):
+        import importlib
+        import sys
+        tools = ROOT / "tools"
+        self.assertIn(str(tools), sys.path)
+        for path in sorted(tools.glob("*.py")):
+            importlib.import_module(path.stem)
+        pending, classes = [match.BufferCallProof], set()
+        while pending:
+            cls = pending.pop()
+            if cls not in classes:
+                classes.add(cls)
+                pending.extend(cls.__subclasses__())
+        self.assertGreater(len(classes), 20)
+        for flag in ("_loop_replay_opt_in", "loop_replay"):
+            with self.subTest(flag=flag):
+                self.assertEqual({cls for cls in classes if flag in cls.__dict__ and cls.__dict__[flag]},
+                                 {match.BufferCallProof, match.FunctionBufferCallProof}
+                                 if flag == "_loop_replay_opt_in" else set())
 
     def test_only_reviewed_construction_sites_request_replay(self):
         import ast
@@ -419,7 +462,12 @@ class BufferLoopReplayTests(unittest.TestCase):
         for source in ("BufferCallProof(rom, m, **options)", "BufferCallProof(rom, m, loop_replay=flag)",
                        "proof.loop_replay = True", "proof._loop_replay_opt_in = True",
                        "setattr(proof, 'loop_replay', True)",
-                       "from match import BufferCallProof as P"):
+                       "from match import BufferCallProof as P", "P = match.BufferCallProof",
+                       "P: type = BufferCallProof", "class Q(match.BufferCallProof):\n    _loop_replay_opt_in = True",
+                       "functools.partial(BufferCallProof, loop_replay=True)",
+                       "functools.partial(match.BufferCallProof, rom)",
+                       "type(proof).__dict__['_loop_replay_opt_in'] = True",
+                       "Q.__dict__.update(_loop_replay_opt_in=True)"):
             with self.subTest(source=source):
                 violations = []
                 self.scan_opt_in("other.py", ast.parse(source), set(), violations)
@@ -504,6 +552,66 @@ class BufferLoopReplayTests(unittest.TestCase):
         self.assertFalse(pinned(words(0xB500, 0xBC08, 0xE7FD, 0x4718)))  # branch into the return pair
         self.assertFalse(pinned(words(0x2700, 0x4770)))
         self.assertTrue(pinned(words(0xE000, 0x2700, 0x4770)))        # dead r7 write is never reached
+
+    def test_preservation_proof_is_armv4t_and_controls_sp_lr_and_the_switch_guard(self):
+        import hashlib
+        import struct
+        import callee_preservation_profile as preservation
+        words = lambda *w: b"".join(struct.pack("<H", x) for x in w)
+        pool = lambda *w: b"".join(struct.pack("<I", x) for x in w)
+        at = BASE + 0x100
+
+        def pinned(body, tables=()):
+            rom = bytearray(0x400)
+            rom[0x100:0x100 + len(body)] = body
+            with patch.dict(preservation.PINS, {at: (at + len(body), hashlib.sha256(body).hexdigest(), tables)}):
+                return preservation.preserves_r7_r8(bytes(rom), at)
+
+        def bcc(cc, source, target):
+            return 0xD000 | (cc << 8) | (((target - (source + 4)) >> 1) & 0xFF)
+
+        def switch(case, entries=(0x1C, 0x20), tail=b"", bound=1):
+            body = words(0xB500, 0x2800 | bound, bcc(8, 4, 0x1C), 0x0080, 0x4901, 0x1840, 0x6800, 0x4687)
+            body += pool(at + 0x14) + pool(*(at + e for e in entries)) + words(0xBC01, 0x4700) + case + tail
+            return body, ((at + 0x14, len(entries)),)
+        done = words(0xBC01, 0x4700)                                     # pop {r0}; bx r0
+        self.assertTrue(pinned(*switch(done)))
+        # Not ARMv4T: capstone's Thumb-2 decode of F000 0007 is and.w, the ARM7TDMI runs BL prefix + lsls r7.
+        for odd in ((0xF000, 0x0007), (0xF000, 0x0807), (0xF04F, 0x0701), (0xF000, 0xE800), (0xF000, 0xD000),
+                    (0xB108,), (0xDE00,), (0xBE00,), (0xBF08,), (0xBF00,), (0xB662,), (0x4608,)):
+            with self.subTest(odd=odd):
+                self.assertFalse(pinned(words(0xB500, *odd, 0xBC01, 0x4700)))
+        self.assertFalse(pinned(words(0xB500, 0x4800, 0xF7FF, 0xFFFD, 0xBC01, 0x4700)))   # BL half in a literal
+        # A branch cannot start an instruction inside the second half of a BL.
+        self.assertFalse(pinned(words(0xB500, 0xF000, 0xF800, 0xE7FD, 0xBC01, 0x4700)))
+        # PC control.
+        guard_loop = words(0x2006, 0x4292, bcc(0, 0x24, 0x04), 0xBC01, 0x4700, 0x0000)
+        evil = pool(at + 0x30 | 1) + words(0x2701, 0xBC01, 0x4700)
+        self.assertFalse(pinned(*switch(guard_loop, tail=evil)))         # beq back to the bhi, index 6
+        self.assertFalse(pinned(*switch(done, entries=(0x1C, 0x04))))    # table entry on the guard
+        self.assertFalse(pinned(*switch(done, entries=(0x1C, 0x02))))    # table entry on the cmp
+        self.assertFalse(pinned(*switch(done, entries=(0x1C, 0x0A))))    # table entry inside the idiom
+        self.assertFalse(pinned(*switch(done, entries=(0x1C, 0x21))))    # odd entry: mov pc drops bit 0
+        body, tables = switch(done)
+        self.assertFalse(pinned(body.replace(words(0x6800), words(0x5840)), tables))   # ldr r0,[r0,r1]
+        self.assertFalse(pinned(words(0xB410, 0xBC10, 0x4770)))          # push {r4}; pop {r4}; bx lr
+        # SP and LR.
+        self.assertTrue(pinned(words(0xB510, 0xBC10, 0xBC02, 0x4708)))   # push {r4,lr}; pop {r4}; pop {r1}; bx r1
+        self.assertTrue(pinned(words(0xB510, 0xBD10)))                   # push {r4,lr}; pop {r4,pc}
+        for odd in (words(0xB510, 0xBC02, 0x4708),                       # pop {r1} takes the saved r4
+                    words(0x2000, 0xB500, 0xBC02, 0x4708),               # push later than the entry
+                    words(0xB500, 0xB001, 0xBD00), words(0xB500, 0xB081, 0xBD00),   # add/sub sp
+                    words(0xB500, 0x9000, 0xBD00), words(0xB500, 0x4668, 0xBD00),   # str [sp]; mov r0, sp
+                    words(0xB500, 0xBC01, 0xBD00),                       # pop {r0}; pop {pc}
+                    words(0xB500, 0xBC01),                               # pop {r0} falls off
+                    words(0xB510, 0xBD00),                               # pop {pc} takes the saved r4
+                    words(0xB500, 0x4686, 0xBC02, 0x4708),               # mov lr, r0
+                    words(0xB500, 0x4770),                               # bx lr with the entry frame pushed
+                    words(0xF7FF, 0xFFFF, 0x4770),                       # bl then bx lr (lr clobbered)
+                    words(0x4686, 0x4770),                               # mov lr, r0; bx lr
+                    words(0xB510, bcc(0, 2, 6), 0xBC10, 0xBD10)):         # paths reaching one address at two depths
+            with self.subTest(body=odd.hex()):
+                self.assertFalse(pinned(odd))
 
     def test_preservation_switch_bound_must_agree_with_code_table_and_pin(self):
         import callee_preservation_profile as preservation
