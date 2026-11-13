@@ -21,10 +21,11 @@ class BiosCpuSetFillTests(unittest.TestCase):
         self.addCleanup(self.base.doCleanups)
 
     def fixture(self, prefix=(0x2280, 0x0452), source=0x4668, destination=0x2100,
-                data=False, control=None):
+                data=False, control=None, after=()):
         tokens = [0xB500, 0xB081, *prefix]
         if control is not None:
             tokens.append('literal')
+        tokens += after
         tokens += [source, destination, 'bios', 0xB001, 0xBC01, 0x4700]
         body, calls, bindings = bytearray(), {}, {}
         literal_load = None
@@ -114,6 +115,50 @@ class BiosCpuSetFillTests(unittest.TestCase):
                 profile.verify(**self.fixture(control=control))
         # Both arms retain the same fill fact after a real conditional split.
         profile.verify(**self.fixture(prefix=(0x2280,0x0452,0x2B00,0xD000,0x2301)))
+
+    def test_immediate_add_and_subtract_derive_exact_control_words(self):
+        # One pooled word, later control words derived by ADDS/SUBS immediate
+        # (imm8 and imm3 forms), with exact 32-bit wraparound.
+        for control, after, width in ((0x01000001, (0x3202,), 2),          # adds r2,#2
+                                      (0x01000001, (0x1C92,), 2),          # adds r2,r2,#2
+                                      (0x01000005, (0x3A04,), 2),          # subs r2,#4
+                                      (0x01000005, (0x1E52,), 2),          # subs r2,r2,#1
+                                      (0x00FFFFFF, (0x3201,), 2),          # carry sets bit24
+                                      (0x00000001, (0x3A02,), 4),          # wraps to 0xFFFFFFFF
+                                      (0x01000001, (0x1C13, 0x1C5A), 2)):  # r3=r2+0; r2=r3+1
+            with self.subTest(control=control, after=after):
+                proof = profile.verify(**self.fixture(control=control, after=after)
+                                       )[0]['native_buffers']['bios_fill']
+                site = proof['sites'][0]
+                self.assertEqual(site[2], width)
+                expected = bios.exact(control + {0x3202:2, 0x1C92:2, 0x3A04:-4, 0x1E52:-1,
+                                                 0x3201:1, 0x3A02:-2, 0x1C5A:1}[after[-1]])
+                self.assertEqual(tuple(site[3:]), expected)
+
+    def test_immediate_add_and_subtract_fail_closed(self):
+        # Unknown input: bit24 is known from ORRS but the rest is not, so a
+        # carry could clear it; the sum must become unknown.
+        with self.assertRaises(ValueError):
+            profile.verify(**self.fixture(prefix=(0x2080, 0x0440, 0x4302, 0x3201)))
+        # The undisturbed literal proves fill; wrap and borrow clear bit24.
+        profile.verify(**self.fixture(control=0xFFFFFFFF))
+        for control, after in ((0xFFFFFFFF, (0x3202,)),    # adds wraps to 1
+                               (0xFFFFFFFF, (0x1C92,)),
+                               (0x01000000, (0x3A01,)),    # subs below bit24
+                               (0x01000000, (0x1E52,)),
+                               (0x01000001, (0x1C5A,))):   # r3 unknown
+            with self.subTest(control=control, after=after), self.assertRaises(ValueError):
+                profile.verify(**self.fixture(control=control, after=after))
+        # Partial facts never pass through a non-zero immediate.
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        decoder.detail = True
+        from capstone.arm import ARM_REG_R2
+        for code in (0x3201, 0x3A01, 0x1C52, 0x1E52):
+            item = next(decoder.disasm(struct.pack('<H', code), 0x1000))
+            self.assertEqual(bios.transfer(item, {ARM_REG_R2: (1 << 24, 0)}, b'', 0x1000),
+                             (ARM_REG_R2, (0, 0)))
+            self.assertEqual(bios.transfer(item, {}, b'', 0x1000), (ARM_REG_R2, (0, 0)))
 
     def test_local_destination_other_aliases_and_source_extent_are_rejected(self):
         for f in (self.fixture(destination=0x4669),
