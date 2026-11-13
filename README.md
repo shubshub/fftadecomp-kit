@@ -1652,8 +1652,24 @@ local-label relocation is accepted. Addends are in-symbol section offsets;
 linked words must equal the caller address plus that offset. Case addresses
 are **even local Thumb instruction addresses**, not odd external function
 pointers. The table has exactly bound-plus-one entries, all targeting
-instructions after the table inside the complete caller. Duplicate case
-targets are allowed.
+instructions inside the complete caller. A case may precede the dispatch (agbcc
+shares a `p += 2` block at a loop top this way) but may not land on or between
+the comparison and the table's last word; the CFG still refuses a target in a
+literal word or in the middle of an instruction, and walks the reached block like
+any other. Exactly five schemas admit this, all through `verify_switches`:
+`elf-symbol-thumb-switches-v1`, `elf-symbol-thumb-switch-data-v1`,
+`elf-symbol-thumb-switch-data-v2` (multiple data), `elf-symbol-thumb-switch-data-u16-scalars-v1`
+and `elf-symbol-thumb-switch-typed-outgoing-frame-v1`. The opt-in is
+`allow_backward_cases=True` in `selected_switch_layout`, `verify_switches` and
+`verify_leaf_instructions` (`backward_switch_cases=True`, passed by `verify_switches`
+and the u16-scalar replay in `match.py`). `switch_layout` defaults to the forward
+rule, so every other consumer keeps it: the inventory and owner-graph discovery in
+`analyze.py`, the software-double, thunk-pool, BIOS and named-data buffer,
+owner-graph, watched-switch and multiple-switch profiles, and
+`verify_leaf_instructions` itself unless a caller passes the flag. The preloaded and
+switch-constants profiles have their own layout rules. The schemas are not bumped:
+an older kit refuses these inputs rather than accepting them.
+Duplicate case targets are allowed.
 
 The CFG reserves the pointer and table as data before decoding cases. It
 derives switch successors internally from the verified bytes and relocation
