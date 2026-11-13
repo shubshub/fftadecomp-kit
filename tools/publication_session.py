@@ -361,7 +361,7 @@ class VerificationSession:
             raise ValueError("commit has not passed every gate in this live session")
         remote, branch, base = self.history()
         # Recheck the destination and upstream immediately before publication;
-        # the actual destination update remains protected by the original lease.
+        # the actual destination update remains protected by the current exact lease.
         if push.capture_force_lease(self.repo, self.remote, self.branch) != self.lease:
             raise ValueError("destination changed since the session lease was captured")
         code, output = push.git("ls-remote", "--exit-code", "--refs", remote,
@@ -373,6 +373,8 @@ class VerificationSession:
         if not push.do_push(self.repo, self.remote, self.branch, force=True,
                             lease=self.lease, commit=expected):
             raise ValueError("conditional native push failed")
+        if not os.environ.get("FFTA_PUSH_DRY"):
+            self.lease = (self.lease[0], expected)
 
 
 def emit(event):
@@ -404,7 +406,6 @@ def run_session(args):
                 session.publish(fields[1])
                 emit({"event": "dry-run" if os.environ.get("FFTA_PUSH_DRY") else "pushed",
                       "commit": fields[1]})
-                return 0
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             emit({"event": "refused", "error": str(error)})
     return 0
