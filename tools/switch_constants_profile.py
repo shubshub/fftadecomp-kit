@@ -1,4 +1,4 @@
-"""Fresh-source provenance for one guarded Thumb switch with two constant words."""
+"""Fresh-source provenance for one guarded Thumb switch with closed one- or two-constant policies."""
 
 import argparse
 from contextvars import ContextVar
@@ -33,24 +33,29 @@ class SwitchPolicy:
     schema: str
     selector: str
     scalar_frame: bool
+    constant_count: int = 2
 
 
 LEGACY_POLICY = SwitchPolicy(SCHEMA, SELECTOR, False)
 FRAME_POLICY = SwitchPolicy("elf-symbol-thumb-switch-two-constants-frame-v1",
                             "two-constants-frame-v1", True)
+ONE_FRAME_POLICY = SwitchPolicy("elf-symbol-thumb-switch-one-constant-frame-v1",
+                                "one-constant-frame-v1", True, 1)
+POLICIES = (LEGACY_POLICY, FRAME_POLICY, ONE_FRAME_POLICY)
+ONE_CONTROL_FLOW = "one unsigned-guarded local Thumb table with one reached signed scalar bias"
 FRAME_SUMMARY = "fixed Thumb scalar SP frames; no stack-address materialization"
 FRAME_RULE = "fixed-scalar-sp-v1"
 
 
 def policy_for(selector):
-    for policy in (LEGACY_POLICY, FRAME_POLICY):
+    for policy in POLICIES:
         if type(selector) is str and selector == policy.selector:
             return policy
     raise ValueError("unknown switch-constants policy")
 
 
 def checked_policy(policy):
-    if policy is not LEGACY_POLICY and policy is not FRAME_POLICY:
+    if not any(policy is known for known in POLICIES):
         raise ValueError("unknown switch-constants policy object")
     return policy
 
@@ -76,7 +81,8 @@ def check_opt_in(enabled, relocations, *incompatible):
         raise ValueError("switch constants require isolated local-switch bindings")
 
 
-def layout(data, address, relocations):
+def layout(data, address, relocations, policy=LEGACY_POLICY):
+    checked_policy(policy)
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
     from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_REG_PC
     if type(address) is not int or address % 2 or type(relocations) is not dict or \
@@ -112,8 +118,8 @@ def layout(data, address, relocations):
         return decoded.operands[0].imm - address
 
     candidates = []
-    for dispatch in (literal - 18, literal - 20):
-        gap = literal - 8
+    gap = literal - 4 * policy.constant_count
+    for dispatch in (gap - 10, gap - 12):
         if dispatch < 0 or ((address + dispatch + 13) & ~3) != address + gap or \
                 gap - dispatch - 10 not in (0, 2) or any(data[dispatch + 10:gap]):
             continue
@@ -161,7 +167,9 @@ def layout(data, address, relocations):
                                    "bound": count - 1,
                                    "relocations": [[offset, addend] for offset, addend in sorted(relocations.items())]})
     if len(candidates) != 1:
-        raise ValueError("switch constants require an exact two-word gap and unsigned guarded dispatch")
+        raise ValueError("switch constants require an exact " +
+                         ("one-word" if policy is ONE_FRAME_POLICY else "two-word") +
+                         " gap and unsigned guarded dispatch")
     return candidates[0]
 
 
@@ -260,20 +268,67 @@ def complete_partition(data, address, instructions, descriptor):
     return loads
 
 
+def verify_scalar_bias(data, address, instructions, descriptor, constants):
+    """Require the sole word to feed the adjacent guarded-selector addition."""
+    from capstone.arm import ARM_OP_REG, ARM_OP_MEM, ARM_OP_IMM, ARM_REG_PC
+    offset, value, loads = constants[0]
+    comparison = descriptor["comparison"]
+    if not 0xFFFF0000 <= value <= 0xFFFFFF00 or loads != [comparison - 4]:
+        raise ValueError("one-constant switch requires one reached small negative scalar bias")
+    indexed = {item.address - address: item for item in instructions}
+    load, addition, compare = (indexed.get(comparison + delta) for delta in (-4, -2, 0))
+    if load is None or addition is None or compare is None or addition.mnemonic != "adds" or \
+            addition.size != 2 or len(addition.operands) != 3 or \
+            any(operand.type != ARM_OP_REG for operand in addition.operands):
+        raise ValueError("one-constant bias requires an adjacent scalar addition")
+    destination, left, right = (operand.reg for operand in addition.operands)
+    bias = load.operands[0].reg
+    if load.mnemonic != "ldr" or load.size != 2 or len(load.operands) != 2 or \
+            load.operands[1].type != ARM_OP_MEM or load.operands[1].mem.base != ARM_REG_PC or \
+            left == right or bias not in (left, right) or destination != compare.operands[0].reg:
+        raise ValueError("one-constant bias must feed its guarded selector")
+    forbidden = {address + comparison - 2, address + comparison}
+    if any(operand.type == ARM_OP_IMM and operand.imm in forbidden
+           for item in instructions if item.mnemonic.startswith("b") for operand in item.operands) or \
+            any(address + target in forbidden for _, target in descriptor["relocations"]):
+        raise ValueError("one-constant scalar bias pair is bypassed")
+
+
+def verify_external_single_stm(instruction, aliases, return_registers):
+    """Allow only Thumb-1 STMIA Rb!, {Rs}, Rb != Rs, without tracked pointers."""
+    from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_OP_REG, ARM_REG_R0
+    word = int.from_bytes(instruction.bytes, "little")
+    mask = word & 255
+    base = ARM_REG_R0 + ((word >> 8) & 7)
+    stored = ARM_REG_R0 + (mask.bit_length() - 1)
+    read, written = instruction.regs_access()
+    if instruction.size != 2 or word & 0xF800 != 0xC000 or mask.bit_count() != 1 or \
+            base == stored or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            not instruction.writeback or instruction.update_flags or \
+            len(instruction.operands) != 2 or any(op.type != ARM_OP_REG for op in instruction.operands) or \
+            tuple(op.reg for op in instruction.operands) != (base, stored) or \
+            set(read) != {base, stored} or set(written) != {base} or \
+            {base, stored} & (set(aliases) | set(return_registers)):
+        raise ValueError("one-constant scalar frame requires an external single-register STM without control pointers")
+
+
 def _manifest(data, address, calls, relocations, policy=LEGACY_POLICY):
     from capstone.arm import ARM_OP_MEM, ARM_REG_PC, ARM_REG_SP
     from match import verify_leaf_instructions, thumb_stack_adjustment
     checked_policy(policy)
-    descriptor = layout(data, address, relocations)
+    descriptor = layout(data, address, relocations, policy)
     instructions = verify_leaf_instructions(data, address, True, calls,
                                             switch_relocations=relocations, allow_switch_constants=True,
-                                            allow_switch_scalar_frame=policy.scalar_frame)
+                                            allow_switch_scalar_frame=policy.scalar_frame,
+                                            switch_constants_policy=policy if policy is ONE_FRAME_POLICY else None)
     loads = complete_partition(data, address, instructions, descriptor)
     constants = []
-    for offset in (descriptor["literal"] - 8, descriptor["literal"] - 4):
+    for offset in range(descriptor["literal"] - 4 * policy.constant_count, descriptor["literal"], 4):
         if not loads.get(offset):
             raise ValueError("each interposed constant requires a reached word load")
         constants.append([offset, struct.unpack_from("<I", data, offset)[0], sorted(set(loads[offset]))])
+    if policy is ONE_FRAME_POLICY:
+        verify_scalar_bias(data, address, instructions, descriptor, constants)
     manifest = {"calls": [[site - address, f"func_{target:08X}"] for site, target in sorted(calls.items())],
                 "switch": descriptor, "constants": constants}
     if policy.scalar_frame:
@@ -572,12 +627,12 @@ def fingerprint(address, result, policy=LEGACY_POLICY):
 
 def selected_policy(report):
     normalized = [re.sub(r"[ \t]+", " ", line.strip()).lower() for line in report.splitlines()]
-    if not any("switch-two-constants" in line or line.startswith(("* switch constants", "* scalar frame"))
+    if not any(("switch-two-constants" in line or "switch-one-constant" in line) or line.startswith(("* switch constants", "* scalar frame"))
                for line in normalized):
         return None
     verification = [line for line in report.splitlines()
                     if re.sub(r"[ \t]+", " ", line.strip()).startswith("* verification")]
-    policies = [policy for policy in (LEGACY_POLICY, FRAME_POLICY)
+    policies = [policy for policy in POLICIES
                 if verification == [f"* verification: `{policy.schema}`"]]
     if len(policies) != 1:
         raise ValueError("mixed or malformed switch-constants selection")
@@ -690,8 +745,8 @@ def _parse_manifest(encoded, size, policy=LEGACY_POLICY):
         integer(switch[field], 255 if field == "bound" else size - 2)
     pairs(switch["relocations"])
     constants = manifest["constants"]
-    if type(constants) is not list or len(constants) != 2:
-        raise ValueError("exactly two constant records required")
+    if type(constants) is not list or len(constants) != policy.constant_count:
+        raise ValueError("incorrect closed-policy constant record count")
     previous = -1
     for record in constants:
         if type(record) is not list or len(record) != 3:
@@ -717,7 +772,7 @@ def render_report(address, result, policy=LEGACY_POLICY):
         f"* switch constants: {policy.selector}", f"* compiler: `{configuration()[0]} {configuration()[5]}`",
         f"* source: `{result.source_path}`", f"* source SHA-256: `{result.source_digest}`",
         f"* mapping SHA-256: `{result.mapping_digest}`", f"* function index SHA-256: `{result.index_digest}`",
-        f"* ROM SHA-256: `{result.rom_digest}`", f"* control flow: {CONTROL_FLOW}",
+        f"* ROM SHA-256: `{result.rom_digest}`", f"* control flow: {ONE_CONTROL_FLOW if policy is ONE_FRAME_POLICY else CONTROL_FLOW}",
         f"* reached instructions: {result.instruction_count}",
         "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
         "* source plausibility: plausible", "* hand-asm allow list: not listed",
@@ -757,7 +812,7 @@ def report_matches(report, root, address):
         if policy.scalar_frame:
             required.add("* scalar frame")
         if set(fields) != required or quoted("* compiler") != f"{configuration()[0]} {configuration()[5]}" or \
-                fields["* control flow"] != CONTROL_FLOW or fields["* relocations"] != "none" or \
+                fields["* control flow"] != (ONE_CONTROL_FLOW if policy is ONE_FRAME_POLICY else CONTROL_FLOW) or fields["* relocations"] != "none" or \
                 fields["* source plausibility"] != "plausible" or fields["* hand-asm allow list"] != "not listed" or \
                 fields["* verified extent"] != "complete ELF function symbol, including literal pools" or \
                 re.fullmatch(r"[1-9][0-9]*", fields["* reached instructions"]) is None:

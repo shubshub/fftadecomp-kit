@@ -2854,6 +2854,38 @@ tool capability; source review and the complete publication gates remain separat
 * `rebuild.py` is the gate: if the concatenation does not reproduce the ROM, the
   split is wrong and nothing downstream is safe.
 
+# Scalar-frame one-constant switches
+
+The explicit `--switch-profile one-constant-frame-v1` selector uses the separate
+`elf-symbol-thumb-switch-one-constant-frame-v1` source-bound schema. It requires
+exactly one unrelocated interposed word before one adjacent forward switch
+pointer/table. That word must be a signed scalar bias in `[-65536,-256]`, loaded
+exactly once by the reached PC-relative word load immediately before the
+three-register addition and canonical unsigned selector comparison. Branches or
+table entries bypassing the bias pair reject. The existing complete ELF owner,
+alignment, guarded five-operation dispatch, reachable pool use, typed ordinary
+call linking, plausibility and fresh source replay checks remain mandatory.
+
+This policy requires a reached nonzero fixed scalar frame and additionally runs
+the existing restoring-frame proof for saved registers and entry-LR returns.
+It excludes incoming stack arguments, SP address formation, stack aliases,
+buffer arguments, dynamic frames and runtime/data/function-pointer profiles.
+The sole block-transfer exception is the exact two-byte Thumb-1
+`STMIA Rb!, {Rs}` encoding with one low stored register, distinct low base,
+writeback, unchanged flags and the exact decoded register effects. Neither
+register may carry tracked stack or return-pointer provenance. Its base is
+invalidated by the ordinary register writeback transfer; saved registers must
+still be restored. Multi-register STM, LDM, base-in-list and control-pointer
+stores reject. External pointer validity remains the ordinary caller ABI
+precondition, and local loops provide partial correctness, not termination.
+
+The manifest records exactly one constant plus the existing scalar-frame and
+placement records. Schema, selector, scalar marker, body, source/headers, maps,
+function index and producer artifacts are checked by fresh compilation during
+report replay. Neither legacy two-constant selector nor default matching
+selects or falls back to this policy. The two-constant formats and boundaries
+remain unchanged.
+
 # Scalar-frame two-constant switches
 
 The explicit `--switch-profile two-constants-frame-v1` selector and
@@ -2874,7 +2906,7 @@ dynamic/wide adjustments, invalid stores and fabricated returns also reject.
 Buffer/resolver, function/object literal, runtime/thunk, preloaded-switch and
 inert contexts cannot combine with this policy.
 
-Only this schema adds the exact marker `fixed Thumb scalar SP frames; no
+This scalar-frame schema adds the exact marker `fixed Thumb scalar SP frames; no
 stack-address materialization` and a `frame` manifest with policy
 `fixed-scalar-sp-v1`, sorted `adjustments` pairs `[instruction_offset,
 signed_byte_delta]`, and sorted `accesses` triples `[instruction_offset,

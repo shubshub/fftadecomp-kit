@@ -3477,6 +3477,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              preloaded_switch=False, modsi3_context=None, divsi3_context=None,
                              inert_spin_context=None, double_context=None, function_thunk_context=None, *,
                              allow_switch_constants=False, allow_switch_scalar_frame=False,
+                             switch_constants_policy=None,
                              umodsi3_context=None, ashldi3_context=None, float_context=None,
                              acyclic_state_budget=None, ignored_leaf_alias_proof=None,
                              signed_quotient_profile=None, stack_pointer_compare_profile=None,
@@ -3724,7 +3725,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     ashldi3_context, float_context)) or preloaded_switch or \
                 allow_switch_constants or allow_switch_scalar_frame:
             raise ValueError("acyclic path states require an ordinary isolated Thumb CFG")
-    from switch_constants_profile import check_opt_in, layout as constants_layout
+    from switch_constants_profile import check_opt_in, layout as constants_layout, ONE_FRAME_POLICY
+    if switch_constants_policy is not None and (switch_constants_policy is not ONE_FRAME_POLICY or
+            not allow_switch_constants or not allow_switch_scalar_frame):
+        raise ValueError("one-constant switch requires its explicit isolated scalar-frame policy")
     check_opt_in(allow_switch_constants, switch_relocations, buffer_proof, call_resolver,
                  switch_data_relocations, udivsi3_context, preloaded_switch, modsi3_context,
                  divsi3_context, inert_spin_context, double_context, function_thunk_context,
@@ -3880,7 +3884,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if not thumb or buffer_proof is not None and not root_buffer_switch or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
         if allow_switch_constants:
-            switch = constants_layout(data, address, switch_relocations)
+            switch = (constants_layout(data, address, switch_relocations, switch_constants_policy)
+                      if switch_constants_policy is not None else
+                      constants_layout(data, address, switch_relocations))
             reserved.update(range(address + switch["dispatch"] + 10,
                                   address + switch["literal"]))
         else:
@@ -3987,7 +3993,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 literal_adjustments.add(current)
         if scalar_switch_frame:
             if instruction.mnemonic.startswith(("ldm", "stm")):
-                raise ValueError("scalar switch frames exclude block transfers")
+                if switch_constants_policy is ONE_FRAME_POLICY:
+                    from switch_constants_profile import verify_external_single_stm
+                    verify_external_single_stm(instruction, aliases, return_registers)
+                else:
+                    raise ValueError("scalar switch frames exclude block transfers")
             if not stack_operation and adjustment is None and ARM_REG_SP in registers:
                 raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
@@ -4546,6 +4556,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     current == address or predecessors.get(current) != incoming
                     for current, incoming in expected.items()):
                 raise ValueError("switch selector bound is bypassed by an unverified predecessor edge")
+    if switch_constants_policy is ONE_FRAME_POLICY:
+        from local_long_branch_profile import prove_frame
+        prove_frame(instructions, edges, address, {}, calls)
     if typed_switch_outgoing_frame is not None:
         typed_switch_frame.verify_frame(instructions, edges, address, calls)
     reaching_return = set(returns)
@@ -4795,7 +4808,7 @@ def main():
     ap.add_argument("--software-double-profile", choices=(software_double.SELECTOR,))
     ap.add_argument("--software-double-remainder-profile", choices=(software_double.REMAINDER_TARGET_SELECTOR,))
     ap.add_argument("--function-address-profile", choices=function_thunk.SELECTORS)
-    ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1"))
+    ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1", "one-constant-frame-v1"))
     ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR, typed_switch_frame.SELECTOR))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
