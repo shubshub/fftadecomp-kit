@@ -315,6 +315,38 @@
           "who": "match-astra-08126764"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "706ecdf3359e34c347e398ebc5180ce08b93d7809c4228d5cf2be4c4e6776b8d",
+        "acknowledged_cursor": 6842179685,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "706ecdf3359e34c347e398ebc5180ce08b93d7809c4228d5cf2be4c4e6776b8d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C224\",\"who\":\"match-astra-0800C224\",\"note\":\"Bounded natural C recovery of preserved complete 68-byte candidate; prior attempts retained\"}",
+          "created_at": "2026-11-13T02:39:35Z",
+          "id": 6842179685,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:39:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f21b96480727b9e19c808f3dc362c3cc278ddb1b5199b9c0694bce51f7427043",
+        "result": {
+          "address": "0x0800C224",
+          "claim_id": 6842179685,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6842179685,
+          "status": "accepted",
+          "who": "match-astra-0800C224"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
