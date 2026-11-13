@@ -407,6 +407,18 @@ class SemanticDiffTests(unittest.TestCase):
             self.compare16(branching, branching.replace("ldrh\tr0, [r1, #4]\n\t", "").replace(
                 "cmp\tr2, #3", "cmp\tr2, #4"))
         self.assertIn("different conditions", str(caught.exception))
+        # with the permuted compile an all-ones store may lack its own load,
+        # so a dead load before one may be planted: its window admits no
+        # scheduled-in work (the narrower rules alone, as before)
+        def permuted(real):
+            return self.compare16(real, real.replace("ldrh\tr0, [r1, #4]\n\t", ""),
+                                  real.replace("#4]", "#2]"))
+
+        scheduled = shaped("mul\tr2, r2, r6", "mov\tr8, r2")
+        self.assertEqual(permuted(scheduled)[0][1:3], (1, [2]))
+        with self.assertRaises(semantics.SemanticError) as caught:
+            permuted(scheduled.replace("0xFFA8", "0xFFFF"))
+        self.assertIn("is a dead load of", str(caught.exception))
         # defence in depth behind dead(): the window itself refuses a read of
         # the loaded value before it is overwritten
         load = semantics.Record(0, "ldrh", "load", {"r1"}, {"r0"}, address=("sym", 4), width=2)
