@@ -3035,6 +3035,38 @@
           "who": "astra-selfcall-08089ba4"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d43e3e853a85bd3c720a17952b481f4c8a12727fece53af9f0a12c052c132122",
+        "acknowledged_cursor": 6855193175,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d43e3e853a85bd3c720a17952b481f4c8a12727fece53af9f0a12c052c132122",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08014D44\",\"who\":\"astra-backward-switch-08014d44\",\"note\":\"Complete 460-byte native backward-switch C recovery under the merged default switch profile.\"}",
+          "created_at": "2026-11-13T14:03:39Z",
+          "id": 6855193175,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T14:03:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dc30a6ad04a4812c27dd25379f82a59b319e92db848b7f227573e02d179ba83b",
+        "result": {
+          "address": "0x08014D44",
+          "claim_id": 6855193175,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6855193175,
+          "status": "accepted",
+          "who": "astra-backward-switch-08014d44"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
