@@ -290,66 +290,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "4bb2f1da255819cd14f898e1fe778d397b6ffeb65dfd6dd114e4dea53ccf98ee",
-        "acknowledged_cursor": 6848752419,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4bb2f1da255819cd14f898e1fe778d397b6ffeb65dfd6dd114e4dea53ccf98ee",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813DD58\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
-          "created_at": "2026-11-13T09:07:51Z",
-          "id": 6848752419,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T09:07:51Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c493cbd7e6c23c8e0708781b60052dfb52dedcd925c546f01cda27e29ab9bfad",
-        "result": {
-          "address": "0x0813DD58",
-          "claim_id": 6848752419,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6848752419,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "352de8faa271a5c7ee0317eef94fd0601f5aacd576ab3e91d6bce31f01ac29d0",
-        "acknowledged_cursor": 6867599619,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "352de8faa271a5c7ee0317eef94fd0601f5aacd576ab3e91d6bce31f01ac29d0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813DD58\",\"who\":\"claude-ffta2\",\"claim_id\":6848752419,\"reason\":\"parked: Near miss: regalloc - target keeps which in sb (no frame); ours spills which (sub sp,4). BG scroll lerp via func_081426B8 (signed /) + volatile MMIO s\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T23:32:33Z",
-          "id": 6867599619,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T23:32:33Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f00a7f1217a3c5ea9470f08fd82a9478b1a17a5970f75fec6d88addeb25787f2",
-        "result": {
-          "address": "0x0813DD58",
-          "claim_id": 6848752419,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6867599619,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "53f72fd55023fa8b882e6349e68490be857b75d7ec54bd64b762b175f63b758b",
         "acknowledged_cursor": 6848875698,
         "body_provenance": "acceptance-time",
