@@ -1960,7 +1960,7 @@ def selected_switch_layout(data, address, relocations, data_relocations=None,
             all(type(offset) is int for offset in relocations) and \
             preloaded_switch_encoding(data, address, min(relocations)) is not None:
         return preloaded_switch_layout(data, address, relocations, data_relocations)
-    return switch_layout(data, address, relocations, data_relocations)
+    return switch_layout(data, address, relocations, data_relocations, allow_backward_cases=True)
 
 
 def preloaded_switch_layout(data, address, relocations, data_relocations):
@@ -2149,8 +2149,16 @@ def verify_preloaded_switches(data, address, rom, mapping, data_mapping, manifes
     return instructions, PRELOADED_SWITCH_CONTROL_FLOW
 
 
-def switch_layout(data, address, relocations, data_relocations=None, *, interposed_words=0):
-    """Derive a guarded dispatch; the five-word pool needs separate reached-load proof."""
+def switch_layout(data, address, relocations, data_relocations=None, *, interposed_words=0,
+                  allow_backward_cases=False):
+    """Derive a guarded dispatch; the five-word pool needs separate reached-load proof.
+
+    Case targets must follow the table unless allow_backward_cases. Only the
+    default switches-v1 paths (selected_switch_layout, verify_switches and the
+    verify_leaf_instructions calls made with backward_switch_cases=True) opt in;
+    every other caller keeps the forward rule by default. A backward target must
+    still lie outside the guard, dispatch, pool and table bytes; the reached
+    block is then checked like any other by the CFG proof."""
     if type(interposed_words) is not int or interposed_words not in (0, 5) or \
             interposed_words and data_relocations is not None:
         raise ValueError("unsupported interposed switch pool")
@@ -2167,7 +2175,7 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
     count = len(relocations) - 1
     table_end = table + 4 * count
     if sorted(relocations) != list(range(literal, table_end, 4)) or \
-            relocations[literal] != table or \
+            relocations[literal] != table or not allow_backward_cases and \
             any(relocations[offset] < table_end for offset in range(table, table_end, 4)):
         raise ValueError("switch words must describe an adjacent table and forward local cases")
     object_words_before_table = 0
@@ -2270,6 +2278,9 @@ def switch_layout(data, address, relocations, data_relocations=None, *, interpos
                         continue
             if default is None or default % 2 or not table_end <= default <= len(data) - 2:
                 continue
+            if any(comparison <= relocations[offset] < table_end
+                   for offset in range(table, table_end, 4)):
+                continue
             candidates.append({"comparison": comparison, "guard": guard, "dispatch": dispatch,
                                "default": default, "literal": literal, "table": table,
                                "bound": count - 1,
@@ -2362,7 +2373,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
             raise ValueError("switch relocations must be unique ordered integer pairs")
         previous = record[0]
         relocations[record[0]] = record[1]
-    if switch_layout(data, address, relocations, data_relocations) != descriptor:
+    if switch_layout(data, address, relocations, data_relocations,
+                     allow_backward_cases=True) != descriptor:
         raise ValueError("switch descriptor does not match the guarded bytes")
     scalars = {}
     if scalar_data:
@@ -2415,6 +2427,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     instructions = verify_leaf_instructions(data, address, True, calls,
                                             switch_relocations=relocations,
                                             switch_data_relocations=data_relocations,
+                                            backward_switch_cases=True,
                                             typed_switch_outgoing_frame=typed_switch_frame.SELECTOR
                                             if outgoing_frame else None)
     if complete_data:
@@ -3223,7 +3236,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              zero_aware_unsigned_quotient_inventory_context=None,
                              addressed_signed_runtime_context=None, entry_recursive_calls=None,
                              typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
-                             finite_small_copy_context=None, self_calls=None):
+                             finite_small_copy_context=None, self_calls=None,
+                             backward_switch_cases=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -3616,7 +3630,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                   address + switch["literal"]))
         else:
             layout = preloaded_switch_layout if preloaded_switch else switch_layout
-            switch = layout(data, address, switch_relocations, switch_data_relocations)
+            switch = (layout(data, address, switch_relocations, switch_data_relocations)
+                      if preloaded_switch else
+                      layout(data, address, switch_relocations, switch_data_relocations,
+                             allow_backward_cases=backward_switch_cases))
         reserved.update({address + position
                     for offset in (*switch_relocations, *(switch_data_relocations or {}))
                     for position in range(offset, offset + 4)})
@@ -4952,7 +4969,7 @@ def main():
                         raise ValueError("u16 switch-data excludes preloaded switches")
                     scalar_instructions = verify_leaf_instructions(
                         got, addr, True, calls, switch_relocations=switch_relocations,
-                        switch_data_relocations=data_relocations)
+                        switch_data_relocations=data_relocations, backward_switch_cases=True)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                     switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
                     switch_evidence["scalars"] = switch_u16_scalar_records(
