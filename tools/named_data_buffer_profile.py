@@ -151,6 +151,17 @@ class NamedDataBufferProof(match.BufferCallProof):
         validate_owner(data, address, self.rom, self.mapping, self.index)
         return data
 
+    # Opt-in: profile families that deliberately refuse table callees keep refusing.
+    jump_table_callees = False
+    _delegated = False
+
+    def _switch_refinement(self, data, address):
+        if self._delegated or not self.jump_table_callees:
+            return None
+        import owner_admission_profile as owner
+        refinement = owner.refine(data, address, self.mapping)
+        return refinement if refinement['word_switches'] else None
+
     def inspect(self, address, data):
         candidates = []
         for literal in range((-address) % 4, len(data) - 3, 4):
@@ -181,6 +192,15 @@ class NamedDataBufferProof(match.BufferCallProof):
             structure = {'kind': 'existing-complete-read-only-preloaded-switch-v1',
                          'switch': switch, 'instructions': len(instructions),
                          'object_word_sha256': hashlib.sha256(data[literal-4:literal]).hexdigest()}
+        elif self._switch_refinement(data, address) is not None:
+            # A compiler jump table is followed only through the existing
+            # guarded-switch layout (canonical dispatch, bound covering the
+            # table, in-span forward cases). Its record carries the table hash.
+            inspector = GuardedSwitchBufferProof(self.rom, self.mapping, self.index, self.objects)
+            inspector._delegated = True
+            instructions, transfers = inspector.inspect(address, data)
+            self.records[address] = inspector.records[address]
+            return instructions, transfers
         else:
             instructions, transfers = super().inspect(address, data)
             import owner_admission_profile as owner
@@ -346,6 +366,7 @@ def conditional_thunk_replay(proof):
 
 
 class DiscardedReturnScratchProof(NamedDataBufferProof):
+    jump_table_callees = True
     """Project R2/R3 only after checking their complete actual continuation."""
 
     def __init__(self, rom, mapping, index, objects):
