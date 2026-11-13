@@ -2865,10 +2865,42 @@ class BufferCallProof:
                                         tuple(register for register in aliases if register not in CALLER_CLOBBERED)))
 
     def inspect(self, address, data):
+        if self.stack_arguments and type(self) in (BufferCallProof, FunctionBufferCallProof):
+            # Profile subclasses keep their own refusal of a table callee.
+            switched = self.inspect_jump_table(address, data)
+            if switched is not None:
+                return switched
         instructions = verify_leaf_instructions(data, address, True,
                                                 buffer_proof=self if self.stack_arguments else None,
                                                 call_resolver=self.target)
         return instructions, {}
+
+    def inspect_jump_table(self, address, data):
+        """Follow one compiler jump table inside a call-free callee.
+
+        The dispatch, the bound check covering the whole table, the pool literal
+        and the in-span forward case words are all derived by the existing
+        guarded word-switch layout; table bytes are part of the hashed span.
+        """
+        import analyze
+        import owner_graph_profile as graph
+        refinement = analyze.refine_function(data, address, self.entries,
+            max_bytes=len(data), max_instructions=len(data) // 2, rom_end=0x09000000,
+            same_owner_long_branches=True)
+        switches = refinement["word_switches"]
+        if not switches:
+            return None
+        if len(switches) != 1 or switches[0].get("interposed_words", 0) != 0:
+            raise ValueError("buffer callee requires exactly one plain guarded jump table")
+        ins, edges, branches, calls, words = graph.graph(data, address, refinement)
+        if branches or calls:
+            raise ValueError("jump-table buffer callee excludes calls and local BL control")
+        instructions = verify_leaf_instructions(data, address, True, calls,
+                                                switch_relocations=words)
+        if set(ins) != {item.address for item in instructions}:
+            raise ValueError("jump-table callee differs from its complete verified instructions")
+        transfer = address + switches[0]["dispatch"] + 8
+        return instructions, {transfer: edges[transfer]}
 
     def check_arguments(self, address, arguments, stack, incoming, protected, *, constants=None, site=None,
                         words=None, frame_base=None, root_frame=None, watched=()):
