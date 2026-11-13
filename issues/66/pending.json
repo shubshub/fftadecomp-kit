@@ -90,7 +90,35 @@
           "who": "match-astra-0800DAB8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "116aef8db1ba024f5ed1254a74aa12db556c6010c4b5c53a328da56318fab60d",
+        "acknowledged_cursor": 6841693281,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "116aef8db1ba024f5ed1254a74aa12db556c6010c4b5c53a328da56318fab60d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DAB8\",\"who\":\"match-astra-0800DAB8\",\"claim_id\":6841305977,\"reason\":\"Bounded natural-C revisit retained the complete 82-byte body with six scheduling-byte differences; source and genuine failures preserved.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; packed byte union; scalar union\"}",
+          "created_at": "2026-11-13T02:08:07Z",
+          "id": 6841693281,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:08:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b9bfb69f97d81fb3fea17960b71d3a7b4cc459ddfd3563fb8ed1964b33041a40",
+        "result": {
+          "address": "0x0800DAB8",
+          "claim_id": 6841305977,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6841693281,
+          "status": "accepted",
+          "who": "match-astra-0800DAB8"
+        }
+      }
     },
     {
       "claim": {
