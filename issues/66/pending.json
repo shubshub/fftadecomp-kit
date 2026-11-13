@@ -3394,66 +3394,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "1f3615c9f501dc4a096efc11d391be30ae9ac4e31aca2a94f738e1f313ba61d4",
-        "acknowledged_cursor": 6859537596,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1f3615c9f501dc4a096efc11d391be30ae9ac4e31aca2a94f738e1f313ba61d4",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F1948\",\"who\":\"astra-affine-array-080f1948\",\"note\":\"Complete native qualification and natural C matching using merged affine or private-array proof\"}",
-          "created_at": "2026-11-13T17:01:06Z",
-          "id": 6859537596,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:01:06Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ccd38d6d0c2499718f51bd17a71d2e2add8b106ca89905b4448d0ccd9c1e07e6",
-        "result": {
-          "address": "0x080F1948",
-          "claim_id": 6859537596,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6859537596,
-          "status": "accepted",
-          "who": "astra-affine-array-080f1948"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "4c329abe507018a6c9306c6c98a6f516a338db5e59662842821282afc12728c9",
-        "acknowledged_cursor": 6859742408,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "4c329abe507018a6c9306c6c98a6f516a338db5e59662842821282afc12728c9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F1948\",\"who\":\"astra-affine-array-080f1948\",\"claim_id\":6859537596,\"reason\":\"Complete 420-byte native MATCH, plausible source and exactly one source-bound replay passed. All candidates and compiler products retained; ready for publication.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T17:10:04Z",
-          "id": 6859742408,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:10:04Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c31705e1d90ff92e0146b16b1d1b92623d9aa284fbcb6c7c3ed446b957831aff",
-        "result": {
-          "address": "0x080F1948",
-          "claim_id": 6859537596,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6859742408,
-          "status": "accepted",
-          "who": "astra-affine-array-080f1948"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1113e24ea8ba60e9f0dfa0b1a32dcbdb8c2b0aceda17390edfb097440fe05ad8",
         "acknowledged_cursor": 6859634177,
         "body_provenance": "acceptance-time",
