@@ -22,9 +22,10 @@ INTERPOSED_SELECTOR = "canonical-thunks-interposed-pool-v1"
 INTERPOSED_SCHEMA = "elf-symbol-thumb-function-address-thunks-interposed-pool-v1"
 from umod_r1_thunk_profile import SELECTOR as UMOD_R1_SELECTOR, SCHEMA as UMOD_R1_SCHEMA
 from thunk_pool_switch import INTERPOSED
-from unsigned_thunk_profile import SELECTOR as UNSIGNED_SELECTOR, SCHEMA as UNSIGNED_SCHEMA
+from unsigned_thunk_profile import SELECTOR as UNSIGNED_SELECTOR, SCHEMA as UNSIGNED_SCHEMA, \
+    FRAME_SELECTOR as UNSIGNED_FRAME_SELECTOR, FRAME_SCHEMA as UNSIGNED_FRAME_SCHEMA, SELECTORS as UNSIGNED_SELECTORS
 
-SELECTORS = (SELECTOR, ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR, UNSIGNED_SELECTOR)
+SELECTORS = (SELECTOR, ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR, *UNSIGNED_SELECTORS)
 # Selectors whose manifests carry their selector and producer-source digests.
 VERSIONED_POOLS = {ZERO_SELECTOR: 0, INTERPOSED_SELECTOR: INTERPOSED}
 
@@ -48,14 +49,15 @@ def policy_name(words):
 def schema_for(selector):
     pool_words(selector)
     return {UMOD_R1_SELECTOR: UMOD_R1_SCHEMA, ZERO_SELECTOR: ZERO_SCHEMA,
-            INTERPOSED_SELECTOR: INTERPOSED_SCHEMA, UNSIGNED_SELECTOR: UNSIGNED_SCHEMA}.get(selector, SCHEMA)
+            INTERPOSED_SELECTOR: INTERPOSED_SCHEMA, UNSIGNED_SELECTOR: UNSIGNED_SCHEMA,
+            UNSIGNED_FRAME_SELECTOR: UNSIGNED_FRAME_SCHEMA}.get(selector, SCHEMA)
 
 
 def selector_from_manifest(manifest):
     selector = manifest.get("selector", SELECTOR)
     pool_words(selector)
     if "selector" in manifest and selector not in (ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR,
-                                                   UNSIGNED_SELECTOR):
+                                                   *UNSIGNED_SELECTORS):
         raise ValueError("legacy thunk evidence cannot carry an alternate pool policy")
     return selector
 
@@ -244,15 +246,15 @@ def original_bindings(image, address, mapping, rom, objects, *, switch_relocatio
                         instruction.operands[0].imm != address + site:
                     raise ValueError("function-thunk BL requires a canonical zero addend")
     functions = {}
-    unsigned = {} if selector in (UMOD_R1_SELECTOR, UNSIGNED_SELECTOR) else None
-    quotient = {} if selector == UNSIGNED_SELECTOR else None
+    unsigned = {} if selector in (UMOD_R1_SELECTOR, *UNSIGNED_SELECTORS) else None
+    quotient = {} if selector in UNSIGNED_SELECTORS else None
     switch_relocations = {} if switch_relocations is None else switch_relocations
     calls, targets, literals = call_bindings(image, f"func_{address:08X}", address, mapping,
                                             len(rom), rom, objects, functions, switch_relocations,
                                             udivsi3_bindings=quotient,
                                             function_thunks=True, thunk_pool_words=words, umodsi3_bindings=unsigned,
                                             umod_r1_profile=selector if selector == UMOD_R1_SELECTOR else None,
-                                            unsigned_thunk_profile=selector if selector == UNSIGNED_SELECTOR else None)
+                                            unsigned_thunk_profile=selector if selector in UNSIGNED_SELECTORS else None)
     verify_pool_calls(calls, words)
     if is_versioned(words) and not switch_relocations:
         raise ValueError(f"{policy_name(words)} requires a complete local switch")
@@ -272,7 +274,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, objec
     fixed_configuration(args)
     preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
     namespace(preprocessed)
-    if selector == UNSIGNED_SELECTOR:
+    if selector in UNSIGNED_SELECTORS:
         from unsigned_thunk_profile import namespace as unsigned_namespace, compiled as unsigned_compiled
         unsigned_namespace(preprocessed)
         unsigned_compiled(runner.read_binary(f"{workspace}/f.s").decode("utf-8"), original, address)
@@ -280,32 +282,36 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, objec
     expected_calls, expected_functions, expected_literals = original_bindings(
         original, address, mapping, rom, objects, switch_relocations=expected_switch, selector=selector)
     functions, switches = {}, {}
-    unsigned = {} if selector in (UMOD_R1_SELECTOR, UNSIGNED_SELECTOR) else None
-    quotient = {} if selector == UNSIGNED_SELECTOR else None
+    unsigned = {} if selector in (UMOD_R1_SELECTOR, *UNSIGNED_SELECTORS) else None
+    quotient = {} if selector in UNSIGNED_SELECTORS else None
     data, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
                                        len(rom), rom, objects, functions, switches, udivsi3_bindings=quotient,
                                        function_thunks=True,
                                        thunk_pool_words=pool_words(selector), umodsi3_bindings=unsigned,
                                        umod_r1_profile=selector if selector == UMOD_R1_SELECTOR else None,
-                                       unsigned_thunk_profile=selector if selector == UNSIGNED_SELECTOR else None)
+                                       unsigned_thunk_profile=selector if selector in UNSIGNED_SELECTORS else None)
     if (calls, functions, literals, switches) != \
             (expected_calls, expected_functions, expected_literals, expected_switch):
         raise ValueError("function-thunk original bindings changed during linking")
     return data, calls, functions, literals
 
 
-def make_manifest(calls, functions, literals, address, rom, objects, instructions, *, pool_switch=None, selector=SELECTOR):
+def make_manifest(calls, functions, literals, address, rom, objects, instructions, *, pool_switch=None, selector=SELECTOR,
+                  frame_proof=None):
     from match import parse_data_symbols, uses_stack_frame, ARM_OP_REG, ARM_REG_PC
     if selector == UMOD_R1_SELECTOR:
         from umod_r1_thunk_profile import make_manifest as composed_manifest
         if pool_switch is not None:
             raise ValueError("UMOD/r1 source admission excludes switches")
         return composed_manifest(calls, functions, literals, address, rom, objects, instructions)
-    if selector == UNSIGNED_SELECTOR:
+    if selector in UNSIGNED_SELECTORS:
         from unsigned_thunk_profile import make_manifest as unsigned_manifest
         if pool_switch is not None:
             raise ValueError("unsigned thunk source admission excludes switches")
-        return unsigned_manifest(calls, functions, literals, address, rom, objects, instructions)
+        return unsigned_manifest(calls, functions, literals, address, rom, objects, instructions,
+                                 selector=selector, frame_proof=frame_proof)
+    if frame_proof is not None:
+        raise ValueError("only the framed unsigned thunk selector binds frame evidence")
     words = pool_words(selector)
     verify_pool_calls(calls, words)
     reverse = {target: name for name, target in ALIASES.items()}
@@ -351,7 +357,7 @@ def verify(data, address, rom, mapping, index, objects, manifest):
         instructions = composed_verify(data, address, rom, mapping, index, objects, manifest)
         verify_own_span_literals(data, address, instructions)
         return instructions
-    if selector == UNSIGNED_SELECTOR:
+    if selector in UNSIGNED_SELECTORS:
         from unsigned_thunk_profile import verify as unsigned_verify
         instructions = unsigned_verify(data, address, rom, mapping, index, objects, manifest)
         verify_own_span_literals(data, address, instructions)
@@ -490,7 +496,12 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                                 manifest["pool_switch"]["layout"]["relocations"]:
                             raise ValueError("pool switch lacks exact original local relocations")
                     instructions = verify(got, address, rom, mapping, index, objects, manifest)
-                    if make_manifest(calls, functions, literals, address, rom, objects, instructions, selector=selector) != manifest:
+                    frame_proof = None
+                    if selector == UNSIGNED_FRAME_SELECTOR:
+                        from unsigned_thunk_profile import prove as unsigned_prove
+                        frame_proof, _ = unsigned_prove(got, address, rom, mapping, index, calls, selector=selector)
+                    if make_manifest(calls, functions, literals, address, rom, objects, instructions, selector=selector,
+                                     frame_proof=frame_proof) != manifest:
                         raise ValueError("function-thunk manifest lacks original-ELF provenance")
                 if got != data:
                     raise ValueError("function-thunk fresh complete bytes differ")

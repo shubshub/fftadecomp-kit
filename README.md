@@ -3175,6 +3175,22 @@ weak symbol other than `func_<addr>`. So an alias such as
 `__attribute__((__alias__("__udiv" "si3")))` cannot borrow a runtime or thunk
 name.
 
+`--function-address-profile unsigned-divmod-thunks-frame-v1` selects
+`elf-symbol-thumb-function-address-thunks-unsigned-divmod-frame-v1`, the same
+composition for a fixed Thumb frame. Its inventory,
+`unsigned-divmod-thunk-ordinary-framed-structural-inventory-v1`, replaces the
+saved-only check with the unchanged `prove_frame` policy without stack aliases:
+constant `sub`/`add sp` adjustments, direct aligned `ldr`/`str [sp, #imm]`
+words inside the allocated frame (locals, and outgoing stack arguments at the
+call), and incoming words only under the existing read-only contracts (word0,
+or contiguous words 0..n-1 for n up to 6, each read). The narrowest contract
+that covers the reads is used. SP materialization, dynamic SP, block transfers,
+writes to incoming or saved words and unbalanced exits are refused. The caller
+needs an allocated local or an incoming read. The manifest carries a
+`stack_frame` record (the fresh frame proof, adjustments and every SP word
+access), and each verification re-proves it. `unsigned-divmod-thunks-v1`
+reports keep their saved-only meaning.
+
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
   swallows the one after it.
