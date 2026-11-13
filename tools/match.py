@@ -4490,6 +4490,7 @@ def main():
                                                       "conditional-nested-known-query-continuation-v1",
                                                       "conditional-finite-local-word-loops-v1",
                                                       "conditional-known-query-stack-buffer-v1",
+                                                      "named-data-buffer-known-query-callee-v1",
                                                       "conditional-finite-spilled-scalar-loops-v1",
                                                       "bounded-buffer-discarded-return-scratch-v1",
                                                       "bounded-buffer-bios-sqrt-scratch-v1",
