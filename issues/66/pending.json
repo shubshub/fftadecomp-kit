@@ -31,6 +31,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c6417e8b022a1f34e64cf27e39ccf15acb2ea530ca493c63cb70ee5eabf35e42",
+        "acknowledged_cursor": 6840378776,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c6417e8b022a1f34e64cf27e39ccf15acb2ea530ca493c63cb70ee5eabf35e42",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08110FE0\",\"who\":\"native-08110fe0\",\"note\":\"Recover complete scheduler caller using authenticated killed-alias profile\"}",
+          "created_at": "2026-11-13T00:47:44Z",
+          "id": 6840378776,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T00:47:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9aac8e1515729d6e549aff56c5e6a0f34888070947ef9ca83ffb7809b8300973",
+        "result": {
+          "address": "0x08110FE0",
+          "claim_id": 6840378776,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6840378776,
+          "status": "accepted",
+          "who": "native-08110fe0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
