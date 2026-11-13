@@ -3266,66 +3266,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "74dc4e4ce3fdfe5017a80d4b563d7a6b91b0fc1c3d82f0fa8c616cf38eeab6c1",
-        "acknowledged_cursor": 6859702556,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "74dc4e4ce3fdfe5017a80d4b563d7a6b91b0fc1c3d82f0fa8c616cf38eeab6c1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E317C\",\"who\":\"astra-affine-array-080e317c\",\"note\":\"Native stack-index qualification and evidence review before natural C matching; no automatic acceptance of unproved runtime premises.\"}",
-          "created_at": "2026-11-13T17:08:16Z",
-          "id": 6859702556,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:08:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3c9878b2ba2cd01b63a0c2aa3bdd0bf083f532a963bacb9e6fe00972bde12d63",
-        "result": {
-          "address": "0x080E317C",
-          "claim_id": 6859702556,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6859702556,
-          "status": "accepted",
-          "who": "astra-affine-array-080e317c"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "bd9ab94a3b82c14f6663775cfa29f464cb86cdbc2fdeedde3f9fa8e0a3be1310",
-        "acknowledged_cursor": 6860025353,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "bd9ab94a3b82c14f6663775cfa29f464cb86cdbc2fdeedde3f9fa8e0a3be1310",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E317C\",\"who\":\"astra-affine-array-080e317c\",\"claim_id\":6859702556,\"reason\":\"User cancelled matching for workflow reassessment; private evidence preserved, no C authored.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T17:22:13Z",
-          "id": 6860025252,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:22:13Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e2b47b8e635cb835e5f0b01cafeff3318dda1ef52404c5d2f49e0c229921a078",
-        "result": {
-          "address": "0x080E317C",
-          "claim_id": 6859702556,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6860025252,
-          "status": "accepted",
-          "who": "astra-affine-array-080e317c"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "ea24f44a463d3cccd8798aabb06bf09b8f02687c3b29199b979e3658838a86f7",
         "acknowledged_cursor": 6859716024,
         "body_provenance": "acceptance-time",
@@ -3381,66 +3321,6 @@
           "request_id": 6860025353,
           "status": "accepted",
           "who": "astra-affine-array-08101a8c"
-        }
-      }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "3ab7a19df2980811c02269c1b0b39fa1ddab22a827845b24e3eefed076fd2f52",
-        "acknowledged_cursor": 6859798895,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3ab7a19df2980811c02269c1b0b39fa1ddab22a827845b24e3eefed076fd2f52",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800CC8C\",\"who\":\"claude-ffta2\",\"note\":\"hand match\"}",
-          "created_at": "2026-11-13T17:12:35Z",
-          "id": 6859798895,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:12:35Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5e80b696a0182c7c5e9d01116d0d780c7c18f7441bb54587b416e4acf0118d26",
-        "result": {
-          "address": "0x0800CC8C",
-          "claim_id": 6859798895,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6859798895,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "e67d08f56a4ffdeb09c71408b91ca73806ea801384408667c8bb58484ce12d98",
-        "acknowledged_cursor": 6860007016,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "e67d08f56a4ffdeb09c71408b91ca73806ea801384408667c8bb58484ce12d98",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800CC8C\",\"who\":\"claude-ffta2\",\"claim_id\":6859798895,\"reason\":\"bytes identical; verifier gap, parked\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T17:21:26Z",
-          "id": 6860007016,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:21:26Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8ff7a99aabbbb665ff97ab2fba842e925b62bca314a72d21a7776e13170c4d76",
-        "result": {
-          "address": "0x0800CC8C",
-          "claim_id": 6859798895,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6860007016,
-          "status": "accepted",
-          "who": "claude-ffta2"
         }
       }
     },
