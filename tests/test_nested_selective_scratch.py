@@ -74,7 +74,7 @@ class NestedSelectiveScratchTests(unittest.TestCase):
     def test_saved_lr_read_through_retained_alias_is_refused(self):
         # offset 8 is the saved-LR slot of the caller frame; the exact-type guard must cover this class
         for access in ('ldr r0, [r3, #8]', 'str r0, [r3, #8]'):
-            with self.subTest(access=access), self.assertRaisesRegex(ValueError, 'access|escape|outside'):
+            with self.subTest(access=access), self.assertRaisesRegex(ValueError, 'outside allocated local words'):
                 self.verify(self.PREFIX + access + '\nmovs r3, #0' + self.SUFFIX, nested.SELECTIVE_SELECTOR)
         self.verify(self.PREFIX + 'ldr r0, [r3, #4]\nmovs r3, #0' + self.SUFFIX, nested.SELECTIVE_SELECTOR)
 

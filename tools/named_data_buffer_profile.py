@@ -162,6 +162,9 @@ class NamedDataBufferProof(match.BufferCallProof):
             return None
         import owner_admission_profile as owner
         refinement = owner.refine(data, address, self.mapping)
+        # owner.refine does not enable two-constant tables, while the delegated
+        # GuardedSwitchBufferProof does. Such callees are unreachable through this
+        # selector: no word switch is seen here, so they take the ordinary path and fail closed.
         return refinement if refinement['word_switches'] else None
 
     def inspect(self, address, data):
