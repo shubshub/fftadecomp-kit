@@ -405,7 +405,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                     if functions:
                         raise ValueError("legacy thunk evidence cannot carry function literals")
                     if buffer_stack_arguments is not None or any(reserved(target) for target in calls.values()):
-                        proof = BufferCallProof(rom, mapping, stack_arguments=buffer_stack_arguments) \
+                        proof = BufferCallProof(rom, mapping, stack_arguments=buffer_stack_arguments,
+                                                loop_replay=True) \
                             if buffer_stack_arguments is not None else None
                         instructions = verify_leaf_instructions(got, address, True, calls, buffer_proof=proof)
                         if proof is not None and (not proof.dependencies or literals or proof.span(address) != got):

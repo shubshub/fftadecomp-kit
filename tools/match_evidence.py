@@ -275,7 +275,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
     try:
         rom = Path(report_rom_path(root)).read_bytes()
         data = bytes.fromhex(encoded[1])
-        proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments)
+        proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments, loop_replay=True)
         if proof.span(address) != data:
             return False
         verdict = f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"
@@ -284,7 +284,9 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
         verify_leaf_instructions(data, address, True, buffer_proof=proof,
                                  call_resolver=proof.target)
         return bool(proof.dependencies) and \
-            fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"]
+            fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and \
+            [line for line in lines if line.startswith("* buffer")
+             and not line.startswith(("* buffer calls:", "* buffer proof SHA-256:"))] == proof.loop_replay_lines()
     except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return False
 
@@ -351,7 +353,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 not buffer_profile and any(line.startswith(
-                    ("* buffer calls:", "* buffer proof SHA-256:")) for line in lines):
+                    ("* buffer calls:", "* buffer proof SHA-256:", "* buffer loop replay")) for line in lines):
             return False
         if buffer_profile and (
                 single("* verification: ") != f"`{FUNCTION_BUFFER_SCHEMA}`" or
@@ -378,7 +380,8 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
             if single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
-                        address, data, manifest, source_digest, functions, proof.fingerprint()):
+                        address, data, manifest, source_digest, functions, proof.fingerprint()) or \
+                    [line for line in lines if line.startswith("* buffer loop replay")] != proof.loop_replay_lines():
                 return False
             control_flow = CALL_SUMMARY
         else:

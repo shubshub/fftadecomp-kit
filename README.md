@@ -896,16 +896,25 @@ or an inspected callee of it, writes anywhere (including its restoring pops) is
 also forgotten. Values in R4-R11 survive uninspected calls only under the
 returning-ABI premise this proof already uses for aliases, so a callee that
 breaks the premise (for example by zeroing a counter and never restoring it) is
-admitted. This is not proved: every un-inspected call target whose R4-R11
+admitted. This is not proved in general: every un-inspected call target whose R4-R11
 survival the replay relied on, and the register, is recorded and bound by the
-fingerprint, and `match.py` prints it when it writes the report. Nothing is widened: if no exact counter bounds the loop, the pointer
+fingerprint, and the report states it in a `* buffer loop replay:` line (one per
+replayed callee) as `proved` or `trusted`. `callee_preservation_profile.py` proves
+R7 and R8 for the callees of `0812E4F4` (`080C7EA4`, `080CA7A4` and its callee
+`080C95A8`) from pinned bytes: no instruction writes them, branches and dispatch
+entries stay inside the callee, and any unpinned call, interrupt or unpinned
+indirect jump refuses. Everything else stays `trusted`. The report check requires exactly the
+lines the recomputed proof states, and none for a proof without a replay.
+Nothing is widened: if no exact counter bounds the loop, the pointer
 keeps moving until a store leaves the buffer, or the replay exhausts its budget
 (4,096 states per callee, 65,536 per proof) and refuses. The per-proof counter
 only increases (states are never refunded) and joined passes, including nested
 ones, are not counted. Different stack depths
 at the same address still refuse.
 
-Replay is opt-in per class and is not inherited: only the plain register and
+Replay is opt-in per class (not inherited) and per construction
+(`loop_replay=True`, passed only by the frame-buffer and function-buffer
+producers and their report checks): only the plain register and
 stack buffer proofs (`BufferCallProof`, `FunctionBufferCallProof`) enable it,
 and not when they carry a discarded-scratch or BIOS-fill policy. Every profile
 subclass keeps the join refusal. Records of the aborted joined pass are

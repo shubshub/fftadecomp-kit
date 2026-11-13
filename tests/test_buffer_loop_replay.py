@@ -85,7 +85,9 @@ class BufferLoopReplayTests(unittest.TestCase):
         rom = (self.root / "baserom.bin").read_bytes()
         self.mapping = json.dumps(entries).encode()
         self.body = rom[:symbols["caller_end"] - BASE]
-        proof = proof_type(rom, self.mapping, stack_arguments=stack_arguments)
+        replay = {"loop_replay": True} if proof_type in (
+            match.BufferCallProof, match.FunctionBufferCallProof) else {}
+        proof = proof_type(rom, self.mapping, stack_arguments=stack_arguments, **replay)
         match.verify_leaf_instructions(self.body, BASE, True,
                                        buffer_proof=proof, call_resolver=proof.target)
         return proof
@@ -317,19 +319,124 @@ class BufferLoopReplayTests(unittest.TestCase):
             proof.check_arguments(BASE + 0x100, {match.ARM_REG_R1: -8},
                                   [(False, False, True)] * 2, {}, frozenset())
 
+    def report_lines(self, proof, *extra, fingerprint=None):
+        return [f"* compiled : `{self.body.hex()}`",
+                f"* buffer calls: {evidence.BUFFER_SUMMARY}",
+                f"* buffer proof SHA-256: `{fingerprint or proof.fingerprint()}`",
+                *extra,
+                f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes"]
+
+    def accepted(self, lines):
+        return evidence.buffer_report_matches(lines, self.root, BASE, self.mapping)
+
     def test_report_replay_refuses_a_tampered_replay_fingerprint(self):
         proof = self.fixture(counted(4), frame=8)
         honest = proof.fingerprint()
+        stated = proof.loop_replay_lines()
+        self.assertTrue(self.accepted(self.report_lines(proof, *stated)))
         proof.loop_replays.clear()
         stale = proof.fingerprint()
-        def lines(fingerprint):
-            return [f"* compiled : `{self.body.hex()}`",
-                    f"* buffer calls: {evidence.BUFFER_SUMMARY}",
-                    f"* buffer proof SHA-256: `{fingerprint}`",
-                    f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes"]
-        self.assertTrue(evidence.buffer_report_matches(lines(honest), self.root, BASE, self.mapping))
-        self.assertFalse(evidence.buffer_report_matches(lines(stale), self.root, BASE, self.mapping))
-        self.assertFalse(evidence.buffer_report_matches(lines("0" * 64), self.root, BASE, self.mapping))
+        self.assertFalse(self.accepted(self.report_lines(proof, *stated, fingerprint=stale)))
+        self.assertFalse(self.accepted(self.report_lines(proof, *stated, fingerprint="0" * 64)))
+        self.assertEqual(honest, self.fixture(counted(4), frame=8).fingerprint())
+
+    def test_report_states_the_replay_and_refuses_a_missing_altered_or_extra_line(self):
+        proof = self.fixture(counted(4), frame=8)
+        (line,) = proof.loop_replay_lines()
+        self.assertRegex(line, r"^\* buffer loop replay: `bounded-loop-replay-v2` callee 0x08000100 "
+                               r"sites 0x[0-9A-F]{8} writes sp\+0:2 sp\+2:2 sp\+4:2 sp\+6:2; "
+                               r"proved none; trusted 0x08000200:r5; pruned edges \d+$")
+        self.assertTrue(self.accepted(self.report_lines(proof, line)))
+        self.assertFalse(self.accepted(self.report_lines(proof)))
+        self.assertFalse(self.accepted(self.report_lines(proof, line.replace("sp+6:2", "sp+8:2"))))
+        self.assertFalse(self.accepted(self.report_lines(proof, line, line)))
+        self.assertFalse(self.accepted(self.report_lines(proof, line, "* buffer unknown: x")))
+        plain = self.fixture("strh r0, [r1]\nmovs r1, #0\nbx lr", frame=8)
+        self.assertEqual(plain.loop_replay_lines(), [])
+        self.assertTrue(self.accepted(self.report_lines(plain)))
+        self.assertFalse(self.accepted(self.report_lines(plain, line)))
+
+    def test_replay_requires_the_explicit_constructor_argument(self):
+        proof = self.fixture(counted(4), frame=8)
+        self.assertTrue(proof.loop_replay)
+        rom = (self.root / "baserom.bin").read_bytes()
+        plain = match.BufferCallProof(rom, self.mapping)
+        self.assertFalse(plain.loop_replay_eligible())
+        with self.assertRaisesRegex(ValueError, "inconsistent possible pointer offsets|inconsistent buffer aliases"):
+            match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=match.BufferCallProof(
+                rom, self.mapping, stack_arguments=True), call_resolver=plain.target)
+
+    def test_only_reviewed_construction_sites_request_replay(self):
+        import ast
+        found = set()
+        for path in sorted((ROOT / "tools").glob("*.py")):
+            tree = ast.parse(path.read_text())
+
+            def visit(node, function):
+                if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                    function = node.name
+                if isinstance(node, ast.Call):
+                    name = getattr(node.func, "attr", getattr(node.func, "id", None))
+                    if name in ("BufferCallProof", "FunctionBufferCallProof"):
+                        replay = {keyword.arg: getattr(keyword.value, "value", None)
+                                  for keyword in node.keywords}.get("loop_replay") is True
+                        found.add((path.name, function, replay))
+                for child in ast.iter_child_nodes(node):
+                    visit(child, function)
+            visit(tree, "<module>")
+        self.assertEqual({site[:2] for site in found if site[2]}, {
+            ("match.py", "verify_function_buffers"), ("match.py", "main"),
+            ("function_thunk_profile.py", "verify_source"),
+            ("match_evidence.py", "buffer_report_matches")})
+        # Producers whose evidence neither states nor binds a replay stay plain.
+        plain = {site[0] for site in found if not site[2]}
+        self.assertTrue({"owner_runtime_profile.py", "match.py"} <= plain)
+
+    def test_pinned_preserving_callee_moves_a_pair_from_trusted_to_proved(self):
+        import hashlib
+        import callee_preservation_profile as preservation
+        proof = self.fixture(counted(4), frame=8)
+        rom = (self.root / "baserom.bin").read_bytes()
+        span = rom[0x200:0x202]
+        self.assertEqual(span, bytes.fromhex("7047"))
+        pin = {BASE + 0x200: (BASE + 0x202, hashlib.sha256(span).hexdigest(), ())}
+        with patch.dict(preservation.PINS, pin, clear=True):
+            self.assertTrue(preservation.preserves_r7_r8(rom, BASE + 0x200))
+            (line,) = proof.loop_replay_lines()
+            self.assertIn("proved none; trusted 0x08000200:r5;", line)  # only r7/r8 can be proved
+            seven = counted(4).replace("push {r4, r5, r6, lr}", "push {r4, r6, r7, lr}") \
+                .replace("pop {r4, r5, r6}", "pop {r4, r6, r7}").replace("r5", "r7")
+            (line,) = self.fixture(seven, frame=8).loop_replay_lines()
+            self.assertIn("proved 0x08000200:r7; trusted none;", line)
+        (line,) = self.fixture(seven, frame=8).loop_replay_lines()
+        self.assertIn("proved none; trusted 0x08000200:r7;", line)
+        with patch.dict(preservation.PINS, pin, clear=True):
+            self.assertFalse(preservation.preserves_r7_r8(rom[:0x200] + b"\x70\x46" + rom[0x202:], BASE + 0x200))
+            for body in ("movs r7, #0\nbx lr", "push {r7, lr}\npop {r7, pc}", "mov r8, r0\nbx lr",
+                         "bl 1f\nbx lr\n1:\nbx lr", "svc 1\nbx lr", "mov pc, r0"):
+                with self.subTest(body=body):
+                    self.fixture(counted(4), frame=8, child=body)
+                    rom = (self.root / "baserom.bin").read_bytes()
+                    entry = json.loads(self.mapping)[2]
+                    child = rom[int(entry["rom"], 16) - BASE:int(entry["end"], 16) - BASE]
+                    pins = {int(entry["rom"], 16): (int(entry["end"], 16),
+                                                    hashlib.sha256(child).hexdigest(), ())}
+                    with patch.dict(preservation.PINS, pins, clear=True):
+                        self.assertFalse(preservation.preserves_r7_r8(rom, int(entry["rom"], 16)))
+
+    def test_real_pinned_callees_are_proved_and_a_changed_byte_is_not(self):
+        import callee_preservation_profile as preservation
+        path = ROOT.parent / "fftadecomp" / "baserom.bin"
+        if not path.exists():
+            self.skipTest("no real ROM next to the kit")
+        rom = path.read_bytes()
+        for address in (0x080C7EA4, 0x080CA7A4):
+            with self.subTest(address=address):
+                self.assertTrue(preservation.preserves_r7_r8(rom, address))
+                offset = address - match.ROM_BASE + 8
+                changed = rom[:offset] + bytes([rom[offset] ^ 1]) + rom[offset + 1:]
+                self.assertFalse(preservation.preserves_r7_r8(changed, address))
+        self.assertFalse(preservation.preserves_r7_r8(rom, 0x0812E4F4))
 
     def test_condition_evaluation_matches_the_arm_definition(self):
         values = (0, 1, 2, 4, 5, 0x7FFFFFFF, 0x80000000, 0xFFFFFFFF)
