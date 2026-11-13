@@ -3550,66 +3550,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "993b0a13cec3ebeef5c6f061d749e5ffdbb111e87c28592b107a7124ee0f351e",
-        "acknowledged_cursor": 6859564080,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "993b0a13cec3ebeef5c6f061d749e5ffdbb111e87c28592b107a7124ee0f351e",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080E6B10\",\"who\":\"astra-affine-array-080e6b10\",\"note\":\"Complete native qualification and natural C matching using merged affine or private-array proof\"}",
-          "created_at": "2026-11-13T17:02:13Z",
-          "id": 6859563294,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:02:13Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a755fd3a9fa0dc8725832ce87ac67d04c8c68841bc87fe90a0f558a849b6cd40",
-        "result": {
-          "address": "0x080E6B10",
-          "claim_id": 6859563294,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6859563294,
-          "status": "accepted",
-          "who": "astra-affine-array-080e6b10"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "bd2fc06b88bbec2272455e6bed94fb3652bd541038cab275266a04a1435d471b",
-        "acknowledged_cursor": 6859618461,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "bd2fc06b88bbec2272455e6bed94fb3652bd541038cab275266a04a1435d471b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E6B10\",\"who\":\"astra-affine-array-080e6b10\",\"claim_id\":6859563294,\"reason\":\"Native private-array qualification refused bounded-buffer pointer use or escape in helper 080DBDA0; no C authored and no match credit. Exact refusal retained.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-13T17:04:30Z",
-          "id": 6859615446,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-13T17:04:30Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "07b7743a1f16d7e15452d41588cc11204338a6f804c4904485245526ad25c4c4",
-        "result": {
-          "address": "0x080E6B10",
-          "claim_id": 6859563294,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6859615446,
-          "status": "accepted",
-          "who": "astra-affine-array-080e6b10"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "73fd5acbb73ca8aa864bd5ee6280d44ae59ac2526bfd734bc5a94380ff778930",
         "acknowledged_cursor": 6859577891,
         "body_provenance": "acceptance-time",
