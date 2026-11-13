@@ -287,6 +287,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "631fbb52ed1de2129920a3f219ef21055cdfeb52036803b9656f7a83804cb0eb",
+        "acknowledged_cursor": 6842218819,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "631fbb52ed1de2129920a3f219ef21055cdfeb52036803b9656f7a83804cb0eb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811B888\",\"who\":\"match-astra-0811B888\",\"note\":\"Bounded natural C recovery of preserved complete 638-byte event handler; prior attempts retained\"}",
+          "created_at": "2026-11-13T02:42:17Z",
+          "id": 6842218819,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:42:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ec864009e02c0ffaaba4ab188ac06c1b4f097f3a79b284ad922af416828bd18b",
+        "result": {
+          "address": "0x0811B888",
+          "claim_id": 6842218819,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6842218819,
+          "status": "accepted",
+          "who": "match-astra-0811B888"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
