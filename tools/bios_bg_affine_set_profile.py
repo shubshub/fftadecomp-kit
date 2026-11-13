@@ -95,3 +95,7 @@ class BgAffineSetProof(buffers.NamedDataBufferProof):
             producer_sha256={Path(module.__file__).name:
                 hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
                 for module in (buffers, __import__(__name__))})
+
+
+class BgAffineSetScratchProof(BgAffineSetProof, buffers.DiscardedReturnScratchProof):
+    """Compose exact local BIOS spans with authenticated scratch nonobservation."""

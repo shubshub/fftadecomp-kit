@@ -3090,6 +3090,15 @@ CLI, forged-report and stale-source replay. These tests confer no game credit.
 
 ### Explicit BIOS BgAffineSet local buffers
 
+`--owner-runtime-profile bounded-buffer-bios-bg-affine-set-discarded-scratch-v1`
+composes the following exact BIOS wrapper and disjoint local-span checks with
+`DiscardedReturnScratchProof`. Ordinary helpers may leave local aliases in
+R2/R3 only when the complete authenticated consumer continuation never reads
+them or calls before a killing write or normal return. R0/R1 return escapes
+still fail. Both the BIOS sites and scratch projections are bound into the
+source-replayed report; this selector requires an actual projection. The
+legacy selector below retains its existing refusal behavior.
+
 `python3 tools/match.py --root <game> --owner-runtime-profile bounded-buffer-bios-bg-affine-set-v1 <address>`
 selects `elf-symbol-thumb-bounded-buffer-bios-bg-affine-set-v1`. The owner is a
 complete named-data Thumb owner whose ordinary calls keep the existing
