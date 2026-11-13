@@ -60,8 +60,10 @@ class BufferIndexTests(unittest.TestCase):
                         for name in ("caller", "callee", "child")]
         self.rom = (self.root / "baserom.bin").read_bytes()
         self.body = self.rom[:symbols["caller_end"] - BASE]
+        replay = {"loop_replay": True} if proof_type in (
+            match.BufferCallProof, match.FunctionBufferCallProof) else {}
         proof = proof_type(self.rom, json.dumps(self.entries).encode(),
-                           stack_arguments=stack_arguments)
+                           stack_arguments=stack_arguments, **replay)
         match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=proof,
                                        call_resolver=proof.target)
         return proof
@@ -228,7 +230,7 @@ class BufferIndexTests(unittest.TestCase):
             f"{(int(entry['end'], 16) - int(entry['rom'], 16)) // 2} return\n"
             for entry in self.entries))
         proof = match.BufferCallProof(self.rom, json.dumps(self.entries).encode(),
-                                      stack_arguments=True)
+                                      stack_arguments=True, loop_replay=True)
         match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=proof,
                                        call_resolver=proof.target)
         report = "\n".join((

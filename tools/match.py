@@ -1914,7 +1914,7 @@ def verify_function_buffers(data, address, rom, mapping, manifest):
     calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest)
     if manifest["data"] or not calls:
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
-    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True)
+    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
     if proof.span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     instructions = verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
@@ -2859,7 +2859,11 @@ class BufferCallProof:
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
-    def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None):
+    def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
+                 loop_replay=False):
+        # Replay is stated in the report (loop_replay_lines) and bound in the fingerprint, so
+        # only producers whose reports carry and check those lines may ask for it.
+        self.loop_replay = loop_replay is True
         if discarded_exit_scratch is not None:
             from local_long_branch_profile import validate_discarded_exit_scratch
             validate_discarded_exit_scratch(discarded_exit_scratch)
@@ -2970,7 +2974,7 @@ class BufferCallProof:
         return instructions, {}
 
     def loop_replay_eligible(self):
-        return type(self).__dict__.get("_loop_replay_opt_in", False) is True and \
+        return self.loop_replay and type(self).__dict__.get("_loop_replay_opt_in", False) is True and \
             not (self.callee_frames or self.word_provenance or self.single_word_stores or
                  self.exact_alias_state_budget is not None or
                  self.discarded_exit_scratch is not None or self.bios_fill_proof is not None)
@@ -3004,6 +3008,9 @@ class BufferCallProof:
         if address in self.active or len(self.active) >= 16:
             raise ValueError("recursive or excessively nested buffer calls are unsupported")
         self.active.add(address)
+        # No entry survives from an earlier pass: an early return below records none.
+        self.callee_clobbers.pop(address, None)
+        self.callee_trusted.pop(address, None)
         try:
             if self.callee_frames and frame_base != -4 * len(stack):
                 raise ValueError("callee frame origin differs from the exact incoming live stack")
@@ -3382,6 +3389,32 @@ class BufferCallProof:
             for register, offset in aliases.items() if register in scratch)
         return {register: offset for register, offset in aliases.items()
                 if register not in scratch}
+
+    def loop_replay_lines(self):
+        """Report lines stating every replayed callee and the premises it relied on."""
+        from callee_preservation_profile import preserves_r7_r8
+        lines = []
+        for callee, records in sorted(self.loop_replays.items()):
+            trusted, pruned, writes = {}, set(), set()
+            for record in records:
+                for target, register in record[3]:
+                    trusted.setdefault(target, set()).add(register - ARM_REG_R0)
+                pruned.update(record[4])
+                writes.update(record[5])
+            proved, assumed = [], []
+            for target, registers in sorted(trusted.items()):
+                held = preserves_r7_r8(self.rom, target)
+                for group, selected in ((proved, [r for r in sorted(registers) if held and r in (7, 8)]),
+                                        (assumed, [r for r in sorted(registers) if not (held and r in (7, 8))])):
+                    if selected:
+                        group.append(f"0x{target:08X}:" + ",".join(f"r{r}" for r in selected))
+            sites = ",".join("none" if site is None else f"0x{site:08X}"
+                             for site in sorted({record[0] for record in records}, key=lambda s: -1 if s is None else s))
+            lines.append(f"* buffer loop replay: `bounded-loop-replay-v2` callee 0x{callee:08X} sites {sites} "
+                         f"writes {' '.join(f'sp{offset:+d}:{width}' for offset, width in sorted(writes))}; "
+                         f"proved {' '.join(proved) or 'none'}; trusted {' '.join(assumed) or 'none'}; "
+                         f"pruned edges {len(pruned)}")
+        return lines
 
     def fingerprint(self):
         digest = hashlib.sha256()
@@ -5048,7 +5081,7 @@ def main():
                                args.switch_data_profile or
                                any(t in RUNTIME_HELPERS.values() for t in calls.values())):
                 raise ValueError("self calls are admitted only on the plain direct-call path")
-            buffer_proof = BufferCallProof(rom, mapping if calls else None)
+            buffer_proof = BufferCallProof(rom, mapping if calls else None, loop_replay=True)
             if thunk_profile:
                 if args.function_address_profile == function_thunk.UMOD_R1_SELECTOR:
                     from umod_r1_thunk_profile import prove
@@ -5234,7 +5267,7 @@ def main():
                 except ValueError:
                     if not thumb or not calls or self_sites:
                         raise
-                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True)
+                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof)
             if args.signed_quotient_profile is not None and quotient_evidence is None:
@@ -5499,13 +5532,8 @@ def main():
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-                for callee, records in sorted(buffer_proof.loop_replays.items()):
-                    for record in sorted(records):
-                        if record[3]:
-                            trusted = ", ".join(f"0x{target:08X}:r{register - ARM_REG_R0}"
-                                                for target, register in record[3])
-                            print(f"note: bounded loop replay of 0x{callee:08X} trusts un-inspected "
-                                  f"calls to preserve (target:register) {trusted}")
+                for line in buffer_proof.loop_replay_lines():
+                    f.write(line + "\n")
             if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
                 f.write(f"* control flow: {control_flow}\n")
