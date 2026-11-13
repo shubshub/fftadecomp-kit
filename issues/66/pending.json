@@ -826,7 +826,35 @@
           "who": "native-astra-0811166c"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ed6c17845bc79297483ff4c7155ab152fc59d69a66e291a483b6042d2dc7a690",
+        "acknowledged_cursor": 6844968853,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ed6c17845bc79297483ff4c7155ab152fc59d69a66e291a483b6042d2dc7a690",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811166C\",\"who\":\"native-astra-0811166c\",\"claim_id\":6844773531,\"reason\":\"Unused lease released while prioritizing publication of the completed nineteen-function batch; no C authored. Full-body qualification preserved.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T05:24:49Z",
+          "id": 6844968853,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T05:24:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ddd8dbb45e4a7fd59b2f788594d62cbd4e28c910a11dc56ecc23b5da88033770",
+        "result": {
+          "address": "0x0811166C",
+          "claim_id": 6844773531,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6844968853,
+          "status": "accepted",
+          "who": "native-astra-0811166c"
+        }
+      }
     }
   ],
   "issue": 66,
