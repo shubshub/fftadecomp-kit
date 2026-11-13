@@ -340,9 +340,10 @@ def selector_for_report(report):
     return ACYCLIC_SELECTOR if f'* verification: `{ACYCLIC_SCHEMA}`' in report.splitlines() else SELECTOR
 
 
-def refine(data, address, mapping):
+def refine(data, address, mapping, *, multiple_switch_profile=None):
     return analyze.refine_function(data, address, json.loads(mapping), max_bytes=len(data),
-            max_instructions=len(data)//2, rom_end=0x09000000, same_owner_long_branches=True)
+            max_instructions=len(data)//2, rom_end=0x09000000, same_owner_long_branches=True,
+            multiple_switch_profile=multiple_switch_profile)
 
 
 def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindings=None,

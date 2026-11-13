@@ -39,7 +39,15 @@ def check_context(selector, relocations, contexts=(), flags=(), pool_words=5):
         raise ValueError('multiple-switch prerequisite requires its isolated explicit context')
 
 
-def layout(data, address, relocations):
+def check_backward_context(selector, flags=()):
+    """Only the explicit multi-switch route may widen table target direction."""
+    if selector is not None and (type(selector) is not str or selector != SELECTOR or
+            any(type(flag) is not bool or flag for flag in flags)):
+        raise ValueError('backward multiple-switch cases require isolated explicit qualification')
+    return selector is not None
+
+
+def layout(data, address, relocations, *, multiple_switch_profile=None):
     """Partition every original local word into a unique existing guarded table.
 
     Table lengths come from matching exact guard/dispatch bytes, never from a
@@ -51,6 +59,7 @@ def layout(data, address, relocations):
             not 4 <= len(relocations) <= len(data)//4 or any(
                 type(at) is not int or type(value) is not int for at, value in relocations.items()):
         raise ValueError('multiple-switch layout requires bounded immutable bytes and local words')
+    backward = check_backward_context(multiple_switch_profile)
     remaining = dict(relocations)
     descriptors = []
     while remaining:
@@ -64,7 +73,7 @@ def layout(data, address, relocations):
                 break
             words = {at: remaining[at] for at in positions}
             try:
-                descriptor = match.switch_layout(data, address, words)
+                descriptor = match.switch_layout(data, address, words, allow_backward_cases=backward)
             except ValueError:
                 continue
             candidates.append(descriptor)
@@ -117,9 +126,9 @@ def verify(original_ELF, linked_ELF, address, rom, mapping, index, *, selector, 
     data = match.linked_function_bytes(original, linked, name, address, calls, targets,
         switch_relocations=relocations, multiple_switch_profile=SELECTOR)
     entries = owner.validate_span(data, address, rom, mapping, index)
-    refinement = owner.refine(data, address, mapping)
-    instructions, edges, branches, actual_calls, words = graph.graph(data, address, refinement)
-    descriptor = layout(data, address, relocations)
+    refinement = owner.refine(data, address, mapping, multiple_switch_profile=selector)
+    instructions, edges, branches, actual_calls, words = graph.graph(data, address, refinement, multiple_switch_profile=selector)
+    descriptor = layout(data, address, relocations, multiple_switch_profile=selector)
     if branches or calls != actual_calls or words != relocations or \
             len(refinement['word_switches']) != len(descriptor['switches']):
         raise ValueError('multiple-switch complete CFG differs from original relocations/calls')
@@ -173,6 +182,7 @@ def verify(original_ELF, linked_ELF, address, rom, mapping, index, *, selector, 
     modules = (analyze, ordinary, frame, match, owner, graph, operations)
     result = dict(schema=SELECTOR, selector=selector, address=address, bytes=len(data),
         instructions=len(instructions), switches=descriptor['switches'],
+        backward_case_policy='explicit multi-switch cases; complete acyclic cross-table CFG',
         local_relocations=sorted(relocations.items()), scalar_words=scalar_words,
         calls=sorted(calls.items()), bindings=sorted(bindings.items()), frame=restored,
         partition=partition, cycles_present=False, original_ET_REL_sha256=_sha(original_ELF),

@@ -16,7 +16,7 @@ from test_typed_switch_outgoing_frame import relocatable as _relocatable
 BASE, CALLEE = 0x08000100, 0x08001000
 
 
-def fixture(count=2, *, call=True, scalar=True, highregs=False, local=False, table_counts=None):
+def fixture(count=2, *, call=True, scalar=True, highregs=False, local=False, table_counts=None, shared_backward=False):
     body, labels, fixups, switches = bytearray(), {}, [], {}
     instructions = 0
     def half(value):
@@ -35,7 +35,7 @@ def fixture(count=2, *, call=True, scalar=True, highregs=False, local=False, tab
         half(0xB500)
     if local: half(0xB081); half(0x9000)
     for n in range(count):
-        entries = table_counts[n] if table_counts is not None else 2
+        entries = table_counts[n] if table_counts is not None else (3 if shared_backward and n else 2)
         label(f'cmp{n}'); half(0x2800 | (entries-1))
         label(f'guard{n}'); emit('bhi', f'default{n}')
         label(f'dispatch{n}'); half(0x0080)
@@ -44,12 +44,16 @@ def fixture(count=2, *, call=True, scalar=True, highregs=False, local=False, tab
         while len(body) % 4: body.extend(bytes(2))
         label(f'pointer{n}'); emit('word', f'table{n}')
         names = [f'case{n}{chr(97+i)}' for i in range(entries)]
+        if shared_backward and n:
+            names[-1] = 'case0a'
         label(f'table{n}')
         for name in names: emit('word', name)
         for number, name in enumerate(names):
+            if shared_backward and n and name == 'case0a':
+                continue
             label(name); half(0x2000 | number)
             if number == 0: label(f'branch{n}a')
-            emit('b', f'join{n}')
+            emit('b', 'epilogue' if shared_backward and n == 0 and number == 0 else f'join{n}')
         label(f'default{n}'); half(0x2002)
         label(f'join{n}')
     calls = []

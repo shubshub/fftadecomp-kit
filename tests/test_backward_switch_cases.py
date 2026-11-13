@@ -316,7 +316,7 @@ def switch_layout_calls(case, operation):
 
 
 class PinnedProfileTests(unittest.TestCase):
-    """Every profile other than the default switches-v1 path keeps the forward rule."""
+    """Default consumers retain the forward rule; explicit multi-switch qualification is separate."""
 
     def setUp(self):
         body, labels = fixture()
@@ -464,7 +464,10 @@ class PinnedProfileTests(unittest.TestCase):
             ("match.py", "verify_leaf_instructions", "allow_backward_cases", "backward_switch_cases"),
             ("match.py", "verify_switches", "allow_backward_cases", "True"),
             ("match.py", "verify_switches", "backward_switch_cases", "True"),
-            ("match.py", "main", "backward_switch_cases", "True")]))
+            ("match.py", "main", "backward_switch_cases", "True"),
+            ("analyze.py", "refinement_word_switch", "allow_backward_cases", "backward"),
+            ("multiple_switch_owner_prerequisite.py", "layout", "allow_backward_cases", "backward"),
+            ("owner_graph_profile.py", "graph", "allow_backward_cases", "backward")]))
 
     def test_exact_opt_in_calls_in_the_two_verifiers(self):
         counts = {}
@@ -474,11 +477,14 @@ class PinnedProfileTests(unittest.TestCase):
                 opted = any(keyword.arg == "allow_backward_cases" for keyword in parent.keywords)
                 counts[(function, opted)] = counts.get((function, opted), 0) + 1
         self.assertEqual(counts, {("selected_switch_layout", True): 1, ("verify_switches", True): 1})
-        # Every other switch_layout call, including every profile, keeps the default.
+        # Other than the three isolated qualified multi-switch calls, defaults stay forward-only.
         for file, function, kind, name, parent in self.references():
             if name == "switch_layout" and kind == "call" and \
                     (file, function) not in (("match.py", "selected_switch_layout"),
-                                             ("match.py", "verify_switches")):
+                                             ("match.py", "verify_switches"),
+                                             ("analyze.py", "refinement_word_switch"),
+                                             ("multiple_switch_owner_prerequisite.py", "layout"),
+                                             ("owner_graph_profile.py", "graph")):
                 with self.subTest(file=file, function=function, line=parent.lineno):
                     self.assertFalse(any(keyword.arg in self.OPT_IN for keyword in parent.keywords))
 

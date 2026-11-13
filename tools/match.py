@@ -1949,7 +1949,7 @@ def selected_switch_layout(data, address, relocations, data_relocations=None,
         from multiple_switch_owner_prerequisite import check_context, layout
         check_context(multiple_switch_profile, relocations, (data_relocations,),
             (allow_preloaded_switch, allow_switch_constants), 5)
-        return layout(data, address, relocations)
+        return layout(data, address, relocations, multiple_switch_profile=multiple_switch_profile)
     from switch_constants_profile import check_opt_in, layout
     check_opt_in(allow_switch_constants, relocations, data_relocations, allow_preloaded_switch)
     if allow_switch_constants:
