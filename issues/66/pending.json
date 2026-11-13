@@ -318,7 +318,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "85dc0ce029d820d10affcce675d893b21b6f7f3694dcab7064e55f35f1834827",
+        "acknowledged_cursor": 6867468409,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "85dc0ce029d820d10affcce675d893b21b6f7f3694dcab7064e55f35f1834827",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810FAF8\",\"who\":\"claude-ffta2\",\"claim_id\":6847561668,\"reason\":\"parked: NOW BYTE-IDENTICAL (permuter+hand: u8 *second = &colors[1] pointer local in case 0). Needs data_083A2DF4. Refused: 'buffer callee 0x080035A8: buffer c\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:24:24Z",
+          "id": 6867466062,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:24:24Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1f75f062d7017dce0663e417b5543bf484fc98fb6118ae9d6601d31667532aef",
+        "result": {
+          "address": "0x0810FAF8",
+          "claim_id": 6847561668,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867466062,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1914,7 +1942,35 @@
           "who": "astra-xhigh-dff8c-live"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "975f8bddbea809f6cb7ea0acfad8fa99d57c7a6caa17221a3ed54d81137fefc3",
+        "acknowledged_cursor": 6867468409,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "975f8bddbea809f6cb7ea0acfad8fa99d57c7a6caa17221a3ed54d81137fefc3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFF8C\",\"who\":\"astra-xhigh-dff8c-live\",\"claim_id\":6867239446,\"reason\":\"Plausible complete 690-byte reconstruction reaches 686/690 exact bytes; only factor load/multiply register r1 vs r2 differs at 080E0126/128 and 080E014E/150; retained direct-astra/080DFF8C\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; 23 typed/default/narrowing/fixed-point/scalar-helper formulations\"}",
+          "created_at": "2026-11-13T23:24:32Z",
+          "id": 6867468409,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:24:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1f75f062d7017dce0663e417b5543bf484fc98fb6118ae9d6601d31667532aef",
+        "result": {
+          "address": "0x080DFF8C",
+          "claim_id": 6867239446,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6867468409,
+          "status": "accepted",
+          "who": "astra-xhigh-dff8c-live"
+        }
+      }
     },
     {
       "claim": {

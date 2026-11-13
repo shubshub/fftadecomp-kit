@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ce9842066ca4e8dbc0c2caa2d311395abb5c4296cda19c0162accf54e29f3b88",
+    "acknowledged_cursor": 6867241610,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ce9842066ca4e8dbc0c2caa2d311395abb5c4296cda19c0162accf54e29f3b88",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"astra-xhigh-dff8c-live\",\"note\":\"Native Astra xhigh recovery of 690-byte two-channel curve sampling state machine; no tooling edits\"}",
+      "created_at": "2026-11-13T23:10:37Z",
+      "id": 6867239446,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:10:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c1bcfdfa4957af78f8c4c2c4a34e3d97f48eabc14dfce674e7c342f1a59bddfc",
+    "result": {
+      "address": "0x080DFF8C",
+      "claim_id": 6867239446,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6867239446,
+      "status": "accepted",
+      "who": "astra-xhigh-dff8c-live"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "975f8bddbea809f6cb7ea0acfad8fa99d57c7a6caa17221a3ed54d81137fefc3",
+    "acknowledged_cursor": 6867468409,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "975f8bddbea809f6cb7ea0acfad8fa99d57c7a6caa17221a3ed54d81137fefc3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFF8C\",\"who\":\"astra-xhigh-dff8c-live\",\"claim_id\":6867239446,\"reason\":\"Plausible complete 690-byte reconstruction reaches 686/690 exact bytes; only factor load/multiply register r1 vs r2 differs at 080E0126/128 and 080E014E/150; retained direct-astra/080DFF8C\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; 23 typed/default/narrowing/fixed-point/scalar-helper formulations\"}",
+      "created_at": "2026-11-13T23:24:32Z",
+      "id": 6867468409,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T23:24:32Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1f75f062d7017dce0663e417b5543bf484fc98fb6118ae9d6601d31667532aef",
+    "result": {
+      "address": "0x080DFF8C",
+      "claim_id": 6867239446,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6867468409,
+      "status": "accepted",
+      "who": "astra-xhigh-dff8c-live"
+    }
+  }
+}
