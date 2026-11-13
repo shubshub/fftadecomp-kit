@@ -3260,6 +3260,61 @@ C with a retained original ET_REL object; a dependency is the exact read-only
 original switch body. This test proves verifier capability, not authorship or
 admission of any actual game owner.
 
+### Division runtimes as leaf summaries in buffer walks
+
+`--owner-runtime-profile bounded-buffer-runtime-summaries-v1` is
+`named-data-buffer-v1` with one change: a direct Thumb BL to the exact entry of
+`__divsi3` (0x081426B8), `__modsi3` (0x08142950), `__udivsi3` (0x08142AB0) or
+`__umodsi3` (0x08142B28) is a summarised leaf call, in the root and in every
+inspected buffer callee. `bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1`
+adds the same summary to `bounded-buffer-bios-mixed-fast-fill-source-v1`.
+Their schemas are `elf-symbol-thumb-bounded-buffer-runtime-summaries-v1` and
+`elf-symbol-thumb-bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1`.
+Named data is optional; function literals and switches are refused.
+
+What each run proves, for every runtime family actually called:
+
+* the SHA-256-pinned spans of the runtime and of the shared `__div0` hook
+  (0x0814274C, a bare `mov pc, lr`), mapped exactly and uniquely as Thumb;
+* through the existing native ABI interpreter: every reachable path,
+  including divide-by-zero, returns to the entry LR with R4-R11 and SP
+  restored; the only call is BL `__div0`; there are no external writes or
+  incoming stack reads;
+* no instruction has a memory operand or is a block transfer, so the
+  runtime's own balanced PUSH/POP is its only memory traffic;
+* R2, R3 and R12 are never read before they are written, and a caller's
+  R4-R11 or LR is read only to save it (each pushed word keeps its
+  provenance, so popping it back does not make it runtime data), so the
+  result depends only on R0 and R1; the walk also records which of them are written
+  on every path to every return (for the pinned bytes, only R3 of
+  `__modsi3`; the divide-by-zero paths leave the others unchanged).
+
+The caller walk applies the summary: R0 is an unconstrained scalar; R1-R3, R12,
+LR and the flags are clobbered and every fact about them is dropped. The caller
+frame, its pointer slots and aliases in R4-R11 are untouched. A tracked
+local pointer in R0, R1 or LR at the call is refused. A dead pointer in R2, R3
+or R12 is refused too, unless that register is written on every path to every
+return; only then is it discarded, and the report lists each discard. No constant, range
+or alias leaves the call, so a quotient used as a buffer index fails the
+existing constant-index rules. Other runtime contexts, thunks and self-calls
+cannot be combined with the summary.
+
+A source may spell a call as the compiler emits it (`a / b`) or as the exact
+addressed entry (`func_08142950(a, b)`). The original ELF relocation name is
+bound per site, and a name that does not resolve to that site's entry is
+refused. The four compiler names are reserved in preprocessed source. The
+report's `runtime_summaries` record lists every site, every discarded scratch
+alias, the component hashes, the contract and the producer hashes. It states
+no numeric quotient, remainder or range, no definedness of C division by
+zero, and no termination (partial correctness only). The existing division
+schemas (`divsi3-positive-constant`, `udivsi3`, `modsi3-s16`, `umodsi3-constant`,
+the addressed and compiler runtime selectors) are unchanged.
+
+Focused checks: `FFTA_ROM=<approved ROM> python -m unittest test_runtime_summary_profile`
+from `tests/`. They include the attack cases: a pointer operand, altered runtime
+bytes or spans, interior targets, wrong call names and a quotient used as an
+index.
+
 ### Explicit BIOS word-switch local buffers
 
 `python3 tools/match.py --root <game> --owner-runtime-profile bios-word-switch-local-buffers-v1 <address>`
