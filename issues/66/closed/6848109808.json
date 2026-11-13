@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8893422380a0791d5f372f3a3263928b39cf7d191889558018eaa606ca44ffbb",
+    "acknowledged_cursor": 6848109808,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8893422380a0791d5f372f3a3263928b39cf7d191889558018eaa606ca44ffbb",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080241B4\",\"who\":\"astra-bios-state-switch\",\"note\":\"Native whole-owner qualification passed: 1064 bytes, 329 instructions; reconstruct complete plausible C with explicit BIOS word-switch local-buffer profile\"}",
+      "created_at": "2026-11-13T08:35:40Z",
+      "id": 6848109808,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T08:35:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "04f44c3d6d1799bf4be794894059a6ba81d258854d07c552bff6829cba17aefb",
+    "result": {
+      "address": "0x080241B4",
+      "claim_id": 6848109808,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6848109808,
+      "status": "accepted",
+      "who": "astra-bios-state-switch"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "65f3de90434b63d411fd2b56b4e766061bfbf0d1961aae4b6e40e3a470b0c57f",
+    "acknowledged_cursor": 6848617003,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "65f3de90434b63d411fd2b56b4e766061bfbf0d1961aae4b6e40e3a470b0c57f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080241B4\",\"who\":\"astra-bios-state-switch\",\"claim_id\":6848109808,\"reason\":\"Six grounded complete-body formulations; best 1064-byte body differs only in operand registers at 08024304 and 0802430A. Native admission failed. Candidate and exact diagnostics retained privately.\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; six natural control-expression and return formulations\"}",
+      "created_at": "2026-11-13T09:02:22Z",
+      "id": 6848616857,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-13T09:02:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "06561beee630008fcbe16304a644d9caded769a12081241a031ae6248a3ab758",
+    "result": {
+      "address": "0x080241B4",
+      "claim_id": 6848109808,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6848616857,
+      "status": "accepted",
+      "who": "astra-bios-state-switch"
+    }
+  }
+}
