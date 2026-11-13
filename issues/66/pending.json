@@ -442,7 +442,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ec97e1ead537b8f9548dc322379a055578ffad97551bb894e86d1743e36870dd",
+        "acknowledged_cursor": 6867406419,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ec97e1ead537b8f9548dc322379a055578ffad97551bb894e86d1743e36870dd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D74E0\",\"who\":\"claude-ffta2\",\"claim_id\":6846920328,\"reason\":\"parked:  0x080D74E0: parked (two ROM-table copies via func_081443FC; kit 135 family)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-13T23:20:47Z",
+          "id": 6867406419,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T23:20:47Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a7509062d9939c5488ca0605b05f51317d0a28dcfe39d56c16cc9053ac2f1bf",
+        "result": {
+          "address": "0x080D74E0",
+          "claim_id": 6846920328,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6867406419,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
