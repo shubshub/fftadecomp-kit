@@ -3423,6 +3423,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d192f5312b85dcd512ed3790ddbdd1c4cdc200cfb08cbaa03bc8ed0808f16aa3",
+        "acknowledged_cursor": 6861845606,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d192f5312b85dcd512ed3790ddbdd1c4cdc200cfb08cbaa03bc8ed0808f16aa3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08042774\",\"who\":\"astra-xhigh-08042774\",\"note\":\"Recover complete 1020-byte page navigation from retained 1010-byte near-match with native Astra xhigh\"}",
+          "created_at": "2026-11-13T18:42:44Z",
+          "id": 6861845606,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T18:42:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e2c141f71f5f16b516dc2cf45d72a4ea8434adcd35dbdbf430b6ca07d5373b2c",
+        "result": {
+          "address": "0x08042774",
+          "claim_id": 6861845606,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6861845606,
+          "status": "accepted",
+          "who": "astra-xhigh-08042774"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
