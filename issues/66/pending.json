@@ -315,6 +315,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "34c043c4b282a9d0745b0d4a936a586e3ac4485e033233d5513f419f8b873047",
+        "acknowledged_cursor": 6841944636,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "34c043c4b282a9d0745b0d4a936a586e3ac4485e033233d5513f419f8b873047",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811C018\",\"who\":\"match-astra-0811C018\",\"note\":\"Native Astra bounded revisit of retained plausible state machine; prior residual is one constant-load register copy.\"}",
+          "created_at": "2026-11-13T02:24:06Z",
+          "id": 6841944636,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-13T02:24:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8e9493c7c19c26b205afc6cc7a17152924f130399b8553d6fa87942878c75fd4",
+        "result": {
+          "address": "0x0811C018",
+          "claim_id": 6841944636,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6841944636,
+          "status": "accepted",
+          "who": "match-astra-0811C018"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
