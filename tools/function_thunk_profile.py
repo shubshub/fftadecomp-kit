@@ -18,26 +18,32 @@ SCHEMA = "elf-symbol-thumb-function-address-thunks-v1"
 SELECTOR = "canonical-thunks-v1"
 ZERO_SELECTOR = "canonical-thunks-zero-word-pool-v1"
 ZERO_SCHEMA = "elf-symbol-thumb-function-address-thunks-zero-pool-v1"
+INTERPOSED_SELECTOR = "canonical-thunks-interposed-pool-v1"
+INTERPOSED_SCHEMA = "elf-symbol-thumb-function-address-thunks-interposed-pool-v1"
 from umod_r1_thunk_profile import SELECTOR as UMOD_R1_SELECTOR, SCHEMA as UMOD_R1_SCHEMA
+from thunk_pool_switch import INTERPOSED
 
-SELECTORS = (SELECTOR, ZERO_SELECTOR, UMOD_R1_SELECTOR)
+SELECTORS = (SELECTOR, ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR)
+# Selectors whose manifests carry their selector and producer-source digests.
+VERSIONED_POOLS = {ZERO_SELECTOR: 0, INTERPOSED_SELECTOR: INTERPOSED}
 
 
 def pool_words(selector):
-    if selector not in SELECTORS:
+    if type(selector) is not str or selector not in SELECTORS:
         raise ValueError("unsupported canonical-thunk selector")
-    return 0 if selector == ZERO_SELECTOR else 5
+    return VERSIONED_POOLS.get(selector, 5)
 
 
 def schema_for(selector):
     pool_words(selector)
-    return UMOD_R1_SCHEMA if selector == UMOD_R1_SELECTOR else ZERO_SCHEMA if selector == ZERO_SELECTOR else SCHEMA
+    return {UMOD_R1_SELECTOR: UMOD_R1_SCHEMA, ZERO_SELECTOR: ZERO_SCHEMA,
+            INTERPOSED_SELECTOR: INTERPOSED_SCHEMA}.get(selector, SCHEMA)
 
 
 def selector_from_manifest(manifest):
     selector = manifest.get("selector", SELECTOR)
     pool_words(selector)
-    if "selector" in manifest and selector not in (ZERO_SELECTOR, UMOD_R1_SELECTOR):
+    if "selector" in manifest and selector not in (ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR):
         raise ValueError("legacy thunk evidence cannot carry an alternate pool policy")
     return selector
 
@@ -49,19 +55,21 @@ def producer_sources():
 
 def context_words(context):
     if context is not None and "interposed_words" in context:
-        if type(context["interposed_words"]) is not int or context["interposed_words"] != 0:
-            raise ValueError("explicit zero-pool context requires the exact integer zero")
-        return 0
+        words = context["interposed_words"]
+        if not (type(words) is int and words == 0 or type(words) is str and words == INTERPOSED):
+            raise ValueError("explicit pool context requires the exact integer zero or the interposed policy")
+        return words
     return 5
 
 
 def check_pool_opt_in(words, function_thunks):
-    if type(words) is not int or words not in (0, 5) or words == 0 and function_thunks is not True:
+    if not (type(words) is int and words in (0, 5) or type(words) is str and words == INTERPOSED) or \
+            words != 5 and function_thunks is not True:
         raise ValueError("zero-pool linking requires its explicit canonical-thunk context")
 
 
 def verify_pool_calls(calls, words):
-    if type(words) is not int or words not in (0, 5):
+    if not (type(words) is int and words in (0, 5) or type(words) is str and words == INTERPOSED):
         raise ValueError("unsupported canonical-thunk pool policy")
     if words == 0 and {target for target in calls.values() if reserved(target)} != {ALIASES["_call_via_r3"]}:
         raise ValueError("zero-pool selector requires only canonical R3 thunks and ordinary calls")
@@ -212,7 +220,7 @@ def original_bindings(image, address, mapping, rom, objects, *, switch_relocatio
                                             function_thunks=True, thunk_pool_words=words, umodsi3_bindings=unsigned,
                                             umod_r1_profile=selector if unsigned is not None else None)
     verify_pool_calls(calls, words)
-    if words == 0 and not switch_relocations:
+    if words != 5 and not switch_relocations:
         raise ValueError("zero-pool selector requires a complete local switch")
     if not any(name in ALIASES for name in targets):
         raise ValueError("function thunks require canonical calls")
@@ -276,7 +284,7 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
         if pool_switch is None:
             pool_switch = discover(body, address, instructions, interposed_words=words)
         manifest['pool_switch'] = record(body, address, pool_switch, instructions, interposed_words=words)
-    if words == 0:
+    if words != 5:
         if 'pool_switch' not in manifest:
             raise ValueError("zero-pool selector requires a complete local switch")
         manifest["selector"] = selector
@@ -295,13 +303,13 @@ def verify(data, address, rom, mapping, index, objects, manifest):
         from umod_r1_thunk_profile import verify as composed_verify
         return composed_verify(data, address, rom, mapping, index, objects, manifest)
     words = pool_words(selector)
-    allowed = (keys | {"pool_switch", "selector", "producer_source_sha256"},) if words == 0 else (keys, keys | {'pool_switch'})
+    allowed = (keys | {"pool_switch", "selector", "producer_source_sha256"},) if words != 5 else (keys, keys | {'pool_switch'})
     if set(manifest) not in allowed or manifest["runtime"] != RUNTIME or \
             manifest["abi"] != ABI or type(manifest["frame"]) is not bool or \
             any(type(manifest[name]) is not list for name in keys - {"runtime", "abi", "frame"}) or \
             not manifest["thunks"]:
         raise ValueError("invalid function-thunk manifest")
-    if words == 0 and manifest["producer_source_sha256"] != producer_sources():
+    if words != 5 and manifest["producer_source_sha256"] != producer_sources():
         raise ValueError("zero-pool producer source bytes differ")
     ordinary = {name: manifest[name] for name in ("calls", "functions", "data")}
     calls, literals = function_address_bindings(
@@ -340,8 +348,8 @@ def verify(data, address, rom, mapping, index, objects, manifest):
         decoder.detail = True
         relocations = discover(data, address, list(decoder.disasm(data, address)), interposed_words=words)
         context['pool_switch'] = relocations
-        if words == 0:
-            context['interposed_words'] = 0
+        if words != 5:
+            context['interposed_words'] = words
     instructions = verify_leaf_instructions(data, address, True, calls, function_thunk_context=context)
     if not context:
         from match import ARM_OP_REG, ARM_REG_PC
