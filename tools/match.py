@@ -2785,7 +2785,7 @@ def loop_replay_transfer(instruction, known, flags):
     """
     read, written = instruction.regs_access()
     operands = instruction.operands
-    call = CS_GRP_CALL in instruction.groups
+    call = CS_GRP_CALL in instruction.groups or CS_GRP_INT in instruction.groups
     unconditional = instruction.cc in (ARM_CC_AL, ARM_CC_INVALID)
     value = None
     if instruction.size == 2 and unconditional and operands and \
@@ -2878,6 +2878,8 @@ class BufferCallProof:
         self.stack_arguments = stack_arguments
         self.loop_replays = {}
         self.loop_replay_states = 0
+        # R4-R11 an inspected callee (or an inspected callee of it) may write.
+        self.callee_clobbers = {}
 
     def target(self, address):
         if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or ashldi3.reserved(address) or software_double.reserved(address) or software_float.reserved(address):
@@ -2958,15 +2960,28 @@ class BufferCallProof:
                                                 call_resolver=self.target)
         return instructions, {}
 
+    loop_replay = True
+
     def loop_replay_eligible(self):
-        return not (self.callee_frames or self.word_provenance or self.single_word_stores or
-                    self.exact_alias_state_budget is not None)
+        # Opt-in per class: a subclass does not inherit replay, because its own
+        # hooks and ledgers have not been reviewed against per-state exploration.
+        return type(self).__dict__.get("loop_replay", False) is True and \
+            not (self.callee_frames or self.word_provenance or self.single_word_stores or
+                 self.exact_alias_state_budget is not None or
+                 self.discarded_exit_scratch is not None or self.bios_fill_proof is not None)
 
     def check_arguments(self, address, arguments, stack, incoming, protected, **context):
+        snapshot = ({callee: set(records) for callee, records in self.loop_replays.items()},
+                    dict(self.dependencies), dict(self.callee_clobbers))
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
         except _LoopReplayRequired:
+            # Records of the aborted joined pass never enter the evidence.
+            for ledger, saved in zip((self.loop_replays, self.dependencies, self.callee_clobbers),
+                                     snapshot):
+                ledger.clear()
+                ledger.update(saved)
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=True, **context)
 
@@ -2990,6 +3005,9 @@ class BufferCallProof:
             instructions, finite_transfers = self.inspect(address, data)
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
+            callee_saved = range(ARM_REG_R0 + 4, ARM_REG_R0 + 12)
+            clobbered = {register for instruction in instructions
+                         for register in instruction.regs_access()[1] if register in callee_saved}
             states = {address: (tuple(sorted(arguments.items())), 0,
                                 tuple(sorted((constants or {}).items())),
                                 tuple(sorted((words or {}).items())))}
@@ -3082,6 +3100,13 @@ class BufferCallProof:
                         constants.pop(register, None)
                     self.finish_call_constants(constants, result, site=current, target=operands[0].imm)
                     aliases.update(result)
+                    # An inspected callee's own writes to R4-R11 are not trusted
+                    # to be restored; uninspected calls keep the ABI premise.
+                    nested_clobbers = self.callee_clobbers.get(operands[0].imm, ())
+                    clobbered.update(nested_clobbers)
+                    if replay:
+                        next_known = tuple((register, value) for register, value in next_known
+                                           if register not in nested_clobbers)
                 elif self.single_word_stores and self.apply_single_store(
                         instruction, aliases, constants, stack, words, root_frame=root_frame,
                         context={'address':address, 'call_site':site, 'frame_base':frame_base,
@@ -3307,6 +3332,7 @@ class BufferCallProof:
                 self.complete_frame(address, data, instructions)
             if path_states is not None:
                 return self.alternative_result([exact_returns[key] for key in sorted(exact_returns)])
+            self.callee_clobbers[address] = frozenset(clobbered)
             if replay:
                 self.loop_replays.setdefault(address, set()).add(
                     (site, tuple(sorted(arguments.items())), tuple(sorted(incoming.items())),
@@ -3362,6 +3388,8 @@ class BufferCallProof:
 
 
 class FunctionBufferCallProof(BufferCallProof):
+    loop_replay = True
+
     def target(self, address):
         if address in RUNTIME_HELPERS.values():
             raise ValueError("function-buffer evidence excludes runtime call thunks in inspected dependencies")

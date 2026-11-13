@@ -886,20 +886,26 @@ Loops end only through exact facts. The replay tracks R0-R12 values produced by
 unconditional 16-bit `mov`, `add` and `sub` of known values and immediates (32-bit
 wrap), and the operand pair of the last `cmp` whose operands are both known.
 A conditional branch with known flags follows only its taken or fallthrough
-side. Any other write forgets the register; any other flag-setting instruction
-or call forgets the flags; a call forgets R0-R3, R12 and LR. Values in R4-R11
-survive calls under the returning-ABI premise this proof already uses for
-aliases. Nothing is widened: if no exact counter bounds the loop, the pointer
+side. Any other write forgets the register; any other flag-setting instruction,
+call or software interrupt forgets the flags; a call forgets R0-R3, R12 and LR.
+After a call to an inspected buffer callee, every R4-R11 register that callee,
+or an inspected callee of it, writes anywhere (including its restoring pops) is
+also forgotten. Values in R4-R11 survive uninspected calls only under the
+returning-ABI premise this proof already uses for aliases. Nothing is widened: if no exact counter bounds the loop, the pointer
 keeps moving until a store leaves the buffer, or the replay exhausts its budget
 (4,096 states per callee, 65,536 per proof) and refuses. Different stack depths
 at the same address still refuse.
 
-The replay applies only to the plain buffer proofs. Profiles with callee frames,
-word provenance, single-word stores or exact alternatives keep the join
-refusal. Only replayed callees change the evidence: the buffer proof fingerprint
-then also binds each replayed callee's call site, argument offsets and the exact
-set of caller-frame bytes it may write, so report replay recomputes it. Proofs
-without a replay keep their previous fingerprint.
+Replay is opt-in per class and is not inherited: only the plain register and
+stack buffer proofs (`BufferCallProof`, `FunctionBufferCallProof`) enable it,
+and not when they carry a discarded-scratch or BIOS-fill policy. Every profile
+subclass keeps the join refusal. Records of the aborted joined pass are
+discarded before the replay. Only replayed callees change the evidence: the
+buffer proof fingerprint then also binds each replayed callee's call site,
+argument offsets and the exact set of caller-frame bytes written by its own
+stores (stores of nested callees that are not replayed are checked but not
+listed), so report replay recomputes it. Proofs without a replay keep their
+previous fingerprint.
 
 The ROM bounds a loop's trip count, not the data that decides each iteration.
 `0812E4F4` runs five iterations and may store up to five halfwords
