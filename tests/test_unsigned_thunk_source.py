@@ -365,13 +365,53 @@ class UnsignedThunkSourceTests(unittest.TestCase):
             with self.subTest(source=source), self.assertRaises(ValueError):
                 profile.namespace(source)
 
+    def test_alias_and_weak_attributes_refuse_in_any_spelling(self):
+        for source in (CLEAN + 'unsigned weak, alias;\n',
+                       CLEAN + 'extern void g(void) __attribute__((noreturn));\n'):
+            profile.namespace(source)
+        for source in (
+                'extern unsigned my_div(unsigned, unsigned) __attribute__((__alias__("__udiv" "si3")));\n'
+                'unsigned f(unsigned x) { return (unsigned short)my_div(x, 10u); }\n',
+                'extern unsigned my_mod(unsigned, unsigned) __attribute ((alias ("__umod" "si3")));\n',
+                'extern void forged(void) __attribute((__alias__("_call_" "via_r3")));\nvoid f(void) { forged(); }\n',
+                'extern void forged(void) __attribute__((_alias("_call_" "via_r2")));\n',
+                'extern unsigned my_div(unsigned, unsigned) __attribute__((weak));\n',
+                'extern unsigned my_div(unsigned, unsigned) __attribute__((noreturn, __weak__));\n',
+                'extern unsigned my_div(unsigned, unsigned) __attribute((_weak_));\n'):
+            with self.subTest(source=source), self.assertRaises(ValueError):
+                profile.namespace(source)
+
+    def test_compiler_assembly_and_object_cannot_alias_or_export(self):
+        original, _ = self.images()
+        clean = f'\t.code\t16\n\t.globl\t{NAME}\n\t.thumb_func\n{NAME}:\n\tbl\t__udivsi3\n'
+        profile.compiled(clean, original, A)
+        for line in ('\t.thumb_set my_div,__udivsi3', '\t.thumb_set forged,_call_via_r3',
+                     '\t.set my_div,__udivsi3', '\t.equ my_div,0x08142AB1', '\t.equiv my_div,__umodsi3',
+                     '\t.eqv my_div,__udivsi3', '\t.weak my_div', '\t.weakref my_div,__udivsi3',
+                     'label: .set my_div,__udivsi3'):
+            with self.subTest(line=line), self.assertRaises(ValueError):
+                profile.compiled(clean + line + '\n', original, A)
+        for extra in (dict(name='my_div', value=0x51, size=4, type=2, bind=1, section=1),
+                      dict(name='my_div', value=0x08142AB1, size=0, type=2, bind=1, section=0xfff1),
+                      dict(name='my_div', value=0x51, size=4, type=2, bind=2, section=1)):
+            bad = copy.deepcopy(original)
+            bad['symbols'].append(extra)
+            with self.subTest(symbol=extra), self.assertRaises(ValueError):
+                profile.compiled(clean, bad, A)
+        bad = copy.deepcopy(original)
+        bad['symbols'][0]['bind'] = 0
+        with self.assertRaises(ValueError):
+            profile.compiled(clean, bad, A)
+
     def test_source_replay_applies_the_namespace_before_linking(self):
         class Runner:
-            def __init__(self, text):
-                self.text = text
+            def __init__(self, text, assembly=f'\t.globl\t{NAME}\n{NAME}:\n'):
+                self.text, self.assembly = text, assembly
             def read_binary(self, path):
                 if path.endswith('/f.i'):
                     return self.text.encode()
+                if path.endswith('/f.s'):
+                    return self.assembly.encode()
                 raise AssertionError('unexpected read')
         original, _ = self.images()
         args = match.argparse.Namespace(cc=match.DEFAULT_CC, cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
@@ -384,6 +424,22 @@ class UnsignedThunkSourceTests(unittest.TestCase):
                                         self.objects, selector=selector)
             link.assert_not_called()
         literals = self.literals
+        # The C spelling is irrelevant to the assembly and object checks.  An
+        # otherwise admissible link is mocked, so only those checks can refuse.
+        exported = copy.deepcopy(original)
+        exported['symbols'].append(dict(name='my_div', value=0x51, size=4, type=2, bind=1, section=1))
+        with patch.object(match, 'link_calls', return_value=(self.body, self.calls, literals)) as link, \
+                patch.object(thunks, 'original_bindings', return_value=(self.calls, {}, literals)):
+            for assembly, image in ((f'\t.globl\tmy_div\n\t.thumb_set my_div,__udivsi3\n\t.globl\t{NAME}\n', original),
+                                    (f'\t.globl\tforged\n\t.thumb_set forged,_call_via_r3\n\t.globl\t{NAME}\n', original),
+                                    (f'\t.globl\t{NAME}\n{NAME}:\n', exported)):
+                with self.subTest(assembly=assembly), self.assertRaises(ValueError):
+                    thunks.object_bytes(Runner(CLEAN, assembly), '/w', args, image, A, self.mapping,
+                                        self.rom, self.objects, selector=profile.SELECTOR)
+            link.assert_not_called()
+            self.assertEqual(thunks.object_bytes(Runner(CLEAN), '/w', args, original, A, self.mapping, self.rom,
+                                                 self.objects, selector=profile.SELECTOR),
+                             (self.body, self.calls, {}, literals))
         with patch.object(match, 'link_calls', return_value=(self.body, self.calls, literals)) as link, self.identities():
             result = thunks.object_bytes(Runner(CLEAN), '/w', args, original, A, self.mapping, self.rom,
                                          self.objects, selector=profile.SELECTOR)

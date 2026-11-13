@@ -3167,7 +3167,13 @@ manifest lists each one. Function literals, switches and other runtimes are
 refused. The preprocessed source must not spell `_call_via_`, `__udivsi3`,
 `__umodsi3`, `__divsi3` or `__modsi3` anywhere, string literals included, and
 must not use an `asm`, `__asm` or `__asm__` keyword, so an asm label cannot give
-a declaration a reserved ELF name.
+a declaration a reserved ELF name. No `__attribute`/`__attribute__` list may name
+`alias` or `weak` in any underscore spelling. Independently of the C spelling,
+the compiler's assembly may not contain `.set`, `.thumb_set`, `.equ`, `.equiv`,
+`.eqv`, `.weak` or `.weakref`, and the compiled object may define no global or
+weak symbol other than `func_<addr>`. So an alias such as
+`__attribute__((__alias__("__udiv" "si3")))` cannot borrow a runtime or thunk
+name.
 
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
