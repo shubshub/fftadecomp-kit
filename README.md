@@ -1560,9 +1560,60 @@ and a slot still live at a return refuses. In addition:
   nothing reads the slot without the walk seeing it;
 * a word reload of the slot yields the pointer again, a scalar word store
   kills it, and any other overlapping access refuses;
-* a slot in a pushed word refuses when it is popped into a register, and
-  `add sp,#imm` drops it with the word that held it;
-* a store into the callee's incoming argument area or a saved word refuses.
+* a store into the callee's incoming argument area refuses (the callee's own
+  core proof refuses it first), and a slot placed in a pushed register word
+  refuses when that word is popped into a register;
+* the next callee can reach the word only by `ldr [sp,#imm]`, which yields the
+  pointer: its core proof refuses reading or writing above its entry SP
+  through a materialised SP ("stack-alias access is unaligned or outside the
+  tracked frame", "stack-frame write is outside the tracked frame").
+
+**Released words.** The wrappers free the slot with `add sp,#4` in their
+epilogue. That frees the word but leaves the pointer in memory below SP, where
+anything that later moves SP down over it without writing it could read the
+pointer as an unchecked scalar. v2 therefore keeps tracking every released word
+until it is written:
+
+* in the forwarder and in every walked callee, a read of a released word, or a
+  partial write to it, refuses ("access to a released forwarded pointer word
+  before it is written"); a word store or a `push` over it clears it. Moving
+  SP down over it with `sub sp,#imm` is allowed only in a function whose every
+  SP use is immediate; such a function can reach the word only by an immediate
+  SP load or store, which the rule checks, so no read is missed;
+* **every callee called while a released word exists is walked, and inherits
+  the released words re-based to its entry SP** — even a callee that receives
+  no stack pointer, when a released word is at or above its entry SP (its
+  incoming argument area). Each callee returns the words it released to its
+  caller. This is what makes the walk, not the premise, cover a callee that
+  reads a re-covered word in its own frame;
+* in the owner, which receives the released words below its SP, the selector
+  refuses any SP decrement (`sub sp,#imm`, `add sp,Rm`, `mov sp,Rm`) reachable
+  after the call that released them. It also refuses any walked call (one
+  passing stack pointers) reachable after that call, because the owner does
+  not pass the words down;
+* only two kinds of code are left to an **unproved runtime premise**: a callee
+  called without any stack pointer while every released word is below the
+  caller's SP (so the word is not in the callee's incoming area and the callee
+  is not walked), and interrupt handlers. The premise is that they do not read
+  a stack word below their entry SP before writing it, and the same holds for
+  everything a trusted callee calls. Walking every callee instead was tried: it exceeds the named-data buffer dependency budget on 080F7720, whose chain 080DD760 → 080DE268 → 080DE278 → 0809A2D8 is entered after the release, so these pointer-free callees are trusted rather than walked. It is **accepted without
+  a per-owner reviewed entry** — unlike the index premises in
+  `config/stack_index_premises.json`, which each need a reviewed row. It is
+  recorded in the evidence (`forwarded_stack_arguments.premise`,
+  `premise_proved: false`) and as one report line naming the released words and
+  the trusted call sites:
+
+```
+* forwarded stack argument premise: released words entry_SP-0x54 after call 0x080FDCA0; trusted calls 0x080FDCA6, 0x080FDCD4, ...; unproved runtime premise: a trusted call (a callee called without stack pointer arguments while every released word is below the caller's SP; it is not inspected), including everything it calls, does not read a stack word below the trusted callee's entry SP before writing it, and neither do interrupt handlers, so no released forwarded pointer word is read
+```
+
+The evidence also lists every forwarded slot (callee, store site, callee
+entry-SP offset, owner offset), the released words per owner call, and each
+trusted callee call made while a word was released (`trusted_callee_calls`).
+
+A trusted pointer-free callee that does read below its entry SP would not be
+caught; that is exactly what the recorded premise covers, and a reviewer of a
+matched function should confirm it for the listed call sites.
 
 The forwarded slot is owned by the inspected callee, not by the owner, so v1's
 exclusion of pointer-bearing local words in the owner is unchanged.
@@ -1572,9 +1623,11 @@ element compiles to `lsls #24; asrs #22`. v1 knows nothing about an `asrs` whose
 operand may be negative, so it cannot show the access is word aligned and
 refuses. v2 keeps the congruence: the low `m - n` bits of `x asr n` are bits
 `n..m-1` of `x`, which a congruence modulo `2^m` fixes. The range is not
-narrowed, so the access still needs a premise. Its expression is stated as
-`((ret(0x080FDCA6) << 24) >>s 22)`, an unsigned bound on the scaled, signed
-value. A bound below the table size therefore also excludes negative indices.
+narrowed, so the access still needs a premise. Under v2 every premise
+expression is prefixed `(u32)`, e.g. `(u32)((ret(0x080FDCA6) << 24) >>s 22)`:
+the bound is on the unsigned value of the scaled, signed index. A bound below
+the table size therefore also excludes negative indices, and a reviewer has to
+check that no negative value occurs.
 
 ### Buffer owners with stale aliases a callee overwrites
 

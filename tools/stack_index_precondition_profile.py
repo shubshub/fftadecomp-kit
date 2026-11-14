@@ -61,7 +61,11 @@ off under v1 so that v1 reports keep their meaning:
   as an outgoing stack argument (`str Rn,[sp,#k]` into a word of its own frame;
   see ``match.BufferCallProof.forwarded_slot_step``); the next callee receives it
   as an ordinary incoming stack argument and every access through it is still
-  bounded against the owner's frame; and
+  bounded against the owner's frame.  A slot released by `add sp` still holds
+  the pointer, so it is tracked until written (walked code that reads it
+  refuses, see ``match.BufferCallProof.forwarded_frame_change``), the owner may
+  not move SP down or walk a callee after the release, and what is not
+  inspected is covered by the recorded premise ``FORWARD_PREMISE``; and
 * an arithmetic shift right keeps the congruence its operand's low bits carry, so
   a sign-extended scaled index (`lsls #24; asrs #22`, a `s8` times four) is known
   to be word aligned.  Its range is not narrowed: the access still needs a premise.
@@ -70,6 +74,7 @@ import json
 
 from capstone.arm import ARM_REG_R0, ARM_REG_SP
 
+import match
 import named_data_buffer_profile as named
 import rom_table_copy_profile as rom_copy
 
@@ -185,6 +190,7 @@ class Policy:
     def __init__(self, owner, size, selector=SELECTOR):
         self.owner, self.size = owner, size
         self.selector = selector
+        self.forwarding = None      # v2: the buffer proof whose forwarded-slot facts bind the owner
         self.derivations = set()
         self.accesses = set()
         self.evidence = None
@@ -222,7 +228,8 @@ class Policy:
     def finish(self, data, address, instructions, copies):
         self.evidence = prove(data, address, sorted(instruction.address for instruction in instructions),
                               frozenset(self.derivations), frozenset(self.accesses), copies,
-                              selector=self.selector)
+                              selector=self.selector,
+                              forwarding=None if self.forwarding is None else self.forwarding.forwarding_facts())
         return self.evidence
 
 
@@ -638,7 +645,9 @@ class Analysis:
         bound = tmax // scale + 1
         if self.check:
             self.premises[site] = dict(
-                site=site, kind="load" if load else "store", width=width, expression=render(index),
+                site=site, kind="load" if load else "store", width=width,
+                # v2 may state signed (>>s) expressions; the bound is on the unsigned value.
+                expression=f"(u32){render(index)}" if self.signed_shift_congruence else render(index),
                 bound=bound, scale=scale, loads=sorted(load_sites(index)),
                 array_sp=[start + 4 * depth(state), start + 4 * depth(state) + tmax + width],
                 array_entry_sp=[start, start + tmax + width])
@@ -1137,7 +1146,59 @@ class Analysis:
         return states
 
 
-def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR):
+FORWARD_PREMISE = ("unproved runtime premise: a trusted call (a callee called without stack pointer "
+                   "arguments while every released word is below the caller's SP; it is not inspected), "
+                   "including everything it calls, does not read a stack word below the trusted callee's "
+                   "entry SP before writing it, and neither do interrupt handlers, so no released "
+                   "forwarded pointer word is read")
+
+
+def moves_sp_down(raw):
+    """SUB SP,#imm, ADD SP,Rm or MOV SP,Rm: an SP move that does not write the words it covers."""
+    if raw & 0xFF80 == 0xB080:
+        return True
+    return raw & 0xFC00 == 0x4400 and ((raw >> 8) & 3) in (0, 2) and (raw & 7) | ((raw >> 4) & 8) == 13
+
+
+def forwarding_evidence(analysis, forwarding):
+    """Bind the forwarded slots and refuse owner code that could read a released word unseen.
+
+    A callee that forwarded a pointer leaves the word in memory below the owner's SP. The owner
+    is refused if, anywhere after such a call, it moves SP down over memory without writing
+    it, or passes stack pointers to a walked callee (which is not told about the word)."""
+    releases = forwarding["releases"]
+    after = analysis.reaches(site for site, _ in releases)
+    trusted = []
+    for site in sorted(after):
+        raw = analysis.halfword(site)
+        if moves_sp_down(raw):
+            refuse("the owner moves SP down after a callee released a forwarded pointer word")
+        if site in forwarding["walked"]:
+            refuse("the owner passes stack pointers to a callee after a callee released a "
+                   "forwarded pointer word")
+        if raw & 0xF800 == 0xF000:
+            offset = ((raw & 0x7FF) << 12) | ((analysis.halfword(site + 2) & 0x7FF) << 1)
+            trusted.append([site, site + 4 + (offset - 0x800000 if offset & 0x400000 else offset)])
+    return {"slots": forwarding["slots"], "released": releases, "trusted_calls": trusted,
+            "trusted_callee_calls": forwarding["trusted"],
+            "premise": FORWARD_PREMISE if releases else None, "premise_proved": False}
+
+
+def forwarded_lines(evidence):
+    """The report line for the recorded premise, when a forwarded word was released."""
+    found = evidence.get("forwarded_stack_arguments")
+    if not found or found["premise"] is None:
+        return []
+    words = ", ".join(f"entry_SP{position:+#x} after call 0x{site:08X}"
+                      for site, positions in found["released"] for position in positions)
+    calls = ", ".join([f"0x{site:08X}" for site, _ in found["trusted_calls"]] +
+                      [f"0x{site:08X}" for _, site, _ in found["trusted_callee_calls"]]) or "none"
+    return [f"* forwarded stack argument premise: released words {words}; trusted calls {calls}; "
+            f"{found['premise']}"]
+
+
+def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
+          forwarding=None):
     analysis = Analysis(bytes(data), address, derivations, accesses, dict(copies),
                         signed_shift_congruence=selector == SELECTOR_V2)
     sites = analysis.syntactic_sites()
@@ -1159,10 +1220,13 @@ def prove(data, address, verified_sites, derivations, accesses, copies, *, selec
     for _, row in sorted(analysis.premises.items()):
         loads = row.pop("loads")
         preconditions.append(dict(row, may_be_owner_written=any(site in written for site in loads)))
-    return {"schema": SCHEMAS[selector],
+    evidence = {"schema": SCHEMAS[selector],
             "accesses": [[site - address, *record] for site, record in sorted(analysis.records.items())],
             "derivations": [[site - address, *record] for site, record in sorted(analysis.derived.items())],
             "preconditions": preconditions}
+    if forwarding is not None:
+        evidence["forwarded_stack_arguments"] = forwarding_evidence(analysis, forwarding)
+    return evidence
 
 
 class StackIndexBufferProof(rom_copy.RomTableCopyBufferProof):
@@ -1191,3 +1255,29 @@ class StackIndexV2BufferProof(StackIndexBufferProof):
     """v2: buffer callees may forward the owner's frame pointers as their callees' stack arguments."""
     selector = SELECTOR_V2
     forwarded_stack_arguments = True
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.forward_slot_records = set()   # (callee, store site, callee entry-SP offset, owner offset)
+        self.forward_releases = {}           # owner call site -> owner entry-SP offsets released
+        self.forward_trusted_calls = set()   # (caller, site, target) trusted under the premise
+        self.walked_sites = set()
+        self.index_policy.forwarding = self
+
+    def check_call(self, address, aliases, stack, slots=None, *, site=None, **kwargs):
+        """Owner-level call: record the words the walked callee released below the owner's SP."""
+        result = super().check_call(address, aliases, stack, slots, site=site, **kwargs)
+        self.walked_sites.add(site)
+        stale = match.stale_words(result)
+        if stale:
+            self.forward_releases.setdefault(site, set()).update(
+                position - 4 * len(stack) for position in stale)
+            result = type(result)({key: value for key, value in result.items()
+                                   if key not in stale.values()})
+        return result
+
+    def forwarding_facts(self):
+        return {"releases": [[site, sorted(positions)] for site, positions in sorted(self.forward_releases.items())],
+                "walked": frozenset(self.walked_sites),
+                "slots": sorted(list(record) for record in self.forward_slot_records),
+                "trusted": sorted(list(record) for record in self.forward_trusted_calls)}

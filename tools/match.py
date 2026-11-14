@@ -3059,9 +3059,20 @@ def loop_replay_condition(cc, flags):
     return conditions[cc]
 
 
+# Forwarded buffer stack arguments ride in the alias map under non-register keys:
+# a live slot is keyed by its (negative) entry-SP-relative word offset, and a
+# released word that still holds the pointer by FORWARD_STALE_BASE + its offset.
+FORWARD_STALE_BASE = -(1 << 24)
+
+
 def forwarded_slots(aliases):
-    """Entry-SP-relative words holding forwarded buffer pointers (negative keys)."""
-    return [key for key in aliases if key < 0]
+    """Entry-SP-relative words of this frame holding live forwarded buffer pointers."""
+    return [key for key in aliases if FORWARD_STALE_BASE // 2 < key < 0]
+
+
+def stale_words(aliases):
+    """{entry-SP-relative offset: key} of released words that may still hold a buffer pointer."""
+    return {key - FORWARD_STALE_BASE: key for key in aliases if key < FORWARD_STALE_BASE // 2}
 
 
 def sp_immediate_access(instruction):
@@ -3093,6 +3104,7 @@ class BufferCallProof:
     # Opt-in per class: buffer pointers an inspected callee stores into its own frame as
     # outgoing stack arguments (see forwarded_slot_step); off keeps every such store refused.
     forwarded_stack_arguments = False
+    forward_slot_records = forward_trusted_calls = frozenset()
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
@@ -3308,6 +3320,7 @@ class BufferCallProof:
                     protected, constants or {}, words or {}, frame_base, root_frame, watched, site)
                 self.observe_alias_state(path_context, address, states[address])
             returned = ()
+            returned_stale = {}
             exact_returns = {}
             returned_words = None
             while pending:
@@ -3336,11 +3349,15 @@ class BufferCallProof:
                              instruction.mnemonic == "pop" and ARM_REG_PC in registers or
                              instruction.mnemonic == "mov" and registers and registers[0] == ARM_REG_PC)
                 if self.forwarded_stack_arguments and \
-                        self.forwarded_slot_step(instruction, aliases, constants, depth, by_address, replay):
+                        self.forwarded_slot_step(address, instruction, aliases, constants, depth, by_address,
+                                                 replay):
                     pass
                 elif instruction.mnemonic == "push":
                     if set(registers) & aliases.keys():
                         raise ValueError("buffer pointers cannot be pushed or spilled")
+                    if self.forwarded_stack_arguments:
+                        self.forwarded_frame_change(aliases, depth, depth + len(registers), by_address,
+                                                    writes=True)
                     depth += len(registers)
                     if self.callee_frames:
                         stack[:0] = [(False, True, False)] * len(registers)
@@ -3355,10 +3372,10 @@ class BufferCallProof:
                         del stack[:len(registers)]
                 elif (adjustment := thumb_stack_adjustment(instruction)) is not None or \
                         (adjustment := thumb_literal_stack_adjustment(instruction, data, address)) is not None:
+                    if self.forwarded_stack_arguments:
+                        self.forwarded_frame_change(aliases, depth, depth - adjustment, by_address,
+                                                    writes=False)
                     depth -= adjustment
-                    for slot in forwarded_slots(aliases):
-                        if slot < -4 * depth:
-                            del aliases[slot]   # released with the frame word that held it
                     if self.callee_frames:
                         if adjustment < 0:
                             stack[:0] = [(False, False, True)] * -adjustment
@@ -3370,6 +3387,17 @@ class BufferCallProof:
                     nested = {offset + depth * 4: target for offset, target in incoming.items()}
                     # A forwarded slot is the next callee's incoming stack argument word.
                     nested.update({slot + depth * 4: aliases[slot] for slot in forwarded_slots(aliases)})
+                    stale = stale_words(aliases)
+                    if stale and (passed or nested or max(stale) >= -4 * depth):
+                        # A callee that is walked anyway inherits the released words (re-based
+                        # to its entry SP). A word at or above SP is in the callee's incoming
+                        # area, so then the callee is walked even without a stack pointer.
+                        passed.update({FORWARD_STALE_BASE + position + depth * 4: aliases[key]
+                                       for position, key in stale.items()})
+                    elif stale:
+                        # Every released word is below the callee's entry SP and the callee gets
+                        # no stack pointer: it is trusted, not inspected (the recorded premise).
+                        self.forward_trusted_calls.add((address, current, operands[0].imm))
                     result = self.check_arguments(operands[0].imm, passed, stack, nested, protected,
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
@@ -3380,6 +3408,8 @@ class BufferCallProof:
                     for register in CALLER_CLOBBERED:
                         aliases.pop(register, None)
                         constants.pop(register, None)
+                    if self.forwarded_stack_arguments:
+                        result = self.import_stale_words(result, aliases, depth)
                     self.finish_call_constants(constants, result, site=current, target=operands[0].imm)
                     aliases.update(result)
                     # An inspected callee's own writes to R4-R11 are not trusted
@@ -3513,6 +3543,11 @@ class BufferCallProof:
                     successors = finite_transfers[current]
                 elif returning:
                     aliases = self.normal_return_aliases(address, current, aliases)
+                    for position, key in stale_words(aliases).items():
+                        # Released words leave with the frame; the caller keeps tracking them.
+                        if returned_stale.setdefault(key, aliases[key]) != aliases[key]:
+                            raise ValueError("inconsistent released forwarded pointer words at return")
+                        del aliases[key]
                     if self.callee_frames:
                         for offset in aliases.values():
                             self.validate_pointer_value(offset, stack)
@@ -3629,7 +3664,10 @@ class BufferCallProof:
                     (site, tuple(sorted(arguments.items())), tuple(sorted(incoming.items())),
                      tuple(sorted(replay_trusted)), tuple(sorted(replay_pruned)),
                      tuple(sorted(replay_writes))))
-            return self.word_result(returned, returned_words or {})
+            result = self.word_result(returned, returned_words or {})
+            if returned_stale:
+                result.update(returned_stale)
+            return result
         except ValueError as error:
             if replay:
                 where = f" at 0x{current:08X}" if current is not None else ""
@@ -3638,7 +3676,44 @@ class BufferCallProof:
         finally:
             self.active.remove(address)
 
-    def forwarded_slot_step(self, instruction, aliases, constants, depth, by_address, replay):
+    def forwarded_frame_change(self, aliases, before, after, by_address, *, writes):
+        """Apply an SP move from ``before`` to ``after`` words to forwarded slots and released words.
+
+        Releasing a live slot (ADD SP) leaves the pointer in memory below SP, so the word
+        becomes a released word that is tracked until it is written. Re-covering a released
+        word without writing it (SUB SP) is admitted only in a function whose every SP use is
+        immediate. This function can then reach the word only by an immediate SP load or
+        store, which ``forwarded_slot_step`` checks. A callee can reach it only through its
+        incoming area, and a callee called while a released word is at or above SP is always
+        walked and inherits the word, so its reads are checked the same way. A callee called
+        while every released word is below SP is walked only if it receives a stack pointer;
+        otherwise it is trusted under the recorded premise. A PUSH writes every word it covers.
+        """
+        for slot in forwarded_slots(aliases):
+            if slot < -4 * after:
+                aliases[FORWARD_STALE_BASE + slot] = aliases.pop(slot)
+        covered = range(-4 * after, -4 * before)
+        for position, key in stale_words(aliases).items():
+            if position in covered:
+                if writes:
+                    del aliases[key]
+                elif any(not plain_stack_use(item) for item in by_address.values()):
+                    raise ValueError("released forwarded pointer word is re-covered by a callee "
+                                     "with non-immediate SP uses")
+
+    def import_stale_words(self, result, aliases, depth):
+        """Move the callee's released words (callee entry-SP offsets) into this frame's terms."""
+        stale = stale_words(result)
+        if not stale:
+            return result
+        kept = type(result)({key: value for key, value in result.items() if key not in stale.values()})
+        for position, key in stale.items():
+            local = FORWARD_STALE_BASE + position - 4 * depth
+            if aliases.setdefault(local, result[key]) != result[key]:
+                raise ValueError("inconsistent released forwarded pointer words after a call")
+        return kept
+
+    def forwarded_slot_step(self, address, instruction, aliases, constants, depth, by_address, replay):
         """Track buffer pointers an inspected callee stores in its own frame for its own callees.
 
         A slot is one aligned word the callee allocated below its entry SP, keyed in ``aliases``
@@ -3648,8 +3723,14 @@ class BufferCallProof:
         admitted only in a callee whose every SP use is PUSH, POP, ADD/SUB SP,#imm or an
         immediate-offset SP load/store, so nothing reads the slot without being seen here. A
         word reload yields the alias again, a word store kills the slot, any other overlapping
-        access refuses, popping it into a register refuses, and releasing its word with ADD SP
-        drops it. At a call each live slot is passed as the callee's incoming stack argument.
+        access refuses, and popping it into a register refuses. Releasing its word with ADD SP
+        turns it into a released word (see ``forwarded_frame_change``): the pointer is still in
+        memory, so the word is tracked until it is written, any read of it refuses, walked
+        callees inherit it, and the caller receives it at return. At a call each live slot is
+        passed as the callee's incoming stack argument; the callee's own core proof refuses
+        reading that word through a materialised SP ("stack-alias access is unaligned or outside
+        the tracked frame") or writing it ("stack-frame write is outside the tracked frame"), so
+        it reaches the word only by `ldr [sp,#imm]`, which yields the alias.
         Returns True when the instruction's effect is applied here.
         """
         if replay or self.callee_frames or self.word_provenance or self.single_word_stores:
@@ -3666,6 +3747,15 @@ class BufferCallProof:
                 if any(not plain_stack_use(item) for item in by_address.values()):
                     raise ValueError("forwarded buffer pointer slot needs a callee with only immediate SP uses")
                 aliases[position] = aliases[register]
+                aliases.pop(FORWARD_STALE_BASE + position, None)
+                self.forward_slot_records.add((address, instruction.address, position,
+                                               aliases[register]))
+                return True
+            stale = stale_words(aliases)
+            if any(word < position + width and position < word + 4 for word in stale):
+                if not (width == 4 and instruction.mnemonic == "str" and position in stale):
+                    raise ValueError("access to a released forwarded pointer word before it is written")
+                del aliases[stale[position]]    # overwritten: no pointer remains
                 return True
             if width == 4 and position in slots:
                 if instruction.mnemonic == "ldr":
