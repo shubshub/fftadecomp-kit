@@ -11,6 +11,9 @@ SUMMARY = ('one guarded local Thumb table found by its dispatch load, with compl
 # The manifest key deliberately avoids "frame_policy", which names the
 # typed-outgoing-six-words-v1 family when status recovers saved selectors.
 STACK_POLICY = 'write-only-outgoing-argument-words-v1'
+# Conditional frame stores between calls can multiply the walked
+# (site, phase, written) states; past this bound the proof refuses.
+STATE_LIMIT = 1 << 16
 
 
 def fingerprint(address, data, manifest):
@@ -48,7 +51,8 @@ def verify_frame(instructions, edges, address, calls):
       frame, identical on every path to the call, and is empty again after
       the call because a callee may overwrite its incoming arguments;
     * no word is still pending at the release, and every frame word is
-      consumed by some call.
+      consumed by some call;
+    * the walk visits at most STATE_LIMIT states, or the proof refuses.
 
     No fact about a callee's arity or memory effects follows.
     """
@@ -83,6 +87,8 @@ def verify_frame(instructions, edges, address, calls):
         if state in seen:
             continue
         seen.add(state)
+        if len(seen) > STATE_LIMIT:
+            raise ValueError('outgoing-argument frame proof exceeds its state limit')
         site, phase, written = state
         item = instructions[site]
         if site == allocation:

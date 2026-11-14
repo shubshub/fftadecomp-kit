@@ -183,6 +183,27 @@ def leaf(body, manifest, calls, **kwargs):
         switch_interposed_pool=True, **kwargs)
 
 
+def straight(*items):
+    """Run only the frame proof over straight-line code (`strN`, `call`, halfwords)."""
+    from capstone import CS_ARCH_ARM, CS_MODE_THUMB, Cs
+    body = bytearray()
+    for item in items:
+        if item == "call":
+            body.extend(struct.pack("<HH", 0xF000, 0xF800))
+        elif isinstance(item, str):
+            body.extend(struct.pack("<H", STR_SP | int(item[3:])))
+        else:
+            body.extend(struct.pack("<H", item))
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    decoder.detail = True
+    instructions = {item.address: item for item in decoder.disasm(bytes(body), BASE)}
+    sites = sorted(instructions)
+    edges = {site: [following] for site, following in zip(sites, sites[1:])}
+    edges[sites[-1]] = []
+    calls = {site: CALLEE for site in sites if instructions[site].size == 4}
+    frame.verify_frame(instructions, edges, BASE, calls)
+
+
 class AdmissionTests(unittest.TestCase):
     def test_outgoing_frame_with_interposed_pool_verifies(self):
         body, _, manifest, mapping = fixture()
@@ -199,6 +220,20 @@ class AdmissionTests(unittest.TestCase):
     def test_non_stack_block_copy_is_ordinary(self):
         copy_words = (0xC90C, 0xC00C)  # ldmia r1!,{r2,r3}; stmia r0!,{r2,r3}
         body, _, manifest, mapping = fixture(arguments=(*copy_words, *ARGUMENTS))
+        verify(body, manifest, mapping)
+
+    def test_loop_that_stores_and_calls(self):
+        # str0; str1; bl; subs r1,#1; bne back to str0.
+        body, _, manifest, mapping = fixture(arguments=(*ARGUMENTS, 0x3901, 0xD1F9))
+        verify(body, manifest, mapping)
+
+    def test_each_return_path_may_release(self):
+        # The second case consumes the frame and returns through its own release.
+        body, _, manifest, mapping = fixture(case1=(*ARGUMENTS, add_sp(2), POP_R1, BX_R1))
+        verify(body, manifest, mapping)
+
+    def test_call_after_the_whole_frame_call_is_register_only(self):
+        body, _, manifest, mapping = fixture(arguments=(*ARGUMENTS, "call"))
         verify(body, manifest, mapping)
 
     def test_v2_still_refuses_the_frame(self):
@@ -222,6 +257,19 @@ class AttackTests(unittest.TestCase):
         self.refused(arguments=(0x449D, *ARGUMENTS))  # add sp,r3
         self.refused(arguments=(sub_sp(1), *ARGUMENTS, add_sp(1)))
         self.refused("one fixed allocation", arguments=(add_sp(1), sub_sp(1), *ARGUMENTS))
+
+    def test_zero_stack_adjustment(self):
+        for adjustment in (add_sp(0), sub_sp(0)):
+            with self.subTest(adjustment=hex(adjustment)):
+                self.refused(arguments=(adjustment, *ARGUMENTS))
+
+    def test_second_release_on_one_path(self):
+        # The ordinary stack tracker refuses this first; the frame proof
+        # refuses it on its own as well.
+        self.refused(case1=(add_sp(2), add_sp(2)))
+        straight(sub_sp(1), "str0", "call", add_sp(1), 0x4770)  # bx lr
+        with self.assertRaisesRegex(ValueError, "outside its allocation"):
+            straight(sub_sp(1), "str0", "call", add_sp(1), add_sp(1), 0x4770)
 
     def test_unbalanced_return(self):
         self.refused(release=add_sp(1))
@@ -277,6 +325,24 @@ class AttackTests(unittest.TestCase):
         self.refused(arguments=(0xE88D, 0x0003, *ARGUMENTS))  # stm.w sp,{r0,r1}
 
 
+class StateLimitTests(unittest.TestCase):
+    # Seven conditionally written words, then all seven unconditionally:
+    # every path reaches the call with the whole frame, but the walk holds
+    # up to 2**7 written sets at each site in between.
+    ARGUMENTS = (*(token for slot in range(7) for token in (0xD000, f"str{slot}")),  # beq over the store
+                 *(f"str{slot}" for slot in range(7)), "call")
+
+    def test_branching_writes_verify_within_the_limit(self):
+        body, _, manifest, mapping = fixture(words=7, arguments=self.ARGUMENTS)
+        verify(body, manifest, mapping)
+
+    def test_walk_beyond_the_limit_refuses(self):
+        body, _, manifest, mapping = fixture(words=7, arguments=self.ARGUMENTS)
+        with mock.patch.object(frame, "STATE_LIMIT", 64), \
+                self.assertRaisesRegex(ValueError, "state limit"):
+            verify(body, manifest, mapping)
+
+
 class ManifestTests(unittest.TestCase):
     def test_policy_marker_is_exact_and_requires_the_pool(self):
         body, _, manifest, mapping = fixture()
@@ -325,9 +391,8 @@ class ManifestTests(unittest.TestCase):
 class ReportTests(unittest.TestCase):
     def setUp(self):
         self.body, _, self.manifest, self.mapping = fixture()
-        scratch = TASK / "build"
-        scratch.mkdir(exist_ok=True)
-        directory = tempfile.TemporaryDirectory(prefix="switch_pool_frame_", dir=scratch)
+        directory = tempfile.TemporaryDirectory(prefix="switch_pool_frame_",
+                                                dir=os.environ.get("FFTA_TEST_SCRATCH"))
         self.addCleanup(directory.cleanup)
         self.root = Path(directory.name)
         (self.root / "src").mkdir()
