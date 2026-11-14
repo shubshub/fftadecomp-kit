@@ -511,6 +511,25 @@ class ProofTests(unittest.TestCase):
         # The same literal used as a plain value, never as the thunk register, stays ordinary.
         verify(build(post=(*obj, ('h', 0x041A), ('ldr', 2, 'object'), ('h', 0x6812)), **lit))
 
+    def test_identity_operations_are_moves(self):
+        # A call result copied with adds rd, rs, #0, stored, then a callback loaded: no constant contributes.
+        def copy_store(copy):
+            return dict(post=(('bl', CALLEE), ('h', copy), ('ldr', 3, 'object'), ('h', 0x601C),
+                              ('ldr', 2, 'object'), ('h', 0x6812)))
+        verify(build(**copy_store(0x1C04)))  # adds r4, r0, #0
+        verify(build(**copy_store(0x0004)))  # lsls r4, r0, #0
+        # A nonzero immediate on the same loaded value is constant-derived and stays refused.
+        for label, copy in {'adds #1': 0x1C44, 'subs #1': 0x1E44}.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'constant-derived'):
+                verify(build(**copy_store(copy)))
+        # A constant copied by an identity operation stays constant, and a thunk register may not hold one.
+        for label, copy in {'adds #0': 0x1C1A, 'lsls #0': 0x001A}.items():  # r2 = r3 (the object address)
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'constant-derived'):
+                leaf(build(post=(('ldr', 3, 'object'), ('h', copy))), switch_thunks=PLAIN)
+        # Taint survives identity operations.
+        with self.assertRaisesRegex(ValueError, 'can hold a local code address'):
+            leaf(build(post=(('ldr', 3, 'object'), ('h', 0x1C02), ('h', 0x0012))), switch_thunks=PLAIN)
+
     def test_only_armv4t_16_bit_encodings_are_admitted(self):
         verify(build(tail=(('h', 0x46C0), ('h', 0x4640))))
         for label, half in {'uxtb': 0xB2D2, 'sxth': 0xB212, 'rev': 0xBA12, 'cps': 0xB662, 'setend': 0xB650,
