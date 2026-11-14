@@ -24,11 +24,14 @@ import subprocess
 import sys
 import tempfile
 
-from match_evidence import data_snapshot, mapping_snapshot, report_matches, source_fingerprint
+from match_evidence import (data_snapshot, mapping_snapshot, report_matches, source_fingerprint,
+                            SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
+                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
+import typed_switch_outgoing_frame as typed_switch_frame
 
 ROM_BASE = 0x08000000
 
@@ -97,6 +100,15 @@ def saved_profile_arguments(report, root, address):
     constants_policy = switch_constants.selected_policy(report)
     if constants_policy is not None:
         arguments += ["--switch-profile", constants_policy.selector]
+    # The switch-data selectors are forwarded exactly as status.py does.
+    typed_outgoing_profile = typed_switch_frame.selector_for_report(report)
+    if typed_outgoing_profile:
+        arguments += ["--switch-data-profile", typed_outgoing_profile]
+    lines = report.splitlines()
+    if f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", SWITCH_U16_SCALAR_SELECTOR]
+    elif f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", SWITCH_POOL_U16_SCALAR_SELECTOR]
     if function_thunk.selected(report):
         arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
     if software_double.selected(report):

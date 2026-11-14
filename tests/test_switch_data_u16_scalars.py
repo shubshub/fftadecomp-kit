@@ -493,6 +493,15 @@ class ReportTests(unittest.TestCase):
                   "verdict MATCH - byte identical\n")
         return status, report, output
 
+    def test_rebuild_restores_scalar_selector(self):
+        import rebuild
+        self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
+        self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+                         ["--switch-data-profile", evidence.SWITCH_U16_SCALAR_SELECTOR])
+        with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
+            rebuild.saved_profile_arguments(self.report().replace(
+                self.body.hex(), bytes(self.body[:-1] + bytes([self.body[-1] ^ 1])).hex()), self.root, BASE)
+
     def test_status_restores_scalar_selector_for_read_only_and_write_verification(self):
         status, report, output = self.prepare_status()
         self.assertTrue(evidence.report_matches(report.read_text(), self.root, BASE))
