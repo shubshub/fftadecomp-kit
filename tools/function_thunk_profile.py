@@ -127,9 +127,11 @@ def verify_literal_bindings(data, address, instructions, calls, mapping, functio
             raise ValueError("code-entry thunk literals require canonical function provenance")
 
 
-def verify_own_span_literals(data, address, instructions, functions, switch_relocations):
-    """Only the switch table pointer, or the caller's own entry with canonical
-    function provenance, may name the caller's bytes (Thumb bit set or not)."""
+def verify_own_span_literals(data, address, instructions, table_pointer=None):
+    """No reached literal may name the caller's own bytes (Thumb bit set or not),
+    its own entry included. The one exception is the switch table pointer word at
+    offset table_pointer, whose only reader the pool-switch record pins to the
+    dispatch; the table's case words are never exempt."""
     from match import ARM_OP_MEM, ARM_REG_PC
     for instruction in instructions:
         for operand in instruction.operands:
@@ -137,10 +139,10 @@ def verify_own_span_literals(data, address, instructions, functions, switch_relo
                     operand.mem.base != ARM_REG_PC or operand.mem.index:
                 continue
             offset = ((instruction.address + 4) & ~3) + operand.mem.disp - address
+            if offset < 0 or offset + 4 > len(data) or (address + offset) % 4:
+                raise ValueError("thunk literal is not a complete aligned caller word")
             value = struct.unpack_from("<I", data, offset)[0]
-            if address <= value & ~1 < address + len(data) and \
-                    switch_relocations.get(offset) != value - address and \
-                    not (value & ~1 == address and offset in functions and functions[offset][1] == value):
+            if offset != table_pointer and address <= value & ~1 < address + len(data):
                 raise ValueError("thunk literals cannot name the caller's own bytes")
 
 
@@ -328,7 +330,9 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     selector = selector_from_manifest(manifest)
     if selector == UMOD_R1_SELECTOR:
         from umod_r1_thunk_profile import verify as composed_verify
-        return composed_verify(data, address, rom, mapping, index, objects, manifest)
+        instructions = composed_verify(data, address, rom, mapping, index, objects, manifest)
+        verify_own_span_literals(data, address, instructions)
+        return instructions
     words = pool_words(selector)
     allowed = (keys | {"pool_switch", "selector", "producer_source_sha256"},) if is_versioned(words) else (keys, keys | {'pool_switch'})
     if set(manifest) not in allowed or manifest["runtime"] != RUNTIME or \
@@ -384,15 +388,17 @@ def verify(data, address, rom, mapping, index, objects, manifest):
                item.operands[0].type == ARM_OP_REG and item.operands[0].reg == ARM_REG_PC
                for item in instructions):
             raise ValueError('canonical pool switch requires its versioned manifest')
+    table_pointer = None
     if context:
+        recorded = record(data, address, context['pool_switch'], instructions, interposed_words=words)
         if type(manifest['pool_switch']) is not dict or \
-                manifest_text(manifest['pool_switch']) != manifest_text(
-                    record(data, address, context['pool_switch'], instructions, interposed_words=words)):
+                manifest_text(manifest['pool_switch']) != manifest_text(recorded):
             raise ValueError('canonical pool-switch manifest differs')
+        table_pointer = recorded['layout']['literal']
     functions = {offset: (name, struct.unpack_from("<I", data, offset)[0])
                  for offset, name in manifest["functions"]}
     verify_literal_bindings(data, address, instructions, calls, mapping, functions)
-    verify_own_span_literals(data, address, instructions, functions, context.get('pool_switch', {}))
+    verify_own_span_literals(data, address, instructions, table_pointer)
     verify_data_literals(instructions, address, literals)
     if uses_stack_frame(instructions) != manifest["frame"]:
         raise ValueError("function-thunk frame differs")
@@ -448,6 +454,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                         if proof is not None and (not proof.dependencies or literals or proof.span(address) != got):
                             raise ValueError("legacy thunk buffer replay requires its complete buffer-only proof")
                         verify_literal_bindings(got, address, instructions, calls, mapping, functions)
+                        if any(reserved(target) for target in calls.values()):
+                            verify_own_span_literals(got, address, instructions)
                 else:
                     got, calls, functions, literals = object_bytes(runner, workspace, args, original,
                                                                   address, mapping, rom, objects, selector=selector)

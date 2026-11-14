@@ -48,7 +48,8 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
     slot without its PC-relative load; values overrides the numeric pool words;
     align forces the dispatch to the given word alignment by a leading NOP;
     pointer_reader adds a second reader of the table pointer, either an extra
-    load ("extra") or the thunk target itself ("thunk").
+    load ("extra") or the thunk target itself ("thunk"); "case_extra" and
+    "case_thunk" read the first case word of the table the same two ways.
     """
     data = bytearray()
     labels, branches, loads = {}, [], []
@@ -62,8 +63,10 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
             load(n % 3, "pool" + str(n))
     if pointer_reader == "extra":
         load(4, "literal")
-    if pointer_reader == "thunk":
-        load(3, "literal")
+    if pointer_reader == "case_extra":
+        load(4, "table")
+    if pointer_reader in ("thunk", "case_thunk"):
+        load(3, "literal" if pointer_reader == "thunk" else "table")
     else:
         word(0x6813)  # LDR r3,[r2]: the thunk target stays an arbitrary conditional call.
     call = len(data); data.extend(bl(A + call, profile.ALIASES["_call_via_r3"]))
@@ -305,6 +308,35 @@ class InterposedPoolLayout(unittest.TestCase):
             f = fixture(interposed=interposed)
             pool.record(f["data"], A, f["switches"], leaf(f, words=words), interposed_words=words)
 
+    def test_case_words_have_no_reader_under_any_pool_policy(self):
+        # A case word is an address inside the caller: neither a dead load nor
+        # a thunk target (ldr r3,=case0; bl _call_via_r3) may read it.
+        for interposed, words in ((2, WORDS), (5, 5), (0, 0)):
+            for reader in ("case_extra", "case_thunk"):
+                f = fixture(interposed=interposed, pointer_reader=reader)
+                with self.subTest(words=words, reader=reader):
+                    with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
+                        leaf(f, words=words)
+                    with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
+                        discovered(f, words=words)
+                    instructions = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+                    instructions.detail = True
+                    end = f["labels"]["literal"] - 4 * interposed - (2 if "alignment" in f["labels"] else 0)
+                    decoded = list(instructions.disasm(f["data"][:end], A))
+                    with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
+                        pool.record(f["data"], A, f["switches"], decoded, interposed_words=words)
+                    # The own-span rule exempts only the table pointer word, never a case word.
+                    with self.assertRaisesRegex(ValueError, "caller's own bytes"):
+                        profile.verify_own_span_literals(f["data"], A, decoded, f["labels"]["literal"])
+
+    def test_own_span_literals_require_complete_aligned_words(self):
+        f = fixture(interposed=2)
+        decoded = leaf(f)
+        profile.verify_own_span_literals(f["data"], A, decoded, f["labels"]["literal"])
+        for size in (f["labels"]["literal"], f["labels"]["literal"] + 2):
+            with self.subTest(size=size), self.assertRaisesRegex(ValueError, "complete aligned caller word"):
+                profile.verify_own_span_literals(f["data"][:size], A, decoded, f["labels"]["literal"])
+
     def test_two_qualifying_placements_are_refused(self):
         # Outer cmp; bhi; dispatch whose four-word pool is itself a second
         # cmp; bhi; dispatch loading the same table pointer.
@@ -408,6 +440,23 @@ class InterposedPoolManifest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "caller's own bytes"):
                 profile.verify(damaged["data"], A, damaged["rom"], damaged["mapping"], damaged["index"],
                                damaged["objects"], manifest_for(damaged))
+        # The caller's own entry is refused, with or without the Thumb bit, and
+        # canonical function provenance cannot name it either.
+        for value in (A, A | 1):
+            damaged = fixture(interposed=3, values=[0x1424, value, 0x1539])
+            decoded = discovered(damaged)
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "caller's own bytes"):
+                    profile.verify_own_span_literals(damaged["data"], A, decoded,
+                                                     damaged["labels"]["literal"])
+                manifest = manifest_for(damaged)
+                with self.assertRaises(ValueError):
+                    profile.verify(damaged["data"], A, damaged["rom"], damaged["mapping"], damaged["index"],
+                                   damaged["objects"], manifest)
+                manifest["functions"] = [[damaged["labels"]["pool1"], NAME]]
+                with self.assertRaises(ValueError):
+                    profile.verify(damaged["data"], A, damaged["rom"], damaged["mapping"], damaged["index"],
+                                   damaged["objects"], manifest)
         # The first byte past the caller is not its own.
         outside = fixture(interposed=3, values=[0x1424, A + size, 0x1539])
         self.assertTrue(profile.verify(outside["data"], A, outside["rom"], outside["mapping"], outside["index"],

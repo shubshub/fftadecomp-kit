@@ -114,6 +114,9 @@ def record(data, address, relocations, instructions, *, interposed_words=5):
     # reached load (for example a thunk target) may read it.
     if sorted(set(loads.get(descriptor['literal'], ()))) != [descriptor['dispatch'] + 2]:
         raise ValueError('switch table pointer must be read only by its dispatch load')
+    # A case word is a code address inside the caller; no reached load may read one.
+    if any(offset in loads for offset in relocations if offset != descriptor['literal']):
+        raise ValueError('switch table entries cannot be read by a PC-relative load')
     pool = pool_range(descriptor, address, interposed_words)
     if any(offset not in loads for offset in pool):
         raise ValueError('every interposed pool word requires a reached PC-relative load')
