@@ -46,7 +46,9 @@ symbolically along every path, and the check requires
      (immediate moves and arithmetic on known constants) and copies or
      literal loads into the store's operand registers in between, plus
      live register-only operations that neither read the loaded value nor
-     feed or overwrite the store's operands (not before a store of the
+     feed or overwrite the store's operands, and register arithmetic that
+     builds only the stored value from values the load cannot reach, its
+     flags unread by any conditional branch (neither before a store of the
      member's all-ones value) (read_modify_write_store). One
      bounded exception permits the same-member live OR update to occur
      after its separate dead insertion read: an exact-width member read,
@@ -2203,16 +2205,25 @@ def read_modify_write_store(records, position, address, width):
     call or a conditional branch along the path - see live) and writes
     neither a register the store reads nor sp/pc. No instruction in between
     may read the dead value before it is overwritten, and every operation in
-    the slice must still be one of the forms above, so the store's value and
-    address are built before the load.
+    the slice must still be one of the forms above, so the store's address
+    is built before the load.
+    The stored value may also be finished after it (080EA6F4: `ldrb r2, [r3];
+    orrs r0, r1; strb r0, [r3]` for `sym.x = f(2) | 0x40`): a register ALU
+    operation in the store's slice is admitted if it feeds the value
+    register only, not the address registers, writes neither an address
+    register nor sp/pc, and its flags reach no conditional branch; the
+    constants, copies and literal loads it reads may sit there too.  Its
+    inputs cannot carry the loaded value, because no step in the window may
+    read it, so the stored value is the one the stripped compile computes
+    before the store; the comparison still checks it.
     Not before a store of the member's all-ones value, though: agbcc may
     fold that store's own load away (081175D4 keeps it), so a dead load
     before one may be planted, and the window keeps the narrower rules above
     rather than admitting scheduled-in work.
     A same-member OR may follow its insertion read only under the separate
     bounded authentication in separated_or_store.
-    Anything else in between - arithmetic on unknown values feeding the
-    store, another memory access, a call or a conditional branch - refuses.
+    Anything else in between - arithmetic feeding the store's address,
+    another memory access, a call or a conditional branch - refuses.
     The store must have the load's width and address on every explored path.
     """
     separated = separated_or_store(records, position, address, width)
@@ -2239,9 +2250,28 @@ def read_modify_write_store(records, position, address, width):
                 return found
             operands, value = feeding(record.reads), feeding({record.value_register})
             slice_ = feeding(record.reads, through_all=True)
+            addressing = record.reads - {record.value_register}
+            value_slice = feeding({record.value_register}, through_all=True) - \
+                feeding(addressing, through_all=True)
             all_ones = record.value == (1 << 8 * width) - 1
+            if all_ones:
+                value_slice = set()
             for place, step in zip(places, between):
                 if step.immediate:
+                    continue
+                if step.index in slice_ and step.kind == "alu" and not (step.copy or step.constant):
+                    # 080EA6F4 (`ldrb r2, [r3]; orrs r0, r1; strb r0, [r3]`):
+                    # arithmetic on values the load cannot reach (no step
+                    # here reads it) that builds the stored value only, not
+                    # the address, and whose flags have no conditional reader
+                    if step.index not in value_slice or step.writes & (addressing | {"sp", "pc"}):
+                        return None
+                    if step.flags_written:
+                        for after in records[place + 1:]:
+                            if after.kind == "branch" and not after.unconditional:
+                                return None
+                            if after.flags_written:
+                                break
                     continue
                 if step.index not in slice_:
                     # scheduled in from unrelated code (0813F934: `movs r0, #0;
@@ -2254,9 +2284,9 @@ def read_modify_write_store(records, position, address, width):
                 elif not (step.kind == "literal" or step.copy or step.constant):
                     return None                      # the store's operands are built before the load
                 elif step.constant and not step.copy and step.kind != "literal":
-                    if step.index not in value:      # constant arithmetic builds the stored value
-                        return None
-                elif step.index not in operands:
+                    if step.index not in value | value_slice:
+                        return None                  # constant arithmetic builds the stored value
+                elif step.index not in operands | value_slice:
                     return None
             return later
         # no memory access but a literal-pool load, no call or conditional
@@ -2558,10 +2588,11 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         raise SemanticError(
                             f"{name}: {describe(record)} is a dead load of {where(record.address)} "
                             "that is not directly followed by a store to the same member (only "
-                            "constants, the store's own operand copies and register operations "
-                            "that neither read the load nor feed the store may sit between "
-                            "them); only the read-modify-write load of a member store is the "
-                            "qualifier's documented effect")
+                            "constants, the store's own operand copies, register operations "
+                            "that neither read the load nor feed the store, and arithmetic that "
+                            "builds only the stored value may sit between them); only the "
+                            "read-modify-write load of a member store is the qualifier's "
+                            "documented effect")
                     explained_stores.add(store)
                     read_modify_write.add(record.index)
                     classified_dead_reads.add(record.index)
