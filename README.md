@@ -1534,6 +1534,48 @@ object is not detected), the physical stack, source readability or
 termination. The premise lines are the reviewable list of what must hold
 whenever each site runs.
 
+#### Version 2: forwarded callee stack arguments and sign-extended indices
+
+`--owner-runtime-profile named-data-buffer-stack-index-v2` is v1 with two
+additions. v1 reports keep their meaning: under v1 both stay refused, and a v2
+report relabelled as v1 fails replay.
+
+```sh
+python tools/match.py --root ../fftadecomp 0x080DE9E0 --owner-runtime-profile named-data-buffer-stack-index-v2
+```
+
+**Forwarded stack arguments.** The coordinate wrappers `func_080DBD78`,
+`func_080DBDA0` and `func_080DBDC8` take the owner's local `s16` outputs and
+pass the last one or two on to their own callee as stack arguments
+(`str r2,[sp]; bl func_0801C984`). The buffer walk refuses that store
+("unsupported buffer pointer use or escape"). Under v2 an inspected callee may
+store a pointer into the owner's frame into one aligned word **of its own
+frame**, and the following call receives it as an ordinary incoming stack
+argument. Every access through it is still bounded against the owner's frame.
+The slot is tracked like a register alias, so joins must agree on its offset
+and a slot still live at a return refuses. In addition:
+
+* the store is admitted only in a callee whose every SP use is `push`, `pop`,
+  `add/sub sp,#imm` or an immediate-offset `[sp,#imm]` load or store, so
+  nothing reads the slot without the walk seeing it;
+* a word reload of the slot yields the pointer again, a scalar word store
+  kills it, and any other overlapping access refuses;
+* a slot in a pushed word refuses when it is popped into a register, and
+  `add sp,#imm` drops it with the word that held it;
+* a store into the callee's incoming argument area or a saved word refuses.
+
+The forwarded slot is owned by the inspected callee, not by the owner, so v1's
+exclusion of pointer-bearing local words in the owner is unchanged.
+
+**Sign-extended scaled indices.** `index = (s8)f(); t[index]` with a word
+element compiles to `lsls #24; asrs #22`. v1 knows nothing about an `asrs` whose
+operand may be negative, so it cannot show the access is word aligned and
+refuses. v2 keeps the congruence: the low `m - n` bits of `x asr n` are bits
+`n..m-1` of `x`, which a congruence modulo `2^m` fixes. The range is not
+narrowed, so the access still needs a premise. Its expression is stated as
+`((ret(0x080FDCA6) << 24) >>s 22)`, an unsigned bound on the scaled, signed
+value. A bound below the table size therefore also excludes negative indices.
+
 ### Buffer owners with stale aliases a callee overwrites
 
 `--owner-runtime-profile named-data-buffer-dead-argument-aliases-v1` admits a

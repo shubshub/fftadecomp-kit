@@ -53,6 +53,18 @@ re-decodes the verified body as raw Thumb-1 and runs one abstract interpretation
 (unsigned intervals with power-of-two congruence, CMP + branch refinement,
 threshold widening, word-level frame kinds, a must-initialised byte set, and one
 derivation expression per register).
+
+`named-data-buffer-stack-index-v2` is the same contract with two additions, both
+off under v1 so that v1 reports keep their meaning:
+
+* a buffer callee may forward a pointer into the owner's frame to its own callee
+  as an outgoing stack argument (`str Rn,[sp,#k]` into a word of its own frame;
+  see ``match.BufferCallProof.forwarded_slot_step``); the next callee receives it
+  as an ordinary incoming stack argument and every access through it is still
+  bounded against the owner's frame; and
+* an arithmetic shift right keeps the congruence its operand's low bits carry, so
+  a sign-extended scaled index (`lsls #24; asrs #22`, a `s8` times four) is known
+  to be word aligned.  Its range is not narrowed: the access still needs a premise.
 """
 import json
 
@@ -63,9 +75,16 @@ import rom_table_copy_profile as rom_copy
 
 SELECTOR = named.STACK_INDEX_SELECTOR
 SCHEMA = named.STACK_INDEX_SCHEMA
+SELECTOR_V2 = named.STACK_INDEX_V2_SELECTOR
+SCHEMA_V2 = named.STACK_INDEX_V2_SCHEMA
+SELECTORS = (SELECTOR, SELECTOR_V2)
+SCHEMAS = {SELECTOR: SCHEMA, SELECTOR_V2: SCHEMA_V2}
 CONTROL_FLOW = ("complete named-data owner with ROM-proved bounded buffer callees, ROM table copies "
                 "and variable private-stack-array indices proved in bounds or admitted under "
                 "reviewed, recorded unproved runtime premises")
+CONTROL_FLOW_V2 = CONTROL_FLOW + (", with buffer pointers forwarded as callee stack arguments and "
+                                  "sign-extended index congruence")
+CONTROL_FLOWS = {SELECTOR: CONTROL_FLOW, SELECTOR_V2: CONTROL_FLOW_V2}
 MAX_DEPENDENCIES = rom_copy.MAX_DEPENDENCIES
 SUMMARY = ("variable private-stack-array indices proved in bounds, each either by in-function "
            "value ranges or under a reviewed, recorded runtime premise that is NOT proved: "
@@ -163,8 +182,9 @@ def shift_expr(operation, value, amount):
 class Policy:
     """Collect the core's deferred sites, then prove them in ``finish``."""
 
-    def __init__(self, owner, size):
+    def __init__(self, owner, size, selector=SELECTOR):
         self.owner, self.size = owner, size
+        self.selector = selector
         self.derivations = set()
         self.accesses = set()
         self.evidence = None
@@ -201,7 +221,8 @@ class Policy:
 
     def finish(self, data, address, instructions, copies):
         self.evidence = prove(data, address, sorted(instruction.address for instruction in instructions),
-                              frozenset(self.derivations), frozenset(self.accesses), copies)
+                              frozenset(self.derivations), frozenset(self.accesses), copies,
+                              selector=self.selector)
         return self.evidence
 
 
@@ -418,6 +439,17 @@ def shift_right(value, amount):
     return norm("S", value[1] >> amount, value[2] >> amount, max(0, value[3] - amount))
 
 
+def arithmetic_shift_right(value, amount):
+    """ASR #amount (1..31) of a scalar that may have its sign bit set: congruence only.
+
+    The low ``m - amount`` bits of the result are bits ``amount..m-1`` of the operand, which
+    its congruence modulo 2**m fixes for every member; the sign fill only reaches higher bits.
+    """
+    if value[3] <= amount:
+        return TOP
+    return wrapped(value[1] >> amount, value[3] - amount)
+
+
 def low_zeros(value):
     return min(value[3], ctz(value[1]))
 
@@ -475,8 +507,9 @@ def trim_init(init, new_depth):
 
 
 class Analysis:
-    def __init__(self, data, address, derivations, accesses, copies):
+    def __init__(self, data, address, derivations, accesses, copies, *, signed_shift_congruence=False):
         self.data, self.address = data, address
+        self.signed_shift_congruence = signed_shift_congruence
         self.end = address + len(data)
         self.derivations, self.accesses = derivations, accesses
         self.copies = copies        # call site -> (entry-SP-relative destination, byte count)
@@ -987,6 +1020,8 @@ class Analysis:
                         result = shift_right(value, amount or 32)
                     elif amount and value[2] <= SIGNED_MAX:
                         result = shift_right(value, amount)
+                    elif amount and self.signed_shift_congruence:
+                        result = arithmetic_shift_right(value, amount)
                 self.write(state, destination, result,
                            shift_expr(symbol, self.expr(state, source), shift))
             state.flags = None
@@ -1102,8 +1137,9 @@ class Analysis:
         return states
 
 
-def prove(data, address, verified_sites, derivations, accesses, copies):
-    analysis = Analysis(bytes(data), address, derivations, accesses, dict(copies))
+def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR):
+    analysis = Analysis(bytes(data), address, derivations, accesses, dict(copies),
+                        signed_shift_congruence=selector == SELECTOR_V2)
     sites = analysis.syntactic_sites()
     if sites - set(verified_sites) - {site + 2 for site in sites
                                        if analysis.halfword(site) & 0xF800 == 0xF000} or \
@@ -1123,7 +1159,7 @@ def prove(data, address, verified_sites, derivations, accesses, copies):
     for _, row in sorted(analysis.premises.items()):
         loads = row.pop("loads")
         preconditions.append(dict(row, may_be_owner_written=any(site in written for site in loads)))
-    return {"schema": SCHEMA,
+    return {"schema": SCHEMAS[selector],
             "accesses": [[site - address, *record] for site, record in sorted(analysis.records.items())],
             "derivations": [[site - address, *record] for site, record in sorted(analysis.derived.items())],
             "preconditions": preconditions}
@@ -1132,9 +1168,11 @@ def prove(data, address, verified_sites, derivations, accesses, copies):
 class StackIndexBufferProof(rom_copy.RomTableCopyBufferProof):
     """The ROM-table-copy buffer walk with variable stack indices deferred to the analysis above."""
 
+    selector = SELECTOR
+
     def __init__(self, rom, mapping, index, objects, *, rodata=None, data=None, address=None):
         super().__init__(rom, mapping, index, objects, rodata=rodata, data=data, address=address)
-        self.index_policy = Policy(address, len(data))
+        self.index_policy = Policy(address, len(data), self.selector)
 
     def index_copies(self):
         return {site: (record["destination_offset"], record["count"])
@@ -1147,3 +1185,9 @@ class StackIndexBufferProof(rom_copy.RomTableCopyBufferProof):
         return dict(schema=rom_copy.SCHEMA, helper=None, contract=rom_copy.CONTRACT, copies=[],
                     object_initializer=self.rodata, conditions=[], physical_access_proved=False,
                     nonaliasing_proved=False)
+
+
+class StackIndexV2BufferProof(StackIndexBufferProof):
+    """v2: buffer callees may forward the owner's frame pointers as their callees' stack arguments."""
+    selector = SELECTOR_V2
+    forwarded_stack_arguments = True
