@@ -371,5 +371,25 @@ class UmodR1SourceTests(unittest.TestCase):
             with self.subTest(value=value),self.assertRaises(ValueError):
                 self.verify(data=bytes(data),rom=bytes(rom),objects=objects)
 
+    def test_reached_literal_naming_the_callers_own_bytes_refuses_after_composition(self):
+        # Typed data inside the caller is refused by the object binding before
+        # the composed proof returns, so the own-span rule after it is reached
+        # only through that boundary: substitute the composed result there.
+        instructions=self.verify()
+        with patch.object(profile,'verify',return_value=instructions) as composed:
+            self.assertIs(self.verify(),instructions)
+            composed.assert_called_once()
+            for value in (A+8,A+9):
+                data=bytearray(self.body);struct.pack_into('<I',data,self.word,value)
+                rom=bytearray(self.rom);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(data)]=data
+                with self.subTest(value=value),self.assertRaisesRegex(ValueError,"caller's own bytes"):
+                    self.verify(data=bytes(data),rom=bytes(rom))
+        for value in (A+8,A+9):
+            data=bytearray(self.body);struct.pack_into('<I',data,self.word,value)
+            rom=bytearray(self.rom);rom[A-match.ROM_BASE:A-match.ROM_BASE+len(data)]=data
+            objects=json.dumps({'synthetic_object':f'0x{value:08X}'}).encode()
+            with self.subTest(value=value),self.assertRaisesRegex(ValueError,'references itself'):
+                self.verify(data=bytes(data),rom=bytes(rom),objects=objects)
+
 
 if __name__=='__main__':unittest.main()

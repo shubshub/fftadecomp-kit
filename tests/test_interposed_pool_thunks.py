@@ -50,6 +50,7 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
     pointer_reader adds a second reader of the table pointer, either an extra
     load ("extra") or the thunk target itself ("thunk"); "case_extra" and
     "case_thunk" read the first case word of the table the same two ways.
+    code_end is the end of the code that precedes the dispatch's pool.
     """
     data = bytearray()
     labels, branches, loads = {}, [], []
@@ -78,6 +79,7 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
     else:
         branch(0xD800, "default")
     label("dispatch"); word(0x0080); load(1, "literal"); word(0x1840); word(0x6800); word(0x4687)
+    code_end = len(data)
     if len(data) % 4:
         label("alignment"); word(0)
     for n in range(interposed):
@@ -108,7 +110,7 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
     objects = f'{{"g_synthetic":"0x{OBJECT:08X}"}}'.encode() if has_object else None
     literals = {labels["pool" + str(object_word)]: ("g_synthetic", OBJECT)} if has_object else {}
     mapping = json.dumps([dict(rom=f"0x{A:08X}", end=f"0x{A + len(data):08X}", mode="thumb")]).encode()
-    return dict(data=bytes(data), rom=bytes(rom), labels=labels, switches=relocations,
+    return dict(data=bytes(data), rom=bytes(rom), labels=labels, switches=relocations, code_end=code_end,
                 calls={A + call: profile.ALIASES["_call_via_r3"]}, objects=objects, literals=literals,
                 mapping=mapping, index=f"{A:08X} {A + len(data):08X} {len(data)}\n".encode())
 
@@ -311,7 +313,15 @@ class InterposedPoolLayout(unittest.TestCase):
     def test_case_words_have_no_reader_under_any_pool_policy(self):
         # A case word is an address inside the caller: neither a dead load nor
         # a thunk target (ldr r3,=case0; bl _call_via_r3) may read it.
-        for interposed, words in ((2, WORDS), (5, 5), (0, 0)):
+        for interposed, words, selector in ((2, WORDS, SELECTOR), (5, 5, profile.SELECTOR),
+                                            (0, 0, profile.ZERO_SELECTOR)):
+            # The reader-free twin has the same pool layout and verifies under
+            # this policy's full manifest path.
+            clean = fixture(interposed=interposed)
+            manifest = profile.make_manifest(clean["calls"], {}, {}, A, clean["rom"], clean["objects"],
+                                             discovered(clean, words=words), selector=selector)
+            self.assertTrue(profile.verify(clean["data"], A, clean["rom"], clean["mapping"], clean["index"],
+                                           clean["objects"], manifest))
             for reader in ("case_extra", "case_thunk"):
                 f = fixture(interposed=interposed, pointer_reader=reader)
                 with self.subTest(words=words, reader=reader):
@@ -319,10 +329,15 @@ class InterposedPoolLayout(unittest.TestCase):
                         leaf(f, words=words)
                     with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
                         discovered(f, words=words)
+                    # The same refusal through profile.verify, with the twin's
+                    # manifest moved onto this caller's thunk call.
+                    damaged = copy.deepcopy(manifest)
+                    damaged["thunks"] = [[site - A, "_call_via_r3"] for site in f["calls"]]
+                    with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
+                        profile.verify(f["data"], A, f["rom"], f["mapping"], f["index"], f["objects"], damaged)
                     instructions = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
                     instructions.detail = True
-                    end = f["labels"]["literal"] - 4 * interposed - (2 if "alignment" in f["labels"] else 0)
-                    decoded = list(instructions.disasm(f["data"][:end], A))
+                    decoded = list(instructions.disasm(f["data"][:f["code_end"]], A))
                     with self.assertRaisesRegex(ValueError, "table entries cannot be read"):
                         pool.record(f["data"], A, f["switches"], decoded, interposed_words=words)
                     # The own-span rule exempts only the table pointer word, never a case word.
