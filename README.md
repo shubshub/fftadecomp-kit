@@ -3543,6 +3543,37 @@ ordinary callee that is still live across a later call is refused as before.
 tampering and manifest forgery on synthetic bytes;
 `test_bios_bg_affine_set_native.py` covers real agbcc, CLI and report replay.
 
+### CpuSet and CpuFastSet fills in one owner
+
+`--owner-runtime-profile bounded-buffer-bios-mixed-cpuset-fast-fill-source-v1`
+selects `elf-symbol-thumb-bounded-buffer-bios-mixed-cpuset-fast-fill-source-v1`
+for a complete named-data Thumb owner that calls both the exact indexed CpuSet
+wrapper `func_0814186C` (`0bdf7047`) and the exact indexed CpuFastSet wrapper
+`func_08141868` (`0cdf7047`), alongside ordinary calls. Nothing is widened:
+each call is checked by the proof that already owns it. A CpuSet site is
+checked by `bios_cpuset_fill_profile.BiosFillProof`, exactly as under
+`bounded-buffer-bios-fill-source-v1`. Bit24 must be set on every reaching
+path, bit26 sets a halfword or word source unit, and an unknown width
+needs a whole aligned word. A CpuFastSet site is checked by the
+`bounded-buffer-bios-mixed-fast-fill-source-v1` proof: bit24 on every
+reaching path and one aligned local word. Each wrapper call must pass only a
+local R0 source with an external destination. Every other callee keeps the
+unchanged named-data bounded-buffer check. The owner must reach at least one
+call to each wrapper, the closed CFG must have no indirect branches or switch
+words, and function literals and switches are refused.
+
+The report records both site lists, under `bios_fill` and `bios_fast_fill`,
+with the producer digests. Replay recomputes both, and a relabelled report is
+refused. Destination extent, source initialization, physical
+readability/nonalias, numeric results and termination are not proved.
+Returning BIOS semantics and the ordinary returning ABI remain explicit
+premises, as in the two component selectors. The pinned-volatile semantic check
+uses the default ROM interfaces here, the same as
+`bounded-buffer-bios-mixed-fast-fill-source-v1`. The older fill selectors still
+refuse an owner that calls both wrappers. `test_bios_mixed_cpuset_fast_fill.py`
+covers both proofs, the requirement for both wrappers, each site's own control,
+source and destination refusals, stale manifests and swapped wrappers.
+
 ### Expired root-frame scratch at the root's own return
 
 `--owner-runtime-profile bounded-buffer-root-return-scratch-v1` (ordinary
