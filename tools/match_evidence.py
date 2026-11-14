@@ -62,6 +62,16 @@ SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR = "u16-scalars-functions-v2"
 SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA = "elf-symbol-thumb-switch-data-u16-scalars-functions-v2"
 SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY = ("one guarded local Thumb table found by its dispatch load, "
                                            "with complete mapped object, u16 scalar and canonical function words")
+SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR = "u16-scalars-functions-frame-v1"
+SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA = "elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1"
+SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY = (
+    "one guarded local Thumb table with complete mapped object, u16 scalar and canonical function words "
+    "and a fixed write-only outgoing-argument frame")
+SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR = "u16-scalars-functions-frame-v2"
+SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA = "elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v2"
+SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY = (
+    "one guarded local Thumb table found by its dispatch load, with complete mapped object, u16 scalar "
+    "and canonical function words and a fixed write-only outgoing-argument frame")
 PRELOADED_SWITCH_SCHEMA = "elf-symbol-thumb-preloaded-switch-v1"
 PRELOADED_SWITCH_SUMMARY = "one preloaded guarded local Thumb table; backward default loop; termination not proved"
 PRELOADED_SWITCH_CONTROL_FLOW = "closed leaf CFG; termination not proved"
@@ -486,7 +496,9 @@ def switch_pool_u16_scalar_fingerprint(address, data, manifest):
 
 def switch_function_u16_scalar_fingerprint(address, data, manifest):
     """Domain-separated by the function-literal schema of the manifest's pool shape."""
-    schema = (SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if "pool_policy" in manifest else
+    schema = ((SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if "pool_policy" in manifest else
+               SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA) if "stack_policy" in manifest else
+              SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if "pool_policy" in manifest else
               SWITCH_FUNCTION_U16_SCALAR_SCHEMA)
     digest = hashlib.sha256()
     for payload in (schema.encode("ascii"), address.to_bytes(4, "little"),
@@ -594,16 +606,22 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         mapping = mapping_snapshot(root)
         objects = data_snapshot(root) if data_profile else None
         outgoing_frame = data_profile and single("* verification: ") == f"`{typed_switch_frame.SCHEMA}`"
-        pool_frame = data_profile and single("* verification: ") == f"`{pool_switch_frame.SCHEMA}`"
-        function_data = data_profile and single("* verification: ") in (
+        function_frame = data_profile and single("* verification: ") in (
+            f"`{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
+        pool_frame = function_frame or data_profile and \
+            single("* verification: ") == f"`{pool_switch_frame.SCHEMA}`"
+        function_data = function_frame or data_profile and single("* verification: ") in (
             f"`{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`")
-        pool_data = pool_frame or data_profile and single("* verification: ") in (
-            f"`{SWITCH_POOL_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`")
+        pool_data = data_profile and single("* verification: ") in (
+            f"`{SWITCH_POOL_U16_SCALAR_SCHEMA}`", f"`{pool_switch_frame.SCHEMA}`",
+            f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
         scalar_data = pool_data or function_data or data_profile and \
             single("* verification: ") == f"`{SWITCH_U16_SCALAR_SCHEMA}`"
         multiple_data = outgoing_frame or scalar_data or data_profile and \
             single("* verification: ") == f"`{SWITCH_MULTIPLE_DATA_SCHEMA}`"
         summary = (typed_switch_frame.SUMMARY if outgoing_frame else
+                   SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if function_frame and pool_data else
+                   SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY if function_frame else
                    pool_switch_frame.SUMMARY if pool_frame else
                    SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if function_data and pool_data else
                    SWITCH_FUNCTION_U16_SCALAR_SUMMARY if function_data else
@@ -620,6 +638,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
             excluded = excluded[1:]
         if data_profile:
             schema = (typed_switch_frame.SCHEMA if outgoing_frame else
+                      SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if function_frame and pool_data else
+                      SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA if function_frame else
                       pool_switch_frame.SCHEMA if pool_frame else
                       SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if function_data and pool_data else
                       SWITCH_FUNCTION_U16_SCALAR_SCHEMA if function_data else
@@ -675,8 +695,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
                                          data_mapping=objects)
         fingerprint = (typed_switch_frame.fingerprint if outgoing_frame else
-                       pool_switch_frame.fingerprint if pool_frame else
                        switch_function_u16_scalar_fingerprint if function_data else
+                       pool_switch_frame.fingerprint if pool_frame else
                        switch_pool_u16_scalar_fingerprint if pool_data else
                        switch_u16_scalar_fingerprint if scalar_data else
                        switch_multiple_data_fingerprint if multiple_data else
@@ -1175,6 +1195,8 @@ def report_matches(report, root, address):
                     [f"* verification: `{pool_switch_frame.SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`"],
+                    [f"* verification: `{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`"],
+                    [f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{typed_switch_frame.SCHEMA}`"]):
         return switch_report_matches(lines, root, address, data_profile=True)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:

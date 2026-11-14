@@ -30,15 +30,21 @@ OTHER = BASE + 0x1010
 V1 = "elf-symbol-thumb-switch-data-u16-scalars-functions-v1"
 V2 = "elf-symbol-thumb-switch-data-u16-scalars-functions-v2"
 POLICY = "canonical-function-literals-v1"
+FRAME_V1 = "elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1"
+FRAME_V2 = "elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v2"
+STACK_POLICY = "write-only-outgoing-argument-words-v1"
 
 
-def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_function=False):
+def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_function=False,
+            frame=False):
     """A guarded table with a typed object, a u16 scalar and a function literal.
 
     `pool` lists object/scalar words interposed between the dispatch and the
     table pointer (empty is the fixed v1 shape). The cases read a late object,
     a late u16 scalar and a late function word, the function word as an
     ordinary register value (or, with `branch_to_function`, as a branch target).
+    With `frame`, a one-word outgoing-argument frame is allocated after
+    `push {lr}` and consumed by a call to OTHER in the shared tail.
     """
     body, labels, fixups = bytearray(), {}, []
 
@@ -52,6 +58,10 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
         fixups.append((len(body), kind, name, register))
         body.extend(bytes(4 if kind == "word" else 2))
 
+    calls = []
+    if frame:
+        half(0xB500)  # push {lr}
+        half(0xB081)  # sub sp,#4
     if pointer_reader:
         emit("ldr", "pointer", 1)
     for index, kind in enumerate(pool):
@@ -94,7 +104,17 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
     label("default")
     half(0x2000)  # movs r0,#0
     label("done")
-    half(0x4770)  # bx lr
+    if frame:
+        half(0x9000)  # str r0,[sp]
+        displacement = OTHER - (BASE + len(body) + 4)
+        calls.append([len(body), f"func_{OTHER:08X}"])
+        half(0xF000 | ((displacement >> 12) & 0x7FF))
+        half(0xF800 | ((displacement >> 1) & 0x7FF))
+        half(0xB001)  # add sp,#4
+        half(0xBC02)  # pop {r1}
+        half(0x4708)  # bx r1
+    else:
+        half(0x4770)  # bx lr
     while len(body) % 4:
         half(0)
     label("late_object")
@@ -119,7 +139,7 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
     descriptor.update(literal=labels["pointer"], bound=1, relocations=[
         [labels["pointer"], labels["table"]], [labels["table"], labels["case0"]],
         [labels["table"] + 4, labels["case1"]]])
-    manifest = {"calls": [], "switch": descriptor,
+    manifest = {"calls": calls, "switch": descriptor,
                 "data": [[labels[f"pool{index}"], "g_object", 0]
                          for index, kind in enumerate(pool) if kind == "object"] +
                         [[labels["late_object"], "g_object", 8]],
@@ -134,6 +154,8 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
                              [[labels["late_function"], f"func_{CALLBACK:08X}"]]}
     if pool:
         manifest["pool_policy"] = "dispatch-identified-table-pointer-v1"
+    if frame:
+        manifest["stack_policy"] = STACK_POLICY
     mapping = [{"rom": f"0x{BASE:08X}", "end": f"0x{BASE + len(body):08X}", "mode": "thumb"},
                {"rom": f"0x{CALLBACK:08X}", "end": f"0x{CALLBACK + 2:08X}", "mode": "thumb"},
                {"rom": f"0x{OTHER:08X}", "end": f"0x{OTHER + 2:08X}", "mode": "thumb"}]
@@ -160,6 +182,54 @@ class VerificationTests(unittest.TestCase):
                 body, _, manifest, mapping = fixture(pool)
                 _, summary = verify(body, manifest, mapping)
                 self.assertEqual(summary, "closed leaf CFG")
+
+    def test_framed_variants_verify_in_both_pool_shapes(self):
+        for pool in ((), ("object", "scalar")):
+            with self.subTest(pool=pool):
+                body, _, manifest, mapping = fixture(pool, frame=True)
+                _, summary = verify(body, manifest, mapping)
+                self.assertEqual(summary, match.CALL_SUMMARY)
+
+    def test_frame_requires_its_policy_and_fixed_pool_frame_requires_functions(self):
+        body, _, manifest, mapping = fixture(frame=True)
+        unframed = dict(manifest)
+        unframed.pop("stack_policy")
+        with self.assertRaisesRegex(ValueError, "excludes fixed frames"):
+            verify(body, unframed, mapping)
+        with self.assertRaisesRegex(ValueError, "canonical stack policy marker"):
+            verify(body, dict(manifest, stack_policy="other-policy"), mapping)
+        plain = copy.deepcopy(manifest)
+        for field in ("function_policy", "functions"):
+            plain.pop(field)
+        # Without function literals the fixed pool admits no frame (#171 stays v2-only).
+        with self.assertRaisesRegex(ValueError, "canonical stack policy marker"):
+            verify(body, plain, mapping)
+        body, _, manifest, mapping = fixture(("object", "scalar"), frame=True)
+        plain = copy.deepcopy(manifest)
+        for field in ("function_policy", "functions"):
+            plain.pop(field)
+        with self.assertRaisesRegex(ValueError, "only u16"):
+            verify(body, plain, mapping)
+
+    def test_fixed_pool_frame_context_is_isolated(self):
+        body, _, manifest, _ = fixture(frame=True)
+        relocations = dict(map(tuple, manifest["switch"]["relocations"]))
+        objects = {offset: (name, OBJECT + addend) for offset, name, addend in manifest["data"]}
+        calls = {BASE + offset: OTHER for offset, _ in manifest["calls"]}
+        common = dict(switch_relocations=relocations, switch_data_relocations=objects,
+                      backward_switch_cases=True)
+        for options, message in (
+                ({"switch_outgoing_stack": STACK_POLICY}, "requires the interposed switch pool"),
+                ({"switch_outgoing_stack_fixed_pool": True}, "isolated switch-data context"),
+                ({"switch_outgoing_stack": STACK_POLICY, "switch_outgoing_stack_fixed_pool": 1},
+                 "isolated switch-data context"),
+                ({"switch_outgoing_stack": STACK_POLICY, "switch_outgoing_stack_fixed_pool": True,
+                  "switch_interposed_pool": True}, "isolated switch-data context")):
+            with self.subTest(options=options), self.assertRaisesRegex(ValueError, message):
+                match.verify_leaf_instructions(bytes(body), BASE, True, calls, **common, **options)
+        match.verify_leaf_instructions(bytes(body), BASE, True, calls, **common,
+                                       switch_outgoing_stack=STACK_POLICY,
+                                       switch_outgoing_stack_fixed_pool=True)
 
     def test_existing_policies_still_refuse_the_function_word(self):
         for pool in ((), ("object", "scalar")):
@@ -262,7 +332,9 @@ class ConfigurationTests(unittest.TestCase):
 
     def test_selectors_use_the_isolated_fixed_configuration(self):
         for selector in (evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
-                         evidence.SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR):
+                         evidence.SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+                         evidence.SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+                         evidence.SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR):
             args = SimpleNamespace(
                 switch_data_profile=selector,
                 mode="thumb", control_flow_profile="ordinary", signed_quotient_profile=None,
@@ -293,12 +365,16 @@ class ReportTests(unittest.TestCase):
         self.rom_path = self.root / "synthetic-image.bin"
         self.use(())
 
-    def use(self, pool):
-        self.body, _, self.manifest, mapping = fixture(pool)
+    def use(self, pool, frame=False):
+        self.frame = frame
+        self.body, _, self.manifest, mapping = fixture(pool, frame=frame)
         self.functions = json.dumps(mapping).encode()
         self.rom_path.write_bytes(image(self.body))
-        self.schema, self.summary = (V2, evidence.SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY) if pool else \
-            (V1, evidence.SWITCH_FUNCTION_U16_SCALAR_SUMMARY)
+        self.schema, self.summary = {
+            (False, False): (V1, evidence.SWITCH_FUNCTION_U16_SCALAR_SUMMARY),
+            (True, False): (V2, evidence.SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY),
+            (False, True): (FRAME_V1, evidence.SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY),
+            (True, True): (FRAME_V2, evidence.SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY)}[bool(pool), frame]
         for name, value in (("mapping_snapshot", self.functions), ("data_snapshot", self.objects),
                             ("report_rom_path", str(self.rom_path))):
             patcher = mock.patch.object(evidence, name, return_value=value)
@@ -313,12 +389,13 @@ class ReportTests(unittest.TestCase):
             f"* source SHA-256: `{self.source}`",
             f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.functions)}`",
             f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            f"* switches: {self.summary}",
+            f"* switches: {self.summary}"] + (
+            [f"* stack frame: {evidence.STACK_SUMMARY}"] if self.frame else []) + [
             "* source plausibility: plausible", "* relocations: none",
             "* verified extent: complete ELF function symbol, including literal pools",
             f"* compiled : `{self.body.hex()}`",
             f"* switch manifest: `{evidence.switch_manifest(manifest)}`",
-            "* control flow: closed leaf CFG",
+            f"* control flow: {match.CALL_SUMMARY if self.frame else 'closed leaf CFG'}",
             f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
             f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
             f"* switch proof SHA-256: `{fingerprint}`"])
@@ -334,6 +411,34 @@ class ReportTests(unittest.TestCase):
                 self.assertTrue(self.valid(report))
                 with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
                     self.assertTrue(evidence.report_matches(report, self.root, BASE))
+
+    def test_framed_reports_revalidate_and_cannot_be_relabelled(self):
+        import rebuild
+        self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
+        for pool, selector in (((), evidence.SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR),
+                               (("object", "scalar"), evidence.SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)):
+            with self.subTest(selector=selector):
+                self.use(pool, frame=True)
+                report = self.report()
+                self.assertTrue(self.valid(report))
+                self.assertTrue(evidence.report_matches(report, self.root, BASE))
+                self.assertEqual(rebuild.saved_profile_arguments(report, self.root, BASE),
+                                 ["--switch-data-profile", selector])
+                unframed = V2 if pool else V1
+                for variant in (report.replace(self.schema, unframed),
+                                report.replace(self.schema, "elf-symbol-thumb-switch-data-u16-scalars-frame-v1"),
+                                report.replace(self.schema, FRAME_V1 if pool else FRAME_V2),
+                                "\n".join(line for line in report.splitlines()
+                                          if not line.startswith("* stack frame")),
+                                self.report(dict(self.manifest, stack_policy="other-policy"))):
+                    self.assertFalse(self.valid(variant))
+                plain = copy.deepcopy(self.manifest)
+                plain.pop("stack_policy")
+                self.assertFalse(self.valid(self.report(
+                    plain, evidence.switch_function_u16_scalar_fingerprint(BASE, self.body, plain))))
+                self.assertNotEqual(
+                    evidence.switch_function_u16_scalar_fingerprint(BASE, self.body, self.manifest),
+                    evidence.switch_function_u16_scalar_fingerprint(BASE, self.body, plain))
 
     def test_tampered_policy_schema_summary_and_fingerprint_reject(self):
         report = self.report()
