@@ -2086,7 +2086,11 @@ arguments 5 and up:
   allocation). That set must be a prefix of the frame, the same on every
   path to the call, and is empty again after the call, since a callee may
   overwrite its incoming arguments. A word still pending at the release
-  rejects, and some call must consume the whole frame.
+  rejects, and some call must consume the whole frame. Later calls are not
+  shown to ignore stale frame words: only the frame stores since the previous
+  call are attributed to a call, and no proof relies on frame contents;
+* the per-path walk is bounded at 65536 `(site, phase, written-words)`
+  states, and a function that needs more rejects.
 
 Non-SP block copies keep their ordinary meaning, because no register can hold
 a stack address. The ordinary direct-call ABI boundary is unchanged: nothing
