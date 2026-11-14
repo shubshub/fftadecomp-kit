@@ -2572,10 +2572,16 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
             if struct.unpack_from("<I", data, offset)[0] != value:
                 raise ValueError("switch function literal does not equal its binding")
             functions[offset] = (name, value)
-        code_entries = {int(entry["rom"], 16) & ~1 for entry in entries}
-        for _, value in data_relocations.values():
-            if value & ~1 in code_entries or address <= value & ~1 < address + len(data):
-                raise ValueError("switch function-literal callers cannot bind code entries or their own span as data")
+        # Neither an object's symbol address nor its bound value may name an
+        # indexed code entry, a reserved call thunk, or any byte inside an
+        # indexed function span (the caller's own span included).
+        spans = [(int(entry["rom"], 16) & ~1, int(entry["end"], 16)) for entry in entries]
+        spans.append((address, address + len(data)))
+        for name, value in data_relocations.values():
+            for target in (objects[name], value):
+                if function_thunk.reserved(target) or any(start <= target & ~1 < end for start, end in spans):
+                    raise ValueError("switch function-literal callers cannot bind code entries "
+                                     "or indexed function spans as data")
     calls = {}
     previous = -1
     occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars, *functions)

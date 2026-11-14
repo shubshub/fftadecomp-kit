@@ -1949,10 +1949,12 @@ instructions inside the complete caller. A case may precede the dispatch (agbcc
 shares a `p += 2` block at a loop top this way) but may not land on or between
 the comparison and the table's last word; the CFG still refuses a target in a
 literal word or in the middle of an instruction, and walks the reached block like
-any other. Exactly five schemas admit this, all through `verify_switches`:
+any other. Exactly seven schemas admit this, all through `verify_switches`:
 `elf-symbol-thumb-switches-v1`, `elf-symbol-thumb-switch-data-v1`,
-`elf-symbol-thumb-switch-data-v2` (multiple data), `elf-symbol-thumb-switch-data-u16-scalars-v1`
-and `elf-symbol-thumb-switch-typed-outgoing-frame-v1`. The opt-in is
+`elf-symbol-thumb-switch-data-v2` (multiple data), `elf-symbol-thumb-switch-data-u16-scalars-v1`,
+`elf-symbol-thumb-switch-typed-outgoing-frame-v1`, and the two fixed-pool
+function-literal schemas `elf-symbol-thumb-switch-data-u16-scalars-functions-v1`
+and `elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1`. The opt-in is
 `allow_backward_cases=True` in `selected_switch_layout`, `verify_switches` and
 `verify_leaf_instructions` (`backward_switch_cases=True`, passed by `verify_switches`
 and the u16-scalar replay in `match.py`). `switch_layout` defaults to the forward
@@ -2123,8 +2125,10 @@ value from the index and compares the word. Function words must be aligned,
 complete, reached, outside the table and pool, and must not overlap a table,
 object or scalar word. Interposed pool words must still be objects or u16
 scalars. Every reached literal must be the table pointer, a typed object, a
-u16 scalar or a bound function word. No typed object may resolve to an
-indexed code entry or into the caller's own span. The two `#139` rules also
+u16 scalar or a bound function word. Neither a typed object's symbol
+address nor its bound value (symbol plus addend) may be a reserved call thunk
+or fall anywhere inside an indexed function span `[rom, end)`, the caller's
+own span included. The two `#139` rules also
 apply: no reached literal names the caller's own bytes except the table
 pointer, and the dispatch load is the table pointer's only reader, in both
 pool shapes.
