@@ -3913,6 +3913,76 @@ termination remain unproved, and returning BIOS semantics remain a premise.
 width arithmetic, wide-encoding refusal, forged and relabelled manifests and CLI
 report replay.
 
+### CpuSet copies whose source is a RAM-copied code image
+
+Some routines are copied from ROM to RAM before they run, so the decomp keeps
+them as bounded ROM entries (see the `0x08A38A2C` image above). The installer's
+literal pool then holds an entry start, which a typed object may not name
+(`addressed data overflows or aliases indexed code`) and which a function
+literal cannot name (those bind Thumb entries and set bit 0).
+
+Two opt-in selectors admit exactly that literal, and nothing else:
+
+* `--addressed-runtime-profile addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1`
+  is `...-fill-scalar-control-numeric-mmio-data-v1` plus the binding below;
+* `--addressed-runtime-profile addressed-native-bios-fill-scalar-control-code-image-data-v1`
+  is `...-fill-scalar-control-data-v1` plus the binding below.
+
+Their schemas are `elf-symbol-thumb-` followed by the selector name, so a report
+cannot be replayed or relabelled under any older selector, and
+`data_producer_fingerprint` additionally pins `cpuset_code_image_profile.py` and
+`iwram_installation_prerequisite.py` for them only.
+
+**Binding.** A typed object (`config/data_symbols.json`, e.g.
+`data_08005088`) whose value is exactly the `rom` of one indexed row (ARM or
+Thumb; zero addend; the value lies in exactly one row) is no longer refused.
+Every other aliasing of indexed code is still refused. The CFG proof then
+requires, for every load of that literal word:
+
+* it is `ldr r0, [pc, #n]` and nothing else loads the word;
+* one linear path reaches an actual CpuSet wrapper call; every instruction on
+  it has exactly one predecessor (no joins) and r0 is not written on the way.
+  The only read of r0 is `subs r2, rN, r0` (r0 the subtrahend, r2 the
+  destination; the `end - start` length of `0x08002768`). Any other `subs`,
+  `negs` or other read of r0 is refused, and until r2 is overwritten every read
+  of that derived r2 must be an r2-to-r2 shift or add/sub immediate. The flags
+  that subtraction and those steps set also carry the alias, so from the `subs`
+  to the call only instructions that do not read flags may appear (`adcs`,
+  `sbcs`, `rors` and anything conditional are refused), and the same holds after
+  the call until a `cmp`/`cmn`/`adds`/`subs`/`negs` recomputes the flags (a later
+  call with tainted flags is refused);
+* after the call r0 may not be read (the BIOS is assumed to leave source plus
+  length there, an unproved register premise) until it is written, a later
+  call may not see it live, and no function exit may be reached with it live;
+* constant propagation over the exact bytes gives r0, r1 and r2 on every
+  reaching path: r0 equals the literal, r2 is a plain copy control (bit 24 clear,
+  no reserved bits, 1 to 0x200 bytes; the real images are 0xB0 and 0x140) and r1
+  is aligned with the unit width with the whole destination in EWRAM or IWRAM
+  below 0x03007E00 (above it is the BIOS-reserved IRQ vector and stacks). The
+  destination may overlap typed objects the function itself writes; that is not
+  checked.
+
+**What is recorded.** `manifest['code_image_sources']` holds, per call, the
+source, destination, control, unit width and count, a SHA-256 of the copied ROM
+bytes, every indexed row the span intersects with its mode and covered byte
+count, the unindexed gaps and the overrun. The span is bounded: at most 3 rows (the largest real case, `0x08002768`; a reviewed bump is needed to go higher),
+gaps of at most 3 bytes (alignment padding), no covered row may be the owner or
+the CpuSet wrapper. A copy may read past its image: it is *admitted and
+recorded* when the only partially covered row is the last one the span reaches
+and at most 0x80 bytes of it are read (`0x08004AC0` reads 68 bytes into the Thumb
+function at `0x080051C4`), and the span may not start inside an indexed row. The alternative of refusing an
+overrun, or of requiring it to be named, was rejected: the overread is a fact
+about the original, the selector only claims static source-span identity, and
+the rows are written into the report (and re-derived on replay) either way.
+Rows after the first are rows the span covers: they are recorded, not asserted to be part of the image.
+
+**Not proved.** No BIOS effect or return, readability, persistence of the
+installed bytes, destination safety, or any property of the installed code; the
+literal is not callable, storable or an object bound (any other use of the word
+is refused). It does not widen function literals or ordinary objects.
+`test_cpuset_code_image.py` covers admitted and refused shapes, overrun, gaps,
+forged manifests, relabelling and report replay.
+
 ### Expired root-frame scratch at the root's own return
 
 `--owner-runtime-profile bounded-buffer-root-return-scratch-v1` (ordinary
