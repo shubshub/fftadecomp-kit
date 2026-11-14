@@ -72,11 +72,33 @@ class MixedCpuSetFastFillTests(unittest.TestCase):
 
     def test_legacy_fill_selectors_still_refuse_the_mixture(self):
         f = self.fixture()
-        for selector in (buffers.MIXED_FAST_FILL_SELECTOR, buffers.FAST_FILL_SELECTOR,
-                         buffers.BIOS_FILL_SELECTOR, buffers.BIOS_LOCAL_FILL_SELECTOR,
-                         buffers.SELECTOR):
-            with self.subTest(selector=selector), self.assertRaises(ValueError):
+        unbounded = 'buffer callee 0x{:08X}: non-leaf calls and interrupts'
+        for selector, message in (
+                (buffers.MIXED_FAST_FILL_SELECTOR, unbounded.format(fixtures.bios.ADDRESS)),
+                (buffers.FAST_FILL_SELECTOR,
+                 'CpuFastSet fill requires only its actual direct wrapper calls'),
+                (buffers.BIOS_FILL_SELECTOR, unbounded.format(fast.ADDRESS)),
+                (buffers.BIOS_LOCAL_FILL_SELECTOR, unbounded.format(fast.ADDRESS)),
+                (buffers.SELECTOR, unbounded.format(fixtures.bios.ADDRESS))):
+            with self.subTest(selector=selector), \
+                    self.assertRaisesRegex(ValueError, message):
                 owner.verify(**dict(f, selector=selector))
+
+    def test_cpuset_target_at_a_non_cpuset_site_is_refused(self):
+        # Defence in depth: the dispatch refuses before BiosFillProof sees it.
+        f = self.fixture()
+        proof = mixed.MixedCpuSetFastFillProof(f['rom'], f['mapping'], f['index'],
+                                               f['objects'])
+        calls = {fixtures.A+offset: int(name[5:], 16)
+                 for offset, name in f['bindings']['calls']}
+        proof.bind_root(f['data'], fixtures.A, calls)
+        for site in (*(s for s, t in calls.items() if t != fixtures.bios.ADDRESS), None):
+            with self.subTest(site=site), self.assertRaisesRegex(
+                    ValueError, 'mixed CpuSet fill requires its exact bound root call'):
+                proof.check_call(fixtures.bios.ADDRESS, {0: 0}, {}, site=site)
+        self.assertFalse(proof._root_fill.observations)
+        with self.assertRaisesRegex(ValueError, 'actual checked local source'):
+            proof.cpuset_manifest()
 
     def test_both_wrappers_are_required(self):
         # CpuSet only (no CpuFastSet), and CpuFastSet only (no CpuSet).

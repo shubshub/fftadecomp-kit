@@ -37,10 +37,13 @@ class MixedCpuSetFastFillProof(fast_fill.MixedFastFillSourceProof):
         if address != cpuset.ADDRESS:
             return super().check_call(address, aliases, stack, slots,
                 constants=constants, site=site, words=words)
+        # Defence in depth: BiosFillProof.check_call already refuses a site
+        # outside its own bound calls, but the dispatch here must never route
+        # a CpuSet target through anything but the root's actual CpuSet site.
         if not hasattr(self, '_root') or self._root[2].get(site) != address:
             raise ValueError('mixed CpuSet fill requires its exact bound root call')
-        return buffers.BiosFillSourceProof.check_call(self, address, aliases,
-            stack, slots, constants=constants, site=site, words=words)
+        return buffers.check_bios_fill_call(self, address, aliases, stack,
+            slots, site, words)
 
     def _producers(self):
         return {Path(module.__file__).name:
@@ -51,6 +54,9 @@ class MixedCpuSetFastFillProof(fast_fill.MixedFastFillSourceProof):
         return dict(super().bios_manifest(), producer_sha256=self._producers())
 
     def cpuset_manifest(self):
+        # Defence in depth: bind_root already requires a CpuSet call and the
+        # owner walk checks every reached site, so an empty observation set
+        # should be unreachable; refuse rather than emit an unbacked manifest.
         if not hasattr(self, '_root_fill') or not self._root_fill.observations:
             raise ValueError('mixed CpuSet fill requires an actual checked local source')
         return dict(self._root_fill.manifest(), producer_sha256=self._producers())

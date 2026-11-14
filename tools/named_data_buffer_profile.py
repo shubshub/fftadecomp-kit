@@ -728,6 +728,26 @@ class GuardedSwitchBufferProof(DiscardedReturnScratchProof):
             observations=[self._guarded_switches[key] for key in sorted(self._guarded_switches)])
 
 
+def check_bios_fill_call(proof, address, aliases, stack, slots, site, words):
+    """Check one CpuSet wrapper site against `proof._root_fill`, a bound
+    bios_cpuset_fill_profile.BiosFillProof, and record the exact wrapper."""
+    import bios_cpuset_fill_profile as bios
+    if not hasattr(proof, '_root_fill') or slots or words or match.ARM_REG_LR in aliases:
+        raise ValueError('BIOS fill requires its actual root call without pointer slots or words')
+    arguments = {reg:offset for reg,offset in aliases.items()
+                 if reg in match.CALLER_CLOBBERED}
+    result = proof._root_fill.check_call(site, arguments, stack)
+    data = proof.span(address)
+    if data != bios.WRAPPER:
+        raise ValueError('BIOS fill requires the exact complete indexed wrapper')
+    proof.dependencies[address] = data
+    proof.records[address] = dict(address=address, end=address+len(data), bytes=len(data),
+        body_sha256=hashlib.sha256(data).hexdigest(), **proof.identities,
+        structure=dict(kind=BIOS_FILL_SCHEMA, instructions=2,
+            wrapper_hex=data.hex(), conditional_ABI=bios.CONTRACT))
+    return result
+
+
 class BiosFillSourceProof(NamedDataBufferProof):
     """Compose the existing root-local source proof without widening callees."""
 
@@ -744,20 +764,7 @@ class BiosFillSourceProof(NamedDataBufferProof):
         if address != bios.ADDRESS:
             return super().check_call(address, aliases, stack, slots,
                 constants=constants, site=site, words=words)
-        if not hasattr(self, '_root_fill') or slots or words or match.ARM_REG_LR in aliases:
-            raise ValueError('BIOS fill requires its actual root call without pointer slots or words')
-        arguments = {reg:offset for reg,offset in aliases.items()
-                     if reg in match.CALLER_CLOBBERED}
-        result = self._root_fill.check_call(site, arguments, stack)
-        data = self.span(address)
-        if data != bios.WRAPPER:
-            raise ValueError('BIOS fill requires the exact complete indexed wrapper')
-        self.dependencies[address] = data
-        self.records[address] = dict(address=address, end=address+len(data), bytes=len(data),
-            body_sha256=hashlib.sha256(data).hexdigest(), **self.identities,
-            structure=dict(kind=BIOS_FILL_SCHEMA, instructions=2,
-                wrapper_hex=data.hex(), conditional_ABI=bios.CONTRACT))
-        return result
+        return check_bios_fill_call(self, address, aliases, stack, slots, site, words)
 
     def bios_manifest(self):
         import bios_cpuset_fill_profile as bios
