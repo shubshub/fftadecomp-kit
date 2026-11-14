@@ -2364,8 +2364,10 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   not cleared by a call and a join is dirty if any incoming path is. A thunk
   register holding any constant-derived value, including a literal word itself,
   is refused, so a callback must be a plain load from memory and cannot be
-  loaded after a constant store on its path; the only route not followed is a
-  callee copying memory. A thunk BL whose register is tainted is refused. The
+  loaded after a constant store on its path. Not followed: a callee copying
+  memory, and a callee returning a pointer into the caller's outgoing frame
+  (the frame words are exempt from the flag, so a load through such a result
+  is a premise: callee results do not point into the caller's frame). A thunk BL whose register is tainted is refused. The
   table pointer literal must also be read only by the dispatch load, the caller's own
   bytes may not be named by any other literal, and no object or literal may name
   an indexed code entry, a byte inside any indexed function span (the caller's
