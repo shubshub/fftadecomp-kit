@@ -3785,8 +3785,7 @@ source and destination refusals, stale manifests and swapped wrappers.
 
 ### Zero-extended CpuSet fill controls
 
-A direct call to the CpuSet wrapper `func_0814186C` (and `func_08141864`,
-`func_08141868`) is not refused by the buffer walk as such. The default and
+A direct call to the CpuSet wrapper `func_0814186C` is not refused by the buffer walk as such. The default and
 dead-argument walks treat it as an ordinary callee, and the wrapper's `swi` is
 then refused (`buffer callee 0x0814186C: non-leaf calls and interrupts require
 linked CFG verification`); the BIOS fill selectors replace that inspection with
