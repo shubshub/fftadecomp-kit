@@ -78,6 +78,10 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             SWITCH_FUNCTION_U16_SCALAR_SELECTOR, SWITCH_FUNCTION_U16_SCALAR_SCHEMA,
                             SWITCH_FUNCTION_U16_SCALAR_SUMMARY, SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
                             SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY,
+                            SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR, SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA,
+                            SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY, SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR,
+                            SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA,
+                            SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY,
                             PRELOADED_SWITCH_SCHEMA, PRELOADED_SWITCH_SUMMARY,
                             PRELOADED_SWITCH_CONTROL_FLOW, preloaded_switch_fingerprint,
                             UDIVSI3_SCHEMA, UDIVSI3_SUMMARY, UDIVSI3_RUNTIME,
@@ -2447,12 +2451,13 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     pool_data = scalar_data and "pool_policy" in manifest
     if pool_data and manifest["pool_policy"] != SWITCH_POOL_POLICY:
         raise ValueError("interposed switch pool requires its canonical policy marker")
-    pool_frame = isinstance(manifest, dict) and "stack_policy" in manifest
-    if pool_frame and (not pool_data or manifest["stack_policy"] != pool_switch_frame.STACK_POLICY):
-        raise ValueError("outgoing-argument switch frame requires its canonical stack policy marker")
     function_data = scalar_data and "function_policy" in manifest
     if function_data and manifest["function_policy"] != SWITCH_FUNCTION_POLICY:
         raise ValueError("switch function literals require their canonical policy marker")
+    pool_frame = isinstance(manifest, dict) and "stack_policy" in manifest
+    if pool_frame and (not (pool_data or function_data) or
+                       manifest["stack_policy"] != pool_switch_frame.STACK_POLICY):
+        raise ValueError("outgoing-argument switch frame requires its canonical stack policy marker")
     outgoing_frame = isinstance(manifest, dict) and "frame_policy" in manifest
     if outgoing_frame and (not complete_data or scalar_data or
             manifest["frame_policy"] != typed_switch_frame.SELECTOR):
@@ -2596,7 +2601,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             if outgoing_frame else None,
                                             switch_interposed_pool=pool_data,
                                             switch_outgoing_stack=pool_switch_frame.STACK_POLICY
-                                            if pool_frame else None)
+                                            if pool_frame else None,
+                                            switch_outgoing_stack_fixed_pool=pool_frame and not pool_data)
     if complete_data:
         # The default policy still admits only the table pointer and typed
         # objects. The separate explicit policy binds every extra u16 word.
@@ -3706,7 +3712,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              typed_switch_outgoing_frame=None, unsigned_quotient_profile=None,
                              finite_small_copy_context=None, self_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
-                             switch_interposed_pool=False, switch_outgoing_stack=None):
+                             switch_interposed_pool=False, switch_outgoing_stack=None,
+                             switch_outgoing_stack_fixed_pool=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -3746,9 +3753,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             buffer_proof is not None or function_thunk_context is not None or
             double_context is not None or typed_switch_outgoing_frame is not None):
         raise ValueError("interposed switch pool requires its isolated switch-data context")
+    if type(switch_outgoing_stack_fixed_pool) is not bool or switch_outgoing_stack_fixed_pool and (
+            switch_outgoing_stack is None or switch_interposed_pool or
+            switch_relocations is None or switch_data_relocations is None or
+            preloaded_switch or allow_switch_constants or allow_switch_scalar_frame or
+            buffer_proof is not None or function_thunk_context is not None or
+            double_context is not None or typed_switch_outgoing_frame is not None):
+        raise ValueError("fixed-pool outgoing-argument frame requires its isolated switch-data context")
     if switch_outgoing_stack is not None:
         pool_switch_frame.check_context(switch_outgoing_stack)
-        if not switch_interposed_pool:
+        if not switch_interposed_pool and not switch_outgoing_stack_fixed_pool:
             raise ValueError("outgoing-argument switch frame requires the interposed switch pool")
     if finite_small_copy_context is not None:
         from finite_small_local_copy_profile import validate_context
@@ -5069,6 +5083,8 @@ def switch_u16_scalar_configuration(args):
     if args.switch_data_profile not in (SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
                                         pool_switch_frame.SELECTOR, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
                                         SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+                                        SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+                                        SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR,
                                         typed_switch_frame.SELECTOR) or \
             args.mode != "thumb" or args.control_flow_profile != "ordinary" or \
             any((args.signed_quotient_profile, args.signed_runtime_profile,
@@ -5104,6 +5120,8 @@ def main():
     ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
                                                       pool_switch_frame.SELECTOR, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
                                                       SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+                                                      SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+                                                      SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR,
                                                       typed_switch_frame.SELECTOR))
     ap.add_argument("--wsl", default="Ubuntu")
     ap.add_argument("--wsl-path", default=os.environ.get("FFTA_WSL_PATH",
@@ -5320,9 +5338,15 @@ def main():
     print(f"compiler  {args.cc} {args.flags}")
 
     function_switch_profile = args.switch_data_profile in (SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
-                                                           SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR)
+                                                           SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+                                                           SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+                                                           SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
     pool_switch_profile = args.switch_data_profile in (SWITCH_POOL_U16_SCALAR_SELECTOR, pool_switch_frame.SELECTOR,
-                                                       SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR)
+                                                       SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+                                                       SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
+    pool_frame_profile = args.switch_data_profile in (pool_switch_frame.SELECTOR,
+                                                      SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+                                                      SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
     # the compile runs in a shell (possibly inside WSL), so give it a POSIX path
     runner = Runner(args.cc, args.wsl, args.wsl_path,
                     timeout=software_double.REPLAY_TIMEOUT if double_profile or thunk_profile else None)
@@ -5535,7 +5559,6 @@ def main():
                 verified_instructions = verify_udivsi3(
                     got, addr, rom, mapping, division_evidence, selector=args.unsigned_quotient_profile)
             elif switch_relocations:
-                pool_frame_profile = args.switch_data_profile == pool_switch_frame.SELECTOR
                 switch_evidence = {
                     "calls": [[site - addr, f"func_{target:08X}"]
                               for site, target in sorted(calls.items())],
@@ -5563,7 +5586,8 @@ def main():
                         got, addr, True, calls, switch_relocations=switch_relocations,
                         switch_data_relocations=data_relocations, backward_switch_cases=True,
                         switch_interposed_pool=pool_switch_profile,
-                        switch_outgoing_stack=pool_switch_frame.STACK_POLICY if pool_frame_profile else None)
+                        switch_outgoing_stack=pool_switch_frame.STACK_POLICY if pool_frame_profile else None,
+                        switch_outgoing_stack_fixed_pool=pool_frame_profile and not pool_switch_profile)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                     switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
                     if pool_switch_profile:
@@ -5652,6 +5676,9 @@ def main():
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   typed_switch_frame.SCHEMA if "frame_policy" in switch_evidence else
+                  (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
+                   SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA)
+                  if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
                   pool_switch_frame.SCHEMA if "stack_policy" in switch_evidence else
                   (SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
                    SWITCH_FUNCTION_U16_SCALAR_SCHEMA) if "function_policy" in switch_evidence else
@@ -5910,6 +5937,9 @@ def main():
             if switch_relocations:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
                            typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else
+                           (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
+                            SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY)
+                           if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
                            pool_switch_frame.SUMMARY if "stack_policy" in switch_evidence else
                            (SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
                             SWITCH_FUNCTION_U16_SCALAR_SUMMARY) if "function_policy" in switch_evidence else
@@ -5921,8 +5951,8 @@ def main():
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
                                       typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else
-                                      pool_switch_frame.fingerprint if "stack_policy" in switch_evidence else
                                       switch_function_u16_scalar_fingerprint if "function_policy" in switch_evidence else
+                                      pool_switch_frame.fingerprint if "stack_policy" in switch_evidence else
                                       switch_pool_u16_scalar_fingerprint if "pool_policy" in switch_evidence else
                                       switch_u16_scalar_fingerprint if "scalar_policy" in switch_evidence else
                                       switch_multiple_data_fingerprint if "data_policy" in switch_evidence else

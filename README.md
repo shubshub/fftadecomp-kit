@@ -2135,8 +2135,22 @@ literal fails the ordinary control-flow proof. Nothing is claimed about the
 callee or about what the receiving call does with the pointer. The
 fingerprint is domain-separated by the schema, a report under a function-free
 schema cannot carry a function manifest (or the reverse), and status.py and
-rebuild.py forward the saved selector. Frames, thunks, signed or 32-bit
-scalars and owner selectors are not extended.
+rebuild.py forward the saved selector. Thunks, signed or 32-bit scalars and
+owner selectors are not extended.
+
+`u16-scalars-functions-frame-v1` and `u16-scalars-functions-frame-v2`
+(schemas `elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1` and
+`-v2`) add the `u16-scalars-frame-v1` frame proof to the matching
+function-literal selector, unchanged: one fixed `sub sp,#n` of write-only
+outgoing-argument words, consumed as a prefix by the calls that follow, with
+no stack address in a register. The manifest carries both
+`function_policy` and `"stack_policy": "write-only-outgoing-argument-words-v1"`.
+`-frame-v1` places that frame on the fixed pool layout. The frame proof does
+not depend on the pool shape, but a fixed-pool frame is reachable only
+together with bound function literals. `u16-scalars-frame-v1` itself still
+requires the dispatch-identified pool. Unframed function-literal selectors
+still refuse a frame, and a framed report cannot be relabelled as an unframed
+or function-free one.
 
 ### Preloaded guarded Thumb switches
 
