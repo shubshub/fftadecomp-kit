@@ -145,8 +145,9 @@ MASK = 0xFFFFFFFF
 SP = ("sp",)
 # Cost bounds, not soundness bounds: every path is checked in full, and a
 # function the bounds cut short is refused, never accepted on the paths seen.
-# All paths are held at once (about 0.25 MB each with their records), so
-# 1024 paths cost about 300 MB and 5 s at worst (kit#137: 0800C4B4).  More
+# All paths are held at once with their records, so the true ceiling is
+# MAX_PATHS x MAX_STEPS records; measured on 0800C4B4 (kit#137), 1024 paths
+# take about 0.25 MB each, 300 MB and 5 s in all.  More
 # decisions per path would not help: a loop whose exit is unknown is
 # refused at any bound, and each extra decision can double the paths.
 MAX_PATHS = 1024

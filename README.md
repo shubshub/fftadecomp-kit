@@ -2534,8 +2534,9 @@ differently guarded index, a table that is not adjacent, not local or of
 another size, and entering the dispatch past its shift still fail closed.
 The path and decision bounds are cost bounds (kit#137): every path is
 checked in full and a function they cut short is refused, never accepted on
-the paths seen. The path bound was 256; holding 1024 paths costs about
-300 MB and 5 s at worst. Loops whose exit depends on unknown values stay
+the paths seen. The path bound was 256; holding 1024 paths, measured on
+0800C4B4, costs about 300 MB and 5 s (the true ceiling is 1024 paths of
+up to 20000 records each). Loops whose exit depends on unknown values stay
 refused at any decision bound. Because the
 check sees every spelling, the earlier syntactic rule against statements
 that only read `symbol.member` is gone.
