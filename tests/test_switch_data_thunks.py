@@ -410,7 +410,7 @@ class ProofTests(unittest.TestCase):
                  switch_outgoing_stack_fixed_pool=True)
 
     def test_block_transfers_through_untainted_registers_stay_ordinary(self):
-        verify(build(post=(('ldr', 3, 'object'), ('h', 0x2100), ('h', 0xC302),
+        verify(build(post=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0xC302),
                            ('ldr', 2, 'object'), ('h', 0x6812))))
         verify(build(post=(('ldr', 3, 'object'), ('h', 0xCB04))))
 
@@ -458,9 +458,32 @@ class ProofTests(unittest.TestCase):
                     ValueError, 'local code address|constant-derived|cannot be stored'):
                 leaf(build(post=post), switch_thunks=PLAIN)
         # Small constants that never reach the thunk register stay ordinary.
-        verify(build(post=(*obj, ('h', 0x2104), ('h', 0x6019), ('ldr', 2, 'object'), ('h', 0x6812))))
+        verify(build(post=(*obj, ('h', 0x6819), ('h', 0x6019), ('ldr', 2, 'object'), ('h', 0x6812))))
         # A constant mixed with a loaded value is constant-derived, but loading through it is ordinary.
         verify(build(post=(*obj, ('h', 0x6818), ('h', 0x3004), ('h', 0x6802))))
+
+    def test_a_stored_constant_makes_every_later_load_constant_derived(self):
+        # r3 = &g_right; [r3] = 0x04000000; [r3 + 4] = 0x04000031; then r2 = [r4] + [r4 + 4] = 0x08000031.
+        def parts(*, first=(('h', 0x6019),), between=(), reload=(('ldr', 4, 'object'),)):
+            return dict(post=(('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x04C9), *first, *between,
+                              ('h', 0x3131), ('h', 0x6059), *reload,
+                              ('h', 0x6822), ('h', 0x6860), ('h', 0x1812)))
+        variants = {
+            'fresh literal reload': parts(),
+            'rewrite of the base to itself': parts(between=(('h', 0x3300),)),
+            'writeback store': parts(first=(('h', 0xC302),), reload=(('ldr', 4, 'object'),)),
+            'copy of the base': parts(reload=(('h', 0x1C1C),)),
+        }
+        for label, fixture in variants.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'constant-derived'):
+                leaf(build(**fixture), switch_thunks=PLAIN)
+        # The dirty flag survives a call, which could copy the memory.
+        bl = (('bl', CALLEE),)
+        with self.assertRaisesRegex(ValueError, 'constant-derived'):
+            leaf(build(**parts(between=bl)), switch_thunks=PLAIN)
+        # Storing only loaded values leaves later loads ordinary.
+        verify(build(post=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x6019), ('h', 0x6059),
+                           ('ldr', 2, 'object'), ('h', 0x6812))))
 
     def test_literal_words_and_loaded_values_join_the_constant_model(self):
         obj = (('ldr', 0, 'object'),)
@@ -481,7 +504,8 @@ class ProofTests(unittest.TestCase):
                 'counting loop is widened': (
                     dict(post=(('ldr', 3, 'object'), ('h', 0x2100), ('label', 'again'), ('h', 0x3101),
                                ('h', 0x2905), ('bhi', 'again'), ('h', 0x6019),
-                               ('ldr', 2, 'object'), ('h', 0x6812))), 'cannot be stored')}.items():
+                               ('ldr', 2, 'object'), ('h', 0x6812))),
+                    'cannot be stored|constant-derived')}.items():
             with self.subTest(label), self.assertRaisesRegex(ValueError, message):
                 leaf(build(**parts), switch_thunks=PLAIN)
         # The same literal used as a plain value, never as the thunk register, stays ordinary.

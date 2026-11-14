@@ -2357,13 +2357,16 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   object address) feed add, sub, shifts and logical operations; a result that
   reaches the ROM range, or any other operation on a constant, becomes tainted,
   and a loop that keeps changing a constant is tainted after sixteen revisits.
-  A constant combined with a loaded value stays constant-derived, and so does a
-  value loaded through a base register that this path has stored a
-  constant-derived value through. A thunk register holding any constant-derived
-  value, including a literal word itself, is refused, so a callback must be a
-  plain load from memory (aliasing a stored-through base under another register
-  is not followed). A thunk BL whose register is tainted is refused. The table
-  pointer literal must also be read only by the dispatch load, the caller's own
+  A constant combined with a loaded value stays constant-derived. Once a
+  constant-derived value has been stored on a path (other than through SP, the
+  verified write-only outgoing frame), every later non-literal load on that path
+  is constant-derived too, whatever register or address it uses; the flag is
+  not cleared by a call and a join is dirty if any incoming path is. A thunk
+  register holding any constant-derived value, including a literal word itself,
+  is refused, so a callback must be a plain load from memory and cannot be
+  loaded after a constant store on its path; the only route not followed is a
+  callee copying memory. A thunk BL whose register is tainted is refused. The
+  table pointer literal must also be read only by the dispatch load, the caller's own
   bytes may not be named by any other literal, and no object or literal may name
   an indexed code entry, a byte inside any indexed function span (the caller's
   own included) or a reserved thunk (`verify_data_bindings` /
@@ -2380,7 +2383,7 @@ including the target reached through a thunk register, follow the ordinary
 returning ARM call ABI; a callee reached with no outgoing words takes at most
 four register arguments; a callee's result is not a local code address of its
 caller; a code address passed to a callee as an argument (r0-r3 or stack) and
-kept in callee memory is not followed; and the callback register is not tied to
+kept in callee memory, or a constant-derived value copied by a callee, is not followed; and the callback register is not tied to
 a callback object, since any mapped object load is admitted. Callback arity,
 memory safety and termination are not proved. The
 fingerprint is domain-separated by schema, a report cannot be relabelled across
