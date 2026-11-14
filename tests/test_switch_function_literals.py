@@ -36,7 +36,7 @@ STACK_POLICY = "write-only-outgoing-argument-words-v1"
 
 
 def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_function=False,
-            frame=False):
+            frame=False, backward=False):
     """A guarded table with a typed object, a u16 scalar and a function literal.
 
     `pool` lists object/scalar words interposed between the dispatch and the
@@ -44,7 +44,9 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
     a late u16 scalar and a late function word, the function word as an
     ordinary register value (or, with `branch_to_function`, as a branch target).
     With `frame`, a one-word outgoing-argument frame is allocated after
-    `push {lr}` and consumed by a call to OTHER in the shared tail.
+    `push {lr}` and consumed by a call to OTHER in the shared tail. With
+    `backward`, the second case is placed before the comparison (jumped over
+    on entry), so its table entry is a backward case target.
     """
     body, labels, fixups = bytearray(), {}, []
 
@@ -62,6 +64,16 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
     if frame:
         half(0xB500)  # push {lr}
         half(0xB081)  # sub sp,#4
+    def case1():
+        label("case1")
+        emit("ldr", "late_scalar", 1)
+        half(0x2002)  # movs r0,#2
+        emit("b", "done")
+
+    if backward:
+        emit("b", "over")
+        case1()
+        label("over")
     if pointer_reader:
         emit("ldr", "pointer", 1)
     for index, kind in enumerate(pool):
@@ -97,10 +109,8 @@ def fixture(pool=(), *, function=CALLBACK | 1, pointer_reader=False, branch_to_f
     half(0x2001)  # movs r0,#1
     label("skip0")
     emit("b", "done")
-    label("case1")
-    emit("ldr", "late_scalar", 1)
-    half(0x2002)  # movs r0,#2
-    emit("b", "done")
+    if not backward:
+        case1()
     label("default")
     half(0x2000)  # movs r0,#0
     label("done")
@@ -287,9 +297,49 @@ class VerificationTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "typed objects or u16 scalars"):
             verify(body, manifest, mapping)
 
+    def test_fixed_pool_shapes_admit_backward_cases_and_v2_refuses_them(self):
+        for frame in (False, True):
+            with self.subTest(frame=frame):
+                body, labels, manifest, mapping = fixture(frame=frame, backward=True)
+                self.assertLess(labels["case1"], manifest["switch"]["comparison"])
+                verify(body, manifest, mapping)
+                body, _, manifest, mapping = fixture(("object", "scalar"), frame=frame, backward=True)
+                with self.assertRaisesRegex(ValueError, "forward local cases"):
+                    verify(body, manifest, mapping)
+
+    def test_object_symbol_or_value_inside_a_function_is_refused(self):
+        message = "cannot bind code entries or indexed function spans"
+        # A1: the object symbol is an indexed entry; symbol plus addend is not.
+        body, labels, manifest, mapping = fixture()
+        struct.pack_into("<I", body, labels["late_object"], CALLBACK + 8)
+        with self.assertRaisesRegex(ValueError, message):
+            verify(body, manifest, mapping, {"g_object": f"0x{CALLBACK:08X}"})
+        # A1b: the bound word falls inside an indexed function span.
+        body, labels, manifest, mapping = fixture()
+        mapping[1]["end"] = f"0x{CALLBACK + 8:08X}"
+        struct.pack_into("<I", body, labels["late_object"], CALLBACK + 4)
+        with self.assertRaisesRegex(ValueError, message):
+            verify(body, manifest, mapping, {"g_object": f"0x{CALLBACK - 4:08X}"})
+        # A reserved call thunk is never an object either.
+        thunk = match.RUNTIME_HELPERS["_call_via_r3"]
+        body, labels, manifest, mapping = fixture()
+        struct.pack_into("<I", body, labels["late_object"], thunk + 8)
+        with self.assertRaisesRegex(ValueError, message):
+            verify(body, manifest, mapping, {"g_object": f"0x{thunk:08X}"})
+
+    def test_function_word_cannot_name_a_thunk_or_runtime(self):
+        for target in (match.RUNTIME_HELPERS["_call_via_r0"], match.RUNTIME_HELPERS["_call_via_r3"],
+                       match.UDIVSI3_ADDRESS):
+            body, labels, manifest, mapping = fixture(function=target | 1)
+            mapping.append({"rom": f"0x{target:08X}", "end": f"0x{target + 4:08X}", "mode": "thumb"})
+            manifest["functions"] = [[labels["late_function"], f"func_{target:08X}"]]
+            with self.subTest(target=hex(target)), \
+                    self.assertRaisesRegex(ValueError, "runtime call thunks|division runtime"):
+                verify(body, manifest, mapping)
+
     def test_data_cannot_launder_a_code_entry_or_the_callers_span(self):
-        for value, message in ((CALLBACK, "cannot bind code entries or their own span"),
-                               (CALLBACK | 1, "cannot bind code entries or their own span"),
+        for value, message in ((CALLBACK, "cannot bind code entries or indexed function spans"),
+                               (CALLBACK | 1, "cannot bind code entries or indexed function spans"),
                                (BASE + 4, "own span|object word")):
             body, labels, manifest, mapping = fixture()
             struct.pack_into("<I", body, labels["late_object"], value)
@@ -537,9 +587,38 @@ unsigned func_08000000(unsigned mode)
 """
 
 
+FRAME_SOURCE = """extern unsigned g_object;
+extern void func_08001000(void);
+extern unsigned func_08001010(void (*callback)(void), unsigned a, unsigned b, unsigned c,
+                              unsigned d);
+unsigned func_08000000(unsigned mode)
+{
+    switch (mode) {
+    case 0:
+        return func_08001010(func_08001000, g_object, 1, 2, 0x555);
+    case 1:
+        return g_object + 0x444;
+    case 2:
+        g_object = 7;
+        break;
+    case 3:
+        g_object = 3;
+        break;
+    case 4:
+        g_object = 9;
+        break;
+    }
+    return 0;
+}
+"""
+
+
 class CompiledSourceTests(unittest.TestCase):
-    """A fixed-O2 synthetic switch passing a function address: refused by
-    default, admitted end to end by the explicit v1 selector."""
+    """Fixed-O2 synthetic switches passing a function address, one of them
+    with a fifth (stack) argument: refused by default, admitted end to end by
+    the explicit selector."""
+
+    source = SOURCE
 
     def setUp(self):
         import argparse
@@ -550,7 +629,7 @@ class CompiledSourceTests(unittest.TestCase):
         self.root = Path(directory.name)
         for name in ("src", "include", "config", "symbols", "docs/match"):
             (self.root / name).mkdir(parents=True)
-        (self.root / "src/08000000.c").write_text(SOURCE)
+        (self.root / "src/08000000.c").write_text(self.source)
         self.args = argparse.Namespace(cc=match.DEFAULT_CC, cpp=match.DEFAULT_CPP,
             assembler=match.DEFAULT_AS, objcopy=match.DEFAULT_OBJCOPY,
             linker=match.DEFAULT_LD, flags=match.DEFAULT_FLAGS)
@@ -575,6 +654,11 @@ class CompiledSourceTests(unittest.TestCase):
                 self.objects, functions, switches, allow_switch_data=True, **options)
         return body, calls, data, functions, switches
 
+    selector = evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR
+    schema = V1
+    refused = (None, evidence.SWITCH_U16_SCALAR_SELECTOR, "u16-scalars-frame-v1",
+               evidence.SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR)
+
     def test_default_linking_refuses_and_selector_admits(self):
         with self.assertRaisesRegex(ValueError, "switch evidence excludes"):
             self.link()
@@ -598,22 +682,36 @@ class CompiledSourceTests(unittest.TestCase):
         import io
         self.enterContext(mock.patch.dict(os.environ, {"FFTA_ROM": str(self.root / "synthetic.rom"),
                                                        "TMPDIR": str(self.root)}))
-        for selector in (None, evidence.SWITCH_U16_SCALAR_SELECTOR):
+        for selector in self.refused:
             argv = ["match.py", "--root", str(self.root), "--no-write", "0x08000000"]
             if selector:
                 argv[1:1] = ["--switch-data-profile", selector]
             with self.subTest(selector=selector), mock.patch.object(sys, "argv", argv), \
                     redirect_stdout(io.StringIO()), self.assertRaises(SystemExit):
                 match.main()
-        argv = ["match.py", "--root", str(self.root), "--switch-data-profile",
-                evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR, "0x08000000"]
+        argv = ["match.py", "--root", str(self.root), "--switch-data-profile", self.selector, "0x08000000"]
         with mock.patch.object(sys, "argv", argv), redirect_stdout(io.StringIO()):
             self.assertEqual(match.main(), 0)
         report = (self.root / "docs/match/08000000.md").read_text()
-        self.assertIn(f"* verification: `{V1}`", report.splitlines())
+        self.assertIn(f"* verification: `{self.schema}`", report.splitlines())
         self.assertTrue(evidence.report_matches(report, self.root, BASE))
-        (self.root / "src/08000000.c").write_text(SOURCE.replace("0x555", "0x556"))
+        import rebuild
+        self.assertEqual(rebuild.saved_profile_arguments(report, self.root, BASE),
+                         ["--switch-data-profile", self.selector])
+        (self.root / "src/08000000.c").write_text(self.source.replace("0x555", "0x556"))
         self.assertFalse(evidence.report_matches(report, self.root, BASE))
+
+
+class CompiledFrameSourceTests(CompiledSourceTests):
+    """The fifth argument needs a one-word outgoing frame: the frameless
+    function-literal selector and #171's frame selector (no function words)
+    refuse it natively; the framed function-literal selector admits it."""
+
+    source = FRAME_SOURCE
+    selector = evidence.SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR
+    schema = FRAME_V1
+    refused = (None, evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR, "u16-scalars-frame-v1",
+               evidence.SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
 
 
 if __name__ == "__main__":
