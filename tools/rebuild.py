@@ -32,6 +32,7 @@ import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
+import switch_pool_outgoing_frame as pool_switch_frame
 
 ROM_BASE = 0x08000000
 
@@ -110,6 +111,8 @@ def saved_profile_arguments(report, root, address):
         arguments += ["--switch-data-profile", SWITCH_U16_SCALAR_SELECTOR]
     elif f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in lines:
         arguments += ["--switch-data-profile", SWITCH_POOL_U16_SCALAR_SELECTOR]
+    elif f"* verification: `{pool_switch_frame.SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", pool_switch_frame.SELECTOR]
     if function_thunk.selected(report):
         arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
     if software_double.selected(report):

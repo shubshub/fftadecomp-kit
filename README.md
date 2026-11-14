@@ -2063,6 +2063,42 @@ fixed pool shapes. Frames, function literals, runtime thunks, signed or
 32-bit scalar words and owner-level selectors are not extended by this
 profile.
 
+### Dispatch-identified switch pools with outgoing-argument frames
+
+`--switch-data-profile u16-scalars-frame-v1` selects the separate
+`elf-symbol-thumb-switch-data-u16-scalars-frame-v1` schema. It keeps every
+`u16-scalars-v2` layout and literal-binding rule unchanged: the table pointer
+found by the dispatch load and read by nothing else, at least one interposed
+word, and every reached literal bound as a typed object or an exact u16
+scalar. It adds one thing, a fixed Thumb frame that holds only outgoing call
+arguments 5 and up:
+
+* exactly one constant `sub sp,#n`, reached before any call or frame access,
+  and every return reached only after an `add sp,#n` of the same size. No
+  other SP arithmetic, no `add sp,rX`, and no push or pop while the frame is
+  live;
+* no stack address in a register: any SP register operand (`add rX,sp,#k`,
+  `mov rX,sp`, `add rX,sp`, an SP-based `ldm`/`stm`) rejects, as does any
+  32-bit encoding other than a bound call;
+* the caller only writes the frame, with `str rX,[sp,#k]` for word-aligned
+  `0 <= k < n`. A read of the frame, before or after a write, rejects;
+* each call consumes the words written since the previous call (or the
+  allocation). That set must be a prefix of the frame, the same on every
+  path to the call, and is empty again after the call, since a callee may
+  overwrite its incoming arguments. A word still pending at the release
+  rejects, and some call must consume the whole frame.
+
+Non-SP block copies keep their ordinary meaning, because no register can hold
+a stack address. The ordinary direct-call ABI boundary is unchanged: nothing
+is proved about a callee's arity or memory effects. Runtime call thunks stay
+excluded. The manifest adds
+`"stack_policy": "write-only-outgoing-argument-words-v1"`, the report carries
+the stack-frame line, and the fingerprint is domain-separated by the schema.
+Replay refuses relabelling between this schema and `u16-scalars-v1`,
+`u16-scalars-v2` or `typed-outgoing-six-words-v1`, in either direction, and
+status and rebuild forward the saved selector. `u16-scalars-v2` still refuses
+every frame.
+
 ### Preloaded guarded Thumb switches
 
 The distinct `elf-symbol-thumb-preloaded-switch-v1` profile supports one
