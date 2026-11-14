@@ -36,6 +36,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
+import switch_data_thunks
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 
@@ -126,6 +127,9 @@ def saved_profile_arguments(report, root, address):
         arguments += ["--switch-data-profile", SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR]
     elif f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`" in lines:
         arguments += ["--switch-data-profile", SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR]
+    thunk_switch = switch_data_thunks.selector_for_report(report)
+    if thunk_switch is not None:
+        arguments += ["--switch-data-profile", thunk_switch]
     if function_thunk.selected(report):
         arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
     if software_double.selected(report):

@@ -2304,6 +2304,71 @@ requires the dispatch-identified pool. Unframed function-literal selectors
 still refuse a frame, and a framed report cannot be relabelled as an unframed
 or function-free one.
 
+### Switch call thunks
+
+`--switch-data-profile switch-thunks-v1` and `switch-thunks-frame-v1`
+(schemas `elf-symbol-thumb-switch-data-thunks-v1` and
+`elf-symbol-thumb-switch-data-thunks-frame-v1`) admit the compiler's
+`_call_via_rN` indirect-call thunks in a function with a guarded switch and
+named data, such as a callback table `g_callbacks[0](a, b)` compiled to
+`bl _call_via_r2`. Every other selector still refuses such a function with
+`switch evidence excludes object, callback and runtime-thunk bindings`, and
+`--function-address-profile canonical-thunks-*` still refuses it for want of
+its own adjacent guard and five-op dispatch. The two families cannot be
+combined on the command line; this selector composes their proofs instead.
+
+Each selector keeps the complete-object-words proof of the switch-data family
+on the fixed-gap pool layout: one unsigned-guarded table, every reached
+literal word bound as the table pointer, a typed object or, when present, a u16
+scalar (`scalar_policy` and `scalars` appear only if such words exist), the
+backward-case and predecessor checks, and the ordinary conditional call ABI for
+direct calls. `-frame-v1` adds the `u16-scalars-frame-v1` write-only
+outgoing-argument frame proof unchanged (manifest key `stack_policy`); the
+frameless selector refuses any fixed frame. The dispatch-identified pool
+shapes (`-v2`) are not admitted. Function-address words, local buffers, other
+runtimes and a second table stay refused.
+
+The thunk binding is the one `canonical-thunks-v1` proves, reused rather than
+reimplemented: the ELF symbol is the canonical `_call_via_rN` alias, the BL is
+bound to its ROM address and the thunk's two ROM instructions (`bx rN`,
+`mov r8, r8`) are hashed into `dependencies`. The manifest carries
+`"thunk_policy": "canonical-call-thunks-v1"`, `thunks` as sorted
+`[offset, "_call_via_rN"]` pairs and `dependencies`. A thunk BL appears only
+in `thunks`; `calls` never names one, so each call is bound exactly once and a
+manifest that lists the same site in both is refused. Replay recomputes every
+field from the report's bytes, the ROM and the index, and compares
+dependencies as canonical JSON, so `4.0` or `true` cannot stand for `4` or
+`1`.
+
+Three further rules keep a thunk from becoming an arbitrary jump:
+
+* **Reserved identifiers.** A preprocessed source that names any `_call_via_*`
+  identifier is refused before linking, as `canonical-thunks-v1` does. A source
+  that calls the thunk's address as `func_08142248(...)` is an ordinary call to
+  a runtime helper and is refused by the call binding.
+* **No local code address as a target.** A forward pass over the verified CFG
+  marks registers that may hold an address in the caller: taint enters through
+  every load of the table pointer literal, any other read of PC, the entry LR
+  and the LR each BL leaves; it follows register operations and loads through a
+  tainted address; no store may use a tainted register, and popped registers are
+  tainted, so provenance cannot pass through memory. A thunk BL whose register
+  is tainted is refused. The table pointer literal must also be read only by
+  the dispatch load, the caller's own bytes may not be named by any other
+  literal, and no object or literal may name an indexed code entry or a reserved
+  thunk (`verify_data_bindings` / `verify_literal_bindings`).
+* **Decode.** The taint pass decodes every reached instruction itself, so it
+  accepts only 16-bit encodings and the bound BL pairs, and refuses `svc`,
+  `bkpt` and `udf` (kit `#180`).
+
+Premises that stay outside the proof, as for `canonical-thunks-v1`: callees,
+including the target reached through a thunk register, follow the ordinary
+returning ARM call ABI; a callee reached with no outgoing words takes at most
+four register arguments; a callee's result is not a local code address of its
+caller. Callback arity, memory safety and termination are not proved. The
+fingerprint is domain-separated by schema, a report cannot be relabelled across
+the two selectors or to or from any thunk-free schema, and `status.py` and
+`rebuild.py` forward the saved selector only after a fresh replay.
+
 ### Preloaded guarded Thumb switches
 
 The distinct `elf-symbol-thumb-preloaded-switch-v1` profile supports one
