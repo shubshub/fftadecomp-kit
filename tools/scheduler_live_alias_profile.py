@@ -24,11 +24,13 @@ ordinary call. This explicit profile admits two cases and nothing else:
 The scheduler call keeps its descriptor contract unchanged.
 
 Only under entry_liveness (selected by conditional-scheduler-three-per-path-
-live-alias-v1) an alias in R0-R3 or R12 that the complete callee overwrites on
-every path before reading it, calling or returning is not an argument, and a
-passed alias that a closed leaf callee never writes, and so returns unchanged,
-is handed back to the caller as a tracked alias, as the ordinary buffer
-verifier does, instead of being refused. Any other returned alias is refused.
+live-alias-v1) two of the rules above are replaced. An alias in R0-R3 or R12
+that the complete callee overwrites on every path before reading it, calling or
+returning is not an argument and no longer lowers the access bound. A passed
+alias that a closed leaf callee never writes, and so returns unchanged, is
+handed back to the caller as a tracked alias, as the ordinary buffer verifier
+does, instead of being refused. Any other returned alias is still refused, and
+the older selectors keep both original rules.
 """
 import hashlib
 from pathlib import Path
@@ -68,7 +70,11 @@ ENTRY_LIVENESS_PREMISE = ('A local alias in R0-R3 or R12 that the complete calle
            'and is handed back to the caller as the ordinary buffer verifier does: the caller keeps '
            'tracking the register as a local alias, so a later read, store, spill, call '
            'argument or return of it is checked like any other alias; it is recorded as '
-           'returned_aliases. No other part of the live-alias contract changes.')
+           'returned_aliases. For this selector only, this text replaces two clauses of the premise '
+           'above: the sentence that a stale alias lowers the replay bound (a dead alias does not), '
+           'and the clause that the pointer is not returned (a definite unchanged alias from a closed '
+           'leaf is handed back; every other returned alias is still refused). The rest of the '
+           'live-alias premise applies unchanged.')
 # Bounds on the per-path preserved-register walk.
 MAX_NESTING, MAX_STATES = 4, 4096
 
@@ -225,20 +231,31 @@ def check_preserved(proof, address, registers, chain=(), outer=(), copied_in=Fal
 
 
 def _callee_cfg(proof, address):
-    """The complete ARMv4T-checked callee CFG, or None when it is not closed."""
+    """The complete callee CFG, cached per address on the proof.
+
+    None when the graph is not closed (no fact). A closed graph whose decoding
+    differs from the ARMv4T decoder is not "no fact": it refuses the whole proof.
+    """
     import owner_admission_profile as owner
     import callee_preservation_profile as preservation
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+    cache = getattr(proof, '_live_alias_cfgs', None)
+    if cache is None:
+        cache = proof._live_alias_cfgs = {}
+    if address in cache:
+        return cache[address]
     data = proof.span(address)
     try:
         instructions, edges, branches, calls, _ = graph.graph(data, address, owner.refine(data, address, proof.mapping))
     except ValueError:
+        cache[address] = None
         return None
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     for site, instruction in instructions.items():
         require(preservation._decode(decoder, proof.rom, site, address, address+len(data)).id == instruction.id,
                 'live-alias entry liveness decoding differs from the ARMv4T decoder')
-    return instructions, edges, branches, calls
+    cache[address] = instructions, edges, branches, calls
+    return cache[address]
 
 
 def unchanged_leaf_registers(proof, address, registers):
@@ -247,6 +264,9 @@ def unchanged_leaf_registers(proof, address, registers):
     if cfg is None:
         return set()
     instructions, _, branches, calls = cfg
+    # A nested call may write the register on some path (the nested leaf is not
+    # inspected), so any call refuses. The SWI test is defence in depth: the
+    # callee CFG already rejects SWI as an unsupported instruction.
     if calls or branches or any(match.CS_GRP_INT in i.groups for i in instructions.values()):
         return set()
     written = {r for i in instructions.values() for r in i.regs_access()[1]}
@@ -277,6 +297,9 @@ def dead_at_entry(proof, address, registers):
                     continue
                 read, written = instruction.regs_access()
                 # A software interrupt reads its BIOS arguments without naming them.
+                # Defence in depth: the callee CFG already rejects SWI, and a local BL
+                # (branches) is only a jump that writes LR, so treating it as an
+                # observation is conservative rather than needed for soundness.
                 if register in read or site in calls or site in branches or \
                         match.CS_GRP_INT in instruction.groups:
                     continue
@@ -328,6 +351,7 @@ def check_call(proof, address, aliases, stack, slots, *, constants=None, site=No
             proof._live_log = None
         # Only a definite, unchanged alias is handed back: the callee is a closed leaf
         # that never writes the register, so every return holds the passed value.
+        # The offset equality is defensive: an unwritten register returns its passed offset.
         handed = dict(returned) if entry_liveness else {}
         require(not handed or (set(handed) <= unchanged_leaf_registers(proof, address, set(handed)) and
                                all(passed.get(r) == o for r, o in handed.items())),
