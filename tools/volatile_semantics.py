@@ -143,7 +143,13 @@ from plausible import declaration_tokens
 
 MASK = 0xFFFFFFFF
 SP = ("sp",)
-MAX_PATHS = 256
+# Cost bounds, not soundness bounds: every path is checked in full, and a
+# function the bounds cut short is refused, never accepted on the paths seen.
+# All paths are held at once (about 0.25 MB each with their records), so
+# 1024 paths cost about 300 MB and 5 s at worst (kit#137: 0800C4B4).  More
+# decisions per path would not help: a loop whose exit is unknown is
+# refused at any bound, and each extra decision can double the paths.
+MAX_PATHS = 1024
 MAX_STEPS = 20000
 MAX_DECISIONS = 32
 RUNTIME_ARITY = {"__divsi3": 2, "__udivsi3": 2, "__modsi3": 2, "__umodsi3": 2}

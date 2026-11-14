@@ -2516,7 +2516,7 @@ out-of-bounds subscript store, which is not adjacent to its store;
 add a read; and `sym.x |= 0;`, `sym.x = sym.x;`, `sym.x ^= 0;` and
 `sym.x &= 0xFF;`, which are self-assignments. Code the executor does not
 model fails closed with a reason: ARM code, computed jumps, untyped indirect calls,
-loops whose exit depends on unknown values, more than 256 paths, and
+loops whose exit depends on unknown values, more than 1024 paths, and
 prototypes that are missing, `()`, variadic, inconsistent, not one word per
 parameter, or too complex to read at file scope. The one computed jump it
 models is agbcc's switch dispatch (kit#170): `lsl rD, rI, #2; ldr rT, .Lp;
@@ -2526,13 +2526,17 @@ exactly a local code label of the function, and on the path the index is
 either a known constant inside the table or was compared with
 `cmp rI, #N` and the `hi` branch not taken, for a table of exactly N+1
 entries. Each distinct case label is then a successor, explored like a
-conditional branch and counted against the same 256-path bound; the
+conditional branch and counted against the same 1024-path bound; the
 decision records the index, N and which entries share a label, so the
 stripped and permuted compiles must dispatch on the same value through the
 same partition. Any other `mov pc` or `bx` source, an unguarded or
 differently guarded index, a table that is not adjacent, not local or of
 another size, and entering the dispatch past its shift still fail closed.
-Because the
+The path and decision bounds are cost bounds (kit#137): every path is
+checked in full and a function they cut short is refused, never accepted on
+the paths seen. The path bound was 256; holding 1024 paths costs about
+300 MB and 5 s at worst. Loops whose exit depends on unknown values stay
+refused at any decision bound. Because the
 check sees every spelling, the earlier syntactic rule against statements
 that only read `symbol.member` is gone.
 
@@ -2633,7 +2637,7 @@ has these gaps:
 * The read-back rule refuses an object offset computed from any byte or
   halfword local read back from memory, and turns branches on such values
   into decisions; the extra, possibly infeasible, paths count against the
-  256-path and 32-decision bounds (080D3CB4 goes from 73 to 79 paths).
+  1024-path and 32-decision bounds (080D3CB4 goes from 73 to 79 paths).
 * Callee interfaces assume the ARM calling convention for r4-r11 (a callee
   that reads a callee-saved register as a hidden argument is not modelled,
   as before), that capstone reports each Thumb instruction's register reads
