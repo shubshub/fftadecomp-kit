@@ -1562,7 +1562,7 @@ one of these:
   stays an argument.
 
 The allowlist is register and immediate data processing, single loads and
-stores, PUSH and ADD/SUB SP by an immediate. Everything else stops the scan:
+stores, PUSH and SUB SP by an immediate. Everything else stops the scan:
 * SWI, which capstone reports as reading only PC although the BIOS reads
   R0-R3;
 * BKPT and UDF;
@@ -1571,7 +1571,8 @@ stores, PUSH and ADD/SUB SP by an immediate. Everything else stops the scan:
 * post-ARMv4T 16-bit forms;
 * POP, LDM and STM;
 * branches, calls and returns;
-* any write of PC, or of SP other than by ADD/SUB SP or PUSH.
+* ADD SP, which could move SP up into the caller's frame before a later
+  PUSH, and any other write of PC or SP than SUB SP and PUSH.
 
 So only a straight-line entry prefix that unconditionally overwrites the
 register counts, and nothing in the callee can observe the alias. The scan
