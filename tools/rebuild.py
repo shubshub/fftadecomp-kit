@@ -26,7 +26,9 @@ import tempfile
 
 from match_evidence import (data_snapshot, mapping_snapshot, report_matches, source_fingerprint,
                             SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
-                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR)
+                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR,
+                            SWITCH_FUNCTION_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
+                            SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -113,6 +115,10 @@ def saved_profile_arguments(report, root, address):
         arguments += ["--switch-data-profile", SWITCH_POOL_U16_SCALAR_SELECTOR]
     elif f"* verification: `{pool_switch_frame.SCHEMA}`" in lines:
         arguments += ["--switch-data-profile", pool_switch_frame.SELECTOR]
+    elif f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", SWITCH_FUNCTION_U16_SCALAR_SELECTOR]
+    elif f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR]
     if function_thunk.selected(report):
         arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
     if software_double.selected(report):
