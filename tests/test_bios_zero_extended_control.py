@@ -118,11 +118,9 @@ class BiosZeroExtendedControlTests(unittest.TestCase):
                                            LDR_R1_R3, ORRS_R2_R1)),
                 ('widening loop', (LDRB_R1_R3, LSLS_R1_1, CMP_R3_0, BNE_BACK3, ORRS_R2_R1))):
             with self.subTest(name=name):
-                try:
-                    site = self.site(self.fixture(after))
-                except ValueError:
-                    continue      # refused outright is also fail-closed
-                self.assertEqual(site[2], 4)
+                # Each shape is admitted today; asserting the admission keeps the
+                # width check from passing vacuously if a later change refuses it.
+                self.assertEqual(self.site(self.fixture(after))[2], 4)
         # A call kills r0-r3 facts: r1 is loaded before it, the control after it.
         f = self.fixture_case.fixture(data=True, control=FILL_BIT,
                                       prefix=(LDRB_R1_R3, 'ordinary'), after=(ORRS_R2_R1,))
