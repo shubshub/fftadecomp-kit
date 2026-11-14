@@ -2266,6 +2266,9 @@ def read_modify_write_store(records, position, address, width):
                     # the address, and whose flags have no conditional reader
                     if step.index not in value_slice or step.writes & (addressing | {"sp", "pc"}):
                         return None
+                    # Conditional branches are the only flag readers the
+                    # executor models: ADC/SBC and the like fail closed there
+                    # as unsupported instructions.
                     if step.flags_written:
                         for after in records[place + 1:]:
                             if after.kind == "branch" and not after.unconditional:

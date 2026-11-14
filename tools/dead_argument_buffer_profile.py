@@ -17,11 +17,20 @@ instruction that
 
 * reads the register (refuses: the alias stays an argument),
 * writes it (the alias is dead), or
-* is a jump, call, return, a write of PC, a conditional instruction or an
-  instruction capstone cannot decode (refuses).
+* is not one 16-bit ARMv4T instruction of an allowlisted form (refuses).
 
-So only a straight-line entry prefix that unconditionally overwrites the
-register counts; nothing in the callee can observe the alias.  When every
+The allowlist is register and immediate data processing, single loads and
+stores, PUSH and ADD/SUB SP by an immediate.  Everything else stops the scan:
+SWI (capstone reports it reading only PC, but the BIOS reads R0-R3), BKPT,
+UDF, any 32-bit decode (capstone decodes Thumb-2; on the ARM7TDMI `f04f 0100`
+is a BL prefix and `lsls r0, r0, #4`, not `mov.w r1, #0`), post-ARMv4T 16-bit
+forms (a high-register ADD/CMP/MOV of two low registers, the miscellaneous
+space beyond ADD/SUB SP and PUSH), POP, LDM/STM, branches, calls, returns,
+conditional instructions and any write of PC or (but for ADD/SUB SP and PUSH)
+SP.  So only a straight-line entry prefix that unconditionally overwrites the
+register counts; nothing in the callee can observe the alias.  The scan reads
+the callee's bytes without spending the walk's dependency budget: a callee
+whose aliases are all dead is not walked and is not a dependency.  When every
 alias is dead, the call is exactly a call that receives no alias, which the
 walk already admits under its ordinary premise; otherwise the callee is
 walked with the remaining aliases.  Each dropped register is reported with the
@@ -29,8 +38,8 @@ callee's extent and body hash and the killing instruction.
 """
 import hashlib
 
-from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET
-from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_REG_PC
+from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT
+from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_REG_PC, ARM_REG_SP
 
 import match
 import named_data_buffer_profile as named
@@ -53,6 +62,40 @@ def sha(raw):
     return hashlib.sha256(raw).hexdigest()
 
 
+# 16-bit Thumb (ARMv4T) forms the scan may step over: register and immediate
+# data processing, single loads and stores, and PUSH.  Everything else stops it
+# - in particular SWI (the BIOS reads R0-R3), BKPT/UDF, every 32-bit or
+# post-ARMv4T encoding (capstone decodes Thumb-2), POP, LDM/STM, branches.
+ALLOWED = frozenset((
+    'mov', 'movs', 'mvn', 'mvns', 'neg', 'negs', 'rsb', 'rsbs',
+    'add', 'adds', 'sub', 'subs', 'adc', 'adcs', 'sbc', 'sbcs', 'mul', 'muls',
+    'and', 'ands', 'orr', 'orrs', 'eor', 'eors', 'bic', 'bics',
+    'lsl', 'lsls', 'lsr', 'lsrs', 'asr', 'asrs', 'ror', 'rors',
+    'cmp', 'cmn', 'tst', 'adr',
+    'ldr', 'ldrb', 'ldrh', 'ldrsb', 'ldrsh', 'str', 'strb', 'strh', 'push'))
+
+
+def thumb1(instruction):
+    """is this one 16-bit ARMv4T Thumb instruction of an allowed form?"""
+    if instruction.size != 2 or instruction.mnemonic not in ALLOWED or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            {CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT} & set(instruction.groups):
+        return False
+    half = int.from_bytes(instruction.bytes, 'little')
+    if half >> 11 >= 0b11101:
+        return False                      # a 32-bit prefix, BL halves included
+    if half & 0xfc00 == 0x4400 and not half & 0xc0:
+        return False                      # hi-register ADD/CMP/MOV of two low registers: not ARMv4T
+    if 0xb000 <= half < 0xc000 and not (half & 0xff80 in (0xb000, 0xb080) or half & 0xfe00 == 0xb400):
+        return False                      # only ADD/SUB SP,#imm and PUSH of the miscellaneous space
+    read, written = instruction.regs_access()
+    if ARM_REG_PC in written:
+        return False
+    if ARM_REG_SP in written and not (half & 0xff00 == 0xb000 or half & 0xfe00 == 0xb400):
+        return False                      # MOV/ADD SP, rX and the like: the frame becomes untracked
+    return True
+
+
 def killing_instruction(data, address, register):
     """The offset of the entry-prefix instruction that overwrites register
     before any read of it, or None when the prefix does not prove it dead."""
@@ -60,15 +103,11 @@ def killing_instruction(data, address, register):
     decoder.detail = True
     expected = address
     for instruction in decoder.disasm(data, address):
-        if instruction.address != expected:
+        if instruction.address != expected or not thumb1(instruction):
             return None
         expected += instruction.size
         read, written = instruction.regs_access()
         if register in read:
-            return None
-        if instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
-                {CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET} & set(instruction.groups) or \
-                ARM_REG_PC in written:
             return None
         if register in written:
             return instruction.address - address
@@ -82,10 +121,21 @@ class DeadArgumentBufferProof(named.NamedDataBufferProof):
         super().__init__(rom, mapping, index, objects)
         self.dead_arguments = {}
 
+    def entry_bytes(self, address):
+        """The callee's indexed, validated bytes, as span() reads them, without
+        spending the walk's dependency budget: a callee whose aliases are all
+        dead is never walked, so it is not a dependency of the proof."""
+        entry = self.target(address)
+        require(0 < int(entry['end'], 16) - address <= named.MAX_BYTES,
+                'dead-argument callee exceeds bounded owner size')
+        data = match.BufferCallProof.span(self, address)
+        named.validate_owner(data, address, self.rom, self.mapping, self.index)
+        return data
+
     def check_arguments(self, address, arguments, stack, incoming, protected, **context):
         candidates = sorted(register for register in arguments if register in ARGUMENTS)
         if candidates:
-            data = self.span(address)
+            data = self.entry_bytes(address)
             dead = {}
             for register in candidates:
                 offset = killing_instruction(data, address, register)
@@ -110,7 +160,7 @@ class DeadArgumentBufferProof(named.NamedDataBufferProof):
         require(self.dead_arguments, 'dead argument profile requires a discounted owner alias')
         return dict(
             selector=SELECTOR,
-            rule=('an owner alias in R0-R3 is not passed to a callee whose straight-line entry '
-                  'prefix (no jump, call, return, PC write or conditional instruction) writes the '
-                  'register before any instruction reads it'),
+            rule=('an owner alias in R0-R3 is not passed to a callee whose entry prefix of '
+                  'allowlisted 16-bit ARMv4T data-processing, single load/store, PUSH and '
+                  'ADD/SUB SP instructions writes the register before any instruction reads it'),
             calls=[self.dead_arguments[key] for key in sorted(self.dead_arguments, key=repr)])

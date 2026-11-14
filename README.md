@@ -1558,11 +1558,25 @@ one of these:
 
 * reads the register: the alias stays an argument;
 * writes it: the alias is dead;
-* is a jump, call, return, PC write or conditional instruction, or does not
-  decode: the alias stays an argument.
+* is not one 16-bit ARMv4T instruction of an allowlisted form: the alias
+  stays an argument.
+
+The allowlist is register and immediate data processing, single loads and
+stores, PUSH and ADD/SUB SP by an immediate. Everything else stops the scan:
+* SWI, which capstone reports as reading only PC although the BIOS reads
+  R0-R3;
+* BKPT and UDF;
+* any 32-bit decode. Capstone decodes Thumb-2, but on the ARM7TDMI `f04f 0100`
+  is a BL prefix followed by `lsls r0, r0, #4`, not `mov.w r1, #0`;
+* post-ARMv4T 16-bit forms;
+* POP, LDM and STM;
+* branches, calls and returns;
+* any write of PC, or of SP other than by ADD/SUB SP or PUSH.
 
 So only a straight-line entry prefix that unconditionally overwrites the
-register counts, and nothing in the callee can observe the alias. When every
+register counts, and nothing in the callee can observe the alias. The scan
+reads the callee's validated bytes without spending the walk's dependency
+budget. When every
 alias is dead, the call is a call that receives no alias, which the walk
 already admits under its ordinary premise. Otherwise the callee is walked with
 the aliases that remain.

@@ -1,4 +1,5 @@
 """Buffer owners whose stale argument-register aliases are dead in the callee."""
+import copy
 import json
 from pathlib import Path
 import struct
@@ -82,6 +83,30 @@ class KillingInstructionTests(unittest.TestCase):
             with self.subTest(name):
                 self.assertIsNone(self.kill(tokens))
 
+    def test_only_armv4t_16_bit_forms_are_stepped_over(self):
+        R0 = match.ARM_REG_R0
+        # review B1, func_08141874: `svc #6; adds r0,r1,#0` - the BIOS reads R0
+        self.assertIsNone(dead.killing_instruction(assemble(G, [0xdf06, 0x1c08, 0x4770]), G, R0))
+        for name, tokens in (
+                ('svc', [0xdf00, 0x2100, 0x4770]),
+                # review B2: Thumb-2 `mov.w r1,#0`; on ARM7TDMI a BL prefix and `lsls r0,r0,#4`
+                ('32-bit decode', [0xf04f, 0x0100, 0x4770]),
+                ('bkpt', [0xbe00, 0x2100, 0x4770]),
+                ('udf', [0xde00, 0x2100, 0x4770]),
+                ('mov sp, r0', [0x4685, 0x2100, 0x4770]),
+                ('low-low hi-register mov (ARMv6)', [0x4601, 0x4770]),   # mov r1,r0
+                ('uxtb (ARMv6)', [0xb2c9, 0x4770]),                      # uxtb r1,r1
+                ('pop', [0xbc02, 0x4770])):
+            with self.subTest(name):
+                self.assertIsNone(self.kill(tokens))
+        # the kills agbcc emits stay admitted
+        for tokens, offset in (([0xb500, 0xb082, 0x4669, 0x4770], 4),   # push; sub sp; mov r1,sp
+                               ([0x4641, 0x4770], 0),                   # mov r1,r8
+                               ([0xa901, 0x4770], 0)):                  # add r1,sp,#4
+            with self.subTest(tokens=tokens):
+                self.assertEqual(self.kill(tokens), offset)
+        self.assertIsNone(self.kill([0x4689, 0x2100, 0x4770]))          # mov r9,r1 reads it
+
 
 class DeadArgumentBufferTests(unittest.TestCase):
     def test_stale_alias_overwritten_by_callee_is_not_passed(self):
@@ -118,6 +143,19 @@ class DeadArgumentBufferTests(unittest.TestCase):
         code[5] = 0xa800
         with self.assertRaisesRegex(ValueError, 'buffer callee 0x08012000'):
             owner.verify(**fixture(owner_code=code))
+
+    def test_manifest_tampering_refuses(self):
+        args = fixture()
+        manifest, _ = owner.verify(**args)
+        for name, edit in (
+                ('kill offset', lambda p: p['calls'][0]['dead'][0].__setitem__(2, 2)),
+                ('body hash', lambda p: p['calls'][0].__setitem__('body_sha256', '0' * 64)),
+                ('register', lambda p: p['calls'][0]['dead'][0].__setitem__(0, 'r0')),
+                ('dropped call', lambda p: p.__setitem__('calls', []))):
+            changed = copy.deepcopy(manifest)
+            edit(changed['proof']['buffers']['dead_argument_aliases'])
+            with self.subTest(name), self.assertRaises(ValueError):
+                owner.verify(**args, manifest=changed)
 
     def test_profile_requires_a_discounted_alias(self):
         proof = dead.DeadArgumentBufferProof(b'', b'[]', b'', b'{}')
