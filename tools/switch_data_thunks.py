@@ -192,10 +192,10 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     thunks = {site: ARM_REG_R0 + (target - function_thunk.START) // 4
               for site, target in calls.items() if target in function_thunk.ALIASES.values()}
     states, revisits = {}, {}
-    pending = [(address, frozenset((ARM_REG_LR,)), (), frozenset())]
+    pending = [(address, frozenset((ARM_REG_LR,)), (), False)]
     while pending:
-        site, incoming, known, incoming_stored = pending.pop()
-        old_tainted, old_known, old_stored = states.get(site, (frozenset(), {}, frozenset()))
+        site, incoming, known, dirty_in = pending.pop()
+        old_tainted, old_known, old_stored = states.get(site, (frozenset(), {}, False))
         merged = dict(old_known)
         for register, low, high in known:
             old = merged.get(register)
@@ -205,9 +205,9 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
                 merged[register] = MIXED
             else:
                 merged[register] = (min(low, old[0]), max(high, old[1]))
-        if site in states and incoming <= old_tainted and merged == old_known and incoming_stored <= old_stored:
+        if site in states and incoming <= old_tainted and merged == old_known and (not dirty_in or old_stored):
             continue
-        tainted, stored = old_tainted | incoming, old_stored | incoming_stored
+        tainted, stored = old_tainted | incoming, old_stored or dirty_in
         revisits[site] = revisits.get(site, 0) + 1
         if revisits[site] > CONSTANT_BUDGET:
             tainted |= frozenset(merged)
@@ -231,20 +231,23 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
             clobbered = (set(CALLER_CLOBBERED) if site in calls else set()) | {ARM_REG_LR}
             tainted = (tainted - clobbered) | {ARM_REG_LR}
             constants = {register: value for register, value in constants.items() if register not in clobbered}
-            stored = stored - clobbered
         elif item.mnemonic == 'pop':
             tainted = tainted | written
             constants = {register: value for register, value in constants.items() if register not in written}
-            stored = stored - written
         elif item.mnemonic.startswith(('str', 'stm')):
             if tainted & read:
                 raise ValueError('a local code address cannot be stored')
-            # A store of a constant-derived value marks its base: loads through that
-            # base register are constant-derived too, so memory cannot launder it.
-            if any(register in constants for register in read if register not in {mem.base for mem in mems}) or \
-                    item.mnemonic.startswith('stm') and any(register in constants for register in read):
-                stored = stored | {mem.base for mem in mems} | (
-                    {item.operands[0].reg} if item.mnemonic.startswith('stm') else set())
+            # Once a constant-derived value is stored on a path, memory may hold a code
+            # address built from immediates: every later load on the path is constant-derived,
+            # whatever register or address it uses, and a call cannot clear that.
+            skip = {mem.base for mem in mems} | {mem.index for mem in mems}
+            if item.mnemonic.startswith('stm'):
+                skip = {item.operands[0].reg}
+            # Stores through SP are the verified write-only outgoing frame; the function never
+            # reads them back, so only a callee could copy them (a stated premise).
+            if any(register in constants for register in read - skip) and \
+                    not (mems and all(mem.base == ARM_REG_SP for mem in mems)):
+                stored = True
         elif item.mnemonic != 'push':
             source = literals == [pointer] if literals else \
                 item.mnemonic == 'adr' or bool(read & (tainted | {ARM_REG_PC, ARM_REG_SP}))
@@ -262,7 +265,7 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
                 value = int.from_bytes(data[word:word + 4], 'little')
                 if written:
                     constants[operands[0].reg] = (value, value)
-            elif loaded and any(mem.base in stored for mem in mems):
+            elif loaded and stored:
                 for register in written:
                     constants[register] = MIXED
             elif not source and modelled and operands and operands[0].type == ARM_OP_REG:
@@ -291,7 +294,6 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
                     constants[destination] = MIXED
                 elif result is not None and destination in registers:
                     constants[destination] = result
-        stored = stored - written if item.id != ARM_INS_BL else stored
         pending.extend((target, frozenset(tainted), tuple((r, *v) for r, v in constants.items()), stored)
                        for target in edges[site])
 
