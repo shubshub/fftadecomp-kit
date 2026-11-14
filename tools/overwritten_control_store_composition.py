@@ -165,6 +165,9 @@ def compare_survivors(real, stripped, removed, other_removed, *, manifest=None,
                             for pair in value[2]), 'malformed linear coefficients')
                 return ('lin',value[1],tuple((term(atom,before), coefficient)
                     for atom,coefficient in value[2]))
+            # parse_word gives an offset local label as a 3-tuple ('code', label,
+            # offset), and a jump-table dispatch leaves 'jump-table'/'jump-entry'
+            # terms; both are refused here as unknown forms.
             arities = {'sym':2,'arg':2,'entry':2,'frame':2,'code':2,'sp':1,
                        'trunc':3,'sext':3,'byte':3,'and':3,'orr':3,'eor':3,
                        'lsl':3,'lsr':3,'asr':3,'mul':3}

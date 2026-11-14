@@ -92,6 +92,20 @@ class JumpTableTests(unittest.TestCase):
         self.refused(reason, assembly(guard=GUARD + ("add\tr0, r0, #1",)))
         self.refused("lies beyond", assembly(guard=("mov\tr0, #3",)))
 
+    def test_a_constant_read_back_from_memory_is_no_known_index(self):
+        # `x = 1` through a byte of memory: the reload is derived, so the
+        # dispatch needs its guard, and the case is a recorded decision
+        spilled = ("mov\tr0, #1", "strb\tr0, [sp]", "ldrb\tr0, [sp]")
+        self.refused("not bounded by `cmp r0, #2`", assembly(guard=spilled))
+        guarded = assembly(guard=spilled + GUARD)
+        self.assertEqual(compare(guarded)[0][1], 3)
+        function = semantics.parse_assembly(guarded)[0]["func_08028C34"]
+        paths = semantics.explore("func_08028C34", function, {}, "real", (SYMBOL, 0x3E, {0x3C: 1, 0x3D: 1}))
+        self.assertEqual(sorted(c[0] for p in paths for c in p.conditions if c[0] == "jump-table"),
+                         ["jump-table", "jump-table"])
+        self.assertTrue(all(c[1] == 1 and c[2] == 2 and c[3] == (0, 1, 0)
+                            for p in paths for c in p.conditions if c[0] == "jump-table"))
+
     def test_the_table_must_be_the_adjacent_local_one_with_one_entry_per_index(self):
         self.refused("not bounded by `cmp r0, #3`", assembly(table=TABLE + (".word\t.L6",)))
         self.refused("not bounded by `cmp r0, #1`", assembly(table=TABLE[:2]))
@@ -117,6 +131,10 @@ class JumpTableTests(unittest.TestCase):
             with self.subTest(change=change):
                 dispatch = DISPATCH[:index] + (change,) + DISPATCH[index + 1:]
                 self.refused(reason, assembly(dispatch=dispatch))
+        # the table pointer loaded over the scaled index: `add r0, r0, r0`
+        # doubles the pointer and is no dispatch
+        self.refused(reason, assembly(dispatch=DISPATCH[:1] + ("ldr\tr0, .L12", "add\tr0, r0, r0") +
+                                      DISPATCH[3:]))
         # entering the dispatch past its shift
         self.refused(reason, assembly(guard=GUARD + ("b\t.L30",),
                                       dispatch=DISPATCH[:1] + (".L30:",) + DISPATCH[1:]))
