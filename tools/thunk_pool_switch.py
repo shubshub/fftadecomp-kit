@@ -108,8 +108,12 @@ def record(data, address, relocations, instructions, *, interposed_words=5):
                     operand.mem.base == ARM_REG_PC and not operand.mem.index:
                 offset = ((item.address + 4) & ~3) + operand.mem.disp - address
                 if offset < 0 or (address + offset) % 4 or offset + 4 > len(data):
-                    raise ValueError('five-word pool requires complete local literal words')
+                    raise ValueError('canonical pool switch requires complete local literal words')
                 loads.setdefault(offset, []).append(item.address - address)
+    # The table pointer grants only the dispatch's indirect jump, so no other
+    # reached load (for example a thunk target) may read it.
+    if sorted(set(loads.get(descriptor['literal'], ()))) != [descriptor['dispatch'] + 2]:
+        raise ValueError('switch table pointer must be read only by its dispatch load')
     pool = pool_range(descriptor, address, interposed_words)
     if any(offset not in loads for offset in pool):
         raise ValueError('every interposed pool word requires a reached PC-relative load')

@@ -40,12 +40,15 @@ def bl(site, target):
     return struct.pack("<HH", 0xF000 | ((offset >> 12) & 0x7FF), 0xF800 | ((offset >> 1) & 0x7FF))
 
 
-def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=None, align=None):
+def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=None, align=None,
+            pointer_reader=None):
     """A complete R3-thunk caller whose switch pool holds `interposed` words.
 
     object_word puts the typed object in that pool slot; unread leaves that
     slot without its PC-relative load; values overrides the numeric pool words;
-    align forces the dispatch to the given word alignment by a leading NOP.
+    align forces the dispatch to the given word alignment by a leading NOP;
+    pointer_reader adds a second reader of the table pointer, either an extra
+    load ("extra") or the thunk target itself ("thunk").
     """
     data = bytearray()
     labels, branches, loads = {}, [], []
@@ -57,7 +60,12 @@ def fixture(*, interposed=2, guard="bls", object_word=None, unread=None, values=
     for n in range(interposed):
         if n != unread:
             load(n % 3, "pool" + str(n))
-    word(0x6813)  # LDR r3,[r2]: the thunk target stays an arbitrary conditional call.
+    if pointer_reader == "extra":
+        load(4, "literal")
+    if pointer_reader == "thunk":
+        load(3, "literal")
+    else:
+        word(0x6813)  # LDR r3,[r2]: the thunk target stays an arbitrary conditional call.
     call = len(data); data.extend(bl(A + call, profile.ALIASES["_call_via_r3"]))
     if align is not None and (len(data) + (6 if guard == "bls" else 4) + 10) % 4 != align:
         word(0x46C0)
@@ -277,6 +285,49 @@ class InterposedPoolLayout(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 leaf(damaged)
 
+    def test_table_pointer_has_no_other_reader_under_any_pool_policy(self):
+        for interposed, words in ((2, WORDS), (5, 5), (0, 0)):
+            for reader in ("extra", "thunk"):
+                f = fixture(interposed=interposed, pointer_reader=reader)
+                with self.subTest(words=words, reader=reader):
+                    with self.assertRaisesRegex(ValueError, "read only by its dispatch load"):
+                        leaf(f, words=words)
+                    with self.assertRaisesRegex(ValueError, "read only by its dispatch load"):
+                        discovered(f, words=words)
+                    # The record itself refuses the reader on the decoded body.
+                    instructions = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+                    instructions.detail = True
+                    end = f["labels"]["literal"] - 4 * interposed - (2 if "alignment" in f["labels"] else 0)
+                    decoded = list(instructions.disasm(f["data"][:end], A))
+                    with self.assertRaisesRegex(ValueError, "read only by its dispatch load"):
+                        pool.record(f["data"], A, f["switches"], decoded, interposed_words=words)
+            # The same caller without the second reader is admitted.
+            f = fixture(interposed=interposed)
+            pool.record(f["data"], A, f["switches"], leaf(f, words=words), interposed_words=words)
+
+    def test_two_qualifying_placements_are_refused(self):
+        # Outer cmp; bhi; dispatch whose four-word pool is itself a second
+        # cmp; bhi; dispatch loading the same table pointer.
+        halves = [0x2801, 0xD817, 0x0080, 0x4906, 0x1840, 0x6800, 0x4687, 0,
+                  0x2801, 0xD80F, 0x0080, 0x4902, 0x1840, 0x6800, 0x4687, 0]
+        data = bytearray(struct.pack(f"<{len(halves)}H", *halves))
+        data += struct.pack("<III", A + 36, A + 44, A + 48)
+        data += struct.pack("<5H", 0x2001, 0xE001, 0x2002, 0xE000, 0x4770)
+        relocations = {32: 36, 36: 44, 40: 48}
+        def without(offset):
+            alone = bytearray(data)
+            struct.pack_into("<H", alone, offset, 0x2802)  # cmp r0,#2: a wrong bound
+            return bytes(alone)
+        layout = lambda body: match.switch_layout(body, A, relocations, interposed_pool=True)
+        with self.assertRaisesRegex(ValueError, "one exact adjacent unsigned guard"):
+            layout(bytes(data))
+        with self.assertRaisesRegex(ValueError, "one exact adjacent unsigned guard"):
+            pool.layout(bytes(data), A, relocations, interposed_words=WORDS)
+        # Each placement qualifies on its own once the other guard is broken.
+        self.assertEqual(layout(without(0))["dispatch"], 20)
+        self.assertEqual(layout(without(16))["dispatch"], 4)
+        self.assertEqual(pool.layout(without(16), A, relocations, interposed_words=WORDS)["dispatch"], 4)
+
     def test_pool_words_that_are_code_are_refused(self):
         f = fixture(interposed=3)
         # A case entry into the pool.
@@ -325,6 +376,11 @@ class InterposedPoolLayout(unittest.TestCase):
         self.assertEqual(profile.pool_words(SELECTOR), WORDS)
         self.assertEqual(profile.schema_for(SELECTOR), profile.INTERPOSED_SCHEMA)
         self.assertEqual(profile.pool_words(profile.SELECTOR), 5)
+        self.assertTrue(profile.is_versioned(WORDS))
+        self.assertTrue(profile.is_versioned(0))
+        for words in (5, False, 0.0, "", "Dispatch-identified", None):
+            with self.subTest(words=words):
+                self.assertFalse(profile.is_versioned(words))
 
 
 class InterposedPoolManifest(unittest.TestCase):
@@ -343,6 +399,19 @@ class InterposedPoolManifest(unittest.TestCase):
             f = fixture(interposed=2, values=[0x1424, value])
             with self.subTest(value=value), self.assertRaises(ValueError):
                 profile.verify(f["data"], A, f["rom"], f["mapping"], f["index"], f["objects"], manifest_for(f))
+
+    def test_numeric_word_naming_the_callers_own_bytes_is_refused(self):
+        f = fixture(interposed=3)
+        size = len(f["data"])
+        for value in (A + 2, A + 3, A + f["labels"]["case0"] | 1, A + f["labels"]["table"], A + size - 1):
+            damaged = fixture(interposed=3, values=[0x1424, value, 0x1539])
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, "caller's own bytes"):
+                profile.verify(damaged["data"], A, damaged["rom"], damaged["mapping"], damaged["index"],
+                               damaged["objects"], manifest_for(damaged))
+        # The first byte past the caller is not its own.
+        outside = fixture(interposed=3, values=[0x1424, A + size, 0x1539])
+        self.assertTrue(profile.verify(outside["data"], A, outside["rom"], outside["mapping"], outside["index"],
+                                       outside["objects"], manifest_for(outside)))
 
     def test_manifest_mutations_and_input_changes_are_refused(self):
         f = fixture(interposed=3, object_word=1, guard="bhi")
