@@ -52,6 +52,11 @@ first tail narrows it. The argument depends on R4-R7 surviving every call,
 which is the existing returning ARM ABI premise; it proves neither
 termination of a callee nor any memory property.
 
+conditional-scheduler-three-per-path-live-alias-v1 applies the same rules
+with the wider cost bounds of WIDE_LIMITS (eight scheduler sites, 32 ordinary
+targets, 40 call sites, 512 instructions); the per-path scheduler bound is
+unchanged.
+
 Scheduler invocations. Every component other than a counted loop is a
 single instruction, and the condensation of the CFG is a DAG, so a
 component is entered at most once per execution and a scheduler site
@@ -72,6 +77,15 @@ MAX_ORDINARY_TARGETS = 24
 MAX_CALL_SITES = 32
 # The same complete-owner instruction bound as scheduler_counted_loop_profile.layout.
 MAX_INSTRUCTIONS = 256
+LIMITS = dict(scheduler_sites=MAX_SCHEDULER_SITES, ordinary_targets=MAX_ORDINARY_TARGETS,
+              call_sites=MAX_CALL_SITES, instructions=MAX_INSTRUCTIONS)
+# conditional-scheduler-three-per-path-live-alias-v1: the same proof obligations
+# under wider cost bounds. No obligation depends on them: the per-path scheduler
+# bound stays MAX_ACYCLIC_PER_PATH and is what limits invocations; every
+# scheduler site is checked against the descriptor contract on its own; the SCC,
+# topological and loop-shape checks are linear; the owner replay is a monotone
+# join fixpoint and each callee replay keeps its own explicit state budget.
+WIDE_LIMITS = dict(scheduler_sites=8, ordinary_targets=32, call_sites=40, instructions=512)
 
 
 def require(condition, message):
@@ -213,14 +227,17 @@ def loop(instructions, edges, predecessors, members, address):
         rank='2**W - 1 - counter at each latch test; back edge implies counter <= 2**W - 2')
 
 
-def phases(instructions, edges, calls, address):
-    require(0 < len(instructions) <= MAX_INSTRUCTIONS and set(calls) <= set(edges) and
+def phases(instructions, edges, calls, address, *, limits=None):
+    bounds = LIMITS if limits is None else limits
+    require(set(bounds) == set(LIMITS) and all(type(v) is int and v > 0 for v in bounds.values()),
+            'scheduler loop composition limits must be explicit positive integers')
+    require(0 < len(instructions) <= bounds['instructions'] and set(calls) <= set(edges) and
             set(instructions) == set(edges) and address in edges,
             'scheduler loop composition requires a complete bounded instruction graph')
     schedulers = sorted(s for s, t in calls.items() if t == SCHEDULER)
     ordinary = sorted(set(calls.values()) - {SCHEDULER})
-    require(1 <= len(schedulers) <= MAX_SCHEDULER_SITES and
-            1 <= len(ordinary) <= MAX_ORDINARY_TARGETS and len(calls) <= MAX_CALL_SITES,
+    require(1 <= len(schedulers) <= bounds['scheduler_sites'] and
+            1 <= len(ordinary) <= bounds['ordinary_targets'] and len(calls) <= bounds['call_sites'],
             'scheduler loop composition exceeds the explicit call-site or target bounds')
     component = components(edges)
     predecessors = {s: set() for s in edges}
@@ -263,9 +280,9 @@ def phases(instructions, edges, calls, address):
     looped_sites = sorted(s for item in loops.values() for s in item['scheduler_sites'])
     require(set(looped_sites) | {s for s in schedulers if component[s] not in loops} == set(schedulers),
             'scheduler loop composition lost a scheduler site')
-    return dict(scheduler_sites=schedulers, ordinary_targets=ordinary,
-        scheduler_site_budget=MAX_SCHEDULER_SITES, call_site_budget=MAX_CALL_SITES,
-        ordinary_target_budget=MAX_ORDINARY_TARGETS,
+    result = dict(scheduler_sites=schedulers, ordinary_targets=ordinary,
+        scheduler_site_budget=bounds['scheduler_sites'], call_site_budget=bounds['call_sites'],
+        ordinary_target_budget=bounds['ordinary_targets'],
         scheduler_calls_per_path_budget=MAX_ACYCLIC_PER_PATH,
         maximum_scheduler_calls_per_path_outside_loops=maximum,
         looped_scheduler_sites=looped_sites,
@@ -274,10 +291,13 @@ def phases(instructions, edges, calls, address):
         following_ordinary_sites=sorted(following),
         loop_budget=MAX_LOOPS, actual_count_or_capacity_proved=False,
         unconditional_termination_proved=False)
+    if limits is not None:
+        result['instruction_budget'] = bounds['instructions']
+    return result
 
 
-def bind(proof, instructions, edges, calls, address):
-    result = phases(instructions, edges, calls, address)
+def bind(proof, instructions, edges, calls, address, *, limits=None):
+    result = phases(instructions, edges, calls, address, limits=limits)
     for target in result['ordinary_targets']:
         require(not match.function_thunk.reserved(target) and
                 target not in match.RUNTIME_HELPERS.values(),

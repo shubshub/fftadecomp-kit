@@ -3844,6 +3844,39 @@ including that no earlier invocation or callback retains the reused descriptor
 or any local pointer. Actual counts, capacities, callee effects and
 termination remain unproved.
 
+### Wide three-per-path live-alias scheduler phases
+
+`--owner-runtime-profile conditional-scheduler-three-per-path-live-alias-v1`
+applies every rule of
+`conditional-scheduler-sequential-live-alias-counted-loops-v1` (per-path
+scheduler bound of three outside counted loops, counted-loop shape, live-alias
+contract for ordinary calls, unchanged 28-byte descriptor contract, no alias
+besides R2 at a looped scheduler call) under wider cost bounds: at most eight
+scheduler sites in total, 32 ordinary targets, 40 call sites and 512 owner
+instructions. None of these bounds carries a proof obligation: the per-path
+bound still limits how often the scheduler runs, every scheduler site is checked
+against the descriptor contract on its own, and the CFG checks are linear.
+
+It adds two refinements to the live-alias rule for ordinary calls, and only for
+this selector:
+
+* An alias in R0-R3 or R12 is dead at callee entry when the complete callee CFG,
+  decoded as ARMv4T Thumb, overwrites that register on every path before any
+  instruction reads it, before any call or software interrupt and before any
+  return (least fixpoint, so any cycle reached before the overwrite keeps it
+  live; a callee without a closed CFG overwrites nothing). A dead alias is not an
+  argument: the callee is not replayed for it and it does not lower the replay
+  bound. It is recorded as `dead_at_entry_aliases`.
+* A passed alias the callee returns in R0-R3 or R12 is handed back to the
+  caller, which keeps tracking it as a possible local alias. That is what the
+  ordinary buffer verifier does already. Any later read, store, spill, call
+  argument or scheduler use of it is checked like any other alias, so a stale
+  returned alias reaching a scheduler call is refused. It is recorded as
+  `returned_aliases`.
+
+Callee effects, nested execution and termination remain unproved, as for the
+other live-alias selectors.
+
 ### Conditional coordinate outputs before a scheduler call
 
 `--owner-runtime-profile conditional-scheduler-projected-outputs-v1` composes

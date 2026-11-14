@@ -22,6 +22,12 @@ ordinary call. This explicit profile admits two cases and nothing else:
   upper bound of the extent is the private frame itself.
 
 The scheduler call keeps its descriptor contract unchanged.
+
+Only under entry_liveness (selected by conditional-scheduler-three-per-path-
+live-alias-v1) an alias in R0-R3 or R12 that the complete callee overwrites on
+every path before reading it, calling or returning is not an argument, and a
+passed alias the callee returns is handed back to the caller as a tracked
+possible alias, as the ordinary buffer verifier does, instead of being refused.
 """
 import hashlib
 from pathlib import Path
@@ -51,6 +57,16 @@ PREMISE = ('Values held in callee-saved registers R4-R11 survive every ordinary 
            'uses that register as an argument, so a stale alias lowers the bound; the pointer is not '
            'stored, pushed, spilled or returned, and no thunk or runtime helper is reached. Callee '
            'effects on the aliased words and nested execution remain unproved.')
+# Explicit opt-in refinement (conditional-scheduler-three-per-path-live-alias-v1 only).
+ENTRY_LIVENESS_PREMISE = ('A local alias in R0-R3 or R12 that the complete callee CFG (ARMv4T-decoded) '
+           'overwrites on every path before any read of that register, any call, any software interrupt '
+           'and any return is dead '
+           'at callee entry: it is not an argument, is not replayed and does not bound the replay, and '
+           'is recorded as dead_at_entry_aliases. A callee that returns a passed alias in R0-R3 or R12 '
+           'hands it back to the caller exactly as the ordinary buffer verifier does: the caller keeps '
+           'tracking the register as a possible local alias, so a later read, store, spill, call '
+           'argument or return of it is checked like any other alias; it is recorded as '
+           'returned_aliases. No other part of the live-alias contract changes.')
 # Bounds on the per-path preserved-register walk.
 MAX_NESTING, MAX_STATES = 4, 4096
 
@@ -206,12 +222,64 @@ def check_preserved(proof, address, registers, chain=(), outer=(), copied_in=Fal
     return walked, unwalked
 
 
-def check_call(proof, address, aliases, stack, slots, *, constants=None, site=None, words=None):
+def dead_at_entry(proof, address, registers):
+    """Registers the complete callee overwrites on every path before any observation.
+
+    An instruction that reads the register, any call (BL, local or not), any
+    software interrupt and any return observe it; an unconditional write kills it. A cycle that never
+    kills it is not a proof (least fixpoint).
+    """
+    import owner_admission_profile as owner
+    import callee_preservation_profile as preservation
+    from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+    if not registers:
+        return set()
+    data = proof.span(address)
+    try:
+        instructions, edges, branches, calls, _ = graph.graph(data, address, owner.refine(data, address, proof.mapping))
+    except ValueError:
+        # No closed CFG, no liveness fact: every alias stays an argument.
+        return set()
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    for site, instruction in instructions.items():
+        require(preservation._decode(decoder, proof.rom, site, address, address+len(data)).id == instruction.id,
+                'live-alias entry liveness decoding differs from the ARMv4T decoder')
+    dead = set()
+    for register in registers:
+        safe = set()
+        while True:
+            added = False
+            for site, instruction in instructions.items():
+                if site in safe:
+                    continue
+                read, written = instruction.regs_access()
+                # A software interrupt reads its BIOS arguments without naming them.
+                if register in read or site in calls or site in branches or \
+                        match.CS_GRP_INT in instruction.groups:
+                    continue
+                if register in written or (edges[site] and all(t in safe for t in edges[site])):
+                    safe.add(site)
+                    added = True
+            if not added:
+                break
+        if address in safe:
+            dead.add(register)
+    return dead
+
+
+def check_call(proof, address, aliases, stack, slots, *, constants=None, site=None, words=None,
+               entry_liveness=False):
     require(address in proof.branch_calls['ordinary_targets'],
             'live-alias call requires an indexed ordinary target')
     require(not slots and not words,
             'live-alias calls exclude pointer-bearing slots and word provenance')
+    require(type(entry_liveness) is bool, 'entry-liveness selection must be Boolean')
     passed = {r: o for r, o in aliases.items() if r in match.CALLER_CLOBBERED}
+    dead = {}
+    if entry_liveness:
+        killed = dead_at_entry(proof, address, set(passed) - {match.ARM_REG_LR})
+        dead = {r: o for r, o in passed.items() if r in killed}
+        passed = {r: o for r, o in passed.items() if r not in killed}
     preserved = {r: o for r, o in aliases.items() if r not in match.CALLER_CLOBBERED}
     require(match.ARM_REG_LR not in passed, 'live-alias calls cannot pass a pointer in the link register')
     for offset in aliases.values():
@@ -220,6 +288,8 @@ def check_call(proof, address, aliases, stack, slots, *, constants=None, site=No
     if aliases:
         observation = dict(site=site, target=address, kind='live-local-alias-ordinary-call',
             passed_aliases=sorted(passed.items()), preserved_aliases=sorted(preserved.items()))
+        if entry_liveness:
+            observation['dead_at_entry_aliases'] = sorted(dead.items())
     if preserved:
         walked, unwalked = check_preserved(proof, address, preserved)
         observation.update(preserved_register_reads='push-only', preserved_register_restore='every-return',
@@ -233,7 +303,7 @@ def check_call(proof, address, aliases, stack, slots, *, constants=None, site=No
                 constants=proof.argument_constants(constants or {}), site=site)
         finally:
             proof._live_log = None
-        require(not returned, 'live-alias callee cannot return a local alias')
+        require(entry_liveness or not returned, 'live-alias callee cannot return a local alias')
         reached = set(log['calls'])
         require(not any(match.function_thunk.reserved(a) or a in match.RUNTIME_HELPERS.values()
                         for a in reached | {address}),
@@ -244,10 +314,14 @@ def check_call(proof, address, aliases, stack, slots, *, constants=None, site=No
         observation.update(access_lowest=min((o for o, _ in log['access']), default=None),
             access_end=max((o+w for o, w in log['access']), default=None),
             nested_dependencies=sorted(reached - {address}))
+        if entry_liveness:
+            observation['returned_aliases'] = sorted(dict(returned).items())
     if aliases:
         observation.update(premise=PREMISE,
             source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+        if entry_liveness:
+            observation['entry_liveness_premise'] = ENTRY_LIVENESS_PREMISE
     require(site not in proof.observations or proof.observations[site] == observation,
             'live-alias call differs across incoming paths')
     proof.observations[site] = observation
-    return {}
+    return returned if passed and entry_liveness else {}
