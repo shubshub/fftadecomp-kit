@@ -20,6 +20,10 @@ CONTRACT = ('conditional returning GBA BIOS CpuSet fill boundary: bit24 selects 
             'no initialization, '
             'physical readability, physical nonalias, destination bounds, '
             'numeric result or termination theorem')
+ZERO_EXTENSION_RULES = (
+    'zero-extending-loads-and-bounded-multiply-v1: LDRB and LDRH results are '
+    'zero above bit 7 and bit 15; MULS of values below 2**a and 2**b is below '
+    '2**(a+b) when a+b<=32; no other instruction gains facts')
 MASK = 0xFFFFFFFF
 MAX_UPDATES = 4096
 LOCAL_SOURCE_CONTRACT = (
@@ -177,13 +181,42 @@ def exact(value):
     return value, MASK ^ value
 
 
-def transfer(instruction, incoming, data, address):
+def known_width(bits):
+    """Smallest w such that every bit from w upward is known zero."""
+    width = 32
+    while width and bits[1] >> (width - 1) & 1:
+        width -= 1
+    return width
+
+
+def zero_extension_transfer(instruction, incoming, code, name):
+    """Only the ARMv4T Thumb LDRB/LDRH/MULS forms, decoded from their bytes."""
+    op = instruction.operands
+    if name in ('ldrb', 'ldrh'):
+        half = name == 'ldrh'
+        if (code & 0xF800 == (0x8800 if half else 0x7800) or code & 0xFE00 == (0x5A00 if half else 0x5C00)) and \
+                op and op[0].type == ARM_OP_REG and op[0].reg == ARM_REG_R0 + (code & 7) and \
+                not instruction.writeback:
+            return op[0].reg, (0, MASK ^ (0xFFFF if half else 0xFF))
+    elif name == 'muls' and code & 0xFFC0 == 0x4340 and op and all(p.type == ARM_OP_REG for p in op):
+        destination, source = ARM_REG_R0 + (code & 7), ARM_REG_R0 + ((code >> 3) & 7)
+        if op[0].reg == destination and {p.reg for p in op} <= {destination, source}:
+            width = known_width(incoming.get(destination, (0, 0))) + known_width(incoming.get(source, (0, 0)))
+            return destination, (0, (MASK << width) & MASK if width <= 32 else 0)
+    return None
+
+
+def transfer(instruction, incoming, data, address, zero_extension=False):
     """Introduce bits only from authenticated native Thumb encodings."""
     if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID):
         return None
     op = instruction.operands
     code = int.from_bytes(instruction.bytes, 'little')
     name = instruction.mnemonic
+    if zero_extension:
+        extended = zero_extension_transfer(instruction, incoming, code, name)
+        if extended is not None:
+            return extended
     if code & 0xF800 == 0x2000 and name == 'movs' and len(op) == 2 and \
             op[0].type == ARM_OP_REG and op[1].type == ARM_OP_IMM and \
             op[0].reg == ARM_REG_R0 + ((code >> 8) & 7) and op[1].imm == (code & 255):
@@ -255,7 +288,7 @@ def transfer(instruction, incoming, data, address):
     return None
 
 
-def prove_bits(instructions, edges, address, data):
+def prove_bits(instructions, edges, address, data, zero_extension=False):
     """Intersect joins, retaining only ABI callee-saved facts across calls."""
     if address not in instructions or set(edges) != set(instructions):
         raise ValueError('BIOS fill bits require an exact closed native CFG')
@@ -270,7 +303,7 @@ def prove_bits(instructions, edges, address, data):
         else:
             for register in instruction.regs_access()[1]:
                 outgoing.pop(register, None)
-            result = transfer(instruction, incoming, data, address)
+            result = transfer(instruction, incoming, data, address, zero_extension)
             if result is not None and result[1] != (0, 0):
                 outgoing[result[0]] = result[1]
         for successor in edges[site]:
@@ -293,7 +326,8 @@ def prove_bits(instructions, edges, address, data):
 
 
 class BiosFillProof:
-    def __init__(self, data, address, rom, mapping, index, calls, *, one_object_word_switch=False):
+    def __init__(self, data, address, rom, mapping, index, calls, *, one_object_word_switch=False,
+                 zero_extension=False):
         import match
         import owner_admission_profile as owner
         import owner_graph_profile as graph
@@ -322,7 +356,10 @@ class BiosFillProof:
         self.rom, self.mapping, self.index = rom, mapping, index
         self.calls = dict(calls)
         self.wrapper = body
-        self.states = prove_bits(instructions, edges, address, data)
+        if type(zero_extension) is not bool:
+            raise ValueError('BIOS zero-extension opt-in must be Boolean')
+        self.zero_extension = zero_extension
+        self.states = prove_bits(instructions, edges, address, data, zero_extension)
         self.observations = set()
 
     def check_call(self, site, aliases, stack):
@@ -341,7 +378,8 @@ class BiosFillProof:
         return {}
 
     def manifest(self):
-        return dict(schema=SCHEMA, contract=CONTRACT,
+        extra = dict(bit_rules=ZERO_EXTENSION_RULES) if self.zero_extension else {}
+        return dict(schema=SCHEMA, contract=CONTRACT, **extra,
                     owner=[self.address, len(self.data), hashlib.sha256(self.data).hexdigest()],
                     dependency=[ADDRESS, len(self.wrapper), hashlib.sha256(self.wrapper).hexdigest()],
                     sites=[list(row) for row in sorted(self.observations)])
