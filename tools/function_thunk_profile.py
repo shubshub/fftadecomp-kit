@@ -34,6 +34,16 @@ def pool_words(selector):
     return VERSIONED_POOLS.get(selector, 5)
 
 
+def is_versioned(words):
+    """True for a pool policy whose selector is versioned (zero or dispatch-identified)."""
+    return any(type(words) is type(value) and words == value for value in VERSIONED_POOLS.values())
+
+
+def policy_name(words):
+    return INTERPOSED_SELECTOR if type(words) is str and words == INTERPOSED else \
+        ZERO_SELECTOR if type(words) is int and words == 0 else SELECTOR
+
+
 def schema_for(selector):
     pool_words(selector)
     return {UMOD_R1_SELECTOR: UMOD_R1_SCHEMA, ZERO_SELECTOR: ZERO_SCHEMA,
@@ -64,8 +74,8 @@ def context_words(context):
 
 def check_pool_opt_in(words, function_thunks):
     if not (type(words) is int and words in (0, 5) or type(words) is str and words == INTERPOSED) or \
-            words != 5 and function_thunks is not True:
-        raise ValueError("zero-pool linking requires its explicit canonical-thunk context")
+            is_versioned(words) and function_thunks is not True:
+        raise ValueError("versioned pool selector linking requires its explicit canonical-thunk context")
 
 
 def verify_pool_calls(calls, words):
@@ -115,6 +125,23 @@ def verify_literal_bindings(data, address, instructions, calls, mapping, functio
         if reserved(value) or value & ~1 in code_entries and (
                 offset not in functions or functions[offset][1] != value):
             raise ValueError("code-entry thunk literals require canonical function provenance")
+
+
+def verify_own_span_literals(data, address, instructions, functions, switch_relocations):
+    """Only the switch table pointer, or the caller's own entry with canonical
+    function provenance, may name the caller's bytes (Thumb bit set or not)."""
+    from match import ARM_OP_MEM, ARM_REG_PC
+    for instruction in instructions:
+        for operand in instruction.operands:
+            if instruction.mnemonic != "ldr" or operand.type != ARM_OP_MEM or \
+                    operand.mem.base != ARM_REG_PC or operand.mem.index:
+                continue
+            offset = ((instruction.address + 4) & ~3) + operand.mem.disp - address
+            value = struct.unpack_from("<I", data, offset)[0]
+            if address <= value & ~1 < address + len(data) and \
+                    switch_relocations.get(offset) != value - address and \
+                    not (value & ~1 == address and offset in functions and functions[offset][1] == value):
+                raise ValueError("thunk literals cannot name the caller's own bytes")
 
 
 def selector_for_report(report):
@@ -220,8 +247,8 @@ def original_bindings(image, address, mapping, rom, objects, *, switch_relocatio
                                             function_thunks=True, thunk_pool_words=words, umodsi3_bindings=unsigned,
                                             umod_r1_profile=selector if unsigned is not None else None)
     verify_pool_calls(calls, words)
-    if words != 5 and not switch_relocations:
-        raise ValueError("zero-pool selector requires a complete local switch")
+    if is_versioned(words) and not switch_relocations:
+        raise ValueError(f"{policy_name(words)} requires a complete local switch")
     if not any(name in ALIASES for name in targets):
         raise ValueError("function thunks require canonical calls")
     for name, value in targets.items():
@@ -284,9 +311,9 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
         if pool_switch is None:
             pool_switch = discover(body, address, instructions, interposed_words=words)
         manifest['pool_switch'] = record(body, address, pool_switch, instructions, interposed_words=words)
-    if words != 5:
+    if is_versioned(words):
         if 'pool_switch' not in manifest:
-            raise ValueError("zero-pool selector requires a complete local switch")
+            raise ValueError(f"{policy_name(words)} requires a complete local switch")
         manifest["selector"] = selector
         manifest["producer_source_sha256"] = producer_sources()
     return manifest
@@ -303,14 +330,14 @@ def verify(data, address, rom, mapping, index, objects, manifest):
         from umod_r1_thunk_profile import verify as composed_verify
         return composed_verify(data, address, rom, mapping, index, objects, manifest)
     words = pool_words(selector)
-    allowed = (keys | {"pool_switch", "selector", "producer_source_sha256"},) if words != 5 else (keys, keys | {'pool_switch'})
+    allowed = (keys | {"pool_switch", "selector", "producer_source_sha256"},) if is_versioned(words) else (keys, keys | {'pool_switch'})
     if set(manifest) not in allowed or manifest["runtime"] != RUNTIME or \
             manifest["abi"] != ABI or type(manifest["frame"]) is not bool or \
             any(type(manifest[name]) is not list for name in keys - {"runtime", "abi", "frame"}) or \
             not manifest["thunks"]:
         raise ValueError("invalid function-thunk manifest")
-    if words != 5 and manifest["producer_source_sha256"] != producer_sources():
-        raise ValueError("zero-pool producer source bytes differ")
+    if is_versioned(words) and manifest["producer_source_sha256"] != producer_sources():
+        raise ValueError(f"{selector} producer source bytes differ")
     ordinary = {name: manifest[name] for name in ("calls", "functions", "data")}
     calls, literals = function_address_bindings(
         data, address, rom, mapping, objects, ordinary, allow_empty_functions=True)
@@ -348,7 +375,7 @@ def verify(data, address, rom, mapping, index, objects, manifest):
         decoder.detail = True
         relocations = discover(data, address, list(decoder.disasm(data, address)), interposed_words=words)
         context['pool_switch'] = relocations
-        if words != 5:
+        if is_versioned(words):
             context['interposed_words'] = words
     instructions = verify_leaf_instructions(data, address, True, calls, function_thunk_context=context)
     if not context:
@@ -365,6 +392,7 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     functions = {offset: (name, struct.unpack_from("<I", data, offset)[0])
                  for offset, name in manifest["functions"]}
     verify_literal_bindings(data, address, instructions, calls, mapping, functions)
+    verify_own_span_literals(data, address, instructions, functions, context.get('pool_switch', {}))
     verify_data_literals(instructions, address, literals)
     if uses_stack_frame(instructions) != manifest["frame"]:
         raise ValueError("function-thunk frame differs")

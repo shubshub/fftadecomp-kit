@@ -1075,10 +1075,10 @@ def call_bindings(image, name, address, mapping, rom_size,
             any(item["name"] and not item["section"] and item["name"] not in targets
                 for item in image["symbols"]):
         raise ValueError("unresolved symbols outside the permitted bindings")
-    if thunk_pool_words != 5:
+    if function_thunk.is_versioned(thunk_pool_words):
         function_thunk.verify_pool_calls(calls, thunk_pool_words)
         if not switch_relocations:
-            raise ValueError("zero-pool linking requires its complete local switch")
+            raise ValueError(f"{function_thunk.policy_name(thunk_pool_words)} linking requires its complete local switch")
     function_thunk.verify_data_bindings(calls, data_relocations, data_symbols, entries)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_bindings
@@ -1162,10 +1162,10 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
         raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
-    if thunk_pool_words != 5:
+    if function_thunk.is_versioned(thunk_pool_words):
         function_thunk.verify_pool_calls(calls, thunk_pool_words)
         if not switch_relocations:
-            raise ValueError("zero-pool linking requires its complete local switch")
+            raise ValueError(f"{function_thunk.policy_name(thunk_pool_words)} linking requires its complete local switch")
     float_targets = {name: target for name, target in targets.items()
                      if software_float.reserved(target) and not (
                          double_bindings is not None and software_double.shared_float_call(name, target) or
@@ -1340,7 +1340,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             # against the fully linked complete symbol, not linear decoding.
             verify_leaf_instructions(linked["text"][:after["size"]], address, True, calls,
                                      function_thunk_context={"pool_switch": switch_relocations,
-                                         **({"interposed_words": thunk_pool_words} if thunk_pool_words != 5 else {})})
+                                         **({"interposed_words": thunk_pool_words}
+                                            if function_thunk.is_versioned(thunk_pool_words) else {})})
         else:
             layout = (switch_layout(linked["text"][:after["size"]], address, switch_relocations)
                       if double_bindings is not None else selected_switch_layout(
@@ -4032,12 +4033,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             pool_relocations = pool_discover(data, address, list(decoder.disasm(data, address)),
                 interposed_words=function_thunk.context_words(function_thunk_context))
         except ValueError:
-            if function_thunk.context_words(function_thunk_context) != 5:
+            if function_thunk.is_versioned(function_thunk.context_words(function_thunk_context)):
                 raise
         else:
             words = function_thunk.context_words(function_thunk_context)
             function_thunk_context = {'pool_switch': pool_relocations,
-                **({'interposed_words': words} if words != 5 else {})}
+                **({'interposed_words': words} if function_thunk.is_versioned(words) else {})}
     if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
         from thunk_pool_switch import layout as pool_layout
         switch_relocations = function_thunk_context['pool_switch']
@@ -5276,7 +5277,8 @@ def main():
                 else:
                     verified_instructions = verify_leaf_instructions(got, addr, True, calls,
                         function_thunk_context={"interposed_words": function_thunk.pool_words(args.function_address_profile)}
-                            if function_thunk.pool_words(args.function_address_profile) != 5 else {})
+                            if function_thunk.is_versioned(function_thunk.pool_words(args.function_address_profile))
+                            else {})
                 thunk_evidence = function_thunk.make_manifest(calls, function_relocations, data_relocations,
                                                              addr, rom, data_mapping, verified_instructions,
                                                              selector=args.function_address_profile)
