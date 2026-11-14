@@ -1353,6 +1353,8 @@ def render(address,result):
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         *(stack_index.precondition_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if manifest['profile'] in stack_index.SCHEMAS.values() else []),
+        *(stack_index.forwarded_lines(manifest['proof']['buffers']['stack_index_preconditions'])
+          if manifest['profile'] == stack_index.SCHEMA_V2 else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])
