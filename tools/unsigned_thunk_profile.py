@@ -1,6 +1,7 @@
 """Explicit source admission for unsigned DIV/MOD with canonical thunk callbacks.
 
-The structural inventory proves the complete saved-only caller frame, an
+The structural inventory proves the complete caller frame (saved-only, or
+the fixed frame under the framed selector below), an
 all-path constant divisor at every runtime call and the native UDIV/UMOD/zero
 closure.  This selector adds the typed original-ELF relocation and
 canonical-thunk source/report lifecycle.  Indirect destinations keep the

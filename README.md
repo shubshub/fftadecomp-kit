@@ -3191,6 +3191,8 @@ needs an allocated local or an incoming read. The manifest carries a
 access), and each verification re-proves it. `unsigned-divmod-thunks-v1`
 reports keep their saved-only meaning.
 
+### Analysis and split notes
+
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the
   Thumb interworking epilogue, and without that every function using it
   swallows the one after it.
