@@ -2518,7 +2518,21 @@ add a read; and `sym.x |= 0;`, `sym.x = sym.x;`, `sym.x ^= 0;` and
 model fails closed with a reason: ARM code, computed jumps, untyped indirect calls,
 loops whose exit depends on unknown values, more than 256 paths, and
 prototypes that are missing, `()`, variadic, inconsistent, not one word per
-parameter, or too complex to read at file scope. Because the
+parameter, or too complex to read at file scope. The one computed jump it
+models is agbcc's switch dispatch (kit#170): `lsl rD, rI, #2; ldr rT, .Lp;
+add rD, rD, rT; ldr rD, [rD]; mov pc, rD`, where `.Lp` holds exactly the
+label of a table that starts right after the `mov pc`, every entry is
+exactly a local code label of the function, and on the path the index is
+either a known constant inside the table or was compared with
+`cmp rI, #N` and the `hi` branch not taken, for a table of exactly N+1
+entries. Each distinct case label is then a successor, explored like a
+conditional branch and counted against the same 256-path bound; the
+decision records the index, N and which entries share a label, so the
+stripped and permuted compiles must dispatch on the same value through the
+same partition. Any other `mov pc` or `bx` source, an unguarded or
+differently guarded index, a table that is not adjacent, not local or of
+another size, and entering the dispatch past its shift still fail closed.
+Because the
 check sees every spelling, the earlier syntactic rule against statements
 that only read `symbol.member` is gone.
 
