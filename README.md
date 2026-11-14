@@ -2348,23 +2348,34 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   a runtime helper and is refused by the call binding.
 * **No local code address as a target.** A forward pass over the verified CFG
   marks registers that may hold an address in the caller: taint enters through
-  every load of the table pointer literal, any other read of PC, the entry LR
-  and the LR each BL leaves; it follows register operations and loads through a
-  tainted address; no store may use a tainted register, and popped registers are
-  tainted, so provenance cannot pass through memory. A thunk BL whose register
-  is tainted is refused. The table pointer literal must also be read only by
-  the dispatch load, the caller's own bytes may not be named by any other
-  literal, and no object or literal may name an indexed code entry or a reserved
-  thunk (`verify_data_bindings` / `verify_literal_bindings`).
-* **Decode.** The taint pass decodes every reached instruction itself, so it
-  accepts only 16-bit encodings and the bound BL pairs, and refuses `svc`,
-  `bkpt` and `udf` (kit `#180`).
+  every load of the table pointer literal, any other read of PC or SP, the
+  entry LR and the LR each BL leaves; it follows register operations and loads
+  through a tainted address; no store may use a tainted register, and popped
+  registers are tainted, so provenance cannot pass through memory. Values built
+  from immediates are tracked as intervals (`movs`, then add, sub, shifts and
+  logical operations over constants); one that reaches the ROM range, or any
+  other operation on a constant, becomes tainted, a loop that keeps changing a
+  constant is tainted after sixteen revisits, and a thunk register holding any
+  constant-derived value is refused. A thunk BL whose register is tainted is
+  refused. The table pointer literal must also be read only by the dispatch
+  load, the caller's own bytes may not be named by any other literal, and no
+  object or literal may name an indexed code entry, a byte inside any indexed
+  function span (the caller's own included) or a reserved thunk
+  (`verify_data_bindings` / `verify_literal_bindings` and the span check).
+* **Decode.** The taint pass decodes every reached instruction itself. It
+  accepts only the 16-bit ARMv4T Thumb mnemonics (so no `uxtb`, `sxth`, `rev`,
+  `cps`, `setend`, hint `nop`, `yield`, `sev`, `blx` register, or a hi-register
+  `mov`/`cmp`/`add` encoding with two low registers) and the bound BL pairs, and refuses
+  `svc`, `bkpt` and `udf` (kit `#180`).
 
 Premises that stay outside the proof, as for `canonical-thunks-v1`: callees,
 including the target reached through a thunk register, follow the ordinary
 returning ARM call ABI; a callee reached with no outgoing words takes at most
 four register arguments; a callee's result is not a local code address of its
-caller. Callback arity, memory safety and termination are not proved. The
+caller; a code address passed to a callee as an argument (r0-r3 or stack) and
+kept in callee memory is not followed; and the callback register is not tied to
+a callback object, since any mapped object load is admitted. Callback arity,
+memory safety and termination are not proved. The
 fingerprint is domain-separated by schema, a report cannot be relabelled across
 the two selectors or to or from any thunk-free schema, and `status.py` and
 `rebuild.py` forward the saved selector only after a fresh replay.

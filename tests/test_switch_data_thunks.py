@@ -432,6 +432,49 @@ class ProofTests(unittest.TestCase):
             with self.subTest(word=word), self.assertRaisesRegex(ValueError, '16-bit ARMv4T'):
                 thunks.verify_thunk_targets({BASE: narrow}, {BASE: ()}, BASE, {}, BASE + 8)
 
+    def test_objects_cannot_lie_inside_indexed_function_spans(self):
+        verify(build())
+        body, labels, manifest = build()
+        # The issue's shape: 0x08001009 lies inside a 0x40-byte indexed function, not at its entry.
+        wide = json.dumps([{'rom': f'0x{BASE:08X}', 'end': f'0x{BASE + len(body):08X}', 'mode': 'thumb'},
+                           {'rom': f'0x{CALLEE:08X}', 'end': f'0x{CALLEE + 0x40:08X}', 'mode': 'thumb'}]).encode()
+        for label, address in {'callee span': CALLEE + 9, 'own span': BASE + 8}.items():
+            moved = bytearray(body)
+            struct.pack_into('<I', moved, labels['object'], address)
+            with self.subTest(label), self.assertRaisesRegex(
+                    ValueError, 'code entries or indexed function spans|invalid interposed switch-data object'):
+                match.verify_switches(bytes(moved), BASE, rom_image(bytes(moved)), wide, manifest,
+                                      data_mapping=json.dumps({'g_right': f'0x{address:08X}'}).encode())
+
+    def test_constants_built_from_immediates_cannot_be_thunk_targets(self):
+        obj = (('ldr', 3, 'object'),)
+        rom_address = (('h', 0x2280), ('h', 0x0512), ('h', 0x3231))  # movs #0x80; lsls #20; adds #0x31
+        for label, post in {
+                'rom address': (*obj, *rom_address),
+                'rom address through a non-modelled operation': (*obj, *rom_address[:2], ('h', 0x4252)),
+                'plain constant': (*obj, ('h', 0x2204)),
+                'stored rom address': (*obj, *rom_address, ('h', 0x601A))}.items():
+            with self.subTest(label), self.assertRaisesRegex(
+                    ValueError, 'local code address|constant-derived|cannot be stored'):
+                leaf(build(post=post), switch_thunks=PLAIN)
+        # Small constants that never reach the thunk register stay ordinary.
+        verify(build(post=(*obj, ('h', 0x2104), ('h', 0x6019), ('h', 0x681A))))
+        # A constant mixed with a loaded value is not a known constant.
+        verify(build(post=(*obj, ('h', 0x6818), ('h', 0x3004), ('h', 0x6802))))
+
+    def test_only_armv4t_16_bit_encodings_are_admitted(self):
+        verify(build(tail=(('h', 0x46C0), ('h', 0x4640))))
+        for label, half in {'uxtb': 0xB2D2, 'sxth': 0xB212, 'rev': 0xBA12, 'cps': 0xB662, 'setend': 0xB650,
+                            'nop hint': 0xBF00, 'yield': 0xBF10, 'sev': 0xBF40, 'blx register': 0x4790,
+                            'low mov': 0x4612, 'low cmp': 0x4512, 'low add': 0x4412}.items():
+            with self.subTest(label), self.assertRaises(ValueError):
+                verify(build(tail=(('h', half),)))
+            with self.subTest(label), self.assertRaisesRegex(ValueError, '16-bit ARMv4T'):
+                from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+                decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB); decoder.detail = True
+                item = next(decoder.disasm(half.to_bytes(2, 'little'), BASE))
+                thunks.verify_thunk_targets({BASE: item}, {BASE: ()}, BASE, {}, BASE + 8)
+
     def test_leaf_context_is_isolated(self):
         f = build(); frame = build(frame=True)
         for key, value in [('allow_switch_constants', True), ('function_thunk_context', {}),
