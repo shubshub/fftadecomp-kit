@@ -87,6 +87,14 @@ class StatusTypedOutgoingSwitchTests(unittest.TestCase):
             self.assertEqual(replay.call_count, 2)
             self.assertEqual([call.args[0] for call in replay.call_args_list], [self.original] * 2)
 
+    def test_rebuild_forwards_the_exact_selector(self):
+        import rebuild
+        self.assertEqual(rebuild.saved_profile_arguments(self.original, self.root, BASE),
+                         ['--switch-data-profile', frame.SELECTOR])
+        with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
+            rebuild.saved_profile_arguments(self.original.replace('* relocations: none', '* relocations: some'),
+                                            self.root, BASE)
+
     def test_write_verification_revalidates_actual_regenerated_report(self):
         regenerated = self.original.replace('# synthetic', '# regenerated synthetic')
         def invoke(command, **kwargs):

@@ -393,6 +393,20 @@ class ReportTests(unittest.TestCase):
         self.rom_path.write_bytes(altered)
         self.assertFalse(self.valid(self.report()))
 
+    def test_rebuild_forwards_the_v2_selector(self):
+        import rebuild
+        self.enterContext(mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False))
+        self.assertEqual(rebuild.saved_profile_arguments(self.report(), self.root, BASE),
+                         ["--switch-data-profile", evidence.SWITCH_POOL_U16_SCALAR_SELECTOR])
+        with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
+            rebuild.saved_profile_arguments(
+                self.report().replace(SCHEMA, evidence.SWITCH_U16_SCALAR_SCHEMA), self.root, BASE)
+        v1 = copy.deepcopy(self.manifest)
+        v1.pop("pool_policy")
+        relabelled = self.report(v1, evidence.switch_u16_scalar_fingerprint(BASE, self.body, v1))
+        with self.assertRaisesRegex(ValueError, "invalid saved profile report"):
+            rebuild.saved_profile_arguments(relabelled, self.root, BASE)
+
     def test_status_forwards_the_v2_selector(self):
         import status
         (self.root / "config").mkdir()
