@@ -49,6 +49,7 @@ import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
+import switch_pool_outgoing_frame as pool_switch_frame
 import divsi3_profile as divsi3
 from rompath import rom_path
 
@@ -315,6 +316,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                     if f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
                     SWITCH_POOL_U16_SCALAR_SELECTOR
                     if f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
+                    pool_switch_frame.SELECTOR
+                    if f"* verification: `{pool_switch_frame.SCHEMA}`" in saved_report.splitlines() else
                     False)
                 double_profile = software_double.selected(saved_report)
                 if double_profile:
