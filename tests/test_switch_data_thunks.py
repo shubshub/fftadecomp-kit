@@ -108,7 +108,7 @@ def mapping(body):
 
 
 def build(*, pre=(), post=(('ldr', 2, 'object'), ('h', 0x6812)), scalar=False, frame=False,
-          thunk_target=THUNK_R2, tail=()):
+          thunk_target=THUNK_R2, tail=(), scalar_value=0x1234):
     """A guarded two-case switch with one thunk call.
 
     `pre` runs before the guard and `post` loads the thunk target register (r2 by
@@ -126,7 +126,7 @@ def build(*, pre=(), post=(('ldr', 2, 'object'), ('h', 0x6812)), scalar=False, f
               *(frame and [('h', 0xB002)] or []), ('h', 0xBC10), ('h', 0xBC01), ('h', 0x4700), ('align',),
               ('label', 'object'), ('word', 0x02002000)]
     if scalar:
-        items += [('label', 'scalar'), ('word', 0x1234)]
+        items += [('label', 'scalar'), ('word', scalar_value)]
     body, labels, calls = assemble(items)
     thunk_sites = [[at, name] for at, target in calls
                    for name, alias in function_thunk.ALIASES.items() if target == alias]
@@ -137,7 +137,7 @@ def build(*, pre=(), post=(('ldr', 2, 'object'), ('h', 0x6812)), scalar=False, f
                 'switch': descriptor(labels), 'thunk_policy': thunks.POLICY, 'thunks': thunk_sites}
     if scalar:
         manifest['scalar_policy'] = SCALAR_POLICY
-        manifest['scalars'] = [[labels['scalar'], 0x1234]]
+        manifest['scalars'] = [[labels['scalar'], scalar_value]]
     if frame:
         manifest['stack_policy'] = pool_switch_frame.STACK_POLICY
     return body, labels, manifest
@@ -458,15 +458,40 @@ class ProofTests(unittest.TestCase):
                     ValueError, 'local code address|constant-derived|cannot be stored'):
                 leaf(build(post=post), switch_thunks=PLAIN)
         # Small constants that never reach the thunk register stay ordinary.
-        verify(build(post=(*obj, ('h', 0x2104), ('h', 0x6019), ('h', 0x681A))))
-        # A constant mixed with a loaded value is not a known constant.
+        verify(build(post=(*obj, ('h', 0x2104), ('h', 0x6019), ('ldr', 2, 'object'), ('h', 0x6812))))
+        # A constant mixed with a loaded value is constant-derived, but loading through it is ordinary.
         verify(build(post=(*obj, ('h', 0x6818), ('h', 0x3004), ('h', 0x6802))))
+
+    def test_literal_words_and_loaded_values_join_the_constant_model(self):
+        obj = (('ldr', 0, 'object'),)
+        lit = dict(scalar=True, scalar_value=0x0800)
+        for label, (parts, message) in {
+                'literal shifted into the rom': (dict(post=(*obj, ('h', 0x041A)), **lit), 'local code address'),
+                'literal shifted and offset': (dict(post=(*obj, ('h', 0x041A), ('h', 0x3231)), **lit),
+                                               'local code address'),
+                'literal copied': (dict(post=(*obj, ('h', 0x1C1A)), **lit), 'constant-derived'),
+                'object address plus offset': (dict(post=(('ldr', 2, 'object'), ('h', 0x3231))),
+                                               'constant-derived'),
+                'loaded value plus constant, shifted': (
+                    dict(post=(('ldr', 3, 'object'), ('h', 0x6818), ('h', 0x3031), ('h', 0x0502))),
+                    'constant-derived'),
+                'constant stored and loaded back': (
+                    dict(post=(('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x6019), ('h', 0x681A), ('h', 0x0512))),
+                    'constant-derived'),
+                'counting loop is widened': (
+                    dict(post=(('ldr', 3, 'object'), ('h', 0x2100), ('label', 'again'), ('h', 0x3101),
+                               ('h', 0x2905), ('bhi', 'again'), ('h', 0x6019),
+                               ('ldr', 2, 'object'), ('h', 0x6812))), 'cannot be stored')}.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, message):
+                leaf(build(**parts), switch_thunks=PLAIN)
+        # The same literal used as a plain value, never as the thunk register, stays ordinary.
+        verify(build(post=(*obj, ('h', 0x041A), ('ldr', 2, 'object'), ('h', 0x6812)), **lit))
 
     def test_only_armv4t_16_bit_encodings_are_admitted(self):
         verify(build(tail=(('h', 0x46C0), ('h', 0x4640))))
         for label, half in {'uxtb': 0xB2D2, 'sxth': 0xB212, 'rev': 0xBA12, 'cps': 0xB662, 'setend': 0xB650,
                             'nop hint': 0xBF00, 'yield': 0xBF10, 'sev': 0xBF40, 'blx register': 0x4790,
-                            'low mov': 0x4612, 'low cmp': 0x4512, 'low add': 0x4412}.items():
+                            'stm base not lowest': 0xC418, 'low mov': 0x4612, 'low cmp': 0x4512, 'low add': 0x4412}.items():
             with self.subTest(label), self.assertRaises(ValueError):
                 verify(build(tail=(('h', half),)))
             with self.subTest(label), self.assertRaisesRegex(ValueError, '16-bit ARMv4T'):

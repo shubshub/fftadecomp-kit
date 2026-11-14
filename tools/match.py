@@ -5135,7 +5135,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if switch is None or calls != validated_calls:
             raise ValueError("switch thunks require their verified local switch and exact calls")
         switch_data_thunks.verify_thunk_targets(instructions, edges, address, calls,
-                                                address + switch["literal"])
+                                                address + switch["literal"], data)
     reaching_return = set(returns)
     pending = list(returns)
     while pending:

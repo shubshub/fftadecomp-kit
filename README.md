@@ -2351,21 +2351,28 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   every load of the table pointer literal, any other read of PC or SP, the
   entry LR and the LR each BL leaves; it follows register operations and loads
   through a tainted address; no store may use a tainted register, and popped
-  registers are tainted, so provenance cannot pass through memory. Values built
-  from immediates are tracked as intervals (`movs`, then add, sub, shifts and
-  logical operations over constants); one that reaches the ROM range, or any
-  other operation on a constant, becomes tainted, a loop that keeps changing a
-  constant is tainted after sixteen revisits, and a thunk register holding any
-  constant-derived value is refused. A thunk BL whose register is tainted is
-  refused. The table pointer literal must also be read only by the dispatch
-  load, the caller's own bytes may not be named by any other literal, and no
-  object or literal may name an indexed code entry, a byte inside any indexed
-  function span (the caller's own included) or a reserved thunk
-  (`verify_data_bindings` / `verify_literal_bindings` and the span check).
+  registers are tainted, so a local code address cannot be stored or reloaded
+  from the stack. Constants are tracked as intervals: `movs`/`mov` immediates
+  and every reached non-pointer literal word (its exact bound value, scalar or
+  object address) feed add, sub, shifts and logical operations; a result that
+  reaches the ROM range, or any other operation on a constant, becomes tainted,
+  and a loop that keeps changing a constant is tainted after sixteen revisits.
+  A constant combined with a loaded value stays constant-derived, and so does a
+  value loaded through a base register that this path has stored a
+  constant-derived value through. A thunk register holding any constant-derived
+  value, including a literal word itself, is refused, so a callback must be a
+  plain load from memory (aliasing a stored-through base under another register
+  is not followed). A thunk BL whose register is tainted is refused. The table
+  pointer literal must also be read only by the dispatch load, the caller's own
+  bytes may not be named by any other literal, and no object or literal may name
+  an indexed code entry, a byte inside any indexed function span (the caller's
+  own included) or a reserved thunk (`verify_data_bindings` /
+  `verify_literal_bindings` and the span check).
 * **Decode.** The taint pass decodes every reached instruction itself. It
   accepts only the 16-bit ARMv4T Thumb mnemonics (so no `uxtb`, `sxth`, `rev`,
-  `cps`, `setend`, hint `nop`, `yield`, `sev`, `blx` register, or a hi-register
-  `mov`/`cmp`/`add` encoding with two low registers) and the bound BL pairs, and refuses
+  `cps`, `setend`, hint `nop`, `yield`, `sev`, `blx` register, a hi-register
+  `mov`/`cmp`/`add` encoding with two low registers, or an `stmia` whose
+  writeback base is in the list but not lowest) and the bound BL pairs, and refuses
   `svc`, `bkpt` and `udf` (kit `#180`).
 
 Premises that stay outside the proof, as for `canonical-thunks-v1`: callees,
