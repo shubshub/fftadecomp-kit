@@ -58,7 +58,11 @@ BIOS_SCALAR_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-data-v1'
 BIOS_ZERO_EXTENDED_DATA_SELECTOR = 'addressed-native-bios-fill-zero-extended-control-data-v1'
 BIOS_SCALAR_MMIO_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-numeric-mmio-data-v1'
 BIOS_SAVED_SCALAR_MMIO_DATA_SELECTOR = 'addressed-native-bios-fill-saved-scalar-control-numeric-mmio-data-v1'
-NUMERIC_MMIO_SELECTORS = (BIOS_SCALAR_MMIO_DATA_SELECTOR, BIOS_SAVED_SCALAR_MMIO_DATA_SELECTOR)
+BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR = 'addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1'
+BIOS_SCALAR_CODE_IMAGE_SELECTOR = 'addressed-native-bios-fill-scalar-control-code-image-data-v1'
+CODE_IMAGE_SELECTORS = (BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR)
+NUMERIC_MMIO_SELECTORS = (BIOS_SCALAR_MMIO_DATA_SELECTOR, BIOS_SAVED_SCALAR_MMIO_DATA_SELECTOR,
+                          BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR)
 BIOS_R2_ORDINARY_DATA_SELECTOR = 'addressed-native-bios-ordinary-r2-callback-data-v1'
 BIOS_READONLY_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-word0-data-v1'
 BIOS_READONLY_TWO_SELECTOR = 'addressed-native-bios-fill-readonly-two-words-v1'
@@ -67,9 +71,11 @@ BIOS_READONLY_FOUR_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-four-wor
 BIOS_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-function-literals-data-v1'
 BIOS_SCALAR_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-function-literals-data-v1'
 BIOS_ORDINARY_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-ordinary-function-literals-data-v1'
+SCALAR_CONTROL_SELECTORS = (BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
+                            BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS)
 FUNCTION_DATA_SELECTORS = (BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                            BIOS_ORDINARY_FUNCTION_DATA_SELECTOR)
-BIOS_SELECTORS = (BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
+BIOS_SELECTORS = (BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
 BIOS_ORDINARY_SELECTOR = 'addressed-native-bios-ordinary-v1'
 BIOS_ORDINARY_DATA_SELECTOR = 'addressed-native-bios-ordinary-data-v1'
 BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR = 'addressed-native-bios-ordinary-readonly-two-words-data-v1'
@@ -91,7 +97,7 @@ INTEGER_SELECTORS = (INTEGER_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_READONLY_S
 UNSIGNED_CAPABLE_SELECTORS = (*BIOS_ORDINARY_SELECTORS, *BIOS_SELECTORS, *UNSIGNED_SELECTORS, *INTEGER_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                              UNSIGNED_BUFFER_DATA_SELECTOR)
 CALLBACK_SELECTORS = (CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_DATA_SELECTOR)
-DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
+DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
                   BUFFER_DATA_SELECTOR, UNSIGNED_BUFFER_DATA_SELECTOR, *COMPILER_SELECTORS)
 CALLBACK_ALIAS = '_call_via_r2'
@@ -104,6 +110,8 @@ R3_CALLBACK_CONTRACT = ('conditional returning typed source callback via canonic
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
 SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
+            BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1',
+            BIOS_SCALAR_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-code-image-data-v1',
             BIOS_READONLY_TWO_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-readonly-two-words-v1',
             COMPILER_MMIO_DATA_SELECTOR: COMPILER_MMIO_DATA_SCHEMA,
             BIOS_ORDINARY_FUNCTION_DATA_SELECTOR:'elf-symbol-thumb-addressed-native-bios-ordinary-function-literals-data-v1',
@@ -211,15 +219,22 @@ def binds_unsigned(context, site, target):
         UNSIGNED_OPERATIONS[context[3][site]] == target
 
 
-def object_value(name, addend, objects, entries, address, size):
-    """The existing typed-data addend boundary, excluding code-as-data aliases."""
+def object_value(name, addend, objects, entries, address, size, *, image=False):
+    """The existing typed-data addend boundary, excluding code-as-data aliases.
+
+    image=True (code-image selectors only) additionally admits a zero-addend object whose value is
+    exactly one indexed entry start; the CFG-level proof of its use is cpuset_code_image_profile.
+    """
     import match
     if name not in objects or type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF:
         raise ValueError('addressed data requires a mapped object and signed32 addend')
     base = objects[name]
     value = base + addend
+    alias = image and addend == 0 and value % 2 == 0 and \
+        sum(int(row['rom'], 16) == value for row in entries) == 1 and \
+        sum(int(row['rom'], 16) <= value < int(row['end'], 16) for row in entries) == 1
     if not 0 <= value <= 0xFFFFFFFF or address <= value < address + size or \
-            any(match.function_thunk.reserved(target) for target in (base, value)) or any(
+            any(match.function_thunk.reserved(target) for target in (base, value)) or not alias and any(
             int(row['rom'], 16) <= (target & ~1) < int(row['end'], 16)
             for row in entries for target in (base, value)):
         raise ValueError('addressed data overflows or aliases indexed code')
@@ -260,7 +275,8 @@ def data_literals(data, address, rom, mapping, objects, records, *, selector=DAT
     if any(name in parsed for _, name in functions):
         raise ValueError('function literal cannot also have an object identity')
     for offset, name, addend in data_records:
-        value = object_value(name, addend, parsed, entries, address, len(data))
+        value = object_value(name, addend, parsed, entries, address, len(data),
+                             image=selector in CODE_IMAGE_SELECTORS)
         if literals[offset] != (name, value):
             raise ValueError('addressed data lost its typed object identity')
     if calls:
@@ -281,6 +297,9 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
                  ('match_evidence', 'inert_spin_profile', 'analyze', 'plausible'))
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         paths.add(Path(importlib.import_module('bios_cpuset_fill_profile').__file__))
+    if selector in CODE_IMAGE_SELECTORS:
+        paths.update(Path(importlib.import_module(name).__file__) for name in
+                     ('cpuset_code_image_profile', 'iwram_installation_prerequisite'))
     if selector == BIOS_READONLY_DATA_SELECTOR:
         paths.add(Path(importlib.import_module('readonly_entry_stack_profile').__file__))
     if selector in (READONLY_TWO_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
@@ -574,10 +593,11 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
     scalar_controls = []
     saved_controls = []
     numeric_mmio = []
+    code_images = None
     if selector in DATA_SELECTORS:
         literals = data_literals(data, address, context[0], context[1], context[6], context[7], selector=selector)
         match.verify_data_literals(instructions.values(), address, literals)
-        if selector in (BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS):
+        if selector in SCALAR_CONTROL_SELECTORS:
             from bios_cpuset_fill_profile import scalar_control_words
             scalar_controls = scalar_control_words(instructions, edges, calls, partition, address)
             if selector == BIOS_SAVED_SCALAR_MMIO_DATA_SELECTOR:
@@ -605,6 +625,10 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             address_words -= offsets
         if address_words != set(literals):
             raise ValueError('addressed data requires exact typed coverage of reached address words')
+        if selector in CODE_IMAGE_SELECTORS:
+            import cpuset_code_image_profile as code_image
+            code_images = code_image.verify(literals, partition, instructions, edges, calls,
+                                            address, data, context[0], context[1])
     elif any(remainder.address_literal(row['value']) for row in partition['words']):
         raise ValueError('addressed signed runtimes exclude address literals and data bindings')
     if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
@@ -705,7 +729,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
     if selector in BIOS_SELECTORS:
         context[4]['native_buffers']['bios_fill'] = bios.manifest()
         context[4]['native_buffers']['contract'] += '; ' + bios_cpuset_fill_profile.CONTRACT
-    if selector in (BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS):
+    if selector in SCALAR_CONTROL_SELECTORS:
         context[4]['bios_scalar_control'] = dict(words=scalar_controls,
             contract='Exact native PC literal loaded only into R2 and consumed by '
                      'the next actual CpuSet call without an intervening R2 read, '
@@ -742,6 +766,8 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             'r0/r1 returned aliases or unproved escapes; ' + DISCARDED_SCRATCH_CONTRACT +
             '; explicit conditional ordinary returning ABI; no initialization, '
             'physical nonalias, numeric result or termination theorem')
+    if selector in CODE_IMAGE_SELECTORS:
+        context[4]['code_image_sources'] = code_image.manifest(code_images)
     if selector in DATA_SELECTORS:
         context[4].update(data_bindings=[list(row) for row in context[7]],
             data_contract=DATA_CONTRACT)
@@ -857,7 +883,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                         raise ValueError('function literal cannot have an addend or an object identity')
                     target = match.function_address_target(name, entries, address, symbol['size'], len(rom))
                 else:
-                    object_value(name, addend, objects, entries, address, symbol['size'])
+                    object_value(name, addend, objects, entries, address, symbol['size'],
+                                 image=selector in CODE_IMAGE_SELECTORS)
                     target = objects[name]
                 data_relocations[offset] = (name, addend)
                 targets[name] = target
@@ -1107,6 +1134,8 @@ def render(result):
         '* incoming stack ABI: ' + result['manifest']['frame']['entry_stack']['contract']]
     if selector in DATA_SELECTORS:
         premise.append('* named data binding: ' + result['manifest']['data_contract'])
+    if selector in CODE_IMAGE_SELECTORS:
+        premise.append('* code image source: ' + result['manifest']['code_image_sources']['contract'])
     if selector in BUFFER_SELECTORS:
         premise.append('* local buffer boundary: ' + result['manifest']['native_buffers']['contract'])
     if selector in CALLBACK_SELECTORS:
