@@ -3867,12 +3867,14 @@ this selector:
   live; a callee without a closed CFG overwrites nothing). A dead alias is not an
   argument: the callee is not replayed for it and it does not lower the replay
   bound. It is recorded as `dead_at_entry_aliases`.
-* A passed alias the callee returns in R0-R3 or R12 is handed back to the
-  caller, which keeps tracking it as a possible local alias. That is what the
-  ordinary buffer verifier does already. Any later read, store, spill, call
-  argument or scheduler use of it is checked like any other alias, so a stale
-  returned alias reaching a scheduler call is refused. It is recorded as
-  `returned_aliases`.
+* A passed alias in R0-R3 or R12 that the callee returns is handed back to
+  the caller only when it is definite: the callee is a closed leaf (no call, no
+  software interrupt) that never writes that register, so every return holds
+  the passed value. The caller keeps tracking it as a local alias, as the
+  ordinary buffer verifier does. Any later read, store, spill, call argument or
+  scheduler use of it is checked like any other alias, so a stale returned alias
+  reaching a scheduler call is refused. It is recorded as `returned_aliases`.
+  Any other returned alias is still refused.
 
 Callee effects, nested execution and termination remain unproved, as for the
 other live-alias selectors.

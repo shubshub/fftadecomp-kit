@@ -156,7 +156,8 @@ class EntryLivenessTests(unittest.TestCase):
     def test_overwritten_before_observation_is_dead(self):
         for callee in (half(0x2100, 0x4770),                     # movs r1,#0; bx lr
                        half(0x4669, 0x7808, 0x4770),             # mov r1,sp; ldrb r0,[r1]
-                       half(0x2800, 0xD001, 0x2100, 0x4770, 0x2101, 0x4770)):  # both arms kill
+                       half(0x2800, 0xD001, 0x2100, 0x4770, 0x2101, 0x4770),  # both arms kill
+                       half(0xB504, 0xBD02)):                    # push {r2,lr}; pop {r1,pc}: killed by the return
             with self.subTest(callee=callee.hex()):
                 self.assertEqual(self.dead(callee), {R1})
 
@@ -164,7 +165,7 @@ class EntryLivenessTests(unittest.TestCase):
         for callee in (half(0x7808, 0x2100, 0x4770),             # ldrb r0,[r1] first
                        half(0x1C08, 0x2100, 0x4770),             # adds r0,r1,#0 first
                        half(0x4770),                             # returned unkilled
-                       half(0xDF0B, 0x2100, 0x4770),             # swi CpuSet reads R1 implicitly
+                       half(0xDF0B, 0x2100, 0x4770),             # swi: not ARMv4T-closed, so no fact
                        half(0x2800, 0xD000, 0x2100, 0x4770),     # killed on one arm only
                        half(0x2800, 0xD1FD, 0x2100, 0x4770),     # a cycle that never kills
                        half(0x3801, 0xD1FD, 0x2100, 0x4770)):    # least fixpoint: a cycle before the kill
@@ -186,6 +187,27 @@ class EntryLivenessTests(unittest.TestCase):
         self.assertEqual(observation['passed_aliases'], [])
         self.assertNotIn('access_lowest', observation)
         self.assertEqual(observation['entry_liveness_premise'], live.ENTRY_LIVENESS_PREMISE)
+
+    def test_old_selector_keeps_the_dead_alias_as_an_argument(self):
+        data, calls, labels = alias_owner()
+        observation = verify(data, calls, OLD, callee=half(0x2100, 0x2000, 0x4770)).observations[labels['ordinary']]
+        self.assertEqual(observation['passed_aliases'], [(R1, FRAME)])
+        self.assertNotIn('dead_at_entry_aliases', observation)
+
+    def test_dead_and_live_aliases_at_one_call(self):
+        # R0 = SP+4 is read; R1 = SP is dead. The replay bound is R0's, not the dead R1's.
+        p = Program()
+        p.emit(0xB5F0, 0xB087, 0xA900, 0xA801)          # add r1,sp,#0; add r0,sp,#4
+        p.call(B, 'ordinary')
+        descriptor_call(p)
+        p.emit(0xB007, 0xBCF0, 0xBC01, 0x4700)
+        data, calls, labels = p.build()
+        q = verify(data, calls, callee=half(0x2100, 0x7802, 0x2000, 0x4770))
+        observation = q.observations[labels['ordinary']]
+        self.assertEqual(observation['dead_at_entry_aliases'], [(R1, FRAME)])
+        self.assertEqual(observation['passed_aliases'], [(R0, FRAME + 4)])
+        with self.assertRaisesRegex(ValueError, 'below its lowest passed alias'):
+            verify(data, calls, callee=half(0x2100, 0x3804, 0x7802, 0x2000, 0x4770))
 
     def test_live_alias_is_still_replayed(self):
         data, calls, labels = alias_owner()
@@ -211,6 +233,15 @@ class ReturnedAliasTests(unittest.TestCase):
         self.assertEqual(observation['passed_aliases'], [(R1, FRAME)])
         with self.assertRaisesRegex(ValueError, 'return a local alias'):
             verify(data, calls, OLD, callee=self.STORE)
+
+    def test_only_a_definite_unchanged_alias_is_handed_back(self):
+        data, calls, _ = alias_owner()
+        for callee in (half(0x2800, 0xD000, 0x2100, 0x4770),     # kept on one path only
+                       half(0x3101, 0x3901, 0x4770),             # adds r1,#1; subs r1,#1
+                       half(0x1C08, 0x1C01, 0x4770)):            # adds r0,r1,#0; adds r1,r0,#0
+            with self.subTest(callee=callee.hex()), \
+                    self.assertRaisesRegex(ValueError, 'return a local alias'):
+                verify(data, calls, callee=callee)
 
     def test_returned_alias_cannot_escape_afterwards(self):
         data, calls, _ = alias_owner(after=(0x6029,))  # str r1,[r5]

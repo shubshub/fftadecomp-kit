@@ -26,8 +26,9 @@ The scheduler call keeps its descriptor contract unchanged.
 Only under entry_liveness (selected by conditional-scheduler-three-per-path-
 live-alias-v1) an alias in R0-R3 or R12 that the complete callee overwrites on
 every path before reading it, calling or returning is not an argument, and a
-passed alias the callee returns is handed back to the caller as a tracked
-possible alias, as the ordinary buffer verifier does, instead of being refused.
+passed alias that a closed leaf callee never writes, and so returns unchanged,
+is handed back to the caller as a tracked alias, as the ordinary buffer
+verifier does, instead of being refused. Any other returned alias is refused.
 """
 import hashlib
 from pathlib import Path
@@ -62,9 +63,10 @@ ENTRY_LIVENESS_PREMISE = ('A local alias in R0-R3 or R12 that the complete calle
            'overwrites on every path before any read of that register, any call, any software interrupt '
            'and any return is dead '
            'at callee entry: it is not an argument, is not replayed and does not bound the replay, and '
-           'is recorded as dead_at_entry_aliases. A callee that returns a passed alias in R0-R3 or R12 '
-           'hands it back to the caller exactly as the ordinary buffer verifier does: the caller keeps '
-           'tracking the register as a possible local alias, so a later read, store, spill, call '
+           'is recorded as dead_at_entry_aliases. A passed alias in R0-R3 or R12 that a closed leaf '
+           'callee (no call, no software interrupt) never writes is returned unchanged on every path '
+           'and is handed back to the caller as the ordinary buffer verifier does: the caller keeps '
+           'tracking the register as a local alias, so a later read, store, spill, call '
            'argument or return of it is checked like any other alias; it is recorded as '
            'returned_aliases. No other part of the live-alias contract changes.')
 # Bounds on the per-path preserved-register walk.
@@ -222,6 +224,35 @@ def check_preserved(proof, address, registers, chain=(), outer=(), copied_in=Fal
     return walked, unwalked
 
 
+def _callee_cfg(proof, address):
+    """The complete ARMv4T-checked callee CFG, or None when it is not closed."""
+    import owner_admission_profile as owner
+    import callee_preservation_profile as preservation
+    from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+    data = proof.span(address)
+    try:
+        instructions, edges, branches, calls, _ = graph.graph(data, address, owner.refine(data, address, proof.mapping))
+    except ValueError:
+        return None
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    for site, instruction in instructions.items():
+        require(preservation._decode(decoder, proof.rom, site, address, address+len(data)).id == instruction.id,
+                'live-alias entry liveness decoding differs from the ARMv4T decoder')
+    return instructions, edges, branches, calls
+
+
+def unchanged_leaf_registers(proof, address, registers):
+    """Registers a closed callee with no call, no software interrupt and no write to them returns unchanged."""
+    cfg = _callee_cfg(proof, address)
+    if cfg is None:
+        return set()
+    instructions, _, branches, calls = cfg
+    if calls or branches or any(match.CS_GRP_INT in i.groups for i in instructions.values()):
+        return set()
+    written = {r for i in instructions.values() for r in i.regs_access()[1]}
+    return set(registers) - written
+
+
 def dead_at_entry(proof, address, registers):
     """Registers the complete callee overwrites on every path before any observation.
 
@@ -229,21 +260,13 @@ def dead_at_entry(proof, address, registers):
     software interrupt and any return observe it; an unconditional write kills it. A cycle that never
     kills it is not a proof (least fixpoint).
     """
-    import owner_admission_profile as owner
-    import callee_preservation_profile as preservation
-    from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
     if not registers:
         return set()
-    data = proof.span(address)
-    try:
-        instructions, edges, branches, calls, _ = graph.graph(data, address, owner.refine(data, address, proof.mapping))
-    except ValueError:
+    cfg = _callee_cfg(proof, address)
+    if cfg is None:
         # No closed CFG, no liveness fact: every alias stays an argument.
         return set()
-    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
-    for site, instruction in instructions.items():
-        require(preservation._decode(decoder, proof.rom, site, address, address+len(data)).id == instruction.id,
-                'live-alias entry liveness decoding differs from the ARMv4T decoder')
+    instructions, edges, branches, calls = cfg
     dead = set()
     for register in registers:
         safe = set()
@@ -303,6 +326,12 @@ def check_call(proof, address, aliases, stack, slots, *, constants=None, site=No
                 constants=proof.argument_constants(constants or {}), site=site)
         finally:
             proof._live_log = None
+        # Only a definite, unchanged alias is handed back: the callee is a closed leaf
+        # that never writes the register, so every return holds the passed value.
+        handed = dict(returned) if entry_liveness else {}
+        require(not handed or (set(handed) <= unchanged_leaf_registers(proof, address, set(handed)) and
+                               all(passed.get(r) == o for r, o in handed.items())),
+                'live-alias callee cannot return a local alias')
         require(entry_liveness or not returned, 'live-alias callee cannot return a local alias')
         reached = set(log['calls'])
         require(not any(match.function_thunk.reserved(a) or a in match.RUNTIME_HELPERS.values()
