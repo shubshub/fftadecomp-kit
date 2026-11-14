@@ -1,4 +1,5 @@
-"""Zero-extended BIOS fill controls: an opt-in bit proof for LDRB/LDRH/MULS."""
+"""Zero-extended BIOS fill controls: an opt-in bit proof for LDRB and MULS (LDRH is excluded:
+misaligned halfword loads rotate on the ARM7TDMI)."""
 from contextlib import redirect_stdout
 import copy
 import io
@@ -16,8 +17,14 @@ NEW = profile.BIOS_ZERO_EXTENDED_DATA_SELECTOR
 LDRB_R1_R3 = 0x7819      # ldrb r1,[r3,#0]
 LDRB_R0_R3 = 0x7818      # ldrb r0,[r3,#0]
 LDRB_R1_R3_1 = 0x7859    # ldrb r1,[r3,#1]
-LDRH_R0_R3 = 0x8818      # ldrh r0,[r3,#0]
 LDRH_R1_R3 = 0x8819      # ldrh r1,[r3,#0]
+LDRH_R1_R3_R0 = 0x5A19   # ldrh r1,[r3,r0]
+MOVS_R0_1 = 0x2001       # movs r0,#1
+BICS_R2_R1 = 0x438A      # bics r2,r1
+BNE_BACK3 = 0xD1FC       # bne to 3 instructions back
+LSLS_R1_1 = 0x0049       # lsls r1,r1,#1
+CMP_R3_0 = 0x2B00
+BEQ_SKIP1, BEQ_SKIP2, B_SKIP1 = 0xD000, 0xD001, 0xE000
 LDR_R1_R3 = 0x6819       # ldr r1,[r3,#0]
 MULS_R0_R1 = 0x4348      # muls r0,r1,r0
 ORRS_R2_R1 = 0x430A      # orrs r2,r1
@@ -57,23 +64,70 @@ class BiosZeroExtendedControlTests(unittest.TestCase):
         manifest, _ = profile.verify(**f)
         self.assertNotIn('bit_rules', manifest['native_buffers']['bios_fill'])
 
-    def test_halfword_control_clears_bit26(self):
-        f = self.fixture((LDRH_R1_R3, ORRS_R2_R1))
+    def test_halfword_loads_gain_no_facts_even_at_an_odd_address(self):
+        # ARM7TDMI LDRH from an odd address returns the aligned halfword rotated
+        # right by 8, so bits 24-31 are not zero: LDRH is not a zero-extension rule.
+        # movs r0,#1; ldrh r1,[r3,r0]; orrs r2,r1 must stay a whole-word unit.
+        for after in ((MOVS_R0_1, LDRH_R1_R3_R0, ORRS_R2_R1), (LDRH_R1_R3, ORRS_R2_R1)):
+            with self.subTest(after=after):
+                site = self.site(self.fixture(after))
+                self.assertEqual(site[2], 4)
+                self.assertEqual(site[4] & (1 << 26), 0)
+
+    def test_bics_keeps_bit24_through_a_known_zero_byte(self):
+        # bics r2,r1 clears only bits r1 may hold; a zero-extended byte leaves
+        # bit24 set. The older proof knows nothing of r1 and loses bit24.
+        f = self.fixture((LDRB_R1_R3, BICS_R2_R1))
         site = self.site(f)
-        self.assertEqual((site[2], site[4] & 0xFFFF), (2, 0))
+        self.assertEqual((site[2], site[3] & FILL_BIT), (2, FILL_BIT))
+        with self.assertRaisesRegex(ValueError, 'bit24'):
+            profile.verify(**dict(f, selector=profile.BIOS_DATA_SELECTOR))
 
     def test_multiply_bounds_the_product_only_when_widths_fit(self):
-        # u8*u8 < 2**16 and u16*u8 < 2**24 keep bit 26 clear.
-        for loads in ((LDRB_R0_R3, LDRB_R1_R3_1), (LDRH_R0_R3, LDRB_R1_R3_1)):
-            f = self.fixture((*loads, MULS_R0_R1, ORRS_R2_R0))
-            with self.subTest(loads=loads):
-                self.assertEqual(self.site(f)[2], 2)
-        # u16*u16 can reach 2**32: no bit above bit 24 is known, so the width stays whole.
-        for loads in ((LDRH_R0_R3, LDRH_R1_R3), (LDRB_R0_R3, LDR_R1_R3),
-                      (0x6818, LDRB_R1_R3_1)):
+        # (u8 << n) * u8 has width 8+n+8: 26 clears bit 26, 27 does not.
+        for shift, width in ((0x0280, 2), (0x02C0, 4), (0x0400, 4)):   # lsls r0,r0,#10/11/16
+            f = self.fixture((LDRB_R0_R3, shift, LDRB_R1_R3_1, MULS_R0_R1, ORRS_R2_R0))
+            with self.subTest(shift=hex(shift)):
+                self.assertEqual(self.site(f)[2], width)
+        self.assertEqual(self.site(self.fixture(
+            (LDRB_R0_R3, LDRB_R1_R3_1, MULS_R0_R1, ORRS_R2_R0)))[2], 2)
+        # An unknown or word-loaded factor leaves no bound.
+        for loads in ((LDRB_R0_R3, LDR_R1_R3), (0x6818, LDRB_R1_R3_1)):
             f = self.fixture((*loads, MULS_R0_R1, ORRS_R2_R0))
             with self.subTest(loads=loads):
                 self.assertEqual(self.site(f)[2], 4)
+
+    def test_width_sum_of_32_carries_no_fact(self):
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        from capstone.arm import ARM_REG_R0
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        decoder.detail = True
+        item = next(decoder.disasm(struct.pack('<H', MULS_R0_R1), 0x1000))
+        r0, r1 = ARM_REG_R0, ARM_REG_R0 + 1
+        self.assertEqual(bios.transfer(item, {r0: (0, 0xFF000000), r1: (0, 0xFFFFFF00)},
+                                       b'', 0x1000, True), (r0, (0, 0)))       # 24 + 8
+        self.assertEqual(bios.transfer(item, {r0: (0, 0xFE000000), r1: (0, 0xFFFFFF00)},
+                                       b'', 0x1000, True), (r0, (0, 0)))       # 25 + 8 > 32
+        self.assertEqual(bios.transfer(item, {r0: (0, 0xFFFFC000), r1: (0, 0xFFFFFF00)},
+                                       b'', 0x1000, True), (r0, (0, 0xFFC00000)))  # 14 + 8
+
+    def test_joins_loops_and_calls_do_not_keep_unproved_facts(self):
+        for name, after in (
+                ('skipped ldrb', (CMP_R3_0, BEQ_SKIP1, LDRB_R1_R3, ORRS_R2_R1)),
+                ('word load on one arm', (CMP_R3_0, BEQ_SKIP2, LDRB_R1_R3, B_SKIP1,
+                                           LDR_R1_R3, ORRS_R2_R1)),
+                ('widening loop', (LDRB_R1_R3, LSLS_R1_1, CMP_R3_0, BNE_BACK3, ORRS_R2_R1))):
+            with self.subTest(name=name):
+                try:
+                    site = self.site(self.fixture(after))
+                except ValueError:
+                    continue      # refused outright is also fail-closed
+                self.assertEqual(site[2], 4)
+        # A call kills r0-r3 facts: r1 is loaded before it, the control after it.
+        f = self.fixture_case.fixture(data=True, control=FILL_BIT,
+                                      prefix=(LDRB_R1_R3, 'ordinary'), after=(ORRS_R2_R1,))
+        f['selector'] = NEW
+        self.assertEqual(self.site(f)[2], 4)
 
     def test_other_loads_and_clobbers_gain_no_facts(self):
         # ldrsb sign-extends, a full word load is unknown, ldrb into the control
@@ -152,7 +206,7 @@ class BiosZeroExtendedControlTests(unittest.TestCase):
             self.assertFalse(evidence.report_matches(
                 report.replace(NEW, profile.BIOS_DATA_SELECTOR), root, A))
             self.assertFalse(evidence.report_matches(
-                report.replace('zero-extending-loads', 'forged-loads'), root, A))
+                report.replace('zero-extending-byte-load', 'forged-loads'), root, A))
             source = root / 'src/08010000.c'
             source.write_bytes(source.read_bytes() + b' ')
             self.assertFalse(evidence.report_matches(report, root, A))

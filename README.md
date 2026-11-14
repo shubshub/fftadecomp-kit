@@ -3801,16 +3801,20 @@ controls the compiler builds from byte or halfword fields, such as
 `(width * height) | 0x01000000` with `u8` fields. Besides the existing
 authenticated Thumb encodings it knows:
 
-* `LDRB`/`LDRH` (immediate or register offset): the result is zero above bit 7
-  or bit 15, whatever the memory holds;
+* `LDRB` (immediate or register offset): the result is zero above bit 7,
+  whatever the memory holds. `LDRH` is deliberately excluded: on the ARM7TDMI a
+  misaligned `LDRH` returns the aligned halfword rotated right by 8, so its
+  upper bits are not known zero;
 * `MULS`: if both factors are below `2**a` and `2**b` and `a + b <= 32`, the
   product is below `2**(a+b)`; otherwise it carries no fact.
 
 Only the 16-bit Thumb encodings are decoded, each from its bytes and operands,
 and every other instruction (including four-byte forms, `svc`, `bkpt`, `udf`
 and sign-extending loads) writes an unknown value as before. The facts only add
-known-zero bits, which can only select the narrower halfword source unit;
-bit24, the destination and the frame checks are unchanged. The older selectors
+known-zero bits, each architecturally true, so the narrower halfword source
+unit they can select is sound; the destination and the frame checks are
+unchanged. A known-zero fact can also keep bit24 set through `BICS`, where the
+older proof lost it; that is sound for the same reason. The older selectors
 keep their exact bit proof and report text, and the new proof's manifest carries
 a `bit_rules` field, so a report cannot be replayed under the other rules.
 Source initialization, destination extent, physical readability and

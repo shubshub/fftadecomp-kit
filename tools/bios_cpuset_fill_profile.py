@@ -21,9 +21,10 @@ CONTRACT = ('conditional returning GBA BIOS CpuSet fill boundary: bit24 selects 
             'physical readability, physical nonalias, destination bounds, '
             'numeric result or termination theorem')
 ZERO_EXTENSION_RULES = (
-    'zero-extending-loads-and-bounded-multiply-v1: LDRB and LDRH results are '
-    'zero above bit 7 and bit 15; MULS of values below 2**a and 2**b is below '
-    '2**(a+b) when a+b<=32; no other instruction gains facts')
+    'zero-extending-byte-load-and-bounded-multiply-v2: an LDRB result is '
+    'zero above bit 7; MULS of values below 2**a and 2**b is below '
+    '2**(a+b) when a+b<=32; LDRH is excluded (a misaligned halfword load '
+    'rotates); no other instruction gains facts')
 MASK = 0xFFFFFFFF
 MAX_UPDATES = 4096
 LOCAL_SOURCE_CONTRACT = (
@@ -190,14 +191,13 @@ def known_width(bits):
 
 
 def zero_extension_transfer(instruction, incoming, code, name):
-    """Only the ARMv4T Thumb LDRB/LDRH/MULS forms, decoded from their bytes."""
+    """Only the ARMv4T Thumb LDRB/MULS forms, decoded from their bytes."""
     op = instruction.operands
-    if name in ('ldrb', 'ldrh'):
-        half = name == 'ldrh'
-        if (code & 0xF800 == (0x8800 if half else 0x7800) or code & 0xFE00 == (0x5A00 if half else 0x5C00)) and \
+    if name == 'ldrb':
+        if (code & 0xF800 == 0x7800 or code & 0xFE00 == 0x5C00) and \
                 op and op[0].type == ARM_OP_REG and op[0].reg == ARM_REG_R0 + (code & 7) and \
                 not instruction.writeback:
-            return op[0].reg, (0, MASK ^ (0xFFFF if half else 0xFF))
+            return op[0].reg, (0, MASK ^ 0xFF)
     elif name == 'muls' and code & 0xFFC0 == 0x4340 and op and all(p.type == ARM_OP_REG for p in op):
         destination, source = ARM_REG_R0 + (code & 7), ARM_REG_R0 + ((code >> 3) & 7)
         if op[0].reg == destination and {p.reg for p in op} <= {destination, source}:
