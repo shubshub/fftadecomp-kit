@@ -3059,11 +3059,40 @@ def loop_replay_condition(cc, flags):
     return conditions[cc]
 
 
+def forwarded_slots(aliases):
+    """Entry-SP-relative words holding forwarded buffer pointers (negative keys)."""
+    return [key for key in aliases if key < 0]
+
+
+def sp_immediate_access(instruction):
+    """(width, transfer register) of a Thumb `ldr/str{,h,b}, ldrs{h,b} Rd,[sp,#imm]`, else None."""
+    widths = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2, "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}
+    operands = instruction.operands
+    if instruction.size != 2 or instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or \
+            instruction.mnemonic not in widths or len(operands) != 2 or \
+            operands[0].type != ARM_OP_REG or operands[1].type != ARM_OP_MEM or \
+            operands[1].mem.base != ARM_REG_SP or operands[1].mem.index or instruction.writeback:
+        return None
+    return widths[instruction.mnemonic], operands[0].reg
+
+
+def plain_stack_use(instruction):
+    """True when SP is untouched or used only by PUSH/POP, ADD/SUB SP,#imm or [sp,#imm]."""
+    read, written = instruction.regs_access()
+    if ARM_REG_SP not in read and ARM_REG_SP not in written:
+        return True
+    return instruction.mnemonic in ("push", "pop") or thumb_stack_adjustment(instruction) is not None or \
+        sp_immediate_access(instruction) is not None
+
+
 class BufferCallProof:
     word_provenance = False
     callee_frames = False
     single_word_stores = False
     exact_alias_state_budget = None
+    # Opt-in per class: buffer pointers an inspected callee stores into its own frame as
+    # outgoing stack arguments (see forwarded_slot_step); off keeps every such store refused.
+    forwarded_stack_arguments = False
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
@@ -3306,7 +3335,10 @@ class BufferCallProof:
                 returning = current not in finite_transfers and (instruction.mnemonic == "bx" or
                              instruction.mnemonic == "pop" and ARM_REG_PC in registers or
                              instruction.mnemonic == "mov" and registers and registers[0] == ARM_REG_PC)
-                if instruction.mnemonic == "push":
+                if self.forwarded_stack_arguments and \
+                        self.forwarded_slot_step(instruction, aliases, constants, depth, by_address, replay):
+                    pass
+                elif instruction.mnemonic == "push":
                     if set(registers) & aliases.keys():
                         raise ValueError("buffer pointers cannot be pushed or spilled")
                     depth += len(registers)
@@ -3317,11 +3349,16 @@ class BufferCallProof:
                         aliases.pop(register, None)
                         constants.pop(register, None)
                     depth -= len(registers)
+                    if any(slot < -4 * depth for slot in forwarded_slots(aliases)):
+                        raise ValueError("forwarded buffer pointer slot is restored into a register")
                     if self.callee_frames:
                         del stack[:len(registers)]
                 elif (adjustment := thumb_stack_adjustment(instruction)) is not None or \
                         (adjustment := thumb_literal_stack_adjustment(instruction, data, address)) is not None:
                     depth -= adjustment
+                    for slot in forwarded_slots(aliases):
+                        if slot < -4 * depth:
+                            del aliases[slot]   # released with the frame word that held it
                     if self.callee_frames:
                         if adjustment < 0:
                             stack[:0] = [(False, False, True)] * -adjustment
@@ -3331,6 +3368,8 @@ class BufferCallProof:
                     passed = {register: offset for register, offset in aliases.items()
                               if register in CALLER_CLOBBERED}
                     nested = {offset + depth * 4: target for offset, target in incoming.items()}
+                    # A forwarded slot is the next callee's incoming stack argument word.
+                    nested.update({slot + depth * 4: aliases[slot] for slot in forwarded_slots(aliases)})
                     result = self.check_arguments(operands[0].imm, passed, stack, nested, protected,
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
@@ -3598,6 +3637,46 @@ class BufferCallProof:
             raise ValueError(f"buffer callee 0x{address:08X}: {error}") from error
         finally:
             self.active.remove(address)
+
+    def forwarded_slot_step(self, instruction, aliases, constants, depth, by_address, replay):
+        """Track buffer pointers an inspected callee stores in its own frame for its own callees.
+
+        A slot is one aligned word the callee allocated below its entry SP, keyed in ``aliases``
+        by its negative entry-SP-relative offset (register keys are never negative), so the
+        ordinary join, call and return rules carry it: joins require equal offsets, calls keep
+        it, and a slot still live at a return refuses as an unrestored alias. The store is
+        admitted only in a callee whose every SP use is PUSH, POP, ADD/SUB SP,#imm or an
+        immediate-offset SP load/store, so nothing reads the slot without being seen here. A
+        word reload yields the alias again, a word store kills the slot, any other overlapping
+        access refuses, popping it into a register refuses, and releasing its word with ADD SP
+        drops it. At a call each live slot is passed as the callee's incoming stack argument.
+        Returns True when the instruction's effect is applied here.
+        """
+        if replay or self.callee_frames or self.word_provenance or self.single_word_stores:
+            raise ValueError("forwarded buffer stack arguments exclude replay and frame-content profiles")
+        slots = set(forwarded_slots(aliases))
+        operands = instruction.operands
+        sp_access = sp_immediate_access(instruction)
+        if sp_access is not None:
+            width, register = sp_access
+            position = operands[1].mem.disp - 4 * depth
+            if width == 4 and instruction.mnemonic == "str" and register in aliases:
+                if position % 4 or not -4 * depth <= position < 0:
+                    raise ValueError("forwarded buffer pointer slot lies outside the callee's own frame")
+                if any(not plain_stack_use(item) for item in by_address.values()):
+                    raise ValueError("forwarded buffer pointer slot needs a callee with only immediate SP uses")
+                aliases[position] = aliases[register]
+                return True
+            if width == 4 and position in slots:
+                if instruction.mnemonic == "ldr":
+                    constants.pop(register, None)
+                    aliases[register] = aliases[position]
+                else:
+                    del aliases[position]       # a scalar overwrites the forwarded pointer
+                return True
+            if any(slot < position + width and position < slot + 4 for slot in slots):
+                raise ValueError("partial access to a forwarded buffer pointer slot")
+        return False
 
     def resident_effect_replay(self, address):
         return False
@@ -5163,6 +5242,7 @@ def main():
                                                       "named-data-buffer-known-query-callee-v1",
                                                       "named-data-buffer-dead-argument-aliases-v1",
                                                       "named-data-buffer-rom-table-copy-v1", "named-data-buffer-stack-index-v1",
+                                                      "named-data-buffer-stack-index-v2",
                                                       "conditional-finite-spilled-scalar-loops-v1",
                                                       "bounded-buffer-discarded-return-scratch-v1",
                                                       "bounded-buffer-bios-sqrt-scratch-v1",
