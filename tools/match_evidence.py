@@ -15,6 +15,7 @@ import empty_body_profile as empty_body
 import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
+import switch_data_thunks
 import subprocess
 from rompath import rom_path
 from pathlib import Path
@@ -608,8 +609,11 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         outgoing_frame = data_profile and single("* verification: ") == f"`{typed_switch_frame.SCHEMA}`"
         function_frame = data_profile and single("* verification: ") in (
             f"`{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
+        thunk_selector = next((selector for selector, schema in switch_data_thunks.SCHEMAS.items()
+                               if data_profile and single("* verification: ") == f"`{schema}`"), None)
         pool_frame = function_frame or data_profile and \
-            single("* verification: ") == f"`{pool_switch_frame.SCHEMA}`"
+            single("* verification: ") == f"`{pool_switch_frame.SCHEMA}`" or \
+            thunk_selector is not None and switch_data_thunks.framed(thunk_selector)
         function_data = function_frame or data_profile and single("* verification: ") in (
             f"`{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`")
         pool_data = data_profile and single("* verification: ") in (
@@ -617,9 +621,10 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
             f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
         scalar_data = pool_data or function_data or data_profile and \
             single("* verification: ") == f"`{SWITCH_U16_SCALAR_SCHEMA}`"
-        multiple_data = outgoing_frame or scalar_data or data_profile and \
+        multiple_data = outgoing_frame or scalar_data or thunk_selector is not None or data_profile and \
             single("* verification: ") == f"`{SWITCH_MULTIPLE_DATA_SCHEMA}`"
-        summary = (typed_switch_frame.SUMMARY if outgoing_frame else
+        summary = (switch_data_thunks.SUMMARIES[thunk_selector] if thunk_selector is not None else
+                   typed_switch_frame.SUMMARY if outgoing_frame else
                    SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if function_frame and pool_data else
                    SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY if function_frame else
                    pool_switch_frame.SUMMARY if pool_frame else
@@ -637,7 +642,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                 return False
             excluded = excluded[1:]
         if data_profile:
-            schema = (typed_switch_frame.SCHEMA if outgoing_frame else
+            schema = (switch_data_thunks.SCHEMAS[thunk_selector] if thunk_selector is not None else
+                      typed_switch_frame.SCHEMA if outgoing_frame else
                       SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if function_frame and pool_data else
                       SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA if function_frame else
                       pool_switch_frame.SCHEMA if pool_frame else
@@ -679,7 +685,9 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         if outgoing_frame != (isinstance(manifest, dict) and
                               manifest.get("frame_policy") == typed_switch_frame.SELECTOR):
             return False
-        if scalar_data != (isinstance(manifest, dict) and
+        if (thunk_selector is not None) != (isinstance(manifest, dict) and "thunk_policy" in manifest):
+            return False
+        if thunk_selector is None and scalar_data != (isinstance(manifest, dict) and
                            manifest.get("scalar_policy") == SWITCH_U16_SCALAR_POLICY):
             return False
         if pool_data != (isinstance(manifest, dict) and
@@ -694,7 +702,10 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
                                          data_mapping=objects)
-        fingerprint = (typed_switch_frame.fingerprint if outgoing_frame else
+        if thunk_selector is not None and switch_data_thunks.selector_for_manifest(manifest) != thunk_selector:
+            return False
+        fingerprint = (switch_data_thunks.fingerprint if thunk_selector is not None else
+                       typed_switch_frame.fingerprint if outgoing_frame else
                        switch_function_u16_scalar_fingerprint if function_data else
                        pool_switch_frame.fingerprint if pool_frame else
                        switch_pool_u16_scalar_fingerprint if pool_data else
@@ -1197,7 +1208,8 @@ def report_matches(report, root, address):
                     [f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`"],
-                    [f"* verification: `{typed_switch_frame.SCHEMA}`"]):
+                    [f"* verification: `{typed_switch_frame.SCHEMA}`"],
+                    *([f"* verification: `{schema}`"] for schema in switch_data_thunks.SCHEMAS.values())):
         return switch_report_matches(lines, root, address, data_profile=True)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:
         return switch_report_matches(lines, root, address)
