@@ -43,7 +43,9 @@ import sys
 from threading import Lock, active_count
 from match_evidence import (report_matches, compiler_flags,
                             SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
-                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR)
+                            SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR,
+                            SWITCH_FUNCTION_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
+                            SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
@@ -318,6 +320,10 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                     if f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
                     pool_switch_frame.SELECTOR
                     if f"* verification: `{pool_switch_frame.SCHEMA}`" in saved_report.splitlines() else
+                    SWITCH_FUNCTION_U16_SCALAR_SELECTOR
+                    if f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
+                    SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR
+                    if f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
                     False)
                 double_profile = software_double.selected(saved_report)
                 if double_profile:

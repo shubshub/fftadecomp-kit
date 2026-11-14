@@ -2102,6 +2102,41 @@ Replay refuses relabelling between this schema and `u16-scalars-v1`,
 `u16-scalars-v2` or `typed-outgoing-six-words-v1`, in either direction, and
 status and rebuild forward the saved selector. `u16-scalars-v2` still refuses
 every frame.
+### Switch function literals
+
+`--switch-data-profile u16-scalars-functions-v1` and
+`u16-scalars-functions-v2` select the separate
+`elf-symbol-thumb-switch-data-u16-scalars-functions-v1` and `-v2` schemas.
+Each keeps every rule of `u16-scalars-v1` or `u16-scalars-v2` respectively
+(the fixed or the dispatch-identified pool) and adds one thing: reached
+literal words holding plain function addresses, as when a case passes
+`func_X` as an argument to an ordinary call. Without one of these selectors a
+switch with a function relocation is still refused.
+
+A function word is bound as `canonical-thunks-v1` binds a function literal.
+The original ELF must carry a zero-addend `R_ARM_ABS32` against a unique
+undefined global `func_<address>` naming one indexed Thumb entry outside the
+caller, and the linked word must equal that entry with its Thumb bit. The
+manifest records each word as `[offset, name]` under
+`"function_policy": "canonical-function-literals-v1"`; replay re-derives the
+value from the index and compares the word. Function words must be aligned,
+complete, reached, outside the table and pool, and must not overlap a table,
+object or scalar word. Interposed pool words must still be objects or u16
+scalars. Every reached literal must be the table pointer, a typed object, a
+u16 scalar or a bound function word. No typed object may resolve to an
+indexed code entry or into the caller's own span. The two `#139` rules also
+apply: no reached literal names the caller's own bytes except the table
+pointer, and the dispatch load is the table pointer's only reader, in both
+pool shapes.
+
+A function word is a value only. It is never a call or branch target:
+`_call_via_*` thunks remain refused, and an indirect branch through a loaded
+literal fails the ordinary control-flow proof. Nothing is claimed about the
+callee or about what the receiving call does with the pointer. The
+fingerprint is domain-separated by the schema, a report under a function-free
+schema cannot carry a function manifest (or the reverse), and status.py and
+rebuild.py forward the saved selector. Frames, thunks, signed or 32-bit
+scalars and owner selectors are not extended.
 
 ### Preloaded guarded Thumb switches
 
