@@ -3783,6 +3783,43 @@ refuse an owner that calls both wrappers. `test_bios_mixed_cpuset_fast_fill.py`
 covers both proofs, the requirement for both wrappers, each site's own control,
 source and destination refusals, stale manifests and swapped wrappers.
 
+### Zero-extended CpuSet fill controls
+
+A direct call to the CpuSet wrapper `func_0814186C` (and `func_08141864`,
+`func_08141868`) is not refused by the buffer walk as such. The default and
+dead-argument walks treat it as an ordinary callee, and the wrapper's `swi` is
+then refused (`buffer callee 0x0814186C: non-leaf calls and interrupts require
+linked CFG verification`); the BIOS fill selectors replace that inspection with
+`bios_cpuset_fill_profile.BiosFillProof`, which already checks every site: R0
+must be the only local pointer, it is read as one source unit, and bit24 of R2
+must be set on every reaching path. Bit26 chooses the unit width, and when it is
+not proved clear the source must be a whole aligned word.
+
+`--addressed-runtime-profile addressed-native-bios-fill-zero-extended-control-data-v1`
+(schema `elf-symbol-thumb-addressed-native-bios-fill-zero-extended-control-data-v1`)
+is `addressed-native-bios-fill-buffer-data-v1` with a stronger bit proof, for
+controls the compiler builds from byte or halfword fields, such as
+`(width * height) | 0x01000000` with `u8` fields. Besides the existing
+authenticated Thumb encodings it knows:
+
+* `LDRB`/`LDRH` (immediate or register offset): the result is zero above bit 7
+  or bit 15, whatever the memory holds;
+* `MULS`: if both factors are below `2**a` and `2**b` and `a + b <= 32`, the
+  product is below `2**(a+b)`; otherwise it carries no fact.
+
+Only the 16-bit Thumb encodings are decoded, each from its bytes and operands,
+and every other instruction (including four-byte forms, `svc`, `bkpt`, `udf`
+and sign-extending loads) writes an unknown value as before. The facts only add
+known-zero bits, which can only select the narrower halfword source unit;
+bit24, the destination and the frame checks are unchanged. The older selectors
+keep their exact bit proof and report text, and the new proof's manifest carries
+a `bit_rules` field, so a report cannot be replayed under the other rules.
+Source initialization, destination extent, physical readability and
+termination remain unproved, and returning BIOS semantics remain a premise.
+`test_bios_zero_extended_control.py` covers admitted and refused shapes, the
+width arithmetic, wide-encoding refusal, forged and relabelled manifests and CLI
+report replay.
+
 ### Expired root-frame scratch at the root's own return
 
 `--owner-runtime-profile bounded-buffer-root-return-scratch-v1` (ordinary
