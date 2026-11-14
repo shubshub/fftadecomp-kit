@@ -5472,6 +5472,9 @@ def main():
             verify_data_literals(verified_instructions, addr, data_relocations)
             function_thunk.verify_literal_bindings(got, addr, verified_instructions, calls,
                                                     mapping, function_relocations)
+            # The thunk profile already applied this with its switch table pointer.
+            if not thunk_profile and any(function_thunk.reserved(target) for target in calls.values()):
+                function_thunk.verify_own_span_literals(got, addr, verified_instructions)
             if buffer_proof.stack_arguments and not buffer_proof.dependencies:
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
             if buffer_proof.dependencies and data_relocations:

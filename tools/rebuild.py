@@ -100,7 +100,8 @@ def saved_profile_arguments(report, root, address):
     constants_policy = switch_constants.selected_policy(report)
     if constants_policy is not None:
         arguments += ["--switch-profile", constants_policy.selector]
-    # The switch-data selectors are forwarded exactly as status.py does.
+    # The switch-data selectors are recovered from the report as status.py
+    # recovers them; status.py forwards other selectors this does not.
     typed_outgoing_profile = typed_switch_frame.selector_for_report(report)
     if typed_outgoing_profile:
         arguments += ["--switch-data-profile", typed_outgoing_profile]
