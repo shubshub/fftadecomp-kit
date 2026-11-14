@@ -1,7 +1,7 @@
 """Canonical _call_via_rN thunk calls inside the complete switch-data family.
 
 Each selector keeps every rule of the complete-object-words switch-data proof
-(fixed or dispatch-identified pool, with or without the write-only
+(fixed-gap pool layout, with or without the write-only
 outgoing-argument frame; reached u16 scalar words bound when present) and
 additionally admits the compiler's indirect-call thunks. The thunk
 binding is the one canonical-thunks-v1 already proves: a ROM-checked
@@ -12,6 +12,7 @@ A thunk call is bound exactly once, in the ``thunks`` list; the ordinary
 """
 
 import hashlib
+import json
 
 POLICY = 'canonical-call-thunks-v1'
 # selector -> (schema, outgoing frame). Only the fixed-gap pool layout is admitted.
@@ -62,7 +63,6 @@ def selector_for_report(report):
 
 def exact(left, right):
     """Compare manifest facts as canonical JSON, so 4.0 or true cannot stand for 4 or 1."""
-    import json
     return json.dumps(left, sort_keys=True) == json.dumps(right, sort_keys=True)
 
 
@@ -90,12 +90,70 @@ def thunk_sites(selector, calls):
     return sites
 
 
+ROM_LOW, ROM_HIGH = 0x08000000, 0x0E000000
+# The only 16-bit mnemonics ARMv4T Thumb defines, plus the bound BL pair (kit #180).
+ARMV4T = frozenset((
+    'adcs', 'add', 'adds', 'adr', 'ands', 'asrs', 'b', 'bics', 'bl', 'bx', 'cmn', 'cmp', 'eors',
+    'ldm', 'ldmia', 'ldr', 'ldrb', 'ldrh', 'ldrsb', 'ldrsh', 'lsls', 'lsrs', 'mov', 'movs', 'muls',
+    'mvns', 'negs', 'orrs', 'pop', 'push', 'rors', 'rsbs', 'sbcs', 'stm', 'stmia', 'str', 'strb',
+    'strh', 'sub', 'subs', 'tst'))
+CONDITIONS = ('eq', 'ne', 'cs', 'hs', 'cc', 'lo', 'mi', 'pl', 'vs', 'vc', 'hi', 'ls', 'ge', 'lt', 'gt', 'le')
+# Binary operations whose exact result over constants is modelled; any other operation
+# with a constant-derived source makes its result a possible code address.
+BINARY = frozenset(('add', 'adds', 'sub', 'subs', 'lsls', 'lsrs', 'orrs', 'ands', 'eors', 'bics'))
+OTHER = frozenset(('asrs', 'rors', 'muls', 'adcs', 'sbcs', 'mvns', 'negs', 'rsbs'))
+CONSTANT_BUDGET = 16
+
+
+def armv4t_encoding(item):
+    """Whether one 16-bit instruction is an ARMv4T Thumb encoding (not ARMv5/v6)."""
+    mnemonic = item.mnemonic
+    if mnemonic.startswith('b') and mnemonic[1:] in CONDITIONS:
+        return True
+    half = int.from_bytes(bytes(item.bytes), 'little')
+    if mnemonic == 'nop':
+        return half == 0x46C0
+    if mnemonic not in ARMV4T:
+        return False
+    if half >> 8 == 0x47:  # bx: blx (bit 7) and nonzero low bits are not ARMv4T
+        return mnemonic == 'bx' and half & 0x87 == 0
+    if half >> 10 == 0x11:  # hi-register add, cmp, mov: at least one register must be high
+        return (half >> 6) & 3 != 0
+    return True
+
+
+def constant_value(operand, constants):
+    """(low, high) of an operand known to be built from immediates, else None."""
+    from capstone.arm import ARM_OP_IMM, ARM_OP_REG
+    if operand.type == ARM_OP_IMM:
+        return operand.imm & 0xFFFFFFFF, operand.imm & 0xFFFFFFFF
+    if operand.type == ARM_OP_REG:
+        return constants.get(operand.reg)
+    return None
+
+
+def combine(mnemonic, left, right):
+    """Interval of ``left op right``, or None when it is not representable."""
+    (a, b), (c, d) = left, right
+    if mnemonic in ('add', 'adds'):
+        low, high = a + c, b + d
+    elif mnemonic in ('sub', 'subs'):
+        low, high = a - d, b - c
+    elif a == b and c == d and mnemonic in ('lsls', 'lsrs') and 0 <= c < 32:
+        low = high = (a << c if mnemonic == 'lsls' else a >> c) & 0xFFFFFFFF
+    elif a == b and c == d and mnemonic in ('orrs', 'ands', 'eors', 'bics'):
+        low = high = {'orrs': a | c, 'ands': a & c, 'eors': a ^ c, 'bics': a & ~c}[mnemonic] & 0xFFFFFFFF
+    else:
+        return None
+    return (low, high) if 0 <= low <= high <= 0xFFFFFFFF else None
+
+
 def verify_thunk_targets(instructions, edges, address, calls, pointer):
     """Refuse a thunk call whose target register may hold a local code address.
 
     Local provenance enters through every load of the switch table pointer
-    literal at ``pointer``, any other read of PC, the entry return address and
-    the return address each BL leaves in LR. It follows every register
+    literal at ``pointer``, any other read of PC or SP, the entry return
+    address and the return address each BL leaves in LR. It follows every register
     operation and every load whose address uses a tainted register, so table
     entries and the dispatch registers that stay live into the cases are
     tainted too. No store may use a tainted register, and pops are tainted
@@ -104,39 +162,69 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer):
     ordinary call ABI premise; values loaded through untainted addresses and
     values built from immediates are not tracked.
 
-    The walk is a new decode of every reached instruction, so it admits only
-    16-bit encodings plus the bound BL pairs, and refuses ``svc``, ``bkpt`` and
+    Values built from immediates are tracked as intervals (movs/mov of an
+    immediate, then add, sub, shifts and logical operations over constants).
+    An interval that reaches the ROM range, or any other operation on a
+    constant, makes the register tainted; a loop that keeps changing a constant
+    taints it after a fixed number of revisits. A thunk register that holds any
+    constant-derived value is refused, so a callback must be loaded from memory.
+
+    Premises: callee results are untainted under the ordinary call ABI; a code
+    address passed to a callee as an argument (r0-r3 or stack) and kept in
+    memory is not followed; nothing ties the callback register to a particular
+    callback object, so any mapped object may be loaded.
+
+    The walk decodes every reached instruction itself, so it admits only the
+    16-bit ARMv4T mnemonics in ``ARMV4T`` (hi-register and bx forms checked by
+    encoding) plus the bound BL pairs, and refuses ``svc``, ``bkpt`` and
     ``udf`` (kit #180): the model must agree with the ARM7TDMI on every byte.
     """
     import function_thunk_profile as function_thunk
     from capstone import CS_GRP_INT
-    from capstone.arm import (ARM_INS_BKPT, ARM_INS_BL, ARM_INS_SVC, ARM_INS_UDF, ARM_OP_MEM,
-                              ARM_REG_LR, ARM_REG_PC, ARM_REG_R0, ARM_REG_R12, ARM_REG_SP)
+    from capstone.arm import (ARM_INS_BL, ARM_OP_MEM, ARM_OP_REG, ARM_REG_LR, ARM_REG_PC,
+                              ARM_REG_R0, ARM_REG_R12, ARM_REG_SP)
     from match import CALLER_CLOBBERED
     registers = {*range(ARM_REG_R0, ARM_REG_R12 + 1), ARM_REG_LR}
     thunks = {site: ARM_REG_R0 + (target - function_thunk.START) // 4
               for site, target in calls.items() if target in function_thunk.ALIASES.values()}
-    states = {}
-    pending = [(address, frozenset((ARM_REG_LR,)))]
+    states, revisits = {}, {}
+    pending = [(address, frozenset((ARM_REG_LR,)), ())]
     while pending:
-        site, incoming = pending.pop()
-        if site in states and incoming <= states[site]:
+        site, incoming, known = pending.pop()
+        old_tainted, old_known = states.get(site, (frozenset(), {}))
+        merged = dict(old_known)
+        for register, low, high in known:
+            old_low, old_high = merged.get(register, (low, high))
+            merged[register] = (min(low, old_low), max(high, old_high))
+        if site in states and incoming <= old_tainted and merged == old_known:
             continue
-        tainted = states[site] = states.get(site, frozenset()) | incoming
+        tainted = old_tainted | incoming
+        revisits[site] = revisits.get(site, 0) + 1
+        if revisits[site] > CONSTANT_BUDGET:
+            tainted |= frozenset(merged)
+            merged = {}
+        states[site] = (tainted, merged)
+        constants = dict(merged)
         item = instructions[site]
         if item.size != 2 and not (item.id == ARM_INS_BL and item.size == 4 and site in calls) or \
-                item.id in (ARM_INS_BKPT, ARM_INS_UDF, ARM_INS_SVC) or CS_GRP_INT in item.groups:
+                CS_GRP_INT in item.groups or item.size == 2 and not armv4t_encoding(item):
             raise ValueError('switch thunks admit only 16-bit ARMv4T encodings and bound BL pairs')
         read, written = item.regs_access()
         read, written = set(read), set(written) & registers
         literals = [((item.address + 4) & ~3) + operand.mem.disp for operand in item.operands
                     if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC]
         if item.id == ARM_INS_BL:
-            if thunks.get(site) in tainted:
+            target = thunks.get(site)
+            if target in tainted:
                 raise ValueError('thunk target register can hold a local code address')
-            tainted = (tainted - set(CALLER_CLOBBERED) if site in calls else tainted) | {ARM_REG_LR}
+            if target in constants:
+                raise ValueError('thunk target register holds a constant-derived value')
+            clobbered = (set(CALLER_CLOBBERED) if site in calls else set()) | {ARM_REG_LR}
+            tainted = (tainted - clobbered) | {ARM_REG_LR}
+            constants = {register: value for register, value in constants.items() if register not in clobbered}
         elif item.mnemonic == 'pop':
             tainted = tainted | written
+            constants = {register: value for register, value in constants.items() if register not in written}
         elif item.mnemonic.startswith(('str', 'stm')):
             if tainted & read:
                 raise ValueError('a local code address cannot be stored')
@@ -144,7 +232,34 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer):
             source = literals == [pointer] if literals else \
                 item.mnemonic == 'adr' or bool(read & (tainted | {ARM_REG_PC, ARM_REG_SP}))
             tainted = tainted | written if source else tainted - written
-        pending.extend((target, frozenset(tainted)) for target in edges[site])
+            operands = list(item.operands)
+            modelled = item.mnemonic in BINARY or item.mnemonic in OTHER or item.mnemonic in ('mov', 'movs')
+            for register in written:
+                constants.pop(register, None)
+            if not source and modelled and not literals and operands and operands[0].type == ARM_OP_REG:
+                destination = operands[0].reg
+                sources = operands[1:]
+                if len(sources) == 1 and (item.mnemonic in BINARY or item.mnemonic in ('asrs', 'rors', 'muls',
+                                                                                          'adcs', 'sbcs')):
+                    sources = [operands[0], *sources]
+                values = [constant_value(operand, merged) for operand in sources]
+                result, escapes = None, False
+                if item.mnemonic in ('mov', 'movs'):
+                    result = values[0] if values else None
+                elif any(value is not None for value in values):
+                    if item.mnemonic in BINARY and None in values:
+                        pass  # a constant mixed with a loaded value is no longer a known constant
+                    elif item.mnemonic in BINARY:
+                        result = combine(item.mnemonic, *values)
+                        escapes = result is None
+                    else:
+                        escapes = True
+                if escapes or result is not None and result[1] >= ROM_LOW and result[0] < ROM_HIGH:
+                    tainted = tainted | {destination}
+                elif result is not None and destination in registers:
+                    constants[destination] = result
+        pending.extend((target, frozenset(tainted), tuple((r, *v) for r, v in constants.items()))
+                       for target in edges[site])
 
 
 def fingerprint(address, data, manifest):

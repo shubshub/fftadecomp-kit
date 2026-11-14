@@ -2671,6 +2671,15 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         # The thunk binding's own literal rules: no object or literal may name a
         # code entry or a reserved thunk, so no data word can become a call target.
         function_thunk.verify_data_bindings(calls, data_relocations, objects, entries)
+        # Nor may an object's address or bound value lie inside any indexed function
+        # span, the caller's own span included.
+        spans = [(int(entry["rom"], 16) & ~1, int(entry["end"], 16)) for entry in entries]
+        spans.append((address, address + len(data)))
+        for name, value in data_relocations.values():
+            for target in (objects[name], value):
+                if function_thunk.reserved(target) or any(start <= target & ~1 < end for start, end in spans):
+                    raise ValueError("switch thunk callers cannot bind code entries "
+                                     "or indexed function spans as data")
         function_thunk.verify_literal_bindings(data, address, instructions, calls, mapping, {})
     if complete_data:
         # The default policy still admits only the table pointer and typed
