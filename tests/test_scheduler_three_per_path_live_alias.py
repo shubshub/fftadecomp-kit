@@ -165,7 +165,7 @@ class EntryLivenessTests(unittest.TestCase):
         for callee in (half(0x7808, 0x2100, 0x4770),             # ldrb r0,[r1] first
                        half(0x1C08, 0x2100, 0x4770),             # adds r0,r1,#0 first
                        half(0x4770),                             # returned unkilled
-                       half(0xDF0B, 0x2100, 0x4770),             # swi: not ARMv4T-closed, so no fact
+                       half(0xDF0B, 0x2100, 0x4770),             # swi: the callee CFG rejects it as unsupported, so no fact
                        half(0x2800, 0xD000, 0x2100, 0x4770),     # killed on one arm only
                        half(0x2800, 0xD1FD, 0x2100, 0x4770),     # a cycle that never kills
                        half(0x3801, 0xD1FD, 0x2100, 0x4770)):    # least fixpoint: a cycle before the kill
@@ -178,6 +178,20 @@ class EntryLivenessTests(unittest.TestCase):
         body[2:6] = bl(B + 2, C)
         p = bound(data, calls, SELECTOR, bytes(body))
         self.assertEqual(live.dead_at_entry(p, B, {R1}), set())
+
+    def test_local_bl_before_the_kill_keeps_it_live(self):
+        # push {lr}; bl B+8; nop; movs r1,#0; pop {pc}: conservative, a local BL observes.
+        data, calls, _ = alias_owner()
+        body = bytearray(half(0xB500, 0, 0, 0x46C0, 0x2100, 0xBD00))
+        body[2:6] = bl(B + 2, B + 8)
+        p = bound(data, calls, SELECTOR, bytes(body))
+        self.assertEqual(live._callee_cfg(p, B)[2], {B + 2: B + 8})
+        self.assertEqual(live.dead_at_entry(p, B, {R1}), set())
+
+    def test_callee_cfg_is_cached_per_address(self):
+        data, calls, _ = alias_owner()
+        p = bound(data, calls, SELECTOR, half(0x2100, 0x4770))
+        self.assertIs(live._callee_cfg(p, B), live._callee_cfg(p, B))
 
     def test_dead_alias_is_not_an_argument(self):
         data, calls, labels = alias_owner()
@@ -242,6 +256,15 @@ class ReturnedAliasTests(unittest.TestCase):
             with self.subTest(callee=callee.hex()), \
                     self.assertRaisesRegex(ValueError, 'return a local alias'):
                 verify(data, calls, callee=callee)
+
+    def test_callee_with_a_call_hands_nothing_back(self):
+        # push {lr}; bl C; pop {pc}: the outer callee never writes R1, but its nested
+        # leaf kills it on one path, so the alias is not definitely returned.
+        data, calls, _ = alias_owner()
+        body = bytearray(half(0xB500, 0, 0, 0xBD00))
+        body[2:6] = bl(B + 2, C)
+        with self.assertRaisesRegex(ValueError, 'return a local alias'):
+            verify(data, calls, callee=bytes(body), second=half(0x2800, 0xD000, 0x2100, 0x4770))
 
     def test_returned_alias_cannot_escape_afterwards(self):
         data, calls, _ = alias_owner(after=(0x6029,))  # str r1,[r5]
