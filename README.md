@@ -2357,7 +2357,7 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   object address) feed add, sub, shifts and logical operations; a result that
   reaches the ROM range, or any other operation on a constant, becomes tainted,
   and a loop that keeps changing a constant is tainted after sixteen revisits.
-  A constant combined with a loaded value stays constant-derived. Once a
+  A constant combined with a loaded value stays constant-derived, except by an exact identity (`adds/subs rd, rs, #0`, `lsls rd, rs, #0`, the compiler's register copy), which carries the source's state over unchanged. Once a
   constant-derived value has been stored on a path (other than through SP, the
   verified write-only outgoing frame), every later non-literal load on that path
   is constant-derived too, whatever register or address it uses; the flag is

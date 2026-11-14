@@ -185,7 +185,7 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     """
     import function_thunk_profile as function_thunk
     from capstone import CS_GRP_INT
-    from capstone.arm import (ARM_INS_BL, ARM_OP_MEM, ARM_OP_REG, ARM_REG_LR, ARM_REG_PC,
+    from capstone.arm import (ARM_INS_BL, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_REG_LR, ARM_REG_PC,
                               ARM_REG_R0, ARM_REG_R12, ARM_REG_SP)
     from match import CALLER_CLOBBERED
     registers = {*range(ARM_REG_R0, ARM_REG_R12 + 1), ARM_REG_LR}
@@ -271,12 +271,18 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
             elif not source and modelled and operands and operands[0].type == ARM_OP_REG:
                 destination = operands[0].reg
                 sources = operands[1:]
-                if len(sources) == 1 and (item.mnemonic in BINARY or item.mnemonic in ('asrs', 'rors', 'muls',
-                                                                                          'adcs', 'sbcs')):
+                # x + 0, x - 0 and x << 0 are exactly x (agbcc's register copy is adds rd, rs, #0):
+                # a move, so the source's state carries over unchanged.
+                identity = item.mnemonic in ('add', 'adds', 'sub', 'subs', 'lsls') and len(operands) <= 3 and \
+                    bool(sources) and sources[-1].type == ARM_OP_IMM and sources[-1].imm == 0
+                if identity:
+                    sources = [operands[len(operands) - 2]]
+                elif len(sources) == 1 and (item.mnemonic in BINARY or item.mnemonic in ('asrs', 'rors', 'muls',
+                                                                                         'adcs', 'sbcs')):
                     sources = [operands[0], *sources]
                 values = [constant_value(operand, merged) for operand in sources]
                 result, escapes, mixed = None, False, False
-                if item.mnemonic in ('mov', 'movs'):
+                if item.mnemonic in ('mov', 'movs') or identity:
                     result = values[0] if values else None
                     mixed = result == MIXED
                     result = None if mixed else result
