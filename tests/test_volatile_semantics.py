@@ -178,12 +178,20 @@ class SemanticDiffTests(unittest.TestCase):
 
     def test_read_modify_write_load_must_sit_next_to_its_store(self):
         # review repro p2/08000002: a planted read, then the value's arithmetic,
-        # then a store to the pinned byte; the store borrows the planted load
+        # then a store to the pinned byte; the store borrows the planted load.
+        # Since kit#165 the window admits load-independent arithmetic that
+        # finishes the stored value (080EA6F4), so the real/stripped rules
+        # alone take this shape; the store is an alias, though, and the
+        # permuted compile, where the planted read moves and the alias does
+        # not, refuses it (as do the lexical rules on the source)
         real = assembly("add\tr3, r0, #0", "ldr\tr0, .L3", "add\tr0, r0, #60", "ldrb\tr2, [r0]",
                         "mul\tr1, r1, r3", "add\tr3, r1, #7", "strb\tr3, [r0]", "bx\tlr")
         stripped = assembly("add\tr2, r0, #0", "mov\tr0, r2", "mul\tr0, r0, r1", "add\tr2, r0, #7",
                             "ldr\tr0, .L3", "add\tr0, r0, #60", "strb\tr2, [r0]", "bx\tlr")
-        self.refused(real, stripped, "is a dead load of")
+        self.assertEqual(compare(real, stripped)[0][1:3], (1, [3]))
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.perturbed(real, real.replace("ldrb\tr2, [r0]", "ldrb\tr2, [r0, #1]"), stripped)
+        self.assertIn("does not follow its member", str(caught.exception))
         # the genuine shape computes the value first (p2b)
         genuine = assembly("add\tr2, r0, #0", "mov\tr0, r2", "mul\tr0, r0, r1", "add\tr2, r0, #7",
                            "ldr\tr0, .L3", "add\tr0, r0, #60", "ldrb\tr1, [r0]", "strb\tr2, [r0]",
@@ -334,7 +342,8 @@ class SemanticDiffTests(unittest.TestCase):
         self.assertEqual(self.compare16(increment, increment.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:4],
                          (1, [3], []))
         # agbcc builds a halfword constant after the dead load (`sym.bg1cnt =
-        # 0x100`); arithmetic on anything but constants may not sit there
+        # 0x100`); since kit#165 load-independent arithmetic may finish the
+        # value there too, but nothing may read the loaded value
         built = assembly("ldr\tr1, .L3", "ldrh\tr2, [r1, #4]", "mov\tr0, #128", "lsl\tr0, r0, #1",
                          "strh\tr0, [r1, #4]", "bx\tlr")
         self.assertEqual(self.compare16(built, built.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:4],
@@ -344,7 +353,8 @@ class SemanticDiffTests(unittest.TestCase):
         for name, window, accepted in (
                 ("copied constant", "mov\tr3, #128\n\tlsl\tr3, r3, #1\n\tadd\tr0, r3, #0", True),
                 ("copied literal", "ldr\tr3, .L3+4\n\tadd\tr0, r3, #0", True),
-                ("unknown arithmetic on the value", "add\tr0, r3, #1", False),
+                ("unknown arithmetic on the value", "add\tr0, r3, #1", True),
+                ("literal feeding value arithmetic", "ldr\tr3, .L3+4\n\tadd\tr0, r0, r3", True),
                 # dead unrelated work; live scheduled-in work is admitted (0813F934)
                 ("unrelated constant", "mov\tr3, #128\n\tlsl\tr3, r3, #1\n\tmov\tr0, #1", False),
                 ("unrelated literal", "ldr\tr3, .L3+4\n\tmov\tr0, #1", False)):
@@ -359,9 +369,14 @@ class SemanticDiffTests(unittest.TestCase):
                         self.compare16(shaped, shaped.replace("ldrh\tr2, [r1, #4]\n\t", ""))
                     self.assertIn("not directly followed by a store", str(caught.exception))
         computed = built.replace("mov\tr0, #128\n\tlsl\tr0, r0, #1", "lsl\tr0, r0, #1")
+        self.assertEqual(self.compare16(computed, computed.replace("ldrh\tr2, [r1, #4]\n\t", ""))[0][1:3],
+                         (1, [1]))
+        # arithmetic on the loaded value makes the load live: it is a real
+        # read-modify-write the qualifier would otherwise hide
+        reading = built.replace("mov\tr0, #128\n\tlsl\tr0, r0, #1", "orr\tr0, r2")
         with self.assertRaises(semantics.SemanticError) as caught:
-            self.compare16(computed, computed.replace("ldrh\tr2, [r1, #4]\n\t", ""))
-        self.assertIn("not directly followed by a store", str(caught.exception))
+            self.compare16(reading, reading.replace("ldrh\tr2, [r1, #4]\n\t", ""))
+        self.assertIn("without the read-modify-write load", str(caught.exception))
         # a dead ldrh with no strh of the same halfword is a planted read
         for name, planted in (
                 ("alone", assembly("ldr\tr1, .L3", "ldrh\tr2, [r1, #4]", "bx\tlr")),
@@ -399,6 +414,10 @@ class SemanticDiffTests(unittest.TestCase):
                              ("unknown arithmetic", ("mul\tr2, r2, r6", "mov\tr8, r2"))):
             with self.subTest(accepted=name):
                 self.assertEqual(check(shaped(*window))[0][1:3], (1, [2]))
+        # kit#165: the stored value itself may be finished in the window
+        computed = shaped("mov\tr0, #0", "mov\tr8, r0", "ldr\tr0, .L3+4", "add\tr0, r0, r2",
+                          "mov\tr2, #0").replace("ldr\tr0, .L3+4\n\tstrh", "strh")
+        self.assertEqual(check(computed)[0][1:3], (1, [2]))
         # flags set in the window and consumed after the store stay ordinary
         # behaviour: both compiles must branch on the same condition
         branching = shaped("cmp\tr2, #3").replace("mov\tr0, r8", "beq\t.L9\n\tmov\tr0, r8\n.L9:")
@@ -468,9 +487,6 @@ class SemanticDiffTests(unittest.TestCase):
                 ("pushed and popped", shaped("mov\tr0, #0", "mov\tr8, r0", "add\tr2, r2, r6").replace(
                     "mov\tr0, r8", "mov\tr0, r8\n\tpush\t{r2}\n\tpop\t{r2}"), dead_load),
                 ("store base redefined", shaped("add\tr1, r1, r2", "add\tr1, r3, #0"), dead_load),
-                ("store value computed", shaped("mov\tr0, #0", "mov\tr8, r0", "ldr\tr0, .L3+4",
-                                                "add\tr0, r0, r2", "mov\tr2, #0").replace(
-                    "ldr\tr0, .L3+4\n\tstrh", "strh"), dead_load),
                 ("other member stored", shaped("mov\tr0, #0", "mov\tr8, r0",
                                                store="strh\tr0, [r1, #2]"), dead_load),
                 ("two dead loads, one store", shaped("mov\tr0, #0", "mov\tr8, r0",
@@ -478,6 +494,74 @@ class SemanticDiffTests(unittest.TestCase):
             with self.subTest(refused=name), self.assertRaises(semantics.SemanticError) as caught:
                 check(real)
             self.assertIn(reason, str(caught.exception), name)
+
+    def test_load_independent_value_arithmetic_may_finish_the_stored_value(self):
+        # kit#165, 080EA6F4: `sym.bldcnt_lo = func_080035F8(2) | 0x40;` is
+        # `movs r1, #0x40; ...; ldrb r2, [r3]; orrs r0, r1; strb r0, [r3]`
+        def shaped(*window, store="strb\tr0, [r3]", after=()):
+            return assembly("push\t{lr}", "ldr\tr3, .L3", "add\tr3, r3, #60", "mov\tr1, #64",
+                            "ldrb\tr2, [r3]", *window, store, *after, "pop\t{r1}", "bx\tr1")
+
+        def check(real, stripped=None):
+            return compare(real, stripped or real.replace("ldrb\tr2, [r3]\n\t", ""))
+
+        self.assertEqual(check(shaped("orr\tr0, r1"))[0][1:3], (1, [4]))
+        # with a constant built and copied in the window as well
+        self.assertEqual(check(shaped("mov\tr6, #3", "add\tr5, r6, #0", "orr\tr0, r5",
+                                      "orr\tr0, r1"))[0][1:3], (1, [4]))
+        # the comparison still checks the value: a different expression is refused
+        with self.assertRaises(semantics.SemanticError) as caught:
+            check(shaped("orr\tr0, r1"), shaped("eor\tr0, r1").replace("ldrb\tr2, [r3]\n\t", ""))
+        self.assertIn("differ in observable behaviour", str(caught.exception))
+        dead_load, unexplained = "is a dead load of", "without the read-modify-write load"
+        for name, real, reason in (
+                # a real read-modify-write the qualifier would otherwise hide
+                ("reads the loaded value", shaped("orr\tr0, r2"), unexplained),
+                ("reads it through a step", shaped("add\tr6, r2, #0", "orr\tr0, r6"), unexplained),
+                ("intervening store", shaped("str\tr1, [r5]", "orr\tr0, r1"), dead_load),
+                ("intervening frame store", shaped("sub\tsp, #4", "str\tr1, [sp]", "add\tsp, #4",
+                                                   "orr\tr0, r1"), dead_load),
+                ("non-frame load", shaped("ldr\tr1, [r5]", "orr\tr0, r1"), dead_load),
+                ("intervening call", shaped("mov\tr2, #0", "bl\tfunc_0802A2C0", "orr\tr0, r1"),
+                 dead_load),
+                ("other member stored", shaped("orr\tr0, r1", store="strb\tr0, [r3, #1]"), dead_load),
+                ("conditional branch", shaped("orr\tr0, r1", "cmp\tr1, #0", "beq\t.L9", ".L9:"),
+                 dead_load),
+                ("flags read after the store", shaped("orr\tr0, r1", after=("beq\t.L9", ".L9:")),
+                 dead_load),
+                ("arithmetic builds the address", shaped("mov\tr6, #0", "add\tr3, r3, r6",
+                                                         "orr\tr0, r1"), dead_load)):
+            with self.subTest(refused=name), self.assertRaises(semantics.SemanticError) as caught:
+                check(real)
+            self.assertIn(reason, str(caught.exception), name)
+        # the window rules themselves, on records
+        load = semantics.Record(0, "ldrb", "load", {"r3"}, {"r2"}, address=("sym", 4), width=1)
+
+        def store(value=None):
+            return semantics.Record(3, "strb", "store", {"r0", "r3"}, (), address=("sym", 4), width=1,
+                                    value_register="r0", value=value)
+
+        def alu(index, reads, writes, flags=False):
+            return semantics.Record(index, "alu", "alu", reads, writes, alu_operation="orr",
+                                    flags_written=flags)
+
+        branch = semantics.Record(4, "beq", "branch")
+        compare_flags = semantics.Record(4, "cmp", "alu", {"r5"}, (), flags_written=True)
+        rmw = semantics.read_modify_write_store
+        self.assertEqual(rmw([load, alu(1, {"r0", "r1"}, {"r0"}), store()], 0, ("sym", 4), 1), 2)
+        for name, records in (
+                ("writes the address register", [load, alu(1, {"r3", "r6"}, {"r3"}), store()]),
+                ("feeds the address through a copy",
+                 [load, alu(1, {"r1", "r5"}, {"r6"}),
+                  semantics.Record(2, "mov", "alu", {"r6"}, {"r3"}, copy=True),
+                  semantics.Record(5, "mov", "alu", {"r6"}, {"r0"}, copy=True), store()]),
+                ("all-ones value", [load, alu(1, {"r0", "r1"}, {"r0"}), store(0xFF)]),
+                ("flags reach a branch", [load, alu(1, {"r0", "r1"}, {"r0"}, True), store(), branch]),
+                ("reads the loaded register", [load, alu(1, {"r0", "r2"}, {"r0"}), store()])):
+            with self.subTest(records=name):
+                self.assertIsNone(rmw(records, 0, ("sym", 4), 1))
+        killed = [load, alu(1, {"r0", "r1"}, {"r0"}, True), store(), compare_flags, branch]
+        self.assertEqual(rmw(killed, 0, ("sym", 4), 1), 2)
 
     def test_halfword_chained_assignment_re_read(self):
         # `sym.bg0cnt = (sym.bg1cnt = 0);` re-reads +0x04 at its own width
@@ -1038,6 +1122,22 @@ class CompiledSemanticTests(unittest.TestCase):
                 with self.assertRaises(semantics.SemanticError) as caught:
                     self.check(plant + tail)
                 self.assertIn(reason, str(caught.exception))
+
+    def test_value_finished_after_the_load_through_agbcc(self):
+        # kit#165 (080EA6F4): agbcc schedules the OR of a call result after
+        # the bit-field's read-modify-write load
+        s = SYMBOL
+        (record,) = self.check(f"{s}.bldcnt_lo = func_080035F8(2) | 0x40;", "void",
+                               "extern u8 func_080035F8(u8);\n")
+        self.assertIn("read-modify-write loads at [7]", record)
+        # the plant the old window refused on order alone (08000002) stays
+        # refused with the lexical passes off: its alias store does not move
+        # with the permuted members
+        with mock.patch.object(plausible, "member_provenance", return_value=[]), \
+                mock.patch.object(plausible, "whole_object_uses", return_value=[]), \
+                self.assertRaises(semantics.SemanticError) as caught:
+            self.check(f"(void){s}.bldcnt_lo; a = a * b + 7; {s}.unknown_48[2] = a;", "int a, int b")
+        self.assertIn("does not follow its member", str(caught.exception))
 
     def test_all_ones_stores_through_agbcc(self):
         s = SYMBOL

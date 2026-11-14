@@ -2469,7 +2469,15 @@ symbolically along every path, and the check requires:
     branch's flags) and writes neither a register the store reads nor sp/pc
     (an immediate `mov`, as before, may write one that the store's own
     operands later overwrite). Nothing in between may read the loaded value,
-    and no memory access, call or conditional branch may intervene. Before
+    and no memory access, call or conditional branch may intervene. The
+    scheduler may also finish the stored value after the load (080EA6F4,
+    080ED4E8: `ldrb r2, [r3]; orrs r0, r1; strb r0, [r3]` for
+    `sym.x = f(2) | 0x40`): a register ALU operation in the store's slice is
+    admitted if it feeds only the value register, not the address
+    registers, writes neither an address register nor sp/pc, and its flags
+    reach no conditional branch. As nothing in the window reads the loaded
+    value, its inputs cannot carry it, and the stored value stays the one
+    the stripped compile computes. Before
     a store of the member's all-ones value the window keeps only the
     narrower forms: agbcc may fold that store's own load away (081175D4
     keeps it), so a dead load before one may be planted;

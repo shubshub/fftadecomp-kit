@@ -35,13 +35,18 @@ class SharedStoreTests(unittest.TestCase):
         with self.assertRaises(semantics.SemanticError):
             fixtures.compare(real, stripped)
 
-    def test_intervening_effects_and_unknown_arithmetic_still_refuse(self):
+    def test_intervening_effects_still_refuse(self):
         for between in [('ldrb\tr3, [r1, #1]',),
                         ('strb\tr2, [r1, #1]',),
                         ('bl\tfunc_0802A2C0',),
-                        ('add\tr0, r0, r2',)]:
+                        ('add\tr1, r1, r2',)]:
             with self.subTest(between=between), self.assertRaises(semantics.SemanticError):
                 fixtures.compare(*self.bodies(between))
+
+    def test_load_independent_value_arithmetic_after_the_jump(self):
+        # kit#165: arithmetic that finishes only the stored value is admitted
+        # on the shared store's side of the jump as well
+        self.assertEqual(fixtures.compare(*self.bodies(('add\tr0, r0, r2',)))[0][2], [2])
 
     def test_different_member_width_or_missing_store_still_refuses(self):
         for store in ('strb\tr0, [r1, #1]', 'strh\tr0, [r1]', 'bx\tlr'):
