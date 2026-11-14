@@ -20,14 +20,14 @@ instruction that
 * is not one 16-bit ARMv4T instruction of an allowlisted form (refuses).
 
 The allowlist is register and immediate data processing, single loads and
-stores, PUSH and ADD/SUB SP by an immediate.  Everything else stops the scan:
+stores, PUSH and SUB SP by an immediate.  Everything else stops the scan:
 SWI (capstone reports it reading only PC, but the BIOS reads R0-R3), BKPT,
 UDF, any 32-bit decode (capstone decodes Thumb-2; on the ARM7TDMI `f04f 0100`
 is a BL prefix and `lsls r0, r0, #4`, not `mov.w r1, #0`), post-ARMv4T 16-bit
 forms (a high-register ADD/CMP/MOV of two low registers, the miscellaneous
-space beyond ADD/SUB SP and PUSH), POP, LDM/STM, branches, calls, returns,
-conditional instructions and any write of PC or (but for ADD/SUB SP and PUSH)
-SP.  So only a straight-line entry prefix that unconditionally overwrites the
+space beyond SUB SP and PUSH), ADD SP, POP, LDM/STM, branches, calls,
+returns, conditional instructions and any write of PC or (but for SUB SP and
+PUSH) SP.  So only a straight-line entry prefix that unconditionally overwrites the
 register counts; nothing in the callee can observe the alias.  The scan reads
 the callee's bytes without spending the walk's dependency budget: a callee
 whose aliases are all dead is not walked and is not a dependency.  When every
@@ -65,7 +65,8 @@ def sha(raw):
 # 16-bit Thumb (ARMv4T) forms the scan may step over: register and immediate
 # data processing, single loads and stores, and PUSH.  Everything else stops it
 # - in particular SWI (the BIOS reads R0-R3), BKPT/UDF, every 32-bit or
-# post-ARMv4T encoding (capstone decodes Thumb-2), POP, LDM/STM, branches.
+# post-ARMv4T encoding (capstone decodes Thumb-2), POP, LDM/STM, branches, and
+# ADD SP (it would move SP up into the caller's frame before a later PUSH).
 ALLOWED = frozenset((
     'mov', 'movs', 'mvn', 'mvns', 'neg', 'negs', 'rsb', 'rsbs',
     'add', 'adds', 'sub', 'subs', 'adc', 'adcs', 'sbc', 'sbcs', 'mul', 'muls',
@@ -86,13 +87,13 @@ def thumb1(instruction):
         return False                      # a 32-bit prefix, BL halves included
     if half & 0xfc00 == 0x4400 and not half & 0xc0:
         return False                      # hi-register ADD/CMP/MOV of two low registers: not ARMv4T
-    if 0xb000 <= half < 0xc000 and not (half & 0xff80 in (0xb000, 0xb080) or half & 0xfe00 == 0xb400):
-        return False                      # only ADD/SUB SP,#imm and PUSH of the miscellaneous space
+    if 0xb000 <= half < 0xc000 and not (half & 0xff80 == 0xb080 or half & 0xfe00 == 0xb400):
+        return False                      # only SUB SP,#imm and PUSH of the miscellaneous space
     read, written = instruction.regs_access()
     if ARM_REG_PC in written:
         return False
-    if ARM_REG_SP in written and not (half & 0xff00 == 0xb000 or half & 0xfe00 == 0xb400):
-        return False                      # MOV/ADD SP, rX and the like: the frame becomes untracked
+    if ARM_REG_SP in written and not (half & 0xff80 == 0xb080 or half & 0xfe00 == 0xb400):
+        return False                      # SP may only grow the callee's own frame before the kill
     return True
 
 
@@ -162,5 +163,5 @@ class DeadArgumentBufferProof(named.NamedDataBufferProof):
             selector=SELECTOR,
             rule=('an owner alias in R0-R3 is not passed to a callee whose entry prefix of '
                   'allowlisted 16-bit ARMv4T data-processing, single load/store, PUSH and '
-                  'ADD/SUB SP instructions writes the register before any instruction reads it'),
+                  'SUB SP instructions writes the register before any instruction reads it'),
             calls=[self.dead_arguments[key] for key in sorted(self.dead_arguments, key=repr)])

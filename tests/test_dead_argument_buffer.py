@@ -96,7 +96,9 @@ class KillingInstructionTests(unittest.TestCase):
                 ('mov sp, r0', [0x4685, 0x2100, 0x4770]),
                 ('low-low hi-register mov (ARMv6)', [0x4601, 0x4770]),   # mov r1,r0
                 ('uxtb (ARMv6)', [0xb2c9, 0x4770]),                      # uxtb r1,r1
-                ('pop', [0xbc02, 0x4770])):
+                ('pop', [0xbc02, 0x4770]),
+                # review L1: ADD SP moves SP up into the owner frame before a PUSH
+                ('add sp before the kill', [0xb002, 0xb404, 0x2100, 0x4770])):
             with self.subTest(name):
                 self.assertIsNone(self.kill(tokens))
         # the kills agbcc emits stay admitted
