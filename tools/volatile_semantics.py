@@ -110,9 +110,12 @@ and a branch on them is always a decision, imposed alike on every compile.
 A planted read therefore either vanishes from the stripped compile, so the
 real compile has a load the rules cannot explain, or it stays, which shows
 the qualifier did not produce it; then it is ordinary code that the stripped
-compile emits too.  Anything the symbolic executor does not model - ARM
-code, computed jumps, symbolic loops beyond the path bound, unknown
-instructions - fails closed with a reason.
+compile emits too.  agbcc's guarded jump-table dispatch is a multiway
+branch to the table's distinct case labels (Executor.jump_table), each
+explored like a conditional branch under the same path bound.  Anything
+else the symbolic executor does not model - ARM code, any other computed
+jump, symbolic loops beyond the path bound, unknown instructions - fails
+closed with a reason.
 
 Known limits (false refusals, never false acceptance of a qualifier
 effect): reading a pinned member twice where an ordinary declaration would
@@ -946,7 +949,9 @@ def parse_word(text):
     if found is None:
         raise SemanticError(f"unsupported literal word `{text}`")
     if found[1].startswith(".L"):
-        return ("code", found[1])
+        # a local label with an offset is not that label: keep the offset, so
+        # nothing (jump tables in particular) mistakes `.L5+4` for `.L5`
+        return ("code", found[1]) if not found[3] else ("code", found[1], found[2] + found[3])
     offset = int(found[3], 0) * (-1 if found[2] == "-" else 1) if found[3] else 0
     return make_linear(offset, {("sym", found[1]): 1})
 
@@ -1011,7 +1016,12 @@ def parse_assembly(text):
 # ---------------------------------------------------------------- execution
 
 class NeedDecision(Exception):
-    pass
+    """the path needs one more decision; options are its possible values:
+    taken or not for a branch, the case of a jump table (Executor.jump_table)"""
+
+    def __init__(self, options=(False, True)):
+        super().__init__()
+        self.options = tuple(options)
 
 
 class Record:
@@ -1279,6 +1289,9 @@ class Executor:
                                     "conditions are not modelled)")
             raise NeedDecision()
         taken = self.decisions[len(self.conditions)]
+        if type(taken) is not bool:
+            self.fail(text, "a conditional branch where the explored compile dispatches through "
+                      "a jump table")
         self.conditions.append(condition)
         self.known[condition] = taken
         return taken != flipped
@@ -1565,6 +1578,8 @@ class Executor:
         if mnemonic.endswith("s") and mnemonic[:-1] in alu:
             mnemonic = mnemonic[:-1]      # unified syntax spells the flag-setting forms `adds`
         regs = self.regs
+        if mnemonic == "lsl" and (form := self.dispatch(pc)) is not None:
+            return self.jump_table(pc, *form)
         if mnemonic in alu:
             destination = register(operands[0]) if operands else None
             if destination is None or destination == "pc" or len(operands) not in (2, 3):
@@ -1763,6 +1778,110 @@ class Executor:
             return None
         self.fail(text, f"unsupported instruction `{mnemonic}`")
 
+    def dispatch(self, pc):
+        """(index register, destination, table register, pointer pool) when the
+        five instructions at pc are agbcc's jump-table dispatch, else None:
+
+            lsl rD, rI, #2; ldr rT, .Lpool; add rD, rD, rT; ldr rD, [rD]; mov pc, rD
+
+        Only the shape is read here; jump_table proves the rest or fails."""
+        low = [f"r{n}" for n in range(8)]
+        forms = [(mnemonic[:-1] if mnemonic in ("lsls", "adds") else mnemonic, operands)
+                 for mnemonic, operands, _ in self.instructions[pc:pc + 5]]
+        if len(forms) != 5 or [mnemonic for mnemonic, _ in forms] != ["lsl", "ldr", "add", "ldr", "mov"]:
+            return None
+        (_, shift_ops), (_, pointer_ops), (_, add_ops), (_, load_ops), (_, jump_ops) = forms
+        if len(shift_ops) != 3 or len(pointer_ops) != 2 or len(add_ops) != 3 or \
+                len(load_ops) != 2 or len(jump_ops) != 2:
+            return None
+        destination, index = register(shift_ops[0]), register(shift_ops[1])
+        table, pool = register(pointer_ops[0]), pointer_ops[1].strip()
+        if destination not in low or index not in low or table not in low or table == destination or \
+                immediate(shift_ops[2]) != 2 or not re.fullmatch(r"\.L\w+", pool) or \
+                [register(o) for o in add_ops] != [destination, destination, table] or \
+                register(load_ops[0]) != destination or \
+                not re.fullmatch(r"\[\s*" + destination + r"\s*\]", load_ops[1].strip()) or \
+                register(jump_ops[0]) != "pc" or register(jump_ops[1]) != destination:
+            return None
+        return index, destination, table, pool
+
+    def jump_table(self, pc, index, destination, table, pool):
+        """agbcc's guarded jump-table dispatch, as a multiway branch.
+
+        The table must be the function's own: the pointer pool and the table
+        both start right after `mov pc` (nothing but labels, alignment and
+        the pointer word between), the pointer is exactly the table's label,
+        and every entry is exactly a local code label.  The index must be
+        bounded by the table: with N+1 entries, either a known constant at
+        most N or a `cmp index, #N` whose `hi` branch was not taken on this
+        path, so the loaded word is one of the entries.  Each distinct label
+        is then a successor, explored like a conditional branch; the
+        condition records the index, N and which entries share a label (by
+        position, not by label name), so the stripped compile must dispatch
+        on the same value through the same partition.  The index is not
+        narrowed to the case: a path covers every index that reaches its
+        label.  Anything else fails closed."""
+        text = self.instructions[pc + 4][2]
+        after = pc + 5
+        words = self.pools.get(pool)
+        if words is None or self.labels.get(pool) != after or len(words) != 1 or \
+                not (isinstance(words[0], tuple) and len(words[0]) == 2 and words[0][0] == "code"):
+            self.fail(text, "the jump-table pointer is not a local label word right after the jump")
+        label = words[0][1]
+        entries = self.pools.get(label)
+        if entries is None or self.labels.get(label) != after:
+            self.fail(text, "the jump table does not immediately follow the jump")
+        targets = []
+        for entry in entries:
+            if not (isinstance(entry, tuple) and len(entry) == 2 and entry[0] == "code") or \
+                    entry[1] not in self.labels or entry[1] in self.pools or \
+                    self.labels[entry[1]] >= len(self.instructions):
+                self.fail(text, "a jump-table entry is not a local code label of this function")
+            targets.append(self.labels[entry[1]])
+        bound = len(entries) - 1
+        value, derived = self.regs[index], index in self.derived
+        partition = tuple(targets.index(target) for target in targets)
+        if isinstance(value, int) and not derived:
+            if value > bound:
+                self.fail(text, f"the constant index {value} lies beyond the {bound + 1}-entry jump table")
+            case = partition[value]
+        else:
+            if self.known.get(("hi", ("cmp", value, bound))) is not False:
+                self.fail(text, f"the jump-table index is not bounded by `cmp {index}, #{bound}` "
+                          f"(not taken `bhi`) on this path; the table has {bound + 1} entries")
+            condition = ("jump-table", value, bound, partition)
+            if condition in self.known:
+                case = self.known[condition]
+            else:
+                if len(self.conditions) >= len(self.decisions):
+                    if len(self.decisions) >= MAX_DECISIONS:
+                        raise SemanticError(f"{self.label} compile of {self.name}: more than "
+                                            f"{MAX_DECISIONS} unknown branch conditions on one path "
+                                            "(loops with unknown exit conditions are not modelled)")
+                    raise NeedDecision(sorted(set(partition)))
+                case = self.decisions[len(self.conditions)]
+                if type(case) is not int or case not in partition:
+                    self.fail(text, "a jump table where the explored compile branches otherwise")
+                self.conditions.append(condition)
+                self.known[condition] = case
+        # The dispatch reads the index and the table only: the five records
+        # carry that dataflow (the index reaches a branch through the flags,
+        # as a conditional branch's operands do) with label-free values.
+        pointer = ("jump-table", partition)
+        entry = ("jump-entry", partition, case)
+        rows = [({index}, {destination}, "alu"), (set(), {table}, "literal"),
+                ({destination, table}, {destination}, "alu"), ({destination}, {destination}, "alu"),
+                ({destination}, set(), "branch")]
+        for offset, (reads, writes, kind) in enumerate(rows):
+            record = Record(pc + offset, self.instructions[pc + offset][2], kind, reads, writes)
+            record.flags_written = offset in (0, 2)
+            self.records.append(record)
+        self.regs[table], self.regs[destination] = pointer, entry
+        self.derived.discard(table)
+        self.derived = (self.derived | {destination}) if derived else (self.derived - {destination})
+        self.flags, self.flags_derived = ("jump-table", value, case), derived
+        return targets[case]
+
     def jump_register(self, operand, text, record):
         name = register(operand)
         if name is None:
@@ -1927,8 +2046,8 @@ def explore(name, function, signatures, label, layout, interfaces=None, *,
         try:
             path = Executor(name, function, signatures, label, layout, interfaces).run(
                 decisions, _capture_load_provenance=_capture_load_provenance)
-        except NeedDecision:
-            pending += [decisions + [False], decisions + [True]]
+        except NeedDecision as error:
+            pending += [decisions + [option] for option in error.options]
             continue
         paths.append(path)
         if len(paths) > MAX_PATHS:
