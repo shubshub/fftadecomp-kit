@@ -122,8 +122,12 @@ def fixed_frame(instructions, edges, address, calls, runtime_calls):
                 raise
             refusal = refusal or error
             continue
-        if policy is not None and not restored['entry_stack']['reads']:
-            raise ValueError('unsigned DIV/MOD thunk frame entry contract requires an actual incoming read')
+        # Unreachable as a refusal: a policy is tried only after the None
+        # policy refused an out-of-frame SP access, which the same walk now
+        # records as an incoming read (and the words contract additionally
+        # requires every declared word to be read).
+        assert policy is None or restored['entry_stack']['reads'], \
+            'unsigned DIV/MOD thunk frame entry contract requires an actual incoming read'
         return restored
     raise ValueError('unsigned DIV/MOD thunk frame incoming words exceed the existing read-only contracts') from refusal
 

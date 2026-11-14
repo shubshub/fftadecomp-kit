@@ -195,6 +195,16 @@ class UnsignedThunkFrameSourceTests(unittest.TestCase):
         # A missing release leaves SP unbalanced at the return.
         self.refuses('pop leaves the established saved frame', epilogue=EPILOGUE[1:])
 
+    def test_entry_policy_refusals_are_still_raised_by_prove_frame(self):
+        # fixed_frame retries the next policy only on these exact messages, so
+        # a reword in prove_frame or its entry contracts must be noticed here.
+        sources = ''.join((HERE/'tools'/name).read_text() for name in (
+            'local_long_branch_profile.py', 'readonly_entry_stack_profile.py',
+            'readonly_entry_stack_words_profile.py'))
+        for message in inventory.ENTRY_POLICY_REFUSALS:
+            with self.subTest(message=message):
+                self.assertTrue(f'"{message}"' in sources or f"'{message}'" in sources)
+
     def test_SP_escapes_refuse(self):
         # add r0, sp, #0; mov r0, sp; mov r2, sp (a stack-derived thunk target); stmia/ldmia
         for middle in ((0xA800,), (0x4668,), (0x466A,), (0xC810,)):

@@ -371,6 +371,16 @@ class UnsignedThunkSourceTests(unittest.TestCase):
                 profile.check_link_bindings(self.calls, targets, self.literals, {}, {}, q, r)
         profile.check_link_bindings(self.calls, targets, self.literals, {}, {}, quotient, remainder)
 
+    def test_link_context_refuses_the_interposed_and_zero_pool_opt_ins(self):
+        # Only the default five-word thunk pool is in scope; the versioned
+        # interposed and zero-word pools stay with their own selectors.
+        for selector in profile.SELECTORS:
+            profile.check_link_context(selector, True, 5, {}, {}, {}, {}, (False,)*4, (None,)*8)
+            for words in (thunks.INTERPOSED, 0):
+                with self.subTest(selector=selector, words=words), \
+                        self.assertRaisesRegex(ValueError, 'exclusive explicit typed context'):
+                    profile.check_link_context(selector, True, words, {}, {}, {}, {}, (False,)*4, (None,)*8)
+
     def test_explicit_runtime_aliases_and_noncanonical_thunk_names_refuse(self):
         original, _ = self.images()
         for old, new in (('__udivsi3', 'func_08142AB0'), ('__umodsi3', 'func_08142B28'),
