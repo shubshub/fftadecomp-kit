@@ -5161,6 +5161,7 @@ def main():
                                                       "conditional-known-query-stack-buffer-v1",
                                                       "conditional-known-query-stack-buffer-unsigned-quotient-v1",
                                                       "named-data-buffer-known-query-callee-v1",
+                                                      "named-data-buffer-dead-argument-aliases-v1",
                                                       "named-data-buffer-rom-table-copy-v1", "named-data-buffer-stack-index-v1",
                                                       "conditional-finite-spilled-scalar-loops-v1",
                                                       "bounded-buffer-discarded-return-scratch-v1",

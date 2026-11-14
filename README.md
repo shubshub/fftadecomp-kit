@@ -1534,6 +1534,44 @@ object is not detected), the physical stack, source readability or
 termination. The premise lines are the reviewable list of what must hold
 whenever each site runs.
 
+### Buffer owners with stale aliases a callee overwrites
+
+`--owner-runtime-profile named-data-buffer-dead-argument-aliases-v1` admits a
+named-data buffer owner that leaves one of its stack aliases in an argument
+register the next callee does not take:
+
+```sh
+python tools/match.py --root ../fftadecomp 080EA6F4 --owner-runtime-profile named-data-buffer-dead-argument-aliases-v1
+```
+
+`named-data-buffer-v1` follows every callee that receives an owner alias in
+R0-R3, whatever its prototype. 080EA6F4 and 080ED4E8 call `0801E610(&a, &b)`,
+which returns with `&b` still in R1, and then `080035F8(2)`. That function's
+first R1 instruction is `ldr r1, =table`, but the walk enters it with the stale
+R1 and refuses its own frame arithmetic.
+
+This profile is `named-data-buffer-v1` with one step changed. Before a callee
+is walked, an owner alias in R0-R3 is not passed to it when the callee's
+indexed, validated bytes write that register before reading it. The check
+scans the callee from its entry and stops at the first instruction that does
+one of these:
+
+* reads the register: the alias stays an argument;
+* writes it: the alias is dead;
+* is a jump, call, return, PC write or conditional instruction, or does not
+  decode: the alias stays an argument.
+
+So only a straight-line entry prefix that unconditionally overwrites the
+register counts, and nothing in the callee can observe the alias. When every
+alias is dead, the call is a call that receives no alias, which the walk
+already admits under its ordinary premise. Otherwise the callee is walked with
+the aliases that remain.
+
+The report lists every discounted register with the call site, the callee's
+extent and body SHA-256, and the offset of the instruction that kills it. Data
+literals are required and function literals refuse, as for
+`named-data-buffer-v1`.
+
 ### Buffer owners whose callees run the known list queries
 
 `--owner-runtime-profile named-data-buffer-known-query-callee-v1` admits an
