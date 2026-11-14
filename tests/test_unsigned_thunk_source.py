@@ -269,6 +269,32 @@ class UnsignedThunkSourceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 self.verify(data=bytes(data), rom=bytes(rom))
 
+    def test_reached_literal_naming_the_callers_own_bytes_refuses_after_composition(self):
+        # An untyped ROM word is refused by the typed-pool rule, and typed data
+        # inside the caller by the object binding, before the composed proof
+        # returns; the own-span rule after it is reached only through that
+        # boundary, so substitute the composed result there.
+        hardware = next(offset for offset, value in self.words.items() if value == HARDWARE)
+
+        def own(value):
+            data = bytearray(self.body)
+            struct.pack_into('<I', data, hardware, value)
+            rom = bytearray(self.rom)
+            rom[A-match.ROM_BASE:A-match.ROM_BASE+len(data)] = data
+            return bytes(data), bytes(rom)
+        instructions = self.verify()
+        with patch.object(profile, 'verify', return_value=instructions) as composed:
+            self.assertIs(self.verify(), instructions)
+            composed.assert_called_once()
+            for value in (A+8, A+9):
+                data, rom = own(value)
+                with self.subTest(value=value), self.assertRaisesRegex(ValueError, "caller's own bytes"):
+                    self.verify(data=data, rom=rom)
+        for value in (A+8, A+9):
+            data, rom = own(value)
+            with self.subTest(value=value), self.assertRaisesRegex(ValueError, 'typed provenance'):
+                self.verify(data=data, rom=rom)
+
     def test_tampered_manifests_refuse(self):
         def changed(**fields):
             bad = copy.deepcopy(self.manifest)
@@ -319,10 +345,16 @@ class UnsignedThunkSourceTests(unittest.TestCase):
                         {'function_thunks': False}, {'allow_switch_data': True}, {'modsi3_bindings': {}},
                         {'divsi3_bindings': {}}, {'thunk_pool_words': 0}, {'umodsi3_bindings': None},
                         {'udivsi3_bindings': None}, {'umod_r1_profile': umod48.SELECTOR},
-                        {'unsigned_runtime_profile': 'unsigned-divmod-ten-v1'}):
+                        {'unsigned_runtime_profile': 'unsigned-divmod-ten-v1'},
+                        {'switch_interposed_pool': True}, {'switch_interposed_pool': True, 'allow_switch_data': True}):
             with self.subTest(changes=changes), self.identities(), self.assertRaises(ValueError):
                 match.call_bindings(original, NAME, A, self.mapping, len(self.rom), self.rom, self.objects,
                                     {}, {}, **self.link_kwargs(**changes))
+        # The interposed switch pool is reachable only from its isolated switch-data selector.
+        with self.identities(), self.assertRaisesRegex(ValueError, 'interposed switch pool'):
+            match.call_bindings(original, NAME, A, self.mapping, len(self.rom), self.rom, self.objects,
+                                {}, {}, **self.link_kwargs(switch_interposed_pool=True, allow_switch_data=True,
+                                                           function_thunks=False))
         quotient, remainder = self.link_kwargs()['udivsi3_bindings'], self.link_kwargs()['umodsi3_bindings']
         for functions, switches in (({0: ('func_08011000', 0x08011001)}, {}), ({}, {0: 4})):
             with self.subTest(functions=functions, switches=switches), self.assertRaises(ValueError):
