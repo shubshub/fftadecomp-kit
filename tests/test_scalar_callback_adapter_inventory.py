@@ -22,7 +22,7 @@ def bl(site, target):
 
 
 def fixture(*, context=4, returning=1, changes=None, getter=None):
-    code = bytearray(struct.pack('<HH', 0xB500|(1<<context), 0x4608|context))
+    code = bytearray(struct.pack('<HH', 0xB500|(1<<context), 0x1C08|context))
     code += bl(A+4,G)
     code += struct.pack('<HH', 0x6801|(context<<3), 0x6842|(context<<3))
     code += bl(A+12,T)
@@ -72,7 +72,7 @@ class AdapterTests(unittest.TestCase):
             adapter.verify(**fixture(changes={2:0x1C4C}))
 
     def test_wrong_descriptor_offsets_and_argument_transfer_refuse(self):
-        for value in (0x68A1,0x6819,0x4621):
+        for value in (0x68A1,0x6819,0x1C21):
             with self.subTest(value=value), self.assertRaisesRegex(ValueError,'argument word zero'):
                 adapter.verify(**fixture(changes={8:value}))
 

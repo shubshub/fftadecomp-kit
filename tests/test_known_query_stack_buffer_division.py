@@ -127,7 +127,7 @@ class KnownQueryDivisionTests(unittest.TestCase):
         owner.verify(**f)
 
     def test_local_pointer_and_saved_operands_refuse(self):
-        for before in ((0x4668, 0x210a), (0x2064, 0x4669), (0x4620, 0x210a)):
+        for before in ((0x4668, 0x210a), (0x2064, 0x4669), (0x0020, 0x210a)):
             with self.subTest(before=before), self.assertRaisesRegex(ValueError, 'passed to a call'):
                 owner.verify(**self.native(before=before))
 

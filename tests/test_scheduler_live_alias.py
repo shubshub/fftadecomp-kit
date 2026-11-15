@@ -114,9 +114,12 @@ class LiveAliasTests(unittest.TestCase):
 
     def test_alias_passed_to_unbounded_callee_refused(self):
         data, calls = caller(first=(ADD_R0_SP,))
-        for name, body in (('read past frame', half(0x6A81, 0x4770)),        # ldr r1,[r0,#40]
-                           ('unknown access form', half(0x4401, 0x4770))):   # add r1,r0
-            with self.subTest(name=name), self.assertRaises(ValueError):
+        for name, body, message in (
+                ('read past frame', half(0x6A81, 0x4770),         # ldr r1,[r0,#40]
+                 'outside allocated local words'),
+                ('unknown access form', half(0x1841, 0x4770),     # adds r1,r0,r1
+                 'unsupported buffer pointer use or escape')):
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, message):
                 verify(data, calls, h1=body)
 
     def test_alias_written_past_its_extent_refused(self):
@@ -217,7 +220,7 @@ class LiveAliasTests(unittest.TestCase):
              half(0xB410, 0x2400, 0xB081, 0x2300, 0x2800, 0xD000, 0x4B02, 0x449D, 0xBC10, 0x4770, 0, 0)
              + (4).to_bytes(4, 'little'), None, 'lacks its sole literal load'),      # beq lands on add sp,r3
             ('ARMv6-only low-register mov', half(0x4608, 0x4770), None,
-             'not ARMv4T|undefined on ARMv4T'),                                      # mov r0,r1
+             'not an ARMv4T encoding'),                                              # mov r0,r1
             ('saved slot released by add sp', half(0xB410, 0xB001, 0xB081, 0x9D00, 0x6028, 0xB001, 0x4770), None,
              'releases a saved alias slot'),                                         # push {r4}; add sp,#4; sub sp,#4; ldr r5,[sp]
             ('stale slot loaded after sub sp', half(0xB410, 0xBC10, 0xB081, 0x9D00, 0x6028, 0xB001, 0x4770), None,

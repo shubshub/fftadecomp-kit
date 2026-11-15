@@ -56,7 +56,7 @@ class RestoringDescriptorLeafTests(unittest.TestCase):
             owner.verify(**dict(fixture(),selector=policy.SELECTOR))
 
     def test_opaque_alias_read_and_private_stack_escape_refuse(self):
-        for leaf in (halfwords(0xB510,0x4621,0x2407,0x8014,0xBC10,0xBC02,0x4708),
+        for leaf in (halfwords(0xB510,0x1C21,0x2407,0x8014,0xBC10,0xBC02,0x4708),
                      halfwords(0xB510,0x9400,0x2407,0x8014,0xBC10,0xBC02,0x4708)):
             with self.subTest(leaf=leaf),self.assertRaisesRegex(ValueError,'observes an opaque|only private PUSH/POP'):
                 owner.verify(**fixture(leaf))

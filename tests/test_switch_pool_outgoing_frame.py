@@ -322,7 +322,8 @@ class AttackTests(unittest.TestCase):
         self.refused("move inside", arguments=(0xB410, *ARGUMENTS, 0xBC10))  # push/pop {r4}
 
     def test_stack_block_transfer(self):
-        self.refused(arguments=(0xE88D, 0x0003, *ARGUMENTS))  # stm.w sp,{r0,r1}
+        # stm.w sp,{r0,r1}: Thumb has no SP block store on ARMv4T, so the encoding is refused.
+        self.refused("not an ARMv4T encoding", arguments=(0xE88D, 0x0003, *ARGUMENTS))
 
 
 class StateLimitTests(unittest.TestCase):

@@ -127,7 +127,7 @@ class ClosureTests(unittest.TestCase):
 
     def test_callback_descriptor_escape_refuses(self):
         with self.assertRaisesRegex(ValueError,'scalar loads'):
-            owner.verify(**fixture({(C,16):0x4621}))
+            owner.verify(**fixture({(C,16):0x1C21}))
 
     def test_callback_target_and_return_damage_refuse(self):
         for offset,value in((18,0x68A2),(26,0xBC20),(28,0xBC01),(30,0x4700)):

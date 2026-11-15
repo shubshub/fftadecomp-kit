@@ -64,12 +64,15 @@ class TransparentLeafTests(unittest.TestCase):
             owner.verify(**dict(f,selector=buffers.BG_AFFINE_TRANSPARENT_SELECTOR))
 
     def test_observed_written_spilled_returned_and_unknown_effects_refuse(self):
-        for leaf in (bytes.fromhex(h) for h in (
-            '181c7047', '002b7047', '00237047', '03607047', '08b408bc7047',
-            '1847', '18467047', '00df7047', '00d170477047', 'fee7',
-            '00b500210222835e002800d10121081c02bc0847')):
-            with self.subTest(leaf=leaf.hex()), self.assertRaises(ValueError):
-                owner.verify(**self.fixture(leaf=leaf))
+        scratch, effect, closed = ('reads or writes selected live scratch', 'unsupported instruction effect',
+                                   'structural inventory is not closed')
+        for leaf, message in (
+                ('181c7047', scratch), ('002b7047', scratch), ('00237047', scratch), ('03607047', effect),
+                ('08b408bc7047', effect), ('1847', closed), ('98467047', effect),   # mov r8, r3
+                ('00df7047', closed), ('00d170477047', 'observes incoming condition flags'), ('fee7', closed),
+                ('00b500210222835e002800d10121081c02bc0847', scratch)):
+            with self.subTest(leaf=leaf), self.assertRaisesRegex(ValueError, message):
+                owner.verify(**self.fixture(leaf=bytes.fromhex(leaf)))
         leaf = bytes.fromhex('00b5')+base.bl(C+2,B)+bytes.fromhex('01bc0047')
         with self.assertRaisesRegex(ValueError,'nested ordinary calls'):
             owner.verify(**self.fixture(leaf=leaf))

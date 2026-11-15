@@ -352,8 +352,9 @@ class LiteralClosureTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'exact typed callback and adapter bindings'):owner.verify(**values)
 
     def test_iterator_and_dependency_changes_refuse(self):
-        for target,offset,value in ((W,10,0x60A4),(W,12,0x2C01),(C,8,0x4621),(G,0,0x6840)):
-            with self.subTest(target=hex(target),offset=offset),self.assertRaises(ValueError):
+        for target,offset,value,message in ((W,10,0x60A4,'iterator body differs'),(W,12,0x2C01,'iterator body differs'),
+                                            (C,8,0x1C21,'argument word zero'),(G,0,0x6840,'getter must only load')):
+            with self.subTest(target=hex(target),offset=offset),self.assertRaisesRegex(ValueError,message):
                 owner.verify(**fixture(changes={(target,offset):value}))
         for target in (W,C,G,S,thunk.ALIASES['_call_via_r6']):
             values=fixture();rows=json.loads(values['mapping'])
@@ -732,7 +733,7 @@ class LiteralClosureTests(unittest.TestCase):
             closure.scratch_aliases_unread(ins,edges,calls,G,registers)
         check(bytes.fromhex('00687047'))          # the genuine getter
         check(bytes.fromhex('00231b687047'))      # movs r3,#0 then ldr r3,[r3]: overwritten first
-        for body in (bytes.fromhex('18687047'),bytes.fromhex('1846'+'7047'),bytes.fromhex('0023')+bl(G+2,X)+bytes.fromhex('18687047')):
+        for body in (bytes.fromhex('18687047'),bytes.fromhex('181c'+'7047'),bytes.fromhex('0023')+bl(G+2,X)+bytes.fromhex('18687047')):
             with self.subTest(body=body.hex()),self.assertRaisesRegex(ValueError,'alias reaches a reader'):check(body)
         with self.assertRaisesRegex(ValueError,'alias reaches a reader'):check(bytes.fromhex('6046'+'7047'),(12,))
 

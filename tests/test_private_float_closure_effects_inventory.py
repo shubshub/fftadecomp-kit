@@ -97,9 +97,11 @@ class PrivateFloatClosureEffectsTests(unittest.TestCase):
 
     def test_pack_reads_must_remain_live_caller_locals(self):
         body=self.fixture()[0]
-        for opcode in (0xA804,0xA805,0x2000,0x4618):
+        for opcode,message in ((0xA804,'overlaps a saved register'),(0xA805,'exceeds its frame'),
+                               (0x2000,'unbounded external read'),(0x1C18,'unbounded external read')):
             changed=body[:14]+words(opcode)+body[16:]
-            with self.subTest(opcode=opcode),self.assertRaises(ValueError):self.verify_fixture(fixture=self.fixture(body=changed))
+            with self.subTest(opcode=opcode),self.assertRaisesRegex(ValueError,message):
+                self.verify_fixture(fixture=self.fixture(body=changed))
 
     def test_fresh_helper_complete_effect_receipt_cannot_be_dropped_or_forged(self):
         original=runtime.prove_runtime

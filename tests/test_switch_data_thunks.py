@@ -416,10 +416,13 @@ class ProofTests(unittest.TestCase):
 
     def test_new_decode_refuses_wide_and_trapping_encodings(self):
         # The taint walk decodes every reached instruction: kit #180's rule applies to it.
+        # Through the whole verifier the base leaf walk refuses these first; the pass's own
+        # check is exercised directly below.
         for label, tail in {'bkpt': (('h', 0xBE00),), 'udf': (('h', 0xDE00),),
                             'svc': (('h', 0xDF00),), 'thumb-2 mov.w': (('h', 0xF04F), ('h', 0x0002))}.items():
             f = build(tail=tail)
-            with self.subTest(label), self.assertRaises(ValueError):
+            with self.subTest(label), self.assertRaisesRegex(
+                    ValueError, 'non-leaf calls and interrupts' if label == 'svc' else 'not an ARMv4T encoding'):
                 verify(f)
         with self.assertRaisesRegex(ValueError, '16-bit ARMv4T'):
             # Defence in depth: the walk itself refuses when handed such an instruction.
@@ -535,7 +538,9 @@ class ProofTests(unittest.TestCase):
         for label, half in {'uxtb': 0xB2D2, 'sxth': 0xB212, 'rev': 0xBA12, 'cps': 0xB662, 'setend': 0xB650,
                             'nop hint': 0xBF00, 'yield': 0xBF10, 'sev': 0xBF40, 'blx register': 0x4790,
                             'stm base not lowest': 0xC418, 'low mov': 0x4612, 'low cmp': 0x4512, 'low add': 0x4412}.items():
-            with self.subTest(label), self.assertRaises(ValueError):
+            with self.subTest(label), self.assertRaisesRegex(
+                    ValueError, 'not a validated external direct Thumb BL' if label == 'blx register'
+                    else 'not an ARMv4T encoding'):
                 verify(build(tail=(('h', half),)))
             with self.subTest(label), self.assertRaisesRegex(ValueError, '16-bit ARMv4T'):
                 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB

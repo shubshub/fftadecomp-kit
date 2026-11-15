@@ -103,8 +103,8 @@ class CompositionTests(unittest.TestCase):
         values = fixture()
         proof = policy.R6FrameCallbackProof(values['rom'], values['mapping'], values['index'],
                                             values['objects'], policy=policy.SELECTOR)
-        with self.assertRaises(ValueError):
-            proof.inspect(W, bytes.fromhex('00bf'))
+        with self.assertRaisesRegex(ValueError, 'no verified return'):
+            proof.inspect(W, bytes.fromhex('c046'))
         self.assertTrue(match._ordinary_call_replay(proof))
         self.assertEqual(proof._frames, [])
         with self.assertRaisesRegex(ValueError, 'without descriptor words'):

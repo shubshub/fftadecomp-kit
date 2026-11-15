@@ -260,8 +260,8 @@ class MultipleSwitchTests(unittest.TestCase):
         with self.assertRaises(ValueError): policy.verify(*args, selector=policy.SELECTOR)
 
     def test_missing_frame_restore_and_SP_escape_refuse(self):
-        f = fixture(highregs=True); struct.pack_into('<H', f[0], f[1]['epilogue']+2, 0x4618)
-        with self.assertRaises(ValueError): verify(f)
+        f = fixture(highregs=True); struct.pack_into('<H', f[0], f[1]['epilogue']+2, 0x1C18)
+        with self.assertRaisesRegex(ValueError, 'must restore SP'): verify(f)
         f = fixture(); struct.pack_into('<H', f[0], f[1]['case0a'], 0x4668)
         with self.assertRaisesRegex(ValueError, 'stack address materialization'):
             verify(f)

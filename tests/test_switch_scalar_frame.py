@@ -147,6 +147,8 @@ class ScalarFrameTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(ValueError) as error:
                 self.verify(self.structural(assembly))
             record("structural_rejections", {"case": name, "reason": str(error.exception)})
+            if name in ("wide", "conditional"):  # Thumb-2 forms, refused as encodings (kit #180)
+                self.assertIn("not an ARMv4T encoding", str(error.exception))
 
     def test_alias_materialization_and_block_transfers_reject_even_dead(self):
         initial, _, _, _ = self.structural()

@@ -95,7 +95,7 @@ class ClosureTests(unittest.TestCase):
 
     def test_callback_descriptor_escape_refuses(self):
         with self.assertRaisesRegex(ValueError,'argument word zero'):
-            owner.verify(**fixture({(C,8):0x4621}))
+            owner.verify(**fixture({(C,8):0x1C21}))
 
     def test_callback_target_and_return_damage_refuse(self):
         for offset,value in((10,0x68A2),(16,0xBC20),(18,0xBC01),(20,0x4700)):

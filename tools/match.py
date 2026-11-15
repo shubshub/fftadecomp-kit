@@ -4513,6 +4513,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 owners[position] = current
             instructions[current] = instruction
         instruction = instructions[current]
+        # svc and blx are skipped here only to keep their established messages. Both are
+        # still refused below without exception: CS_GRP_INT by the unconditional "non-leaf
+        # calls and interrupts" raise, and blx (always CS_GRP_CALL) by that same raise, by
+        # the BL validation ("call is not a validated external direct Thumb BL", which
+        # requires ARM_INS_BL) or by local_long_branch_profile.target for a local target.
         if thumb and CS_GRP_INT not in instruction.groups and instruction.mnemonic != "blx" and \
                 not armv4t.instruction(instruction):
             raise ValueError("reachable Thumb instruction is not an ARMv4T encoding or a BL pair")
