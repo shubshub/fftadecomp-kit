@@ -90,7 +90,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
                 proof['writes'] or proof['stack_reads'] for proof in closure.values()):
         raise ValueError('UDIV scalar inventory requires complete exact UDIV/zero native closures')
     native_frames = runtime_frames(rom, mapping, closure)
-    modules = (match, thunks, owner, graph, operations, frame, quotient, shared, complete,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, quotient, shared, complete,
         match.software_double, match.software_float)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

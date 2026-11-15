@@ -92,7 +92,7 @@ class BiosWordSwitchBufferProof(named.BiosFillSourceProof):
                 'No initialization, physical memory permissions, nonalias, destination bounds, '
                 'numeric results, arithmetic C equivalence or termination theorem.',
             producer_sha256={Path(module.__file__).name:hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
-                for module in (bios,named,graph,frame,owner,operations,match,__import__(__name__))})
+                for module in (bios,named,graph,frame,owner,operations,match, match.armv4t,__import__(__name__))})
 
     def fingerprint(self):
         return hashlib.sha256((super().fingerprint()+json.dumps(self.root_manifest(),

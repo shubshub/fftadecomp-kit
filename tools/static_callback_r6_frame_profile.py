@@ -76,7 +76,7 @@ def policy_manifest(policy=SELECTOR):
     modules = ('static_callback_r6_frame_profile', 'static_callback_target_preservation_profile',
                'static_callback_buffer_profile', 'named_data_buffer_profile',
                'local_long_branch_profile', 'owner_graph_profile', 'owner_admission_profile',
-               'function_thunk_profile', 'analyze', 'inert_spin_profile', 'match')
+               'function_thunk_profile', 'analyze', 'inert_spin_profile', 'match', 'armv4t')
     result = dict(schema='thumb-static-callback-restoring-r6-target-policy-v1' if target else 'thumb-static-callback-restoring-r6-policy-v1', selector=policy,
         register=6, callbacks='exact canonical R6, complete restoring frames, R6/R11 unwritten' if target else 'exact canonical R7, complete leaf, R4-R11 and SP unwritten',
         ordinary_calls='complete existing restoring frame with exact completed nested call certificates',

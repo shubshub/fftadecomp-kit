@@ -179,7 +179,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
                 proof['writes'] or proof['stack_reads'] for proof in closure.values()):
         raise ValueError('UDIV choices inventory requires complete exact UDIV/zero native closures')
     native_frames = runtime_frames(rom, mapping, closure)
-    modules = (match, owner, graph, operations, frame, canonical, native, quotient)
+    modules = (match, match.armv4t, owner, graph, operations, frame, canonical, native, quotient)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

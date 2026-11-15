@@ -154,7 +154,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
             raise ValueError('UMOD-only inventory cannot materialize runtime or thunk addresses')
     closure, runtime_frames = runtime_closure(rom, mapping, index)
     restored = frame.prove_frame(instructions, edges, address, {}, calls)
-    modules = (match, thunks, owner, graph, operations, frame, remainder, complete,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, remainder, complete,
         match.software_double, match.software_float)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

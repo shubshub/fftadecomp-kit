@@ -179,7 +179,7 @@ def verify(original_ELF, linked_ELF, address, rom, mapping, index, *, selector, 
             raise ValueError('multiple-switch extra literals must be actually reached u16 scalars')
         scalar_words.append(word)
     restored = frame.prove_frame(instructions, edges, address, {}, calls)
-    modules = (analyze, ordinary, frame, match, owner, graph, operations)
+    modules = (analyze, ordinary, frame, match, match.armv4t, owner, graph, operations)
     result = dict(schema=SELECTOR, selector=selector, address=address, bytes=len(data),
         instructions=len(instructions), switches=descriptor['switches'],
         backward_case_policy='explicit multi-switch cases; complete acyclic cross-table CFG',

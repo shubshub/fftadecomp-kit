@@ -64,7 +64,7 @@ def pinned(data, pin, label):
 def environment_fingerprint():
     return dict(toolchain=toolchain_fingerprint(), runtime=runtime_fingerprint(),
                 modules={Path(m.__file__).name: sha(Path(m.__file__).read_bytes())
-                         for m in (match, spans)},
+                         for m in (match, match.armv4t, spans)},
                 producer_sha256=sha(Path(__file__).read_bytes()))
 
 

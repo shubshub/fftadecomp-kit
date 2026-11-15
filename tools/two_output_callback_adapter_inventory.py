@@ -106,7 +106,7 @@ def verify(address, getter, rom, mapping, index, *, selector, manifest=None):
         C_initialization_established=False, termination_proved=False, source_or_ELF_admission=False,
         ROM_sha256=sha(rom), mapping_sha256=sha(mapping), index_sha256=sha(index),
         producer_source_sha256={Path(module.__file__).name:sha(Path(module.__file__).read_bytes())
-            for module in (match,owner,graph,thunk,frame)})
+            for module in (match, match.armv4t,owner,graph,thunk,frame)})
     observed['producer_source_sha256'][Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed['producer_source_sha256']['two_word_callback_closure_profile.py'] = sha(
         (Path(__file__).parent/'two_word_callback_closure_profile.py').read_bytes())

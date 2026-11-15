@@ -275,7 +275,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     restored = frame.prove_frame(instructions, edges, address, {}, calls,
         stack_aliases=True, local_alias_slot_policy=slots.SELECTOR,
         zero_index_profile=zero_index.SELECTOR, formal_stack_callee_proof=leaf)
-    modules = (analyze, match, thunks, owner, graph, operations, indices, frame, slots, zero_index, incoming)
+    modules = (analyze, match, match.armv4t, thunks, owner, graph, operations, indices, frame, slots, zero_index, incoming)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

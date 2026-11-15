@@ -148,7 +148,7 @@ def prove(data,address,rom,mapping,index,*,selector):
                 'Every reached list/node load is aligned, live, initialized and physically readable at its recorded width; null is tested only as a word value.',
                 'All private root, iterator, adapter and callback frames and continuation code satisfy compatible returning ABI validity and noninterference; external values carry no private-frame/saved-return provenance.'],
             source_sha256={**{Path(module.__file__).name:sha(Path(module.__file__).read_bytes())
-                for module in(match,owner,graph,thunk,frame,adapter)},
+                for module in(match, match.armv4t,owner,graph,thunk,frame,adapter)},
                 Path(__file__).name:sha(Path(__file__).read_bytes())},
             physical_memory_permission=False,numeric_nonalias_proved=False,
             actual_callback_ABI_established=False,termination_proved=False))

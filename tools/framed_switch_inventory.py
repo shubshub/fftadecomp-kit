@@ -135,7 +135,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         entry_stack_policy=entry_policy, runtime_calls=runtime_calls or None)
     if entry_policy is not None and not restored['entry_stack']['reads']:
         raise ValueError('entry-word switch requires an actual incoming word0 read')
-    modules = (analyze, thunks, frame, match, owner, graph, operations)
+    modules = (analyze, thunks, frame, match, match.armv4t, owner, graph, operations)
     if entry_policy is not None:
         modules += (entry_stack,)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

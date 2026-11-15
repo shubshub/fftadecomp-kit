@@ -103,7 +103,7 @@ def verify(data, address, rom, mapping, index, *, selector, manifest=None):
     if not caller['argument_accesses'] or caller['absolute_reads']['reads'] != ABSOLUTE_POLICY['reads']:
         raise ValueError('private double inline caller must retain every conditional fixed-record read')
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
-                   for module in (runtime, argument_base, match, owner, graph, operations)}
+                   for module in (runtime, argument_base, match, match.armv4t, owner, graph, operations)}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,
         'complete_native_structural_proof': True, 'complete_argument_effect_proof': True,

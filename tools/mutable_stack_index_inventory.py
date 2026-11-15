@@ -121,7 +121,7 @@ def verify(data,address,rom,mapping,index,calls,bindings,*,selector,manifest=Non
     offsets={row[2] for row in proof['writes'] if row[3]==4}
     if not proof['reads'] or not any({offset+step for step in (0,4,8,12)} <= offsets for offset in offsets):
         raise ValueError('mutable index inventory requires actual four consecutive initialized-word writes and a local read')
-    modules=(match,owner,graph,operations,frame,finite,*reserved)
+    modules=(match, match.armv4t,owner,graph,operations,frame,finite,*reserved)
     if pointer_slots:
         import local_alias_slot_profile as alias_slots
         modules += (alias_slots,)

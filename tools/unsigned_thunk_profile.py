@@ -143,7 +143,7 @@ def producer_sources(framed=False):
     import unsigned_divmod_thunk_inventory
     import unsigned_remainder_closure_inventory
     import zero_aware_unsigned_quotient_inventory
-    modules = (analyze, function_thunk_profile, local_long_branch_profile, match,
+    modules = (analyze, function_thunk_profile, local_long_branch_profile, match, match.armv4t,
         owner_admission_profile, owner_graph_profile, owner_runtime_profile, plausible,
         *((readonly_entry_stack_profile, readonly_entry_stack_words_profile) if framed else ()),
         software_double_profile, software_float_profile, umod_only_ordinary_inventory,

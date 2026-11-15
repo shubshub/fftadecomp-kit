@@ -267,4 +267,4 @@ def prove(data, address, rom, mapping, index, objects, bindings):
             'External pointer validity, callback installation, pointee extents and allocator behavior remain conditions.'],
         physical_memory_claim=False, allocator_effects_claim=False, installed_image_claim=False,
         producer_sha256={Path(m.__file__).name:hashlib.sha256(Path(m.__file__).read_bytes()).hexdigest()
-                        for m in (match,graph,operations,thunk,__import__(__name__))})
+                        for m in (match, match.armv4t,graph,operations,thunk,__import__(__name__))})

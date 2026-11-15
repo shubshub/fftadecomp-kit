@@ -101,7 +101,7 @@ def verify(data, address, rom, mapping, index, *, selector, manifest=None):
                                              for item in caller['argument_accesses']):
         raise ValueError('private float caller must discharge actual helper effects into allocated locals')
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
-                   for module in (runtime, argument_base, match, owner, graph, operations)}
+                   for module in (runtime, argument_base, match, match.armv4t, owner, graph, operations)}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,
         'complete_native_structural_proof': True, 'complete_argument_effect_proof': True,

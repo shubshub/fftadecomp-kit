@@ -364,7 +364,7 @@ def verify(data, address, rom, mapping, index, data_mapping, calls, bindings, *,
     restored = parent.frame.prove_frame(instructions, edges, address, {}, calls, stack_aliases=True,
         local_alias_slot_policy=parent.slots.SELECTOR, zero_index_profile=parent.zero_index.SELECTOR,
         formal_stack_callee_proof=proof)
-    modules = (prior, prior.leaf, named, parent, parent.analyze, parent.match, parent.thunks, parent.owner,
+    modules = (prior, prior.leaf, named, parent, parent.analyze, parent.match, parent.match.armv4t, parent.thunks, parent.owner,
                parent.graph, parent.operations, parent.indices, parent.frame, parent.slots, parent.zero_index, parent.incoming)
     source = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source[Path(__file__).name] = sha(Path(__file__).read_bytes())

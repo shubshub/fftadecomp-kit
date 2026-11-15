@@ -298,6 +298,6 @@ class KnownQueryCalleeBufferProof(named.NamedDataBufferProof):
             family_calls=[self.summaries[key] for key in sorted(self.summaries, key=repr)],
             explicit_conditions=list(CALLEE_CONDITIONS),
             producer_sha256={Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
-                             for module in (match, named, stack_query, closure, graph,
+                             for module in (match, match.armv4t, named, stack_query, closure, graph,
                                             owner_admission_profile, software_double_profile,
                                             __import__(__name__))})

@@ -62,7 +62,7 @@ def verify(data, address, rom, mapping, index, data_mapping, calls, bindings, *,
         formal_stack_entry_word_policy=SELECTOR, zero_index_profile=parent.zero_index.SELECTOR)
     if not restored['entry_stack']['reads']:
         raise ValueError('named entry-word inventory requires an actual reached incoming word0 read')
-    modules = (named, parent, parent.analyze, parent.match, parent.thunks, parent.owner,
+    modules = (named, parent, parent.analyze, parent.match, parent.match.armv4t, parent.thunks, parent.owner,
         parent.graph, parent.operations, parent.indices, parent.frame, parent.slots, parent.incoming,
         parent.zero_index, entry)
     source = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

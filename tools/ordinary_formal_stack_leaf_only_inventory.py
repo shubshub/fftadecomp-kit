@@ -58,7 +58,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     additions = [row for row in restored['local_alias_slots']['small_SP_additions'] if row[2] == 10]
     if not additions:
         raise ValueError('leaf-only MOVS10 inventory requires an actual proved MOVS10 to SP constructor')
-    modules = (parent, parent.analyze, parent.match, parent.thunks, parent.owner,
+    modules = (parent, parent.analyze, parent.match, parent.match.armv4t, parent.thunks, parent.owner,
         parent.graph, parent.operations, parent.indices, parent.frame, parent.slots,
         parent.zero_index, parent.incoming)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

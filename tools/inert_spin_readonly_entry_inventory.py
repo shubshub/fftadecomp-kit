@@ -210,7 +210,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # The same exact instruction bytes, native refinement successors, call map,
     # strict returns and authenticated inert offsets bind both component proofs.
     cfg = [[site, list(edges[site])] for site in sorted(edges)]
-    modules = (analyze, ordinary, inert, frame, match, owner, partitioner, operations, entry)
+    modules = (analyze, ordinary, inert, frame, match, match.armv4t, owner, partitioner, operations, entry)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

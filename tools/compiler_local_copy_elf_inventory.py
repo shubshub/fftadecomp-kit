@@ -128,7 +128,7 @@ def verify(original, linked, address, rom, mapping, index, objects, *, selector,
         memory_safety_claim=False, physical_memory_claim=False, initialized_contents_claim=False,
         claim='Complete original binding and byte identity only; copy, indexed effects and frame obligations remain separate.',
         producer_source_sha256={Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
-            for module in (match, owner, graph)})
+            for module in (match, match.armv4t, owner, graph)})
     observed['producer_source_sha256'][Path(__file__).name] = sha(Path(__file__).read_bytes())
     if manifest is not None and json.dumps(manifest, sort_keys=True) != json.dumps(observed, sort_keys=True):
         raise ValueError('original compiler-copy ELF inventory manifest differs')

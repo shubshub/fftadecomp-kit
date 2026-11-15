@@ -66,7 +66,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, dis
         raise ValueError('discarded scratch inventory requires actual residual local alias provenance')
     families = set(bindings.values()) & OPERATIONS.keys()
     closure, native_frames, components = prove_called_closures(rom, mapping, index, families)
-    modules = (match, thunks, owner, graph, operations, frame, core, zero_index, canonical, core.division,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, core, zero_index, canonical, core.division,
                core.quotient, core.unsigned_frames, core.unsigned_remainder, match.software_float)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

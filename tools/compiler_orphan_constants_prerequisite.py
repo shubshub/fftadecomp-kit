@@ -257,7 +257,7 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
         input_pins=dict(original_elf_sha256=sha(original_elf),text_sha256=sha(image['text']),
             objects_sha256=sha(objects),preprocessed_source_sha256=sha(preprocessed_source)),
         producer_sha256={module.__name__:sha(Path(module.__file__).read_bytes()) for module in
-            (match,analyze)}, adapter_sha256=sha(Path(__file__).read_bytes()),
+            (match, match.armv4t,analyze)}, adapter_sha256=sha(Path(__file__).read_bytes()),
         native_admission=False, source_ELF_provenance_proved=False, section_exclusion_performed=False,
         runtime_unreachability_proved=False, ABI_or_return_provenance_proved=False,
         contract='Original ELF reference-graph and duplicate-word prerequisite only. '

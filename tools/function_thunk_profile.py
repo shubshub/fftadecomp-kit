@@ -64,7 +64,7 @@ def selector_from_manifest(manifest):
 
 def producer_sources():
     return {name: hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
-            for name in ("match.py", "function_thunk_profile.py", "thunk_pool_switch.py")}
+            for name in ("match.py", "armv4t.py", "function_thunk_profile.py", "thunk_pool_switch.py")}
 
 
 def context_words(context):
