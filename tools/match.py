@@ -33,6 +33,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import armv4t
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 import switch_data_thunks
@@ -3012,6 +3013,7 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
         instruction = next(decoder.disasm(data[current - address:current - address + 4],
                                          current, count=1), None)
         if instruction is None or current + instruction.size > end or \
+                not armv4t.instruction(instruction) or \
                 instruction.id == ARM_INS_IT or any(group in instruction.groups
                     for group in (CS_GRP_CALL, CS_GRP_INT)):
             return False
@@ -4511,6 +4513,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 owners[position] = current
             instructions[current] = instruction
         instruction = instructions[current]
+        if thumb and not armv4t.instruction(instruction):
+            raise ValueError("reachable Thumb instruction is not an ARMv4T encoding or a BL pair")
         return_registers = set(states[current][0])
         stack = list(states[current][1])
         aliases = dict(states[current][2])

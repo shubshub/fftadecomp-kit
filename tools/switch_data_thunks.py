@@ -14,6 +14,8 @@ A thunk call is bound exactly once, in the ``thunks`` list; the ordinary
 import hashlib
 import json
 
+from armv4t import ARMV4T, CONDITIONS, encoding as armv4t_encoding  # noqa: F401 (kit #180 shared checker)
+
 POLICY = 'canonical-call-thunks-v1'
 # selector -> (schema, outgoing frame). Only the fixed-gap pool layout is admitted.
 SELECTORS = {
@@ -91,39 +93,12 @@ def thunk_sites(selector, calls):
 
 
 ROM_LOW, ROM_HIGH = 0x08000000, 0x0E000000
-# The only 16-bit mnemonics ARMv4T Thumb defines, plus the bound BL pair (kit #180).
-ARMV4T = frozenset((
-    'adcs', 'add', 'adds', 'adr', 'ands', 'asrs', 'b', 'bics', 'bl', 'bx', 'cmn', 'cmp', 'eors',
-    'ldm', 'ldmia', 'ldr', 'ldrb', 'ldrh', 'ldrsb', 'ldrsh', 'lsls', 'lsrs', 'mov', 'movs', 'muls',
-    'mvns', 'negs', 'orrs', 'pop', 'push', 'rors', 'rsbs', 'sbcs', 'stm', 'stmia', 'str', 'strb',
-    'strh', 'sub', 'subs', 'tst'))
-CONDITIONS = ('eq', 'ne', 'cs', 'hs', 'cc', 'lo', 'mi', 'pl', 'vs', 'vc', 'hi', 'ls', 'ge', 'lt', 'gt', 'le')
 # Binary operations whose exact result over constants is modelled; any other operation
 # with a constant-derived source makes its result a possible code address.
 BINARY = frozenset(('add', 'adds', 'sub', 'subs', 'lsls', 'lsrs', 'orrs', 'ands', 'eors', 'bics'))
 OTHER = frozenset(('asrs', 'rors', 'muls', 'adcs', 'sbcs', 'mvns', 'negs', 'rsbs'))
 CONSTANT_BUDGET = 16
 MIXED = (-1, -1)  # constant-derived, value unknown (a constant combined with a loaded value)
-
-
-def armv4t_encoding(item):
-    """Whether one 16-bit instruction is an ARMv4T Thumb encoding (not ARMv5/v6)."""
-    mnemonic = item.mnemonic
-    if mnemonic.startswith('b') and mnemonic[1:] in CONDITIONS:
-        return True
-    half = int.from_bytes(bytes(item.bytes), 'little')
-    if mnemonic == 'nop':
-        return half == 0x46C0
-    if mnemonic not in ARMV4T:
-        return False
-    if mnemonic in ('stm', 'stmia') and half >> 11 == 0x18 and half >> 8 & 7 != 0 and \
-            half & (1 << (half >> 8 & 7)) and half & ((1 << (half >> 8 & 7)) - 1):
-        return False  # writeback base in the list but not the lowest register: UNPREDICTABLE
-    if half >> 8 == 0x47:  # bx: blx (bit 7) and nonzero low bits are not ARMv4T
-        return mnemonic == 'bx' and half & 0x87 == 0
-    if half >> 10 == 0x11:  # hi-register add, cmp, mov: at least one register must be high
-        return (half >> 6) & 3 != 0
-    return True
 
 
 def constant_value(operand, constants):
