@@ -39,7 +39,7 @@ def verify(data, address, rom, mapping, index, *, selector, manifest=None):
     if proof['external_memory_reads'] or proof['external_memory_writes'] or proof['incoming_stack_reads']:
         raise ValueError('scalar division locals cannot import external or incoming memory permission')
     producer = {Path(module.__file__).name: hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
-                for module in (dynamic, runtime, owner, graph)}
+                for module in (dynamic, runtime, owner, graph, graph.armv4t)}
     producer[Path(__file__).name] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     observed = dict(schema=SCHEMA, selector=SELECTOR, inventory_only=True,
         private_bindings=[[site, 'signed-division'] for site in sorted(calls)],

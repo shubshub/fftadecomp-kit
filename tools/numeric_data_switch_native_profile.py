@@ -22,7 +22,7 @@ def environment_fingerprint():
     result['numeric_switch_producers'] = {Path(module.__file__).name:
         hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
         for module in (inventory, inventory.analyze, inventory.ordinary, inventory.thunks,
-                       inventory.frame, inventory.graph, inventory.operations)}
+                       inventory.frame, inventory.graph, inventory.graph.armv4t, inventory.operations)}
     result['numeric_switch_producers'][Path(__file__).name] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     return result
 
