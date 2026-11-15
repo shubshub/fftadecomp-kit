@@ -64,7 +64,7 @@ class ConditionalThunkScratchTests(unittest.TestCase):
             owner.verify(**dict(f, selector=buffers.SELECTOR))
         for leaf in ((0x2101, 0x7001, 0x4770),
                      (0x2101, 0x7001, 0x1C01, 0x2000, 0x4770)):
-            with self.subTest(leaf=leaf), self.assertRaises(ValueError):
+            with self.subTest(leaf=leaf), self.assertRaisesRegex(ValueError, 'local argument aliases'):
                 owner.verify(**dict(fixture(extra=(0x2200,), leaf=leaf),
                                     selector=buffers.THUNK_SCRATCH_SELECTOR))
 

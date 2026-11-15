@@ -243,8 +243,9 @@ class TableTests(unittest.TestCase):
             # Bit 0 of the final bx is should-be-zero on ARMv4T, so change its register instead.
             changed=copy.deepcopy(env);body=bytearray(changed['data']);body[offset]^=8 if offset==34 else 1
             changed['data']=bytes(body);rom=bytearray(changed['rom']);rom[ROOT-match.ROM_BASE:ROOT-match.ROM_BASE+40]=body;changed['rom']=bytes(rom)
-            with self.subTest(offset=offset),self.assertRaisesRegex(
-                    ValueError,'root instruction grammar differs|structural inventory is not closed'):prove(changed)
+            # The literal load (10), the return pop (32) and the return bx (34) fail the inventory first.
+            message='structural inventory is not closed' if offset in (10,32,34) else 'root instruction grammar differs'
+            with self.subTest(offset=offset),self.assertRaisesRegex(ValueError,message):prove(changed)
 
     def test_complete_helper_including_unreached_path_is_bound(self):
         env=fixture()

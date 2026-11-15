@@ -60,8 +60,9 @@ class SelectiveScratchTests(unittest.TestCase):
         self.assertEqual(second[0]['retained'], [])
 
     def test_nested_helper_access_and_return_escape_are_not_summarized_away(self):
-        for leaf in ((0x2001, 0x7210, 0x4770), (0x1C10, 0x4770)):
-            with self.subTest(leaf=leaf), self.assertRaises(ValueError):
+        for leaf, message in (((0x2001, 0x7210, 0x4770), 'outside allocated local words'),
+                              ((0x1C10, 0x4770), 'local argument aliases')):
+            with self.subTest(leaf=leaf), self.assertRaisesRegex(ValueError, message):
                 owner.verify(**nested(leaf))
 
     def test_live_indirect_argument_is_still_rejected(self):
@@ -74,7 +75,7 @@ class SelectiveScratchTests(unittest.TestCase):
             owner.verify(**selective(extra=(0x2200, 0x2800, 0xD000, 0x2300)))
 
     def test_read_copy_to_argument_remains_tracked(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, 'local argument aliases'):
             owner.verify(**selective(extra=(0x2200, 0x1C19, 0x2300)))
 
     def test_old_selectors_retain_their_distinct_contracts(self):
