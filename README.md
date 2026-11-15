@@ -605,7 +605,10 @@ over the same bytes must check its own forms; ARM-mode code is not checked;
 and bytes no walk reaches are not checked. The checker decides conditions and
 flag setting from the encoding bits, because Capstone carries Thumb-2 `it`
 state across one multi-instruction decode; an item must still come from a
-decode that starts at that instruction.
+decode that starts at that instruction, or from a multi-instruction decode
+whose preceding items were all checked (the owner graph and the dead-argument
+scan decode a range this way; `it` is itself refused, so no such state reaches
+a later item).
 
 Unconditional 16-bit Thumb register moves preserve a proven original return
 address, including copies restored to LR. Overwrites discard that fact, joins

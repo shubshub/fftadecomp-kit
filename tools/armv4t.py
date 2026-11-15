@@ -13,12 +13,17 @@ scan and the switch-thunk taint pass; a walk that decodes Thumb on its own and i
 not fed by one of these is not covered.
 
 An item must come from a detail decode that starts at that instruction (one
-address at a time).  Within one multi-instruction decode Capstone carries
-Thumb-2 ``it`` state forward: after an ``it`` halfword it renames ``b`` to
-``b<cond>``, changes conditions and drops the ``s`` of ``adds``/``subs``/``movs``,
-none of which the ARM7TDMI does.  The checks below read the condition and the
-flag-setting class from the encoding bits and refuse an item whose decode
-disagrees with them, so such an item is refused rather than modelled wrongly.
+address at a time), or from a multi-instruction decode in which every preceding
+item of the same call was checked and accepted (``owner_graph_profile.graph``
+and ``dead_argument_buffer_profile.killing_instruction`` decode a whole range
+this way and stop at the first refused item).  Within one multi-instruction
+decode Capstone carries Thumb-2 ``it`` state forward: after an ``it`` halfword
+it renames ``b`` to ``b<cond>``, changes conditions and drops the ``s`` of
+``adds``/``subs``/``movs``, none of which the ARM7TDMI does.  ``it`` is itself
+refused, so a decode whose earlier items all passed carries no such state.  The
+checks below also read the condition and the flag-setting class from the
+encoding bits and refuse an item whose decode disagrees with them, so an item
+that follows an unchecked ``it`` is refused rather than modelled wrongly.
 """
 from capstone.arm import ARM_CC_AL, ARM_CC_EQ
 
@@ -35,9 +40,11 @@ BRANCH_CONDITIONS = (('eq',), ('ne',), ('cs', 'hs'), ('cc', 'lo'), ('mi',), ('pl
 
 
 def encoding(item):
-    """Whether one 16-bit instruction is an ARMv4T Thumb encoding (not ARMv5/v6).
+    """Whether one 16-bit instruction is an ARMv4T Thumb encoding other than SWI (not ARMv5/v6).
 
-    ``item`` is a detail decode that starts at this instruction (see the module docstring).
+    SWI (``0xDFxx``) is an ARMv4T encoding but is refused here, because every caller refuses
+    interrupts.  ``item`` is a detail decode that starts at this instruction, or an item of a
+    multi-instruction decode whose preceding items all passed (see the module docstring).
     """
     if item.size != 2:
         return False

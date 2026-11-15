@@ -3012,6 +3012,7 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
             return False
         instruction = next(decoder.disasm(data[current - address:current - address + 4],
                                          current, count=1), None)
+        # The ARMv4T encoding check refuses "it" first; the ARM_INS_IT test is defence in depth.
         if instruction is None or current + instruction.size > end or \
                 not armv4t.instruction(instruction) or \
                 instruction.id == ARM_INS_IT or any(group in instruction.groups
@@ -4647,7 +4648,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             elif calls.get(current) != operands[0].imm:
                 raise ValueError("call is not a validated external direct Thumb BL")
             seen_calls.add(current)
-        if instruction.id == ARM_INS_IT:
+        if instruction.id == ARM_INS_IT:  # defence in depth: the ARMv4T encoding check above refuses "it" first
             raise ValueError("unsupported conditional instruction block")
         if instruction.id == ARM_INS_ADR:
             raise ValueError("unsupported program-counter materialization")
