@@ -830,7 +830,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "39aa8e8f51a447e8b93c1b4d4d6325b12fe525ffdf3b5bc821f997ae417ed65c",
+        "acknowledged_cursor": 6901718876,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "39aa8e8f51a447e8b93c1b4d4d6325b12fe525ffdf3b5bc821f997ae417ed65c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021D48\",\"who\":\"claude-ffta2\",\"claim_id\":6901573468,\"reason\":\"near miss 76/78 (GCSE drops a reload); parked with notes\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-15T21:34:18Z",
+          "id": 6901718876,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-15T21:34:18Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3b275d603caae9284b5a27740263cc95344b3128d08d630f0e7169cc59cfaef0",
+        "result": {
+          "address": "0x08021D48",
+          "claim_id": 6901573468,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6901718876,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
