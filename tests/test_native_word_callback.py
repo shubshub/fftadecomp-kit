@@ -187,21 +187,25 @@ def build_mocks(env,root,change=None):
 
 class NativeWordCallbackRejectionTests(unittest.TestCase):
     def test_consumer_read_store_forward_loop_and_partial_coverage(self):
-        cases=[dict(walker_change={8:0x2a00}),dict(root_tail=[0x2a00,0x9801,0xb002,0xbc02,0x4708]),
-            dict(root_tail=[0x601a,0x9801,0xb002,0xbc02,0x4708]),
-            dict(root_tail=[0x1C10,0x9801,0xb002,0xbc02,0x4708]),
-            dict(root_tail=[0xe7fe,0x9801,0xb002,0xbc02,0x4708])]
-        for changes in cases:
-            with self.subTest(changes=changes),self.assertRaises(ValueError):prove(environment(**changes))
+        forwards='outer word-result continuation observes or forwards R2'
+        cases=[(dict(walker_change={8:0x2a00}),'consumer lacks inspected R0 word-result use'),
+            (dict(root_tail=[0x2a00,0x9801,0xb002,0xbc02,0x4708]),forwards),
+            (dict(root_tail=[0x601a,0x9801,0xb002,0xbc02,0x4708]),forwards),
+            (dict(root_tail=[0x1C10,0x9801,0xb002,0xbc02,0x4708]),forwards),
+            (dict(root_tail=[0xe7fe,0x9801,0xb002,0xbc02,0x4708]),'structural inventory is not closed')]
+        for changes,message in cases:
+            with self.subTest(changes=changes),self.assertRaisesRegex(ValueError,message):prove(environment(**changes))
         env=environment();rows=json.loads(env['mapping']);rows[1]['end']=f'0x{WALK+4:08X}';env['mapping']=json.dumps(rows).encode()
-        with self.assertRaises(ValueError):prove(env)
+        with self.assertRaisesRegex(ValueError,'text index disagrees with the complete symbol'):prove(env)
 
     def test_callback_r7_write_extra_alias_and_invalid_helper(self):
-        for changes in (dict(callback_change={3:0x1C0F}),dict(walker_change={4:0x46c0}),
-                        dict(callback_change={17:0x4668})):
-            with self.subTest(changes=changes),self.assertRaises(ValueError):prove(environment(**changes))
+        for changes,message in (
+                (dict(callback_change={3:0x1C0F}),'descriptor call does not prove preservation of a live alias register'),
+                (dict(walker_change={4:0x46c0}),'callback context mismatch'),
+                (dict(callback_change={17:0x4668}),'normal R0 word result carries a callback-local alias')):
+            with self.subTest(changes=changes),self.assertRaisesRegex(ValueError,message):prove(environment(**changes))
         env=environment();rom=bytearray(env['rom']);rom[HELP-match.ROM_BASE:HELP-match.ROM_BASE+2]=bytes.fromhex('0b60');env['rom']=bytes(rom)
-        with self.assertRaises(ValueError):prove(env)
+        with self.assertRaisesRegex(ValueError,'two-output helper differs from ordered scalar-load/word-store effects'):prove(env)
 
     def test_exact_binding_thunk_and_fresh_manifest_tamper(self):
         env=environment();manifest,_=prove(env)

@@ -241,6 +241,26 @@ class LiveAliasTests(unittest.TestCase):
                 with self.subTest(pre=pre, name=name), self.assertRaisesRegex(ValueError, message):
                     verify(data, calls, h1=h1, **({'h2': h2} if h2 else {}))
 
+    def test_callee_decode_refuses_non_armv4t_encodings_itself(self):
+        # Through verify the owner graph refuses these first (the low-register mov case above);
+        # the callee decode the preserved-register walks use is exercised directly here.
+        import callee_preservation_profile as preservation
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB); decoder.detail = True
+        base = preservation.ROM_BASE
+        for name, body, message in (
+                ('low-register mov', half(0x4608, 0x4770),                           # mov r0,r1
+                 'low-register hi-register-format operation is undefined on ARMv4T'),
+                ('low-register add', half(0x4408, 0x4770),                           # add r0,r1
+                 'low-register hi-register-format operation is undefined on ARMv4T'),
+                ('bkpt', half(0xBE00, 0x4770), 'instruction is not ARMv4T Thumb'),
+                ('thumb-2 mov.w', half(0xF04F, 0x0002), '32-bit instruction is not ARMv4T')):
+            with self.subTest(name=name), self.assertRaisesRegex(ValueError, message):
+                preservation._decode(decoder, body, base, base, base+len(body))
+        for body in (half(0x1C08, 0x4770), half(0x4640, 0x4770)):                    # adds r0,r1,#0; mov r0,r8
+            with self.subTest(body=body.hex()):
+                self.assertEqual(preservation._decode(decoder, body, base, base, base+len(body)).size, 2)
+
     def test_pointer_words_word_facts_and_wrong_sites_refused(self):
         data, calls = caller(first=(ADD_R4_SP,))
         site = min(calls)

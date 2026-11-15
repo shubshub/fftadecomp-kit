@@ -144,9 +144,13 @@ class OrdinaryRemainderTests(unittest.TestCase):
             (self.retained/'native-inventory-cli.json').write_text(run.stdout)
 
     def test_every_ordinary_target_requires_central_mapped_nonruntime_binding(self):
-        for target in (0x08030000,ORDINARY+2,match.UDIVSI3_ADDRESS,pure.remainder.ADDRESS+2,
-                       0x0814274C,thunks.START,thunks.START+2,0x09000000):
-            with self.subTest(target=target),self.assertRaises(ValueError):
+        unbound = 'call is not a validated external direct Thumb BL'
+        for target,message in ((0x08030000,unbound),(ORDINARY+2,unbound),
+                               (match.UDIVSI3_ADDRESS,'division runtime requires its versioned nonzero-divisor proof'),
+                               (pure.remainder.ADDRESS+2,'signed remainder call lacks a canonical binding'),
+                               (0x0814274C,'division runtime requires its canonical versioned proof'),
+                               (thunks.START,unbound),(thunks.START+2,unbound),(0x09000000,unbound)):
+            with self.subTest(target=target),self.assertRaisesRegex(ValueError,message):
                 self.machine([0xB510,'ordinary',('call',target),0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708])
         site = next(site for site,target in self.calls.items() if target == ORDINARY)
         for changes in ('missing','forged_alias','extra_site'):
@@ -190,10 +194,14 @@ class OrdinaryRemainderTests(unittest.TestCase):
         rows = [r for r in self.rows if r['rom'] != '0x0814274C']
         mapping,index = self.indexes(rows)
         with self.assertRaises(ValueError):self.native(mapping=mapping,index=index)
-        for sequence in ([0xB510,0x9000,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
-                         [0xB510,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC02,0x4708],
-                         [0xB510,0x4668,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708]):
-            with self.subTest(sequence=sequence),self.assertRaises(ValueError):self.machine(sequence)
+        for sequence,message in (
+                ([0xB510,0x9000,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
+                 'numeric proof requires a frameless caller'),
+                ([0xB510,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC02,0x4708],
+                 'non-leaf indirect control flow requires linked CFG verification'),
+                ([0xB510,0x4668,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
+                 'stack aliases cannot cross calls in caller-clobbered registers')):
+            with self.subTest(sequence=sequence),self.assertRaisesRegex(ValueError,message):self.machine(sequence)
 
     def test_forged_runtime_ordinary_clobber_frame_and_origin_evidence(self):
         for key in ('native_runtime_closure','runtime_cases','divisor_partition','frame','calls',

@@ -52,13 +52,13 @@ class AddressedNativeBufferScratchTests(unittest.TestCase):
 
     def test_bounds_returned_results_and_pointer_stores_still_fail(self):
         helpers = (
-            b'\x03\x1c\x07\x21\x19\x70\x70\x47',
-            b'\x01\x1c\x07\x23\x0b\x70\x00\x20\x70\x47',
-            b'\x03\x1c\x07\x21\x19\x71\x00\x20\x70\x47',
-            b'\x03\x1c\x18\x60\x00\x20\x70\x47',
+            (b'\x03\x1c\x07\x21\x19\x70\x70\x47', 'buffer pointer escapes through a return register'),
+            (b'\x01\x1c\x07\x23\x0b\x70\x00\x20\x70\x47', 'buffer pointer escapes through a return register'),
+            (b'\x03\x1c\x07\x21\x19\x71\x00\x20\x70\x47', 'outside allocated local words'),
+            (b'\x03\x1c\x18\x60\x00\x20\x70\x47', 'buffer pointers cannot be stored or spilled'),
         )
-        for helper in helpers:
-            with self.subTest(helper=helper.hex()), self.assertRaises(ValueError):
+        for helper, message in helpers:
+            with self.subTest(helper=helper.hex()), self.assertRaisesRegex(ValueError, message):
                 profile.verify(**self.fixture(helper))
         f = self.fixture()
         policy = profile.buffer_scratch_policy(f['selector'])
@@ -98,7 +98,7 @@ class AddressedNativeBufferScratchTests(unittest.TestCase):
         manifest, _ = profile.verify(**f)
         self.assertEqual(len(manifest['frame']['zero_index_signed_loads']), 1)
         self.assertIn('zero_index_stack_profile.py', manifest['producer_source_sha256'])
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, 'local alias requires an ordinary constant-offset memory access'):
             profile.verify(**self.fixture(tokens=(*prefix, 0x2201, *suffix)))
 
 

@@ -100,15 +100,15 @@ class ResidentPositiveTests(unittest.TestCase):
 class ResidentRejectionTests(unittest.TestCase):
     def test_local_pointer_result_store_forward_and_dead_stack_read(self):
         cases={
-            'R0-result':{18:0x4668},
-            'R0-copied-R2':{18:0x1C10},
-            'external-store':{17:0x6062},
-            'forward-local-source':{8:0x4668},
-            'read-after-free':{20:0x9801},
-            'tail-local':{22:0x4710},
+            'R0-result':({18:0x4668},'resident R0 word result carries a local stack address'),
+            'R0-copied-R2':({18:0x1C10},'resident R0 word result carries a local stack address'),
+            'external-store':({17:0x6062},'callback-local output pointer cannot be stored or escape'),
+            'forward-local-source':({8:0x4668},'two-output helper requires separate callback-local R1/R2 words'),
+            'read-after-free':({20:0x9801},'non-leaf indirect control flow requires linked CFG verification'),
+            'tail-local':({22:0x4710},'structural inventory is not closed'),
         }
-        for kind,changes in cases.items():
-            with self.subTest(kind=kind),self.assertRaises(ValueError):prove(environment(changes))
+        for kind,(changes,message) in cases.items():
+            with self.subTest(kind=kind),self.assertRaisesRegex(ValueError,message):prove(environment(changes))
 
     def test_all_paths_frame_initialization_helper_identity_and_order(self):
         cases={
@@ -317,5 +317,6 @@ class ResidentCompatibilityTests(unittest.TestCase):
         self.assertEqual(native.call_count,1)
         with self.assertRaisesRegex(ValueError,'entry native admission requires original resident-owner ELF bindings'):
             owner.preflight(data,ROOT,rom,mapping,index,b'{}',selector=entry.SELECTOR)
-        for change in ({18:0x1C13},{7:0xaa00}):
-            with self.subTest(change=change),self.assertRaises(ValueError):prove(environment(change))
+        for change,message in (({18:0x1C13},'resident scratch is not the unique second-output R2 alias'),
+                               ({7:0xaa00},'two-output helper requires separate callback-local R1/R2 words')):
+            with self.subTest(change=change),self.assertRaisesRegex(ValueError,message):prove(environment(change))
