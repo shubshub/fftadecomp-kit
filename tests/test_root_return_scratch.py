@@ -197,7 +197,7 @@ class ConditionalThunkRootScratchTests(unittest.TestCase):
         # mov r0, r2 makes the result register a root-frame address on the early path;
         # the callback path clears both R0 and R2 so only the return can refuse.
         with self.assertRaisesRegex(ValueError, ESCAPE):
-            owner.verify(**self.thunk(extra=(0x4610, 0x2800, 0xD003, 0x2200, 0x2000)))
+            owner.verify(**self.thunk(extra=(0x1C10, 0x2800, 0xD003, 0x2200, 0x2000)))
         # Control: the same shape without the copy is admitted through R2 alone.
         manifest, _ = owner.verify(**self.thunk(extra=(0x2800, 0xD003, 0x2200, 0x2000)))
         self.assertEqual([row[1:] for row in manifest['proof']['buffers']['root_return_scratch']['observations']],

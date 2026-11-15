@@ -266,7 +266,7 @@ class QueryContinuationTests(unittest.TestCase):
     def test_root_return_does_not_discard_r0_alias(self):
         f = fixture()
         with self.assertRaisesRegex(ValueError, 'escapes through a return'):
-            owner.verify(**changed_root(f, 24, 0x4610))
+            owner.verify(**changed_root(f, 24, 0x1C10))
 
     def test_genuine_callback_binding_and_manifest_cannot_be_substituted(self):
         f = fixture(); manifest, _ = owner.verify(**f)

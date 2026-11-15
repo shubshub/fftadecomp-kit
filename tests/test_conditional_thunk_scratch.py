@@ -10,7 +10,7 @@ import owner_admission_profile as owner
 
 def scratch_fixture(extra=(0x2200,), register=2, **kwargs):
     # Store one bounded byte, leave R2/R3 as a local alias, return scalar R0.
-    leaf = (0x2101, 0x7001, 0x4600 | register, 0x2000, 0x4770)
+    leaf = (0x2101, 0x7001, 0x1C00 | register, 0x2000, 0x4770)
     return dict(fixture(extra=extra, leaf=leaf, **kwargs),
                 selector=buffers.THUNK_SCRATCH_SELECTOR)
 
@@ -38,7 +38,7 @@ class ConditionalThunkScratchTests(unittest.TestCase):
     def test_reading_scratch_before_kill_is_not_projection(self):
         # mov r1,r2 observes the returned pointer, even if R2 is killed later.
         with self.assertRaisesRegex(ValueError, 'observes discarded return scratch'):
-            owner.verify(**scratch_fixture(extra=(0x4611, 0x2200)))
+            owner.verify(**scratch_fixture(extra=(0x1C11, 0x2200)))
 
     def test_one_branch_avoiding_kill_is_rejected(self):
         # cmp r0,#0; beq callback; movs r2,#0.
@@ -63,7 +63,7 @@ class ConditionalThunkScratchTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             owner.verify(**dict(f, selector=buffers.SELECTOR))
         for leaf in ((0x2101, 0x7001, 0x4770),
-                     (0x2101, 0x7001, 0x4601, 0x2000, 0x4770)):
+                     (0x2101, 0x7001, 0x1C01, 0x2000, 0x4770)):
             with self.subTest(leaf=leaf), self.assertRaises(ValueError):
                 owner.verify(**dict(fixture(extra=(0x2200,), leaf=leaf),
                                     selector=buffers.THUNK_SCRATCH_SELECTOR))

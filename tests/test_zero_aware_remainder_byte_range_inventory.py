@@ -160,7 +160,7 @@ class ByteRangeRemainderTests(unittest.TestCase):
                 manifest,_ = self.machine([0xB510,'ordinary',load,arithmetic,'mod',0xBC10,0xBC02,0x4708])
                 self.assertEqual(manifest['operand_ranges'][0][1:3],list(expected))
                 self.assertEqual(len(manifest['operand_ranges'][0][4]),1)
-        self.machine([0xB510,'ordinary',0x7810,0x4604,'ordinary',0x4620,'mod',0xBC10,0xBC02,0x4708])
+        self.machine([0xB510,'ordinary',0x7810,0x1C04,'ordinary',0x1C20,'mod',0xBC10,0xBC02,0x4708])
 
     def test_unknown_word_unsigned_halfword_shifts_and_excess_ranges_refused(self):
         for instruction in (0x6810,0x8810,0x5AD0,0x4108,0x4088,0x1410,0x0C10):

@@ -190,7 +190,7 @@ class ShiftRemainderTests(unittest.TestCase):
             self.encoded_shift(0x0800,17)]+tail)
         self.assertEqual(len(manifest['operand_shift_origins'][0][1]),2)
         # Caller-saved facts die; saved r4 follows only the existing conditional ABI.
-        self.machine([0xB510,'ordinary',shift,0x4604,'ordinary',0x4620]+tail)
+        self.machine([0xB510,'ordinary',shift,0x1C04,'ordinary',0x1C20]+tail)
 
     def test_helper_identity_all_bindings_and_forged_shift_origins_refused(self):
         for site in (0x08142954,0x0814274C,0x08142A1A,0x08142A12):

@@ -13,7 +13,7 @@ C = B + 0x40
 
 
 def selective(extra=(0x2200, 0x7819, 0x2300), **kwargs):
-    leaf = (0x2101, 0x7001, 0x4602, 0x4603, 0x2000, 0x4770)
+    leaf = (0x2101, 0x7001, 0x1C02, 0x1C03, 0x2000, 0x4770)
     return dict(fixture(extra=extra, leaf=leaf, **kwargs),
                 selector=buffers.THUNK_PARTIAL_SELECTOR)
 
@@ -60,7 +60,7 @@ class SelectiveScratchTests(unittest.TestCase):
         self.assertEqual(second[0]['retained'], [])
 
     def test_nested_helper_access_and_return_escape_are_not_summarized_away(self):
-        for leaf in ((0x2001, 0x7210, 0x4770), (0x4610, 0x4770)):
+        for leaf in ((0x2001, 0x7210, 0x4770), (0x1C10, 0x4770)):
             with self.subTest(leaf=leaf), self.assertRaises(ValueError):
                 owner.verify(**nested(leaf))
 
@@ -75,7 +75,7 @@ class SelectiveScratchTests(unittest.TestCase):
 
     def test_read_copy_to_argument_remains_tracked(self):
         with self.assertRaises(ValueError):
-            owner.verify(**selective(extra=(0x2200, 0x4619, 0x2300)))
+            owner.verify(**selective(extra=(0x2200, 0x1C19, 0x2300)))
 
     def test_old_selectors_retain_their_distinct_contracts(self):
         f = selective()

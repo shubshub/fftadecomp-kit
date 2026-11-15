@@ -173,7 +173,7 @@ class FramedRemainderTests(unittest.TestCase):
     def test_call_clobbers_numeric_facts_at_every_site(self):
         head = [0xB510, 0xB081, 0x0400, 0x1400]
         tail = [0x2103, 'mod', 0xB001, 0xBC10, 0xBC02, 0x4708]
-        for middle in (['ordinary'], ['ordinary', 0x4600], ['ordinary', 0x0400],
+        for middle in (['ordinary'], ['ordinary', 0x1C00], ['ordinary', 0x0400],
                        ['ordinary', 0x0400, 0x1400, 0x2103, 'mod']):
             with self.subTest(middle=middle), self.assertRaisesRegex(ValueError, 'signed16 r0'):
                 self.machine(head + middle + tail)

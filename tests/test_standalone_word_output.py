@@ -33,8 +33,8 @@ def branch_link(site, target):
 
 
 def environment(changes=None, helper_change=None):
-    words = [0xb530, 0xb082, 0x4605, 0x460c, 0x2001, 0x4240, 0x9000,
-             0xaa01, 0x4628, 0x4669, 'call', 0x6821, 0x9800, 0x4281,
+    words = [0xb530, 0xb082, 0x1C05, 0x1C0C, 0x2001, 0x4240, 0x9000,
+             0xaa01, 0x1C28, 0x4669, 'call', 0x6821, 0x9800, 0x4281,
              0xd001, 0x2001, 0xe001, 0x6065, 0x2000, 0xb002,
              0xbc30, 0xbc02, 0x4708]
     for index, value in (changes or {}).items():
@@ -101,7 +101,7 @@ class ResidentRejectionTests(unittest.TestCase):
     def test_local_pointer_result_store_forward_and_dead_stack_read(self):
         cases={
             'R0-result':{18:0x4668},
-            'R0-copied-R2':{18:0x4610},
+            'R0-copied-R2':{18:0x1C10},
             'external-store':{17:0x6062},
             'forward-local-source':{8:0x4668},
             'read-after-free':{20:0x9801},
@@ -317,5 +317,5 @@ class ResidentCompatibilityTests(unittest.TestCase):
         self.assertEqual(native.call_count,1)
         with self.assertRaisesRegex(ValueError,'entry native admission requires original resident-owner ELF bindings'):
             owner.preflight(data,ROOT,rom,mapping,index,b'{}',selector=entry.SELECTOR)
-        for change in ({18:0x4613},{7:0xaa00}):
+        for change in ({18:0x1C13},{7:0xaa00}):
             with self.subTest(change=change),self.assertRaises(ValueError):prove(environment(change))

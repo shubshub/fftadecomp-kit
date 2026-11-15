@@ -157,8 +157,8 @@ class SignedDividendTests(unittest.TestCase):
     def test_clobber_call_and_one_arm_unknown_are_refused(self):
         head = [0xB510, 0x2004, 0x2107, 'div']
         tail = [0x2103, 'mod', 0xBC10, 0xBC02, 0x4708]
-        for middle in ([0x0C50, 0x4610], [0x0C50, 'ordinary'],
-                       [0x2A00, 0xD001, 0x0C50, 0xE000, 0x4610]):
+        for middle in ([0x0C50, 0x1C10], [0x0C50, 'ordinary'],
+                       [0x2A00, 0xD001, 0x0C50, 0xE000, 0x1C10]):
             with self.subTest(middle=middle), self.assertRaisesRegex(ValueError, 'signed16 r0 and nonzero r1'):
                 self.machine(head + middle + tail)
         self.machine(head + [0x2A00, 0xD001, 0x0C50, 0xE000, 0x0C90] + tail)

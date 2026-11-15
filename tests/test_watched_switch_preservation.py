@@ -220,7 +220,7 @@ class NativeTests(unittest.TestCase):
         target = next(value for offset,value in sorted(words.items()) if offset!=layout['literal'])
         rom = bytearray(self.result[6])
         # mov r0,r4 would preserve r4 while returning its caller-held pointer.
-        rom[D-match.ROM_BASE+target:D-match.ROM_BASE+target+2] = bytes.fromhex('2046')
+        rom[D-match.ROM_BASE+target:D-match.ROM_BASE+target+2] = bytes.fromhex('201c')
         with self.assertRaisesRegex(ValueError, 'cannot read an unpassed live alias'):
             self.check(self.proof(bytes(rom)))
 

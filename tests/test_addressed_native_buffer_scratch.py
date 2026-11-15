@@ -19,7 +19,7 @@ class AddressedNativeBufferScratchTests(unittest.TestCase):
         self.base.setUp()
         self.addCleanup(self.base.doCleanups)
 
-    def fixture(self, helper=b'\x03\x46\x07\x21\x19\x70\x00\x20\x70\x47', tokens=None):
+    def fixture(self, helper=b'\x03\x1c\x07\x21\x19\x70\x00\x20\x70\x47', tokens=None):
         f = (self.base.fixture(True, False) if tokens is None else
              self.base.base.base.fixture(tokens))
         rows = json.loads(f['mapping'])
@@ -52,10 +52,10 @@ class AddressedNativeBufferScratchTests(unittest.TestCase):
 
     def test_bounds_returned_results_and_pointer_stores_still_fail(self):
         helpers = (
-            b'\x03\x46\x07\x21\x19\x70\x70\x47',
-            b'\x01\x46\x07\x23\x0b\x70\x00\x20\x70\x47',
-            b'\x03\x46\x07\x21\x19\x71\x00\x20\x70\x47',
-            b'\x03\x46\x18\x60\x00\x20\x70\x47',
+            b'\x03\x1c\x07\x21\x19\x70\x70\x47',
+            b'\x01\x1c\x07\x23\x0b\x70\x00\x20\x70\x47',
+            b'\x03\x1c\x07\x21\x19\x71\x00\x20\x70\x47',
+            b'\x03\x1c\x18\x60\x00\x20\x70\x47',
         )
         for helper in helpers:
             with self.subTest(helper=helper.hex()), self.assertRaises(ValueError):
@@ -92,7 +92,7 @@ class AddressedNativeBufferScratchTests(unittest.TestCase):
             self.assertFalse(evidence.report_matches(report, root, A))
 
     def test_signed_local_index_requires_native_all_path_zero(self):
-        prefix = (0xB510, 0xB081, 0x4668, 0x4604, 'ordinary')
+        prefix = (0xB510, 0xB081, 0x4668, 0x1C04, 'ordinary')
         suffix = (0x56A0, 0x2102, 'div', 0xB001, 0xBC10, 0xBC02, 0x4708)
         f = self.fixture(tokens=(*prefix, 0x2200, *suffix))
         manifest, _ = profile.verify(**f)
