@@ -255,10 +255,10 @@ class SignedDivmodTests(unittest.TestCase):
     def test_zero_unknown_clobbered_and_one_arm_remainder_facts(self):
         head = [0xB510, 0x2107, 0x2004, 'div']
         tail = ['mod', 0xBC10, 0xBC02, 0x4708]
-        operands = [[0x2004, 0x2100], [0x2004], [0x4610, 0x2103],
+        operands = [[0x2004, 0x2100], [0x2004], [0x1C10, 0x2103],
                     [0x2004, 0x2103, 'ordinary'],
                     [0x2004, 0x2A00, 0xD001, 0x2103, 0xE000, 0x2100],
-                    [0x2103, 0x2A00, 0xD001, 0x2004, 0xE000, 0x4610]]
+                    [0x2103, 0x2A00, 0xD001, 0x2004, 0xE000, 0x1C10]]
         for middle in operands:
             with self.subTest(middle=middle), self.assertRaisesRegex(ValueError, 'signed16 r0 and nonzero r1'):
                 self.machine(head + middle + tail)

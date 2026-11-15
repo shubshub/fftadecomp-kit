@@ -147,7 +147,7 @@ class OrdinaryRemainderTests(unittest.TestCase):
         for target in (0x08030000,ORDINARY+2,match.UDIVSI3_ADDRESS,pure.remainder.ADDRESS+2,
                        0x0814274C,thunks.START,thunks.START+2,0x09000000):
             with self.subTest(target=target),self.assertRaises(ValueError):
-                self.machine([0xB510,'ordinary',('call',target),0x237F,0x4610,0x4018,'mod',0xBC10,0xBC02,0x4708])
+                self.machine([0xB510,'ordinary',('call',target),0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708])
         site = next(site for site,target in self.calls.items() if target == ORDINARY)
         for changes in ('missing','forged_alias','extra_site'):
             bindings = dict(self.bindings)
@@ -171,17 +171,17 @@ class OrdinaryRemainderTests(unittest.TestCase):
                 profile.bind_calls({A+2:target,A+6:pure.remainder.ADDRESS},mapping,A,len(self.body),len(self.rom))
 
     def test_all_call_clobbers_and_join_arms_erase_numeric_facts(self):
-        head,tail = [0xB510,0x237F,0x4610,0x4018],['mod',0xBC10,0xBC02,0x4708]
+        head,tail = [0xB510,0x237F,0x1C10,0x4018],['mod',0xBC10,0xBC02,0x4708]
         for middle in (['ordinary'],['ordinary',0x4018],
-                       [0x2A00,0xD001,'ordinary'],[0x2A00,'ordinary',0xD000,0x4610],
-                       ['ordinary',0x237F,0x4610,0x4018,'mod']):
+                       [0x2A00,0xD001,'ordinary'],[0x2A00,'ordinary',0xD000,0x1C10],
+                       ['ordinary',0x237F,0x1C10,0x4018,'mod']):
             with self.subTest(middle=middle),self.assertRaisesRegex(ValueError,'signed16 r0'):
                 self.machine(head+middle+tail)
         # A saved mask survives only the explicit conditional callee-saved ABI.
-        self.machine([0xB510,0x247F,'ordinary',0x4610,0x4020]+tail)
+        self.machine([0xB510,0x247F,'ordinary',0x1C10,0x4020]+tail)
         # Both arms reconstruct the bound after the ordinary call.
-        self.machine([0xB510,'ordinary',0x237F,0x2A00,0xD002,0x4610,0x4018,
-                      0xE001,0x4610,0x4018]+tail)
+        self.machine([0xB510,'ordinary',0x237F,0x2A00,0xD002,0x1C10,0x4018,
+                      0xE001,0x1C10,0x4018]+tail)
 
     def test_canonical_zero_hook_nonzero_body_and_saved_control_stay_protected(self):
         for address in (0x08142954,0x08142A14,0x08142A16,0x0814274C,0x08142A1A,0x08142A1C,0x08142A12):
@@ -190,9 +190,9 @@ class OrdinaryRemainderTests(unittest.TestCase):
         rows = [r for r in self.rows if r['rom'] != '0x0814274C']
         mapping,index = self.indexes(rows)
         with self.assertRaises(ValueError):self.native(mapping=mapping,index=index)
-        for sequence in ([0xB510,0x9000,'ordinary',0x237F,0x4610,0x4018,'mod',0xBC10,0xBC02,0x4708],
-                         [0xB510,'ordinary',0x237F,0x4610,0x4018,'mod',0xBC02,0x4708],
-                         [0xB510,0x4668,'ordinary',0x237F,0x4610,0x4018,'mod',0xBC10,0xBC02,0x4708]):
+        for sequence in ([0xB510,0x9000,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
+                         [0xB510,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC02,0x4708],
+                         [0xB510,0x4668,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708]):
             with self.subTest(sequence=sequence),self.assertRaises(ValueError):self.machine(sequence)
 
     def test_forged_runtime_ordinary_clobber_frame_and_origin_evidence(self):

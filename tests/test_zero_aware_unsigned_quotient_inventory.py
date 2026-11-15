@@ -182,7 +182,7 @@ class UnsignedQuotientInventoryTests(unittest.TestCase):
             with self.subTest(prefix=prefix), self.assertRaisesRegex(ValueError,
                     'signed16 r0|actual exact bounded immediate shift'):
                 self.machine(prefix + tail)
-        self.machine([0xB510, self.asr(4), 'udiv', 'ordinary', 0x4620] + tail)
+        self.machine([0xB510, self.asr(4), 'udiv', 'ordinary', 0x1C20] + tail)
 
     def test_every_CFG_arm_needs_actual_MOD_shift_provenance(self):
         tail = ['mod', 0xBC10, 0xBC02, 0x4708]

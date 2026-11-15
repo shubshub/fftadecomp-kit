@@ -172,7 +172,7 @@ class MixedRuntimeInventoryTests(unittest.TestCase):
             with self.subTest(sequence=sequence),self.assertRaisesRegex(ValueError,'signed16 r0'):
                 self.machine(sequence+tail)
         # Callee-saved origin survives only because both complete runtime closures prove preservation.
-        self.machine([0xB510,self.asr(),0x4604,'div',0x4620,'mod']+tail)
+        self.machine([0xB510,self.asr(),0x1C04,'div',0x1C20,'mod']+tail)
 
     def test_skipped_shift_unknown_arm_and_all_path_origins(self):
         tail = ['mod',0xBC10,0xBC02,0x4708]

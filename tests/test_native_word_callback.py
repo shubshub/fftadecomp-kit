@@ -40,15 +40,15 @@ def build_words(address,words,target):
 
 
 def environment(callback_change=None,walker_change=None,root_tail=None):
-    cb=[0xb530,0xb082,0x4605,0x460c,0x2007,0x9000,0xaa01,0x4628,0x4669,'call',
+    cb=[0xb530,0xb082,0x1C05,0x1C0C,0x2007,0x9000,0xaa01,0x1C28,0x4669,'call',
         0x6821,0x9800,0x4281,0xd102,0x6065,0x2000,0xe000,0x2001,0xb002,0xbc30,0xbc02,0x4708]
     for i,value in (callback_change or {}).items():cb[i]=value
     callback,helper_calls=build_words(CB,cb,HELP)
-    walk=[0xb5f0,0x460f,0x4616,0x4604,0x2200,0x4620,0x4631,'call',0x2800,0xd001,
+    walk=[0xb5f0,0x1C0F,0x1C16,0x1C04,0x2200,0x1C20,0x1C31,'call',0x2800,0xd001,
           0x2200,0xe7f8,0xbcf0,0xbc02,0x4708]
     for i,value in (walker_change or {}).items():walk[i]=value
     walker,callback_calls=build_words(WALK,walk,r7.THUNK)
-    root=[0xb500,0xb082,0x4603,0x9100,0x2000,0x9001,0x4900,0x4618,0x466a,'call']
+    root=[0xb500,0xb082,0x1C03,0x9100,0x2000,0x9001,0x4900,0x1C18,0x466a,'call']
     root+=root_tail if root_tail is not None else [0x9801,0xb002,0xbc02,0x4708]
     data,root_calls=build_words(ROOT,root,WALK)
     if len(data)%4:data+=b'\x00\x00'
@@ -189,7 +189,7 @@ class NativeWordCallbackRejectionTests(unittest.TestCase):
     def test_consumer_read_store_forward_loop_and_partial_coverage(self):
         cases=[dict(walker_change={8:0x2a00}),dict(root_tail=[0x2a00,0x9801,0xb002,0xbc02,0x4708]),
             dict(root_tail=[0x601a,0x9801,0xb002,0xbc02,0x4708]),
-            dict(root_tail=[0x4610,0x9801,0xb002,0xbc02,0x4708]),
+            dict(root_tail=[0x1C10,0x9801,0xb002,0xbc02,0x4708]),
             dict(root_tail=[0xe7fe,0x9801,0xb002,0xbc02,0x4708])]
         for changes in cases:
             with self.subTest(changes=changes),self.assertRaises(ValueError):prove(environment(**changes))
@@ -197,7 +197,7 @@ class NativeWordCallbackRejectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):prove(env)
 
     def test_callback_r7_write_extra_alias_and_invalid_helper(self):
-        for changes in (dict(callback_change={3:0x460f}),dict(walker_change={4:0x46c0}),
+        for changes in (dict(callback_change={3:0x1C0F}),dict(walker_change={4:0x46c0}),
                         dict(callback_change={17:0x4668})):
             with self.subTest(changes=changes),self.assertRaises(ValueError):prove(environment(**changes))
         env=environment();rom=bytearray(env['rom']);rom[HELP-match.ROM_BASE:HELP-match.ROM_BASE+2]=bytes.fromhex('0b60');env['rom']=bytes(rom)

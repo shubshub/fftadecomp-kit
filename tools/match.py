@@ -4513,7 +4513,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 owners[position] = current
             instructions[current] = instruction
         instruction = instructions[current]
-        if thumb and not armv4t.instruction(instruction):
+        if thumb and CS_GRP_INT not in instruction.groups and instruction.mnemonic != "blx" and \
+                not armv4t.instruction(instruction):
             raise ValueError("reachable Thumb instruction is not an ARMv4T encoding or a BL pair")
         return_registers = set(states[current][0])
         stack = list(states[current][1])

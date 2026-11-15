@@ -18,7 +18,7 @@ class OrdinaryBiosFunctionLiteralTests(unittest.TestCase):
         self.base.setUp()
         self.addCleanup(self.base.doCleanups)
 
-    def fixture(self, source=0x4618):
+    def fixture(self, source=0x1C18):
         original = self.base.base.fixture
         with patch.object(self.base.base, 'fixture',
                 side_effect=lambda **kw: original(**dict(kw, prefix=(), source=source))):

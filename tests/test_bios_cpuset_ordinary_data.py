@@ -18,7 +18,7 @@ class OrdinaryBiosDataTests(unittest.TestCase):
         self.base.setUp()
         self.addCleanup(self.base.doCleanups)
 
-    def fixture(self, prefix=(), source=0x4618, destination=0x2100):
+    def fixture(self, prefix=(), source=0x1C18, destination=0x2100):
         f = self.base.fixture(prefix=prefix, source=source, destination=destination, data=True)
         f['selector'] = profile.BIOS_ORDINARY_DATA_SELECTOR
         return f

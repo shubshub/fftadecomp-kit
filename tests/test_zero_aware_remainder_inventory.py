@@ -129,7 +129,7 @@ class ZeroAwareRemainderTests(unittest.TestCase):
         self.assertEqual(self.manifest['frame']['external_calls'], 'complete-native-callee-preservation-v1')
         self.assertEqual(self.native(manifest=self.manifest)[0], self.manifest)
         for divisor in (0, 1, 127):
-            self.machine([0xB510, 0x237F, 0x4610, 0x4018, 0x2100|divisor,
+            self.machine([0xB510, 0x237F, 0x1C10, 0x4018, 0x2100|divisor,
                           'mod', 0xBC10, 0xBC02, 0x4708])
         run = subprocess.run([sys.executable, str(Path(profile.__file__)), '--profile', profile.SELECTOR,
             '--rom', str(self.root/'baserom.bin'), '--mapping', str(self.root/'config/functions.json'),
@@ -158,11 +158,11 @@ class ZeroAwareRemainderTests(unittest.TestCase):
     def test_clobbers_unknown_masks_and_all_join_arms(self):
         head = [0xB510, 0x237F]
         tail = ['mod', 0xBC10, 0xBC02, 0x4708]
-        for middle in ([0x4610, 0x4010], [0x4610, 0x4018, 0x4610],
-                       [0x4610, 0x4018, 'mod'], [0x2A00, 0xD001, 0x4610, 0x4018]):
+        for middle in ([0x1C10, 0x4010], [0x1C10, 0x4018, 0x1C10],
+                       [0x1C10, 0x4018, 'mod'], [0x2A00, 0xD001, 0x1C10, 0x4018]):
             with self.subTest(middle=middle), self.assertRaisesRegex(ValueError, 'signed16 r0'):
                 self.machine(head+middle+tail)
-        self.machine(head+[0x2A00, 0xD002, 0x4610, 0x4018, 0xE001, 0x4610, 0x4018]+tail)
+        self.machine(head+[0x2A00, 0xD002, 0x1C10, 0x4018, 0xE001, 0x1C10, 0x4018]+tail)
 
     def test_zero_entry_hook_returns_and_complete_dependency_identity(self):
         for address in (0x08142950, 0x08142952, 0x08142954, 0x08142A14, 0x08142A16,
@@ -190,9 +190,9 @@ class ZeroAwareRemainderTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.native(calls=calls)
         with self.assertRaises(ValueError): self.native(selector='default')
         with self.assertRaises(ValueError):
-            self.machine([0xB510, 0x237F, 0x4610, 0x4018, 'mod', 0xBC02, 0x4708])
+            self.machine([0xB510, 0x237F, 0x1C10, 0x4018, 'mod', 0xBC02, 0x4708])
         with self.assertRaises(ValueError):
-            self.machine([0xB510, 0x9000, 0x237F, 0x4610, 0x4018, 'mod', 0xBC10, 0xBC02, 0x4708])
+            self.machine([0xB510, 0x9000, 0x237F, 0x1C10, 0x4018, 'mod', 0xBC10, 0xBC02, 0x4708])
 
     def test_inventory_selector_has_no_C_match_report_or_status_admission(self):
         with self.assertRaisesRegex(ValueError, 'signed16 r0 and nonzero r1'):
