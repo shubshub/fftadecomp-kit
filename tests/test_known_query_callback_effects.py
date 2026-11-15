@@ -166,7 +166,7 @@ class QueryCallbackTests(unittest.TestCase):
     def test_signed_record_reads_scalar_rectangle_operations_and_external_write(self):
         extra=words(0x6830,0x2108,0x5e40,0x220a,0x5ea9,0x1a44,0x2c00,0x4264,
                     0x2004,0x7f29,0x4008,0x0600,0x9002,0x9902,0x3110,0x3910,
-                    0x460a,0x2000,0x7728,0x2001,0x6070)
+                    0x1c0a,0x2000,0x7728,0x2001,0x6070)
         body=bytearray(callback()[:36]+extra+callback()[36:])
         body[12:14]=words(0xd000|((36+len(extra)-16)//2))
         r=self.prove(bytes(body))

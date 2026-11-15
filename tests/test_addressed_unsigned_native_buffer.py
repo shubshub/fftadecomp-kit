@@ -38,10 +38,11 @@ class AddressedUnsignedNativeBufferTests(unittest.TestCase):
                          [[B, 8, profile.sha(f['rom'][B-match.ROM_BASE:B-match.ROM_BASE+8])]])
         self.assertEqual(manifest['runtime_numeric_return_facts'], [])
         self.assertFalse(manifest['arithmetic_C_equivalence'])
-        for helper in (b'\x07\x21\x01\x71\x00\x20\x70\x47',
-                       b'\x07\x21\x01\x70\x00\x46\x70\x47',
-                       b'\x08\x60\x00\x20\x70\x47'):
-            with self.subTest(helper=helper.hex()), self.assertRaises(ValueError):
+        for helper, message in (
+                (b'\x07\x21\x01\x71\x00\x20\x70\x47', 'outside allocated local words'),
+                (b'\x07\x21\x01\x70\x00\x1c\x70\x47', 'buffer pointer escapes through a return register'),
+                (b'\x08\x60\x00\x20\x70\x47', 'unsupported buffer pointer use or escape')):
+            with self.subTest(helper=helper.hex()), self.assertRaisesRegex(ValueError, message):
                 profile.verify(**self.fixture(helper))
         for selector in (profile.UNSIGNED_SELECTOR, profile.SELECTOR):
             with self.subTest(selector=selector), self.assertRaises(ValueError):

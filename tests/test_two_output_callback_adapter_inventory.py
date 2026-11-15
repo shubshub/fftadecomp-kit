@@ -73,8 +73,9 @@ class AdapterTests(unittest.TestCase):
             with self.subTest(value=value),self.assertRaises(ValueError):adapter.verify(**fixture(changes={14:value}))
 
     def test_local_pointer_escape_or_descriptor_address_argument_refused(self):
-        for offset,value in [(16,0x4669),(16,0x4621),(18,0xAA01)]:
-            with self.subTest(offset=offset,value=value),self.assertRaises(ValueError):adapter.verify(**fixture(changes={offset:value}))
+        for offset,value in [(16,0x4669),(16,0x1C21),(18,0xAA01)]:
+            with self.subTest(offset=offset,value=value),self.assertRaisesRegex(ValueError,'exact local initialization'):
+                adapter.verify(**fixture(changes={offset:value}))
 
     def test_wrong_descriptor_target_offset_refused(self):
         with self.assertRaises(ValueError):adapter.verify(**fixture(changes={18:0x68A2}))

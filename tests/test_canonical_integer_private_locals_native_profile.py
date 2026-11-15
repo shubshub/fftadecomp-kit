@@ -99,8 +99,9 @@ class PrivateLocalsSourceTests(unittest.TestCase):
         self.assertEqual(self.prove.call_args.args[-1], {'__divsi3'})
 
     def test_alias_call_arguments_and_spills_remain_refused(self):
-        for instruction in (0x4608, 0x9100):
-            with self.subTest(instruction=instruction), self.assertRaises(ValueError):
+        for instruction, message in ((0x1C08, 'local aliases crossing calls require native buffer proof'),
+                                     (0x9100, 'local aliases cannot be stored or spilled')):
+            with self.subTest(instruction=instruction), self.assertRaisesRegex(ValueError, message):
                 self.verify(fixture(replace_read=(7, instruction)))
         self.prove.assert_not_called()
 

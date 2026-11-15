@@ -2,6 +2,7 @@
 import struct
 from capstone import Cs,CS_ARCH_ARM,CS_MODE_THUMB
 import analyze as original_analyze
+import armv4t
 import local_long_branch_profile as local
 import match
 def graph(data, address, refinement, *, one_object_word_switch=False,
@@ -36,6 +37,8 @@ def graph(data, address, refinement, *, one_object_word_switch=False,
         for instruction in cs.disasm(data[lo - address:hi - address], lo):
             if instruction.address != cursor or instruction.address in instructions:
                 raise ValueError('code ranges have an ambiguous instruction boundary')
+            if not armv4t.instruction(instruction):
+                raise ValueError('owner graph instruction is not an ARMv4T encoding or a BL pair')
             span = set(range(cursor, cursor + instruction.size))
             if code_bytes & span:
                 raise ValueError('code ranges overlap')

@@ -161,7 +161,7 @@ class DynamicDivisionTests(unittest.TestCase):
 
     def test_actual_consumer_may_not_read_returned_private_pointer(self):
         with self.assertRaisesRegex(ValueError,'observes discarded'):
-            owner.verify(**caller_fixture(after='1046'),objects=b'{}',selector=dynamic.SELECTOR)
+            owner.verify(**caller_fixture(after='101c'),objects=b'{}',selector=dynamic.SELECTOR)
 
     def test_dynamic_profile_cannot_assume_pointer_operands_are_scalar(self):
         with self.assertRaisesRegex(ValueError,'scalar operands'):
@@ -185,7 +185,7 @@ class DynamicDivisionTests(unittest.TestCase):
 
     def test_return_address_origin_cannot_be_read_as_scalar(self):
         with self.assertRaisesRegex(ValueError,'returned control origin'):
-            owner.verify(**caller_fixture(after='0846'),objects=b'{}',selector=dynamic.SELECTOR)
+            owner.verify(**caller_fixture(after='081c'),objects=b'{}',selector=dynamic.SELECTOR)
 
     def test_return_address_origin_requires_a_kill_before_root_return(self):
         x=caller_fixture()
@@ -208,7 +208,7 @@ class DynamicDivisionTests(unittest.TestCase):
             dynamic.prove(**inputs(callee=bytes(data)),selector=dynamic.SELECTOR)
 
     def test_actual_entry_scratch_must_die_before_numeric_use(self):
-        data=bytearray(actual.CALLEE);data[0x0809D6CC-A:0x0809D6CE-A]=bytes.fromhex('1246')
+        data=bytearray(actual.CALLEE);data[0x0809D6CC-A:0x0809D6CE-A]=bytes.fromhex('121c')
         with self.assertRaisesRegex(ValueError,'opaque'):
             dynamic.prove(**inputs(callee=bytes(data)),selector=dynamic.SELECTOR)
 

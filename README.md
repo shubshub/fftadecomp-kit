@@ -584,6 +584,29 @@ reachable region must have a path to a verified return. This does not prove
 termination of arbitrary loops. Interrupts, dynamic stack adjustments and
 untracked transfers remain unsupported and fail closed.
 
+In Thumb mode every reached instruction must also be one the ARM7TDMI
+executes (kit `#180`). Capstone's Thumb decoder reads Thumb-2 and ARMv5/v6
+encodings too, so the walk refuses a reached instruction that is neither a
+16-bit ARMv4T encoding nor a BL pair whose halves are exactly the `11110`
+prefix and the `11111` suffix. That excludes `bkpt`, `udf`, `cps`, `setend`,
+`rev`, `sxt`/`uxt`, `cbz`, `it`, the hint instructions (the only `nop` is
+`46c0`), a hi-register `mov`/`add`/`cmp` encoding of two low registers, `bx`
+with a nonzero should-be-zero bit, an `stmia` whose writeback base is in the
+list but not lowest, and every other 32-bit decode. `svc` and `blx` keep their
+older refusals. The complete-owner graph (`owner_graph_profile.graph`) applies
+the same check (`tools/armv4t.py`) to every instruction of its code ranges, so
+the admission paths that replay that graph without the base walk are held to
+it as well. Limits: the rule is about encodings, so it says nothing about what
+an admitted instruction does; it covers these two decodes, the walks that
+consume their instructions, and the dead-alias, dead-argument and switch-thunk
+scans that call the checker themselves, so a profile that decodes with its own
+Capstone handle and neither runs the base walk nor replays the owner graph
+over the same bytes must check its own forms; ARM-mode code is not checked;
+and bytes no walk reaches are not checked. The checker decides conditions and
+flag setting from the encoding bits, because Capstone carries Thumb-2 `it`
+state across one multi-instruction decode; an item must still come from a
+decode that starts at that instruction.
+
 Unconditional 16-bit Thumb register moves preserve a proven original return
 address, including copies restored to LR. Overwrites discard that fact, joins
 retain it only when all incoming paths agree, and calls still invalidate

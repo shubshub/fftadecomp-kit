@@ -131,13 +131,19 @@ class ThirdOutputTests(unittest.TestCase):
         self.assertEqual(json.loads(run.stdout), result)
 
     def test_local_read_before_write_saved_overlap_and_local_width(self):
-        for position, word in [(10, 0x782B), (10, 0x722B), (10, 0x802B), (7, 0x4618)]:
-            with self.subTest(position=position), self.assertRaises(ValueError):
+        for position, word, message in [(10, 0x782B, 'precedes initialization'),
+                                        (10, 0x722B, 'leaves live allocated bytes'),
+                                        (10, 0x802B, 'byte-only'),
+                                        (7, 0x46C0, 'lacks an authenticated origin')]:
+            with self.subTest(position=position), self.assertRaisesRegex(ValueError, message):
                 self.changed_helper(position, word)
 
     def test_named_width_offset_store_and_pointer_spill_refused(self):
-        for position, word in [(9, 0x7A63), (9, 0x8B63), (9, 0x7363), (10, 0x7028), (1, 0x4606)]:
-            with self.subTest(position=position), self.assertRaises(ValueError):
+        for position, word, message in [(9, 0x7A63, 'readonly byte premise'), (9, 0x8B63, 'readonly byte premise'),
+                                        (9, 0x7363, 'cannot store a pointer origin'),
+                                        (10, 0x7028, 'cannot store a pointer origin'),
+                                        (2, 0xB401, 'cannot spill pointer origins')]:
+            with self.subTest(position=position), self.assertRaisesRegex(ValueError, message):
                 self.changed_helper(position, word)
 
     def test_formal_reads_require_own_prior_writes(self):

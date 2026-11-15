@@ -94,8 +94,9 @@ int func_08010000(int value, int divisor)
             self.native(data=body,rom=rom)
         # Replace the same emitted MOVS with a copy of an unknown scratch value.
         destination=index-ARM_REG_R0;unknown=next(r for r in range(4) if ARM_REG_R0+r!=index)
-        body,rom=self.changed(origin,0x4600|(unknown<<3)|destination)
-        with self.assertRaises(ValueError):self.native(data=body,rom=rom)
+        body,rom=self.changed(origin,0x1C00|(unknown<<3)|destination)
+        with self.assertRaisesRegex(ValueError,'stack-alias index is not a known constant'):
+            self.native(data=body,rom=rom)
 
     @staticmethod
     def decode(values,address=A):

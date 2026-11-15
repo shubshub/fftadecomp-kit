@@ -15,9 +15,9 @@ import owner_admission_profile as owner
 from test_canonical_integer_native_profile import fixture as scalar_fixture
 
 
-def fixture(*, second_read=0x9D04, padding=True):
-    values = scalar_fixture(prefix=(0xB530, 0x9C03, second_read, 0x4620),
-                            suffix=(0xBC30, 0xBC01, 0x4700))
+def fixture(*, second_read=0x9D04, padding=True, copy=0x1C20, final=0x4700):
+    values = scalar_fixture(prefix=(0xB530, 0x9C03, second_read, copy),
+                            suffix=(0xBC30, 0xBC01, final))
     if padding:
         for index in (0, 1):
             raw = bytearray(values[index])
@@ -119,6 +119,15 @@ class TwoWordsAlignmentTests(unittest.TestCase):
     def test_alignment_cannot_permit_incoming_store(self):
         with self.assertRaises(ValueError):
             self.verify(fixture(second_read=0x9504))
+        self.closure.assert_not_called()
+
+    def test_owner_graph_refuses_encodings_the_ARM7TDMI_does_not_execute(self):
+        # kit #180: this admission path replays the owner graph and never runs the base leaf walk.
+        for name, change in (('mov r0, r4', dict(copy=0x4620)), ('add r0, r4', dict(copy=0x4420)),
+                             ('cmp r0, r4', dict(copy=0x4520)), ('bx r0 with an SBZ bit', dict(final=0x4701))):
+            with self.subTest(name), self.assertRaisesRegex(
+                    ValueError, 'owner graph instruction is not an ARMv4T encoding or a BL pair'):
+                self.verify(fixture(**change))
         self.closure.assert_not_called()
 
     def test_actual_sized_function_bytes_still_bind_ROM(self):

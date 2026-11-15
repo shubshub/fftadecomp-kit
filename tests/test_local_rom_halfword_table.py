@@ -240,9 +240,11 @@ class TableTests(unittest.TestCase):
     def test_every_root_opcode_is_closed(self):
         env=fixture()
         for offset in (0,2,4,6,8,10,12,14,20,22,24,26,28,30,32,34):
-            changed=copy.deepcopy(env);body=bytearray(changed['data']);body[offset]^=1
+            # Bit 0 of the final bx is should-be-zero on ARMv4T, so change its register instead.
+            changed=copy.deepcopy(env);body=bytearray(changed['data']);body[offset]^=8 if offset==34 else 1
             changed['data']=bytes(body);rom=bytearray(changed['rom']);rom[ROOT-match.ROM_BASE:ROOT-match.ROM_BASE+40]=body;changed['rom']=bytes(rom)
-            with self.subTest(offset=offset),self.assertRaises(ValueError):prove(changed)
+            with self.subTest(offset=offset),self.assertRaisesRegex(
+                    ValueError,'root instruction grammar differs|structural inventory is not closed'):prove(changed)
 
     def test_complete_helper_including_unreached_path_is_bound(self):
         env=fixture()
