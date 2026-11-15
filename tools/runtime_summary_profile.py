@@ -266,7 +266,7 @@ class RuntimeSummaries:
         if not self.sites:
             raise ValueError('runtime summary profile requires an actual summarised runtime call')
         import importlib
-        producers = ('runtime_summary_profile', 'match', 'owner_admission_profile', 'named_data_buffer_profile',
+        producers = ('runtime_summary_profile', 'match', 'armv4t', 'owner_admission_profile', 'named_data_buffer_profile',
                      'bios_fast_fill_source_profile', 'canonical_integer_scalar_inventory',
                      'software_double_profile', 'software_float_profile', 'div_only_ordinary_inventory',
                      'zero_aware_unsigned_quotient_inventory', 'udiv_constant_choices_inventory',

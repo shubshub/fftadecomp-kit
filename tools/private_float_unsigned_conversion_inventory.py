@@ -85,7 +85,7 @@ def verify(data, address, rom, mapping, index, *, selector, manifest=None):
         raise ValueError('private float conversion must retain every conditional child absolute read')
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
                    for module in (runtime, argument_base, comparison, scalar_conversion,
-                                  selected_record, match, owner, graph, operations)}
+                                  selected_record, match, match.armv4t, owner, graph, operations)}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = dict(schema=SCHEMA, selector=SELECTOR, inventory_only=True,
         complete_native_structural_proof=True, complete_argument_effect_proof=True,

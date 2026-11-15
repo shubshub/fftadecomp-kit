@@ -513,7 +513,7 @@ def prove(data, address, rom, mapping, index, objects, bindings, *, selector=SEL
         list_bound_proved_from_ROM=False, physical_memory_permission=False,
         actual_C_function_compatibility_proved=False, termination_proved=False,
         producer_sha256={Path(m.__file__).name: sha(Path(m.__file__).read_bytes())
-                         for m in (match, graph, thunk, owner, software_double, __import__(__name__))})
+                         for m in (match, match.armv4t, graph, thunk, owner, software_double, __import__(__name__))})
 
     if division:
         import zero_aware_unsigned_quotient_inventory as quotient

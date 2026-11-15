@@ -219,7 +219,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         restored = frame.prove_frame(instructions, edges, address, {}, calls, runtime_calls=runtime_calls)
     ordinary = [[site-address, name] for site, name in sorted(bindings.items())
                 if name not in OPERATIONS and name not in thunks.ALIASES]
-    modules = (match, thunks, owner, graph, operations, frame, complete, remainder, divmod,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, complete, remainder, divmod,
         divmod.quotient, divmod.remainder, match.software_double, match.software_float)
     if framed:
         import readonly_entry_stack_profile as word0

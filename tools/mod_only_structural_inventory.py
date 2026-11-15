@@ -134,7 +134,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         raise ValueError('MOD-only inventory requires complete exact MOD/zero native closures')
     native_frames = runtime_frames(rom, mapping, closure)
     restored = frame.prove_frame(instructions, edges, address, {}, calls)
-    modules = (match, owner, graph, operations, frame, canonical, native, remainder)
+    modules = (match, match.armv4t, owner, graph, operations, frame, canonical, native, remainder)
     sources = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     sources[Path(__file__).name] = sha(Path(__file__).read_bytes())
     ordinary = [[site - address, name] for site, name in sorted(bindings.items()) if name != '__modsi3']

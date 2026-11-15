@@ -14,7 +14,7 @@ CONTROL_FLOW = ('complete acyclic Thumb owner; original ELF-bound guarded switch
 
 def environment_fingerprint():
     from addressed_signed_runtime_profile import toolchain_fingerprint, runtime_fingerprint
-    names = ('match', 'owner_admission_profile', 'multiple_switch_owner_prerequisite',
+    names = ('match', 'armv4t', 'owner_admission_profile', 'multiple_switch_owner_prerequisite',
              'multiple_switch_native_profile', 'owner_graph_profile', 'owner_runtime_profile',
              'framed_switch_inventory', 'local_long_branch_profile',
              'one_constant_scalar_switch_inventory', 'software_double_profile', 'analyze',

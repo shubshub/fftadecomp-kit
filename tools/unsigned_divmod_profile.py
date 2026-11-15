@@ -30,7 +30,7 @@ def sha(data):
 
 
 def producers():
-    names = ('match', 'match_evidence', 'status', 'inert_spin_profile', 'analyze', 'plausible',
+    names = ('match', 'armv4t', 'match_evidence', 'status', 'inert_spin_profile', 'analyze', 'plausible',
              'unsigned_divmod_ordinary_inventory', 'zero_aware_unsigned_quotient_inventory',
              'umod_only_ordinary_inventory', 'unsigned_remainder_closure_inventory',
              'owner_admission_profile', 'owner_graph_profile', 'owner_runtime_profile',

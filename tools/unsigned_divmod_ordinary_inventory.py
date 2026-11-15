@@ -146,7 +146,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     ordinary = [[site-address, name] for site, name in sorted(bindings.items()) if name not in OPERATIONS]
     restored = frame.prove_frame(instructions, edges, address, {}, calls,
         **({} if ordinary else {'call_preservation': {site: preserved for site in calls}}))
-    modules = (match, thunks, owner, graph, operations, frame, complete, quotient, remainder,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, complete, quotient, remainder,
         remainder.remainder, match.software_double, match.software_float)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

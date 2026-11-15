@@ -73,7 +73,7 @@ class GuardedBiosDivisionProof(buffers.GuardedAliasBufferProof):
         import importlib
         producers = ('guarded_bios_division_profile', 'ordinary_formal_output_spill_profile',
                      'named_data_buffer_profile', 'owner_admission_profile',
-                     'owner_graph_profile', 'analyze', 'inert_spin_profile', 'match')
+                     'owner_graph_profile', 'analyze', 'inert_spin_profile', 'match', 'armv4t')
         return dict(schema=SCHEMA, wrapper_address=ADDRESS, wrapper_hex=WRAPPER.hex(),
             conditional_ABI=CONTRACT,
             source_sha256={name+'.py': hashlib.sha256(

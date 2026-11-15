@@ -114,7 +114,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # buffer, incoming-word, alias, or additional preservation policy is granted.
     restored = frame.prove_frame(instructions, edges, address, branches, calls,
         runtime_calls=runtime)
-    modules = (analyze, thunks, frame, match, owner, graph, operations, quotient,
+    modules = (analyze, thunks, frame, match, match.armv4t, owner, graph, operations, quotient,
         division, canonical, native, guarded)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

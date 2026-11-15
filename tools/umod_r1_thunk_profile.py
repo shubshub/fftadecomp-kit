@@ -56,7 +56,7 @@ def producer_sources():
     import umod_r1_thunk_inventory
     import umodsi3_profile
     import unsigned_remainder_closure_inventory
-    modules = (analyze, function_thunk_profile, local_long_branch_profile, match,
+    modules = (analyze, function_thunk_profile, local_long_branch_profile, match, match.armv4t,
         owner_admission_profile, owner_graph_profile, owner_runtime_profile,
         software_double_profile, software_float_profile, umod_only_ordinary_inventory,
         umod_r1_thunk_inventory, umodsi3_profile, unsigned_remainder_closure_inventory)

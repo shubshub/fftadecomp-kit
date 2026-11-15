@@ -154,7 +154,7 @@ def verify(data, address, rom, mapping, index, data_mapping, calls, bindings, *,
         stack_aliases=True, local_alias_slot_policy=parent.slots.SELECTOR,
         formal_stack_callee_proof=proof, entry_stack_policy=readonly_entry_words_policy,
         formal_stack_entry_words_policy=SELECTOR, zero_index_profile=parent.zero_index.SELECTOR)
-    modules = (leaf, named, output, output.second, parent, parent.analyze, parent.match,
+    modules = (leaf, named, output, output.second, parent, parent.analyze, parent.match, parent.match.armv4t,
         parent.thunks, parent.owner, parent.graph, parent.operations, parent.indices, parent.frame,
         parent.slots, parent.incoming, parent.zero_index, entry)
     sources = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

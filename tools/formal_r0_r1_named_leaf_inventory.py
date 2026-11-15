@@ -120,7 +120,7 @@ def verify(data,address,rom,mapping,index,data_mapping,*,selector,
     instructions,edges,partition = complete(data,address,rom,mapping,index)
     effects = prove_origins(instructions,edges,address,data,partition)
     restored = parent.frame.prove_frame(instructions,edges,address,{}, {})
-    modules = (second,named,parent,parent.analyze,parent.match,parent.thunks,parent.owner,
+    modules = (second,named,parent,parent.analyze,parent.match, parent.match.armv4t,parent.thunks,parent.owner,
                parent.graph,parent.operations,parent.indices,parent.frame)
     sources = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     sources[Path(__file__).name] = sha(Path(__file__).read_bytes())

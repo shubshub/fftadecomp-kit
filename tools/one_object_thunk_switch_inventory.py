@@ -115,7 +115,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # preservation overrides. Every return restores the original frame tokens.
     restored = frame.prove_frame(instructions, edges, address, branches, calls,
         runtime_calls=runtime)
-    modules = (analyze, thunks, frame, match, owner, graph, operations, zero, object_policy,
+    modules = (analyze, thunks, frame, match, match.armv4t, owner, graph, operations, zero, object_policy,
         object_policy.quotient, object_policy.canonical, object_policy.native)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

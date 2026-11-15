@@ -124,7 +124,7 @@ def verify(address, getter, rom, mapping, index, *, selector, manifest=None):
         source_or_ELF_admission=False,
         ROM_sha256=sha(rom), mapping_sha256=sha(mapping), index_sha256=sha(index),
         producer_source_sha256={Path(module.__file__).name:sha(Path(module.__file__).read_bytes())
-            for module in (match, owner, graph, thunk, frame)})
+            for module in (match, match.armv4t, owner, graph, thunk, frame)})
     observed['producer_source_sha256'][Path(__file__).name] = sha(Path(__file__).read_bytes())
     if manifest is not None and json.dumps(manifest,sort_keys=True) != json.dumps(observed,sort_keys=True):
         raise ValueError('scalar adapter inventory manifest differs')

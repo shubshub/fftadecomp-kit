@@ -83,7 +83,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         raise ValueError('pure DIV inventory requires complete exact DIV/zero native closures')
     runtime_frames = existing.runtime_frames(rom, mapping, closure)
     restored = frame.prove_frame(instructions, edges, address, {}, calls, stack_aliases=True)
-    modules = (match, owner, graph, operations, frame, canonical, native, quotient, existing)
+    modules = (match, match.armv4t, owner, graph, operations, frame, canonical, native, quotient, existing)
     sources = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     sources[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

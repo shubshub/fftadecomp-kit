@@ -98,7 +98,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # Acyclicity is checked above; the unchanged strict frame proof authenticates
     # every reached return without local aliases or buffer permissions.
     restored = frame.prove_frame(instructions, edges, address, {}, calls)
-    modules = (analyze, ordinary, thunks, frame, match, owner, graph, operations)
+    modules = (analyze, ordinary, thunks, frame, match, match.armv4t, owner, graph, operations)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

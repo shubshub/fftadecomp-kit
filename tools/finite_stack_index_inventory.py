@@ -68,7 +68,7 @@ def verify(data,address,rom,mapping,index,calls,bindings,*,selector,manifest=Non
     proof=restored['finite_stack_indices']
     if not any(len(row[2])==2 for row in proof['SP_additions']) or not any(len(row[2])==2 for row in proof['reads']):
         raise ValueError('finite index inventory requires an actual two-alternative SP addition and local read')
-    modules=(match,owner,graph,operations,frame,finite,*reserved)
+    modules=(match, match.armv4t,owner,graph,operations,frame,finite,*reserved)
     pins={Path(module.__file__).name:sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name]=sha(Path(__file__).read_bytes())
     observed={'schema':SCHEMA,'selector':SELECTOR,'inventory_only':True,'source_or_ELF_admission':False,

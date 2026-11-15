@@ -75,7 +75,7 @@ def verify(data,address,rom,mapping,index,calls,bindings,*,selector,manifest=Non
         local_alias_slot_policy=slots.SELECTOR)
     if not restored["local_alias_slots"]["stores"]:
         raise ValueError("local alias slot inventory requires actual local pointer-word spills")
-    modules = (match,owner,graph,operations,frame,canonical,native,quotient,remainder,ordinary,unframed,framed,slots)
+    modules = (match, match.armv4t,owner,graph,operations,frame,canonical,native,quotient,remainder,ordinary,unframed,framed,slots)
     source_pins = {Path(module.__file__).name:sha(Path(module.__file__).read_bytes()) for module in modules}
     source_pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema':SCHEMA,'selector':SELECTOR,'inventory_only':True,'source_or_ELF_admission':False,

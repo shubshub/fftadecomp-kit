@@ -126,7 +126,7 @@ class RestoringLeafDisjunctiveProof(DescriptorDisjunctiveAliasProof):
             raise ValueError('restoring descriptor policy requires an actual checked leaf restoration')
         producers = ('descriptor_disjunctive_alias_profile','static_callback_r6_frame_profile',
                      'local_long_branch_profile','owner_graph_profile','owner_admission_profile',
-                     'analyze','match')
+                     'analyze','match', 'armv4t')
         if self.restoration_schema in (CALLEE_SCHEMA,BOUNDED_SCHEMA):
             producers += ('callee_saved_alias_restoration',)
         return dict(schema=self.restoration_schema,

@@ -28,7 +28,7 @@ def policy_manifest():
                'static_callback_buffer_profile.py', 'named_data_buffer_profile.py',
                'owner_admission_profile.py', 'owner_graph_profile.py',
                'inert_spin_profile.py', 'function_thunk_profile.py', 'analyze.py',
-               'local_long_branch_profile.py', 'switch_constants_profile.py', 'match.py')
+               'local_long_branch_profile.py', 'switch_constants_profile.py', 'match.py', 'armv4t.py')
     return dict(schema='thumb-static-callback-unwritten-r7-policy-v1',
         selector=SELECTOR, register=7, thunk=THUNK,
         preservation='every reached instruction leaves R7 unwritten, including inspected dependencies',

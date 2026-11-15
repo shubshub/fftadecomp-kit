@@ -209,7 +209,7 @@ def prove(data, address, mapping, index, rom_size, *, selector):
     result = context.record()
     result['frame'] = frame
     result['producers'] = {Path(path).name:_digest(Path(path).read_bytes())
-                           for path in (__file__, match.__file__, local.__file__)}
+                           for path in (__file__, match.__file__, match.armv4t.__file__, local.__file__)}
     return result
 
 

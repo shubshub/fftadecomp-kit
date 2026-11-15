@@ -101,7 +101,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # UMOD preservation comes from its complete native closure and own-frame
     # proof. The canonical indirect destination retains a conditional ABI.
     restored = frame.prove_frame(instructions, edges, address, {}, calls, runtime_calls=thunk_sites)
-    modules = (analyze, thunks, frame, match, owner, graph, operations, remainder,
+    modules = (analyze, thunks, frame, match, match.armv4t, owner, graph, operations, remainder,
         umod, complete, match.software_double, match.software_float)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())

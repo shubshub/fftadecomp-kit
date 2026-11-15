@@ -290,7 +290,7 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
     import owner_admission_profile as owner
     import owner_graph_profile as graph
     import local_long_branch_profile as frame
-    modules = (match, owner, graph, frame, quotient, remainder, match.function_thunk,
+    modules = (match, match.armv4t, owner, graph, frame, quotient, remainder, match.function_thunk,
                match.software_double, match.software_float, match.ashldi3, match.umodsi3)
     paths = {Path(module.__file__) for module in modules} | {Path(__file__)}
     paths.update(Path(importlib.import_module(name).__file__) for name in
@@ -682,7 +682,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             raise ValueError('discarded scratch selector requires actual native scratch aliases')
     else:
         restored = frame.prove_frame(instructions, edges, address, {}, calls)
-    modules = (match, owner, graph, frame, quotient, remainder)
+    modules = (match, match.armv4t, owner, graph, frame, quotient, remainder)
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         import bios_cpuset_fill_profile
         modules += (bios_cpuset_fill_profile,)

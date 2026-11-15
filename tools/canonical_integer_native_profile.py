@@ -19,7 +19,7 @@ CONTROL_FLOW = ('complete Thumb scalar owner; original ELF-bound canonical integ
 
 def environment_fingerprint():
     from addressed_signed_runtime_profile import toolchain_fingerprint, runtime_fingerprint
-    names = {'match', 'owner_admission_profile', 'canonical_integer_native_profile',
+    names = {'match', 'armv4t', 'owner_admission_profile', 'canonical_integer_native_profile',
              'owner_graph_profile', 'owner_runtime_profile', 'local_long_branch_profile',
              'function_thunk_profile', 'software_double_profile', 'software_float_profile',
              'analyze'}

@@ -392,7 +392,7 @@ class ConditionalThunkBufferProof(NamedDataBufferProof):
             source_sha256={name:hashlib.sha256(Path(__file__).with_name(name).read_bytes()).hexdigest()
                 for name in ('named_data_buffer_profile.py', 'function_thunk_profile.py',
                              'owner_admission_profile.py', 'owner_graph_profile.py',
-                             'inert_spin_profile.py', 'analyze.py', 'match.py')},
+                             'inert_spin_profile.py', 'analyze.py', 'match.py', 'armv4t.py')},
             observations=[self._thunk_observations[site] for site in sorted(calls)])
 
 
@@ -576,7 +576,7 @@ class DiscardedReturnScratchProof(NamedDataBufferProof):
         import importlib
         producers = ('named_data_buffer_profile', 'owner_admission_profile',
                      'owner_graph_profile', 'analyze', 'inert_spin_profile',
-                     'local_long_branch_profile', 'match')
+                     'local_long_branch_profile', 'match', 'armv4t')
         return dict(schema=DISCARDED_SCRATCH_SCHEMA, registers=[2, 3],
             contract=DISCARDED_SCRATCH_CONTRACT +
                 '; every actual consumer path leaves projected values unobserved until '
@@ -718,7 +718,7 @@ class GuardedSwitchBufferProof(DiscardedReturnScratchProof):
         import importlib
         producers = ('named_data_buffer_profile', 'owner_admission_profile',
                      'owner_graph_profile', 'switch_constants_profile', 'analyze',
-                     'inert_spin_profile', 'local_long_branch_profile', 'match')
+                     'inert_spin_profile', 'local_long_branch_profile', 'match', 'armv4t')
         return dict(schema=GUARDED_SWITCH_SCHEMA,
             contract='one exact unsigned-guarded complete local Thumb word table per '
                 'inspected buffer callee, zero or two reached scalar constants; '
@@ -869,7 +869,7 @@ class BiosSqrtScratchProof(DiscardedReturnScratchProof):
         import importlib
         producers = ('named_data_buffer_profile', 'owner_admission_profile',
                      'owner_graph_profile', 'analyze', 'inert_spin_profile',
-                     'local_long_branch_profile', 'match')
+                     'local_long_branch_profile', 'match', 'armv4t')
         return dict(schema='exact-scalar-bios-sqrt-conditional-abi-v1',
             wrapper_hex=self.wrapper_bytes.hex(), contract=self.bios_contract,
             source_sha256={name+'.py': hashlib.sha256(

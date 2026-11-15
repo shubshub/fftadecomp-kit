@@ -262,7 +262,7 @@ def verify(data, address, rom, mapping, index, data_mapping, calls, bindings, *,
     additions = [row for row in restored['local_alias_slots']['small_SP_additions'] if row[2] == 10]
     if not additions:
         raise ValueError('two-output inventory requires an actual exact MOVS10/SP constructor')
-    modules = (parent,parent.analyze,parent.match,parent.thunks,parent.owner,parent.graph,parent.operations,
+    modules = (parent,parent.analyze,parent.match, parent.match.armv4t,parent.thunks,parent.owner,parent.graph,parent.operations,
         parent.indices,parent.frame,parent.slots,parent.zero_index,parent.incoming)
     source = {Path(module.__file__).name:sha(Path(module.__file__).read_bytes()) for module in modules}
     source[Path(__file__).name] = sha(Path(__file__).read_bytes())

@@ -1048,7 +1048,7 @@ def prove(data, address, rom, mapping, index, *, selector):
                 accessible_after_return=False, observed_by_root_continuation=False) for n in flag_aliases],
             explicit_conditions=conditions,
             source_sha256={**{Path(module.__file__).name: sha(Path(module.__file__).read_bytes())
-                for module in (match, owner, graph, thunk, frame, adapter)},
+                for module in (match, match.armv4t, owner, graph, thunk, frame, adapter)},
                 Path(__file__).name: sha(Path(__file__).read_bytes())},
             physical_memory_permission=False, numeric_nonalias_proved=False,
             actual_callback_ABI_established=False, termination_proved=False))

@@ -102,7 +102,7 @@ class ConsumerScratchAliasProof(ignored.IgnoredLeafAliasProof):
         import owner_graph_profile as graph
         import zero_index_stack_profile as zero
         return {Path(module.__file__).name: ignored.sha(Path(module.__file__).read_bytes())
-                for module in (ignored, match, owner, graph, zero)} | {
+                for module in (ignored, match, match.armv4t, owner, graph, zero)} | {
                     Path(__file__).name: ignored.sha(Path(__file__).read_bytes())}
 
     def identity(self):

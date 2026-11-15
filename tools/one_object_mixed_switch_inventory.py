@@ -132,7 +132,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # No buffer, entry-word, alias-slot or call-preservation permission is added.
     restored = frame.prove_frame(instructions, edges, address, {}, calls, stack_aliases=True)
     ordinary_sites = {site: name for site, name in bindings.items() if name not in OPERATIONS}
-    modules = (analyze, quotient, thunks, frame, match, owner, graph, operations, canonical, native, unsigned)
+    modules = (analyze, quotient, thunks, frame, match, match.armv4t, owner, graph, operations, canonical, native, unsigned)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

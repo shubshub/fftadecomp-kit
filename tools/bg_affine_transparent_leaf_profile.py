@@ -122,5 +122,5 @@ class BgAffineTransparentLeafProof(affine.BgAffineSetScratchProof):
             observations=[self._transparent_calls[key] for key in sorted(self._transparent_calls)],
             source_sha256={Path(module.__file__).name:
                 hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
-                for module in (affine, ignored, incoming, match, buffers, __import__(__name__))})
+                for module in (affine, ignored, incoming, match, match.armv4t, buffers, __import__(__name__))})
         return manifest

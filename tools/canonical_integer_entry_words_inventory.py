@@ -80,7 +80,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, ent
         raise ValueError('canonical integer entry-words inventory requires an allocated-or-saved caller frame')
     families = set(bindings.values()) & OPERATIONS.keys()
     closure, native_frames, components = core.prove_called_closures(rom, mapping, index, families)
-    modules = (match, thunks, owner, graph, operations, frame, entry, core, canonical,
+    modules = (match, match.armv4t, thunks, owner, graph, operations, frame, entry, core, canonical,
                core.division, core.quotient, core.unsigned_frames, core.unsigned_remainder,
                match.software_float)
     source_pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

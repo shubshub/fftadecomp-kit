@@ -17,7 +17,7 @@ SCHEMA = 'callback-local-two-word-output-frame-prerequisite-v1'
 _HASHES = ('rom_sha256', 'mapping_sha256', 'index_sha256', 'objects_sha256',
            'callback_sha256', 'helper_sha256')
 _KEYS = {'schema', 'callback', 'helper', 'call_site', 'local_bytes', *_HASHES}
-_ENGINE_FILES = ('match.py', 'descriptor_output_alias_profile.py',
+_ENGINE_FILES = ('match.py', 'armv4t.py', 'descriptor_output_alias_profile.py',
                  'protected_descriptor_word_profile.py', 'named_data_buffer_profile.py',
                  'static_callback_buffer_profile.py', 'watched_switch_preservation_profile.py')
 
