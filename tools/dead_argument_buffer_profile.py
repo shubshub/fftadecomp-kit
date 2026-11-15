@@ -41,6 +41,7 @@ import hashlib
 from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL, CS_GRP_RET, CS_GRP_INT
 from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_REG_PC, ARM_REG_SP
 
+import armv4t
 import match
 import named_data_buffer_profile as named
 
@@ -85,8 +86,8 @@ def thumb1(instruction):
     half = int.from_bytes(instruction.bytes, 'little')
     if half >> 11 >= 0b11101:
         return False                      # a 32-bit prefix, BL halves included
-    if half & 0xfc00 == 0x4400 and not half & 0xc0:
-        return False                      # hi-register ADD/CMP/MOV of two low registers: not ARMv4T
+    if not armv4t.encoding(instruction):
+        return False                      # e.g. hi-register ADD/CMP/MOV of two low registers
     if 0xb000 <= half < 0xc000 and not (half & 0xff80 == 0xb080 or half & 0xfe00 == 0xb400):
         return False                      # only SUB SP,#imm and PUSH of the miscellaneous space
     read, written = instruction.regs_access()
