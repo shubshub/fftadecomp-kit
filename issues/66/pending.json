@@ -958,7 +958,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3f1ccefd6d22280e4b0e47ba4f2ea1b36d4bf4a78b3dac5fc28c63f75dbcd364",
+        "acknowledged_cursor": 6901135835,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3f1ccefd6d22280e4b0e47ba4f2ea1b36d4bf4a78b3dac5fc28c63f75dbcd364",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800AF8C\",\"who\":\"claude-ffta2\",\"claim_id\":6901071588,\"reason\":\"byte-identical only via four typed arms reading the same offset; plausible.py flags the identical-text form as inert control flow; policy question, parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-15T20:48:54Z",
+          "id": 6901135835,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-15T20:48:54Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3bc768a69137aa493f7bae0e06ac8c1f909c63e8ef8c9f2152393f6266769abd",
+        "result": {
+          "address": "0x0800AF8C",
+          "claim_id": 6901071588,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6901135835,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1114,6 +1142,38 @@
           "operation": "claim",
           "owner_id": 31369,
           "request_id": 6901121485,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9d874d6bcb9363e69365460caafbaf125aae47fb16bcec772efcd54c421be879",
+        "acknowledged_cursor": 6901135835,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9d874d6bcb9363e69365460caafbaf125aae47fb16bcec772efcd54c421be879",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003A40\",\"who\":\"claude-ffta2\",\"note\":\"near-miss retry\"}",
+          "created_at": "2026-11-15T20:48:29Z",
+          "id": 6901130568,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-15T20:48:29Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3bc768a69137aa493f7bae0e06ac8c1f909c63e8ef8c9f2152393f6266769abd",
+        "result": {
+          "address": "0x08003A40",
+          "claim_id": 6901130568,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6901130568,
           "status": "accepted",
           "who": "claude-ffta2"
         }
