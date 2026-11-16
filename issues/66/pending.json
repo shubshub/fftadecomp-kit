@@ -158,7 +158,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "da03fe7fc395f5c77003aa69110603ff7e83f7faedb958f14da35971ea4b4ea0",
+        "acknowledged_cursor": 6926565744,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "da03fe7fc395f5c77003aa69110603ff7e83f7faedb958f14da35971ea4b4ea0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021D48\",\"who\":\"claude-ffta2\",\"claim_id\":6925989405,\"reason\":\"R1 retry: GCSE removes the third flags read; only volatile reproduces it (banned on RAM); parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T19:19:08Z",
+          "id": 6926565744,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T19:19:08Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b4631e2e848a7fe8ad727b93dc944359c23894150f4968b3871c482c4036e058",
+        "result": {
+          "address": "0x08021D48",
+          "claim_id": 6925989405,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6926565744,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
