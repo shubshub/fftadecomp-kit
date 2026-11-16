@@ -435,7 +435,11 @@ def verify(data, address, rom, mapping, index, objects, manifest):
 
 
 def verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest=None,
-                  buffer_stack_arguments=None):
+                  buffer_stack_arguments=None, unit_arguments=None):
+    """unit_arguments: a library-unit report's compiler configuration
+    (library_units.report_arguments).  The replay then compiles with it and
+    removes the object's authenticated orphan constants, as match.py
+    --unit-toolchain does; otherwise it uses the default toolchain."""
     from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD,
                        DEFAULT_FLAGS, DEFAULT_WSL_PATH, Runner, compile_object, link_calls,
                        _run_replay_process, plausibility_result, verify_leaf_instructions, BufferCallProof)
@@ -456,6 +460,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
             raise ValueError("function-thunk replay inputs differ")
         args = argparse.Namespace(cc=DEFAULT_CC, cpp=DEFAULT_CPP, assembler=DEFAULT_AS,
                                   objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS)
+        if unit_arguments is not None:
+            args = unit_arguments
         (root / "build").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="ffta_thunk_replay_", dir=root / "build") as directory:
             captured = Path(directory)
@@ -467,8 +473,12 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                 raise ValueError("function-thunk capture differs")
             runner = Runner(DEFAULT_CC, "Ubuntu", DEFAULT_WSL_PATH, root=captured, timeout=REPLAY_TIMEOUT)
             with runner.workspace() as workspace:
-                _, _, original = compile_object(runner, workspace, args, captured, address,
-                                                 candidates[0].relative_to(root).as_posix())
+                object_data, _, original = compile_object(runner, workspace, args, captured, address,
+                                                          candidates[0].relative_to(root).as_posix())
+                if unit_arguments is not None:
+                    import library_units
+                    _, _, original, _ = library_units.exclude_orphan_constants(
+                        runner, workspace, args, object_data, address, rom, mapping, objects, index)
                 if manifest is None:
                     functions = {}
                     got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
@@ -520,11 +530,11 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
         _replay_active.reset(token)
 
 
-def legacy_absence(root, address, data, rom, mapping, buffer_stack_arguments=None):
+def legacy_absence(root, address, data, rom, mapping, buffer_stack_arguments=None, unit_arguments=None):
     from match_evidence import data_snapshot, source_fingerprint
     return verify_source(root, address, data, rom, mapping, index_snapshot(root),
                          data_snapshot(root), source_fingerprint(root, address),
-                         buffer_stack_arguments=buffer_stack_arguments)
+                         buffer_stack_arguments=buffer_stack_arguments, unit_arguments=unit_arguments)
 
 
 def report_matches(report, root, address):
