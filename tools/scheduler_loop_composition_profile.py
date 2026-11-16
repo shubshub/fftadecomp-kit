@@ -54,7 +54,7 @@ termination of a callee nor any memory property.
 
 conditional-scheduler-three-per-path-live-alias-v1 applies the same rules
 with the wider cost bounds of WIDE_LIMITS (eight scheduler sites, 32 ordinary
-targets, 40 call sites, 512 instructions); the per-path scheduler bound is
+targets, 48 call sites, 512 instructions); the per-path scheduler bound is
 unchanged.
 
 Scheduler invocations. Every component other than a counted loop is a
@@ -84,8 +84,9 @@ LIMITS = dict(scheduler_sites=MAX_SCHEDULER_SITES, ordinary_targets=MAX_ORDINARY
 # bound stays MAX_ACYCLIC_PER_PATH and is what limits invocations; every
 # scheduler site is checked against the descriptor contract on its own; the SCC,
 # topological and loop-shape checks are linear; the owner replay is a monotone
-# join fixpoint and each callee replay keeps its own explicit state budget.
-WIDE_LIMITS = dict(scheduler_sites=8, ordinary_targets=32, call_sites=40, instructions=512)
+# join fixpoint and each callee replay keeps its own explicit state budget, so
+# the cost grows linearly with the call-site count.
+WIDE_LIMITS = dict(scheduler_sites=8, ordinary_targets=32, call_sites=48, instructions=512)
 
 
 def require(condition, message):

@@ -13,6 +13,7 @@ from pathlib import Path
 import subprocess
 import sys
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]/'tools'))
@@ -21,6 +22,8 @@ import conditional_local_buffer_profile as local
 import named_data_buffer_profile as named
 import owner_admission_profile as owner
 import scheduler_branch_profile as branch
+from test_scheduler_predicates import half, fixture
+from test_scheduler_loop_composition import Program, descriptor_call
 
 SELECTOR = 'conditional-scheduler-three-per-path-calls-v1'
 S = branch.SCHEDULER
@@ -61,13 +64,33 @@ class SequentialDAGTests(unittest.TestCase):
         self.assertEqual(result['scheduler_calls_per_path_budget'],3)
 
     def test_target_and_call_budgets_are_separate(self):
-        edges,calls=sequence([B+32*i for i in range(32)]+[S]+[B]*7)
+        edges,calls=sequence([B+32*i for i in range(32)]+[S]+[B]*15)
         r=phases(edges,calls)
+        self.assertEqual(len(calls),48)
         self.assertEqual(r['ordinary_target_budget'],32)
-        self.assertEqual(r['call_site_budget'],40)
-        for targets in ([B+32*i for i in range(33)]+[S], [B]*40+[S]):
+        self.assertEqual(r['call_site_budget'],48)
+        for targets in ([B+32*i for i in range(33)]+[S], [B]*48+[S]):
             with self.subTest(sites=len(targets)),self.assertRaisesRegex(ValueError,'bounds'):
                 phases(*sequence(targets))
+
+    def test_per_path_and_site_obligations_hold_at_the_call_site_budget(self):
+        # 48 sites, three schedulers on one path: admitted. A fourth on that
+        # path, a fifth static site or a cycle is refused at the same count.
+        targets=[B+32*(i%28) for i in range(47)]
+        edges,calls=sequence(targets[:20]+[S,S,S]+targets[20:45])
+        self.assertEqual(len(calls),48)
+        self.assertEqual(phases(edges,calls)['maximum_scheduler_calls_per_path'],3)
+        edges,calls=sequence(targets[:20]+[S,S,S,S]+targets[20:44])
+        self.assertEqual(len(calls),48)
+        with self.assertRaisesRegex(ValueError,'per-path'):phases(edges,calls)
+        edges={0:(1,2,3,4,5),1:(6,),2:(6,),3:(6,),4:(6,),5:(6,)}
+        edges.update({i:(i+1,) for i in range(6,48)});edges[48]=()
+        calls={**{i:S for i in range(1,6)},**{i:targets[i-6] for i in range(6,49)}}
+        self.assertEqual(len(calls),48)
+        with self.assertRaisesRegex(ValueError,'bounds'):phases(edges,calls)
+        edges,calls=sequence(targets[:20]+[S]+targets[20:47])
+        self.assertEqual(len(calls),48)
+        with self.assertRaisesRegex(ValueError,'cycles'):phases({**edges,47:(0,)},calls)
 
     def test_fifth_static_scheduler_site_refused(self):
         edges={0:(1,2,3,4,5),1:(6,),2:(6,),3:(6,),4:(6,),5:(6,),6:()}
@@ -111,6 +134,63 @@ class SequentialDAGTests(unittest.TestCase):
         for flag in (None,'wide_targets','twenty_four_targets'):
             with self.subTest(flag=flag),self.assertRaises(ValueError):
                 branch.phases(edges,calls,**({flag:True} if flag else {}))
+
+
+A=0x08001000
+T=0x08003000  # 32 one-instruction ordinary bodies, 0x20 apart
+
+
+def budget_owner(sites, *, alias_at=None, targets=32):
+    """One scheduler call, then sites-1 ordinary calls over `targets` distinct bodies."""
+    p=Program(A)
+    p.emit(0xB5F0,0xB087)                           # push {r4-r7,lr}; sub sp,#28
+    descriptor_call(p)
+    for i in range(sites-1):
+        if i==alias_at:p.emit(0xA900)              # add r1, sp, #0
+        p.call(T+0x20*(i%targets))
+    p.emit(0x2100,0xB007,0xBCF0,0xBC01,0x4700)      # movs r1,#0; add sp,#28; pop; bx r0
+    return p.build()[:2]
+
+
+def budget_replay(data, calls, targets=32):
+    bodies={A:data,S:bytes(60),0x08005954:bytes(206),
+            **{T+0x20*i:half(0x4770) for i in range(targets)}}
+    p=fixture(bodies,policy=SELECTOR)
+    span=p.span
+    runtimes=set(match.function_thunk.ALIASES.values())
+    p.span=lambda a:half(0x4710) if a in runtimes else span(a)
+    pins={a:(len(b),hashlib.sha256(b).hexdigest()) for a,b in bodies.items() if a in (S,0x08005954)}
+    with mock.patch.dict(local.DEPENDENCIES,pins),\
+            mock.patch.object(local.thunk,'dependencies',return_value=[]):
+        p.bind_root(data,A,calls)
+    match.verify_leaf_instructions(data,A,True,calls,buffer_proof=p)
+    return p
+
+
+class SequentialBudgetReplayTests(unittest.TestCase):
+    """Raw Thumb owners at the call-site budget through the complete owner replay."""
+
+    def test_48_sites_over_32_targets_complete_replay(self):
+        data,calls=budget_owner(48)
+        self.assertEqual(len(calls),48)
+        p=budget_replay(data,calls)
+        manifest=p.contract_manifest()
+        self.assertEqual(len(manifest['observations']),48)
+        self.assertEqual(manifest['branch_calls']['call_site_budget'],48)
+        self.assertEqual(len(manifest['branch_calls']['ordinary_targets']),32)
+        # One body per distinct target, not per site: 32 ordinary bodies and
+        # both scheduler bodies (the fixture's thunks are not budgeted here).
+        self.assertEqual(p.requested,{T+0x20*i for i in range(32)}|{S,0x08005954})
+
+    def test_49th_site_refused(self):
+        with self.assertRaisesRegex(ValueError,'call-site or target bounds'):
+            budget_replay(*budget_owner(49))
+
+    def test_live_local_alias_refused_at_the_budget(self):
+        for site in (0,23,46):
+            data,calls=budget_owner(48,alias_at=site)
+            with self.subTest(site=site),self.assertRaisesRegex(ValueError,'every live local alias'):
+                budget_replay(data,calls)
 
 
 @unittest.skipUnless(os.environ.get('FFTA_SCHEDULER_SEQUENTIAL_EVIDENCE'),
