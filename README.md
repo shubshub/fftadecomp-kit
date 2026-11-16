@@ -3320,8 +3320,9 @@ no ROM bodies, disassembly or game-derived fixtures belong in toolkit history.
 selects `elf-symbol-thumb-df-convert-sub-div-target-v1`. Only the fixed agbcc
 `-mthumb-interwork -O2` configuration is supported. At least one fresh original
 ELF call relocation must name `__floatdidf`, `__floatsidf`, `__adddf3`, `__subdf3`,
-`__divdf3`, `__muldf3`, `__ltdf2`, `__truncdfsf2` or `__fixdfsi`. Private
-integer helpers and other floating operations remain unsupported.
+`__divdf3`, `__muldf3`, `__ltdf2`, `__truncdfsf2` or `__fixdfsi`, or the
+wide-integer `__muldi3`/`__divdi3` described below. Private integer helpers
+and other floating operations remain unsupported.
 
 All eighteen complete runtime identities in `software_double_profile.py` are
 mandatory, including pools, internal alignment and 36 dependency edges.
@@ -3435,6 +3436,43 @@ quotient or remainder equivalence. The standalone positive-constant quotient
 and signed16/nonzero remainder policies retain their operand requirements;
 old reports keep their formats. Saved target-state reports retain the explicit
 selector during verification and rebuild replay.
+
+Plain `long long` `*` and `/` compose through the separately versioned
+`agbcc-thumb-muldi3-divdi3-target-state-closure-v1` record. It binds only the
+original compiler symbols `__muldi3` (`08142A20`, 116 bytes/56 instructions)
+and `__divdi3` (`08142280..081426B8`, 1,080 bytes/496 reachable instructions,
+including its final literal word). A caller with no binary64 operation uses
+this selector too, as a caller of only `__negdi2` already does. Both function
+indexes must carry those exact extents; the analyzer's truncated
+`081426B4`/538 row is refused. Division's closure is pinned too: the canonical
+unsigned word quotient and remainder and their shared zero hook, with all 19
+call edges. Local `agbcc/libgcc/libgcc2.c` selections `L_muldi3` and
+`L_divdi3`, preprocessed with that tree's libgcc Makefile options and compiled
+by the fixed agbcc `-mthumb-interwork -O2`, produce complete ELF function
+symbols identical to the 116- and 1,080-byte ROM bodies when `__udivsi3` and
+`__umodsi3` are typed-bound to their Thumb addresses and the `__clz_tab`
+`.rodata` is placed at its literal, `0836CF98`. The `lib1thumb.asm` selections
+`L_udivsi3`, `L_umodsi3` and `L_dvmd_tls` likewise reproduce the other three
+bodies. A focused test rebuilds all five and requires the pinned digests; it is
+a local audit that skips without those sources unless `FFTA_REQUIRE_LIBGCC=1`.
+As for the word runtimes, this identifies the audited source variant, not an
+arbitrary installed libgcc.
+
+The unchanged runtime interpreter proves every reachable return, balanced
+frames, restored r4-r11, no caller-memory writes and no read at or above entry
+SP through a tracked stack address. The three computed `__clz_tab` loads
+(`08142304`, `081423E8`, `0814255C`) are unconstrained by it; that the code
+bounds them to ROM is established by inspection of the pinned bodies. Operands
+and those table loads are target-state inputs: no arithmetic, zero-divisor or
+termination claim is made. Explicit `func_08142A20` calls, `__moddi3`,
+`__udivdi3` and other wide runtimes remain refused in this profile, and neither
+wide runtime composes with inert spins. Explicit `func_08142280` calls are a
+deliberate tightening: they verified under this selector before, as ordinary
+entry-only calls, and are now refused, because inside the selector any call to
+`08142280` must be the canonical `__divdi3`. Outside the selector, `__muldi3`
+and `__divdi3` stay unbound, and an explicit `func_08142280` keeps its existing
+ordinary entry-only binding.
+
 Ordinary callees retain entry-only binding and ABI assumptions: their complete
 bodies, semantics and return behavior are not proved.
 

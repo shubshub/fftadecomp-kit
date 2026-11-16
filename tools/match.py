@@ -594,7 +594,7 @@ def parse_data_symbols(snapshot):
     for name, value in document.items():
         if not re.fullmatch(r"[A-Za-z_][A-Za-z_0-9]*", name) or \
                 name.startswith(("func_", "_call_via_")) or \
-                name in ("__udivsi3", "__modsi3", "__umodsi3", "__ashldi3", "__lshrdi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or name in software_float.OPERATIONS or \
+                name in ("__udivsi3", "__modsi3", "__umodsi3", "__ashldi3", "__lshrdi3", "__divsi3", "__div0") or name in software_double.OPERATIONS or name in software_double.WIDE_OPERATIONS or name in software_float.OPERATIONS or \
                 not isinstance(value, str) or not re.fullmatch(r"0x[0-9A-Fa-f]{8}", value):
             raise ValueError("invalid data symbol name or absolute address")
         if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)) or \
@@ -852,7 +852,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                 sum(item["name"] == name for item in image["symbols"]) == 1
             double_operation = target_symbol["name"] in software_double.OPERATIONS or (
                 double_bindings is not None and
-                software_double.shared_division_call(target_symbol["name"], divsi3.ADDRESS))
+                software_double.shared_division_call(target_symbol["name"], divsi3.ADDRESS)) or (
+                double_bindings is not None and target_symbol["name"] in software_double.WIDE_OPERATIONS)
             float_operation = target_symbol["name"] in software_float.OPERATIONS and not (
                 double_operation and double_bindings is not None)
             if float_operation:
@@ -1226,6 +1227,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     float_targets = {name: target for name, target in targets.items()
                      if software_float.reserved(target) and not (
                          double_bindings is not None and software_double.shared_float_call(name, target) or
+                         double_bindings is not None and software_double.wide_call(name, target) or
                          ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if float_targets:
         if type(float_bindings) is not dict or not float_bindings or \
@@ -1279,7 +1281,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("unsigned remainder bindings have no linked runtime")
     double_targets = {name: target for name, target in targets.items()
                       if (software_double.reserved(target) or
-                          double_bindings is not None and software_double.shared_division_call(name, target)) and not (
+                          double_bindings is not None and software_double.shared_division_call(name, target) or
+                          double_bindings is not None and software_double.wide_call(name, target)) and not (
                           float_bindings is not None and software_double.shared_float_call(name, target) or
                           ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if double_targets:
@@ -1288,7 +1291,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                     for site, alias in double_bindings.items()) or \
                 double_targets != {alias: software_double.call_target(alias) for alias in double_bindings.values()} or \
                 set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target) or
-                                             target in software_double.DIVISION_OPERATION.values()} or \
+                                             target in software_double.DIVISION_OPERATION.values() or
+                                             target in software_double.WIDE_OPERATIONS.values()} or \
                 udivsi3_bindings or divsi3_bindings or \
                 modsi3_bindings is not None and not modsi3_bindings or \
                 data_relocations and not allow_double_data or \
@@ -4406,8 +4410,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 switch_data_relocations is not None or udivsi3_context is not None or \
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
             raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
+        # Neither wide runtime composes with spins; 08142280 is not reserved, so name both.
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
                modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or
+               double_context is not None and target in software_double.WIDE_OPERATIONS.values() or
                (software_double.reserved(target) or software_float.reserved(target)) and not
                (double_context is not None and target in software_double.OPERATIONS.values())
                for target in (validated_calls or {}).values()):
@@ -4630,6 +4636,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if not summarized and software_float.reserved(target) and not (
                     double_context is not None and
                     software_double.shared_float_call(double_context[3].get(current), target) or
+                    double_context is not None and
+                    software_double.wide_call(double_context[3].get(current), target) or
                     ashldi3_context is not None and
                     target == ashldi3.for_bindings(ashldi3_context[3]).ADDRESS):
                 if float_context is None or current not in float_context[3] or \
@@ -4649,7 +4657,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     ashldi3_context is not None and
                     target == ashldi3.for_bindings(ashldi3_context[3]).ADDRESS):
                 if double_context is None or current not in double_context[3] or \
-                        software_double.OPERATIONS.get(double_context[3][current]) != target:
+                        software_double.OPERATIONS.get(double_context[3][current],
+                                                       software_double.WIDE_OPERATIONS.get(double_context[3][current])) != target:
                     raise ValueError("software double requires its canonical runtime proof")
             if not summarized and divsi3.reserved(target) and target != 0x0814274C and not (
                     addressed_signed_runtime_context is not None and
