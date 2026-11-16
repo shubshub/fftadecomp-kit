@@ -3221,17 +3221,38 @@ tool runs `cpp -nostdinc -undef -I include` first and hands the result over.
 `match.py --control-flow-profile mixed-return-inert-spin-v1` selects the
 separate `elf-symbol-thumb-mixed-return-inert-spin-v1` report profile. Ordinary
 matching and all older schemas keep their existing return-reachability rule.
-The new profile requires a normal verified return and at least one reachable
-instruction without a graph path to a return. **Every** such instruction must
-either be an unconditional narrow Thumb branch to its own address, or belong
-to a terminal tail: a straight-line chain of two-byte instructions, each whose
-only successor is the next instruction, that ends in such a self-branch. A tail
+The new profile requires a normal verified return (with one exception, below)
+and at least one reachable instruction without a graph path to a return.
+**Every** such instruction must either be an unconditional narrow Thumb branch
+to its own address, or belong to a terminal tail: a straight-line chain of
+two-byte instructions, each whose only successor is the next instruction, that
+ends in such a self-branch. A tail
 instruction cannot be a branch, call or interrupt, push or pop, stack
 adjustment, or write SP or PC, so a conditional exit, `bl`, frame change or
-indirect transfer refuses. Pure-spin functions, multi-instruction cycles and
-branch feeders remain excluded. Reports list the tail instructions in an
-optional `tails` record and then state the tail summary; reports without one
-keep the self-branch-only meaning, digest and summary.
+indirect transfer refuses. Pure-spin functions, multi-instruction cycles other
+than the call loop below, and branch feeders remain excluded. Reports list the
+tail instructions in an optional `tails` record and then state the tail
+summary; reports without one keep the self-branch-only meaning, digest and
+summary.
+
+The one exception to the return requirement is a function with **no**
+reachable return whose only cycle is a call loop, such as
+`for (;;) func_08003398();` after some setup. Its reachable instructions must
+be one contiguous run from the entry in which every instruction falls through
+to the next, except the last: a narrow unconditional `b` back to the loop
+head. So there is exactly one cycle and no exit; a conditional branch, a
+second cycle, a pop, an interrupt or an indirect transfer anywhere refuses.
+The straight-line prefix before the head may hold the frame setup (push,
+fixed SP adjustments), stores and typed calls. Inside the loop every
+instruction other than the closing branch is an ordinary typed call to an
+indexed Thumb function or a straight-line instruction without a store, push
+or SP write, and the loop holds at least one call, so a function whose only
+cycle is `b .` stays excluded. Such reports carry an optional `loop` record
+(`head`, closing `branch` and the loop's call offsets, with `spins` empty),
+state their own control-flow line and summary, and keep every other check
+and the data, replay and status rules below. The claim is only that, if each
+callee returns, the function never returns and does nothing in the loop but
+load, compute and call; it does not prove that the callees return.
 
 The complete converged instruction, stack/provenance, local-alias, call and
 literal checks still run on every reachable instruction, tails included,

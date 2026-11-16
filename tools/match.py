@@ -4404,8 +4404,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if remainder_bindings and not software_double.target_remainder_context(double_context):
             modsi3_context = (double_context[0], double_context[1], remainder_bindings)
     if inert_spin_context is not None:
-        # {"tails": []} additionally admits straight-line terminal tails before a self-branch.
-        if type(inert_spin_context) is not dict or inert_spin_context not in ({}, {"tails": []}) or not thumb or \
+        # {"tails": []} additionally admits straight-line terminal tails before a self-branch;
+        # {"tails": [], "loop": None} also admits a function without a return that ends in one call loop.
+        if type(inert_spin_context) is not dict or \
+                inert_spin_context not in ({}, {"tails": []}, {"tails": [], "loop": None}) or not thumb or \
                 buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
                 switch_data_relocations is not None or udivsi3_context is not None or \
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
@@ -5157,7 +5159,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             (not division_constants or unsigned_quotient_profile is None and
              uses_stack_frame(instructions.values())):
         raise ValueError("division evidence requires runtime calls and a frameless caller")
-    if not returns:
+    if not returns and (inert_spin_context is None or "loop" not in inert_spin_context):
         raise ValueError("function has no verified return")
     predecessors = {current: set() for current in instructions}
     for current, successors in edges.items():
@@ -5218,8 +5220,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 reaching_return.add(predecessor)
                 pending.append(predecessor)
     if inert_spin_context is not None:
-        spins = sorted(instructions.keys() - reaching_return)
-        if not spins:
+        # Without a return, only the opted-in call loop is admitted, and it has no spin or tail.
+        loop = inert_spin.call_loop(instructions, edges, address, calls) if not returns else None
+        spins = sorted(instructions.keys() - reaching_return) if returns else []
+        if not spins and loop is None:
             raise ValueError("inert-spin profile requires a reachable nonreturning self-branch")
         tails = inert_spin.terminal_tails(instructions, edges, spins) if "tails" in inert_spin_context else []
         spins = [current for current in spins if current not in tails]
@@ -5318,6 +5322,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         inert_spin_context["spins"] = [current - address for current in spins]
         if "tails" in inert_spin_context:
             inert_spin_context["tails"] = [current - address for current in tails]
+        if "loop" in inert_spin_context:
+            inert_spin_context["loop"] = loop
     if local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
@@ -5854,7 +5860,7 @@ def main():
                 verified_instructions = software_double.verify(
                     got, addr, rom, mapping, function_index, double_evidence, data_mapping=data_mapping)
             elif spin_profile:
-                context = {"tails": []}
+                context = {"tails": [], "loop": None}
                 verified_instructions = verify_leaf_instructions(got, addr, True, calls,
                                                                   inert_spin_context=context)
                 spin_evidence = inert_spin.make_manifest(calls, addr, verified_instructions, context,
@@ -6107,7 +6113,9 @@ def main():
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
     if preloaded_profile:
         control_flow = PRELOADED_SWITCH_CONTROL_FLOW
-    if spin_profile or double_profile and "inert_spin" in double_evidence:
+    if spin_profile:
+        control_flow = inert_spin.control_flow(spin_evidence)
+    elif double_profile and "inert_spin" in double_evidence:
         control_flow = inert_spin.CONTROL_FLOW
     if thunk_profile:
         control_flow = function_thunk.CONTROL_FLOW
