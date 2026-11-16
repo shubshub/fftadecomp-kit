@@ -491,6 +491,14 @@ sudo chroot /srv/questing su - user -c '
 sudo umount /srv/questing/proc
 ```
 
+The `old-agbcc-O2-v1` compiler comes from the same chroot, source commit and
+path: build it in a fresh clone with `make -C gcc old -j1` and install
+`gcc/old_agbcc` at `$HOME/agbcc/gcc/old_agbcc`. Built so, it reproduces bit
+for bit as SHA-256
+`88ebbb5b6167ab979f1652e599a5fb134eabe9a93f43122ca019da77a32c29f1`; a
+following `make -C gcc clean && make -C gcc normal -j1` in that tree gives
+the reference `agbcc` above.
+
 That chroot provides `gcc-15 15.2.0-4ubuntu4`, `libc6-dev 2.42-0ubuntu3.1`,
 `binutils-x86-64-linux-gnu 2.45-7ubuntu1.2` and `make 4.4.1-2`. The binary
 needs only `libc.so.6` and runs on the noble report host. Install it at
@@ -1813,6 +1821,104 @@ summary. Mapping changes invalidate cached evidence and interrupt mixed rebuilds
 These checks establish relocation fidelity, not the safety of dereferencing a
 mapped address. No game data should be copied into the symbol map.
 
+### Library units
+
+Some library objects in the ROM were prebuilt with settings other than the
+game's `agbcc -mthumb-interwork -O2`. The decomp records each such object as a
+row of its `config/library_units.json`; the range is a ROM fact, so the table
+lives with the decomp, like `config/data_symbols.json`. The kit owns the
+closed set of toolchains a row may name and all the checks:
+
+| toolchain | compiler | flags |
+|---|---|---|
+| `agbcc-O0-v1` | `$HOME/agbcc/gcc/agbcc` | `-mthumb-interwork -O0` |
+| `agbcc-O1-v1` | `$HOME/agbcc/gcc/agbcc` | `-mthumb-interwork -O1` |
+| `old-agbcc-O2-v1` | `$HOME/agbcc/gcc/old_agbcc` | `-mthumb-interwork -O2` |
+
+```json
+{"units": [{"name": "agb_flash FLASH512_V130", "start": "0x0814189C", "end": "0x0814220C",
+            "toolchain": "agbcc-O1-v1",
+            "identity": [{"address": "0x0836CE28", "ascii": "FLASH512_V130"}],
+            "proof": "0x0814195C", "evidence": "why this object was built so"}]}
+```
+
+* A row has exactly these keys. Addresses are canonical `0x%08X` text. The
+  range is even, starts and ends on `config/functions.json` boundaries, holds
+  at least two index functions (a unit is a library object, never one
+  function), and no index function straddles it; every function inside is
+  Thumb. Rows never overlap, and names are unique.
+* `identity` holds at least one item the tool re-reads from the ROM: an
+  `{address, ascii}` string of at least 8 characters, such as a library
+  version string, or an `{address, size, sha256}` digest of at least 16
+  bytes. An `ascii` item must be a whole C string: followed by a NUL and
+  not preceded by a printable character. Two rows may not use
+  overlapping identity bytes. A mismatch refuses the table. Neither form is
+  checked to belong to the range: an `ascii` item is any such string at that
+  address, and a digest of the span binds the row to this ROM. Which library
+  a range is remains review evidence.
+* `proof` is an index function inside the unit. `status.py` reports the row
+  as needing attention unless that function is verified with the unit's
+  toolchain and, compiled with the default toolchain, gives a different
+  relocatable function (different `.text`, `.text` relocations or symbol).
+  A row whose proof also builds under the default toolchain is reported as
+  stale.
+
+`match.py --unit-toolchain <id>` verifies an address with its unit's
+toolchain. It is refused outside a unit, for a different unit's toolchain,
+together with `--cc`/`--flags`, other toolchain options or non-default WSL
+options, and with any profile selector: unit toolchains use the ordinary Thumb path, and the
+report must be one of the leaf, frame, direct-call, named-data and
+function-address schemas.
+Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
+nothing refers to it. Such a section is first authenticated with the
+existing compiler-orphan prerequisite, then removed; the remaining `.text`,
+its relocations and the function symbol must be unchanged. The excluded
+bytes earn no ROM credit, and the report records the authentication.
+
+Inside a unit the default toolchain still verifies a function, but only when
+the unit's toolchain emits the identical relocatable function: the same
+`.text`, the same `.text` relocations (to named external symbols or the
+function itself) and the same symbol. Otherwise
+`match.py` refuses and points to `--unit-toolchain`. This keeps every
+function in a unit consistent with its unit's toolchain while the specialised
+profiles keep their fixed default toolchain. Outside every unit, any other
+toolchain or flags are exploration: `match.py` prints the diff when the
+object compiles and links, writes no report, and the verdict is
+`NOT VERIFIED`, never a match; a saved report whose
+`* compiler:` line names other flags is refused. The explicit fixed-O0
+orphan-constant selector keeps its existing evidence scope outside units and
+is also admitted inside an `agbcc-O0-v1` unit, never inside another one.
+
+A unit report adds `* library unit:` (the canonical row), `* unit toolchain:`
+and `* unit compiler SHA-256:`, and `* unit orphan constants:` when a
+`.rodata` was excluded. Validation requires the current row, the same
+compiler binary hash and the unit's compiler line. `status.py --verify`
+and `rebuild.py --compiled` replay unit reports with their
+`--unit-toolchain`, and the status block
+lists each unit's functions apart from everything outside units. Without a
+table, only the default toolchain and the fixed-O0 selector verify.
+
+`old_agbcc` must be pret/agbcc's `-DOLD_COMPILER` build: the tool refuses a
+binary that accepts `-fprologue-bugfix`, which only the new compiler has.
+`make -C gcc old` in a tree that already built `agbcc` relinks the new
+objects, so build it from a clean tree (see "Reproducing the reference
+agbcc").
+
+A decomp whose table names `old-agbcc-O2-v1` needs `old_agbcc` installed to
+verify any function in that unit. Default-toolchain reports there are
+admitted only through the consistency check, which compiles with
+`old_agbcc`, so without it they are refused too. Unit reports bind the
+compiler binary's hash, so they validate offline only where that binary is
+installed. Library units need a POSIX host: the compiler is hashed and
+probed on the host, not through WSL.
+
+Limits: runtime-helper calls (`__lshrdi3` and the other audited runtimes),
+function-pointer calls through `_call_via_rN` in an object with orphan
+constants, and every specialised profile still require the default
+toolchain; such a function inside a unit verifies only when the two
+toolchains agree. The tool checks identity bytes and boundaries; that a row
+covers one whole library object is the maintainer's evidence.
+
 ### Named Thumb function addresses
 
 The separate `elf-symbol-thumb-function-addresses-v1` profile admits
@@ -3029,7 +3135,9 @@ Focused checks: `PYTHONDONTWRITEBYTECODE=1 python tests/test_plausible_volatile_
 `python -m unittest discover -s tests -p 'test_volatile_indirect_calls.py'` covers typed indirect calls.
 
 It handles the compiler stage as `cc -> .s`, so it works with a classic cc1
-(GCC 2.9 / agbcc), with modern gcc and with clang:
+(GCC 2.9 / agbcc), with modern gcc and with clang. Any toolchain other than
+the default, outside a library unit's own, is exploration only: the diff is
+printed and the verdict is `NOT VERIFIED`:
 
 ```sh
 python tools/match.py 0x08017514 --flags "-mthumb-interwork -O2"
@@ -3444,6 +3552,13 @@ complete ELF/report extent must equal the unique indexed extent. Internal
 literal pools count; external alignment and installation-time RAM aliases do
 not. No late count changes a legacy numerator, denominator or percentage.
 This is recovered-code evidence, not an exhaustive late-ROM inventory.
+
+A decomp with `config/library_units.json` also gets one row per library
+unit (functions and indexed bytes matched inside it) and a row for every
+function outside units. Unit functions stay in the legacy metrics; the rows
+only separate them. A row whose proving function is unverified, verified with
+the default toolchain, or no longer needs the unit's toolchain is listed
+under "needs attention".
 
 `--verify` performs fresh official matching without rewriting reports;
 `--write --verify` also regenerates and replays them. Fresh no-write verification

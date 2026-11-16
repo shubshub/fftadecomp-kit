@@ -50,6 +50,7 @@ from match_evidence import (report_matches, compiler_flags,
                             SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA,
                             SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
+import library_units
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
@@ -284,6 +285,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         report = None
         rep = os.path.join(root, "docs", "match", f"{addr}.md")
         saved_flags = None
+        unit_toolchain = None
         spin_profile = False
         double_profile = False
         target_remainder_profile = False
@@ -343,6 +345,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 unsigned_quotient_frame = f"* verification: `{UDIVSI3_FRAMED_SCHEMA}`" in saved_report.splitlines()
                 quotient_frame = f"* verification: `{divsi3.FRAMED_SCHEMA}`" in saved_report.splitlines()
                 saved_flags = compiler_flags(saved_report)
+                unit_toolchain = library_units.report_toolchain(saved_report)
             except ValueError as error:
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
@@ -412,7 +415,9 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 command += ["--unsigned-quotient-profile", UDIVSI3_FRAMED_SELECTOR]
             if quotient_frame:
                 command += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
-            if saved_flags is not None:
+            if unit_toolchain is not None:
+                command += ["--unit-toolchain", unit_toolchain]
+            elif saved_flags is not None:
                 command += ["--flags", saved_flags]
             if not write_reports:
                 command.append("--no-write")
@@ -485,6 +490,11 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
     if progress is not None:
         progress.update(index_progress(
             fns, [address for address, _, late in verified_bodies if not late]))
+    unit_problems, unit_summary = library_units.status_summary(
+        root, fns, {address for address, _, late in verified_bodies if not late}, CODE_END)
+    problems.extend(unit_problems)
+    if progress is not None and unit_summary is not None:
+        progress["library_units"] = unit_summary
 
     late_f, late_b = 0, 0
     unknown_main_extent = any(size is None and not late for _, size, late in verified_bodies)
@@ -624,6 +634,24 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
         f"alter the legacy metrics. No late-ROM denominator is established;\n"
         f"neither summary certifies exhaustive whole-game coverage.",
     ]
+    units = (progress or {}).get("library_units")
+    if units:
+        lines += [
+            "",
+            f"**Library units: {len(units['units']):,} recorded in `config/library_units.json`.**\n"
+            f"Prebuilt library objects that the original build compiled with another\n"
+            f"toolchain. Each function inside one is verified with its unit's\n"
+            f"toolchain, or with the default one where both emit the same function.\n"
+            f"They are part of the legacy metrics above and are listed here apart\n"
+            f"from the rest of the code.",
+            "",
+            "| Unit | Range | Toolchain | Functions matched | Bytes matched |",
+            "|---|---|---|---|---|",
+        ] + [f"| {unit['name']} | `0x{unit['start']:08X}`-`0x{unit['end']:08X}` | `{unit['toolchain']}` | "
+             f"{unit['matched']:,} / {unit['functions']:,} | {unit['matched_bytes']:,} / {unit['bytes']:,} |"
+             for unit in units["units"]] + [
+            f"| Everything outside library units | | default | "
+            f"{units['outside_matched']:,} / {units['outside_functions']:,} | |"]
     if problems:
         lines += ["", "```", "needs attention:"] + [f"  {p}" for p in problems] + ["```"]
     lines += ["", END]

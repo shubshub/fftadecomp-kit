@@ -33,6 +33,7 @@ from match_evidence import (data_snapshot, mapping_snapshot, report_matches, sou
                             SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA,
                             SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
 import inert_spin_profile as inert_spin
+import library_units
 import software_double_profile as software_double
 import function_thunk_profile as function_thunk
 import switch_constants_profile as switch_constants
@@ -138,6 +139,9 @@ def saved_profile_arguments(report, root, address):
             arguments += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
     if inert_spin.selected(report):
         arguments += ["--control-flow-profile", inert_spin.SELECTOR]
+    unit_toolchain = library_units.report_toolchain(report)
+    if unit_toolchain is not None:
+        arguments += ["--unit-toolchain", unit_toolchain]
     if arguments and not report_matches(report, root, address):
         raise ValueError(f"0x{address:08X}: invalid saved profile report")
     return arguments

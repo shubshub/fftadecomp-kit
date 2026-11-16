@@ -49,6 +49,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import empty_body_profile as empty_body
+import library_units
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -5442,6 +5443,8 @@ def main():
     ap.add_argument("--linker", default=DEFAULT_LD)
     ap.add_argument("--flags", default=DEFAULT_FLAGS)
     ap.add_argument("--mode", default="thumb", choices=("thumb", "arm"))
+    ap.add_argument("--unit-toolchain", choices=tuple(library_units.TOOLCHAINS),
+                    help="verify with the toolchain of the library unit holding the address")
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
     ap.add_argument("--unsigned-quotient-profile", choices=(UDIVSI3_FRAMED_SELECTOR,))
@@ -5572,6 +5575,17 @@ def main():
             (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) !=
             (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS)):
         sys.exit("framed unsigned quotient excludes other selectors and requires the fixed Thumb toolchain")
+    # config/library_units.json decides the toolchain: a unit's own inside it,
+    # the default elsewhere; anything else is exploration and never a match
+    try:
+        gate = library_units.gate(ROOT, addr, args)
+    except (ValueError, RuntimeError) as error:
+        sys.exit(f"refused: {error}")
+    exploratory = gate == "exploratory"
+    unit_context = gate if isinstance(gate, dict) and "tool" in gate else None
+    # inside a unit the default toolchain was checked against this source only
+    consistent_source = gate["source"] if isinstance(gate, dict) and "source" in gate else None
+    unit_orphan = None
     # an allowlisted volatile object is checked once, here, ahead of every
     # selector: the selectors below write their own reports
     volatile_records, volatile_finding, volatile_source = allowlisted_volatile_check(ROOT, addr, args)
@@ -5580,7 +5594,10 @@ def main():
         if volatile_finding:
             sys.exit(f"source    IMPLAUSIBLE\nverdict NOT VERIFIED - the selector was not run\n\n"
                      f"plausibility findings:\n  {volatile_finding}")
-        return issue_with_volatile_records(issue, ROOT, addr, args, volatile_records, volatile_source)
+        result = issue_with_volatile_records(issue, ROOT, addr, args, volatile_records, volatile_source)
+        if consistent_source is not None and source_fingerprint(ROOT, addr) != consistent_source:
+            sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
+        return result
 
     if args.unsigned_runtime_profile is not None:
         return selector_issue(unsigned_divmod.issue)
@@ -5674,6 +5691,9 @@ def main():
     print(f"function  0x{addr:08X}   {span} bytes ({'Thumb' if thumb else 'ARM'})")
     print(f"source    {src_rel}")
     print(f"compiler  {args.cc} {args.flags}")
+    if unit_context is not None:
+        print(f"unit      {unit_context['unit'].name} ({unit_context['tool']['id']}; "
+              f"compiler SHA-256 {unit_context['tool']['sha256']})")
 
     function_switch_profile = args.switch_data_profile in (SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
                                                            SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
@@ -5694,6 +5714,9 @@ def main():
         with runner.workspace() as workspace:
             object_data, text_data, original = compile_object(
                 runner, workspace, args, ROOT, addr, src_rel, thumb)
+            if unit_context is not None:
+                object_data, text_data, original, unit_orphan = library_units.exclude_orphan_constants(
+                    runner, workspace, args, object_data, addr, rom, mapping, data_mapping, empty_index)
             calls = {}
             data_relocations = {}
             function_relocations = {}
@@ -6111,7 +6134,8 @@ def main():
     if not plausible:
         volatile_records = []
     if source_fingerprint(ROOT, addr) != fingerprint or \
-            volatile_source is not None and volatile_source != fingerprint:
+            volatile_source is not None and volatile_source != fingerprint or \
+            consistent_source is not None and consistent_source != fingerprint:
         sys.exit("source or headers changed during verification; re-run match.py")
     if empty_profile and (mapping_snapshot(ROOT) != mapping or
                           empty_body.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file):
@@ -6121,6 +6145,14 @@ def main():
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
+    if unit_context is not None:
+        if schema not in library_units.schemas():
+            sys.exit(f"refused: library unit toolchains admit the leaf, frame, direct-call, named-data and "
+                     f"function-address schemas only, not {schema}")
+        try:
+            library_units.recheck(ROOT, unit_context)
+        except ValueError as error:
+            sys.exit(f"refused: {error}")
     if schema == FUNCTION_BUFFER_SCHEMA and report_rom_path(ROOT) != rom_file:
         sys.exit("selected ROM changed during verification; re-run match.py")
     if spin_profile and (inert_spin.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file):
@@ -6179,7 +6211,7 @@ def main():
     with open(rom_file, "rb") as original:
         if original.read() != rom:
             sys.exit("base ROM changed during verification; re-run match.py")
-    exact = identical and plausible
+    exact = identical and plausible and not exploratory
     byte_rows = lcs_align(got_body, want)
 
     # Byte-identical output from source that no developer would write is not a
@@ -6188,6 +6220,9 @@ def main():
     # never counts as a decompilation.
     if exact:
         verdict = "MATCH - byte identical"
+    elif identical and exploratory:
+        verdict = ("NOT VERIFIED - bytes equal under a non-default toolchain, which is admitted "
+                   "only as a library unit's toolchain inside that unit")
     elif identical:
         verdict = ("HAND-ASM (sanctioned) - byte identical, but the source is "
                    "not code a developer would have written"
@@ -6250,7 +6285,9 @@ def main():
     print(f"\n{same_instr}/{len(wbytes)} instructions identical "
           f"({same_bytes}/{len(want)} bytes)")
 
-    if not args.no_write:
+    if exploratory:
+        print("\nno report written: exploration with a non-default toolchain")
+    elif not args.no_write:
         label = f".{args.label}" if args.label else ""
         out = os.path.join(ROOT, "docs", "match", f"{addr:08X}{label}.md")
         os.makedirs(os.path.dirname(out), exist_ok=True)
@@ -6387,6 +6424,9 @@ def main():
                 proof_digest = function_thunk.fingerprint(addr, got_body, thunk_evidence, fingerprint,
                                                           mapping, function_index, data_mapping, rom)
                 f.write(f"* function-address-thunk sha256: `{proof_digest}`\n")
+            if unit_context is not None:
+                for line in library_units.report_lines(unit_context, unit_orphan):
+                    f.write(line + "\n")
             f.write(f"* compiler: `{args.cc} {args.flags}`\n")
             f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
             f.write(f"* relocations: none\n")
