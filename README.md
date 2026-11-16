@@ -863,7 +863,8 @@ addresses, cannot be accessed through a passed buffer. Unknown or indexed
 accesses, pointer spills, unrecognized uses, inconsistent alias joins and
 pointer-bearing returns fail closed. Buffer pointers cannot be supplied through
 stack arguments or LR. Combined buffer calls and named data relocations remain
-unsupported.
+unsupported on this path; the explicit `named-data-buffer-v1` selector composes
+them.
 
 A nested call receiving an alias in a caller-clobbered register requires the
 same proof, even when that register contains only a stale argument. Overwriting
@@ -978,12 +979,15 @@ at the same address still refuse.
 
 Replay is opt-in per class (not inherited) and per construction
 (`loop_replay=True`, passed only by the frame-buffer and function-buffer
-producers and their report checks): only the plain register and
-stack buffer proofs (`BufferCallProof`, `FunctionBufferCallProof`) enable it,
-and not when they carry a discarded-scratch or BIOS-fill policy. Every profile
-subclass keeps the join refusal. Records of the aborted joined pass are
-discarded before the replay. Only replayed callees change the evidence: the
-buffer proof fingerprint (`bounded-loop-replay-v2`) then also binds each replayed
+producers, the `named-data-buffer-v1` selector and their report checks): only
+the plain register and stack buffer proofs (`BufferCallProof`,
+`FunctionBufferCallProof`) and the exact named-data buffer proof
+(`NamedDataBufferProof`) enable it, and not when they carry a discarded-scratch
+or BIOS-fill policy. Every profile subclass keeps the join refusal. Records of
+the aborted joined pass are discarded before the replay, including the
+named-data proof's own dependency records and budget charges. Only replayed
+callees change the evidence: the buffer proof fingerprint
+(`bounded-loop-replay-v2`) then also binds each replayed
 callee's call site, argument offsets, the trusted (call target, register) pairs,
 the pruned branch edges and the exact set of caller-frame bytes written by its own
 stores (stores of nested callees that are not replayed are checked but not
@@ -3877,7 +3881,10 @@ linking, complete ROM comparison and fresh fixed-toolchain source/plausibility
 replay use the existing complete-owner lifecycle.
 
 The caller and each inspected dependency are at most 4096 bytes. At most eight
-distinct dependency owners are inspected. Both indexes must identify each exact,
+distinct dependency owners are charged against the budget and recorded. A joined
+pass discarded for a loop replay (below) has its charges refunded, so more than
+eight owners may be walked in total, but the evidence never lists more than
+eight. Both indexes must identify each exact,
 unique, nonoverlapping complete ROM span. Legacy numeric instruction-count
 annotations may include pool words; the complete native CFG establishes the
 actual reachable count and every byte's role. Malformed count annotations reject.
@@ -3900,6 +3907,29 @@ named-data provenance. Callee records contain spans, structural descriptors and
 hashes rather than serialized body hex. Reports bind the original caller ELF,
 source/headers, both function indexes, object map, full ROM and every inspected
 dependency. Fresh report replay, status and rebuild retain the explicit selector.
+
+This selector, and no other named-data selector, uses the bounded loop replay of
+buffer callees described above. A joined pass that the replay replaces leaves
+nothing behind: the callees it alone inspected are absent from the dependency
+records and do not count against the eight-owner budget. When a callee is
+replayed, the evidence gains an optional `loop_replay` record in its buffer
+proof (`bounded-loop-replay-v2`, the buffer proof fingerprint that binds every
+inspected body and each replay's sites, argument offsets, trusted pairs, pruned
+edges and caller-frame writes, the report lines and the premise below), and the
+report states one `* buffer loop replay:` line per replayed callee before the
+evidence line. Reports without a replay are unchanged. Report replay recomputes
+the record and the lines and requires both exactly; an edited, missing, extra or
+indented line refuses. `tests/test_named_data_buffer_loop_replay.py` checks this
+with assembled callees and a natural-C typed-data caller.
+
+Data literals and replay compose under one stated premise. A data literal is a
+typed absolute address and never becomes a tracked stack alias, since aliases
+come only from SP arithmetic; accesses through it are external-memory accesses
+under the returning-ABI premise, exactly as for a pointer parameter. That named
+objects do not overlap any live stack is a premise, not a check: the startup
+code sets the system-mode SP to 0x03007EC0 and the IRQ SP to 0x03007FA0, both
+stacks grow down and their floors are not known statically. An address-class
+check on data symbols is the subject of kit `#196`.
 
 Focused native checks use `tests/test_named_data_buffer.py`, the fixed agbcc
 compiler and `-mthumb-interwork -O2`. Set `FFTA_NAMED_BUFFER_TEST_ROM` to the
