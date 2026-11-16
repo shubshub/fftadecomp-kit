@@ -197,7 +197,10 @@ def selected(report):
                       [f'* verification: `{entry.NATIVE_SCHEMA}`'],
                       [f'* verification: `{mutable_native.SCHEMA}`']) or any(marker_text(line).startswith((
             '* function-address', '* unsigned division', '* software double', '* software float',
-            '* inert spin', '* switches', '* buffer', '* signed quotient', '* signed remainder'))
+            '* inert spin', '* switches', '* buffer', '* signed quotient', '* signed remainder')) and not (
+                # Its own loop-replay disclosure; report replay requires exactly the recomputed lines.
+                fields == [f'* verification: `{named_buffer.SCHEMA}`'] and
+                line.startswith('* buffer loop replay: `bounded-loop-replay-v2` '))
             for line in report.splitlines()):
         raise ValueError('mixed or malformed complete-owner profile')
     return True
@@ -505,7 +508,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                 continue  # the walk proves the exact runtime closure at every reached site.
             match.function_address_target(f'func_{destination:08X}', json.loads(mapping),
                                           address, len(data), len(rom))
-        buffers = (runtime_summary.PROOFS[selector] if selector in runtime_summary.SELECTORS else
+        # Only the exact named-data-buffer-v1 proof replays loops (loop_replay_manifest below).
+        buffers = named_buffer.NamedDataBufferProof(rom, mapping, index, objects, loop_replay=True) \
+            if selector == named_buffer.SELECTOR else \
+                  (runtime_summary.PROOFS[selector] if selector in runtime_summary.SELECTORS else
                    bios_switch.BiosWordSwitchBufferProof if selector == bios_switch.SELECTOR else
                    local_calls.ConditionalLocalBufferProof if selector in local_calls.SELECTORS else
                    query_callee.KnownQueryCalleeBufferProof if selector == query_callee.SELECTOR else
@@ -597,6 +603,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                  'buffers': {'dependency_budget': buffers.dependency_budget if selector in (named_buffer.GUARDED_ALIAS_SELECTOR, *r6_buffer.PROFILES, *local_calls.SELECTORS) else module.MAX_DEPENDENCIES,
                     'owner_byte_budget': named_buffer.MAX_BYTES,
                     'dependencies': [buffers.records[target] for target in sorted(buffers.records)]}}
+        if buffers.loop_replays:
+            # Absent unless a callee was replayed, so reports without a replay keep their meaning.
+            proof['buffers']['loop_replay'] = buffers.loop_replay_manifest()
         if selector == copy_binding.SELECTOR:
             identity = copy_binding.native_manifest(data,address,rom,mapping,index,objects,
                 bindings if bindings is not None else (manifest or {}).get('bindings'))
@@ -1355,6 +1364,8 @@ def render(address,result):
           if manifest['profile'] in stack_index.SCHEMAS.values() else []),
         *(stack_index.forwarded_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if manifest['profile'] == stack_index.SCHEMA_V2 else []),
+        *(manifest['proof']['buffers']['loop_replay']['lines']
+          if manifest['profile'] == named_buffer.SCHEMA and 'loop_replay' in manifest['proof']['buffers'] else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])

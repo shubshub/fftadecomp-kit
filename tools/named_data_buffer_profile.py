@@ -163,9 +163,20 @@ class NamedDataBufferProof(match.BufferCallProof):
     """Keep existing alias rules; add only an independently proved finite dispatch."""
 
     dependency_budget = MAX_DEPENDENCIES
+    # Reviewed for bounded loop replay (this class only; subclasses keep the join
+    # refusal). Its own hooks are `span`, which charges `requested` against the
+    # dependency budget, and `inspect`, which writes one `records` entry per callee
+    # derived only from the callee bytes, mapping and identities. A replay re-enters
+    # both per call, idempotently. An aborted joined pass restores both ledgers
+    # (`_check_arguments`), so its extra callees neither appear in the manifest nor
+    # consume budget. Data literals are absolute typed addresses, never SP-derived
+    # aliases; that named objects do not overlap any live stack is a premise.
+    _loop_replay_opt_in = True
 
-    def __init__(self, rom, mapping, index, objects):
-        super().__init__(rom, mapping, stack_arguments=True)
+    def __init__(self, rom, mapping, index, objects, *, loop_replay=False):
+        # Only the named-data-buffer-v1 selector asks for replay; its report carries
+        # loop_replay_manifest() and replay rebuilds it.
+        super().__init__(rom, mapping, stack_arguments=True, loop_replay=loop_replay)
         self.mapping, self.index, self.objects = mapping, index, objects
         self.requested = set()
         self.records = {}
@@ -173,6 +184,28 @@ class NamedDataBufferProof(match.BufferCallProof):
                            'mapping_sha256': hashlib.sha256(mapping).hexdigest(),
                            'index_sha256': hashlib.sha256(index).hexdigest(),
                            'objects_sha256': None if objects is None else hashlib.sha256(objects).hexdigest()}
+
+    def _check_arguments(self, address, arguments, stack, incoming, protected, *, replay, **context):
+        saved = set(self.requested), dict(self.records)
+        try:
+            return super()._check_arguments(address, arguments, stack, incoming, protected,
+                                            replay=replay, **context)
+        except match._LoopReplayRequired:
+            # The caller restores the base ledgers and replays; nothing this
+            # aborted joined pass requested or recorded survives into the evidence.
+            self.requested.clear()
+            self.requested.update(saved[0])
+            self.records.clear()
+            self.records.update(saved[1])
+            raise
+
+    def loop_replay_manifest(self):
+        """The optional report record of a proof that replayed a callee."""
+        return dict(schema='bounded-loop-replay-v2',
+            buffer_proof_sha256=self.fingerprint(), lines=self.loop_replay_lines(),
+            premise='typed data literals are absolute addresses and never tracked stack '
+                    'aliases (aliases arise only from SP arithmetic); premise, not checked: '
+                    'named objects do not overlap any live stack')
 
     def span(self, address):
         if address not in self.requested and len(self.requested) >= self.dependency_budget:

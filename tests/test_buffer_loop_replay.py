@@ -186,9 +186,10 @@ class BufferLoopReplayTests(unittest.TestCase):
                 classes.add(cls)
                 pending.extend(cls.__subclasses__())
         enabled = {cls for cls in classes if cls.__dict__.get("_loop_replay_opt_in") is True}
-        self.assertEqual(enabled, {match.BufferCallProof, match.FunctionBufferCallProof})
+        self.assertEqual(enabled, {match.BufferCallProof, match.FunctionBufferCallProof,
+                                   named.NamedDataBufferProof})
         self.assertIn(named.NamedDataBufferProof, classes)
-        # A real ineligible class (its ROM-ownership hooks stubbed) keeps the old refusal.
+        # Without the constructor argument (its ROM-ownership hooks stubbed) the old refusal stays.
         def build(rom, mapping, stack_arguments):
             return named.NamedDataBufferProof(rom, mapping, b"", None)
         with patch.object(named.NamedDataBufferProof, "span", match.BufferCallProof.span), \
@@ -369,8 +370,10 @@ class BufferLoopReplayTests(unittest.TestCase):
     @staticmethod
     def scan_opt_in(name, tree, found, violations):
         import ast
-        classes = ("BufferCallProof", "FunctionBufferCallProof")
+        classes = ("BufferCallProof", "FunctionBufferCallProof", "NamedDataBufferProof")
         attributes = ("loop_replay", "_loop_replay_opt_in")
+        # Reviewed class bodies outside match.py that set the opt-in.
+        reviewed = {("named_data_buffer_profile.py", "NamedDataBufferProof")}
 
         def visit(node, function):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -385,6 +388,8 @@ class BufferLoopReplayTests(unittest.TestCase):
                     if value is not None and not isinstance(value, ast.Constant):
                         violations.append((name, function, "non-constant loop_replay"))
                     found.add((name, function, getattr(value, "value", None) is True))
+                if callee == "dict" and any(keyword.arg == "loop_replay" for keyword in node.keywords):
+                    violations.append((name, function, "loop_replay in a keyword dict"))
                 if callee == "setattr" and name != "match.py" and any(
                         isinstance(a, ast.Constant) and a.value in attributes for a in node.args):
                     violations.append((name, function, "setattr of the opt-in"))
@@ -396,7 +401,10 @@ class BufferLoopReplayTests(unittest.TestCase):
             if isinstance(node, ast.ImportFrom) and any(alias.name in classes and alias.asname
                                                         for alias in node.names):
                 violations.append((name, function, "aliased import of a proof class"))
-            if isinstance(node, ast.ClassDef) and name != "match.py":
+            if isinstance(node, ast.Dict) and any(isinstance(key, ast.Constant) and key.value == "loop_replay"
+                                                  for key in node.keys):
+                violations.append((name, function, "loop_replay in a keyword dict"))
+            if isinstance(node, ast.ClassDef) and name != "match.py" and (name, node.name) not in reviewed:
                 for statement in node.body:
                     targets = statement.targets if isinstance(statement, ast.Assign) else \
                         [statement.target] if isinstance(statement, (ast.AnnAssign, ast.AugAssign)) else []
@@ -426,6 +434,7 @@ class BufferLoopReplayTests(unittest.TestCase):
     def test_every_loaded_subclass_that_sets_the_opt_in_is_enumerated(self):
         import importlib
         import sys
+        import named_data_buffer_profile as named
         tools = ROOT / "tools"
         self.assertIn(str(tools), sys.path)
         for path in sorted(tools.glob("*.py")):
@@ -440,7 +449,8 @@ class BufferLoopReplayTests(unittest.TestCase):
         for flag in ("_loop_replay_opt_in", "loop_replay"):
             with self.subTest(flag=flag):
                 self.assertEqual({cls for cls in classes if flag in cls.__dict__ and cls.__dict__[flag]},
-                                 {match.BufferCallProof, match.FunctionBufferCallProof}
+                                 {match.BufferCallProof, match.FunctionBufferCallProof,
+                                  named.NamedDataBufferProof}
                                  if flag == "_loop_replay_opt_in" else set())
 
     def test_only_reviewed_construction_sites_request_replay(self):
@@ -452,10 +462,11 @@ class BufferLoopReplayTests(unittest.TestCase):
         self.assertEqual({site[:2] for site in found if site[2]}, {
             ("match.py", "verify_function_buffers"), ("match.py", "main"),
             ("function_thunk_profile.py", "verify_source"),
-            ("match_evidence.py", "buffer_report_matches")})
+            ("match_evidence.py", "buffer_report_matches"),
+            ("owner_admission_profile.py", "verify")})
         # Producers whose evidence neither states nor binds a replay stay plain.
         plain = {site[0] for site in found if not site[2]}
-        self.assertTrue({"owner_runtime_profile.py", "match.py"} <= plain)
+        self.assertTrue({"owner_runtime_profile.py", "match.py", "scheduler_leaf_output_profile.py"} <= plain)
 
     def test_opt_in_scan_flags_the_cases_it_used_to_miss(self):
         import ast
@@ -467,14 +478,21 @@ class BufferLoopReplayTests(unittest.TestCase):
                        "functools.partial(BufferCallProof, loop_replay=True)",
                        "functools.partial(match.BufferCallProof, rom)",
                        "type(proof).__dict__['_loop_replay_opt_in'] = True",
-                       "Q.__dict__.update(_loop_replay_opt_in=True)"):
+                       "Q.__dict__.update(_loop_replay_opt_in=True)",
+                       "named.NamedDataBufferProof(rom, m, i, o, **options)",
+                       "NamedDataBufferProof(rom, m, i, o, loop_replay=flag)",
+                       "class NamedDataBufferProof(match.BufferCallProof):\n    _loop_replay_opt_in = True",
+                       "(A if c else B)(rom, m, i, o, **({'loop_replay': True} if c else {}))",
+                       "(A if c else B)(rom, m, i, o, **dict(loop_replay=True))"):
             with self.subTest(source=source):
                 violations = []
                 self.scan_opt_in("other.py", ast.parse(source), set(), violations)
                 self.assertTrue(violations)
-        violations = []
-        self.scan_opt_in("other.py", ast.parse("BufferCallProof(rom, m, loop_replay=True)"), set(), violations)
-        self.assertEqual(violations, [])
+        for source in ("BufferCallProof(rom, m, loop_replay=True)",
+                       "named.NamedDataBufferProof(rom, m, i, o, loop_replay=True)"):
+            violations = []
+            self.scan_opt_in("other.py", ast.parse(source), set(), violations)
+            self.assertEqual(violations, [])
 
     def test_replay_lines_are_refused_when_indented_or_in_other_reports(self):
         import ast
