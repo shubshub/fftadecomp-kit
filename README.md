@@ -1926,7 +1926,11 @@ and `* unit compiler SHA-256:`, and `* unit orphan constants:` when a
 compiler binary hash and the unit's compiler line. `status.py --verify`
 and `rebuild.py --compiled` replay unit reports with their
 `--unit-toolchain`, and the status block
-lists each unit's functions apart from everything outside units. Without a
+lists each unit's functions apart from everything outside units. The
+saved-report check recompiles a function that calls through `_call_via_rN`;
+for a unit report it compiles with the report's unit toolchain and removes
+the authenticated orphan constants first, as `match.py` does, and every
+other report keeps the default toolchain. Without a
 table, only the default toolchain and the fixed-O0 selector verify.
 
 `old_agbcc` must be pret/agbcc's `-DOLD_COMPILER` build: the tool refuses a
@@ -1945,12 +1949,9 @@ probed on the host, not through WSL.
 
 Limits: runtime-helper calls (`__lshrdi3` and the other audited runtimes)
 and every specialised profile still require the default toolchain; such a
-function inside a unit verifies only when the two toolchains agree. A unit
-function that calls through `_call_via_rN` matches under `--unit-toolchain`,
-but the saved-report check replays thunk callers with the default
-toolchain, so its report validates only when that toolchain emits the same
-bytes. The tool checks identity bytes and boundaries; that a row covers one
-whole library object is the maintainer's evidence.
+function inside a unit verifies only when the two toolchains agree. The
+tool checks identity bytes and boundaries; that a row covers one whole
+library object is the maintainer's evidence.
 
 ### Named Thumb function addresses
 

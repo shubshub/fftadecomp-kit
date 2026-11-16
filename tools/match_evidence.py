@@ -1034,7 +1034,10 @@ def legacy_report_control_flow(lines, root, address, profile):
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
                 profile == FRAMED_LINKED_SCHEMA)
         if thunk_calls:
-            function_thunk.legacy_absence(root, address, data, rom, mapping)
+            # a library unit report replays with its unit's toolchain
+            import library_units
+            function_thunk.legacy_absence(root, address, data, rom, mapping,
+                                          unit_arguments=library_units.report_arguments("\n".join(lines)))
         return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
