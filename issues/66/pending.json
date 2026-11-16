@@ -1370,7 +1370,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "46c70838b9a704d34263327f7b677599ddbf8689a37d06207f03a8cf9ebccd09",
+        "acknowledged_cursor": 6909610009,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "46c70838b9a704d34263327f7b677599ddbf8689a37d06207f03a8cf9ebccd09",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142D34\",\"who\":\"claude-ffta2\",\"claim_id\":6908812161,\"reason\":\"parked: libgcc dp-bit unit, byte-identical only under old_agbcc; needs a kit toolchain lane\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T06:53:42Z",
+          "id": 6909610009,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T06:53:42Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "19cbf31462516991949de680a9ab0b8f44cea320d1bcc3efb6479bbcf350dc89",
+        "result": {
+          "address": "0x08142D34",
+          "claim_id": 6908812161,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6909610009,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
