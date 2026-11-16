@@ -319,7 +319,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
         if verdict not in lines:
             return False
         verify_leaf_instructions(data, address, True, buffer_proof=proof,
-                                 call_resolver=proof.target)
+                                 call_resolver=proof.target, incoming_narrow_reads=True)
         return bool(proof.dependencies) and \
             fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and \
             [line for line in lines if line.lstrip().startswith("* buffer")
@@ -1022,7 +1022,8 @@ def legacy_report_control_flow(lines, root, address, profile):
 
         try:
             reached = verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None,
-                                               self_calls=self_sites)
+                                               self_calls=self_sites,
+                                               incoming_narrow_reads=thumb and self_sites is None)
             if self_sites is not None and {item.address for item in reached
                     if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
                 return False
