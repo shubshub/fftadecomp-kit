@@ -958,7 +958,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a682c498a09ba71c8f3befa9cad619eae79655bc9a9c0fee7456f490a761fd54",
+        "acknowledged_cursor": 6927615112,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a682c498a09ba71c8f3befa9cad619eae79655bc9a9c0fee7456f490a761fd54",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CBF34\",\"who\":\"claude-ffta2\",\"claim_id\":6926450247,\"reason\":\"R1: review refused (data symbol interior to g_state_02000000; respelling steering); parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T20:00:20Z",
+          "id": 6927615112,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T20:00:20Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "308feec2d4006a88fe7a8ece6abf6a0b5896656acf1fe2f1e234662d9cb90b04",
+        "result": {
+          "address": "0x080CBF34",
+          "claim_id": 6926450247,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6927615112,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
