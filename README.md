@@ -4216,6 +4216,74 @@ is refused). It does not widen function literals or ordinary objects.
 `test_cpuset_code_image.py` covers admitted and refused shapes, overrun, gaps,
 forged manifests, relabelling and report replay.
 
+### Fixed hardware addresses as numbers in BIOS fill owners
+
+A source may name a VRAM, palette, OAM or I/O address as a plain number, such as
+`(u32 *)0x0600B1E0`. The compiler puts it in the literal pool with no relocation.
+Naming it as a data symbol is not the same source: a symbol is a relocation and
+a constant is not, and the register allocation can differ.
+
+The owner selectors `bounded-buffer-bios-fill-source-v1`,
+`bounded-buffer-bios-fill-local-source-semantics-v1`,
+`bounded-buffer-bios-fill-overwritten-control-stores-v1`,
+`bounded-buffer-bios-fast-fill-source-v1`,
+`bounded-buffer-bios-mixed-fast-fill-source-v1`,
+`bounded-buffer-bios-mixed-cpuset-fast-fill-source-v1` and
+`bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1`, and the addressed
+`addressed-native-bios-fill-*-data-v1` selectors, give each reached PC-loaded
+pool word the first class that applies:
+
+1. a typed ABS32 object or function literal;
+2. a BIOS scalar control, in the selectors that compute controls;
+3. a switch word (these selectors have none);
+4. in the numeric-MMIO selectors, a halfword-aligned I/O literal in
+   `[0x04000000,0x04000400)`, with its existing record;
+5. a numeric hardware word: any other word in `[0x04000000,0x08000000)` (the
+   window of `unsigned_thunk_profile.HARDWARE`), provided no load of it is
+   accepted on its own by the CpuSet scalar-control recognizers (direct R2 or
+   saved R4-R7).
+
+Every other reached address word still needs typed provenance. That covers
+RAM (`0x02`, `0x03`) and ROM (`0x08`), and also a hardware-window word with a
+control load that is not a control in the selector at hand. Examples are a
+32-bit CpuSet fill control such as `0x05000100` under a selector that computes
+no controls, and a word loaded once as a control and once as an address. So the
+classes stay disjoint: a load that the recognizers accept as a control never
+makes its word a number.
+
+The recognizers model only direct and saved CpuSet R2 loads. So a CpuSet
+control that reaches R2 by another path (say `ldr r3` then `adds r2, r3, #0`)
+is recorded as a numeric hardware word in any of these selectors, including
+those that compute controls. So is a CpuFastSet control in the window. That is
+a label only: the fill proofs read the control from the register value
+whatever its pool word's class, and the record claims no control role.
+
+When the class is not empty, the manifest carries `numeric_hardware_words`
+(schema `reached-numeric-hardware-literals-v1`). Each row is
+`[offset, value, load sites]`. The record is absent when the class is empty,
+so existing reports keep their bytes and meaning. Replay recomputes the
+classification, and an edited, dropped or extended list is refused.
+
+The record claims literal identity only. The original ELF word has no
+relocation, and the linker must preserve it exactly. A register that holds such
+a word is a non-local value. Tracked stack aliases come only from SP
+arithmetic, and no address in the window lies in the stack, so the existing
+buffer, fill-source and frame proofs are unchanged. No typed symbol, pointee
+type, hardware access validity or memory effect is claimed. Every other owner
+and addressed selector is unchanged, including the ordinary-BIOS, runtime,
+callback and native-buffer data selectors.
+
+The pinned-volatile CpuSet interface builds its premise from the owner
+preflight, and that path is not changed. The preflight still asks for a name
+for every reached address word, as it already does for 32-bit fill controls.
+So an owner whose semantic check runs still refuses a numeric hardware word.
+`bounded-buffer-bios-fill-overwritten-control-stores-v1` always runs that check.
+
+`test_numeric_hardware_words.py` covers each selector, the window bounds, typed
+words, controls, mixed loads, numeric MMIO, other selectors and forged
+manifests and reports. `test_numeric_hardware_words_native.py` compiles real
+CpuSet and CpuFastSet owners and replays their reports.
+
 ### Expired root-frame scratch at the root's own return
 
 `--owner-runtime-profile bounded-buffer-root-return-scratch-v1` (ordinary
