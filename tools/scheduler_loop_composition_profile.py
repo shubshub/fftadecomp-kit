@@ -10,8 +10,10 @@ new proof obligation:
   scheduler_live_alias_profile (preserved-register walk, passed-alias replay);
 * the unchanged 28-byte scheduler descriptor contract at every scheduler call;
   a scheduler site inside a loop additionally admits no local alias other
-  than the R2 descriptor, not even one in a preserved register, because the
-  scheduler and its callback are never walked and the call repeats;
+  than the R2 descriptor and copies of its address in R4-R7, because the
+  scheduler and its callback are never walked and the call repeats: a copy
+  names no storage the invocation is not already handed in R2, and it
+  survives the call under the same premise as the loop counter;
 * new: CFG cycles, admitted only as narrowed counted loops (below). A CFG
   without cycles is admitted too; the three-per-path selector itself still
   refuses every cycle and every live alias.

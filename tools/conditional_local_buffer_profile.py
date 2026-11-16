@@ -320,9 +320,14 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             if self.policy in LOOP_LIVE_ALIAS and site in self.branch_calls['looped_scheduler_sites']:
                 # The scheduler and its callback are never walked. Outside loops the
                 # existing descriptor premise admits recorded preserved-register
-                # aliases; a repeated invocation inside a loop admits none.
-                require(set(aliases) == {r2},
-                        'looped scheduler calls exclude every local alias other than the R2 descriptor')
+                # aliases. A repeated invocation inside a loop admits only R4-R7
+                # holding the descriptor's own address: R2 already hands every
+                # invocation that address, and the loop bound already rests on
+                # R4-R7 surviving each call.
+                require(all(match.ARM_REG_R0+4 <= reg <= match.ARM_REG_R0+7 and value == offset
+                            for reg, value in aliases.items() if reg != r2),
+                        'looped scheduler calls exclude every local alias other than the R2 descriptor '
+                        'and R4-R7 copies of its address')
         elif self.policy == OUTPUT:
             base = -4*len(stack)
             require(aliases == {r2: base} and not slots and sum(1 for word in stack if word[2]) == 1,
@@ -447,9 +452,14 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                     'counted_loops[].maximum_scheduler_calls times per loop entry; each invocation separately '
                     'requires every per-invocation premise above, including that no earlier invocation or '
                     'callback retains the reused descriptor or any local pointer. The iteration bound is '
-                    'conditional on the counter register surviving each call. A looped scheduler call reuses the '
-                    'same 28-byte descriptor frame on every iteration without rewriting it; its contents and '
-                    'nonretention remain stated premises, as for the non-loop selectors.']
+                    'conditional on the counter register surviving each call. Every invocation of a looped '
+                    'scheduler site is passed the same 28-byte descriptor frame; the owner may store to it '
+                    'between invocations, and those stores are checked by the frame and alias replay like any '
+                    'other store through a local alias. Its contents and nonretention remain stated premises, '
+                    'as for the non-loop selectors. The only local aliases admitted across a looped scheduler '
+                    'call are R2 and copies of the descriptor address in R4-R7, recorded in the site aliases; '
+                    'a copy names no storage the invocation is not already handed in R2, and its value after '
+                    'the call is conditional on R4-R7 surviving each call, as the counter is.']
                    if self.policy in LOOP_LIVE_ALIAS else []),
             actual_callback_effects_proved=False, nonescape_proved=False, termination_proved=False,
             source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())

@@ -65,14 +65,14 @@ def descriptor_call(p, name='scheduler'):
 
 def caller(*, width=8, form='load', counter=4, temp=0, limit=1, loaded=None,
            latch=None, imm=2, add=1, right_shift=None, scheduler_in_loop=True,
-           body=(), preserved_alias=False, side_entry=False, tail_entry=False,
+           body=(), preserved_alias=False, alias=(0xAE00,), frame=7, side_entry=False, tail_entry=False,
            schedulers_after=0, second_loop=0, before_ordinary=(), extra_latch=False, prefix=0, base=A):
     shift = 32 - width
     p = Program(base)
-    p.emit(0xB5F0, 0xB087)                      # push {r4-r7,lr}; sub sp,#28
+    p.emit(0xB5F0, 0xB080 | frame)              # push {r4-r7,lr}; sub sp,#4*frame
     p.emit(*(0x46C0,) * prefix)                 # straight-line padding before the loop
     if preserved_alias:
-        p.emit(0xAE00)                          # add r6, sp, #0
+        p.emit(*alias)                          # add r6, sp, #0 by default
     if side_entry:
         p.emit(0x2800)
         p.branch(0xD000, 'inside')              # beq into the body, not the header
@@ -117,7 +117,7 @@ def caller(*, width=8, form='load', counter=4, temp=0, limit=1, loaded=None,
         p.branch(0xD300, f'header{index}')
     p.call(C, 'following')
     p.label('exit')
-    p.emit(0xB007, 0xBCF0, 0xBC01, 0x4700)
+    p.emit(0xB000 | frame, 0xBCF0, 0xBC01, 0x4700)
     return p.build()
 
 
@@ -383,7 +383,7 @@ class ReplayTests(unittest.TestCase):
         self.assertFalse(report['branch_calls']['unconditional_termination_proved'])
         self.assertIn('live private-local aliases may', report['branch_calls']['ordinary_call_contract'])
         self.assertIn('at most once per iteration', ' '.join(report['assumptions']))
-        self.assertIn('without rewriting it', ' '.join(report['assumptions']))
+        self.assertIn('the owner may store to it between invocations', ' '.join(report['assumptions']))
 
     def test_preserved_live_alias_across_looped_ordinary_calls(self):
         data, calls, labels = caller(preserved_alias=True, scheduler_in_loop=False)
@@ -391,11 +391,83 @@ class ReplayTests(unittest.TestCase):
         self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
         self.assertEqual(p.observations[labels['ordinary']]['kind'], 'live-local-alias-ordinary-call')
 
-    def test_preserved_alias_across_a_looped_scheduler_call_is_refused(self):
-        data, calls, _ = caller(preserved_alias=True)
+    def test_descriptor_address_copy_across_a_looped_scheduler_call(self):
+        # agbcc keeps &descriptor in R4-R7 from before the header and stores a
+        # halfword field through it on every iteration (strh r0, [rX, #0x14]).
+        r2 = match.ARM_REG_R0 + 2
+        for policy in local.LOOP_LIVE_ALIAS:
+            for register, shape in ((6, {}), (7, {}), (5, dict(form='imm')), (4, dict(counter=7))):
+                with self.subTest(policy=policy, register=register):
+                    data, calls, labels = caller(preserved_alias=True, alias=(0xA800 | register << 8,),
+                                                 body=(0x8280 | register << 3,), **shape)
+                    p = bound(data, calls, policy)
+                    self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
+                    self.assertEqual(p.observations[labels['scheduler']]['aliases'],
+                                     sorted([(r2, -48), (match.ARM_REG_R0 + register, -48)]))
+                    self.assertIn('copies of the descriptor address in R4-R7',
+                                  ' '.join(p.contract_manifest()['assumptions']))
+            with self.subTest(policy=policy, copies='r6 and r7'):
+                data, calls, labels = caller(preserved_alias=True, alias=(0xAE00, 0x1C37))  # adds r7, r6, #0
+                p = bound(data, calls, policy)
+                self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
+                self.assertEqual(p.observations[labels['scheduler']]['aliases'],
+                                 [(r2, -48), (r2 + 4, -48), (r2 + 5, -48)])
+
+    def test_looped_scheduler_call_refuses_every_other_preserved_alias(self):
+        # sub sp,#32: the descriptor at SP and one more private word at SP+28.
+        cases = (('interior address', (0xAE01,)),                       # add r6, sp, #4
+                 ('another private object', (0xAE07,)),                 # add r6, sp, #28
+                 ('high register', (0xAE00, 0x46B0, 0x2600)))           # mov r8, r6; movs r6, #0
+        for policy in local.LOOP_LIVE_ALIAS:
+            for name, alias in cases:
+                with self.subTest(policy=policy, case=name):
+                    data, calls, _ = caller(preserved_alias=True, alias=alias, frame=8)
+                    p = bound(data, calls, policy)
+                    with self.assertRaisesRegex(ValueError, 'other than the R2 descriptor and R4-R7 copies'):
+                        match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p)
+                if name == 'high register':
+                    continue    # the fixture does not save R8; the rule itself is checked below
+                with self.subTest(policy=policy, case=name, site='after the loop'):
+                    # The rule is the looped site's: outside loops these stay admitted and recorded.
+                    data, calls, _ = caller(preserved_alias=True, alias=alias, frame=8, scheduler_in_loop=False)
+                    p = bound(data, calls, policy)
+                    self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
+
+    def test_looped_site_alias_rule_on_the_tracked_state(self):
+        r = match.ARM_REG_R0
+        stack = [(False, False, True)] * 7 + [(False, True, False)] * 5
+        data, calls, labels = caller()
+        site = labels['scheduler']
+        for aliases, message in (({r+2: -48, r+6: -44}, 'R4-R7 copies'),
+                                 ({r+2: -48, r+4: -48, r+5: -20}, 'R4-R7 copies'),
+                                 ({r+2: -48, r+8: -48}, 'R4-R7 copies'),
+                                 ({r+2: -48, r+11: -48}, 'R4-R7 copies'),
+                                 ({r+2: -48, r+3: -48}, 'additional register'),
+                                 ({r+2: -48, r+12: -48}, 'additional register')):
+            with self.subTest(aliases=aliases), self.assertRaisesRegex(ValueError, message):
+                bound(data, calls).check_call(S, aliases, stack, {}, site=site)
+        # A copy below the descriptor: R6 at another private word under it.
+        lower = [(False, False, True)] * 8 + [(False, True, False)] * 5
+        with self.assertRaisesRegex(ValueError, 'R4-R7 copies'):
+            bound(data, calls).check_call(S, {r+2: -48, r+6: -52}, lower, {}, site=site)
         p = bound(data, calls)
-        with self.assertRaisesRegex(ValueError, 'other than the R2 descriptor'):
-            match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p)
+        p.check_call(S, {r+2: -48, r+4: -48, r+7: -48}, stack, {}, site=site)
+        self.assertEqual(p.observations[site]['aliases'], [(r+2, -48), (r+4, -48), (r+7, -48)])
+        with self.assertRaisesRegex(ValueError, 'differs across incoming paths'):
+            p.check_call(S, {r+2: -48, r+4: -48}, stack, {}, site=site)
+        data, calls, labels = caller(scheduler_in_loop=False)
+        p = bound(data, calls)
+        p.check_call(S, {r+2: -48, r+6: -44, r+8: -20}, stack, {}, site=labels['scheduler'])
+
+    def test_descriptor_copy_holds_one_offset_and_its_stores_are_checked(self):
+        for body, message in (((0xAE01,), 'inconsistent possible pointer offsets at control-flow join'),  # add r6, sp, #4
+                              ((0x6330,), 'outside the tracked frame'),       # str r0, [r6, #0x30]: entry SP
+                              ((0x6036,), 'cannot be stored or spilled')):    # str r6, [r6]
+            with self.subTest(body=body):
+                data, calls, _ = caller(preserved_alias=True, body=body)
+                p = bound(data, calls)
+                with self.assertRaisesRegex(ValueError, message):
+                    match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p)
 
     def test_alias_passed_in_an_argument_register_replays_the_callee(self):
         # mov r0, sp before the looped ordinary call: the callee body is replayed.
