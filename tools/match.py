@@ -4400,7 +4400,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if remainder_bindings and not software_double.target_remainder_context(double_context):
             modsi3_context = (double_context[0], double_context[1], remainder_bindings)
     if inert_spin_context is not None:
-        if type(inert_spin_context) is not dict or inert_spin_context or not thumb or \
+        # {"tails": []} additionally admits straight-line terminal tails before a self-branch.
+        if type(inert_spin_context) is not dict or inert_spin_context not in ({}, {"tails": []}) or not thumb or \
                 buffer_proof is not None or call_resolver is not None or switch_relocations is not None or \
                 switch_data_relocations is not None or udivsi3_context is not None or \
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
@@ -5210,6 +5211,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         spins = sorted(instructions.keys() - reaching_return)
         if not spins:
             raise ValueError("inert-spin profile requires a reachable nonreturning self-branch")
+        tails = inert_spin.terminal_tails(instructions, edges, spins) if "tails" in inert_spin_context else []
+        spins = [current for current in spins if current not in tails]
         for current in spins:
             instruction = instructions[current]
             if instruction.id != ARM_INS_B or instruction.size != 2 or \
@@ -5303,6 +5306,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     signed_divmod.context_selector(signed_runtime_context) == signed_divmod.SHIFT_SELECTOR)
     if inert_spin_context is not None:
         inert_spin_context["spins"] = [current - address for current in spins]
+        if "tails" in inert_spin_context:
+            inert_spin_context["tails"] = [current - address for current in tails]
     if local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
@@ -5756,7 +5761,8 @@ def main():
             elif spin_profile:
                 if not thumb:
                     raise ValueError("inert spins require Thumb mode")
-                got, calls = inert_spin.object_bytes(runner, workspace, args, original, addr, mapping, rom)
+                got, calls = inert_spin.object_bytes(runner, workspace, args, original, addr, mapping, rom,
+                                                     data_mapping=data_mapping, data_relocations=data_relocations)
                 linked_profile = bool(calls)
             elif original["relocations"]:
                 if not thumb:
@@ -5838,12 +5844,13 @@ def main():
                 verified_instructions = software_double.verify(
                     got, addr, rom, mapping, function_index, double_evidence, data_mapping=data_mapping)
             elif spin_profile:
-                context = {}
+                context = {"tails": []}
                 verified_instructions = verify_leaf_instructions(got, addr, True, calls,
                                                                   inert_spin_context=context)
-                spin_evidence = {"calls": inert_spin.call_records(calls, addr),
-                                 "frame": uses_stack_frame(verified_instructions), "spins": context["spins"]}
-                verified_instructions = inert_spin.verify(got, addr, rom, mapping, function_index, spin_evidence)
+                spin_evidence = inert_spin.make_manifest(calls, addr, verified_instructions, context,
+                                                         data_relocations, data_mapping)
+                verified_instructions = inert_spin.verify(got, addr, rom, mapping, function_index, spin_evidence,
+                                                          data_mapping=data_mapping)
             elif float_bindings:
                 software_float.fixed_configuration(args)
                 verified_instructions = verify_leaf_instructions(
@@ -6400,10 +6407,10 @@ def main():
                 f.write(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
             if spin_profile:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
-                f.write(f"* inert spins: {inert_spin.SUMMARY}\n")
+                f.write(f"* inert spins: {inert_spin.summary(spin_evidence)}\n")
                 f.write(f"* inert spin manifest: `{inert_spin.manifest_text(spin_evidence)}`\n")
                 proof_digest = inert_spin.fingerprint(addr, got_body, spin_evidence, fingerprint,
-                                                      mapping, function_index)
+                                                      mapping, function_index, data_mapping=data_mapping)
                 f.write(f"* inert spin proof SHA-256: `{proof_digest}`\n")
             if double_profile:
                 f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")

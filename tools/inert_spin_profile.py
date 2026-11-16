@@ -1,4 +1,4 @@
-"""Explicit mixed-return Thumb CFGs with only inert nonreturning self-branches."""
+"""Explicit mixed-return Thumb CFGs whose nonreturning paths end in inert self-branches."""
 
 import argparse
 from contextvars import ContextVar
@@ -16,8 +16,11 @@ SCHEMA = "elf-symbol-thumb-mixed-return-inert-spin-v1"
 SELECTOR = "mixed-return-inert-spin-v1"
 CONTROL_FLOW = "mixed verified returns and closed inert Thumb self-spins; termination not proved"
 SUMMARY = "every reachable node without a return path is a narrow unconditional self-branch"
+TAIL_SUMMARY = ("every reachable node without a return path is a narrow unconditional self-branch "
+                "or a straight-line terminal-tail instruction that falls through to one")
+DATA_POLICY = b"inert-spin-typed-data-v1"
 REPLAY_TIMEOUT = 120
-FORBIDDEN_MARKERS = ("* buffer", "* data symbols", "* unsigned division", "* signed remainder",
+FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
                      "* signed quotient", "* switches", "* switch manifest", "* switch proof",
                      "* function address", "* function buffer", "* software double", "* function-address")
 _replay_active = ContextVar("inert_spin_replay_active", default=False)
@@ -52,12 +55,22 @@ def index_snapshot(root):
     return (Path(root) / "symbols/functions.txt").read_bytes()
 
 
-def fingerprint(address, data, manifest, source_digest, mapping, index):
+def summary(manifest):
+    return TAIL_SUMMARY if "tails" in manifest else SUMMARY
+
+
+def fingerprint(address, data, manifest, source_digest, mapping, index, data_mapping=None):
     digest = hashlib.sha256()
-    for payload in (SCHEMA.encode("ascii"), address.to_bytes(4, "little"), data,
-                    manifest_text(manifest).encode("utf-8"), source_digest.encode("ascii"),
-                    hashlib.sha256(mapping).hexdigest().encode("ascii"),
-                    hashlib.sha256(index).hexdigest().encode("ascii"), compiler_text().encode("ascii")):
+    payloads = [SCHEMA.encode("ascii"), address.to_bytes(4, "little"), data,
+                manifest_text(manifest).encode("utf-8"), source_digest.encode("ascii"),
+                hashlib.sha256(mapping).hexdigest().encode("ascii"),
+                hashlib.sha256(index).hexdigest().encode("ascii"), compiler_text().encode("ascii")]
+    if "data" in manifest:
+        # Reports without typed data keep their original digest.
+        if not isinstance(data_mapping, bytes):
+            raise ValueError("inert-spin data fingerprint requires its exact data mapping")
+        payloads += [DATA_POLICY, hashlib.sha256(data_mapping).hexdigest().encode("ascii")]
+    for payload in payloads:
         digest.update(len(payload).to_bytes(8, "little"))
         digest.update(payload)
     return digest.hexdigest()
@@ -103,12 +116,70 @@ def call_records(calls, address):
     return [[site - address, f"func_{target:08X}"] for site, target in sorted(calls.items())]
 
 
-def verify(data, address, rom, mapping, index, manifest):
-    from match import function_address_target, uses_stack_frame, verify_leaf_instructions
+def data_records(literals, data_mapping):
+    from match import parse_data_symbols
+    objects = parse_data_symbols(data_mapping)
+    return [[offset, name, value - objects[name]] for offset, (name, value) in sorted(literals.items())]
+
+
+def make_manifest(calls, address, instructions, context, literals=None, data_mapping=None):
+    from match import uses_stack_frame
+    manifest = {"calls": call_records(calls, address), "frame": uses_stack_frame(instructions),
+                "spins": context["spins"]}
+    # Both records are optional, so reports without them keep their format and meaning.
+    if context.get("tails"):
+        manifest["tails"] = context["tails"]
+    if literals:
+        manifest["data"] = data_records(literals, data_mapping)
+    return manifest
+
+
+def terminal_tails(instructions, edges, nonreturning):
+    """Return the nonreturning nodes that are not narrow self-branches, once each is a tail.
+
+    A tail instruction is straight-line: a two-byte instruction whose only
+    successor is the next instruction, with no branch, call, interrupt,
+    push/pop, SP or PC write. Every successor of a nonreturning node is
+    nonreturning and a fallthrough strictly increases the address, so every
+    tail chain is acyclic (the walk below also refuses any step that does not
+    increase it); each must end at a `b .` encoding, which the caller verifies
+    as an inert narrow self-branch.
+    """
+    from match import (CS_GRP_CALL, CS_GRP_INT, CS_GRP_JUMP, ARM_REG_PC, ARM_REG_SP,
+                       thumb_stack_adjustment)
+    tails = [current for current in nonreturning if bytes(instructions[current].bytes) != b"\xfe\xe7"]
+    for current in tails:
+        instruction = instructions[current]
+        written = instruction.regs_access()[1]
+        if instruction.size != 2 or tuple(edges[current]) != (current + 2,) or \
+                any(group in instruction.groups for group in (CS_GRP_CALL, CS_GRP_INT, CS_GRP_JUMP)) or \
+                instruction.mnemonic in ("push", "pop") or thumb_stack_adjustment(instruction) is not None or \
+                ARM_REG_PC in written or ARM_REG_SP in written:
+            raise ValueError("terminal tails must be straight-line instructions without branches, calls "
+                             "or stack-pointer changes")
+    members = set(tails)
+    for current in tails:
+        while current in members:
+            if edges[current][0] <= current:
+                raise ValueError("terminal tail does not fall through towards a narrow self-branch")
+            current = edges[current][0]
+        if bytes(instructions[current].bytes) != b"\xfe\xe7":
+            raise ValueError("terminal tail does not end in a narrow self-branch")
+    return tails
+
+
+def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
+    from match import (function_address_target, uses_stack_frame, verify_data_literals,
+                       verify_leaf_instructions, parse_data_symbols, is_udivsi3_address, modsi3, divsi3,
+                       umodsi3, ashldi3, software_double, software_float)
     entries = validate_span(data, address, rom, mapping, index)
-    if not isinstance(manifest, dict) or set(manifest) != {"calls", "frame", "spins"} or \
+    if not isinstance(manifest, dict) or not {"calls", "frame", "spins"} <= set(manifest) or \
+            set(manifest) - {"calls", "frame", "spins", "data", "tails"} or \
             type(manifest["frame"]) is not bool or not isinstance(manifest["calls"], list) or \
-            not isinstance(manifest["spins"], list) or not manifest["spins"]:
+            not isinstance(manifest["spins"], list) or not manifest["spins"] or \
+            "tails" in manifest and (type(manifest["tails"]) is not list or not manifest["tails"]) or \
+            "data" in manifest and (type(manifest["data"]) is not list or not manifest["data"] or
+                                    not isinstance(data_mapping, bytes)):
         raise ValueError("invalid inert-spin manifest")
     calls = {}
     previous = -4
@@ -121,22 +192,51 @@ def verify(data, address, rom, mapping, index, manifest):
             raise ValueError("inert-spin calls must be ordered nonoverlapping instructions")
         calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
         previous = offset
-    previous = -1
-    for offset in manifest["spins"]:
-        if type(offset) is not int or offset <= previous or offset % 2 or \
-                offset < 0 or offset + 2 > len(data):
-            raise ValueError("inert-spin offsets must be ordered complete instructions")
-        previous = offset
-    context = {}
+    for kind in ("spins", "tails"):
+        previous = -1
+        for offset in manifest.get(kind, []):
+            if type(offset) is not int or offset <= previous or offset % 2 or \
+                    offset < 0 or offset + 2 > len(data):
+                raise ValueError("inert-spin offsets must be ordered complete instructions")
+            previous = offset
+    literals = {}
+    if "data" in manifest:
+        objects = parse_data_symbols(data_mapping)
+        occupied = {byte for site in calls for byte in range(site - address, site - address + 4)}
+        previous = -4
+        for record in manifest["data"]:
+            if type(record) is not list or len(record) != 3:
+                raise ValueError("invalid inert-spin data binding")
+            offset, name, addend = record
+            if type(offset) is not int or type(name) is not str or name not in objects or \
+                    type(addend) is not int or not -0x80000000 <= addend <= 0x7FFFFFFF or \
+                    offset < previous + 4 or offset < 0 or offset + 4 > len(data) or (address + offset) % 4 or \
+                    occupied & set(range(offset, offset + 4)):
+                raise ValueError("inert-spin data bindings require ordered aligned mapped words")
+            value = objects[name] + addend
+            if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data) or \
+                    is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or \
+                    umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value) or \
+                    software_float.reserved(value) or struct.unpack_from("<I", data, offset)[0] != value:
+                raise ValueError("inert-spin data literal differs, references its own function or a runtime")
+            literals[offset] = (name, value)
+            previous = offset
+    context = {"tails": []}
     instructions = verify_leaf_instructions(data, address, True, calls, inert_spin_context=context)
-    if context["spins"] != manifest["spins"] or uses_stack_frame(instructions) != manifest["frame"]:
+    if context["spins"] != manifest["spins"] or context["tails"] != manifest.get("tails", []) or \
+            uses_stack_frame(instructions) != manifest["frame"]:
         raise ValueError("inert-spin manifest disagrees with the converged CFG")
+    verify_data_literals(instructions, address, literals)
     return instructions
 
 
-def object_bytes(runner, workspace, args, original, address, mapping, rom):
-    from match import allocated_text_only, function_record, function_address_target, link_calls
+def object_bytes(runner, workspace, args, original, address, mapping, rom, data_mapping=None, data_relocations=None):
+    from match import (allocated_text_only, function_record, function_address_target, link_calls,
+                       parse_data_symbols)
     fixed_configuration(args)
+    if data_relocations is not None and (type(data_relocations) is not dict or data_relocations):
+        raise ValueError("inert-spin data provenance requires an empty collection")
+    objects = parse_data_symbols(data_mapping) if data_relocations is not None else {}
     if original["type"] != 1:
         raise ValueError("inert spins require a relocatable original ELF")
     allocated_text_only(original)
@@ -156,29 +256,43 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom):
         symbols = original["symbol_tables"].get(section[6])
         for position in range(0, section[5], 8):
             _, info = struct.unpack_from("<II", original["section_data"][section_index], position)
-            if info & 255 != 10 or symbols is None or info >> 8 >= len(symbols):
+            if info & 255 not in (2, 10) or info & 255 == 2 and data_relocations is None or \
+                    symbols is None or info >> 8 >= len(symbols):
                 raise ValueError("inert spins exclude non-call relocations")
             target = symbols[info >> 8]
+            if info & 255 == 2:
+                # Typed named data, bound and checked by the shared data linker below.
+                if target["section"] or target["bind"] != 1 or target["type"] not in (0, 1) or \
+                        target["value"] or target["name"] not in objects or \
+                        sum(item["name"] == target["name"] for item in original["symbols"]) != 1:
+                    raise ValueError("inert spins exclude function-address relocations"
+                                     if target["name"].startswith("func_") else
+                                     "inert-spin data requires one undefined mapped global object")
+                continue
             function_address_target(target["name"], entries, address, symbol["size"], len(rom))
             if target["section"] or target["bind"] != 1 or target["type"] not in (0, 2) or \
                     target["value"] or sum(item["name"] == target["name"]
                                            for item in original["symbols"]) != 1:
                 raise ValueError("inert-spin calls require unique undefined global functions")
     if original["relocations"]:
-        data, calls, literals = link_calls(runner, workspace, args, original, address, mapping, len(rom), rom)
+        data, calls, literals = link_calls(runner, workspace, args, original, address, mapping, len(rom), rom,
+                                           data_mapping=data_mapping if data_relocations is not None else None)
         if literals:
-            raise ValueError("inert spins exclude data relocations")
+            if data_relocations is None:
+                raise ValueError("inert spins exclude data relocations")
+            data_relocations.update(literals)
         return data, calls
     if any(item["name"] and not item["section"] for item in original["symbols"]):
         raise ValueError("inert-spin leaf retains undefined symbols")
     return original["text"][:symbol["size"]], {}
 
 
-def verify_source(root, address, data, rom, mapping, index, source_digest, manifest):
+def verify_source(root, address, data, rom, mapping, index, source_digest, manifest, *, data_mapping=None):
     from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD,
                        DEFAULT_FLAGS, DEFAULT_WSL_PATH, Runner, compile_object,
                        _run_replay_process, plausibility_result)
-    from match_evidence import source_paths, source_fingerprint, mapping_snapshot, report_rom_path
+    from match_evidence import (source_paths, source_fingerprint, mapping_snapshot, report_rom_path,
+                                data_snapshot)
     if _replay_active.get():
         raise ValueError("recursive inert-spin replay is unsupported")
     token = _replay_active.set(True)
@@ -186,7 +300,8 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
         root = Path(root)
         candidates = list((root / "src").rglob(f"{address:08X}.c"))
         if len(candidates) != 1 or source_fingerprint(root, address) != source_digest or \
-                mapping_snapshot(root) != mapping or index_snapshot(root) != index:
+                mapping_snapshot(root) != mapping or index_snapshot(root) != index or \
+                "data" in manifest and data_snapshot(root) != data_mapping:
             raise ValueError("inert-spin replay inputs differ")
         selected_rom = report_rom_path(root)
         if Path(selected_rom).read_bytes() != rom:
@@ -207,10 +322,13 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                  candidates[0].relative_to(root).as_posix())
-                got, calls = object_bytes(runner, workspace, args, original, address, mapping, rom)
-                if got != data or call_records(calls, address) != manifest.get("calls"):
+                literals = {}
+                got, calls = object_bytes(runner, workspace, args, original, address, mapping, rom,
+                                          data_mapping=data_mapping, data_relocations=literals)
+                if got != data or call_records(calls, address) != manifest.get("calls") or \
+                        (data_records(literals, data_mapping) if literals else None) != manifest.get("data"):
                     raise ValueError("inert-spin report lacks fresh original-ELF provenance")
-                instructions = verify(got, address, rom, mapping, index, manifest)
+                instructions = verify(got, address, rom, mapping, index, manifest, data_mapping=data_mapping)
             checker = Path(__file__).resolve().with_name("plausible.py")
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
@@ -220,7 +338,8 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
                 raise ValueError("inert-spin captured source changed or is implausible")
         if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
                 index_snapshot(root) != index or report_rom_path(root) != selected_rom or \
-                Path(selected_rom).read_bytes() != rom:
+                Path(selected_rom).read_bytes() != rom or \
+                "data" in manifest and data_snapshot(root) != data_mapping:
             raise ValueError("inert-spin replay inputs changed")
         return instructions
     finally:
@@ -228,7 +347,7 @@ def verify_source(root, address, data, rom, mapping, index, source_digest, manif
 
 
 def report_matches(report, root, address):
-    from match_evidence import source_fingerprint, mapping_snapshot, report_rom_path, STACK_SUMMARY
+    from match_evidence import source_fingerprint, mapping_snapshot, report_rom_path, data_snapshot, STACK_SUMMARY
     lines = report.splitlines()
 
     def single(prefix):
@@ -262,7 +381,6 @@ def report_matches(report, root, address):
         mapping, index = mapping_snapshot(root), index_snapshot(root)
         source_digest = source_fingerprint(root, address)
         if mapping is None or single("* control flow: ") != CONTROL_FLOW or \
-                single("* inert spins: ") != SUMMARY or \
                 unquote("* compiler: ") != compiler_text() or \
                 unquote("* source SHA-256: ") != source_digest or \
                 unquote("* mapping SHA-256: ") != hashlib.sha256(mapping).hexdigest() or \
@@ -280,7 +398,13 @@ def report_matches(report, root, address):
         data = bytes.fromhex(encoded)
         encoded_manifest = unquote("* inert spin manifest: ")
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
-        if manifest_text(manifest) != encoded_manifest:
+        if not isinstance(manifest, dict) or manifest_text(manifest) != encoded_manifest or \
+                single("* inert spins: ") != summary(manifest):
+            return False
+        objects = data_snapshot(root) if "data" in manifest else None
+        if "data" in manifest and objects is None or \
+                [line for line in lines if marker_text(line).startswith("* data symbols")] != \
+                ([f"* data symbols SHA-256: `{hashlib.sha256(objects).hexdigest()}`"] if objects is not None else []):
             return False
         frames = [line for line in lines if marker_text(line).startswith("* stack frame")]
         if frames != ([f"* stack frame: {STACK_SUMMARY}"] if manifest.get("frame") is True else []):
@@ -290,11 +414,11 @@ def report_matches(report, root, address):
         if single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
                 verdicts != [f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"] or \
                 unquote("* inert spin proof SHA-256: ") != \
-                fingerprint(address, data, manifest, source_digest, mapping, index):
+                fingerprint(address, data, manifest, source_digest, mapping, index, data_mapping=objects):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
-        verify_source(root, address, data, rom, mapping, index, source_digest, manifest)
+        verify_source(root, address, data, rom, mapping, index, source_digest, manifest, data_mapping=objects)
         return report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
