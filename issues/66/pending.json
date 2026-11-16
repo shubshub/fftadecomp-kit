@@ -1150,7 +1150,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "eb61dde8c0d185fe87ea87ae6c9cdfde010bae2ab9fe2a20645e743e33f7b2fb",
+        "acknowledged_cursor": 6904083709,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "eb61dde8c0d185fe87ea87ae6c9cdfde010bae2ab9fe2a20645e743e33f7b2fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08010DD0\",\"who\":\"claude-ffta2\",\"claim_id\":6903787490,\"reason\":\"near miss 136/146: one register swap (allocator priority needs a third loop level); only a do-while(0) macro matches (steering); parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T00:36:32Z",
+          "id": 6904083709,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T00:36:32Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0c5bfbfb9e99c04534b178f7a540bb3e8adc3deb3a03b4641e23676d66bbf83a",
+        "result": {
+          "address": "0x08010DD0",
+          "claim_id": 6903787490,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6904083709,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
