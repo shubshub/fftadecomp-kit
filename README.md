@@ -1879,6 +1879,33 @@ existing compiler-orphan prerequisite, then removed; the remaining `.text`,
 its relocations and the function symbol must be unchanged. The excluded
 bytes earn no ROM credit, and the report records the authentication.
 
+The prerequisite admits two shapes of unit objects, and records each in its
+inventory:
+
+* A call through a function pointer, `bl _call_via_rN`. The name must be one
+  of the ordinary call path's runtime helpers (`match.RUNTIME_HELPERS`,
+  `_call_via_r0` to `_call_via_r14`), and the call is bound to the ROM: the
+  ROM's BL at the call site lands on that helper's address, and the ordinary
+  path's thunk check accepts the code there as `bx rN; mov r8, r8` for the
+  same N. `call_thunks` lists each site, helper and thunk address with the
+  ROM's SHA-256. Any other call name than `func_XXXXXXXX` or a runtime helper
+  is still refused, and an address of a thunk is never data.
+* One trailing alignment halfword. `as` pads `.text` to a word, so a function
+  whose symbol size is 2 mod 4 is followed by one `c046` (`mov r8, r8`). It is
+  admitted only when `.text` is exactly the symbol plus that halfword. It is
+  not function bytes: the reached-instruction and literal walk, the text
+  relocations and the owner's indexed span all stop at the symbol size, so a
+  branch, PC-relative load or relocation that reaches it is refused, and a
+  named-data or function address inside it counts as the owner and is
+  refused. `alignment_fill` records its offset and bytes;
+  `complete_text_bytes` is the symbol size. The ROM is compared over the
+  indexed span only, so its own padding after the function is not read.
+  Any other trailing bytes, two halfwords, or a halfword after a function
+  whose size is a multiple of 4 are refused.
+
+The fixed-O0 selector shares the prerequisite, so the alignment halfword is
+admitted there too; its native linker still refuses `_call_via_rN` calls.
+
 Inside a unit the default toolchain still verifies a function, but only when
 the unit's toolchain emits the identical relocatable function: the same
 `.text`, the same `.text` relocations (to named external symbols or the
@@ -1916,12 +1943,14 @@ compiler binary's hash, so they validate offline only where that binary is
 installed. Library units need a POSIX host: the compiler is hashed and
 probed on the host, not through WSL.
 
-Limits: runtime-helper calls (`__lshrdi3` and the other audited runtimes),
-function-pointer calls through `_call_via_rN` in an object with orphan
-constants, and every specialised profile still require the default
-toolchain; such a function inside a unit verifies only when the two
-toolchains agree. The tool checks identity bytes and boundaries; that a row
-covers one whole library object is the maintainer's evidence.
+Limits: runtime-helper calls (`__lshrdi3` and the other audited runtimes)
+and every specialised profile still require the default toolchain; such a
+function inside a unit verifies only when the two toolchains agree. A unit
+function that calls through `_call_via_rN` matches under `--unit-toolchain`,
+but the saved-report check replays thunk callers with the default
+toolchain, so its report validates only when that toolchain emits the same
+bytes. The tool checks identity bytes and boundaries; that a row covers one
+whole library object is the maintainer's evidence.
 
 ### Named Thumb function addresses
 
