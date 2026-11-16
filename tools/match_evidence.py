@@ -1098,6 +1098,12 @@ def strip_volatile_records(report, records):
 def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
+    import library_units
+    if not library_units.report_admitted(report, root, address):
+        # a unit report must bind its current row and compiler; any other
+        # report must use the default toolchain, and inside a unit the unit's
+        # toolchain must emit the same function
+        return False
     if any(line.lstrip().startswith("* self call") for line in report.splitlines()):
         # self-call lines belong to the plain call profiles only; anything
         # else carrying them is a forged or misplaced claim
@@ -1125,7 +1131,10 @@ def report_matches(report, root, address):
                 records += allowlisted_volatile_semantics(root, address,
                     owner_runtime_profile=BIOS_FILL_SELECTOR)
             else:
-                records += allowlisted_volatile_semantics(root, address)
+                # a library unit report was compiled with its unit's toolchain
+                unit_arguments = library_units.report_arguments(report)
+                records += (allowlisted_volatile_semantics(root, address) if unit_arguments is None else
+                            allowlisted_volatile_semantics(root, address, unit_arguments))
         report = strip_volatile_records(report, records)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):

@@ -76,6 +76,10 @@ def runtime_pin():
     executables = [sys.executable, "/bin/sh", match.DEFAULT_CC,
                    match.DEFAULT_CPP, match.DEFAULT_AS, match.DEFAULT_OBJCOPY,
                    match.DEFAULT_LD, "git", "tar", "mkdir", "mktemp", "rm", "rmdir"]
+    # an installed library-unit compiler is a verifier input as well
+    import library_units
+    executables += [spec["cc"] for spec in library_units.TOOLCHAINS.values()
+                    if spec["cc"] != match.DEFAULT_CC and shutil.which(os.path.expandvars(spec["cc"]))]
     resolved = []
     for command in executables:
         path = shutil.which(os.path.expandvars(command))
