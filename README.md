@@ -3163,14 +3163,29 @@ separate `elf-symbol-thumb-mixed-return-inert-spin-v1` report profile. Ordinary
 matching and all older schemas keep their existing return-reachability rule.
 The new profile requires a normal verified return and at least one reachable
 instruction without a graph path to a return. **Every** such instruction must
-itself be an unconditional narrow Thumb branch to its own address. Pure-spin
-functions, multi-instruction cycles and even branch-only feeders are excluded.
+either be an unconditional narrow Thumb branch to its own address, or belong
+to a terminal tail: a straight-line chain of two-byte instructions, each whose
+only successor is the next instruction, that ends in such a self-branch. A tail
+instruction cannot be a branch, call or interrupt, push or pop, stack
+adjustment, or write SP or PC, so a conditional exit, `bl`, frame change or
+indirect transfer refuses. Pure-spin functions, multi-instruction cycles and
+branch feeders remain excluded. Reports list the tail instructions in an
+optional `tails` record and then state the tail summary; reports without one
+keep the self-branch-only meaning, digest and summary.
 
 The complete converged instruction, stack/provenance, local-alias, call and
-literal checks still run, including checks after return classification. A
-fixed frame may remain allocated on the spin arm; actual returns must balance
-it. Ordinary typed mapped Thumb calls and fixed frames are supported, but
-buffer proofs, switches, function/object relocations, indirect-call thunks and
+literal checks still run on every reachable instruction, tails included,
+including checks after return classification. A tail only escapes the
+obligations at a return, which it never reaches. A fixed frame may remain
+allocated on the spin arm; actual returns must balance it. Ordinary typed
+mapped Thumb calls and fixed frames are supported. Typed named data is
+admitted exactly as `elf-symbol-thumb-data-v1` admits it: undefined global
+object symbols mapped in `config/data_symbols.json`, `R_ARM_ABS32` with signed
+addends, each a complete aligned in-function literal word loaded by reachable
+PC-relative code. Such reports carry an optional `data` record of offset, name
+and addend, bind the data-map digest in the proof and the
+`* data symbols SHA-256` line, and replay relinks and rechecks every word.
+Buffer proofs, switches, function relocations, indirect-call thunks and
 signed/unsigned division/remainder or software-double profiles cannot be combined with this
 profile. No automatic fallback or caller-address exception selects it.
 
