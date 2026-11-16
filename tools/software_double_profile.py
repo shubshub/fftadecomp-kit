@@ -43,8 +43,52 @@ DIVISION_IDENTITIES = (
 )
 
 
+# Optional wide-integer composition. agbcc lowers plain `long long`
+# multiplication and division to libgcc2 __muldi3 and __divdi3. Each complete
+# body is pinned; __divdi3 calls only the canonical unsigned word quotient and
+# remainder, which share the real zero hook. Rows are dependency-first. Local
+# agbcc libgcc2.c L_muldi3/L_divdi3, at the fixed flags, and lib1thumb
+# L_udivsi3/L_umodsi3/L_dvmd_tls reproduce all five bodies. The
+# unchanged ABI interpreter proves every reachable return, restored registers,
+# a balanced frame, no caller-memory writes and no read at or above entry SP
+# through a tracked stack address. It leaves the three computed __clz_tab loads
+# (08142304, 081423E8, 0814255C) unconstrained; that the code bounds them to
+# ROM rests on inspection of the pinned bodies. Numeric registers and table
+# loads are target-state inputs; no arithmetic or termination claim is made.
+# Inert spins compose with neither wide runtime.
+WIDE_OPERATIONS = {"__muldi3": 0x08142A20, "__divdi3": 0x08142280}
+WIDE_RUNTIME = "agbcc-thumb-muldi3-divdi3-target-state-closure-v1"
+WIDE_IDENTITIES = (
+    (0x0814274C, 0x0814274E, 1,
+     "abd49ec8111be1f55319f91a44d26daaf5abd7567c169a61abf6c0b031d4b31c"),
+    (0x08142AB0, 0x08142B28, 59,
+     "b01be100af59274950038e7cfbf7d5a68defe1a607369f88634aeb3c9453e408"),
+    (0x08142B28, 0x08142BE8, 95,
+     "dec75508b46380e474801d918a5bda44a20bc8ec8a9159dda7f5a5f8a4b02b61"),
+    (0x08142A20, 0x08142A94, 56,
+     "f642a6a21668da428cbb8304f9710064aca75ff16130add649b86ff4b9e73be3"),
+    (0x08142280, 0x081426B8, 496,
+     "af2a471ba04a966037feae664702b51d995b3b16349632e09fe222765a466bfe"),
+)
+WIDE_EDGES = (
+    (0x08142334, 0x08142B28), (0x0814233E, 0x08142AB0), (0x0814236C, 0x08142B28),
+    (0x08142376, 0x08142AB0), (0x081423BC, 0x08142AB0), (0x08142430, 0x08142B28),
+    (0x0814243A, 0x08142AB0), (0x08142468, 0x08142B28), (0x08142472, 0x08142AB0),
+    (0x081424B4, 0x08142B28), (0x081424BE, 0x08142AB0), (0x081424EC, 0x08142B28),
+    (0x081424F6, 0x08142AB0), (0x081425B4, 0x08142B28), (0x081425BE, 0x08142AB0),
+    (0x081425EE, 0x08142B28), (0x081425F8, 0x08142AB0),
+    (0x08142B20, 0x0814274C), (0x08142BE0, 0x0814274C),
+)
+WIDE_PC_RETURNS = {0x0814274C: (0x0814274C,), 0x08142AB0: (0x08142B1C, 0x08142B26),
+                   0x08142B28: (0x08142B32, 0x08142BAE, 0x08142BDC, 0x08142BE6)}
+
+
 def call_target(name):
-    return OPERATIONS.get(name, DIVISION_OPERATION.get(name))
+    return OPERATIONS.get(name, DIVISION_OPERATION.get(name, WIDE_OPERATIONS.get(name)))
+
+
+def wide_call(name, target):
+    return name in WIDE_OPERATIONS and target == WIDE_OPERATIONS[name]
 
 
 def shared_division_call(name, target):
@@ -591,6 +635,41 @@ def prove_division_closure(rom, mapping, index):
     return proofs
 
 
+def prove_wide_closure(rom, mapping, index):
+    """Prove canonical wide multiplication, signed wide division and their closure.
+
+    Both public entries and every dependency need exact dual-index spans,
+    pinned bodies, a closed native CFG with only the pinned call edges, and
+    restoring returns without caller-memory writes or reads at or above entry
+    SP through a tracked stack address. Computed table loads are unconstrained.
+    """
+    from match import verify_udivsi3_identity, umodsi3
+    from software_float_profile import prove_runtime
+    verify_udivsi3_identity(rom, mapping)
+    umodsi3.verify_identity(rom, mapping)
+    entries, rows = indices(mapping, index)
+    proofs = {}
+    for start, end, count, digest in WIDE_IDENTITIES:
+        if span_record(start, end, entries, rows, rom)["instrs"] != count or \
+                hashlib.sha256(rom[start - 0x08000000:end - 0x08000000]).hexdigest() != digest:
+            raise ValueError("software-double wide-integer runtime identity/count differs")
+        proofs[start] = prove_runtime(
+            rom, entries, start, end, count, proofs, call_edges=WIDE_EDGES,
+            scalar_entries=(start,), allowed_writes=(), stack_load_widths=(1, 4),
+            thumb_pc_returns=WIDE_PC_RETURNS.get(start, ()))
+        if proofs[start]["writes"] or proofs[start]["stack_reads"]:
+            raise ValueError("software-double wide-integer runtime has caller-memory effects")
+    return proofs
+
+
+def wide_record(address, bindings):
+    sites = [[site - address, name] for site, name in sorted(bindings.items())
+             if name in WIDE_OPERATIONS]
+    return {"runtime": WIDE_RUNTIME, "semantics": SEMANTICS,
+            "dependencies": [list(row) for row in WIDE_IDENTITIES],
+            "calls": sites, "operands": "entry-register-state"} if sites else None
+
+
 def division_record(address, bindings):
     sites = sorted(site - address for site, name in bindings.items() if name == "__divsi3")
     return {"runtime": DIVISION_RUNTIME, "semantics": SEMANTICS,
@@ -606,11 +685,17 @@ def remainder_record(calls, address, bindings):
 
 
 def summary(manifest):
-    if "target_remainder" not in manifest:
-        return SUMMARY
-    return SUMMARY.replace(
-        "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor",
-        "optional canonical signed remainder uses its pinned target-state closure, including sign and zero paths")
+    text = SUMMARY
+    if "target_remainder" in manifest:
+        text = text.replace(
+            "optional canonical signed remainder requires CFG-proven signed16 dividend and nonzero divisor",
+            "optional canonical signed remainder uses its pinned target-state closure, including sign and zero paths")
+    if "wide_integer" in manifest:
+        text = text.replace(
+            "; unrestricted IEEE semantics not proved",
+            "; optional canonical wide multiplication and signed wide division use their pinned target-state closure, "
+            "without arithmetic or termination claims; unrestricted IEEE semantics not proved")
+    return text
 
 
 def target_remainder_context(context):
@@ -635,13 +720,13 @@ def verify_context(data, address, calls, context):
         raise ValueError("software double requires an isolated canonical runtime context")
     rom, mapping, index, bindings = context[:4]
     validate_span(data, address, rom, mapping, index)
-    operations = dict(OPERATIONS, **DIVISION_OPERATION, __modsi3=modsi3.ADDRESS)
-    if not any(name in OPERATIONS for name in bindings.values()) or \
+    operations = dict(OPERATIONS, **DIVISION_OPERATION, **WIDE_OPERATIONS, __modsi3=modsi3.ADDRESS)
+    if not any(name in OPERATIONS or name in WIDE_OPERATIONS for name in bindings.values()) or \
             any(type(site) is not int or name not in operations or calls.get(site) != operations[name]
                 for site, name in bindings.items()) or \
             set(bindings) != {site for site, target in calls.items()
                               if reserved(target) or modsi3.reserved(target) or
-                              target in DIVISION_OPERATION.values()}:
+                              target in DIVISION_OPERATION.values() or target in WIDE_OPERATIONS.values()}:
         raise ValueError("software-double runtime call bindings are incomplete or mixed")
     remainder = {site: name for site, name in bindings.items() if name == "__modsi3"}
     if remainder:
@@ -651,6 +736,8 @@ def verify_context(data, address, calls, context):
         raise ValueError("target-state remainder opt-in requires a canonical remainder call")
     if any(name == "__divsi3" for name in bindings.values()):
         prove_division_closure(rom, mapping, index)
+    if any(name in WIDE_OPERATIONS for name in bindings.values()):
+        prove_wide_closure(rom, mapping, index)
     return remainder
 
 
@@ -687,7 +774,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                        parse_data_symbols, verify_data_literals, modsi3, ARM_OP_MEM, ARM_REG_PC)
     entries, entry = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or \
-            set(manifest) - {"data", "remainder", "signed_division", "switch", "inert_spin", "target_remainder", "local_branches"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
+            set(manifest) - {"data", "remainder", "signed_division", "wide_integer", "switch", "inert_spin", "target_remainder", "local_branches"} != {"runtime", "abi", "semantics", "dependencies", "frame", "calls"} or \
             manifest["runtime"] != RUNTIME or manifest["abi"] != ABI or manifest["semantics"] != SEMANTICS or \
             type(manifest["dependencies"]) is not list or \
             any(type(record) is not list or len(record) != 3 or \
@@ -724,6 +811,10 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
     if ("signed_division" in manifest) != (division is not None) or \
             division is not None and manifest["signed_division"] != division:
         raise ValueError("software-double signed division target-state evidence differs")
+    wide = wide_record(address, bindings)
+    if ("wide_integer" in manifest) != (wide is not None) or \
+            wide is not None and manifest["wide_integer"] != wide:
+        raise ValueError("software-double wide-integer target-state evidence differs")
     literals, occupied = {}, {byte - address for site in calls for byte in range(site, site + 4)}
     objects = parse_data_symbols(data_mapping) if "data" in manifest else {}
     previous = -1
@@ -814,6 +905,9 @@ def make_manifest(calls, address, bindings, instructions, *, literals=None, data
     division = division_record(address, bindings)
     if division is not None:
         manifest["signed_division"] = division
+    wide = wide_record(address, bindings)
+    if wide is not None:
+        manifest["wide_integer"] = wide
     if spins:
         manifest["inert_spin"] = {"schema": INERT_SPIN_SCHEMA, "spins": list(spins)}
     if literals:
@@ -873,7 +967,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                     raise ValueError("software-double data requires one undefined mapped global object")
                 has_data = True
                 continue
-            if target["name"] in OPERATIONS:
+            if target["name"] in OPERATIONS or target["name"] in WIDE_OPERATIONS:
                 has_double = True
             if target["name"] == "__modsi3":
                 has_remainder = True
@@ -893,7 +987,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                                           modsi3_bindings=remainder_bindings if has_remainder else None,
                                           allow_double_data=has_data,
                                           switch_relocations=switch_relocations if has_switch else None)
-        if not any(name in OPERATIONS for name in bindings.values()):
+        if not any(name in OPERATIONS or name in WIDE_OPERATIONS for name in bindings.values()):
             raise ValueError("software double requires at least one canonical binary64 runtime call")
         bindings.update(remainder_bindings)
         if data_relocations is not None:
