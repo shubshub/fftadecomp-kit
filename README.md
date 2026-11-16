@@ -740,6 +740,26 @@ the same instruction-derived rule runs during fresh verification and replay.
 The fixed-frame exclusions in division, switch and function-address profiles
 still apply.
 
+Thumb has no SP-relative byte or halfword load. When a frame is too large for
+the `ldrb`/`ldrh` offset range, agbcc reads a narrow fifth or later argument
+with `add Rd, sp, #imm; ldrb Rd, [Rd, #imm]` (or `ldrh`). The ordinary
+direct-call, data and buffer-call frame profiles accept exactly this pair: a
+16-bit `add Rd, sp, #imm` that addresses entry SP or above, immediately followed
+by `ldrb` or `ldrh` with that same low register as base and destination. The
+load overwrites `Rd`, so the address never becomes an alias and cannot reach a
+join, call, store or return. The bytes read must lie in one aligned incoming
+word that a direct `ldr Rt, [sp, #imm]` at the same depth could read, which
+bounds the read to SP+1020. The pair therefore reads nothing that the existing
+direct incoming reads cannot. As for those, the argument count, caller
+allocation and value are not proved. Every other use of such an address still
+fails with "stack alias arithmetic leaves the tracked frame". That includes a
+store, a word or signed load, another destination or base register, an
+intervening instruction or arithmetic. Stores into the incoming area are still
+rejected. The addressed, owner, switch, function-address, runtime and inventory
+profiles keep their existing refusal. Frame schemas are unchanged, and saved
+reports replay through the same rule. A verifier without it refuses a report
+that uses the pair.
+
 An adjacent 16-bit PC-relative `ldr r0-r7, literal` followed by the exact
 16-bit `add sp, r0-r7` encoding also establishes a fixed adjustment when the
 aligned in-symbol literal contains a nonzero signed multiple of four, at most
@@ -2112,6 +2132,21 @@ fail, and the base unsigned and unsigned native-buffer selectors keep their
 incoming-stack-read refusal. Caller allocation and readability remain explicit
 premises; loaded values, numeric results and historical formal types are not
 proved.
+
+Two four-word selectors use the existing read-only contiguous incoming-word
+contract (`thumb-readonly-entry-stack-words-v1`) with exactly entry SP+0 to
+SP+12. `addressed-integer-runtime-readonly-four-words-data-v1` is the four-word
+sibling of `addressed-integer-runtime-readonly-three-words-data-v1`: explicit
+mixed signed and unsigned runtime calls and actual typed data.
+`compiler-signed-runtime-readonly-four-words-numeric-mmio-data-v1` adds the same
+contract to `compiler-signed-runtime-numeric-mmio-data-v1`: compiler-emitted
+signed runtime names, reached numeric MMIO literals and optional typed data.
+Every declared word needs an actual reached canonical `ldr Rt, [sp, #imm]`.
+Reads of other words, entry stores, narrow or address-forming entry accesses and
+alias escapes fail. Caller allocation and readability are explicit premises, and
+the loaded values are unknown. The reports bind the incoming-word implementation
+with the other data producers. The base and three-word selectors keep their
+boundaries.
 
 ### Guarded local Thumb switches
 

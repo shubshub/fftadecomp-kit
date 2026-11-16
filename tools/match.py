@@ -2862,6 +2862,41 @@ def stack_alias_assignment(instruction, aliases, depth, constants):
     return assignment
 
 
+def thumb_incoming_narrow_read(instruction, data, address, depth):
+    """(register, entry-SP offset, width) of an exact incoming narrow read pair, else None.
+
+    The pair is a 16-bit `add Rd, sp, #imm` addressing entry SP or above, immediately
+    followed by `ldrb` or `ldrh Rd, [Rd, #imm]` on the same low register. Neither load
+    has an SP-relative encoding, so the compiler forms the address first. The load
+    overwrites Rd, so no stack address outlives the pair, and the bytes it reads lie in
+    one aligned incoming word that a direct `ldr Rt, [sp, #imm]` at this depth reaches.
+    """
+    raw = bytes(instruction.bytes)
+    operands = instruction.operands
+    if instruction.size != 2 or len(raw) != 2 or instruction.mnemonic != "add" or \
+            instruction.cc not in (ARM_CC_AL, ARM_CC_INVALID) or len(operands) != 3:
+        return None
+    encoded = int.from_bytes(raw, "little")
+    register = (encoded >> 8) & 7
+    if encoded & 0xF800 != 0xA800 or operands[0].type != ARM_OP_REG or \
+            operands[0].reg != ARM_REG_R0 + register or operands[1].type != ARM_OP_REG or \
+            operands[1].reg != ARM_REG_SP or operands[2].type != ARM_OP_IMM or \
+            operands[2].imm != 4 * (encoded & 0xFF):
+        return None
+    offset = 4 * (encoded & 0xFF) - 4 * depth
+    following = instruction.address + 2 - address
+    if offset < 0 or not 0 <= following <= len(data) - 2:
+        return None
+    load = struct.unpack_from("<H", data, following)[0]
+    width = {0x7800: 1, 0x8800: 2}.get(load & 0xF800)
+    if width is None or load & 7 != register or (load >> 3) & 7 != register:
+        return None
+    offset += width * ((load >> 6) & 0x1F)
+    if 4 * depth + offset - offset % 4 > 1020:
+        return None
+    return ARM_REG_R0 + register, offset, width
+
+
 def stack_alias_store(stack, pointer_slots, aliases, return_registers,
                       offset, width, register, *, pointer_proof=None):
     """Apply an existing scalar store's bounded stack/provenance effects."""
@@ -3937,6 +3972,8 @@ def _ordinary_call_replay(proof, address=None):
 
 # the only verify_leaf_instructions parameters a self-calling function may set
 SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")
+INCOMING_NARROW_READ_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver",
+                                   "buffer_proof", "incoming_narrow_reads")
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
@@ -3963,14 +4000,24 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              finite_small_copy_context=None, self_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
-                             switch_outgoing_stack_fixed_pool=False, switch_thunks=None):
+                             switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
+                             incoming_narrow_reads=False):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
     entry of this very function.  Such a call is an ordinary ARM ABI call to
     the symbol being verified (partial correctness only: no termination or
     depth theorem).  It is accepted only on the plain direct-call path.
+
+    incoming_narrow_reads admits thumb_incoming_narrow_read pairs. It is accepted
+    only on the plain direct-call path, optionally with a plain BufferCallProof.
     """
+    if incoming_narrow_reads is not False and (
+            incoming_narrow_reads is not True or thumb is not True or
+            buffer_proof is not None and type(buffer_proof) is not BufferCallProof or any(
+                value is not None and value is not False for name, value in locals().items()
+                if name not in INCOMING_NARROW_READ_PARAMETERS)):
+        raise ValueError("incoming narrow reads require the plain Thumb direct-call path")
     if runtime_summaries is not None:
         from runtime_summary_profile import RuntimeSummaries
         if type(runtime_summaries) is not RuntimeSummaries or not thumb or any(
@@ -4809,9 +4856,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     if literal is not None:
                         literal_stack_constants.add(current)
                         alias_constants = {**constants, literal[0]: literal[1]}
-                assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) if thumb else None
+                # The pair's load overwrites the register, so the address never becomes an alias.
+                incoming_read = thumb_incoming_narrow_read(instruction, data, address, len(stack)) \
+                    if incoming_narrow_reads and thumb else None
+                assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) \
+                    if thumb and incoming_read is None else None
                 deferred_derivation = False
-                if ARM_REG_SP in registers and assignment is None:
+                if ARM_REG_SP in registers and assignment is None and incoming_read is None:
                     if bounded_index is not None and bounded_index.defer_derivation(instruction, aliases):
                         deferred_derivation = True
                     elif stack_pointer_compare_profile is None:
@@ -5936,13 +5987,15 @@ def main():
                 try:
                     verified_instructions = (
                         verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites) if self_sites else
-                        verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof))
+                        verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof,
+                                                 incoming_narrow_reads=thumb))
                 except ValueError:
                     if not thumb or not calls or self_sites:
                         raise
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
-                                                                      buffer_proof=buffer_proof)
+                                                                      buffer_proof=buffer_proof,
+                                                                      incoming_narrow_reads=True)
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:

@@ -479,7 +479,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                         proof = BufferCallProof(rom, mapping, stack_arguments=buffer_stack_arguments,
                                                 loop_replay=True) \
                             if buffer_stack_arguments is not None else None
-                        instructions = verify_leaf_instructions(got, address, True, calls, buffer_proof=proof)
+                        instructions = verify_leaf_instructions(got, address, True, calls, buffer_proof=proof,
+                                                                incoming_narrow_reads=True)
                         if proof is not None and (not proof.dependencies or literals or proof.span(address) != got):
                             raise ValueError("legacy thunk buffer replay requires its complete buffer-only proof")
                         verify_literal_bindings(got, address, instructions, calls, mapping, functions)
