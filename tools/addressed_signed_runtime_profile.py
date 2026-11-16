@@ -106,6 +106,9 @@ DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_RE
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
                   INTEGER_FOUR_DATA_SELECTOR, BUFFER_DATA_SELECTOR, UNSIGNED_BUFFER_DATA_SELECTOR,
                   *COMPILER_SELECTORS)
+# The addressed-native-bios-fill-*-data-v1 selectors classify reached untyped
+# hardware-window words as owner_admission_profile numeric hardware words.
+NUMERIC_HARDWARE_SELECTORS = tuple(selector for selector in BIOS_SELECTORS if selector in DATA_SELECTORS)
 CALLBACK_ALIAS = '_call_via_r2'
 CALLBACK_CONTRACT = ('conditional returning typed source callback via canonical r2; '
                      'r0/r1 are caller arguments, r2 is the target, not a third C formal; '
@@ -601,6 +604,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
     scalar_controls = []
     saved_controls = []
     numeric_mmio = []
+    numeric_hardware = []
     code_images = None
     if selector in DATA_SELECTORS:
         literals = data_literals(data, address, context[0], context[1], context[6], context[7], selector=selector)
@@ -631,6 +635,10 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             if offsets & (set(literals) | {row[0] for row in scalar_controls + saved_controls}):
                 raise ValueError('numeric MMIO cannot also be a typed object or BIOS scalar control')
             address_words -= offsets
+        if selector in NUMERIC_HARDWARE_SELECTORS:
+            numeric_hardware = owner.numeric_hardware_words(instructions, edges, calls, partition, address,
+                                                            address_words - set(literals))
+            address_words -= {row[0] for row in numeric_hardware}
         if address_words != set(literals):
             raise ValueError('addressed data requires exact typed coverage of reached address words')
         if selector in CODE_IMAGE_SELECTORS:
@@ -765,6 +773,8 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
                      'symbol, pointee type, hardware access validity, physical readability, '
                      'memory effects, initialization, nonalias, bounds, numeric result, '
                      'termination or C semantic equivalence theorem.')
+    if numeric_hardware:
+        context[4]['numeric_hardware_words'] = owner.numeric_hardware_record(numeric_hardware)
     if selector == BUFFER_SCRATCH_SELECTOR:
         from local_long_branch_profile import DISCARDED_SCRATCH_CONTRACT
         context[4]['native_buffers'].update(

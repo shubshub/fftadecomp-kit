@@ -42,11 +42,15 @@ class BiosNumericMmioLiteralTests(unittest.TestCase):
         self.assertEqual(manifest['runtime_numeric_return_facts'], [])
         self.assertFalse(manifest['arithmetic_C_equivalence'])
 
-    def test_old_selectors_ram_odd_and_outside_window_still_refuse(self):
+    def test_old_selectors_ram_odd_and_outside_window_are_not_mmio(self):
         f = self.fixture()
-        for selector in (profile.BIOS_DATA_SELECTOR, profile.BIOS_SCALAR_DATA_SELECTOR):
-            with self.subTest(selector=selector), self.assertRaises(ValueError):
-                profile.verify(**dict(f, selector=selector))
+        # The 32-bit fill control needs a type where controls are not computed.
+        with self.assertRaises(ValueError):
+            profile.verify(**dict(f, selector=profile.BIOS_DATA_SELECTOR))
+        # Outside the numeric-MMIO selectors the I/O word is a numeric hardware word.
+        manifest, _ = profile.verify(**dict(f, selector=profile.BIOS_SCALAR_DATA_SELECTOR))
+        self.assertNotIn('numeric_mmio_literals', manifest)
+        self.assertEqual(manifest['numeric_hardware_words']['words'], [[len(f['data'])-4, 0x04000134, [6]]])
         for value in (0x03000134, 0x04000135, 0x03FFFFFE, 0x04000400, 0x05000010):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 profile.verify(**self.fixture(value))

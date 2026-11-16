@@ -105,6 +105,18 @@ ACYCLIC_SELECTOR = 'restoring-owner-acyclic-v1'
 ACYCLIC_SCHEMA = 'elf-symbol-thumb-acyclic-stack-alias-v1'
 ACYCLIC_STATE_BUDGET = 4096
 ACYCLIC_CONTROL_FLOW = 'complete acyclic Thumb owner; exact bounded path states and ordinary direct-call ABI summaries'
+# The fixed I/O, palette, VRAM and OAM window of unsigned_thunk_profile.HARDWARE.
+NUMERIC_HARDWARE = (0x04000000, 0x08000000)
+NUMERIC_HARDWARE_SCHEMA = 'reached-numeric-hardware-literals-v1'
+NUMERIC_HARDWARE_CONTRACT = ('Reached PC-loaded literals in [0x04000000,0x08000000) that are not a typed '
+    'ABS32 object or function, switch word or numeric MMIO literal, and none of whose loads the BIOS '
+    'scalar control recognizers accept. Original ELF words have no relocation; the linker must preserve '
+    'them exactly. Literal identity only, no typed symbol, pointee type, control role, hardware access '
+    'validity, physical readability, memory effects, initialization, nonalias, bounds, numeric result, '
+    'termination or C semantic equivalence theorem.')
+NUMERIC_HARDWARE_SELECTORS = (named_buffer.BIOS_FILL_SELECTOR, named_buffer.BIOS_LOCAL_FILL_SELECTOR,
+    named_buffer.BIOS_OVERWRITE_SELECTOR, named_buffer.FAST_FILL_SELECTOR, named_buffer.MIXED_FAST_FILL_SELECTOR,
+    named_buffer.MIXED_CPUSET_FAST_FILL_SELECTOR, named_buffer.RUNTIME_SUMMARY_FAST_FILL_SELECTOR)
 _replay = ContextVar('owner_runtime_replay', default=False)
 
 
@@ -392,6 +404,26 @@ def refine(data, address, mapping, *, multiple_switch_profile=None):
     return analyze.refine_function(data, address, json.loads(mapping), max_bytes=len(data),
             max_instructions=len(data)//2, rom_end=0x09000000, same_owner_long_branches=True,
             multiple_switch_profile=multiple_switch_profile)
+
+
+def numeric_hardware_words(instructions, edges, calls, partition, address, remaining):
+    """Reached untyped NUMERIC_HARDWARE words, classified after every earlier class.
+
+    ``remaining`` holds the word offsets that no earlier class took. A word with
+    a load that an existing BIOS scalar control recognizer accepts on its own is
+    never a number: it is a control where the selector computes controls, and
+    otherwise it still needs typed provenance, so its loads cannot mix classes.
+    """
+    from bios_cpuset_fill_profile import saved_scalar_control_words, scalar_control_words
+    return [[row['address'] - address, row['value'], [site - address for site in row['load_sites']]]
+            for row in partition['words']
+            if row['address'] - address in remaining and NUMERIC_HARDWARE[0] <= row['value'] < NUMERIC_HARDWARE[1]
+            and not any(finder(instructions, edges, calls, {'words': [dict(row, load_sites=[site])]}, address)
+                        for site in row['load_sites'] for finder in (scalar_control_words, saved_scalar_control_words))]
+
+
+def numeric_hardware_record(rows):
+    return dict(schema=NUMERIC_HARDWARE_SCHEMA, words=rows, contract=NUMERIC_HARDWARE_CONTRACT)
 
 
 def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindings=None,
@@ -878,6 +910,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         address_words -= controls
     if selector in rom_copy.SELECTORS and rodata:
         address_words -= {site for site,_ in rodata['sites']}
+    if selector in NUMERIC_HARDWARE_SELECTORS:
+        hardware = numeric_hardware_words(ins, edges, calls, proof['partition'], address, address_words - set(literals))
+        if hardware:
+            address_words -= {row[0] for row in hardware}
+            proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
     if address_words != set(literals):
         raise ValueError('owner address literals require exact typed object/function coverage')
     schema = runtime_summary.SCHEMAS[selector] if selector in runtime_summary.SELECTORS else bios_switch.SCHEMA if selector == bios_switch.SELECTOR else small_copy_binding.SCHEMA if selector == small_copy_binding.SELECTOR else copy_binding.SCHEMA if selector == copy_binding.SELECTOR else local_calls.SCHEMAS[selector] if selector in local_calls.SELECTORS else spilled_loop.SCHEMA if selector == spilled_loop.SELECTOR else finite_loop.SCHEMA if selector == finite_loop.SELECTOR else stack_query.DIVISION_SCHEMA if selector == stack_query.DIVISION_SELECTOR else stack_query.SCHEMA if selector == stack_query.SELECTOR else nested_query.SCHEMA if selector == nested_query.SELECTOR else query_cont.SCHEMA if selector == query_cont.SELECTOR else list_query.SCHEMA if selector == list_query.SELECTOR else known_query.SCHEMA if selector == known_query.SELECTOR else tree_callback.SCHEMA if selector == tree_callback.SELECTOR else callback_closure.SCHEMA if selector == callback_closure.SELECTOR else literal_callback.SCHEMA if selector == literal_callback.SELECTOR else THUNK_SWITCH_SCHEMA if selector == THUNK_SWITCH_SELECTOR else DIRECT_SWITCH_SCHEMA if selector == DIRECT_SWITCH_SELECTOR else ENTRY_DATA_SWITCH_SCHEMA if selector == ENTRY_DATA_SWITCH_SELECTOR else ENTRY_SWITCH_SCHEMA if selector == ENTRY_SWITCH_SELECTOR else \
