@@ -12,6 +12,10 @@ SELECTOR = 'compiler-orphan-address-constants-prerequisite-v1'
 SCHEMA = 'thumb-compiler-orphan-address-constants-prerequisite-v1'
 MAX_TEXT = 4096
 MAX_ORPHAN = 64
+# `as` word-aligns .text after a function whose size is 2 mod 4 with one
+# Thumb nop (mov r8, r8). It is not function bytes; the ROM is compared only
+# over the indexed function span, whatever it holds after it.
+ALIGNMENT_FILL = b'\xc0\x46'
 
 
 def require(condition, message):
@@ -94,6 +98,31 @@ def reachable_literals(data, address, calls):
     return loads, len(instructions)
 
 
+def call_thunks(rom, address, calls):
+    """Bind each compiler _call_via_rN call to its thunk in the ROM.
+
+    The ROM's BL at the call site must land on the helper's address in
+    match.RUNTIME_HELPERS, and the ordinary call path's match.thunk_is_call_via
+    must accept the thunk there for the same register.
+    """
+    if not calls:
+        return []
+    require(type(rom) is bytes, 'orphan call thunks require the immutable ROM')
+    decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+    decoder.detail = True
+    rows = []
+    for site, name in sorted(calls.items()):
+        thunk = match.RUNTIME_HELPERS[name]
+        start = address+site-match.ROM_BASE
+        item = next(decoder.disasm(rom[start:start+4], address+site, count=1), None)
+        require(item is not None and item.id == match.ARM_INS_BL and item.size == 4 and
+                item.operands[0].imm == thunk and
+                match.thunk_is_call_via(rom, thunk, int(name[len('_call_via_r'):])),
+                'orphan call thunk differs from its ROM call site or thunk')
+        rows.append(dict(offset=site, symbol=name, thunk=thunk))
+    return rows
+
+
 def function_spans(address, size, names, mapping, index, rom):
     """Bind owner and every addressed target to complete dual-index ROM spans."""
     from software_double_profile import indices, span_record
@@ -131,9 +160,13 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
     image = match.elf_image(original_elf)
     require(image['type'] == 1, 'orphan prerequisite requires original relocatable ELF')
     function, offset = match.function_record(image,f'func_{address:08X}',address,True)
-    require(offset == 0 and function['size'] == len(image['text']) and 0 < len(image['text']) <= MAX_TEXT and
+    size = function['size']
+    fill = image['text'][size:]
+    require(offset == 0 and 0 < len(image['text']) <= MAX_TEXT and
+            (not fill or size%4 == 2 and fill == ALIGNMENT_FILL) and
             [row for row in image['symbols'] if row['type'] == 2 and row['section']] == [function],
             'orphan prerequisite requires sole complete sized Thumb function')
+    body = image['text'][:size]
     header = struct.unpack_from('<HHIIIIIHHHHHH',original_elf,16)
     names = image['section_data'][header[12]]
     def section_name(section):
@@ -206,7 +239,9 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
             require(info>>8 < len(symbols), 'invalid orphan relocation symbol')
             target=symbols[info>>8]
             require(target['section'] != orphan, 'incoming reference to orphan section')
-            require(info&255 in (2,10) and 0 <= site <= image['sections'][row[7]][5]-4 and
+            # Nothing refers to the alignment fill.
+            limit = size if row[7] == image['text_index'] else image['sections'][row[7]][5]
+            require(info&255 in (2,10) and 0 <= site <= limit-4 and
                     not occupied.intersection(range(site,site+4)), 'unsupported partial or overlapping orphan relocation')
             occupied.update(range(site,site+4)); used.add(target['name'])
             require(target['section'] == target['value'] == target['size'] == 0 and target['bind'] == 1 and
@@ -215,7 +250,8 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
                     'orphan relocation requires unique undefined zero-valued global identity')
             if info&255 == 10:
                 require(row[7] == image['text_index'] and site%2 == 0 and target['type'] in (0,2) and
-                        re.fullmatch(r'func_[0-9A-F]{8}',target['name']), 'unsupported orphan prerequisite call identity')
+                        (re.fullmatch(r'func_[0-9A-F]{8}',target['name']) or
+                         target['name'] in match.RUNTIME_HELPERS), 'unsupported orphan prerequisite call identity')
                 addend=None
             else:
                 require(site%4 == 0, 'orphan address requires aligned complete word')
@@ -226,11 +262,15 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
                 if is_function:
                     require(target['type'] in (0,2) and addend == 0,
                             'orphan function address requires typed zero addend')
+                    # Neither the owner nor its alignment fill.
+                    require(not address <= int(target['name'][5:],16) < address+len(image['text']),
+                            'orphan function address refers to owner')
                     function_names.add(target['name'])
                 else:
                     require(target['type'] in (0,1) and target['name'] in data_symbols,
                             'orphan address requires genuine aligned named-data identity')
                     value=data_symbols[target['name']]+addend
+                    # The owner and its alignment fill.
                     require(0 <= value <= 0xFFFFFFFF and not address <= value < address+len(image['text']),
                             'orphan named-data addend overflows or refers to owner')
             relocations[row[7]].append((site,target['name'],addend))
@@ -238,7 +278,8 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
             'orphan prerequisite contains unresolved unused identity')
     text=relocations[image['text_index']]
     calls={site:name for site,name,addend in text if addend is None}
-    loads,count=reachable_literals(image['text'],address,calls)
+    loads,count=reachable_literals(body,address,calls)
+    thunks=call_thunks(rom,address,{site:name for site,name in calls.items() if name in match.RUNTIME_HELPERS})
     originals={(name,addend): [] for site,name,addend in text if addend is not None}
     for site,name,addend in text:
         if addend is not None:
@@ -249,7 +290,7 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
             'orphan words require complete relocation coverage')
     require(all(addend is not None and (name,addend) in originals for _,name,addend in copies),
             'orphan word lacks identical authenticated in-function symbol/addend')
-    observed=dict(schema=SCHEMA, selector=SELECTOR, address=address, complete_text_bytes=len(image['text']),
+    observed=dict(schema=SCHEMA, selector=SELECTOR, address=address, complete_text_bytes=size,
         syntactic_instructions=count, orphan_section=dict(index=orphan,name='.rodata',bytes=section[5],
             sha256=sha(image['section_data'][orphan])),
         duplicate_words=[dict(offset=site,symbol=name,addend=addend,
@@ -265,11 +306,15 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
             'explicit linker GC/exclusion, unchanged linked output, complete native frame/alias/return '
             'replay, typed call/index/ROM binding and distinct replayable admission remain required. '
             'No runtime unreachability, memory access, extent, nonaliasing or termination theorem.')
+    if fill:
+        observed['alignment_fill'] = dict(offset=size, hex=fill.hex())
+    if thunks:
+        observed['call_thunks'] = dict(calls=thunks, rom_sha256=sha(rom))
     if function_names:
         observed['schema'] = SCHEMA + '-typed-functions-v2'
         observed['function_addresses'] = dict(
             names=sorted(function_names),
-            spans=function_spans(address,len(image['text']),function_names,mapping,function_index,rom),
+            spans=function_spans(address,size,function_names,mapping,function_index,rom),
             mapping_sha256=sha(mapping),index_sha256=sha(function_index),rom_sha256=sha(rom),
             callback_body_semantics_proved=False)
     if manifest is not None:
