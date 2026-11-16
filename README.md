@@ -2258,6 +2258,36 @@ the loaded values are unknown. The reports bind the incoming-word implementation
 with the other data producers. The base and three-word selectors keep their
 boundaries.
 
+The separate opt-ins `addressed-signed-runtime-thunks-v1` and
+`addressed-signed-runtime-thunks-data-v1` compose the explicit
+`func_081426B8`/`func_08142950` calls with compiler-emitted canonical
+`_call_via_rN` callback calls. The data variant adds the typed named-data linking
+above and requires actual data; the base variant excludes address literals. Each
+selector needs at least one runtime call and one thunk call, and any number of
+thunk registers may appear. Each thunk's `bx rN; nop` bytes and its two-byte
+indexed owner are authenticated, and the original ELF must name it through the
+compiler-emitted relocation. On every CFG path to a thunk call, the last write of
+the target register must be a full-word `ldr` from memory through a base other
+than PC or SP. This is a must-analysis over the closed CFG, and every call clobbers
+r0-r3, r12 and LR. A constant, PC literal, stack word, entry value, register copy
+or narrower load refuses. A Thumb `ldr` writes only r0-r7, so only those targets
+can pass; `_call_via_r8` to `_call_via_r12` always refuse. The report records
+each thunk site with its reaching load sites. No SP materialization is admitted,
+so no target or argument carries a local address. The callee stays opaque: it is
+assumed to return and to obey the r4-r11/SP preserving ARM ABI, as for the other
+thunk selectors, and no callback identity, value or effect is claimed.
+
+These two selectors also admit agbcc's same-owner long `bl` jumps. The
+restoring-frame proof re-proves them, and the report records them as
+`local_long_branches`; the other addressed selectors still refuse them. Fixed Thumb
+frames with direct aligned SP words are admitted, as in the base selector. Sources
+follow the `unsigned-divmod-thunks-v1` rules: runtime, call-via, asm-label, alias
+and weak spellings are reserved for compiler emission, and the object defines only
+its caller. Still excluded: local buffers passed to callbacks, compiler-emitted
+`__divsi3`/`__modsi3` names, unsigned runtimes, switches, function literals and
+incoming stack words. The r2 and r3 callback selectors keep their fixed producer
+shapes.
+
 ### Guarded local Thumb switches
 
 The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted

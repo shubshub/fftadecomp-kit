@@ -45,6 +45,13 @@ CALLBACK_SELECTOR = 'addressed-signed-runtime-r2-callback-data-v1'
 CALLBACK_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-r2-callback-data-v1'
 R3_CALLBACK_SELECTOR = 'addressed-signed-runtime-r3-callback-data-v1'
 R3_CALLBACK_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-r3-callback-data-v1'
+# Any canonical _call_via_rN thunks, each target a word loaded from memory on
+# every path; the callee stays opaque.  The data variant requires typed data.
+THUNKS_SELECTOR = 'addressed-signed-runtime-thunks-v1'
+THUNKS_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-thunks-v1'
+THUNKS_DATA_SELECTOR = 'addressed-signed-runtime-thunks-data-v1'
+THUNKS_DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-thunks-data-v1'
+THUNK_SELECTORS = (THUNKS_SELECTOR, THUNKS_DATA_SELECTOR)
 UNSIGNED_SELECTOR = 'addressed-unsigned-runtime-v1'
 UNSIGNED_SCHEMA = 'elf-symbol-thumb-addressed-unsigned-runtime-v1'
 UNSIGNED_DATA_SELECTOR = 'addressed-unsigned-runtime-data-v1'
@@ -105,7 +112,7 @@ CALLBACK_SELECTORS = (CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_
 DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
                   INTEGER_FOUR_DATA_SELECTOR, BUFFER_DATA_SELECTOR, UNSIGNED_BUFFER_DATA_SELECTOR,
-                  *COMPILER_SELECTORS)
+                  *COMPILER_SELECTORS, THUNKS_DATA_SELECTOR)
 # The addressed-native-bios-fill-*-data-v1 selectors classify reached untyped
 # hardware-window words as owner_admission_profile numeric hardware words.
 NUMERIC_HARDWARE_SELECTORS = tuple(selector for selector in BIOS_SELECTORS if selector in DATA_SELECTORS)
@@ -116,6 +123,12 @@ CALLBACK_CONTRACT = ('conditional returning typed source callback via canonical 
 R3_CALLBACK_CONTRACT = ('conditional returning typed source callback via canonical r3; '
                         'r0/r1/r2 are caller arguments, r3 is the target, not a fourth C formal; '
                         'no callback numeric, buffer, memory or termination equivalence facts')
+THUNK_CONTRACT = ('conditional returning opaque callee via canonical _call_via_rN; on every path the '
+                  'target register holds a full word loaded from memory through a base other than PC or SP, '
+                  'never a constant, literal, stack or entry-return value; no argument reaches the callee '
+                  'with stack provenance; the callee returns and obeys the r4-r11/SP preserving ARM ABI; '
+                  'no callback identity, numeric, buffer, memory or termination facts')
+THUNK_TARGET_POLICY = 'all-path-memory-word-load-target-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
 SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
@@ -144,6 +157,7 @@ SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
             READONLY_TWO_SELECTOR: READONLY_TWO_SCHEMA, DATA_SELECTOR: DATA_SCHEMA,
             READONLY_TWO_DATA_SELECTOR: READONLY_TWO_DATA_SCHEMA,
             CALLBACK_SELECTOR: CALLBACK_SCHEMA, R3_CALLBACK_SELECTOR: R3_CALLBACK_SCHEMA,
+            THUNKS_SELECTOR: THUNKS_SCHEMA, THUNKS_DATA_SELECTOR: THUNKS_DATA_SCHEMA,
             UNSIGNED_SELECTOR: UNSIGNED_SCHEMA, UNSIGNED_DATA_SELECTOR: UNSIGNED_DATA_SCHEMA,
             UNSIGNED_READONLY_SELECTOR: 'elf-symbol-thumb-addressed-unsigned-runtime-readonly-word0-v1',
             UNSIGNED_BUFFER_SELECTOR: 'elf-symbol-thumb-addressed-unsigned-runtime-native-buffer-v1',
@@ -183,6 +197,19 @@ def compiler_namespace(source):
         raise ValueError('compiler runtime identifiers cannot occur in preprocessed C')
 
 
+def thunk_namespace(preprocessed, assembly, image, address):
+    """The unsigned thunk selectors' source and assembly rules: runtime, call-via,
+    asm-label, alias and weak spellings stay compiler-only, and the object
+    defines only its caller."""
+    import unsigned_thunk_profile as rules
+    try:
+        rules.namespace(preprocessed)
+        rules.compiled(assembly, image, address)
+    except ValueError as error:
+        raise ValueError('thunk sources reserve runtime, call-via, asm-label, alias and weak '
+                         'spellings for compiler emission and define only their caller') from error
+
+
 def buffer_scratch_policy(selector):
     if selector != BUFFER_SCRATCH_SELECTOR:
         return None
@@ -206,7 +233,7 @@ def context_selector(context):
             return READONLY_SELECTOR
         if len(context) == 6 and type(context[5]) is str and context[5] == READONLY_TWO_SELECTOR:
             return READONLY_TWO_SELECTOR
-        if len(context) == 6 and type(context[5]) is str and context[5] in (UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR):
+        if len(context) == 6 and type(context[5]) is str and context[5] in (UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, THUNKS_SELECTOR):
             return context[5]
         if len(context) == 8 and type(context[5]) is str and context[5] in DATA_SELECTORS:
             return context[5]
@@ -221,6 +248,11 @@ def operations(selector):
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS)
     return UNSIGNED_OPERATIONS if selector in (*UNSIGNED_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                                                UNSIGNED_BUFFER_DATA_SELECTOR) else OPERATIONS
+
+
+def local_branches(context):
+    """Only the thunk selectors admit same-owner long BL edges; finish re-proves them."""
+    return context is not None and context_selector(context) in THUNK_SELECTORS
 
 
 def binds_unsigned(context, site, target):
@@ -313,6 +345,8 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
                      ('cpuset_code_image_profile', 'iwram_installation_prerequisite'))
     if selector == BIOS_READONLY_DATA_SELECTOR:
         paths.add(Path(importlib.import_module('readonly_entry_stack_profile').__file__))
+    if selector in THUNK_SELECTORS:
+        paths.add(Path(importlib.import_module('unsigned_thunk_profile').__file__))
     if selector in (READONLY_TWO_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
         paths.add(Path(importlib.import_module('readonly_entry_stack_words_profile').__file__))
     return {path.name: sha(path.read_bytes()) for path in sorted(paths)}
@@ -322,15 +356,73 @@ def callback_alias(selector):
     return '_call_via_r3' if selector == R3_CALLBACK_SELECTOR else CALLBACK_ALIAS
 
 
-def callback_dependencies(rom, mapping, index, selector=CALLBACK_SELECTOR):
-    """Reuse canonical thunk identity, with its actual two-byte indexed owner."""
+def thunk_alias(selector, target):
+    """The canonical thunk name a selector admits at this call target, if any."""
+    import match
+    if selector in CALLBACK_SELECTORS:
+        alias = callback_alias(selector)
+        return alias if target == match.function_thunk.ALIASES[alias] else None
+    if selector in THUNK_SELECTORS:
+        return next((name for name, value in match.function_thunk.ALIASES.items() if value == target), None)
+    return None
+
+
+def thunk_dependencies(rom, mapping, index, aliases):
+    """Reuse canonical thunk identity, each with its actual two-byte indexed owner."""
     import match
     import owner_admission_profile as owner
-    alias = callback_alias(selector)
-    target = match.function_thunk.ALIASES[alias]
-    offset = target - match.ROM_BASE
-    owner.validate_span(rom[offset:offset+2], target, rom, mapping, index)
-    return match.function_thunk.dependencies([alias], rom)
+    for alias in sorted(set(aliases)):
+        target = match.function_thunk.ALIASES[alias]
+        offset = target - match.ROM_BASE
+        owner.validate_span(rom[offset:offset+2], target, rom, mapping, index)
+    return match.function_thunk.dependencies(aliases, rom)
+
+
+def callback_dependencies(rom, mapping, index, selector=CALLBACK_SELECTOR):
+    return thunk_dependencies(rom, mapping, index, [callback_alias(selector)])
+
+
+def thunk_target_loads(instructions, edges, calls, address):
+    """Every path's last write of each thunk target register is a memory word load.
+
+    A forward must-analysis over the closed CFG: a full-word ``ldr`` whose
+    base is neither PC nor SP defines a loaded register; any other write, an
+    entry value and every call's caller-clobbered registers do not.  Joins
+    keep the union of load sites, and one non-load path removes the register.
+    """
+    import match
+    from function_thunk_profile import ALIASES, START
+    clobbered = (*range(match.ARM_REG_R0, match.ARM_REG_R0 + 4), match.ARM_REG_R12, match.ARM_REG_LR)
+    states, pending = {address: {}}, [address]
+    while pending:
+        site = pending.pop()
+        state, item = dict(states[site]), instructions[site]
+        for register in clobbered if site in calls else item.regs_access()[1]:
+            state.pop(register, None)
+        operands = item.operands
+        if site not in calls and item.mnemonic == 'ldr' and len(operands) == 2 and \
+                operands[0].type == match.ARM_OP_REG and operands[1].type == match.ARM_OP_MEM and \
+                operands[1].mem.base not in (match.ARM_REG_PC, match.ARM_REG_SP):
+            state[operands[0].reg] = frozenset((site,))
+        for successor in edges[site]:
+            joined = state if successor not in states else {
+                register: loads | states[successor][register]
+                for register, loads in state.items() if register in states[successor]}
+            if states.get(successor) != joined:
+                states[successor] = joined
+                pending.append(successor)
+    result = []
+    for site in sorted(site for site, target in calls.items() if target in ALIASES.values()):
+        register = match.ARM_REG_R0 + (calls[site] - START) // 4
+        loads = states.get(site, {}).get(register)
+        if not loads:
+            raise ValueError('thunk target requires a memory word load on every path, not a constant, '
+                             'literal, stack, entry or copied value')
+        result.append([site-address, next(name for name, value in ALIASES.items() if value == calls[site]),
+                       sorted(load-address for load in loads)])
+    if not result:
+        raise ValueError('thunk selector requires an actual canonical thunk call')
+    return result
 
 
 def callback_r0_slot(instructions, edges, reverse, calls, site, address, bindings):
@@ -549,6 +641,9 @@ def prepare(data, address, calls, context):
         callback_dependencies(rom, mapping, index, selector)
         if match.function_thunk.ALIASES[callback_alias(selector)] not in calls.values():
             raise ValueError('callback selector requires its actual canonical callback call')
+    if selector in THUNK_SELECTORS:
+        thunk_dependencies(rom, mapping, index,
+                           {thunk_alias(selector, target) for target in calls.values()} - {None})
     selected_operations = operations(selector)
     if any(type(site) is not int or type(name) is not str or name not in selected_operations or
            calls.get(site) != selected_operations[name] for site, name in bindings.items()) or \
@@ -583,7 +678,7 @@ def prepare(data, address, calls, context):
             selected.append([lo, hi, digest])
     for site, target in calls.items():
         if site not in bindings:
-            if selector in CALLBACK_SELECTORS and target == match.function_thunk.ALIASES[callback_alias(selector)]:
+            if thunk_alias(selector, target) is not None:
                 continue
             match.function_address_target(f'func_{target:08X}', entries, address, len(data), len(rom))
     return sorted({tuple(row) for row in selected})
@@ -596,11 +691,11 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
     import local_long_branch_profile as frame
     refinement = owner.refine(data, address, context[1])
     instructions, edges, branches, actual_calls, words = graph.graph(data, address, refinement)
-    if branches or words or calls != actual_calls or \
+    selector = context_selector(context)
+    if branches and selector not in THUNK_SELECTORS or words or calls != actual_calls or \
             set(instructions) != {item.address for item in verified}:
         raise ValueError('addressed signed runtimes require the exact closed direct-call CFG')
     partition = graph.partition(data, address, refinement, instructions, words)
-    selector = context_selector(context)
     scalar_controls = []
     saved_controls = []
     numeric_mmio = []
@@ -697,6 +792,11 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             raise ValueError('BIOS fill selector requires an actual bounded local fill source')
         if selector == BUFFER_SCRATCH_SELECTOR and not buffer_proof.discarded_exit_scratch_sites:
             raise ValueError('discarded scratch selector requires actual native scratch aliases')
+    elif selector in THUNK_SELECTORS:
+        # Each target is a fresh memory load, and the frame proof below admits
+        # no SP materialization, so no target or argument has stack provenance.
+        thunk_sites = thunk_target_loads(instructions, edges, calls, address)
+        restored = frame.prove_frame(instructions, edges, address, branches, calls)
     else:
         restored = frame.prove_frame(instructions, edges, address, {}, calls)
     modules = (match, match.armv4t, owner, graph, frame, quotient, remainder)
@@ -711,12 +811,10 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
         modules += (incoming,)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
-    if selector in DATA_SELECTORS:
+    if selector in (*DATA_SELECTORS, *THUNK_SELECTORS):
         pins = data_producer_fingerprint(selector)
     context[4].update(schema=SCHEMAS[selector], calls=[
-        [site-address, callback_alias(selector) if selector in CALLBACK_SELECTORS and
-         target == match.function_thunk.ALIASES[callback_alias(selector)] else
-         context[3].get(site, f'func_{target:08X}')]
+        [site-address, thunk_alias(selector, target) or context[3].get(site, f'func_{target:08X}')]
         for site, target in sorted(calls.items())], dependencies=[list(row) for row in dependencies],
         runtime_ABI=ABI, runtime_numeric_return_facts=[], arithmetic_C_equivalence=False,
         original_formal_type_certainty=False,
@@ -803,6 +901,13 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
                 instructions, edges, calls, address, context[7]),
             dependencies=callback_dependencies(context[0], context[1], context[2], selector),
             runtime=match.function_thunk.RUNTIME, abi=match.function_thunk.ABI)
+    if selector in THUNK_SELECTORS:
+        context[4]['local_long_branches'] = frame.record(instructions.values(), address)
+        context[4]['thunks'] = dict(contract=THUNK_CONTRACT, target_policy=THUNK_TARGET_POLICY,
+            sites=thunk_sites,
+            dependencies=thunk_dependencies(context[0], context[1], context[2],
+                                            {alias for _, alias, _ in thunk_sites}),
+            runtime=match.function_thunk.RUNTIME, abi=match.function_thunk.ABI)
 
 
 def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *, selector=SELECTOR,
@@ -812,7 +917,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
         raise ValueError('unknown addressed signed runtime selector')
     observed = {}
     context = (rom, mapping, index, bindings, observed)
-    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR):
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, THUNKS_SELECTOR):
         context += (selector,)
     elif selector in DATA_SELECTORS:
         context += (selector, data_mapping, data_bindings)
@@ -920,7 +1025,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                 raise ValueError('compiler runtime linking requires original compiler-emitted names')
             target = operations(selector).get(canonical or name)
             if target is None:
-                if selector in CALLBACK_SELECTORS and name == callback_alias(selector):
+                if name in match.function_thunk.ALIASES and \
+                        thunk_alias(selector, match.function_thunk.ALIASES[name]) == name:
                     target = match.function_thunk.ALIASES[name]
                     match.function_thunk.dependencies([name], rom)
                 else:
@@ -943,6 +1049,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
         raise ValueError('addressed runtime ELF requires actual addressed calls and no unresolved symbols')
     if selector in CALLBACK_SELECTORS and callback_alias(selector) not in targets:
         raise ValueError('callback ELF requires its actual compiler-emitted canonical call')
+    if selector in THUNK_SELECTORS and not set(targets) & set(match.function_thunk.ALIASES):
+        raise ValueError('thunk ELF requires an actual compiler-emitted canonical thunk call')
     return calls, bindings, targets
 
 
@@ -1019,6 +1127,9 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
         compiler_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     if selector in CALLBACK_SELECTORS:
         match.function_thunk.namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
+    if selector in THUNK_SELECTORS:
+        thunk_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'),
+                        runner.read_binary(f'{workspace}/f.s').decode('utf-8'), original, address)
     calls, bindings, targets = original_bindings(original,address,rom,mapping,
         data_mapping=data_mapping if data is not None else None, data_relocations=data, selector=selector)
     function_literals = {record[0] for record in (data or {}).values()
@@ -1094,8 +1205,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     fixed_configuration(args)
     if selector not in SCHEMAS:
         raise ValueError('unknown addressed signed runtime selector')
-    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, *DATA_SELECTORS) else None
-    producers = data_producer_fingerprint(selector) if selector in DATA_SELECTORS else None
+    runtime = runtime_fingerprint() if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, THUNKS_SELECTOR, *DATA_SELECTORS) else None
+    producers = data_producer_fingerprint(selector) if selector in (*DATA_SELECTORS, *THUNK_SELECTORS) else None
     source,mapping,index = source_fingerprint(root,address),mapping_snapshot(root),index_snapshot(root)
     objects,selected_rom = data_snapshot(root),report_rom_path(root)
     rom = Path(selected_rom).read_bytes(); tools = toolchain_fingerprint()
@@ -1160,6 +1271,8 @@ def render(result):
     if selector in CALLBACK_SELECTORS:
         register = 'r3' if selector == R3_CALLBACK_SELECTOR else 'r2'
         premise.append(f'* mapped {register} callback ABI: ' + result['manifest']['callback']['contract'])
+    if selector in THUNK_SELECTORS:
+        premise.append('* canonical thunk callee ABI: ' + result['manifest']['thunks']['contract'])
     evidence = {key:value for key,value in result.items() if key not in
                 ('body','original_elf','assembly','linked_elf')}
     for key in ('body','original_elf','assembly','linked_elf'):
@@ -1225,7 +1338,7 @@ def report_matches(report, root, address):
                 saved['rom_sha256'] != sha(Path(report_rom_path(root)).read_bytes()) or \
                 saved['toolchain'] != toolchain_fingerprint():
             return False
-        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, *DATA_SELECTORS) and saved['runtime'] != runtime_fingerprint():
+        if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, UNSIGNED_SELECTOR, UNSIGNED_BUFFER_SELECTOR, BUFFER_SELECTOR, BUFFER_SCRATCH_SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_ORDINARY_SELECTOR, INTEGER_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, THUNKS_SELECTOR, *DATA_SELECTORS) and saved['runtime'] != runtime_fingerprint():
             return False
         return render(build(root,address,expected=saved['manifest'],selector=selector)) == report
     except (OSError,ValueError,KeyError,TypeError,IndexError,RuntimeError,subprocess.SubprocessError):

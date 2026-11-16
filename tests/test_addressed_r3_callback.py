@@ -209,9 +209,13 @@ class R3CallbackTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.verify(r2)
         r3 = self.fixture()
         for selector in profile.SCHEMAS:
-            if selector != SELECTOR:
+            if selector not in (SELECTOR, profile.THUNKS_DATA_SELECTOR):
                 with self.subTest(selector=selector), self.assertRaises(ValueError):
                     profile.verify(**r3, selector=selector)
+        # Each slot load is a memory word load, so the general thunk selector
+        # admits the same fixture under its own schema.
+        self.assertEqual(profile.verify(**r3, selector=profile.THUNKS_DATA_SELECTOR)[0]['schema'],
+                         profile.THUNKS_DATA_SCHEMA)
         with self.assertRaises(ValueError): self.verify(plain)
         context = (r3['rom'],r3['mapping'],r3['index'],r3['bindings'],{},SELECTOR,
                    r3['data_mapping'],r3['data_bindings'])

@@ -4607,7 +4607,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if not stack_operation and adjustment is None and ARM_REG_SP in registers:
                 raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
-        local_branch = (calling and double_context is not None and
+        local_branch = (calling and (double_context is not None or
+                                     addressed_signed_runtime.local_branches(addressed_signed_runtime_context)) and
                         len(operands) == 1 and operands[0].type == ARM_OP_IMM and
                         address <= operands[0].imm < end)
         if local_branch:
