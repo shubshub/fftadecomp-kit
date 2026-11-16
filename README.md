@@ -1109,6 +1109,18 @@ ordinary call still excludes all local aliases, pointer words and word facts.
 The larger inventory does not prove callee effects or nested execution. The
 original branch selector retains its four-target and eight-site limits.
 
+`conditional-scheduler-three-per-path-calls-v1` keeps the acyclic all-path
+walk but counts scheduler invocations: at most four static scheduler sites and
+three invocations on any path, with ordinary calls admitted after a scheduler
+return. Every ordinary call still excludes all local aliases, pointer words and
+word facts. `conditional-scheduler-sequential-leaf-output-calls-v1` and
+`conditional-scheduler-sequential-killed-alias-calls-v1` use the same phase
+rule with their own ordinary-call rules. All three allow 32 ordinary targets
+and 48 call sites. Both numbers are cost bounds, not proof obligations: the
+walk visits each site once and bounds invocations per path by itself, each
+distinct target body is authenticated once, and the owner replay checks every
+call site on its own, so the work grows linearly with the number of sites.
+
 `conditional-scheduler-following-call-v1` permits ordinary calls after exactly
 one scheduler site in an acyclic caller, with the original four-target and
 eight-site limits. Each following call undergoes the same complete alias/frame
@@ -4337,10 +4349,11 @@ applies every rule of
 scheduler bound of three outside counted loops, counted-loop shape, live-alias
 contract for ordinary calls, unchanged 28-byte descriptor contract, no alias
 besides R2 at a looped scheduler call) under wider cost bounds: at most eight
-scheduler sites in total, 32 ordinary targets, 40 call sites and 512 owner
+scheduler sites in total, 32 ordinary targets, 48 call sites and 512 owner
 instructions. None of these bounds carries a proof obligation: the per-path
 bound still limits how often the scheduler runs, every scheduler site is checked
-against the descriptor contract on its own, and the CFG checks are linear.
+against the descriptor contract on its own, the CFG checks are linear, and each
+call site adds one per-call check that keeps its own replay or walk budget.
 
 It adds two refinements to the live-alias rule for ordinary calls, and only for
 this selector:

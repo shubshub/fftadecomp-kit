@@ -25,8 +25,10 @@ R0, R1 = match.ARM_REG_R0, match.ARM_REG_R0 + 1
 FRAME = -48
 
 
-def phase_owner(arms, *, prefix=0):
-    """A phase switch on R0: arm i makes arms[i] scheduler calls, then one ordinary call."""
+def phase_owner(arms, *, prefix=0, tail=0):
+    """A phase switch on R0: arm i makes arms[i] scheduler calls, then one ordinary call.
+
+    `tail` ordinary calls follow the join, after every arm's scheduler calls."""
     p = Program()
     p.emit(0xB5F0, 0xB087)
     p.emit(*(0x46C0,) * prefix)
@@ -41,6 +43,8 @@ def phase_owner(arms, *, prefix=0):
         p.call(B, f'ordinary{index}')
         p.branch(0xE000, 'exit')
     p.label('exit')
+    for call in range(tail):
+        p.call(B, f'tail{call}')
     p.emit(0xB007, 0xBCF0, 0xBC01, 0x4700)
     return p.build()
 
@@ -90,10 +94,28 @@ class PhaseBudgetTests(unittest.TestCase):
         self.assertEqual(len(result['scheduler_sites']), 8)
         self.assertEqual(result['maximum_scheduler_calls_per_path_outside_loops'], 3)
         self.assertEqual((result['scheduler_site_budget'], result['ordinary_target_budget'],
-                          result['call_site_budget'], result['instruction_budget']), (8, 32, 40, 512))
+                          result['call_site_budget'], result['instruction_budget']), (8, 32, 48, 512))
         self.assertEqual(result['scheduler_calls_per_path_budget'], 3)
         with self.assertRaisesRegex(ValueError, 'call-site or target bounds'):
             phases(data, calls, limits=None)
+
+    def test_call_site_budget_is_48(self):
+        # Eight scheduler sites, three arm calls and 37 calls after the join.
+        data, calls, _ = phase_owner([3, 3, 2], tail=37)
+        self.assertEqual(len(calls), 48)
+        self.assertEqual(phases(data, calls)['call_site_budget'], 48)
+        p = verify(data, calls)
+        self.assertEqual(len(p.contract_manifest()['observations']), 48)
+        with self.assertRaisesRegex(ValueError, 'call-site or target bounds'):
+            phases(*phase_owner([3, 3, 2], tail=38)[:2])
+
+    def test_site_and_per_path_bounds_hold_at_48_call_sites(self):
+        for arms, tail, error in (([3, 3, 3], 36, 'call-site or target bounds'),
+                                  ([4, 1], 41, 'per-path bound')):
+            data, calls, _ = phase_owner(arms, tail=tail)
+            self.assertEqual(len(calls), 48)
+            with self.subTest(arms=arms), self.assertRaisesRegex(ValueError, error):
+                phases(data, calls)
 
     def test_ninth_site_and_fourth_per_path_call_are_refused(self):
         with self.assertRaisesRegex(ValueError, 'call-site or target bounds'):

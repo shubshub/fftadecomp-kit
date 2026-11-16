@@ -45,7 +45,12 @@ def phases(edges, calls, *, following_calls=False, wide_targets=False, twenty_fo
     if twenty_four_targets or twenty_four_following_calls:
         target_budget, call_budget = 24, 32
     if three_per_path_calls:
-        target_budget, call_budget = 32, 40
+        # Cost bounds only. No obligation reads the call-site count: the walk
+        # below visits each site once and bounds scheduler invocations per path
+        # on its own, bind() records one body per distinct target, and the
+        # owner replay checks every call site separately. More sites cost
+        # linearly more per-call checks, each under its own budget.
+        target_budget, call_budget = 32, 48
     schedulers = sorted(site for site, target in calls.items() if target == SCHEDULER)
     ordinary = sorted(set(calls.values()) - {SCHEDULER})
     require(1 <= len(schedulers) <= scheduler_budget and
