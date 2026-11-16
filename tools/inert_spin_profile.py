@@ -1,4 +1,8 @@
-"""Explicit mixed-return Thumb CFGs whose nonreturning paths end in inert self-branches."""
+"""Explicit mixed-return Thumb CFGs whose nonreturning paths end in inert self-branches.
+
+The same selector also admits, through an optional `loop` record, a function
+with no return at all whose only cycle is one closed loop of typed calls.
+"""
 
 import argparse
 from contextvars import ContextVar
@@ -18,6 +22,10 @@ CONTROL_FLOW = "mixed verified returns and closed inert Thumb self-spins; termin
 SUMMARY = "every reachable node without a return path is a narrow unconditional self-branch"
 TAIL_SUMMARY = ("every reachable node without a return path is a narrow unconditional self-branch "
                 "or a straight-line terminal-tail instruction that falls through to one")
+LOOP_CONTROL_FLOW = "no reachable return; a straight-line prefix and one closed Thumb call loop without an exit"
+LOOP_SUMMARY = ("no reachable node has a return path; a straight-line prefix falls through to one loop of typed "
+                "Thumb calls and straight-line instructions without stores or stack changes, closed by a narrow "
+                "unconditional backward branch")
 DATA_POLICY = b"inert-spin-typed-data-v1"
 REPLAY_TIMEOUT = 120
 FORBIDDEN_MARKERS = ("* buffer", "* unsigned division", "* signed remainder",
@@ -56,7 +64,13 @@ def index_snapshot(root):
 
 
 def summary(manifest):
+    if "loop" in manifest:
+        return LOOP_SUMMARY
     return TAIL_SUMMARY if "tails" in manifest else SUMMARY
+
+
+def control_flow(manifest):
+    return LOOP_CONTROL_FLOW if "loop" in manifest else CONTROL_FLOW
 
 
 def fingerprint(address, data, manifest, source_digest, mapping, index, data_mapping=None):
@@ -126,9 +140,11 @@ def make_manifest(calls, address, instructions, context, literals=None, data_map
     from match import uses_stack_frame
     manifest = {"calls": call_records(calls, address), "frame": uses_stack_frame(instructions),
                 "spins": context["spins"]}
-    # Both records are optional, so reports without them keep their format and meaning.
+    # The records are optional, so reports without them keep their format and meaning.
     if context.get("tails"):
         manifest["tails"] = context["tails"]
+    if context.get("loop") is not None:
+        manifest["loop"] = context["loop"]
     if literals:
         manifest["data"] = data_records(literals, data_mapping)
     return manifest
@@ -168,19 +184,72 @@ def terminal_tails(instructions, edges, nonreturning):
     return tails
 
 
+def call_loop(instructions, edges, address, calls):
+    """Return the loop record of a function that has no reachable return.
+
+    The reachable instructions must be one contiguous run from the entry in
+    which every instruction falls through to the next, except the last: a
+    narrow unconditional `b` to a reachable instruction, the loop head, which
+    can only be at or before it. That is exactly one cycle, with no exit. No instruction may
+    branch, pop, interrupt or write PC other than through a typed call. Before
+    the head, the prefix may also set up the frame (push, fixed SP adjustments)
+    and make typed calls, all of which the walker has already checked. In the
+    loop, every instruction other than the closing branch is a typed call or a
+    straight-line instruction without a store, push or SP write, and at least
+    one is a call, so a `b .` self-spin alone is not a call loop.
+    """
+    from match import (CS_AC_WRITE, CS_GRP_CALL, CS_GRP_INT, CS_GRP_JUMP, ARM_CC_AL, ARM_CC_INVALID,
+                       ARM_INS_B, ARM_OP_IMM, ARM_OP_MEM, ARM_REG_PC, ARM_REG_SP)
+    sites = sorted(instructions)
+    branch = sites[-1]
+    closing = instructions[branch]
+    head = closing.operands[0].imm if len(closing.operands) == 1 and \
+        closing.operands[0].type == ARM_OP_IMM else None
+    if sites[0] != address or closing.id != ARM_INS_B or closing.size != 2 or \
+            closing.cc not in (ARM_CC_AL, ARM_CC_INVALID) or head not in instructions or \
+            tuple(edges[branch]) != (head,):
+        raise ValueError("call loop must close with a narrow unconditional backward branch")
+    for current, following in zip(sites, sites[1:]):
+        instruction = instructions[current]
+        call = current in calls
+        written = instruction.regs_access()[1]
+        # Capstone puts a BL in both the call and the jump group, and has it write PC.
+        if following != current + instruction.size or tuple(edges[current]) != (following,) or \
+                (CS_GRP_CALL in instruction.groups) != call or CS_GRP_INT in instruction.groups or \
+                instruction.mnemonic == "pop" or not call and (CS_GRP_JUMP in instruction.groups or
+                                                              ARM_REG_PC in written):
+            raise ValueError("call loop code must fall straight through without branches, returns "
+                             "or indirect transfers")
+        if current >= head and not call and (
+                instruction.mnemonic.startswith(("str", "stm", "push")) or ARM_REG_SP in written or
+                any(operand.type == ARM_OP_MEM and operand.access & CS_AC_WRITE
+                    for operand in instruction.operands)):
+            raise ValueError("call loop excludes stores and stack-pointer changes")
+    loop_calls = [site - address for site in sites if head <= site < branch and site in calls]
+    if not loop_calls:
+        raise ValueError("call loop requires a typed call inside the cycle")
+    return {"branch": branch - address, "calls": loop_calls, "head": head - address}
+
+
 def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
     from match import (function_address_target, uses_stack_frame, verify_data_literals,
                        verify_leaf_instructions, parse_data_symbols, is_udivsi3_address, modsi3, divsi3,
                        umodsi3, ashldi3, software_double, software_float)
     entries = validate_span(data, address, rom, mapping, index)
     if not isinstance(manifest, dict) or not {"calls", "frame", "spins"} <= set(manifest) or \
-            set(manifest) - {"calls", "frame", "spins", "data", "tails"} or \
+            set(manifest) - {"calls", "frame", "spins", "data", "tails", "loop"} or \
             type(manifest["frame"]) is not bool or not isinstance(manifest["calls"], list) or \
-            not isinstance(manifest["spins"], list) or not manifest["spins"] or \
+            not isinstance(manifest["spins"], list) or not manifest["spins"] and "loop" not in manifest or \
             "tails" in manifest and (type(manifest["tails"]) is not list or not manifest["tails"]) or \
             "data" in manifest and (type(manifest["data"]) is not list or not manifest["data"] or
                                     not isinstance(data_mapping, bytes)):
         raise ValueError("invalid inert-spin manifest")
+    loop = manifest.get("loop")
+    if "loop" in manifest and (type(loop) is not dict or set(loop) != {"branch", "calls", "head"} or
+                               type(loop["calls"]) is not list or
+                               any(type(value) is not int for value in [loop["branch"], loop["head"]] +
+                                   loop["calls"])):
+        raise ValueError("invalid inert-spin call-loop record")
     calls = {}
     previous = -4
     for record in manifest["calls"]:
@@ -221,9 +290,10 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                 raise ValueError("inert-spin data literal differs, references its own function or a runtime")
             literals[offset] = (name, value)
             previous = offset
-    context = {"tails": []}
+    context = {"tails": [], "loop": None}
     instructions = verify_leaf_instructions(data, address, True, calls, inert_spin_context=context)
     if context["spins"] != manifest["spins"] or context["tails"] != manifest.get("tails", []) or \
+            context["loop"] != manifest.get("loop") or \
             uses_stack_frame(instructions) != manifest["frame"]:
         raise ValueError("inert-spin manifest disagrees with the converged CFG")
     verify_data_literals(instructions, address, literals)
@@ -380,8 +450,7 @@ def report_matches(report, root, address):
             return False
         mapping, index = mapping_snapshot(root), index_snapshot(root)
         source_digest = source_fingerprint(root, address)
-        if mapping is None or single("* control flow: ") != CONTROL_FLOW or \
-                unquote("* compiler: ") != compiler_text() or \
+        if mapping is None or unquote("* compiler: ") != compiler_text() or \
                 unquote("* source SHA-256: ") != source_digest or \
                 unquote("* mapping SHA-256: ") != hashlib.sha256(mapping).hexdigest() or \
                 unquote("* function index SHA-256: ") != hashlib.sha256(index).hexdigest() or \
@@ -399,6 +468,7 @@ def report_matches(report, root, address):
         encoded_manifest = unquote("* inert spin manifest: ")
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
         if not isinstance(manifest, dict) or manifest_text(manifest) != encoded_manifest or \
+                single("* control flow: ") != control_flow(manifest) or \
                 single("* inert spins: ") != summary(manifest):
             return False
         objects = data_snapshot(root) if "data" in manifest else None
