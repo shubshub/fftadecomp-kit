@@ -4318,8 +4318,8 @@ three invocations on any path outside loops, ordinary calls after a scheduler
 return), the live private-local alias rule for ordinary calls exactly as in
 `conditional-scheduler-live-local-alias-calls-v1`, and the unchanged 28-byte
 descriptor contract at every scheduler call; a scheduler site inside a loop
-admits no local alias besides the R2 descriptor, not even a preserved-register
-one. At most 24 ordinary targets leave dependency room for live-alias nested
+admits no local alias besides the R2 descriptor and copies of its address in
+R4-R7. At most 24 ordinary targets leave dependency room for live-alias nested
 callees; the owner has at most 256 instructions. It additionally admits CFG cycles,
 but only as narrowed counted loops; an owner without cycles is admitted too.
 
@@ -4336,10 +4336,24 @@ wrap, and the header is entered at most 2**W times per execution, for any
 incoming counter value. The bound depends on R4-R7 surviving each call (the
 returning ARM ABI premise). A loop with k scheduler sites records at most
 k * 2**W invocations (a looped site runs at most once per iteration); each
-invocation reuses the same unrewritten descriptor frame and reapplies every per-invocation premise,
+invocation is passed the same descriptor frame and reapplies every per-invocation premise,
 including that no earlier invocation or callback retains the reused descriptor
-or any local pointer. Actual counts, capacities, callee effects and
+or any local pointer. The owner may store to the descriptor between
+invocations; those stores are checked by the frame and alias replay like any
+other store through a local alias. Actual counts, capacities, callee effects and
 termination remain unproved.
+
+A copy of the descriptor address in R4-R7 is the one alias besides R2 that a
+looped scheduler site admits. Its frame offset must equal R2's at the call, on
+every incoming path, and it is recorded in the site's aliases. The invocation
+is already handed that address in R2, so the copy names no storage the
+scheduler or its callback could not already reach under the descriptor
+premise; that it still holds the address after the call is the returning ARM
+ABI premise the loop counter already depends on. A different object, an
+interior address of the descriptor, R8-R11 and any caller-clobbered register
+other than R2 stay refused at a looped site. This is the shape agbcc emits when
+a loop stores halfword fields of the descriptor (Thumb has no SP-relative
+`strh`) and keeps the base register live across the call.
 
 ### Wide three-per-path live-alias scheduler phases
 
@@ -4348,7 +4362,8 @@ applies every rule of
 `conditional-scheduler-sequential-live-alias-counted-loops-v1` (per-path
 scheduler bound of three outside counted loops, counted-loop shape, live-alias
 contract for ordinary calls, unchanged 28-byte descriptor contract, no alias
-besides R2 at a looped scheduler call) under wider cost bounds: at most eight
+besides R2 and R4-R7 copies of its address at a looped scheduler call) under
+wider cost bounds: at most eight
 scheduler sites in total, 32 ordinary targets, 48 call sites and 512 owner
 instructions. None of these bounds carries a proof obligation: the per-path
 bound still limits how often the scheduler runs, every scheduler site is checked
