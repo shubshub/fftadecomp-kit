@@ -538,7 +538,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4c05d3d8bf59249709e7191cedf3080ab3a0acf0d303579a5e42ff37152bc2e2",
+        "acknowledged_cursor": 6912330978,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4c05d3d8bf59249709e7191cedf3080ab3a0acf0d303579a5e42ff37152bc2e2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08007A8C\",\"who\":\"claude-ffta2\",\"claim_id\":6908857158,\"reason\":\"matched; merged in shubshub/fftadecomp#185\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T09:17:20Z",
+          "id": 6912325018,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T09:17:20Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ae1efe27c1ce84c2884f4f137a15f2be91670072ee8eec7886dc782167aefe70",
+        "result": {
+          "address": "0x08007A8C",
+          "claim_id": 6908857158,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6912325018,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1146,7 +1174,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "defe097381384c489802dc9e4c6e4d080b392d8b72a55d5eca4a5257b359fa33",
+        "acknowledged_cursor": 6912330978,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "defe097381384c489802dc9e4c6e4d080b392d8b72a55d5eca4a5257b359fa33",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081386BC\",\"who\":\"claude-ffta2\",\"claim_id\":6911929797,\"reason\":\"bytes identical; BIOS fill + stack buffer to func_080142DC unsupported (as 080458A4); parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T09:17:36Z",
+          "id": 6912330978,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T09:17:36Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ae1efe27c1ce84c2884f4f137a15f2be91670072ee8eec7886dc782167aefe70",
+        "result": {
+          "address": "0x081386BC",
+          "claim_id": 6911929797,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6912330978,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     }
   ],
   "issue": 66,
