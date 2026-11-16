@@ -1726,7 +1726,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "75c9b57eedd23cb8e0c6b56ac1b426a9068101fda1ce1675fdb6a773f0d975fa",
+        "acknowledged_cursor": 6910006034,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "75c9b57eedd23cb8e0c6b56ac1b426a9068101fda1ce1675fdb6a773f0d975fa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000718\",\"who\":\"claude-ffta2\",\"claim_id\":6909664342,\"reason\":\"O0 bytes identical; plausible refuses the indexed volatile DMA pointer and the O0 profile refuses loops; parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-16T07:16:09Z",
+          "id": 6910006034,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-16T07:16:09Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5b92201031563a9a7e4eaef0edc6ae7aa73394f516e7ce3c58abb3de38cb68d6",
+        "result": {
+          "address": "0x08000718",
+          "claim_id": 6909664342,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6910006034,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
