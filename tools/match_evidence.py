@@ -1143,6 +1143,9 @@ def report_matches(report, root, address):
             RuntimeError, subprocess.SubprocessError):
         return False
     try:
+        import data_buffer_profile as data_buffer
+        if data_buffer.selected(report):
+            return data_buffer.report_matches(report, root, address)
         import compiler_orphan_constants_native_profile as orphan_constants
         if orphan_constants.selected(report):
             return orphan_constants.report_matches(report,root,address)
