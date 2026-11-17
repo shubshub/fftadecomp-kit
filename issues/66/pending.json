@@ -2814,7 +2814,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "467ac69ee7eb26340e9c400f4c615cfe3a4133301485c890e85b5b57c307bcce",
+        "acknowledged_cursor": 6936774826,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "467ac69ee7eb26340e9c400f4c615cfe3a4133301485c890e85b5b57c307bcce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081448FC\",\"who\":\"claude-ffta2\",\"claim_id\":6936568498,\"reason\":\"hand-written m4a assembly (ply_fine); agbcc never emits tst\",\"unmatchable\":true,\"tried\":\"agbcc -O2, old_agbcc -O2, pret/sa2 shapes\"}",
+          "created_at": "2026-11-17T03:04:40Z",
+          "id": 6936774826,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-17T03:04:40Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b5f7b3ee041a599f8cbd6b024c525b9628fe2c3f7c3ac78dd437f3ebb526cf21",
+        "result": {
+          "address": "0x081448FC",
+          "claim_id": 6936568498,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6936774826,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
