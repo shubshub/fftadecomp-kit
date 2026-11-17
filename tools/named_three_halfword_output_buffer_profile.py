@@ -10,7 +10,6 @@ from pathlib import Path
 import match
 import named_data_buffer_profile as named
 import nested_formal_output_buffer_profile as nested
-import ordinary_two_output_callees_inventory as named_leaf
 import local_long_branch_profile as frame
 
 SELECTOR = 'bounded-buffer-named-three-halfword-output-v1'
@@ -22,6 +21,7 @@ LEAF = (0x0801C918, 72, '691a3b26d9786d76f850b2cab1e5999bac35af0524a17a4f82f8f0f
 
 
 def prove_leaf_origins(instructions, edges, address, data, partition, objects):
+    import ordinary_two_output_callees_inventory as named_leaf  # circular at module level
     effects = named_leaf.prove_named_origins(instructions, edges, address, data,
         partition, objects, named_leaf.named_policy())
     restored = frame.prove_frame(instructions, edges, address, {}, {},
@@ -182,6 +182,7 @@ class NamedThreeOutputBufferProof(nested.NestedOutputBufferProof):
     dependency_budget = MAX_DEPENDENCIES
 
     def _prove(self):
+        import ordinary_two_output_callees_inventory as named_leaf  # circular at module level
         if self._native is not None:
             return self._native
         raw, ins, edges, calls, partition = self._body(LEAF)
@@ -231,6 +232,7 @@ class NamedThreeOutputBufferProof(nested.NestedOutputBufferProof):
         return result
 
     def nested_manifest(self):
+        import ordinary_two_output_callees_inventory as named_leaf  # circular at module level
         if not self._calls or self._native is None:
             raise ValueError('three-output profile requires an actual bounded caller composition')
         return dict(schema=SCHEMA, native_helpers=self._native, calls=self._calls,
