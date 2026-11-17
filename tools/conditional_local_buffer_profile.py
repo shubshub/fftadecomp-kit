@@ -41,6 +41,7 @@ SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1
 SCHEDULER_MANAGER_FIELD = 'conditional-scheduler-indirect-manager-v1'
 SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
+SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4}
 STATE = 'conditional-local-state-iterator-v1'
 OUTPUT = 'conditional-local-output-word-call-v1'
@@ -70,6 +71,7 @@ SCHEMAS = {
     SCHEDULER_MANAGER_FIELD: 'elf-symbol-thumb-conditional-scheduler-indirect-manager-v1',
     SCHEDULER_MANAGER_OFFSET: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_OFFSET,
     SCHEDULER_MANAGER_PATHS: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_PATHS,
+    SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
     OUTPUT: 'elf-symbol-thumb-conditional-local-output-word-call-v1',
 }
@@ -116,6 +118,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if policy in (SCHEDULER_GUARDED, SCHEDULER_WIDE, SCHEDULER_PROJECTED):
             # Eight authenticated helpers plus two scheduler bodies and two thunks.
             self.dependency_budget = 12
+        if policy == SCHEDULER_CALL_SITES:
+            import scheduler_call_site_profile as call_sites
+            self.dependency_budget = call_sites.DEPENDENCY_BUDGET
 
     def bind_root(self, data, address, calls):
         import owner_admission_profile as owner
@@ -185,6 +190,11 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             self.predicates = predicates.close(self, set(calls.values()) - {0x08005B6C})
             dependencies = (0x08005B6C, 0x08005954)
             runtime_names = ('_call_via_r2', '_call_via_r3')
+        elif self.policy == SCHEDULER_CALL_SITES:
+            import scheduler_call_site_profile as call_sites
+            self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, calls)
+            dependencies = tuple(self.scheduler_call_sites['dependencies'])
+            runtime_names = call_sites.RUNTIME_NAMES
         elif self.policy == SCHEDULER_ENTRY_BRANCH:
             import scheduler_entry_branch_profile as entry_branch
             self.scheduler_entry, self.scheduler_entry_branches = entry_branch.bind(data, address, ins, edges, calls)
@@ -270,8 +280,18 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if getattr(self, '_live_log', None) is not None:
             # Inside a replayed callee body: the ordinary buffer-call rules apply to its own calls.
             return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
+        if self.policy == SCHEDULER_CALL_SITES and self.active:
+            # Inside an inspected buffer callee: its own calls keep the ordinary buffer rules,
+            # including a call to a scheduler entry, which is then walked like any callee.
+            return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
         require(self.calls.get(site) == address and not words,
                 'local-buffer call differs from its authenticated interface')
+        if self.policy == SCHEDULER_CALL_SITES:
+            import scheduler_call_site_profile as call_sites
+            if address in call_sites.ENTRIES:
+                return call_sites.check_call(self, address, aliases, stack, slots, site=site)
+            # Every other root call keeps the unchanged named-data buffer rules.
+            return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
         if self.policy == SCHEDULER_KILLED_ALIAS and address != 0x08005B6C:
             import scheduler_killed_alias_profile as killed
             return killed.check_call(self, address, aliases, stack, slots, site=site)
@@ -383,6 +403,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         return {}
 
     def contract_manifest(self):
+        if self.policy == SCHEDULER_CALL_SITES:
+            import scheduler_call_site_profile as call_sites
+            return call_sites.manifest(self)
         if self.policy == SCHEDULER_ENTRY_BRANCH:
             import scheduler_entry_branch_profile as entry_branch
             return entry_branch.manifest(self)

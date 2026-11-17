@@ -851,6 +851,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         else:
             import scheduler_entry_profile as scheduler_entry
         scheduler_entry.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
+    if selector == local_calls.SCHEDULER_CALL_SITES:
+        import scheduler_call_site_profile as call_sites
+        call_sites.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
     if selector == shadow_matrix.SELECTOR:
         # The closed original-binding adapter has authenticated memcpy to this
         # actual indexed helper. Existing literal validation uses its entry name.

@@ -4774,6 +4774,76 @@ this selector:
 Callee effects, nested execution and termination remain unproved, as for the
 other live-alias selectors.
 
+### Scheduler descriptor calls as per-site summaries
+
+`--owner-runtime-profile conditional-scheduler-call-site-summaries-v1` applies
+the 28-byte descriptor contract at each scheduler call on its own and puts no
+bound on the shape of the caller: any number of scheduler sites, ordinary calls
+before and after them, and CFG cycles. The other `conditional-scheduler-*`
+selectors bound the whole caller (one scheduler call, at most N sites or
+targets, acyclic, no call after a scheduler return); those bounds limit the
+cost of their whole-owner proofs and are not part of the frame argument. Here
+the complete owner is replayed by the named-data buffer walk: joins, saved
+slots, returns, loops and every other call keep the unchanged buffer rules. A
+call that receives a local pointer, in a register or as a pointer-bearing
+frame word, is inspected as a bounded buffer callee; once such a word is in the
+frame every later call receives it. A call that receives none uses the
+returning ABI summary. Only a direct call from the owner to one of three
+pinned entries is summarised: `func_08005B6C` and `func_08121B8C` (callback R0,
+descriptor R2, parent R3) and `func_08005954` called directly (manager R0,
+callback R1, descriptor R3, parent in the outgoing word at SP). A pinned entry
+reached inside an inspected callee is not summarised: if it receives a local
+pointer it is walked like any callee and refused at the callback thunk,
+otherwise it takes the returning ABI summary.
+
+At each site, from the walk's state there:
+
+* the descriptor register is the only alias in R0-R3, R12 and LR;
+* the descriptor is word aligned and its 28 bytes are allocated local words;
+* at a direct `func_08005954` site the outgoing word at SP is an allocated local
+  word below the descriptor and holds no tracked local pointer (the callee reads
+  it as the parent and may overwrite it). Every definition of R0 that reaches
+  the site is a load chain rooted at an owner literal word: a zero-offset word
+  load, then at most one word load at an aligned field offset 0-124, through
+  exact register copies and joins. These are the chain shapes of the four
+  direct-entry selectors. Every chain literal must have one typed zero-addend
+  named data binding, and every chain is recorded;
+* a pointer-bearing word inside the descriptor is admitted only at
+  descriptor+4 or descriptor+8 and must address an allocated local word outside
+  the descriptor. It is recorded with an explicit extent: from its target to
+  the end of that run of allocated local words, or to the descriptor if that
+  comes first (an upper bound, not a type size). The extent must hold no
+  pointer-bearing word and, at a direct `func_08005954` site, not the outgoing
+  word. Pointer-bearing words elsewhere in the frame are recorded and keep
+  their facts; no pinned body reads them;
+* preserved-register aliases are recorded. At a site inside a CFG cycle only
+  R4-R7 copies of the descriptor address are admitted, and no pointer-bearing
+  word, as for the looped sites of the counted-loop selectors;
+* every definition of the callback register that reaches the site is a
+  PC-relative load of an owner literal word, directly or through exact register
+  copies in R0-R12 (`adds rd,rs,#0`, `movs rd,rs`, `mov rd,rs`), and every such
+  word must be a typed function binding. A callback loaded from a table or
+  memory, passed in, or clobbered by a call is refused;
+* the call hands back no alias, and the walk clobbers R0-R3, R12 and LR as at
+  any call.
+
+Both register searches walk back over the complete owner CFG. An interrupt or
+a call that is not a validated `bl` refuses any value, and a validated call
+refuses a value in R0-R3, R12 or LR; a value in R4-R11 held across a validated
+call rests on the returning ABI premise, as every preserved-register fact does.
+
+The report lists every site (entry, callback literals, manager chains,
+descriptor offset, payload words and extents, other pointer words, aliases,
+whether it is in a cycle), the pinned entry bodies and canonical thunks, and
+the descriptor premises of the other scheduler selectors, stated per
+invocation: compatible returning calls with exact SP and protected words, no
+retained or returned local pointer, allocator separation and callback frame
+noninterference, the copied R1 descriptor and the original R9 exposed to the
+callback, a valid parent, readable chain words and a valid manager at the end
+of the recorded chain, and payload reads only through the payload word, within
+its recorded extent and before the call returns. Callback effects, nonescape,
+manager memory access and termination are not proved.
+
 ### Conditional coordinate outputs before a scheduler call
 
 `--owner-runtime-profile conditional-scheduler-projected-outputs-v1` composes
