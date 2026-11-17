@@ -48,6 +48,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
+import data_buffer_profile as data_buffer
 import empty_body_profile as empty_body
 import library_units
 import stack_pointer_compare_profile as sp_compare
@@ -5761,6 +5762,7 @@ def main():
             division_evidence = None
             unsigned_remainder_evidence = None
             address_manifest = None
+            data_buffer_schema = data_buffer_evidence = None
             switch_evidence = None
             preloaded_profile = False
             spin_evidence = None
@@ -6027,13 +6029,19 @@ def main():
                     verified_instructions, _ = verify_function_addresses(
                         got, addr, rom, mapping, data_mapping, address_manifest)
                 except ValueError as address_error:
-                    if data_relocations:
-                        raise
                     try:
-                        verified_instructions, buffer_proof = verify_function_buffers(
-                            got, addr, rom, mapping, address_manifest)
+                        if data_relocations:
+                            # Typed objects beside the function-buffer proof.
+                            verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
+                                data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
+                                                  data_relocations, function_relocations)
+                        else:
+                            verified_instructions, buffer_proof = verify_function_buffers(
+                                got, addr, rom, mapping, address_manifest)
                     except ValueError as buffer_error:
-                        raise ValueError(f"{address_error}; function-buffer proof: {buffer_error}") from buffer_error
+                        raise ValueError(f"{address_error}; "
+                                         f"{'function-data-buffer' if data_relocations else 'function-buffer'} "
+                                         f"proof: {buffer_error}") from buffer_error
             else:
                 try:
                     verified_instructions = (
@@ -6047,6 +6055,10 @@ def main():
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,
                                                                       incoming_narrow_reads=True)
+                if thumb and data_relocations and buffer_proof.dependencies:
+                    # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
+                    verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
+                        data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations)
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:
@@ -6061,7 +6073,7 @@ def main():
                     switch_evidence["switch"]["literal"] if thunk_switch_selector else None)
             if buffer_proof.stack_arguments and not buffer_proof.dependencies:
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
-            if buffer_proof.dependencies and data_relocations:
+            if buffer_proof.dependencies and data_relocations and data_buffer_evidence is None:
                 raise ValueError("buffer-call evidence does not support data relocations")
             if buffer_proof.dependencies and len(buffer_proof.span(addr)) != len(got):
                 raise ValueError("buffer caller requires an exact complete mapped span")
@@ -6083,6 +6095,8 @@ def main():
     if function_relocations:
         schema = (FUNCTION_BUFFER_SCHEMA if buffer_proof.dependencies else
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
+    if data_buffer_evidence is not None:
+        schema = data_buffer_schema
     if switch_relocations:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   switch_data_thunks.SCHEMAS[thunk_switch_selector] if "thunk_policy" in switch_evidence else
@@ -6183,7 +6197,7 @@ def main():
             library_units.recheck(ROOT, unit_context)
         except ValueError as error:
             sys.exit(f"refused: {error}")
-    if schema == FUNCTION_BUFFER_SCHEMA and report_rom_path(ROOT) != rom_file:
+    if schema in (FUNCTION_BUFFER_SCHEMA, *data_buffer.SCHEMAS) and report_rom_path(ROOT) != rom_file:
         sys.exit("selected ROM changed during verification; re-run match.py")
     if spin_profile and (inert_spin.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file):
         sys.exit("inert-spin function index or selected ROM changed during verification; re-run match.py")
@@ -6348,7 +6362,11 @@ def main():
                     f.write(f"* self call sites: `{self_call_sites_text(self_sites, addr)}`\n")
             if data_profile:
                 f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
-            if address_manifest is not None:
+            if data_buffer_evidence is not None:
+                for line in data_buffer.report_lines(schema, addr, got_body, data_buffer_evidence, fingerprint,
+                                                     mapping, data_mapping, buffer_proof.fingerprint()):
+                    f.write(line + "\n")
+            elif address_manifest is not None:
                 encoded_manifest = function_address_manifest(address_manifest)
                 f.write(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
                 f.write(f"* function address manifest: `{encoded_manifest}`\n")

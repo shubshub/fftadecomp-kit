@@ -862,9 +862,10 @@ currently allocated local words. Pushed save slots, including saved return
 addresses, cannot be accessed through a passed buffer. Unknown or indexed
 accesses, pointer spills, unrecognized uses, inconsistent alias joins and
 pointer-bearing returns fail closed. Buffer pointers cannot be supplied through
-stack arguments or LR. Combined buffer calls and named data relocations remain
-unsupported on this path; the explicit `named-data-buffer-v1` selector composes
-them.
+stack arguments or LR. A caller that also has named data relocations is
+verified by the version-2 proof below together with its typed data literals
+(see "Typed named data beside buffer calls"); the explicit
+`named-data-buffer-v1` selector is a separate composition.
 
 A nested call receiving an alias in a caller-clobbered register requires the
 same proof, even when that register contains only a stale argument. Overwriting
@@ -923,8 +924,9 @@ The matcher tries the existing profiles first. A successful version-2 retry
 requires an inspected buffer call and uses its own profile and summary; it does
 not broaden version-1 evidence. The complete caller and inspected ROM spans are
 bound and replayed as above. The ordinary ABI assumptions still apply, and
-combined named data relocations, block transfers, interrupts and indirect-call
-dependencies remain unsupported. A proved output-buffer call alone does not
+block transfers, interrupts and indirect-call dependencies remain unsupported.
+Named data relocations compose with this proof only under the separate schema
+described in "Typed named data beside buffer calls". A proved output-buffer call alone does not
 admit a caller whose later stale-argument or local-buffer calls cannot be proved.
 
 ### Bounded loop replay of buffer callees
@@ -979,7 +981,8 @@ at the same address still refuse.
 
 Replay is opt-in per class (not inherited) and per construction
 (`loop_replay=True`, passed only by the frame-buffer and function-buffer
-producers, the `named-data-buffer-v1` selector and their report checks): only
+producers, the two typed-data buffer producers, the `named-data-buffer-v1`
+selector and their report checks): only
 the plain register and stack buffer proofs (`BufferCallProof`,
 `FunctionBufferCallProof`) and the exact named-data buffer proof
 (`NamedDataBufferProof`) enable it, and not when they carry a discarded-scratch
@@ -1014,8 +1017,9 @@ literal and an actually inspected buffer dependency. The matcher preserves
 function-address version 1 when its frameless proof succeeds; otherwise this
 composition must succeed in full or verification fails, without a legacy
 buffer-only fallback. Fixed frames and multiple direct calls are supported;
-named object relocations, switches, runtime-thunk bindings and indirect-call
-dependencies remain excluded. No buffer bounds, escape or provenance check is
+switches, runtime-thunk bindings and indirect-call dependencies remain
+excluded. A caller that also has named object relocations uses the separate
+`elf-symbol-thumb-function-data-buffer-calls-v1` schema below instead. No buffer bounds, escape or provenance check is
 relaxed, and block transfers and incoming-pointer spills remain unsupported.
 Every reached direct call in an inspected dependency is checked against the
 runtime-thunk exclusion, even if the buffer survives only in a callee-saved
@@ -1044,6 +1048,79 @@ copying its representation. A future callback-word no-clobber proof would
 protect only that word: descriptor frames and saved control require separate
 byte-range proofs or invalidation of affected facts, with no assumed allocator
 or frame separation. Those additional capabilities are not part of this profile.
+
+### Typed named data beside buffer calls
+
+A caller with named data relocations whose stack buffer reaches a callee is
+verified by two schemas, one for each matcher path. Neither needs a selector.
+
+* `elf-symbol-thumb-data-buffer-calls-v1`, on the plain direct-call path. When
+  the plain proof inspected a buffer call and the function has data relocations,
+  the matcher reruns it as one composed proof: the version-2 register and stack
+  buffer proof with bounded loop replay (`BufferCallProof`, exactly as
+  `elf-symbol-thumb-frame-buffer-calls-v2` runs it, incoming narrow reads
+  included), the typed object literals of `elf-symbol-thumb-data-v1`, and the
+  plain path's call rules: direct calls to indexed Thumb functions and the
+  canonical `_call_via_rN` thunks, with the thunk literal and own-span checks.
+* `elf-symbol-thumb-function-data-buffer-calls-v1`, on the function-literal
+  path. When the frameless function-address proof fails and the function has
+  data relocations, the matcher tries the function-buffer proof
+  (`FunctionBufferCallProof`, version 2 with pointer slots and loop replay)
+  with the canonical function literals and the typed object literals. Runtime
+  thunks stay excluded, as on that path without data.
+
+Both require an inspected buffer dependency and an exact complete mapped
+caller span. Every typed object word is bound as `elf-symbol-thumb-data-v1`
+binds it: an undefined external object with an evidence-backed
+`config/data_symbols.json` entry, an `R_ARM_ABS32` relocation occupying a
+complete aligned word inside the function, loaded by a reachable PC-relative
+instruction, equal to its address plus addend, never inside the caller's own
+bytes and never an address reserved for a pinned arithmetic runtime. When the
+caller calls a `_call_via_rN` thunk, no object may name an indexed function
+entry. All linked bytes are compared with the ROM.
+
+Both also require typed provenance for every reached address-domain literal,
+as the complete-owner selectors do: each reached PC-loaded word whose value is
+in `[0x02000000,0x09000000)` (RAM, I/O to OAM, ROM) must be a typed object or
+function literal, and every typed literal must be such a word, with one
+exception. An untyped word in `[0x04000000,0x08000000)` that the owner rule
+classes as a numeric hardware word (`reached-numeric-hardware-literals-v1`,
+see "Fixed hardware addresses as numbers in BIOS fill owners") is a number;
+it is computed over the exact complete owner graph, which must agree with the
+reached instructions. These schemas compute no BIOS scalar controls, so a
+hardware-window word with bit 24 set (a CpuSet fill control such as
+`0x05000080`) any one of whose loads reaches the CpuSet call solely as its R2
+argument (directly, or through R4-R7) still needs typed provenance and is
+refused. A word none of whose loads is such a control (one only stored as a
+number, say) is recorded as a numeric hardware word. The rule refuses an
+untyped reached IWRAM, EWRAM or ROM literal-pool word, so such a number cannot
+reach a buffer callee as an untracked pointer. It covers literal-pool words
+only: an address materialised from immediates (`movs` then `lsls`) is not a
+pool word and is not covered, as on the data-free buffer schemas, which have no
+coverage rule.
+
+A typed object literal is an absolute address loaded from a relocated word. It
+never becomes a tracked stack alias, since aliases come only from SP
+arithmetic, so the bounds, alignment, saved-slot, pointer-slot and escape
+checks treat it as they treat a pointer parameter, under the existing
+returning-ABI premise. That named objects do not overlap any live stack is a
+premise, not a check (kit `#196`); it is stated in the report. No buffer rule
+is relaxed.
+
+The report keeps the generic buffer lines (`* buffer calls:`,
+`* buffer proof SHA-256:`, one `* buffer loop replay:` line per replayed
+callee), the mapping and data-map digests, and adds
+`* data buffer calls:` (the summary and the premise),
+`* data buffer manifest:` (calls, typed object and function bindings and, when
+present, the `numeric_hardware_words` record) and
+`* data buffer proof SHA-256:` (a domain-separated digest of the schema, the
+version-2 buffer schema, the address, the bytes, the manifest, the source
+digest, both maps and the buffer proof fingerprint). Report replay requires exactly these fields and no
+other `* ` field, recompiles and relinks the captured source, reruns the
+composed proof against the selected ROM, and requires the recomputed manifest,
+fingerprints, replay lines and stack-frame line, a plausible source and
+unchanged inputs. Library-unit toolchains do not admit these schemas.
+`tests/test_data_buffer_calls.py` covers both paths.
 
 ### Engine cutpoint diagnostics
 
@@ -1822,6 +1899,8 @@ with the existing call and fixed-frame profiles. Data reports use
 `elf-symbol-thumb-data-v1` or `elf-symbol-thumb-frame-data-v1` and bind both
 function and data mappings, source, headers and the applicable control-flow
 summary. Mapping changes invalidate cached evidence and interrupt mixed rebuilds.
+A caller whose stack buffer also reaches a callee uses the typed-data buffer
+schemas instead (see "Typed named data beside buffer calls").
 These checks establish relocation fidelity, not the safety of dereferencing a
 mapped address. No game data should be copied into the symbol map.
 

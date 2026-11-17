@@ -463,7 +463,8 @@ class BufferLoopReplayTests(unittest.TestCase):
             ("match.py", "verify_function_buffers"), ("match.py", "main"),
             ("function_thunk_profile.py", "verify_source"),
             ("match_evidence.py", "buffer_report_matches"),
-            ("owner_admission_profile.py", "verify")})
+            ("owner_admission_profile.py", "verify"),
+            ("data_buffer_profile.py", "prove")})
         # Producers whose evidence neither states nor binds a replay stay plain.
         plain = {site[0] for site in found if not site[2]}
         self.assertTrue({"owner_runtime_profile.py", "match.py", "scheduler_leaf_output_profile.py"} <= plain)
