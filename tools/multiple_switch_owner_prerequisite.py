@@ -15,7 +15,6 @@ import match
 import owner_admission_profile as owner
 import owner_graph_profile as graph
 import owner_runtime_profile as operations
-from one_constant_scalar_switch_inventory import guard_predecessors
 from software_double_profile import indices, span_record
 
 SELECTOR = 'ordinary-multiple-switch-owner-prerequisite-v1'
@@ -109,6 +108,9 @@ def _ordinary_original_calls(image, calls, address):
 
 
 def verify(original_ELF, linked_ELF, address, rom, mapping, index, *, selector, manifest=None):
+    # Imported here: one_constant_scalar_switch_inventory imports this module's
+    # importers at load time, so a module-level import is circular.
+    from one_constant_scalar_switch_inventory import guard_predecessors
     if type(selector) is not str or selector != SELECTOR or type(address) is not int or \
             any(type(value) is not bytes for value in (original_ELF, linked_ELF, rom, mapping, index)):
         raise ValueError('multiple-switch prerequisite requires its explicit immutable original inputs')
