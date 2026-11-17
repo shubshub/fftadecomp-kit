@@ -176,7 +176,11 @@ void func_08012000(struct Output *output) { output->bytes[100] = 7; }
         stack=[(False,False,True)]*2;facts={-8:('pointer',-4)}
         with self.assertRaisesRegex(ValueError,'exact aligned full word'):
             proof.word_memory(byte,{match.ARM_REG_R0:-8},{},stack,dict(facts),-8,{-8})
-        proof.word_memory(store,{}, {},stack,facts,-8,{-8});self.assertEqual(facts,{})
+        # Since the pointer-provenance change an opaque store refuses instead of
+        # forgetting the live pointer word; the reload below starts from no fact.
+        with self.assertRaisesRegex(ValueError,'unknown store.*pointer'):
+            proof.word_memory(store,{}, {},stack,facts,-8,{-8})
+        self.assertEqual(facts,{-8:('pointer',-4)});facts={}
         with self.assertRaisesRegex(ValueError,'exact surviving word value'):
             proof.word_memory(ldr,{match.ARM_REG_R0:-8},{},stack,facts,-8,{-8})
         with self.assertRaisesRegex(ValueError,'outside allocated local words'):

@@ -18,7 +18,7 @@ ADDRESS = 0x08010000
 
 class MultipleSwitchTerminalAlignmentTests(unittest.TestCase):
     def setUp(self):
-        self.directory = tempfile.TemporaryDirectory(dir=os.environ['TMPDIR'])
+        self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         root = Path(self.directory.name)
         source = root / 'envelope.s'

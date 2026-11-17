@@ -17,7 +17,7 @@ import push
 
 class WorktreeRootTests(unittest.TestCase):
     def setUp(self):
-        self.temporary = tempfile.TemporaryDirectory(prefix='push_worktree_', dir=os.environ['TMPDIR'])
+        self.temporary = tempfile.TemporaryDirectory(prefix='push_worktree_')
         self.addCleanup(self.temporary.cleanup)
         self.root = Path(self.temporary.name)
         self.repo = self.root / 'ordinary'

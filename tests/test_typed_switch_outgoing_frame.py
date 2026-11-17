@@ -287,7 +287,7 @@ class TypedSwitchOutgoingFrameTests(unittest.TestCase):
                 f'* control flow: {evidence.CALL_SUMMARY}',
                 f'* ROM bytes: `{body.hex()}` ({len(body)} bytes)',
                 f'**MATCH - byte identical** - {len(body)}/{len(body)} bytes']
-        with tempfile.TemporaryDirectory(dir=os.environ['TMPDIR']) as directory:
+        with tempfile.TemporaryDirectory() as directory:
             rom = Path(directory) / 'synthetic.bin'; rom.write_bytes(body.ljust(8192, b'\0'))
             with patch.object(evidence, 'mapping_snapshot', return_value=mapping), \
                     patch.object(evidence, 'data_snapshot', return_value=objects), \

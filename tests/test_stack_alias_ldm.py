@@ -89,7 +89,8 @@ class StackAliasLdmTests(unittest.TestCase):
 
     def test_descriptor_pointer_word_is_restored_and_escape_refused(self):
         proof = RecordingWordProof()
-        with self.assertRaisesRegex(ValueError, 'stack-alias use or escape'):
+        # The store through the unproved base r2 refuses before the escape check.
+        with self.assertRaisesRegex(ValueError, 'unknown store.*pointer'):
             self.verify(self.frame([0x4668, 0x9000, 0x2000, 0x4669,
                                     0xC901, 0x6010]), proof)
 
@@ -105,16 +106,16 @@ class StackAliasLdmTests(unittest.TestCase):
 
     def test_unknown_descriptor_word_fact_is_not_erased(self):
         proof = RecordingWordProof()
-        # A partial write destroys the exact stored pointer fact. Reloading
-        # the protected pointer slot must refuse instead of yielding a scalar.
-        with self.assertRaisesRegex(ValueError, 'partial access|descriptor reload'):
+        # A partial write over the live pointer word refuses at the store,
+        # before the protected pointer slot could be reloaded as a scalar.
+        with self.assertRaisesRegex(ValueError, 'partial or unsupported store.*pointer'):
             self.verify(self.frame([0x4668, 0x9000, 0x2100, 0x466A,
                                     0x7011, 0x4669, 0xC901]), proof)
 
     def test_lost_descriptor_word_fact_refuses_at_ldm(self):
-        # An unknown destination write clears exact word facts without deleting
-        # the separately protected pointer slot. LDM cannot turn it into scalar.
-        with self.assertRaisesRegex(ValueError, 'descriptor LDM reload lacks'):
+        # An unknown destination write while a pointer word is live refuses at
+        # the store, so the LDM can never reload that slot as a scalar.
+        with self.assertRaisesRegex(ValueError, 'unknown store.*pointer'):
             self.verify(self.frame([0x4668, 0x9000, 0x2000, 0x601A,
                                     0x4669, 0xC901]), RecordingWordProof())
 

@@ -59,7 +59,7 @@ class CanonicalIntegerEntryWordsInventoryTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         for name in ('src', 'include', 'config', 'symbols', 'build'):
             (cls.root/name).mkdir()
-        cls.retained = Path(os.environ['FFTA_ENTRY_WORDS_RETAIN'])
+        cls.retained = Path(os.environ.get('FFTA_ENTRY_WORDS_RETAIN') or cls.root/'retained')
         cls.retained.mkdir(parents=True, exist_ok=True)
         (cls.root/'src/08010000.c').write_text(SOURCE)
         if os.environ.get('FFTA_REUSE_FIXTURE') == '1':
@@ -356,6 +356,8 @@ class CanonicalIntegerEntryWordsInventoryTests(unittest.TestCase):
             with self.subTest(target=target), self.assertRaises(ValueError):
                 self.native(rom=bytes(rom))
 
+    @unittest.skipUnless(os.environ.get('FFTA_OLD_FIXTURE_ROOT'),
+                         'set FFTA_OLD_FIXTURE_ROOT to the retained fixtures to compare against')
     def test_affected_old_default_and_word0_frame_outputs_exact_on_retained_fixtures(self):
         import local_long_branch_profile as frame
         import readonly_entry_stack_profile as word0

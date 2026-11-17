@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -132,7 +133,7 @@ class NamedPairEntryWordsTests(unittest.TestCase):
         for field in ('source_or_ELF_admission', 'arithmetic_C_equivalence', 'physical_memory_claim',
                       'memory_safety_claim', 'nonescape_claim', 'universal_termination_claim'):
             self.assertIs(result[field], False)
-        root = Path(os.environ['FFTA_PAIR_ENTRY_RETAIN'])
+        root = Path(os.environ.get('FFTA_PAIR_ENTRY_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True, exist_ok=True)
         names = {'rom':'synthetic-rom.bin', 'mapping':'functions.json',
                  'index':'functions.txt', 'data_mapping':'data_symbols.json'}

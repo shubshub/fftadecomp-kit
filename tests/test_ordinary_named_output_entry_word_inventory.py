@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -52,7 +53,7 @@ class NamedOutputEntryWordTests(unittest.TestCase):
         self.assertFalse(result['source_or_ELF_admission'])
         self.assertFalse(result['memory_safety_claim'])
         self.assertEqual(profile.verify(**values, manifest=result)[0], result)
-        root = Path(os.environ['FFTA_ENTRY_OUTPUT_RETAIN'])
+        root = Path(os.environ.get('FFTA_ENTRY_OUTPUT_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True, exist_ok=True)
         names = {'rom': 'synthetic-rom.bin', 'mapping': 'functions.json',
                  'index': 'functions.txt', 'data_mapping': 'data_symbols.json'}

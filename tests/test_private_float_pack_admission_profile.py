@@ -78,7 +78,7 @@ class PrivateFloatPackAdmissionTests(unittest.TestCase):
     @contextmanager
     def project(self, fixture=None):
         fixture = self.fixture() if fixture is None else fixture
-        with tempfile.TemporaryDirectory(prefix='float_admission_test_', dir=os.environ['TMPDIR']) as path:
+        with tempfile.TemporaryDirectory(prefix='float_admission_test_') as path:
             root = Path(path)
             for name, data in {
                 f'src/{ADDRESS:08X}.c': b'/* synthetic source-capture fixture; never compiled */\n',

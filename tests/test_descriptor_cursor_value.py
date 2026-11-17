@@ -129,7 +129,7 @@ class NativeTests(unittest.TestCase):
 
     def test_unknown_base_pointer_escape_and_root_return_refuse(self):
         proof,values=self.call('02680a607047')  # str r2,[r1], unknown base.
-        with self.assertRaisesRegex(ValueError,'pointer use or escape'):proof.check_arguments(D,**values)
+        with self.assertRaisesRegex(ValueError,'unknown store.*pointer'):proof.check_arguments(D,**values)
         with self.assertRaisesRegex(ValueError,'escapes through a return'):
             match.verify_leaf_instructions(bytes.fromhex('81b0684601b07047'),D,True,buffer_proof=self.proof())
         with self.assertRaisesRegex(ValueError,'bounded live stack'):

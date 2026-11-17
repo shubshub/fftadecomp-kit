@@ -103,7 +103,7 @@ class FormalStackCalleeTests(unittest.TestCase):
         self.assertEqual(len(decoded), len(values['data'])//2-4)
         self.assertTrue(result['complete_native_structural_proof'])
         self.assertFalse(result['physical_memory_claim'] or result['source_or_ELF_admission'])
-        root = Path(os.environ.get('FFTA_FORMAL_STACK_RETAIN', os.environ['TMPDIR']))
+        root = Path(os.environ.get('FFTA_FORMAL_STACK_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True, exist_ok=True)
         for name, data in (('caller.bin', values['data']), ('leaf.bin', self.leaf_body),
                 ('synthetic-rom.bin', values['rom']), ('functions.json', values['mapping']), ('functions.txt', values['index'])):

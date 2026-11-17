@@ -7,6 +7,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -109,7 +110,7 @@ class NamedOutputLeafOnlyTests(unittest.TestCase):
         self.assertEqual(branch['frame']['maximum_frame_bytes'], 28)
         self.assertEqual(branch['frame']['formal_stack_callee']['calls'][0]['writes_entry_SP_offsets'],
             [[-20,2],[-18,2],[-16,2]])
-        root = Path(os.environ['FFTA_NAMED_OUTPUT_RETAIN'])
+        root = Path(os.environ.get('FFTA_NAMED_OUTPUT_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True, exist_ok=True)
         for name, data in (('caller.bin', values['data']), ('helper.bin', self.helper),
                 ('synthetic-rom.bin', values['rom']), ('functions.json', values['mapping']),
@@ -224,6 +225,8 @@ class NamedOutputLeafOnlyTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 proof.check_call(site, S, aliases, stack, changed)
 
+    @unittest.skipUnless(os.environ.get('FFTA_NAMED_OUTPUT_BASELINE'),
+                         'set FFTA_NAMED_OUTPUT_BASELINE to a kit checkout to compare against')
     def test_default_frame_output_and_unproved_alias_refusal_unchanged(self):
         code = machine([0xB510,0x1C04,0x1C20,0xBC10,0xBC02,0x4708])
         decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)

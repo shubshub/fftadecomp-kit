@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -107,7 +108,7 @@ class TwoOutputCalleesTests(unittest.TestCase):
         self.assertEqual(result['readonly_named_buffer_policy'],profile.named_policy())
         self.assertEqual(result['numeric_return_facts'],[])
         self.assertFalse(result['source_or_ELF_admission'] or result['physical_memory_claim'])
-        root=Path(os.environ['FFTA_TWO_OUTPUT_RETAIN']);root.mkdir(parents=True,exist_ok=True)
+        root=Path(os.environ.get('FFTA_TWO_OUTPUT_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()));root.mkdir(parents=True,exist_ok=True)
         for name,data in (('caller.bin',values['data']),('first.bin',self.first),('second.bin',self.second),
                 ('synthetic-rom.bin',values['rom']),('functions.json',values['mapping']),('functions.txt',values['index']),
                 ('data_symbols.json',values['data_mapping'])):(root/name).write_bytes(data)

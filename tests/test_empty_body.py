@@ -25,6 +25,11 @@ import push
 class EmptyBodyTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
+        # The fixture supplies its own baserom.bin; an inherited FFTA_ROM would win over it.
+        environment = patch.dict(os.environ)
+        environment.start()
+        cls.addClassCleanup(environment.stop)
+        os.environ.pop("FFTA_ROM", None)
         scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", Path.cwd() / "build"))
         scratch.mkdir(parents=True, exist_ok=True)
         cls.temporary = tempfile.TemporaryDirectory(prefix="empty_body_tests_", dir=scratch)

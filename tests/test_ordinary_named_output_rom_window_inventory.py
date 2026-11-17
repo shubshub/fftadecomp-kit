@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -115,7 +116,7 @@ class ROMWindowTests(unittest.TestCase):
         self.assertFalse(result['readonly_ROM_window']['object_extent_inferred'])
         self.assertEqual(result['numeric_return_facts'],[])
         self.assertEqual(result['readonly_named_buffer_policy'],named.named_policy())
-        root = Path(os.environ['FFTA_ROM_WINDOW_RETAIN']);root.mkdir(parents=True,exist_ok=True)
+        root = Path(os.environ.get('FFTA_ROM_WINDOW_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()));root.mkdir(parents=True,exist_ok=True)
         for name,data in (('caller.bin',values['data']),('helper.bin',self.helper),('rom.bin',values['rom']),
                 ('functions.json',values['mapping']),('functions.txt',values['index']),('data_symbols.json',values['data_mapping'])):
             (root/name).write_bytes(data)
