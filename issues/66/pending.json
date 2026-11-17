@@ -2626,66 +2626,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "f009e67f97d9d600de78511b4703a2e792132be4975aa788124480e6b2b0405d",
-        "acknowledged_cursor": 6932546964,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f009e67f97d9d600de78511b4703a2e792132be4975aa788124480e6b2b0405d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0802ED88\",\"who\":\"claude-ffta2\",\"note\":\"hand match (parked retry at kit 18dcc516)\"}",
-          "created_at": "2026-11-16T23:28:21Z",
-          "id": 6932533561,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-16T23:28:21Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "be9df682e57ab979b223409c2cdf15e499951b3310111bcb6460af644c255012",
-        "result": {
-          "address": "0x0802ED88",
-          "claim_id": 6932533561,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6932533561,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "819bf9cfa79bd09c0c787ae43aa71601fbf075027500ff0b7f8bf523bc4aaaa5",
-        "acknowledged_cursor": 6933396320,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "819bf9cfa79bd09c0c787ae43aa71601fbf075027500ff0b7f8bf523bc4aaaa5",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0802ED88\",\"who\":\"claude-ffta2\",\"claim_id\":6932533561,\"reason\":\"near miss 109/158 (loop hoisting); parked\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-17T00:10:53Z",
-          "id": 6933396320,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-17T00:10:53Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c1d14343ac1b1872c769d0607223d9042b66629d56582ca0c70ade5daebd120e",
-        "result": {
-          "address": "0x0802ED88",
-          "claim_id": 6932533561,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6933396320,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "dbd0fe36cdca0c67baf02410c6318ab86ffced643334275e6e532e85ce197bf5",
         "acknowledged_cursor": 6932546964,
         "body_provenance": "acceptance-time",
