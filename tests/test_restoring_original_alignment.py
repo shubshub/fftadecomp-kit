@@ -15,8 +15,7 @@ class RestoringAlignmentTests(unittest.TestCase):
     def setUp(self):
         import tempfile,os
         from pathlib import Path
-        scratch=Path(os.environ['TMPDIR']);scratch.mkdir(parents=True,exist_ok=True)
-        self.scratch=tempfile.TemporaryDirectory(prefix='restoring_alignment_',dir=scratch)
+        self.scratch=tempfile.TemporaryDirectory(prefix='restoring_alignment_')
         self.root=Path(self.scratch.name)
         self.addCleanup(self.scratch.cleanup)
 

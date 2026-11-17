@@ -6,6 +6,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -55,7 +56,7 @@ class FormalR0R1NamedLeafTests(unittest.TestCase):
         self.assertFalse(result['memory_safety_claim'])
         self.assertEqual(result['numeric_return_facts'],[])
         self.assertEqual(self.native(values,manifest=result)[0],result)
-        root = Path(os.environ['FFTA_R0_R1_LEAF_RETAIN'])
+        root = Path(os.environ.get('FFTA_R0_R1_LEAF_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True,exist_ok=True)
         names = {'rom':'rom.bin','mapping':'functions.json','index':'functions.txt','data_mapping':'data_symbols.json'}
         for key,name in names.items():

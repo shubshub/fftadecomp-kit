@@ -78,6 +78,7 @@ class LargePoolTests(unittest.TestCase):
         (self.root/'.git').mkdir();archive=self.root/'archive';archive.mkdir()
         snapshot=('refs/heads/main','a'*40)
         with patch.object(sys,'argv',['push.py','--repo',str(self.root),'--check-only','--jobs','64']), \
+                patch.object(push,'is_checkout_root',return_value=True), \
                 patch.object(push,'publish_snapshot',return_value=snapshot) as capture, \
                 patch.object(push,'committed_tree',return_value=str(archive)) as archived, \
                 patch.object(push,'check_history',return_value=True) as history, \
@@ -106,6 +107,7 @@ class LargePoolTests(unittest.TestCase):
     def test_failed_source_gate_still_prevents_push_at_64(self):
         (self.root/'.git').mkdir();archive=self.root/'archive';archive.mkdir()
         with patch.object(sys,'argv',['push.py','--repo',str(self.root),'--jobs','64']), \
+                patch.object(push,'is_checkout_root',return_value=True), \
                 patch.object(push,'publish_snapshot',return_value=('refs/heads/main','a'*40)), \
                 patch.object(push,'committed_tree',return_value=str(archive)), \
                 patch.object(push,'check_history',return_value=True), \

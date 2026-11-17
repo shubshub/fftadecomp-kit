@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import struct
 import subprocess
+import importlib.util
 import sys
 import tempfile
 import unittest
@@ -117,6 +118,7 @@ class SpilledScalarLoopTests(unittest.TestCase):
         self.assertEqual(len(p['call_effects']['ordinary_private_frames']),1)
         self.assertTrue(all(x['effect']['retained_pointer_slots'] for x in p['finite_local_words']['calls']))
 
+    @unittest.skipUnless(importlib.util.find_spec('unicorn'), 'unicorn CPU oracle not installed')
     def test_raw_cpu_oracle_preserves_spilled_origins_and_values(self):
         from unicorn import Uc,UC_ARCH_ARM,UC_MODE_THUMB,UC_HOOK_CODE,UC_HOOK_MEM_WRITE
         from unicorn import arm_const as arm

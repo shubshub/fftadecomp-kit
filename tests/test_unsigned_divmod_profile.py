@@ -15,7 +15,7 @@ import unittest
 from unittest.mock import patch
 
 STAGED = Path(__file__).resolve().parents[1]
-PRODUCTION = Path(os.environ['FFTA_TEST_PRODUCTION_KIT'])
+PRODUCTION = Path(os.environ.get('FFTA_TEST_PRODUCTION_KIT', STAGED))
 sys.path[:0] = [str(STAGED/'tools'), str(PRODUCTION/'tools')]
 import match
 import match_evidence as evidence

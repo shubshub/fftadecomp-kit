@@ -278,7 +278,9 @@ class SoftwareFloatTests(unittest.TestCase):
                       "ashldi3_context", "inert_spin_context", "double_context", "function_thunk_context"):
             with self.subTest(other=other), self.assertRaises(ValueError):
                 match.verify_leaf_instructions(self.body, BASE, True, self.calls,
-                    float_context=(self.rom, self.mapping, self.index, self.bindings), **{other: {}})
+                    float_context=(self.rom, self.mapping, self.index, self.bindings),
+                    # A buffer proof is an object; an empty dict stands in for the rest.
+                    **{other: match.BufferCallProof(b'', b'[]') if other == 'buffer_proof' else {}})
         for other in ("udivsi3_bindings", "modsi3_bindings", "divsi3_bindings", "umodsi3_bindings",
                       "ashldi3_bindings", "double_bindings", "function_relocations", "switch_relocations"):
             with self.subTest(other=other), self.assertRaises(ValueError):

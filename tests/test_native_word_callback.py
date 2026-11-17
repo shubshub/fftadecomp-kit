@@ -159,6 +159,7 @@ class FakeRunner:
 
 @contextlib.contextmanager
 def tree(env):
+    (HERE/'scratch').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='word_callback_',dir=HERE/'scratch')as directory:
         root=Path(directory)
         for part in ('src','include','config','symbols','docs/match','build'):(root/part).mkdir(parents=True,exist_ok=True)

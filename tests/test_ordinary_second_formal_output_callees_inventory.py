@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -90,7 +91,7 @@ class SecondOutputTests(unittest.TestCase):
         self.assertEqual(leaves[1]['calls'][0]['writes_entry_SP_offsets'],[[-24,2],[-22,2]])
         self.assertEqual([[r[2],r[3]] for r in leaves[1]['native_leaf']['effects']['named_reads']],[[36,2],[38,2]])
         self.assertEqual(result['numeric_return_facts'],[]);self.assertFalse(result['nonescape_claim'])
-        root = Path(os.environ['FFTA_SECOND_OUTPUT_RETAIN']);root.mkdir(parents=True,exist_ok=True)
+        root = Path(os.environ.get('FFTA_SECOND_OUTPUT_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()));root.mkdir(parents=True,exist_ok=True)
         for name,data in (('caller.bin',values['data']),('C918.bin',self.first),('C960.bin',self.second),
                 ('rom.bin',values['rom']),('functions.json',values['mapping']),('functions.txt',values['index']),
                 ('data_symbols.json',values['data_mapping'])):(root/name).write_bytes(data)

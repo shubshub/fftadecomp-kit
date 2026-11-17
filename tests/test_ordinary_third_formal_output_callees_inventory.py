@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 import subprocess
 import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -114,7 +115,7 @@ class ThirdOutputTests(unittest.TestCase):
         self.assertEqual(len(third['effects']['formal_reads_after_own_writes']), 2)
         self.assertEqual(leaves[1]['calls'][0]['writes_entry_SP_offsets'], [[-24, 2], [-22, 2], [-20, 2]])
         self.assertFalse(result['source_or_ELF_admission'])
-        root = Path(os.environ['FFTA_THIRD_OUTPUT_RETAIN'])
+        root = Path(os.environ.get('FFTA_THIRD_OUTPUT_RETAIN') or self.enterContext(tempfile.TemporaryDirectory()))
         root.mkdir(parents=True, exist_ok=True)
         for name, field in [('rom.bin', 'rom'), ('functions.json', 'mapping'), ('functions.txt', 'index'), ('data_symbols.json', 'data_mapping')]:
             (root / name).write_bytes(values[field])

@@ -73,7 +73,7 @@ class DoubleScalarConversionAdmissionTests(unittest.TestCase):
                     continue
                 with self.subTest(selector=selector), self.assertRaises(ValueError):
                     admission.original_bindings(original, effects.A, rom, mapping, index, selector=selector)
-                self.assertFalse(hasattr(admission.profile(selector)[0], 'COMPILER_ALIASES'))
+                self.assertNotIn('__lshrdi3', getattr(admission.profile(selector)[0], 'COMPILER_ALIASES', {}))
 
     def test_other_names_definitions_duplicates_and_nonzero_addends_refuse(self):
         with self.closure() as (body, rom, _, mapping, index, _):

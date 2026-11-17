@@ -149,6 +149,7 @@ class IntegrationTests(unittest.TestCase):
 
     def test_status_forwards_selector_without_bypassing_report_validation(self):
         r=result();report=owner.render(A,r)
+        (CASE/'scratch').mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(dir=CASE/'scratch',prefix='synthetic_status_') as tmp:
             root=Path(tmp)
             for name in ('config','src','docs/match'):(root/name).mkdir(parents=True,exist_ok=True)

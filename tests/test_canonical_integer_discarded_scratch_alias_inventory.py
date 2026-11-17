@@ -30,7 +30,7 @@ class DiscardedScratchAliasTests(unittest.TestCase):
     def setUpClass(cls):
         cls.rom=Path(os.environ['FFTA_ROM']).read_bytes()
         assert profile.sha(cls.rom)=='43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19'
-        cls.retained=Path(os.environ['FFTA_SCRATCH_ALIAS_RETAIN']);cls.retained.mkdir(exist_ok=True)
+        cls.retained=Path(os.environ.get('FFTA_SCRATCH_ALIAS_RETAIN') or cls.enterClassContext(tempfile.TemporaryDirectory()));cls.retained.mkdir(exist_ok=True)
         cls.rows=[{'rom':f'0x{A:08X}','end':f'0x{A+2:08X}','mode':'thumb','instrs':1},
             {'rom':f'0x{B:08X}','end':f'0x{B+2:08X}','mode':'thumb','instrs':1},
             {'rom':'0x081426B8','end':'0x0814274A','mode':'thumb','instrs':72},

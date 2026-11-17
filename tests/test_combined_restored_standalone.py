@@ -93,6 +93,7 @@ class Runner:
 
 @contextlib.contextmanager
 def tree(env):
+    (HERE/'scratch').mkdir(exist_ok=True)
     with tempfile.TemporaryDirectory(prefix='combined327_',dir=HERE/'scratch')as directory:
         root=Path(directory)
         for name in ('src','include','config','symbols','docs/match','build'):(root/name).mkdir(parents=True)

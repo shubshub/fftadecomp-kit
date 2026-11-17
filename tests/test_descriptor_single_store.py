@@ -138,8 +138,9 @@ class NativeTests(unittest.TestCase):
                 self.leaf(proof,words=facts)
         self.assertGreaterEqual(len(proof.contexts),3)
         facts={-16:('pointer',-8)};stack=[(False,False,True)]*4
-        proof.word_memory(instruction('0860'),{}, {},stack,facts,-16,frozenset({-16}))
-        self.assertEqual(facts,{})
+        with self.assertRaisesRegex(ValueError,'unknown store.*pointer'):
+            proof.word_memory(instruction('0860'),{}, {},stack,facts,-16,frozenset({-16}))
+        self.assertEqual(facts,{-16:('pointer',-8)});facts={}
         with self.assertRaisesRegex(ValueError,'exact surviving word value'):
             self.leaf(proof,words=facts,protected=frozenset({-16}))
 

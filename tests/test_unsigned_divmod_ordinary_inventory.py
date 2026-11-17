@@ -47,7 +47,7 @@ class UnsignedDivmodOrdinaryInventoryTests(unittest.TestCase):
         cls.temporary = tempfile.TemporaryDirectory(prefix='unsigned_divmod_', dir=scratch)
         cls.addClassCleanup(cls.temporary.cleanup)
         cls.root = Path(cls.temporary.name)
-        cls.retained = Path(os.environ['FFTA_UNSIGNED_DIVMOD_RETAIN'])
+        cls.retained = Path(os.environ.get('FFTA_UNSIGNED_DIVMOD_RETAIN') or cls.root/'retained')
         cls.retained.mkdir(parents=True, exist_ok=True)
         for name in ('src', 'include', 'config', 'symbols', 'build'):
             (cls.root/name).mkdir()

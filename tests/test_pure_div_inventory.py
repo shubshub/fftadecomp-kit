@@ -51,7 +51,7 @@ class PureDivInventoryTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         for name in ('src', 'include', 'config', 'symbols', 'build'):
             (cls.root / name).mkdir()
-        cls.retained = Path(os.environ['FFTA_PURE_DIV_RETAIN'])
+        cls.retained = Path(os.environ.get('FFTA_PURE_DIV_RETAIN') or cls.root/'retained')
         cls.retained.mkdir(parents=True, exist_ok=True)
         (cls.root / 'src/08010000.c').write_text(SOURCE)
         if os.environ.get('FFTA_REUSE_FIXTURE') == '1':

@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 import struct
 import subprocess
+import importlib.util
 import sys
 import unittest
 from unittest.mock import patch
@@ -117,6 +118,7 @@ class NamedThreeOutputTests(unittest.TestCase):
         self.assertEqual(m['named_read_policy']['reads'],[[32,2],[34,2]])
         self.assertFalse(m['physical_nonalias_claim'])
 
+    @unittest.skipUnless(importlib.util.find_spec('unicorn'), 'unicorn CPU oracle not installed')
     def test_independent_raw_oracle_values_write_order_and_restoration(self):
         from unicorn import Uc,UC_ARCH_ARM,UC_MODE_THUMB,UC_HOOK_CODE,UC_HOOK_MEM_WRITE
         from unicorn import arm_const as arm

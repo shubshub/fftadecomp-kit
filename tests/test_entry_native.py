@@ -248,7 +248,7 @@ class EntryBuildRoutingTests(unittest.TestCase):
     @contextlib.contextmanager
     def tree(self):
         import tempfile
-        base=Path(__file__).resolve().parents[1]/'scratch'
+        base=Path(__file__).resolve().parents[1]/'scratch';base.mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='synthetic_owner_',dir=base) as folder:
             root=Path(folder)
             (root/'src').mkdir();(root/'include').mkdir();(root/'config').mkdir();(root/'symbols').mkdir()
@@ -355,10 +355,15 @@ class EntryNativePolicyTests(unittest.TestCase):
             bindings,_=entry.original_bindings(match.elf_image(elf(changed)),A,rom,mapping,index)
             with self.subTest(push=push),self.assertRaises(ValueError):
                 owner.verify(changed,A,rom,mapping,index,b'{}',bindings=bindings,selector=entry.SELECTOR)
-        task=Path(__file__).resolve().parents[1]
-        frozen=task.parent/'matching-entry-recursive-ordinary-call278/staged/tools/entry_recursive_ordinary_call_profile.py'
+
+    TASK=Path(__file__).resolve().parents[1]
+    FROZEN=TASK.parent/'matching-entry-recursive-ordinary-call278/staged/tools/entry_recursive_ordinary_call_profile.py'
+    R7=TASK.parent/'matching-static-callback-r7-integration280/tools/static_callback_target_preservation_profile.py'
+
+    @unittest.skipUnless(FROZEN.is_file() and R7.is_file(), 'frozen sibling work trees are not present')
+    def test_frozen_sibling_trees_are_retained(self):
+        task,frozen,r7=self.TASK,self.FROZEN,self.R7
         self.assertTrue(Path(entry.__file__).read_bytes().startswith(frozen.read_bytes()))
-        r7=task.parent/'matching-static-callback-r7-integration280/tools/static_callback_target_preservation_profile.py'
         self.assertEqual((task/'tools'/r7.name).read_bytes(),r7.read_bytes())
         original=(r7.parent/'owner_admission_profile.py').read_text()
         a=original.index('    if args.owner_runtime_profile == r7_buffer.SELECTOR and any(')

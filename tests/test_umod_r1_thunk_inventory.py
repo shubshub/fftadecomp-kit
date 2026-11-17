@@ -48,7 +48,7 @@ class UmodR1ThunkInventoryTests(unittest.TestCase):
     def setUpClass(cls):
         approved = Path(os.environ['FFTA_ROM']).read_bytes()
         assert hashlib.sha256(approved).hexdigest() == '43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19'
-        cls.retained = Path(os.environ['FFTA_UMOD_R1_RETAIN'])
+        cls.retained = Path(os.environ.get('FFTA_UMOD_R1_RETAIN') or cls.enterClassContext(tempfile.TemporaryDirectory()))
         cls.retained.mkdir(parents=True, exist_ok=True)
         cls.temporary = tempfile.TemporaryDirectory(prefix='umod_r1_', dir=os.environ['FFTA_TEST_SCRATCH'])
         cls.addClassCleanup(cls.temporary.cleanup)

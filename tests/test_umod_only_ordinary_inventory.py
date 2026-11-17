@@ -54,7 +54,7 @@ class UmodOnlyOrdinaryInventoryTests(unittest.TestCase):
         cls.root = Path(cls.temporary.name)
         for name in ('src', 'include', 'config', 'symbols', 'build'):
             (cls.root/name).mkdir()
-        cls.retained = Path(os.environ['FFTA_UMOD_ONLY_RETAIN'])
+        cls.retained = Path(os.environ.get('FFTA_UMOD_ONLY_RETAIN') or cls.root/'retained')
         cls.retained.mkdir(parents=True, exist_ok=True)
         (cls.root/'src/08010000.c').write_text(SOURCE)
         if os.environ.get('FFTA_REUSE_FIXTURE') == '1':
@@ -160,7 +160,7 @@ class UmodOnlyOrdinaryInventoryTests(unittest.TestCase):
         (self.retained/'native-inventory-cli.json').write_text(run.stdout)
 
     def test_arbitrary_dividend_and_constant_copy_retain_structural_claim_only(self):
-        for prefix in ([0x211E], [0x221E, 0x4611]):
+        for prefix in ([0x211E], [0x221E, 0x0011]):  # movs r2,#30; lsls r1,r2,#0 (ARMv4T low-register copy)
             with self.subTest(prefix=prefix):
                 observed, _ = self.machine([0xB510, 0xB081, 'ordinary']+prefix+['umod', 0xB001, 0xBC10, 0xBC02, 0x4708])
                 self.assertEqual([value for _, value in observed['caller_divisors']], [30])

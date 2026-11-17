@@ -18,7 +18,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
 
 
-SCRATCH = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-public-bitbyte-sol61")
+# Capture workspaces must be disk backed (the engine refuses tmpfs), so default to build/.
+SCRATCH = Path(os.environ.get("FFTA_TEST_SCRATCH") or Path(__file__).resolve().parents[1] / "build")
+APPROVED_ROM_SHA256 = "43fc8204c6dceee58828aebc7af0c72eb807e99f35ad641c8bb0a4fa8b6edc19"
+# Complete indexed extents of the real callees the two helper chains bind.
+CHAIN_ENDS = {0x0801C918: 0x0801C960, 0x0801CA78: 0x0801CA98, 0x0801CC18: 0x0801CC38,
+              0x080A880C: 0x080A880E, 0x080D8BD8: 0x080D8C58, 0x080DBDA0: 0x080DBDC8}
 ADDRESS = 0x08000002
 DEPENDENCY_SHA256 = "6edf9439e64096d31aa616fbadf5bb3c684893fb05c7b6ae790f3d0c3a0ba917"
 
@@ -969,6 +974,7 @@ class FreshCaptureTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
+        SCRATCH.mkdir(parents=True, exist_ok=True)
         cls.temporary = tempfile.TemporaryDirectory(prefix="fresh-matrix-", dir=SCRATCH)
         cls.root = Path(cls.temporary.name)
         cls.kit = Path(__file__).resolve().parents[1]
@@ -1169,15 +1175,16 @@ class FreshCaptureTests(unittest.TestCase):
         names = {line.split()[2]: int(line.split()[0], 16) for line in symbols}
         real_bodies = {}
         if chain:
-            inputs = Path("/home/user/.codex-work/ffta-ulw/conditional-registration-effects-implementation/inputs/functions.json")
-            maps = profile.private.decode(inputs.read_text())
+            selected = os.environ.get("FFTA_ROM")
+            if not selected or not Path(selected).is_file():
+                self.skipTest("set FFTA_ROM to the approved ROM for the real-callee chains")
+            image = Path(selected).read_bytes()
+            if hashlib.sha256(image).hexdigest() != APPROVED_ROM_SHA256:
+                self.skipTest("FFTA_ROM is not the approved ROM")
             targets = {0x080DBDA0, 0x0801C918} if chain == "DBDA0" else {0x080D8BD8, 0x080A880C, 0x0801CC18, 0x0801CA78, 0x0801C918}
-            with open("/home/user/Downloads/Final Fantasy Tactics Advance (USA, Australia).gba", "rb") as stream:
-                for target in sorted(targets):
-                    end = int(next(item["end"] for item in maps if int(item["rom"], 16) == target), 16)
-                    stream.seek(target - profile.ROM_BASE)
-                    real_bodies[target] = stream.read(end - target)
-                    names[f"func_{target:08X}"] = target
+            for target in sorted(targets):
+                real_bodies[target] = image[target - profile.ROM_BASE:CHAIN_ENDS[target] - profile.ROM_BASE]
+                names[f"func_{target:08X}"] = target
             target = 0x080DBDA0 if chain == "DBDA0" else 0x080D8BD8
             wrapper = (f"extern void func_{target:08X}(void *, void *, void *, void *);\n"
                        f"unsigned int func_{helper_target:08X}(unsigned int left, unsigned int right) {{\n"

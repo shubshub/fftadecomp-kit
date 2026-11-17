@@ -334,7 +334,9 @@ class ConditionalLocalBufferTests(unittest.TestCase):
         self.assertFalse(named.conditional_thunk_replay(None))
 
     def test_selectors_are_registered_with_dispatch_and_cli(self):
-        self.assertEqual(named.LOCAL_CALL_SELECTORS, local.SELECTORS)
+        # Registration is membership; the two tuples are not kept in one order.
+        self.assertCountEqual(named.LOCAL_CALL_SELECTORS, local.SELECTORS)
+        self.assertEqual(len(set(local.SELECTORS)), len(local.SELECTORS))
         source = (Path(match.__file__).read_text(encoding='utf-8'))
         line, = [row for row in source.splitlines() if '"--owner-runtime-profile", choices=(' in row]
         for policy in local.SELECTORS:
