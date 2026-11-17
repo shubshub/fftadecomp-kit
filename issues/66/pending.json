@@ -3102,7 +3102,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9c49a08792152dd6ccd4cb3d92c689f62d32b0ff72b944d0eb97d57832fc3e37",
+        "acknowledged_cursor": 6936913353,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9c49a08792152dd6ccd4cb3d92c689f62d32b0ff72b944d0eb97d57832fc3e37",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0810ADF4\",\"who\":\"claude-ffta2\",\"claim_id\":6936793864,\"reason\":\"stack-index premise not provable: reduces to the unproven facing invariant; parked\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-17T03:11:48Z",
+          "id": 6936913353,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-17T03:11:48Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4c1f7b201a5171264c62ae18c47fd71eca3bd8056fa09733ebc5a0c5e23e3e44",
+        "result": {
+          "address": "0x0810ADF4",
+          "claim_id": 6936793864,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6936913353,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
