@@ -437,7 +437,9 @@ class RealSourceTests(unittest.TestCase):
             state = Path(f"/proc/{child_pid}/stat")
             try:
                 running = state.read_text().split()[2] != "Z"
-            except FileNotFoundError:
+            except (FileNotFoundError, ProcessLookupError):
+                # The child can be reaped between open() and read(); the read
+                # then fails with ESRCH instead of the file being missing.
                 running = False
             if not running:
                 break
