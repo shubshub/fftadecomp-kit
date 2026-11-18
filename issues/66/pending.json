@@ -602,7 +602,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "704e8064ad22fd30a21cd9e386d021775668529d229ff7d9fbe5456cb364990e",
+        "acknowledged_cursor": 6987628651,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "704e8064ad22fd30a21cd9e386d021775668529d229ff7d9fbe5456cb364990e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A3F4\",\"who\":\"rainbow-callback\",\"claim_id\":6987476882,\"reason\":\"152-byte genuine full source parked. 145 bytes / 63 of 67 instructions match; only four equivalent slot-address instructions differ at 0809A42C. Named table is mapped; existing callback wrapper profile excludes the larger root.\",\"unmatchable\":true,\"tried\":\"standard agbcc -O2, typed slot and byte-stride expressions, normal and existing literal callback verifier\"}",
+          "created_at": "2026-11-18T18:23:35Z",
+          "id": 6987628651,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:23:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "65c19e846bdae4a502ac6b7769d573aed3c2219d43a1df99f524b708b6493744",
+        "result": {
+          "address": "0x0809A3F4",
+          "claim_id": 6987476882,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987628651,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
