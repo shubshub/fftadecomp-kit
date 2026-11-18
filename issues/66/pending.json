@@ -218,7 +218,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7e9c8faa6e782ab0e1b3017094ff9403677eaee0a9707d4cef2680c01dce6f67",
+        "acknowledged_cursor": 6989878515,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7e9c8faa6e782ab0e1b3017094ff9403677eaee0a9707d4cef2680c01dce6f67",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813233C\",\"who\":\"claude-ffta2\",\"claim_id\":6989376730,\"reason\":\"retry stopped: already parked in staging with a documented reason; the parked re-check covers it at the current kit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:55:34Z",
+          "id": 6989864556,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:55:34Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "654ddff5291a417e47c304c9bc68b32d4fd4d60ffaf5de8357c5a60e487aad97",
+        "result": {
+          "address": "0x0813233C",
+          "claim_id": 6989376730,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989864556,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -250,7 +278,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e087b9244b02fdf6118a5a65c2df757916a0cd6e2344edd59b40c34f4eab138f",
+        "acknowledged_cursor": 6989878515,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e087b9244b02fdf6118a5a65c2df757916a0cd6e2344edd59b40c34f4eab138f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812C8DC\",\"who\":\"claude-ffta2\",\"claim_id\":6989387446,\"reason\":\"retry stopped: already parked in staging with a documented reason; the parked re-check covers it at the current kit\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:56:07Z",
+          "id": 6989878515,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:56:07Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "654ddff5291a417e47c304c9bc68b32d4fd4d60ffaf5de8357c5a60e487aad97",
+        "result": {
+          "address": "0x0812C8DC",
+          "claim_id": 6989387446,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989878515,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -1240,6 +1296,38 @@
           "request_id": 6989831924,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f26687030bf94b7889ca8b6b258c5db7b2a25431a9d1e2462edda00aa9fa8207",
+        "acknowledged_cursor": 6989878515,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f26687030bf94b7889ca8b6b258c5db7b2a25431a9d1e2462edda00aa9fa8207",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08054314\",\"who\":\"rainbow-affine\",\"note\":\"Second menu icon renderer: recover signed low-byte row and signed remainder, compare caller ABIs\"}",
+          "created_at": "2026-11-18T19:55:46Z",
+          "id": 6989869793,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:55:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "654ddff5291a417e47c304c9bc68b32d4fd4d60ffaf5de8357c5a60e487aad97",
+        "result": {
+          "address": "0x08054314",
+          "claim_id": 6989869793,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989869793,
+          "status": "accepted",
+          "who": "rainbow-affine"
         }
       },
       "release": null
