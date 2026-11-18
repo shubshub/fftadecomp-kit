@@ -4081,7 +4081,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
-                             incoming_narrow_reads=False, engine_track_rom=None):
+                             incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4098,6 +4098,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 value is not None and value is not False for name, value in locals().items()
                 if name not in INCOMING_NARROW_READ_PARAMETERS)):
         raise ValueError("incoming narrow reads require the plain Thumb direct-call path")
+    if masked_argument_proof is not None:
+        if thumb is not True or any(value is not None and value is not False
+                for name, value in locals().items()
+                if name not in ("data", "address", "thumb", "masked_argument_proof")):
+            raise ValueError("masked argument proof requires its isolated Thumb leaf")
+        from transfer_mask_argument import MaskedArgumentProof, ROOT
+        if type(masked_argument_proof) is not MaskedArgumentProof or address != ROOT or masked_argument_proof.data != data:
+            raise ValueError("masked argument proof requires its original transfer leaf")
     if runtime_summaries is not None:
         from runtime_summary_profile import RuntimeSummaries
         if type(runtime_summaries) is not RuntimeSummaries or not thumb or any(
@@ -4949,6 +4957,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 # The pair's load overwrites the register, so the address never becomes an alias.
                 incoming_read = thumb_incoming_narrow_read(instruction, data, address, len(stack)) \
                     if incoming_narrow_reads and thumb else None
+                if masked_argument_proof is not None:
+                    incoming_read = masked_argument_proof.kind_read(instruction, len(stack))
                 assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) \
                     if thumb and incoming_read is None else None
                 deferred_derivation = False
@@ -5081,6 +5091,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                             offset = operand.mem.disp - 4 * len(stack)
                             if instruction.mnemonic == "str":
                                 if slot >= len(stack):
+                                    if masked_argument_proof is not None:
+                                        masked_argument_proof.store(address, current, offset, instruction,
+                                                                    aliases, return_registers)
+                                        continue
                                     from cone_stack_footprint import ConeStackProof
                                     if type(buffer_proof) is ConeStackProof:
                                         buffer_proof.cursor_store(address, current, offset, instruction,
@@ -5641,6 +5655,7 @@ def main():
                                                       "static-callback-restoring-scratch-prefix-aligned-v1",
                                                       "static-callback-local-output-word-return-r7-v1",
                                                       "standalone-local-output-word-return-v1",
+                                                      "transfer-masked-stack-argument-v1",
                                                       "local-rom-halfword-table-v1",
                                                       "local-shadow-halfword-matrix-v1",
             "entry-recursive-ordinary-call-v1",
