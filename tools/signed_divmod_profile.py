@@ -11,12 +11,14 @@ import tempfile
 
 import divsi3_profile as quotient
 import modsi3_profile as remainder
+import odd_remainder_profile as odd_remainder
 
 SELECTOR = 'numeric-divmod-v1'
 SCHEMA = 'elf-symbol-thumb-signed-divmod-numeric-v1'
 SHIFT_SELECTOR = 'numeric-divmod-lsr-v1'
 SHIFT_SCHEMA = 'elf-symbol-thumb-signed-divmod-lsr-v1'
 SCHEMAS = {SELECTOR: SCHEMA, SHIFT_SELECTOR: SHIFT_SCHEMA}
+REPORT_SCHEMAS = {**SCHEMAS, odd_remainder.SELECTOR: odd_remainder.SCHEMA}
 SUMMARY = 'canonical signed quotient and remainder with existing CFG-proven numeric domains and restoring saves'
 _replay = ContextVar('signed_divmod_replay', default=False)
 
@@ -137,6 +139,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     from match_evidence import (source_fingerprint, source_paths, mapping_snapshot,
                                 data_snapshot, report_rom_path)
     from inert_spin_profile import index_snapshot
+    if selector == odd_remainder.SELECTOR:
+        return odd_remainder.build(root, address, args, expected)
     root = Path(root)
     args = args or argparse.Namespace(cc=match.DEFAULT_CC, cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
         objcopy=match.DEFAULT_OBJCOPY, linker=match.DEFAULT_LD, flags=match.DEFAULT_FLAGS)
@@ -195,7 +199,7 @@ def render(result):
     evidence['body_sha256'] = sha(result['body'])
     encoded = text(evidence)
     schema = result['manifest']['schema']
-    selector = next(key for key, value in SCHEMAS.items() if value == schema)
+    selector = next(key for key, value in REPORT_SCHEMAS.items() if value == schema)
     return '\n'.join([f'# 0x{result["address"]:08X}', '', f'* verification: `{schema}`',
         f'* signed runtime: {selector}', f'* signed runtime evidence: `{encoded}`',
         f'* signed runtime proof SHA-256: `{sha(encoded.encode())}`',
@@ -213,10 +217,10 @@ def selected(report):
 
 def selector_for_report(report):
     lines = report.splitlines()
-    if not any(schema in report for schema in SCHEMAS.values()) and \
+    if not any(schema in report for schema in REPORT_SCHEMAS.values()) and \
             not any(line.lstrip().startswith('* signed runtime') for line in lines):
         return False
-    for selector, schema in SCHEMAS.items():
+    for selector, schema in REPORT_SCHEMAS.items():
         if [line for line in lines if line.lstrip().startswith('* verification')] == [f'* verification: `{schema}`'] and \
                 [line for line in lines if line.lstrip().startswith('* signed runtime:')] == [f'* signed runtime: {selector}']:
             return selector
@@ -272,6 +276,7 @@ def issue(root, address, args):
         report = Path(root) / 'docs/match' / f'{address:08X}.md'
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(render(result))
-    print(f'extent    {len(result["body"])} bytes (complete ELF symbol; signed divmod numeric proof; no relocations)')
+    proof = 'bounded odd signed remainder' if args.signed_runtime_profile == odd_remainder.SELECTOR else 'signed divmod numeric proof'
+    print(f'extent    {len(result["body"])} bytes (complete ELF symbol; {proof}; no relocations)')
     print('verdict MATCH - byte identical')
     return 0
