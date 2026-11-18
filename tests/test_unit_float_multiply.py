@@ -1,5 +1,7 @@
 """Closed-unit ELF ownership and real old-agbcc multiply replay."""
 import argparse
+from contextlib import redirect_stdout
+import io
 import copy
 from pathlib import Path
 import json
@@ -15,6 +17,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 import library_units as units
 import match
 import match_evidence as evidence
+import status
 import unit_float_multiply_profile as multiply
 
 
@@ -84,6 +87,11 @@ class NativeTests(unittest.TestCase):
         body, report = multiply.build(self.root, self.addr, self.args)
         self.assertEqual(units.sha(body), "ddb81777890d79690a3c02c5d524f54fcf019175aa88f81f1355ef91fb70e10e")
         self.assertTrue(evidence.report_matches(report, self.root, self.addr))
+        args = argparse.Namespace(**vars(self.args), label=None, emit=None, no_write=True)
+        output = io.StringIO()
+        with redirect_stdout(output):
+            self.assertEqual(multiply.issue(self.root, self.addr, args), 0)
+        self.assertEqual(status.matcher_extent(output.getvalue()), len(body))
         self.assertFalse(evidence.report_matches(report.replace("171,", "170,", 1), self.root, self.addr))
         _, _, digest, _ = units.binding(report)
         self.assertFalse(evidence.report_matches(report.replace(digest, "0"*64), self.root, self.addr))

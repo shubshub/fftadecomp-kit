@@ -203,6 +203,6 @@ def issue(root, address, args):
         path = Path(root) / "docs/match" / f"{address:08X}.md"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(report, encoding="utf-8")
-    print(f"extent    {len(body)} bytes (complete ELF symbol, 171 reachable instructions)")
+    print(f"extent    {len(body)} bytes (complete ELF symbol; 171 reachable instructions; no relocations)")
     print("verdict MATCH - byte identical")
     return 0
