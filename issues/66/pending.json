@@ -1915,6 +1915,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7ca387dbcb59b809b68335551eaf846d9e679accaaa6039ad88951bf19e44246",
+        "acknowledged_cursor": 6993158153,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7ca387dbcb59b809b68335551eaf846d9e679accaaa6039ad88951bf19e44246",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08005A24\",\"who\":\"rainbow-state\",\"note\":\"Recover the 218-byte original scheduler traversal and runtime callback contract.\"}",
+          "created_at": "2026-11-18T22:13:28Z",
+          "id": 6993158153,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:13:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b7d00a8cb782278c89cb6cedc5c1bdcf61db6dcaf2498357b4c06e1a2299517c",
+        "result": {
+          "address": "0x08005A24",
+          "claim_id": 6993158153,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6993158153,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
