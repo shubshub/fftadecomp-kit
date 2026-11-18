@@ -510,7 +510,35 @@
           "who": "rainbow-particle-initializer"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "df3fe37ec7d00be109f67d76d64ea719e44e8a5bb2f7c6fbe5480ce571d613e9",
+        "acknowledged_cursor": 6986785621,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "df3fe37ec7d00be109f67d76d64ea719e44e8a5bb2f7c6fbe5480ce571d613e9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A97EC\",\"who\":\"rainbow-particle-initializer\",\"claim_id\":6986232721,\"reason\":\"340-byte native particle initializer, 152 instructions; original ELF and complete signed-remainder/R3-caller proof replayed with merged toolkit #276.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:49:34Z",
+          "id": 6986785621,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:49:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "15b4543dfb1f69375a5babef22ba7fbfebd748c5e4281c7a7a3755e1683bfa74",
+        "result": {
+          "address": "0x080A97EC",
+          "claim_id": 6986232721,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986785621,
+          "status": "accepted",
+          "who": "rainbow-particle-initializer"
+        }
+      }
     },
     {
       "claim": {
