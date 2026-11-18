@@ -316,7 +316,11 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 import signed_divmod_profile
                 signed_runtime_profile = signed_divmod_profile.selector_for_report(saved_report)
                 import owner_admission_profile
-                owner_profile = owner_admission_profile.selected(saved_report)
+                import libgcc_divdi3
+                if owner_admission_profile.selected(saved_report):
+                    owner_profile = owner_admission_profile.selector_for_report(saved_report)
+                elif f"* verification: `{libgcc_divdi3.SCHEMA}`" in saved_report.splitlines():
+                    owner_profile = libgcc_divdi3.SELECTOR
                 constants_profile = switch_constants.selected_policy(saved_report)
                 typed_outgoing_profile = typed_switch_frame.selector_for_report(saved_report)
                 u16_switch_profile = (
@@ -393,7 +397,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             if thunk_profile:
                 command += ["--function-address-profile", thunk_profile]
             if owner_profile:
-                command += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(saved_report)]
+                command += ["--owner-runtime-profile", owner_profile]
             if palette_source_profile:
                 command += ["--owner-runtime-profile", palette_source_profile]
             if private_float_profile:
