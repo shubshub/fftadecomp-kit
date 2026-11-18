@@ -5660,9 +5660,11 @@ def main():
                                                       "descriptor-cursor-value-v1",
                                                       "private-float-unpack-pack-v1", "private-float-extension-v1", "private-float-comparison-v1", "private-double-comparison-v1", "private-float-scalar-conversion-v1", "private-double-scalar-conversion-v1", "private-double-unpack-pack-v1", "private-double-truncation-v1", "private-double-scalar-pack-v1", "private-scalar-division-byte-locals-v1", "private-float-selected-record-v1", "private-double-inline-division-v1", "private-double-selected-record-v1", "private-float-inline-division-v1", "private-float-unsigned-conversion-v1"))
     args = ap.parse_args()
-    if args.signed_runtime_profile == signed_divmod.odd_remainder.SELECTOR:
+    if args.signed_runtime_profile in (signed_divmod.odd_remainder.SELECTOR, signed_divmod.shuffle.SELECTOR):
         try:
-            signed_divmod.odd_remainder.check_configuration(args)
+            operation = ('installed action shuffle' if args.signed_runtime_profile == signed_divmod.shuffle.SELECTOR
+                         else 'bounded odd remainder')
+            signed_divmod.odd_remainder.check_configuration(args, operation=operation)
         except ValueError as error:
             sys.exit(str(error))
     if args.owner_runtime_profile == "conditional-palette-source-compilation-v1":

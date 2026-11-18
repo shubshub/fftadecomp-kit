@@ -74,7 +74,7 @@ def _add(value, delta):
     raise ValueError('copy arithmetic interprets an opaque value')
 
 
-def _case(payload, destination, entry, count, source_alignment, destination_alignment):
+def _case(payload, destination, entry, count, source_alignment, destination_alignment, *, table_index=None):
     registers=[Opaque(f'entry-r{i}') for i in range(16)]
     registers[0]=Pointer('destination',0)
     registers[1]=Pointer('source',0)
@@ -83,7 +83,12 @@ def _case(payload, destination, entry, count, source_alignment, destination_alig
     registers[14]=Opaque('entry-thumb-return-address')
     initial=registers[:]
     memory={('source',i):Opaque(f'source-byte-{i}') for i in range(count)}
+    if table_index is not None:
+        # Both logical cursors refer to the same physical eight-byte local.
+        original_table = [Opaque(f'table-byte-{i}') for i in range(8)]
+        memory = {('table', i): byte for i, byte in enumerate(original_table)}
     writes,reads,trace=[],[],[]
+    table_accesses = []
     flags=None
     alignments={'source':source_alignment,'destination':destination_alignment,'stack':0}
     pc=entry
@@ -103,6 +108,12 @@ def _case(payload, destination, entry, count, source_alignment, destination_alig
         elif not 0<=lo<hi<=count or (write and pointer.region!='destination') \
                 or (not write and pointer.region!='source'):
             raise ValueError('copy read/write escapes its explicit source/destination permissions')
+        if table_index is not None and pointer.region != 'stack':
+            start = table_index + (pointer.region == 'source') + lo
+            if width != 1 or not 0 <= start < start + width <= 8:
+                raise ValueError('compaction requires a byte access within the common table')
+            table_accesses.append(('write' if write else 'read', start))
+            return [('table', start)]
         return [(pointer.region,i) for i in range(lo,hi)]
 
     def load(pointer,width):
@@ -198,6 +209,16 @@ def _case(payload, destination, entry, count, source_alignment, destination_alig
     if registers[1]!=Pointer('source',count) or registers[2]!=0 \
             or registers[3]!=Pointer('destination',count):
         raise ValueError('copy final argument/cursor state differs from bounded forward copy')
+    if table_index is not None:
+        accesses = []
+        expected = original_table[:]
+        for offset in range(table_index, table_index + count):
+            accesses.extend([('read', offset + 1), ('write', offset)])
+            expected[offset] = original_table[offset + 1]
+        if accesses != table_accesses or any(memory['table', i] != byte for i, byte in enumerate(expected)):
+            raise ValueError('compaction must read each original next byte before writing its predecessor')
+        return dict(index=table_index, length=count, accesses=[list(access) for access in table_accesses],
+                    steps=len(trace), SP_restored=True, preserved_return=True)
     if any(memory.get(('destination',i))!=initial_byte for i,initial_byte in
            ((i,Opaque(f'source-byte-{i}')) for i in range(count))):
         raise ValueError('copy destination does not transport each original opaque source byte')
@@ -205,6 +226,18 @@ def _case(payload, destination, entry, count, source_alignment, destination_alig
         steps=len(trace),trace=trace,reads=reads,writes=writes,
         protected_return=True,opaque_R4_preserved=True,SP_restored=True,
         source_bytes_interpreted_as_scalar_or_pointer=False)
+
+
+def verify_adjacent_table(payload, destination, entry, remaining, index):
+    """Execute the exact dst=table+index, src=dst+1 relation on one aligned local.
+
+    The two data pointers share memory. Only the helper's protected save words
+    are separate. The owner decides whether it actually calls for zero length.
+    """
+    if type(remaining) is not int or type(index) is not int or not 0 <= index < remaining <= 8:
+        raise ValueError('compaction requires a reachable index in the eight-byte table')
+    return _case(payload, destination, entry, remaining - index - 1,
+                 (index + 1) % 4, index % 4, table_index=index)
 
 
 def verify_conditional(payload, destination, entry, count, *, selector):
