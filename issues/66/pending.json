@@ -635,6 +635,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "66f026706589ef9ea19aaad73b6066b566e95c434454b8813335cdb78403aa6f",
+        "acknowledged_cursor": 6981015052,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "66f026706589ef9ea19aaad73b6066b566e95c434454b8813335cdb78403aa6f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081137BC\",\"who\":\"rainbow-state\",\"note\":\"Recover three-phase sprite sequence from 20 ROM spawn records with the existing native stack-buffer proof.\"}",
+          "created_at": "2026-11-18T14:10:12Z",
+          "id": 6981015052,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:10:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dfcbd489c46d328fcff51baac26ad95bff244e864cfb96671256666a2173099e",
+        "result": {
+          "address": "0x081137BC",
+          "claim_id": 6981015052,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981015052,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
