@@ -720,6 +720,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x08000FC8:
         import affine_oam_slot
         records.append(affine_oam_slot.record(root))
+    if address == 0x0800DB0C:
+        import blend_ramp
+        records.append(blend_ramp.record(root))
     if address == 0x0800D3BC:
         import bg_affine_rows
         records.append(bg_affine_rows.record(root))
@@ -883,6 +886,12 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         import affine_oam_slot
         try:
             hardware_qualifiers.update(affine_oam_slot.qualifier_offsets(text, tree, project, closure))
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
+    if relpath == 'src/0800DB0C.c' and tree is not None and project is not None:
+        import blend_ramp
+        try:
+            hardware_qualifiers.update(blend_ramp.qualifier_offsets(text, tree, project, closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
     if relpath == 'src/0800D3BC.c' and tree is not None and project is not None:
