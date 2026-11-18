@@ -130,7 +130,8 @@ class IncomingNarrowReadTests(unittest.TestCase):
                                  ("match_evidence.py", "legacy_report_control_flow"),
                                  ("match_evidence.py", "buffer_report_matches"),
                                  ("function_thunk_profile.py", "verify_source"),
-                                 ("data_buffer_profile.py", "prove")})
+                                 ("data_buffer_profile.py", "prove"),
+                                 ("oam_list_context.py", "compile_group")})
 
     def report(self, data, mapping):
         (self.root / "config").mkdir(exist_ok=True)
