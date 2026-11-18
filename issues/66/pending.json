@@ -667,6 +667,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "353874a0f5e7e0666f1985866508efd8c86f0c60737985abf60cf15d1b25ff04",
+        "acknowledged_cursor": 6987687781,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "353874a0f5e7e0666f1985866508efd8c86f0c60737985abf60cf15d1b25ff04",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810ADF4\",\"who\":\"rainbow-state\",\"note\":\"Recover original scene callback with sibling 0810B754 and original-ROM CFG.\"}",
+          "created_at": "2026-11-18T18:25:52Z",
+          "id": 6987687781,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:25:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "88f59ce864bfdebd0d5b23ec10eaf7467c9fdd680cb47e4a2205d5cfff20e2d2",
+        "result": {
+          "address": "0x0810ADF4",
+          "claim_id": 6987687781,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987687781,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
