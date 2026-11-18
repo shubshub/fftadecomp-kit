@@ -606,7 +606,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b5ef596ab3a5152e0fa258aa3b87c7e5ecfb0eda8d98ba6b1ae34cf35e2411e8",
+        "acknowledged_cursor": 6986262836,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b5ef596ab3a5152e0fa258aa3b87c7e5ecfb0eda8d98ba6b1ae34cf35e2411e8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08132208\",\"who\":\"astra-sound\",\"claim_id\":6986220627,\"reason\":\"Full 96/96 check on toolkit PR 272. Nested scratch alias remains outside proved policy; recorded and parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:28:16Z",
+          "id": 6986262836,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:28:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "49aadf2736a32f03333d0758c929ada582c22fbdfdac45ee08c48f63a703db0c",
+        "result": {
+          "address": "0x08132208",
+          "claim_id": 6986220627,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986262836,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,38 @@
           "request_id": 6986232721,
           "status": "accepted",
           "who": "rainbow-particle-initializer"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bb6eeaa91ee02c093c4b1e24061030fe20a1af8ca04c420e64695eced6aecd9f",
+        "acknowledged_cursor": 6986262836,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bb6eeaa91ee02c093c4b1e24061030fe20a1af8ca04c420e64695eced6aecd9f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08133618\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T17:27:39Z",
+          "id": 6986246937,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:27:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "49aadf2736a32f03333d0758c929ada582c22fbdfdac45ee08c48f63a703db0c",
+        "result": {
+          "address": "0x08133618",
+          "claim_id": 6986246937,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6986246937,
+          "status": "accepted",
+          "who": "rainbow-menu"
         }
       },
       "release": null
