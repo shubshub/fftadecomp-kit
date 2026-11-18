@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c04ddd75c1b998b1bdc01d9ba6f460464497a7aeb41cf12ac8950f121efc49d7",
+    "acknowledged_cursor": 6987401668,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c04ddd75c1b998b1bdc01d9ba6f460464497a7aeb41cf12ac8950f121efc49d7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080B41CC\",\"who\":\"rainbow-affine\",\"note\":\"Original indexed battle scan with real list callback and installed 16-byte clear, native source and evidence\"}",
+      "created_at": "2026-11-18T18:14:56Z",
+      "id": 6987401668,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:14:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "701c6d55710666a4991cb336f691a621bd1b7da329dccf1b8e888f643b7f909d",
+    "result": {
+      "address": "0x080B41CC",
+      "claim_id": 6987401668,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6987401668,
+      "status": "accepted",
+      "who": "rainbow-affine"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7d9de79a9a0f192229b0b2fe6f36cae8f838ec4b86b3de059be2f5dade9f6b33",
+    "acknowledged_cursor": 6987496875,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7d9de79a9a0f192229b0b2fe6f36cae8f838ec4b86b3de059be2f5dade9f6b33",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080B41CC\",\"who\":\"rainbow-affine\",\"claim_id\":6987401668,\"reason\":\"Parked 108/108 exact C; transitive equipment-frame and external result-count bounds unproved. Four current selectors reject; no saved MATCH.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T18:18:39Z",
+      "id": 6987496875,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:18:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d1c7d2b78ad514e33c0e1e39c815399b9021c383275a7b29368a9871c8d5a414",
+    "result": {
+      "address": "0x080B41CC",
+      "claim_id": 6987401668,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6987496875,
+      "status": "accepted",
+      "who": "rainbow-affine"
+    }
+  }
+}
