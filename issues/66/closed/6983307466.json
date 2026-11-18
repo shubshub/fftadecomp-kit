@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "72f1691f3f3a4bc4fbfaabf8a85546e445cc79c445a10c9d02edcad191ad8ce1",
+    "acknowledged_cursor": 6983314601,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "72f1691f3f3a4bc4fbfaabf8a85546e445cc79c445a10c9d02edcad191ad8ce1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08101A8C\",\"who\":\"rainbow-callback\",\"note\":\"Check effect D3 status and direction bound before native owner admission\"}",
+      "created_at": "2026-11-18T15:37:07Z",
+      "id": 6983307466,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:37:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cc2506d6cb2d4e95b0123d119cf830c9af646429fec53865b96aef5e068a9305",
+    "result": {
+      "address": "0x08101A8C",
+      "claim_id": 6983307466,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6983307466,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1ca5adf64aefd0f64cb13ff8afc9a730f1a117c2874b1215e76327d1fb843aa3",
+    "acknowledged_cursor": 6983484615,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1ca5adf64aefd0f64cb13ff8afc9a730f1a117c2874b1215e76327d1fb843aa3",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08101A8C\",\"who\":\"rainbow-callback\",\"claim_id\":6983307466,\"reason\":\"576/576 bytes exact. ROM status child admits coincident-position input at its callback boundary; a separate gameplay range invariant remains unproved. Parked evidence updated.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:43:00Z",
+      "id": 6983465830,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:43:00Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f3e23bf9abb2e5bb2d2c4a18c223967240b8f3a025b444be75941aa52db0bfb0",
+    "result": {
+      "address": "0x08101A8C",
+      "claim_id": 6983307466,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6983465830,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
