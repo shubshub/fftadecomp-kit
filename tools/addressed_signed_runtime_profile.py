@@ -812,6 +812,16 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         import bios_cpuset_fill_profile
         modules += (bios_cpuset_fill_profile,)
+    if selector == BIOS_SELECTOR and address == 0x0813FB7C:
+        import plausible
+        import sdk_cpuset_halfword
+        local = sdk_cpuset_halfword.native_evidence(data, bios.wrapper)
+        observed = (local['call'], local['entry_sp_offset'], local['source_bytes'],
+                    local['control'], 0xFFFFFFFF ^ local['control'])
+        if bios.observations != {observed}:
+            raise ValueError('CpuSet arguments disagree with the initialized SDK halfword source')
+        context[4]['sdk_halfword_fill'] = local
+        modules += (plausible, sdk_cpuset_halfword)
     if selector == BUFFER_SCRATCH_SELECTOR:
         modules += (zero_index,)
     if selector in UNSIGNED_CAPABLE_SELECTORS:
@@ -1277,6 +1287,9 @@ def render(result):
         premise.append('* code image source: ' + result['manifest']['code_image_sources']['contract'])
     if selector in BUFFER_SELECTORS:
         premise.append('* local buffer boundary: ' + result['manifest']['native_buffers']['contract'])
+    if 'sdk_halfword_fill' in result['manifest']:
+        premise.append('* SDK CpuFill16 source: one initialized stack halfword at entry SP-8, '
+                       'consumed by CpuSet with a count of 16 under the conditional BIOS fill interface')
     if selector in CALLBACK_SELECTORS:
         register = 'r3' if selector == R3_CALLBACK_SELECTOR else 'r2'
         premise.append(f'* mapped {register} callback ABI: ' + result['manifest']['callback']['contract'])

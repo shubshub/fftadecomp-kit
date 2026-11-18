@@ -3123,6 +3123,18 @@ source macros. It permits the qualifiers on those five declarations and
 twenty fixed assignments. Direct wave RAM and sound-control accesses still
 need their own hardware justifications.
 
+At `0813FB7C`, the palette fill uses the SDK's CpuFill16 idiom. The
+qualifier is confined to the halfword initializer in the reviewed source
+and base-header closure. The Thumb caller saves the destination, calculates
+the low halfword from the eight color bits, stores it once at entry SP-8,
+and passes that live address to the returning CpuSet wrapper. The literal
+control selects a 16-halfword fill. The conditional BIOS interface supplies
+the source read; physical destination validity and BIOS completion remain
+caller and platform premises. The existing
+`addressed-native-bios-fill-buffer-v1` report records the store and call
+sites, local width and control. Replay repeats the source and native checks.
+Run `python3 tests/test_sdk_cpuset_halfword.py` with agbcc installed.
+
 **Allowlisted volatile RAM (kit#90):** volatile RAM is otherwise
 allowed only for an object on the maintainer's `tools/volatile_allow.json`
 (agents never edit it). An entry names a symbol, its address, one header, the

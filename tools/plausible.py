@@ -805,7 +805,7 @@ def statement_macro_tails(code):
 
 
 def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
-               closure=None, untranslated=None, tree=None):
+               closure=None, untranslated=None, tree=None, project=None):
     """returns list of findings: (line, rule, severity, message)
 
     relpath is the file's path relative to the project root; only the header
@@ -825,6 +825,15 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             if cgb_registers.literal_defines(source, strip_comments_and_strings_keep_strings(header)):
                 hardware_qualifiers.update(cgb_registers.selected_offsets(text, code))
         except (OSError, UnicodeError):
+            pass
+    if relpath == "src/0813FB7C.c" and tree is not None and project is not None and closure == (
+            {relpath, "include/ffta.h"}, []):
+        import sdk_cpuset_halfword
+        try:
+            offset = sdk_cpuset_halfword.selected_offset(text, tree, project)
+            if offset is not None:
+                hardware_qualifiers.add(offset)
+        except (OSError, ValueError, ImportError, SystemExit):
             pass
     listed_qualifiers, findings = allowlisted_volatile(
         code, relpath, data_symbols or {},
@@ -889,7 +898,7 @@ def check_file(path):
                 closure = None
             break
     return check_text(text, os.path.basename(path), data_symbols, relpath, closure=closure,
-                      untranslated=untranslated, tree=tree)
+                      untranslated=untranslated, tree=tree, project=parent if tree is not None else None)
 
 
 def asm_allow_path():
