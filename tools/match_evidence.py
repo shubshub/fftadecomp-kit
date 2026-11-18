@@ -1165,6 +1165,10 @@ def report_matches(report, root, address):
             import m4a_dma_counter
             if not m4a_dma_counter.report_body(report, root):
                 return False
+        if any(line.startswith("* allowlisted volatile scanline:") for line in records):
+            import window_scanline
+            if not window_scanline.report_body(report, root, address):
+                return False
         report = strip_volatile_records(report, records)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
