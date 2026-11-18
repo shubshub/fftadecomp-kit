@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "2c069a52fd8c4c2081c0d652e4f35926e3ea2e78ea30cb85061388503cd4ee77",
-        "acknowledged_cursor": 6978384589,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2c069a52fd8c4c2081c0d652e4f35926e3ea2e78ea30cb85061388503cd4ee77",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809ADDC\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
-          "created_at": "2026-11-18T12:19:45Z",
-          "id": 6978373709,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:19:45Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
-        "result": {
-          "address": "0x0809ADDC",
-          "claim_id": 6978373709,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978373709,
-          "status": "accepted",
-          "who": "rainbow-ffta"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "2e2ebb1b1fd824ba6b4f06bb8017e5e49e8f3b344218227b19629fea19367b6f",
-        "acknowledged_cursor": 6978794978,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2e2ebb1b1fd824ba6b4f06bb8017e5e49e8f3b344218227b19629fea19367b6f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809ADDC\",\"who\":\"rainbow-ffta\",\"claim_id\":6978373709,\"reason\":\"Native match and byte comparison verified locally\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T12:38:44Z",
-          "id": 6978794779,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:38:44Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "2c108fe0abd7ba19fd5155ea309a447f2390564eb0b9caf90954e6d0712d52ef",
-        "result": {
-          "address": "0x0809ADDC",
-          "claim_id": 6978373709,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6978794779,
-          "status": "accepted",
-          "who": "rainbow-ffta"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "7dc10c9d321406fda30b649f920c0b344ef312d8011565129b7a9fccc6f02b66",
         "acknowledged_cursor": 6978384589,
         "body_provenance": "acceptance-time",
@@ -663,66 +603,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "af25d1e176e219f4a59b0083bd23eac3478440e028d439c5bd50866eeb3107b8",
-        "acknowledged_cursor": 6978535132,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "af25d1e176e219f4a59b0083bd23eac3478440e028d439c5bd50866eeb3107b8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08057454\",\"who\":\"rainbow-affine\",\"note\":\"Recover 172-byte message/map menu setup from ROM and sibling callers\"}",
-          "created_at": "2026-11-18T12:26:41Z",
-          "id": 6978528130,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:26:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
-        "result": {
-          "address": "0x08057454",
-          "claim_id": 6978528130,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978528130,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f1e8a850861ad33362df4cdb7e71fa7fe02a33ea99e7093abf59de12aa464f9f",
-        "acknowledged_cursor": 6978781783,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f1e8a850861ad33362df4cdb7e71fa7fe02a33ea99e7093abf59de12aa464f9f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08057454\",\"who\":\"rainbow-affine\",\"claim_id\":6978528130,\"reason\":\"Recovered display setup parked: current source differs by field-address code shape; no matched bytes claimed\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T12:38:09Z",
-          "id": 6978781783,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:38:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "8feb2219d8e60b4f103bccc7dd4b030dba4ab4a5c041df9dfa8f489736021945",
-        "result": {
-          "address": "0x08057454",
-          "claim_id": 6978528130,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6978781783,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      }
     },
     {
       "claim": {
