@@ -2287,6 +2287,13 @@ native sector callers test for a 128-KiB device. IdentifyFlash's three ROM
 setup records and its fallback describe 64-KiB devices, so those callers
 skip the bank switch with the installed configurations.
 
+SetReadFlash1 at `08141AB0` references its own Thumb entry, the adjacent
+four-byte reader and the callback slot. Its unit verifier checks all three
+bindings in both O1 literal pools before excluding the duplicate 12 bytes
+and the two bytes of terminal alignment. It also replays the sector eraser's
+64-byte local buffer, the callback publication and the two halfword writes.
+The complete installer accounts for 62 ROM bytes.
+
 The same library unit compiles chip erase at `08141EB8` with
 `--unit-toolchain agbcc-O1-v1`. Its six flash byte writes issue the chip-erase
 command. All four setup records install the same callback and phase-3 wait.
