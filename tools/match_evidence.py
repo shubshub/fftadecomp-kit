@@ -1180,6 +1180,10 @@ def report_matches(report, root, address):
             import tile_cpufill32
             if not tile_cpufill32.report_body(report, root):
                 return False
+        if address == 0x0814189C:
+            import flash_bank_command
+            if not flash_bank_command.report_body(report, root):
+                return False
         if address == 0x0800DB0C:
             import blend_ramp
             if not blend_ramp.report_body(report, root):
