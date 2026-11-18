@@ -220,7 +220,8 @@ def prove(data, address, rom, mapping, index, objects, original, ins, calls, ref
                 roster=collection(ins), sort=partitions(rom, mapping, index), menu=menu_mode(rom),
                 conditions=[
                     'The 24-slot roster is stable, the 24-byte output is writable ordinary GBA RAM, '
-                    'and both are disjoint from each other and the live stack.',
+                    'and they are disjoint from each other and from frames used by this sorter and its callees. '
+                    'The output may occupy a live local array in a calling function.',
                     'For low-seven-bit modes 1..6, at least one unit must be enabled. '
                     'The callee reads its first pivot before testing for an empty partition.',
                     'With bit 7 clear the sorter reads all 192 local bytes as ordinary readable machine words. '
