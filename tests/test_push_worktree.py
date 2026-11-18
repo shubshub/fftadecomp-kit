@@ -69,6 +69,13 @@ class WorktreeRootTests(unittest.TestCase):
         self.assertTrue((self.repo / '.git').is_dir())
         self.accepted(self.repo)
 
+    def test_game_gate_forwards_workers_to_both_source_checks(self):
+        with self.invocation(self.repo, kit=False) as gates:
+            sys.argv.extend(['--worker-processes', '3'])
+            self.assertEqual(push.main(), 0)
+            for name in ('check_matches', 'check_plausible'):
+                self.assertEqual(gates[name].call_args.kwargs['worker_processes'], 3)
+
     def test_linked_checkout_root_is_accepted_in_kit_mode(self):
         self.assertTrue((self.linked / '.git').is_file())
         self.accepted(self.linked)
