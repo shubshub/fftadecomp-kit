@@ -1882,6 +1882,66 @@
           "who": "rainbow-state"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "1b5c34e8cabb001d8110586942d1c883950c43f093b6283fdb88d23b8998ef73",
+        "acknowledged_cursor": 6992339806,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1b5c34e8cabb001d8110586942d1c883950c43f093b6283fdb88d23b8998ef73",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800216C\",\"who\":\"rainbow-state\",\"claim_id\":6992216853,\"reason\":\"Canonical native reset handler matches 176 bytes/64 instructions; saved live report replayed. Original CPU validates two reset producers and four VBlank returns.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T21:36:15Z",
+          "id": 6992331978,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:36:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e4741130cbd7631b561e6e0ae70bbb27bca3690297c4c7a5f684639c2dc125b",
+        "result": {
+          "address": "0x0800216C",
+          "claim_id": 6992216853,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6992331978,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7914f87214ea3c25b1080e01bba92fa2c7788237a65a52547572c4141afebd86",
+        "acknowledged_cursor": 6992339806,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7914f87214ea3c25b1080e01bba92fa2c7788237a65a52547572c4141afebd86",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0807B928\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T21:36:37Z",
+          "id": 6992339806,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:36:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e4741130cbd7631b561e6e0ae70bbb27bca3690297c4c7a5f684639c2dc125b",
+        "result": {
+          "address": "0x0807B928",
+          "claim_id": 6992339806,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992339806,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
       "release": null
     }
   ],
