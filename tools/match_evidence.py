@@ -1154,6 +1154,9 @@ def report_matches(report, root, address):
                 unit_arguments = library_units.report_arguments(report)
                 records += (allowlisted_volatile_semantics(root, address) if unit_arguments is None else
                             allowlisted_volatile_semantics(root, address, unit_arguments))
+        if address == 0x08006720 and records:
+            import blend_keyframe_loop
+            blend_keyframe_loop.report_scope(report)
         if address == 0x08000718:
             import boot_dma0_shadow
             if not boot_dma0_shadow.report_body(report, root):

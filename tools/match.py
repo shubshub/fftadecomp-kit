@@ -345,7 +345,7 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
         checked = argparse.Namespace(**{**vars(args), "flags": " ".join(
             [flag for flag in args.flags.split() if flag != "-w"] +
             ["-Wimplicit-function-declaration", "-Wnested-externs"])})
-        compile_object(runner, workspace, checked, str(root), address, source, diagnostics=diagnostics)
+        _, _, real_image = compile_object(runner, workspace, checked, str(root), address, source, diagnostics=diagnostics)
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
         real = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
         # cc1 reads `T f(a, b)` with a not-yet-declared type name as an
@@ -359,14 +359,19 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
                 raise ValueError(f"cc1 reports a {message}")
         for entry in used:
             declaration = entry["declaration"]
-            compile_object(runner, workspace, args, str(root), address, source,
+            _, _, stripped_image = compile_object(runner, workspace, args, str(root), address, source,
                            rewrite=lambda text: volatile_semantics.strip_pinned_volatile(text, declaration))
             stripped = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
-            compile_object(runner, workspace, args, str(root), address, source,
+            _, _, perturbed_image = compile_object(runner, workspace, args, str(root), address, source,
                            rewrite=lambda text: volatile_semantics.perturb_pinned(text, declaration))
             perturbed = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
             from named_data_buffer_profile import BIOS_OVERWRITE_SELECTOR
-            if getattr(args, "owner_runtime_profile", None) == BIOS_OVERWRITE_SELECTOR:
+            if address == 0x08006720:
+                import blend_keyframe_loop
+                location = parse_data_symbols(data_snapshot(root)).get(entry["symbol"])
+                records.append(blend_keyframe_loop.record((real, stripped, perturbed),
+                    (real_image, stripped_image, perturbed_image), preprocessed, entry, interfaces, rom, location))
+            elif getattr(args, "owner_runtime_profile", None) == BIOS_OVERWRITE_SELECTOR:
                 import overwritten_control_store_composition as composition
                 pinned_size, _ = volatile_semantics.pinned_members(declaration)
                 location = parse_data_symbols(data_snapshot(root)).get(entry["symbol"])
