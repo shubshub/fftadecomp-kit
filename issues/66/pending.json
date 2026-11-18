@@ -606,7 +606,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "864f860ae0d5480798c58107332cd640e25b759004067b8d3528da6575c63a9b",
+        "acknowledged_cursor": 6983417129,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "864f860ae0d5480798c58107332cd640e25b759004067b8d3528da6575c63a9b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A390F4\",\"who\":\"rainbow-menu\",\"claim_id\":6983314601,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:40:43Z",
+          "id": 6983402919,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:40:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1509b59bfac2666e19da61bc1fbebf084668053dedb69f9d03dbf659b9c29ff",
+        "result": {
+          "address": "0x08A390F4",
+          "claim_id": 6983314601,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6983402919,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -670,7 +698,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "76456ec3abaf289a23402e67aa977cfd66af1b22eb192c59ee5c6cf2192ee449",
+        "acknowledged_cursor": 6983417129,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "76456ec3abaf289a23402e67aa977cfd66af1b22eb192c59ee5c6cf2192ee449",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813107C\",\"who\":\"rainbow-affine\",\"claim_id\":6983391300,\"reason\":\"Native complete 4/4 and independent saved report replay passed; action table slot zero\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:41:15Z",
+          "id": 6983417129,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:41:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1509b59bfac2666e19da61bc1fbebf084668053dedb69f9d03dbf659b9c29ff",
+        "result": {
+          "address": "0x0813107C",
+          "claim_id": 6983391300,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6983417129,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     }
   ],
   "issue": 66,
