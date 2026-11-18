@@ -1883,66 +1883,6 @@
           "who": "rainbow-callback"
         }
       }
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "488dec9da1b2651462473e41794fe136e3b4e8c480cd9f7a660dba212ecdd37f",
-        "acknowledged_cursor": 6991298256,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "488dec9da1b2651462473e41794fe136e3b4e8c480cd9f7a660dba212ecdd37f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C020\",\"who\":\"astra-roster\",\"note\":\"Match the second tile layer getter against initialized size halfwords\"}",
-          "created_at": "2026-11-18T20:52:02Z",
-          "id": 6991298256,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T20:52:02Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "562ebfd64f83c30b876d33d340caa23c93e4ac793506d69db1f4a70a3a132f20",
-        "result": {
-          "address": "0x0800C020",
-          "claim_id": 6991298256,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6991298256,
-          "status": "accepted",
-          "who": "astra-roster"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "015a8af8f72622ffd2f3e36ca90f60dd0a7d1cf4b805c761227cde92884a7917",
-        "acknowledged_cursor": 6991320905,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "015a8af8f72622ffd2f3e36ca90f60dd0a7d1cf4b805c761227cde92884a7917",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C020\",\"who\":\"astra-roster\",\"claim_id\":6991298256,\"reason\":\"MATCH 24/24 using the ordinary typed-data verifier; fourteen original producer/getter cases across two initialized layer records returned the respective size halfword.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T20:52:54Z",
-          "id": 6991319404,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T20:52:54Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4252955ecc24be7f79d91c5f7a566a89496bb756dcfb655627185ad59fbf6a3a",
-        "result": {
-          "address": "0x0800C020",
-          "claim_id": 6991298256,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6991319404,
-          "status": "accepted",
-          "who": "astra-roster"
-        }
-      }
     }
   ],
   "issue": 66,
