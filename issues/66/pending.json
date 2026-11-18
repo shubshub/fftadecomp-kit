@@ -1278,7 +1278,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f01c0a211b32b18897c7f3c706b0002a970232bdb9c5edb847c6aa43cd7b3ac6",
+        "acknowledged_cursor": 6990844387,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f01c0a211b32b18897c7f3c706b0002a970232bdb9c5edb847c6aa43cd7b3ac6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3508\",\"who\":\"rainbow-callback\",\"claim_id\":6990343576,\"reason\":\"MATCH - byte identical, original effect registries and direct scheduler verified in toolkit PR 313; 208 bytes and thirteen live source reports replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:34:07Z",
+          "id": 6990836447,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:34:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ac901021b859fe1d77623ed982ce32adb1228fcf6988f3710bd5e7eef0e29646",
+        "result": {
+          "address": "0x080D3508",
+          "claim_id": 6990343576,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990836447,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -1886,7 +1914,35 @@
           "who": "ntfs-maintainer"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "698f1cdd241b51933a2c443d296078ce93a04b91bd035f4907bc9ee786d65cae",
+        "acknowledged_cursor": 6990844387,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "698f1cdd241b51933a2c443d296078ce93a04b91bd035f4907bc9ee786d65cae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08025584\",\"who\":\"ntfs-maintainer\",\"claim_id\":6990772763,\"reason\":\"Default canonical verifier rejects the existing candidate because the selector callee does not establish its required buffer-use contract. Kept parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:34:25Z",
+          "id": 6990844387,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:34:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ac901021b859fe1d77623ed982ce32adb1228fcf6988f3710bd5e7eef0e29646",
+        "result": {
+          "address": "0x08025584",
+          "claim_id": 6990772763,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990844387,
+          "status": "accepted",
+          "who": "ntfs-maintainer"
+        }
+      }
     }
   ],
   "issue": 66,
