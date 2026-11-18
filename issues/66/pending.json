@@ -574,7 +574,35 @@
           "who": "rainbow-group-selection"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "13df24df44d1bb33aa39b85a8fa5bc182300afcc7e0abd81f33fb9db6ef80377",
+        "acknowledged_cursor": 6981359046,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "13df24df44d1bb33aa39b85a8fa5bc182300afcc7e0abd81f33fb9db6ef80377",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C286C\",\"who\":\"rainbow-group-selection\",\"claim_id\":6981243996,\"reason\":\"192-byte natural compatible C for 212-byte owner; third possible callee output exceeds the two-halfword local in ROM. Parked evidence.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:23:26Z",
+          "id": 6981350560,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:23:26Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "250d84f82ecc1a4a8681b3040ba5e896b9899378ecde5dcd97302240e18356d2",
+        "result": {
+          "address": "0x080C286C",
+          "claim_id": 6981243996,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981350560,
+          "status": "accepted",
+          "who": "rainbow-group-selection"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,70 @@
           "request_id": 6981312927,
           "status": "accepted",
           "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c8005d72ba685ecb999a73cad0278741b361f685dd41c6d0379fb7f8123555d8",
+        "acknowledged_cursor": 6981359046,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c8005d72ba685ecb999a73cad0278741b361f685dd41c6d0379fb7f8123555d8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"rainbow-curve-knots\",\"note\":\"Recover four remaining register allocation bytes in the curve midpoint expression; compatible typed helpers and native gate.\"}",
+          "created_at": "2026-11-18T14:23:34Z",
+          "id": 6981353676,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:23:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "250d84f82ecc1a4a8681b3040ba5e896b9899378ecde5dcd97302240e18356d2",
+        "result": {
+          "address": "0x080DFF8C",
+          "claim_id": 6981353676,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981353676,
+          "status": "accepted",
+          "who": "rainbow-curve-knots"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3e5a01950a501d77dc90f5a8a8354cd8144ac48983b68566cb0db5207932ca98",
+        "acknowledged_cursor": 6981359046,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3e5a01950a501d77dc90f5a8a8354cd8144ac48983b68566cb0db5207932ca98",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08132208\",\"who\":\"rainbow-affine\",\"note\":\"Recover the indexed 96-byte routine and verify its calls and complete ROM extent\"}",
+          "created_at": "2026-11-18T14:23:46Z",
+          "id": 6981359046,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:23:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "250d84f82ecc1a4a8681b3040ba5e896b9899378ecde5dcd97302240e18356d2",
+        "result": {
+          "address": "0x08132208",
+          "claim_id": 6981359046,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981359046,
+          "status": "accepted",
+          "who": "rainbow-affine"
         }
       },
       "release": null
