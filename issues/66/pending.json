@@ -578,66 +578,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "ebaa665ec0ad1374bf6f0197f9b7ef30f9af6fd1b7a24358e9d50da2ccde8986",
-        "acknowledged_cursor": 6978884872,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ebaa665ec0ad1374bf6f0197f9b7ef30f9af6fd1b7a24358e9d50da2ccde8986",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D3508\",\"who\":\"rainbow-tile\",\"note\":\"Retry exact208-byte scheduler starter under shipped per-site scheduler-call summaries; prior Parked notes requested this composition.\"}",
-          "created_at": "2026-11-18T12:42:48Z",
-          "id": 6978884872,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:42:48Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bb1509c0fd4bf5b7e911bd65b9f76b4b586c3f2fd1ba96fbd356e689e4e5f27e",
-        "result": {
-          "address": "0x080D3508",
-          "claim_id": 6978884872,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978884872,
-          "status": "accepted",
-          "who": "rainbow-tile"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c215eae96c782e81e370a2994b07f0530322e8f5e45f7cb1f8a4df38880645e8",
-        "acknowledged_cursor": 6978937434,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c215eae96c782e81e370a2994b07f0530322e8f5e45f7cb1f8a4df38880645e8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3508\",\"who\":\"rainbow-tile\",\"claim_id\":6978884872,\"reason\":\"Exact208-byte plausible recovery retained; both shipped per-site scheduler summaries v1/v2 refuse table-loaded callback provenance, scheduler callback register is not a function literal on every path.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T12:45:03Z",
-          "id": 6978937434,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:45:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "7079aaf7c5e76a4dd15839b894c2a0f9502aa845681520f5e6ac811b941a151f",
-        "result": {
-          "address": "0x080D3508",
-          "claim_id": 6978884872,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6978937434,
-          "status": "accepted",
-          "who": "rainbow-tile"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "af7c3a4a464d01b9924765982353da6d353c7175503820e107d3a05b435f09e2",
         "acknowledged_cursor": 6978913891,
         "body_provenance": "acceptance-time",
