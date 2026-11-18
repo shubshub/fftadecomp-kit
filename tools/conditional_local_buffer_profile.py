@@ -89,6 +89,7 @@ SCHEMAS = {
     effect_init.SELECTOR: effect_init.SCHEMA,
     menu_palette.SELECTOR: menu_palette.SCHEMA,
     effect_registry.SELECTOR: effect_registry.SCHEMA,
+    'conditional-transfer-task-construction-v1': 'elf-symbol-thumb-conditional-transfer-task-construction-v1',
     'conditional-transfer-tree-destruction-v1': 'elf-symbol-thumb-conditional-transfer-tree-destruction-v1',
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
