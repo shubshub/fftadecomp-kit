@@ -12,6 +12,7 @@ import struct
 import match
 import scene_scheduler_cpufill as scene_fill
 import effect_scheduler_initializer as effect_init
+import menu_palette_scheduler as menu_palette
 import named_data_buffer_profile as named
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
@@ -48,7 +49,7 @@ SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
-CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR)
+CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR, menu_palette.SELECTOR)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
@@ -85,6 +86,7 @@ SCHEMAS = {
     SCHEDULER_MANAGER_PATHS: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_PATHS,
     scene_fill.SELECTOR: scene_fill.SCHEMA,
     effect_init.SELECTOR: effect_init.SCHEMA,
+    menu_palette.SELECTOR: menu_palette.SCHEMA,
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
@@ -215,8 +217,11 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
-            scheduler_calls = effect_init.bind(self, data, address, ins, edges, calls) if self.policy == effect_init.SELECTOR else calls
-            self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, scheduler_calls)
+            if self.policy == menu_palette.SELECTOR:
+                self.scheduler_call_sites = menu_palette.bind(self, data, address, ins, edges, calls)
+            else:
+                scheduler_calls = effect_init.bind(self, data, address, ins, edges, calls) if self.policy == effect_init.SELECTOR else calls
+                self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, scheduler_calls)
             if self.policy == scene_fill.SELECTOR:
                 scene_fill.bind(self, data, address, edges, calls)
             call_sites.bind_forwarding(self, edges)
@@ -328,6 +333,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_indirect_target(self, address, aliases, returns, *, site):
         if not thunk.reserved(address):
             return
+        if self.policy == menu_palette.SELECTOR:
+            return menu_palette.check_indirect(self, site, address, aliases, returns)
         require(self.policy in (STATE, FLAGGED_STATE, SCHEDULER_ZERO_DESCRIPTOR, effect_init.SELECTOR) and self.calls.get(site) == address == 0x0814224C,
                 'local-buffer indirect call differs from authenticated root')
         require(match.ARM_REG_R0+2 not in aliases and
@@ -358,6 +365,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == menu_palette.SELECTOR and site in (menu_palette.SETUP_SITE, menu_palette.COPY_SITE):
+                return menu_palette.check_call(self, site, aliases, stack, slots, constants)
             if self.policy == effect_init.SELECTOR and address == effect_init.THUNK:
                 return effect_init.check_call(self, site, aliases, stack, slots, constants, words)
             if self.policy == scene_fill.SELECTOR and address == scene_fill.bios.ADDRESS:
@@ -490,6 +499,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.manifest(self)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == menu_palette.SELECTOR:
+                return menu_palette.manifest(self)
             scheduler = call_sites.manifest(self)
             if self.policy == effect_init.SELECTOR:
                 return effect_init.manifest(self, scheduler)
