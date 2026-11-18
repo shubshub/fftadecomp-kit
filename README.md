@@ -1528,6 +1528,21 @@ and the physical-isolation, allocator, BIOS and ordinary-return premises.
 Run `tests/test_scene_script_position.py` with `FFTA_SCENE_SCRIPT_ROOT` set to
 an indexed game checkout containing the saved `08118A08` report.
 
+The menu routine at `08027528` uses
+`--owner-runtime-profile conditional-unit-entry-output-array-v1`. The producer at
+`0809F78C` treats the low 16 count bits as signed. For a positive count it writes
+one four-byte entry per iteration. The menu passes an 80-byte stack array and a
+count of 20, then dereferences the first word of each returned entry. A separate
+caller at `08099A70` supplies an 80-byte heap buffer to the same producer.
+
+The report follows the output cursor through allocator wrappers, private save slots,
+and the two word outputs of the heap search. On a normal return, the menu consumes
+the same 20 words that the producer initialized. The selected indices must be in
+0 through 12 for the observed accesses to stay inside the temporary allocation.
+Valid external heap objects, entries that survive the free, and a writable menu
+destination remain runtime conditions. Set `FFTA_UNIT_OUTPUT_ROOT` to the indexed
+USA game checkout to run `tests/test_unit_entry_output.py`.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
