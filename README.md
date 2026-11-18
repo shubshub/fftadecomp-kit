@@ -1500,6 +1500,20 @@ and the complete 64-byte owner. Run `tests/test_scheduler_zero_descriptor.py`
 with `FFTA_SCHEDULER_ZERO_ROOT` set to the indexed game checkout for the
 USA ROM tests.
 
+The 248-byte event dispatcher at `080DE524` uses
+`--owner-runtime-profile conditional-scheduler-event-definition-v1`.
+Its private frame contains a two-byte dispatch duration, a 28-byte request,
+a 16-byte definition and five spilled arguments. Only request offset four
+contains a borrowed pointer. The scheduler copies the request and sets its
+phase halfword to zero. On every list path that reaches the copy, the state
+address in R2 is the fresh allocation plus 24. Callback `080DDA94` copies
+seven fields into the state and optionally clears one external result byte.
+The two bytes of definition padding are never read. Physical separation,
+the allocator, the installed zero helper, and termination retain the
+scheduler's ordinary premises. Run `tests/test_scheduler_event_definition.py`
+with `FFTA_EVENT_DEFINITION_ROOT` set to the indexed checkout for native
+replay and mutation tests.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
