@@ -6,11 +6,11 @@ SELECTOR = 'signed-remainder-u16-quarter-odd-v1'
 SCHEMA = 'elf-symbol-thumb-signed-remainder-u16-quarter-odd-v1'
 
 
-def check_configuration(args):
+def check_configuration(args, *, operation='bounded odd remainder'):
     other = (value for name, value in vars(args).items() if name.endswith('_profile')
              and name not in ('signed_runtime_profile', 'control_flow_profile'))
     if any(other) or args.unit_toolchain or args.control_flow_profile != 'ordinary' or args.mode != 'thumb':
-        raise ValueError('bounded odd remainder requires its isolated ordinary Thumb selector')
+        raise ValueError(f'{operation} requires its isolated ordinary Thumb selector')
 
 
 def digest(data):
