@@ -108,12 +108,15 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
     return owner.numeric_hardware_words(graph_instructions, edges, calls, partition, address, remaining)
 
 
-def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None):
+def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
+          index=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
     offset to (name, value) and function_relocations each function word offset
-    to (name, value), all from the exact link of the original ELF.
+    to (name, value), all from the exact link of the original ELF.  index is the
+    function index snapshot that the plain path's default-walk summaries read
+    (copy_helper_summary_profile); the function-literal path takes none.
     """
     import match
     import function_thunk_profile as thunk
@@ -153,7 +156,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             elif match.function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom)) != target:
                 raise ValueError("data-buffer call target is not its canonical function")
         thunk.verify_data_bindings(calls, literals, symbols, entries)
-        proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True)
+        proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
+                                      copy_helper_index=index)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
     if schema == FUNCTION_SCHEMA:
@@ -237,7 +241,10 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
                                                   len(rom), rom, objects, functions)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
-            result = prove(got, address, rom, mapping, objects, calls, literals, functions)
+            from inert_spin_profile import index_snapshot
+            # Without a function index no default-walk summary applies, and the walk refuses as before.
+            index = index_snapshot(root) if (root / "symbols/functions.txt").is_file() else None
+            result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index)
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -253,10 +260,11 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
         _replay_active.reset(token)
 
 
-# Every unindented `* ` field a data-buffer report may carry; only the replay
-# and BIOS premise lines may repeat. Anything else, or any indented field, refuses.
+# Every unindented `* ` field a data-buffer report may carry; only the replay,
+# copy-summary and BIOS premise lines may repeat. Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
-          "* buffer proof SHA-256", "* buffer loop replay", "* mapping SHA-256", "* control flow",
+          "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary",
+          "* mapping SHA-256", "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
@@ -337,7 +345,8 @@ def report_matches(report, root, address):
         return (proved_schema == schema and proved == manifest and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
-                [line for line in lines if key(line) == "* buffer loop replay"] == proof.loop_replay_lines() and
+                [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary")] ==
+                proof.loop_replay_lines() and
                 [line for line in lines if key(line).startswith("* buffer BIOS")] == proof.bios_summary_lines() and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
                                                    functions, objects, proof.fingerprint()) and

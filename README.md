@@ -1125,6 +1125,103 @@ has none of them and keeps its earlier fingerprint, so no existing report
 changes. The report checks that refuse `* buffer loop replay` lines also refuse
 `* buffer BIOS` lines.
 
+### The pinned copy helper in the default stack buffer walk
+
+A local buffer passed to the 98-byte copy helper `func_081443FC` used to stop
+the version-2 walk inside the helper, at its alignment test (`orrs r0, r5` at
+`0x0814440A`), which reads the pointer's value. The walk explores that path for
+every count, so every call with a local alias in R0 or R1 refused:
+
+```
+buffer callee 0x081443FC: unsupported buffer pointer use or escape
+```
+
+The version-2 proof that `match.py` builds on its default path, and that report
+replay rebuilds, now summarises such a call instead of walking it. Only that
+plain proof does: the constructor keyword `copy_helper_index` is refused for any
+subclass and for version 1, and no selector or profile proof is changed
+(`named-data-buffer-rom-table-copy-v1` keeps its own summary). The summary
+applies at a direct `bl` to the helper from a walk of a function's own frame,
+the owner's or an inspected callee's, when R0 or R1 holds a local alias, which
+is exactly where the walk refused. The alias pass that follows a caller's
+pointer into a callee does not carry the count, so a callee that forwards the
+caller's pointer to the helper is still walked and refused. A call with no
+alias in R0 or R1 is walked as before. Each obligation refuses with
+`buffer callee 0x081443FC: ...`:
+
+1. The helper is authenticated as the ROM-table-copy profile does it (the
+   indexed 98-byte span in both indexes, its SHA-256, the byte-loop path, the
+   closed CFG, no register above R5 written), and the mapped span the walk
+   would enter is that body.
+2. R2 holds an exact constant count from 1 to 256 (`copy summary count must be
+   an exact constant from 1 to 256`); the walk's constants come from `mov`.
+3. No alias is in R2 or LR (`copy summary refuses a local pointer in R2 or LR`),
+   and every alias argument and pointer-bearing word passes the ordinary
+   pointer check.
+4. The helper's effect for that count is proved on every run by executing its
+   pinned bytes on a symbolic Thumb interpreter, once for each of the 16
+   (destination mod 4, source mod 4) pairs. Destination, source and stack are
+   separate symbolic regions known only by their low address bits; memory and
+   entry registers are opaque. A run refuses if a branch reads data or an
+   unknown pointer bit, if an access leaves `[dst, dst+n)`, `[src, src+n)` or
+   the helper's own three save words below SP, if a pointer or a non-source
+   value is stored, or if the helper does not return through its saved entry
+   LR. It must end with each source byte at its destination offset, SP, LR and
+   R4-R12 restored, R0 = dst, R1 = the entry LR, R2 = -1 and R3 = src+n, and the
+   entry R3 and R12 never read and R12 never written. Each count actually used
+   is checked exactly, so neither a cap at 15 nor an inductive argument over the
+   16-byte loop is needed. The interpreter decodes only the small subset of
+   ARMv4T encodings the pinned bytes use and refuses any other, so a body that
+   differs is refused; the kit already executes this helper symbolically for a
+   fixed aligned 80-byte copy and for the four small byte-path counts, but not
+   for an arbitrary count under every alignment, which the caller-side check
+   needs. The test module cross-checks the interpreter against the kit's
+   independent concrete executor on concrete inputs.
+5. A local destination lies in allocated local words (`buffer access is
+   unaligned or outside allocated local words`) and holds no pointer-bearing or
+   return-carrying word (`copy destination overlaps a pointer-bearing or
+   return-carrying word`).
+6. A local source lies in allocated local words and holds no pointer-bearing
+   word (`copy source overlaps a pointer-bearing word`), because copying one
+   would make an untracked pointer.
+7. A local source and destination are disjoint (`copy source and destination
+   overlap`).
+8. The proof carries no word facts and no word-provenance, callee-frame,
+   single-store, forwarded-slot, exact-alternative, BIOS, scratch or runtime
+   context (`copy summary excludes word-provenance, callee-frame and other
+   summary contexts`).
+
+After the call, R0 is the destination alias, R3 is the alias src+n when the
+source is local, and an alias in R12 is kept; all three are then checked like
+any alias. An alias in R3 at the call is dropped, since the helper never
+reads it. R1, R2 and the flags are unknown, as after any call. Pointer-bearing
+words outside the destination keep their facts: the helper reads no caller
+stack word.
+
+Every distinct site observation is recorded: count, destination, source,
+returned and dropped aliases, pointer-bearing words and stack-passed
+pointers, with the helper facts and each count's execution digest. They are
+bound into the buffer proof fingerprint only when a call was summarised, so
+every other fingerprint is unchanged, and each observation is one report line:
+
+```
+* buffer copy summary: `pinned-copy-helper-summary-v1` 0x081443FC at 0x080BDABE: count 4, destination sp+0, source external; returns r0=sp+0; drops none; pointer words 0; contract 16 cases 46288f61e9739efd
+```
+
+Report replay recomputes the proof, the lines and the fingerprint, and reads
+`symbols/functions.txt` for the helper identity. Not proved: that a source or
+destination that is not local is readable or writable, or that it does not
+overlap the live frame, the helper's save words or code (the walk's standing
+premise for every untracked pointer); physical stack, lifetime and termination
+beyond the bounded run are not proved either.
+
+The typed-data proof beside the version-2 walk (`data_buffer_profile`) builds
+the same plain proof for its plain path, and takes the same index from
+`match.py` and from its own replay, so a caller with typed object words is
+summarised the same way; its report carries and replays the same lines. Its
+function-literal path builds a `FunctionBufferCallProof` and still refuses
+the call.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the

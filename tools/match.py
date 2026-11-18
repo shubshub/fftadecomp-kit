@@ -3233,11 +3233,13 @@ class BufferCallProof:
     # Plain-path BIOS SWI wrapper summaries (bios_wrapper_summary_profile), set only by
     # BufferCallProof(..., bios_wrappers=True); None keeps every wrapper walked and refused.
     bios_summaries = None
+    # Default-path CopySummaries (copy_helper_summary_profile), set per plain instance only.
+    copy_summaries = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
-                 loop_replay=False, bios_wrappers=False):
+                 loop_replay=False, bios_wrappers=False, copy_helper_index=None):
         if bios_wrappers is not False:
             if bios_wrappers is not True or type(self) is not BufferCallProof or \
                     discarded_exit_scratch is not None or bios_fill_proof is not None:
@@ -3261,6 +3263,12 @@ class BufferCallProof:
                 raise ValueError("BIOS fill requires its separate fresh exact local proof")
         self.bios_fill_proof = bios_fill_proof
         self.discarded_exit_scratch = discarded_exit_scratch
+        if copy_helper_index is not None:
+            from copy_helper_summary_profile import CopySummaries
+            # Scratch and BIOS-fill policies already refuse stack arguments above.
+            if type(self) is not BufferCallProof or stack_arguments is not True:
+                raise ValueError("copy summaries require the plain stack-argument buffer proof")
+            self.copy_summaries = CopySummaries(rom, mapping, copy_helper_index)
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
@@ -3345,6 +3353,9 @@ class BufferCallProof:
         for offset in slots:
             self.access(offset, 4, stack)
         incoming = {offset + 4 * len(stack): target for offset, target in slots.items()}
+        if self.copy_summaries is not None and self.copy_summaries.covers(address, arguments):
+            return self.copy_summaries.call(self, arguments, stack, incoming, frozenset(slots),
+                                            constants=constants or {}, site=site, words=words)
         return self.check_arguments(address, arguments, stack, incoming, frozenset(slots),
                                     constants=self.argument_constants(constants or {}), site=site,
                                     **self.word_context(words or {}, -4*len(stack), site,
@@ -3380,6 +3391,8 @@ class BufferCallProof:
                     dict(self.dependencies), dict(self.callee_clobbers),
                     dict(self.callee_trusted))
         bios_snapshot = self.bios_summaries.copy() if self.bios_summaries is not None else None
+        copy_snapshot = None if self.copy_summaries is None else \
+            (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations))
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
@@ -3391,6 +3404,11 @@ class BufferCallProof:
                 ledger.update(saved)
             if bios_snapshot is not None:
                 self.bios_summaries.restore(bios_snapshot)
+            if copy_snapshot is not None:
+                for ledger, saved in zip((self.copy_summaries.contracts, self.copy_summaries.observations),
+                                         copy_snapshot):
+                    ledger.clear()
+                    ledger.update(saved)
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=True, **context)
 
@@ -3918,7 +3936,8 @@ class BufferCallProof:
                 if register not in scratch}
 
     def loop_replay_lines(self):
-        """Report lines stating every replayed callee and the premises it relied on."""
+        """Report lines stating every replayed callee and the premises it relied on, then every
+        summarised copy-helper call (copy_helper_summary_profile)."""
         from callee_preservation_profile import preserves_r7_r8
         lines = []
         for callee, records in sorted(self.loop_replays.items()):
@@ -3941,6 +3960,8 @@ class BufferCallProof:
                          f"writes {' '.join(f'sp{offset:+d}:{width}' for offset, width in sorted(writes))}; "
                          f"proved {' '.join(proved) or 'none'}; trusted {' '.join(assumed) or 'none'}; "
                          f"pruned edges {len(pruned)}")
+        if self.copy_summaries is not None:
+            lines.extend(self.copy_summaries.lines())
         return lines
 
     def bios_summary_lines(self):
@@ -3976,6 +3997,10 @@ class BufferCallProof:
         if self.bios_summaries is not None and self.bios_summaries.observed():
             # Reports without an applied summary keep their earlier fingerprint.
             digest.update(self.bios_summaries.digest().encode())
+        if self.copy_summaries is not None and self.copy_summaries.observations:
+            # Only a summarised copy adds this; every other fingerprint is unchanged.
+            digest.update(json.dumps(self.copy_summaries.evidence(), sort_keys=True,
+                                     separators=(",", ":")).encode())
         return digest.hexdigest()
 
 
@@ -6082,14 +6107,16 @@ def main():
                     if not thumb or not calls or self_sites:
                         raise
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
-                                                   bios_wrappers=True)
+                                                   bios_wrappers=True,
+                                                   copy_helper_index=inert_spin.index_snapshot(ROOT))
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,
                                                                       incoming_narrow_reads=True)
                 if thumb and data_relocations and buffer_proof.dependencies:
                     # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
                     verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
-                        data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations)
+                        data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
+                                          index=inert_spin.index_snapshot(ROOT))
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:
