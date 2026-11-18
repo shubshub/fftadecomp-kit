@@ -5236,6 +5236,23 @@ DAG requirement. `tests/test_descriptor_disjunctive_alias.py` covers natural fix
 ET_REL match/report/status replay, per-arm bounds and escapes, clobbered words,
 saved slots, watched registers, final return proof, budgets and altered evidence.
 
+### Menu icon row with a transient decoder output pointer
+
+At `08053E4C`, `--owner-runtime-profile bounded-buffer-runtime-summaries-v1`
+binds the original two calls selecting graphics 393 and 394, the unsigned
+remainder by five, the named tile base and string table, and the fifth stack
+argument. The original decoder reads two fixed streams from `083C83FC`.
+Each produces exactly 128 bytes in the live frame. The decoder leaves the
+buffer address in `03002BB8`. An append through that global after the frame
+expires requires the output to have been reinitialized.
+
+The modeled BIOS calls use a 64-halfword CpuSet copy and a word CpuFastSet
+clear. The input contract requires readable text, aligned disjoint tile
+storage of the necessary length, and a returning text renderer. Widths zero
+and one wrap the clear count, and width two programs zero. The native tests
+exercise these descriptors without assigning zero-length BIOS semantics.
+A fifth argument of one reaches the text renderer for both icon cases.
+
 ### Complete ordinary owners with multiple guarded switches
 
 The explicit owner selector `ordinary-multiple-switch-source-v1` compiles plausible
