@@ -574,7 +574,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4aeb6b6a270152a71088468d38c578853b44a892eadb10f8f6cb8025558a8b3b",
+        "acknowledged_cursor": 6981968775,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4aeb6b6a270152a71088468d38c578853b44a892eadb10f8f6cb8025558a8b3b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D74E0\",\"who\":\"rainbow-affine\",\"claim_id\":6981836011,\"reason\":\"172-byte raw ROM match restored with caller-compatible types; indexed R2 at 080D7556 still refused; current findings saved in Parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:47:11Z",
+          "id": 6981968775,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:47:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ed17826ad774b9ce36b857b5cd99a7979f2b7842d7acc80c30c3954de004481c",
+        "result": {
+          "address": "0x080D74E0",
+          "claim_id": 6981836011,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981968775,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
