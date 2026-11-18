@@ -149,6 +149,12 @@ class SignedWideDivisionTests(unittest.TestCase):
             self.assertNotIn('verdict MATCH', run.stdout)
             self.assertNotIn('invalid choice', run.stderr)
 
+    def test_status_recompiles_signed_division_from_its_saved_report(self):
+        import status
+        self.assertTrue((self.root/'src/08142280.c').is_file())
+        result = status.collect(str(self.root), verify=True, quiet=True)
+        self.assertFalse(any(problem.startswith('08142280:') for problem in result[4]), result[4])
+
     def test_source_table_and_original_caller_index_negatives(self):
         with tempfile.TemporaryDirectory(dir=self.root/'build') as temp:
             stage = Path(temp)
