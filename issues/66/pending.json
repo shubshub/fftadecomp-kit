@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "2637c83e2f0b0cf71b765941b20ce904b8ad15e5622fbb43d32e9125b1cc8af2",
-        "acknowledged_cursor": 6987553727,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2637c83e2f0b0cf71b765941b20ce904b8ad15e5622fbb43d32e9125b1cc8af2",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08128E40\",\"who\":\"astra-sound\",\"note\":\"Recover the twenty-entry candidate shuffle through original PRNG, bounded signed remainder and initialized local range.\"}",
-          "created_at": "2026-11-18T18:20:13Z",
-          "id": 6987540280,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T18:20:13Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d49c0fce300310a7b59519e5e9328ed112e25bb625c54e62b42f195e2cdc880d",
-        "result": {
-          "address": "0x08128E40",
-          "claim_id": 6987540280,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6987540280,
-          "status": "accepted",
-          "who": "astra-sound"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "79cefdcca0afd15fbd38354aaaebf21add9d040eda7a913e2bedbefb877229ec",
-        "acknowledged_cursor": 6987805162,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "79cefdcca0afd15fbd38354aaaebf21add9d040eda7a913e2bedbefb877229ec",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08128E40\",\"who\":\"astra-sound\",\"claim_id\":6987540280,\"reason\":\"160 bytes and 71 instructions matched and live report replayed with merged toolkit PR 286\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T18:30:29Z",
-          "id": 6987804313,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T18:30:29Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b8b5e06812213228db0ec1145fd8613582ad41c810f3c91c7c9c63e695dbb1d9",
-        "result": {
-          "address": "0x08128E40",
-          "claim_id": 6987540280,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6987804313,
-          "status": "accepted",
-          "who": "astra-sound"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "4082ae24cd6a7364683183cebf5bb87d6eb70085cc76ad284ebea87d76711285",
         "acknowledged_cursor": 6987553727,
         "body_provenance": "acceptance-time",
