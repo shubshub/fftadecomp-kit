@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "075e16658b7450fe28310e8effa10cfa553dbd5c10411830dc2cfaa99f27a03c",
+    "acknowledged_cursor": 6979885392,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "075e16658b7450fe28310e8effa10cfa553dbd5c10411830dc2cfaa99f27a03c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813FB7C\",\"who\":\"rainbow-state\",\"note\":\"Recover adjacent CpuSet graphics fill using the accepted BIOS fill profile\"}",
+      "created_at": "2026-11-18T13:24:58Z",
+      "id": 6979885392,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:24:58Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+    "result": {
+      "address": "0x0813FB7C",
+      "claim_id": 6979885392,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6979885392,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f90f59ef5f7ab6b5afeb1aa2663ba1e9de1778dbc6ae4424c432fcabe299466d",
+    "acknowledged_cursor": 6980106788,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f90f59ef5f7ab6b5afeb1aa2663ba1e9de1778dbc6ae4424c432fcabe299466d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813FB7C\",\"who\":\"rainbow-state\",\"claim_id\":6979885392,\"reason\":\"Parked 52/52 exact bytes from SDK-style volatile halfword CpuSet source. Local qualifier is outside current policy; ordinary local gives 48 bytes.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; addressed-native-bios-fill-buffer-v1 and bounded-buffer-bios-fill-local-source-semantics-v1\"}",
+      "created_at": "2026-11-18T13:33:11Z",
+      "id": 6980093500,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:33:11Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "41ac0efaba5faf4a5fd603adca9ad951ae7c99f06c22bc1775be04c39a4711b4",
+    "result": {
+      "address": "0x0813FB7C",
+      "claim_id": 6979885392,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6980093500,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
