@@ -606,7 +606,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0b7281aae0a3a3c289f7391c056619669c3bb08463e4b9c71e6ab93119de0b74",
+        "acknowledged_cursor": 6978937434,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0b7281aae0a3a3c289f7391c056619669c3bb08463e4b9c71e6ab93119de0b74",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080142DC\",\"who\":\"rainbow-callback\",\"claim_id\":6978880462,\"reason\":\"Parked exact 192-byte numeric formatter; buffer callee signed remainder proof refused\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:44:41Z",
+          "id": 6978928557,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:44:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7079aaf7c5e76a4dd15839b894c2a0f9502aa845681520f5e6ac811b941a151f",
+        "result": {
+          "address": "0x080142DC",
+          "claim_id": 6978880462,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978928557,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "rainbow-tile"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c215eae96c782e81e370a2994b07f0530322e8f5e45f7cb1f8a4df38880645e8",
+        "acknowledged_cursor": 6978937434,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c215eae96c782e81e370a2994b07f0530322e8f5e45f7cb1f8a4df38880645e8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3508\",\"who\":\"rainbow-tile\",\"claim_id\":6978884872,\"reason\":\"Exact208-byte plausible recovery retained; both shipped per-site scheduler summaries v1/v2 refuse table-loaded callback provenance, scheduler callback register is not a function literal on every path.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:45:03Z",
+          "id": 6978937434,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:45:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7079aaf7c5e76a4dd15839b894c2a0f9502aa845681520f5e6ac811b941a151f",
+        "result": {
+          "address": "0x080D3508",
+          "claim_id": 6978884872,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978937434,
+          "status": "accepted",
+          "who": "rainbow-tile"
+        }
+      }
     },
     {
       "claim": {
