@@ -5604,7 +5604,7 @@ def main():
                                                       "bounded-buffer-runtime-summaries-v1",
                                                       "particle-projection-return-scratch-v1",
                                                       "bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1",
-                                                      "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1", "conditional-unit-entry-output-array-v1",
+                                                      "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1", "conditional-unit-entry-output-array-v1", "conditional-ability-range-local-bytes-v1",
                                                       "bounded-buffer-conditional-thunks-v1",
                                                       "bounded-buffer-conditional-thunks-discarded-scratch-v1",
                                                       "bounded-buffer-conditional-thunks-selective-scratch-v1",
