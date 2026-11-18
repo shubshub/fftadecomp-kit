@@ -816,6 +816,16 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     code = strip_comments_and_strings(text)
     macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
+    if relpath == "src/08145CAC.c" and tree is not None and closure == (
+            {relpath, "include/ffta.h"}, []):
+        import cgb_registers
+        try:
+            header = (Path(tree) / cgb_registers.HEADER).read_text(encoding="utf-8")
+            source = strip_comments_and_strings_keep_strings(text)
+            if cgb_registers.literal_defines(source, strip_comments_and_strings_keep_strings(header)):
+                hardware_qualifiers.update(cgb_registers.selected_offsets(text, code))
+        except (OSError, UnicodeError):
+            pass
     listed_qualifiers, findings = allowlisted_volatile(
         code, relpath, data_symbols or {},
         volatile_allow_entries() if volatile_allow is None else volatile_allow, text, closure,

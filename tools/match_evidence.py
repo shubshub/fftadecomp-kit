@@ -1185,6 +1185,9 @@ def report_matches(report, root, address):
             return owner_admission_profile.report_matches(report, root, address)
         if software_float.selected(report):
             return software_float.report_matches(report, root, address)
+        import unit_float_multiply_profile as multiply
+        if multiply.SCHEMA in report:
+            return multiply.report_matches(report, root, address)
         if lshrdi3.selected(report):
             return lshrdi3.report_matches(report, root, address)
         if ashldi3.selected(report):
