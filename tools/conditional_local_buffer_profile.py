@@ -10,6 +10,7 @@ from pathlib import Path
 import struct
 
 import match
+import scene_scheduler_cpufill as scene_fill
 import named_data_buffer_profile as named
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
@@ -46,7 +47,7 @@ SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
-CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2)
+CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
@@ -80,6 +81,7 @@ SCHEMAS = {
     SCHEDULER_MANAGER_FIELD: 'elf-symbol-thumb-conditional-scheduler-indirect-manager-v1',
     SCHEDULER_MANAGER_OFFSET: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_OFFSET,
     SCHEDULER_MANAGER_PATHS: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_PATHS,
+    scene_fill.SELECTOR: scene_fill.SCHEMA,
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
@@ -211,6 +213,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         elif self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
             self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, calls)
+            if self.policy == scene_fill.SELECTOR:
+                scene_fill.bind(self, data, address, edges, calls)
             call_sites.bind_forwarding(self, edges)
             dependencies = tuple(self.scheduler_call_sites['dependencies'])
             runtime_names = call_sites.RUNTIME_NAMES
@@ -350,6 +354,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == scene_fill.SELECTOR and address == scene_fill.bios.ADDRESS:
+                return scene_fill.check_fill(self, address, aliases, stack, slots, site, words)
             if address in call_sites.ENTRIES:
                 return call_sites.check_call(self, address, aliases, stack, slots, site=site)
             # Every other root call keeps the unchanged named-data buffer rules.
@@ -478,7 +484,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.manifest(self)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
-            return call_sites.manifest(self)
+            scheduler = call_sites.manifest(self)
+            return scene_fill.manifest(self, scheduler) if self.policy == scene_fill.SELECTOR else scheduler
         if self.policy == SCHEDULER_ENTRY_BRANCH:
             import scheduler_entry_branch_profile as entry_branch
             return entry_branch.manifest(self)

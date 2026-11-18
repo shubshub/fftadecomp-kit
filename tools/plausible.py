@@ -850,6 +850,14 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
                 hardware_qualifiers.add(offset)
         except (OSError, ValueError, ImportError, SystemExit):
             pass
+    if relpath in ("src/0811D4A0.c", "src/0811E034.c") and tree is not None and project is not None:
+        import scene_scheduler_cpufill as scene_fill
+        try:
+            offset = scene_fill.qualifier(text, tree, project, int(relpath[4:-2], 16), closure)
+            if offset is not None:
+                hardware_qualifiers.add(offset)
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
     counter_qualifiers = set()
     if relpath == "src/081457FC.c" and tree is not None and project is not None and closure == (
             {relpath, "include/ffta.h"}, []):
