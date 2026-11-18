@@ -1698,66 +1698,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "739afddaa90073d2de07a076909621416e01e733dafa54a29fe6dd25af0c9196",
-        "acknowledged_cursor": 6992111114,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "739afddaa90073d2de07a076909621416e01e733dafa54a29fe6dd25af0c9196",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141AB0\",\"who\":\"astra-combat\",\"note\":\"Recover authentic FLASH512_V130 SetReadFlash1 installation from its ROM byte reader and verify normal caller storage, local lifetime and byte-read behavior\"}",
-          "created_at": "2026-11-18T21:26:15Z",
-          "id": 6992108610,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:26:15Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "ccd692a0e560de1444af5cb1b2e015ce652429977b043e6c3823ec6a4df96ddd",
-        "result": {
-          "address": "0x08141AB0",
-          "claim_id": 6992108610,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6992108610,
-          "status": "accepted",
-          "who": "astra-combat"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "c7543185138789e47701f7041d9af6bb37a766738160a58f05baeb9b91a45267",
-        "acknowledged_cursor": 6992354647,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c7543185138789e47701f7041d9af6bb37a766738160a58f05baeb9b91a45267",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141AB0\",\"who\":\"astra-combat\",\"claim_id\":6992108610,\"reason\":\"62/62 native ROM bytes, 24 instructions, unit verifier and caller CPU tests passed on merged kit PR 328; source and report handed to coordinator.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T21:37:16Z",
-          "id": 6992354647,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:37:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "95b498a280454e90603e721626f4ece1c30107406d21b20c56691cf397867b06",
-        "result": {
-          "address": "0x08141AB0",
-          "claim_id": 6992108610,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6992354647,
-          "status": "accepted",
-          "who": "astra-combat"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "a5110a3594d2a64677ee2e68ba2a949c43f77d72a83b720b5b5dec36e0df790f",
         "acknowledged_cursor": 6992149836,
         "body_provenance": "acceptance-time",
