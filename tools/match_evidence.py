@@ -1169,6 +1169,10 @@ def report_matches(report, root, address):
             import affine_oam_slot
             if not affine_oam_slot.report_body(report, root):
                 return False
+        if address == 0x0800D3BC:
+            import bg_affine_rows
+            if not bg_affine_rows.report_body(report, root):
+                return False
         if address == 0x0800C720:
             import scanline_wave
             if not scanline_wave.report_body(report, root):
