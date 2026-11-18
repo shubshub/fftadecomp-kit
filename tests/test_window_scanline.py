@@ -51,7 +51,8 @@ class NativeWindowTests(unittest.TestCase):
                         window.check_bodies(address, *variant)
             # Keep every other perturbed instruction correct but make just one
             # read access the original field through an alias.
-            site = {window.CIRCLE: 0x74, window.RECT: 0x84, window.ELLIPSE: 0xEA}[address]
+            site = {window.CIRCLE: 0x74, window.RECT: 0x84, window.ELLIPSE: 0xEA,
+                    window.LEFT_EDGE: 0x134, window.RIGHT_EDGE: 0x136}[address]
             wrong = bytearray(swapped)
             wrong[site:site+2] = actual[site:site+2]
             with self.assertRaises(ValueError):
@@ -76,6 +77,11 @@ class NativeWindowTests(unittest.TestCase):
             elif address == window.CIRCLE:
                 mutations += [('(u16)row < 160', '(u16)row <= 160'), ('mode != 2', 'mode != 1'),
                               ('y - offset', 'y + offset'), ('decision >= 0', 'decision > 0')]
+            elif address in window.EDGES:
+                mutations += [('upper_y < 160', 'upper_y <= 160'), ('lower_y >= 0', 'lower_y > 0'),
+                              ('(u16)y1 < 160', '(u16)y1 <= 160'), ('error += adjustment', 'error -= adjustment'),
+                              ('clamp_x(upper_x)' + (' + 1' if address == window.RIGHT_EDGE else ''),
+                               'clamp_x(upper_x) + 2')]
             else:
                 mutations += [('right >', 'right >='), ('row < 160', 'row < 161'),
                               ('right--;', 'right = 0;'), ('radius >> 1, buffer', 'radius >> 1, (u8 *)buffer + 2')]
@@ -137,6 +143,8 @@ class NativeWindowTests(unittest.TestCase):
                     for register, value in zip(registers, args):
                         uc.reg_write(register, value)
                     uc.reg_write(UC_ARM_REG_SP, 0x03007F00)
+                    if len(args) > 4:
+                        uc.mem_write(0x03007F00, b''.join(word(value) for value in args[4:]))
                     uc.reg_write(UC_ARM_REG_LR, stop|1)
                     uc.emu_start(address|1, stop, count=200000)
                     self.assertEqual(uc.reg_read(UC_ARM_REG_PC), stop)
@@ -154,10 +162,16 @@ class NativeWindowTests(unittest.TestCase):
                 # This wrapper is also the scene's real provider for the circle.
                 call(0x080DAC40, task, 100, 80, 2)
                 self.assertEqual(uc.mem_read(payload+160, 2), bytes((103,98)))
+                # Use the original DABC4 mode dispatch, accessor and both edge
+                # writers. The first submitted bank must contain their actual pixels.
+                call(0x080DABC4, task, 30, 10, 30, 12, 0)
+                call(0x080DABC4, task, 240, 10, 240, 12, 1)
+                self.assertEqual(uc.mem_read(payload+20, 6), bytes((241,30))*3)
+                rendered = bytes(uc.mem_read(payload, 320))
                 buffers = (readword(obj+24), readword(obj+28))
                 self.assertEqual(buffers, (payload+320, payload+644))
                 for frame, expectedbank in enumerate(reversed(buffers)):
-                    data = bytes((i+frame*17)%256 for i in range(320))
+                    data = rendered if frame == 0 else bytes((i+17)%256 for i in range(320))
                     uc.mem_write(payload, data)
                     call(0x0800C64C, obj)
                     call(0x0800C4B4)
@@ -184,6 +198,9 @@ class NativeWindowTests(unittest.TestCase):
             elif address == window.CIRCLE:
                 sites += (0xE0DC4, 0xE0DC8, 0xE0DD2, 0xE0DD6, 0xE0DFE, 0xE0E0A,
                           0xE0E32, 0xDAC56, 0xDAC5A, 0xDAC5C, 0xDAC6C, 0xDAC74, 0xDA8E2, 0xDAD26)
+            elif address in window.EDGES:
+                sites += (0x112116, 0x11211A, 0x1121F4, 0x1121F6, 0x1121FA, 0x11220E, 0x112214,
+                          0xDABEA, 0xDABEE, 0xDABF0, 0xDABF8, 0xDAC0E, 0xDAC10, 0xDAC2A, 0xDAC2C)
             for site in sites:
                 rom[site] ^= 2
                 with self.subTest(address=hex(address), site=hex(site)), self.assertRaises(ValueError):
@@ -199,7 +216,8 @@ class NativeWindowTests(unittest.TestCase):
             self.assertTrue(match_evidence.report_matches(report, self.root, address))
             for changed in (report.replace(record + '\n', ''), report.replace(record, record + '\n' + record),
                             report.replace({window.RECT: 'caller unknown', window.ELLIPSE: 'requires signed y <= 160',
-                                            window.CIRCLE: 'the same live tasks must reach phase 0x101'}[address],
+                                            window.CIRCLE: 'the same live tasks must reach phase 0x101',
+                                            **dict.fromkeys(window.EDGES, 'phase 0x100 must retain its live +0x44 task')}[address],
                                            'unconditional'),
                             report.replace('* compiled : `', '* compiled : `00')):
                 with self.subTest(address=hex(address)):
@@ -225,6 +243,9 @@ class NativeWindowTests(unittest.TestCase):
             machine.mem_write(obj+0x10, struct.pack('<HHI', 320, 2, buffer))
             machine.mem_write(stack, struct.pack('<I', height))
             arguments = (task, x, y, size)
+        elif address in window.EDGES:
+            arguments = (x, y, size, height)
+            machine.mem_write(stack, struct.pack('<I', buffer))
         else:
             arguments = (x, y, size, buffer)
             if address == window.CIRCLE:
@@ -293,6 +314,50 @@ class NativeWindowTests(unittest.TestCase):
                         self.assertEqual(pixels, expected)
                         kinds = (UC_MEM_READ, UC_MEM_WRITE) if qualified else (UC_MEM_WRITE,)
                         self.assertEqual(events, [(kind, byte, 1) for byte in sites for kind in kinds])
+
+    def test_edge_pixels_guards_and_exclusive_right_bound(self):
+        from unicorn import UC_MEM_READ, UC_MEM_WRITE
+        cases = ((10,0,80,0), (80,159,10,159), (-5,159,300,159), (120,-1,60,-1),
+                 (15,160,10,160), (16,1,90,9), (90,9,16,1), (16,9,90,1),
+                 (-20,-2,250,163), (240,158,240,161), (308,0,-68,248),
+                 (-32768,20,-32767,21), (32767,20,32766,22))
+        clip = lambda x: max(0, min(240, x))
+        for address in window.EDGES:
+            actual, stripped, swapped = self.bodies[address]
+            right = address == window.RIGHT_EDGE
+            # Independent mutations of unsigned horizontal, top signed high/low,
+            # lower signed high/low and the exclusive coordinate adjustment.
+            lower = 0x140 if right else 0x13E
+            for site in (0x2A, 0x10E, 0x112, lower, lower+4) + ((0x134, 0x164) if right else ()):
+                changed = bytearray(actual)
+                changed[site] ^= 1
+                with self.subTest(site=hex(site)), self.assertRaisesRegex(ValueError, 'edge row guard'):
+                    window.check_bodies(address, changed, stripped, swapped)
+            for x1, y1, x2, y2 in cases:
+                expected = bytearray((i*41+7)%256 for i in range(512))
+                stores = []
+                if y1 == y2:
+                    if 0 <= y1 < 160:
+                        lo, hi = sorted((clip(x1), clip(x2)))
+                        stores = [(2*y1+1, lo), (2*y1, hi)]
+                else:
+                    ax, ay, bx, by = (x1,y1,x2,y2) if y1 < y2 else (x2,y2,x1,y1)
+                    rows = by-ay+1
+                    for i in range((rows+1)//2):
+                        # Closed form of the two-ended rasterizer, independent
+                        # of the ROM's nested incremental error loop.
+                        steps = (i*abs(bx-ax) + rows-1-rows//2)//rows
+                        offset = steps if bx >= ax else -steps
+                        for x, y in ((ax+offset, ay+i), (bx-offset, by-i)):
+                            if 0 <= y < 160:
+                                stores.append((2*y + (0 if right else 1), clip(x) + int(right)))
+                for byte, value in stores:
+                    expected[byte] = value
+                for index, events in ((0, (UC_MEM_READ, UC_MEM_WRITE)), (1, (UC_MEM_WRITE,))):
+                    with self.subTest(address=hex(address), xy=(x1,y1,x2,y2), compile=index):
+                        output, trace = self.execute_writer(address, self.bodies[address][index], x1,y1,x2,y2)
+                        self.assertEqual(output, expected)
+                        self.assertEqual(trace, [(event, byte, 1) for byte, _ in stores for event in events])
 
     def test_real_execution_and_nonvolatile_counterfactual(self):
         from unicorn import UC_MEM_READ, UC_MEM_WRITE

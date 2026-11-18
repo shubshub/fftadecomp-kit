@@ -17,6 +17,9 @@ BASE = 0x08000000
 CIRCLE = 0x080D9F60
 RECT = 0x080DA968
 ELLIPSE = 0x080DA1C4
+LEFT_EDGE = 0x080DA3B8
+RIGHT_EDGE = 0x080DA598
+EDGES = (LEFT_EDGE, RIGHT_EDGE)
 HEADER = 'include/ffta.h'
 ELEMENT = re.compile(
     r'\btypedef\s+struct\s+__attribute__\s*\(\s*\(\s*packed\s*\)\s*\)\s*\{'
@@ -26,6 +29,8 @@ ELEMENT = re.compile(
 # prevents extra expression-level reads or an alias that happens to compile
 # identically. Body and transfer evidence below are independently required.
 SOURCE_TOKENS = {
+    RIGHT_EDGE: '057a6c5c38064f6e2f3b799cd1fbe9ec47930b93059a2896cb134598c4fa5edb',
+    LEFT_EDGE: 'f6c3b249738c7398cfa56d195d6411404a357310da12084bd4eb9628c4012069',
     CIRCLE: '9ef6da9a5d9b377ab691da1170a8713b15b01ed29cd6d5f58bd29619e6d3f74a',
     RECT: 'e932b2672df436650fe5331575191662cc8a2722dc36591565e2a767a13857cb',
     ELLIPSE: '9cbc279cf9136df898b107ecad1f41c0e2dfa645da10d570a62e4a9d63e0f269',
@@ -34,6 +39,10 @@ SOURCE_TOKENS = {
 # Stripping can change the whole frame and register allocation. Both audited
 # controls retain their rectangle bounds or their even-diameter/row conditions.
 OWNER_SHAPES = {
+    RIGHT_EDGE: ((484, '8fb2409fb08f2853626a741237d99e8a6fd6cd3bc12268a5c1cf2323e3a66592'),
+                 (472, '9503ea2c41c8640e0371443903d57df52ee70a5ffd16b534c8dc562333415bd7')),
+    LEFT_EDGE: ((480, '81c63e67b7d72e159c7a3d432bd20934234c8013e83cbac4d7afe906ef6a682e'),
+                (468, 'ec9229e58af789fe6be5ee57db16591f57c74ccedf8acd9ee61e37f0c48951d7')),
     CIRCLE: ((276, 'ebc7f7c2f9ec6b910932b086e1be2cbffcbea48f47f2cc62e050c3756b539d3c'),
              (260, '72503100a8953af693b6df4f81865c9144a475ab0820316b4db48ed55b86a60b')),
     RECT: ((166, 'ac85d657e591e6e33da7fbf0754b93a1799205cddb5f1109ff94a396d1ff4a55'),
@@ -41,7 +50,7 @@ OWNER_SHAPES = {
     ELLIPSE: ((272, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),
               (262, '88843664ee85ce57d3278ca8b1b574436bbca58f189fa68650b1e4bcf151b452')),
 }
-CALLEES = {CIRCLE: (), RECT: (0x08005BFC, 0x0800C614),
+CALLEES = {CIRCLE: (), LEFT_EDGE: (), RIGHT_EDGE: (), RECT: (0x08005BFC, 0x0800C614),
            ELLIPSE: (0x08141870, 0x08141870, 0x080DA074, 0x080D9F60)}
 
 PROVIDER = (
@@ -98,6 +107,15 @@ CIRCLE_PATH = (
     (0x080DAC80, 0x080DAD3A, '4f4d69d9b06146380f60d1b12f68d849c91ef72c3ea50bf0fac9292f27f4d8a9'),
 )
 
+EDGE_PATH = (
+    # Scene 081120CC saves the bank-1 window at +0x44 in phase 0. In phase
+    # 0x100 the same slot goes to DABC4 twice, at rows 0 and 248, modes 0/1.
+    (0x081120CC, 0x08112360, 'c01caf0a36bcda7fecb883efa2e658736d79db54a8bb0dfd8e1e91961cde0aa1'),
+    # Object from task payload +4, C614 result saved in argument 5 at both BLs.
+    (0x080DABC4, 0x080DAC3E, '438b22b792aedc654c439b488ec6e0360a3907f291149ed7fe11d8d64b632544'),
+)
+
+
 def uses_element(root, address):
     import plausible
     path = Path(root) / 'src' / f'{address:08X}.c'
@@ -135,7 +153,8 @@ def provider_evidence(rom, address):
     zero_image = (*installed.BOOT,
                   (0x08002768, 0x080027B8, '6e9dc4c6a9f37a50fb532938d3c1d4e5bd2eb08e1e45744ec654f057d08dd718'),
                   (installed.IMAGE, installed.IMAGE + 176, installed.IMAGE_SHA256))
-    caller_path = {RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH}[address]
+    caller_path = {RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH,
+                   LEFT_EDGE: EDGE_PATH, RIGHT_EDGE: EDGE_PATH}[address]
     for start, end, digest in zero_image + PROVIDER + caller_path:
         if sha256(rom[start-BASE:end-BASE]).hexdigest() != digest:
             raise ValueError(f'changed window provider, bank transfer or caller at {start:08X}')
@@ -178,6 +197,32 @@ def rewrite_element(source, swap=False):
     return source[:m.start()] + element + source[m.end():]
 
 
+def edge_access_sites(address, body):
+    from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+    decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+    right = address == RIGHT_EDGE
+    upper, lower = (0x136, 0x166) if right else (0x134, 0x162)
+    end = address + OWNER_SHAPES[address][0][0] - 20
+
+    def require(offset, expected):
+        code = decoder.disasm(body[offset:offset + 2*len(expected)], address+offset)
+        if [f'{i.mnemonic} {i.op_str}' for i in code] != expected:
+            raise ValueError('window edge row guard, exclusive bound or literal changed')
+
+    # One unsigned guard covers both orders of the horizontal pair. Each
+    # sloped endpoint independently checks its signed row before indexing.
+    require(0x28, ['lsrs r0, r3, #0x10', 'cmp r0, #0x9f', f'bls #{address+0x30:#x}', f'b #{end:#x}'])
+    for guard, skip in ((0x10E, upper+4), (upper+10, lower+4)):
+        require(guard, ['cmp r1, #0x9f', f'bgt #{address+skip:#x}', 'cmp r1, #0', f'blt #{address+skip:#x}'])
+    if right:
+        for site in (upper, lower):
+            require(site-2, ['adds r1, #1', 'ldrb r2, [r0]', 'strb r1, [r0]'])
+    else:
+        for site in (upper, lower):
+            require(site, ['ldrb r2, [r1, #1]', 'strb r0, [r1, #1]'])
+    return (0x6C, 0x6E, 0x70, 0x72, 0x7E, 0x80, 0x82, 0x84, upper, upper+2, lower, lower+2)
+
+
 def check_bodies(address, qualified, stripped, swapped):
     from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
     # The paired original reads immediately precede same-member writes. On the
@@ -199,6 +244,9 @@ def check_bodies(address, qualified, stripped, swapped):
                        f'bhi #{address+site+8:#x}', 'asrs r0, r1, #0xf', 'add r0, r8',
                        'ldrb r1, [r0, #1]', 'strb r3, [r0, #1]', 'ldrb r1, [r0]', 'strb r2, [r0]']:
                 raise ValueError('circle row guard or same-row field accesses changed')
+    elif address in EDGES:
+        actual = edge_access_sites(address, qualified)
+        control = ('strb',) * 6
     elif address == RECT:
         actual = (0x84, 0x86, 0x88, 0x8A)
         control = ('strb', 'strb')
@@ -209,8 +257,18 @@ def check_bodies(address, qualified, stripped, swapped):
         if (len(data), sha256(data).hexdigest()) != shape:
             raise ValueError('changed complete qualified or qualifier-stripped window writer')
     def byte_accesses(body):
-        return [(i.address-address, i.mnemonic) for i in Cs(CS_ARCH_ARM, CS_MODE_THUMB).disasm(body, address)
-                if i.mnemonic in ('ldrb', 'strb')]
+        if address in EDGES:
+            # A literal pool splits the instructions. Walk only original
+            # reachable code and require both literal values in each build.
+            from match import verify_leaf_instructions
+            instructions = verify_leaf_instructions(body, address, True)
+            pools = {((i.address + 4) & ~3) + i.operands[1].mem.disp - address
+                     for i in instructions if i.mnemonic == 'ldr' and '[pc,' in i.op_str}
+            if len(pools) != 2 or {struct.unpack_from('<I', body, p)[0] for p in pools} != {0x0000FFFF, 0xFFFF0000}:
+                raise ValueError('window edge direction or countdown literal changed')
+        else:
+            instructions = Cs(CS_ARCH_ARM, CS_MODE_THUMB).disasm(body, address)
+        return [(i.address-address, i.mnemonic) for i in instructions if i.mnemonic in ('ldrb', 'strb')]
     real = byte_accesses(qualified)
     if tuple(site for site, _ in real) != actual or tuple(op for _, op in byte_accesses(stripped)) != control:
         raise ValueError('window field access sequence changed')
@@ -237,10 +295,10 @@ def compile_bodies(root, address, rom):
         for rewrite in (None, rewrite_element, lambda s: rewrite_element(s, swap=True)):
             obj, text, image = match.compile_object(runner, workspace, args, str(root), address, source, rewrite=rewrite)
             match.allocated_text_only(image)
-            if address == CIRCLE:
+            if not CALLEES[address]:
                 body = match.function_bytes(obj, text, f'func_{address:08X}', address, True)
                 if body != text:
-                    raise ValueError('expected a single complete relocation-free circle owner')
+                    raise ValueError('expected a single complete relocation-free window owner')
             else:
                 body, calls, data = match.link_calls(runner, workspace, args, image, address, mapping, len(rom), rom)
                 if data or tuple(calls[k] for k in sorted(calls)) != CALLEES[address]:
@@ -272,8 +330,13 @@ def record(root, address):
         CIRCLE: ('080E0CC4 banks 1/0 in phase 0x100; the same live tasks must reach phase 0x101; '
                  '080E0E0A/080E0E32 call 080DAC40, passing its 0800C614 payload as r3 to 080DAC74; '
                  'four unsigned-halfword guards constrain every written row to [0,160)'),
+        **dict.fromkeys(EDGES, '08112116 creates bank 1; phase 0x100 must retain its live +0x44 task; '
+                        '081121F6/08112214 call 080DABC4 with rows 0/248 and modes 0/1; '
+                        '080DAC10/080DAC2C forward the C614 payload as argument 5; '
+                        'unsigned horizontal and signed endpoint guards constrain rows to [0,160); '
+                        'signed halfword geometry; no termination claim for arbitrary wrapped deltas'),
     }[address]
-    stability = '' if address == CIRCLE else 'stable values between compare/re-read and '
+    stability = '' if not CALLEES[address] else 'stable values between compare/re-read and '
     hashes = '/'.join(sha256(body).hexdigest() for body in bodies)
     return ('* allowlisted volatile scanline: `window-row-bytes-v1` original/stripped/swapped '
             f'`{hashes}`; {condition}; assumes initialized live task, intact installed clear routine, successful allocation, exclusive 320-byte '
@@ -288,7 +351,7 @@ def report_body(report, root, address):
         stream.seek(address-BASE)
         body = stream.read(length)
     lines = report.splitlines()
-    schema = 'elf-symbol-thumb-frame-v1' if address == CIRCLE else 'elf-symbol-thumb-frame-calls-v1'
+    schema = 'elf-symbol-thumb-frame-v1' if not CALLEES[address] else 'elf-symbol-thumb-frame-calls-v1'
     return len(body) == length and all(lines.count(line) == 1 for line in (
         f'* verification: `{schema}`',
         f'* ROM bytes: `{body.hex()}` ({length} bytes)', f'* compiled : `{body.hex()}`',
