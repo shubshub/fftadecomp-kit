@@ -603,6 +603,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "995e0e9f366913ff846ab093ca07edfe6cf74e105ddf096529e263653a4169d8",
+        "acknowledged_cursor": 6982922824,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "995e0e9f366913ff846ab093ca07edfe6cf74e105ddf096529e263653a4169d8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801CA10\",\"who\":\"rainbow-affine\",\"note\":\"Reopened by toolkit #265; test three-output world-to-grid helper against complete 54-byte ROM span\"}",
+          "created_at": "2026-11-18T15:22:54Z",
+          "id": 6982922824,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:22:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dce79ede40e5486c41f27c2e13c8d68210215ac4cdf52f081f522edc3302cd06",
+        "result": {
+          "address": "0x0801CA10",
+          "claim_id": 6982922824,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982922824,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
