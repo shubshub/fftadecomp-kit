@@ -5897,7 +5897,7 @@ def main():
                 thunk_evidence = function_thunk.make_manifest(calls, function_relocations, data_relocations,
                                                              addr, rom, data_mapping, verified_instructions,
                                                              selector=args.function_address_profile,
-                    frame_proof=unsigned_proof if args.function_address_profile == function_thunk.UNSIGNED_FRAME_SELECTOR else None)
+                    frame_proof=unsigned_proof if args.function_address_profile in function_thunk.UNSIGNED_PROOF_SELECTORS else None)
                 verified_instructions = function_thunk.verify(got, addr, rom, mapping, function_index,
                                                                data_mapping, thunk_evidence)
             elif double_profile:

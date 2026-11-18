@@ -13,6 +13,11 @@ inventory: a fixed Thumb frame with direct SP words and read-only incoming
 words.  Its manifest binds that frame evidence, and each verification
 re-proves it.  Existing ``unsigned-divmod-thunks-v1`` reports keep their
 saved-only meaning.
+
+``unsigned-divmod-thunks-divisor-choices-v1`` retains the saved-only frame
+and binds an exact one-or-two-value nonzero divisor set at each runtime call.
+Its finite must-definition producer is pinned and replayed separately; the
+single-constant selectors retain their original divisor policy.
 """
 import hashlib
 import json
@@ -23,7 +28,10 @@ SELECTOR = 'unsigned-divmod-thunks-v1'
 SCHEMA = 'elf-symbol-thumb-function-address-thunks-unsigned-divmod-v1'
 FRAME_SELECTOR = 'unsigned-divmod-thunks-frame-v1'
 FRAME_SCHEMA = 'elf-symbol-thumb-function-address-thunks-unsigned-divmod-frame-v1'
-SELECTORS = (SELECTOR, FRAME_SELECTOR)
+CHOICES_SELECTOR = 'unsigned-divmod-thunks-divisor-choices-v1'
+CHOICES_SCHEMA = 'elf-symbol-thumb-function-address-thunks-unsigned-divisor-choices-v1'
+SELECTORS = (SELECTOR, FRAME_SELECTOR, CHOICES_SELECTOR)
+PROOF_SELECTORS = (FRAME_SELECTOR, CHOICES_SELECTOR)
 FRAME_EVIDENCE = 'thumb-unsigned-divmod-thunk-fixed-frame-evidence-v1'
 HARDWARE = (0x04000000, 0x08000000)
 # Identifiers only the compiler may emit.  The raw preprocessed text is also
@@ -110,7 +118,8 @@ def prove(data, address, rom, mapping, index, calls, *, selector=SELECTOR):
         raise ValueError('unsigned thunks require their explicit source selector')
     bindings = inventory.bind_calls(calls, mapping, address, len(data), len(rom))
     return inventory.verify(data, address, rom, mapping, index, calls, bindings,
-                            selector=inventory.FRAME_SELECTOR if selector == FRAME_SELECTOR else inventory.SELECTOR)
+                            selector={FRAME_SELECTOR: inventory.FRAME_SELECTOR, CHOICES_SELECTOR: inventory.CHOICES_SELECTOR}.get(
+                                selector, inventory.SELECTOR))
 
 
 def frame_evidence(proof):
@@ -124,7 +133,7 @@ def frame_evidence(proof):
             'entry_stack_contract': proof['entry_stack_contract']}
 
 
-def producer_sources(framed=False):
+def producer_sources(framed=False, choices=False):
     import analyze
     import function_thunk_profile
     import local_long_branch_profile
@@ -149,6 +158,9 @@ def producer_sources(framed=False):
         software_double_profile, software_float_profile, umod_only_ordinary_inventory,
         umodsi3_profile, unsigned_divmod_ordinary_inventory, unsigned_divmod_thunk_inventory,
         unsigned_remainder_closure_inventory, zero_aware_unsigned_quotient_inventory)
+    if choices:
+        import udiv_constant_choices_inventory
+        modules += (udiv_constant_choices_inventory,)
     result = {Path(module.__file__).name: hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
               for module in modules}
     result[Path(__file__).name] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
@@ -183,8 +195,8 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
     import unsigned_divmod_thunk_inventory as inventory
     if functions:
         raise ValueError('unsigned thunks exclude typed function literals')
-    if type(selector) is not str or selector not in SELECTORS or (selector == FRAME_SELECTOR) != (frame_proof is not None):
-        raise ValueError('unsigned thunk manifests require their selector and, when framed, its fresh frame proof')
+    if type(selector) is not str or selector not in SELECTORS or (selector in PROOF_SELECTORS) != (frame_proof is not None):
+        raise ValueError('unsigned thunk manifests require their selector and its required fresh caller proof')
     runtimes = {target: name for name, target in inventory.OPERATIONS.items()}
     aliases = {target: name for name, target in thunks.ALIASES.items()}
     names = match.parse_data_symbols(objects) if literals else {}
@@ -205,9 +217,14 @@ def make_manifest(calls, functions, literals, address, rom, objects, instruction
         'data': [[offset, name, value-names[name]] for offset, (name, value) in sorted(literals.items())],
         'numeric_hardware_words': numeric_words(data, address, instructions, literals, len(rom)),
         'dependencies': thunks.dependencies({aliases[target] for target in calls.values() if target in aliases}, rom),
-        'producer_source_sha256': producer_sources(selector == FRAME_SELECTOR)}
-    if frame_proof is not None:
+        'producer_source_sha256': producer_sources(selector == FRAME_SELECTOR, selector == CHOICES_SELECTOR)}
+    if selector == FRAME_SELECTOR:
         manifest['stack_frame'] = frame_evidence(frame_proof)
+    elif selector == CHOICES_SELECTOR:
+        if type(frame_proof) is not dict or frame_proof.get('selector') != inventory.CHOICES_SELECTOR or \
+                frame_proof.get('schema') != inventory.CHOICES_SCHEMA:
+            raise ValueError('unsigned divisor choices require their fresh finite-choice inventory proof')
+        manifest['divisor_choices'] = frame_proof['caller_divisors']
     return manifest
 
 
@@ -219,11 +236,13 @@ def verify(data, address, rom, mapping, index, objects, manifest):
             'data', 'numeric_hardware_words', 'dependencies', 'producer_source_sha256'}
     selector = manifest.get('selector') if type(manifest) is dict else None
     framed = selector == FRAME_SELECTOR
+    if selector == CHOICES_SELECTOR:
+        keys |= {'divisor_choices'}
     if type(manifest) is not dict or type(selector) is not str or selector not in SELECTORS or \
             set(manifest) != (keys | {'stack_frame'} if framed else keys) or \
             manifest['runtime'] != thunks.RUNTIME or \
             manifest['abi'] != thunks.ABI or type(manifest['frame']) is not bool or \
-            manifest['functions'] != [] or manifest['producer_source_sha256'] != producer_sources(framed):
+            manifest['functions'] != [] or manifest['producer_source_sha256'] != producer_sources(framed, selector == CHOICES_SELECTOR):
         raise ValueError('unsigned thunk source manifest or producer source bytes differ')
     calls, literals = match.function_address_bindings(data, address, rom, mapping, objects,
         {'calls': manifest['calls'], 'functions': [], 'data': manifest['data']}, allow_empty_functions=True)
@@ -250,6 +269,9 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     if manifest['dependencies'] != thunks.dependencies({name for _, name in manifest['thunks']}, rom):
         raise ValueError('unsigned thunk canonical dependencies differ')
     proof, instructions = prove(data, address, rom, mapping, index, calls, selector=selector)
+    if selector == CHOICES_SELECTOR and json.dumps(manifest['divisor_choices'], sort_keys=True) != \
+            json.dumps(proof['caller_divisors'], sort_keys=True):
+        raise ValueError('unsigned divisor choices differ from the fresh all-path finite-choice proof')
     if framed and (manifest['frame'] is not True or json.dumps(manifest['stack_frame'], sort_keys=True) !=
                    json.dumps(frame_evidence(proof), sort_keys=True)):
         raise ValueError('unsigned thunk frame evidence differs from the fresh fixed-frame proof')
@@ -259,8 +281,8 @@ def verify(data, address, rom, mapping, index, objects, manifest):
     if numeric_words(data, address, instructions, literals, len(rom)) != manifest['numeric_hardware_words'] or \
             match.uses_stack_frame(instructions) != manifest['frame']:
         raise ValueError('unsigned thunks require reached typed literals and the exact saved frame')
-    # The inventory re-proves a nonzero all-path r1 constant at each of these
-    # sites on every verification; the values stay in its fresh proof.
+    # The inventory re-proves the selector's all-path r1 policy at every site.
+    # The finite-choice selector additionally binds its exact derived value sets.
     if [offset for offset, _ in proof['caller_divisors']] != [offset for offset, _ in manifest['unsigned_runtime']]:
         raise ValueError('unsigned thunk manifest requires an actual all-path divisor at every runtime call')
     return instructions

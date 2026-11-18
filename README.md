@@ -4129,6 +4129,34 @@ needs an allocated local or an incoming read. The manifest carries a
 access), and each verification re-proves it. `unsigned-divmod-thunks-v1`
 reports keep their saved-only meaning.
 
+`--function-address-profile unsigned-divmod-thunks-divisor-choices-v1` selects
+`elf-symbol-thumb-function-address-thunks-unsigned-divisor-choices-v1`. This
+separate saved-only, acyclic selector allows one or two known nonzero unsigned32
+divisor values at each canonical unsigned runtime call. It reuses the finite
+must-definition analysis from `udiv_constant_choices_inventory.py`: exact Thumb
+immediate MOVs and register copies generate facts; every other register write
+kills its fact; calls kill caller-saved facts. A join unions values only for
+registers defined on every incoming path, dropping facts exceeding two values.
+Unknown incoming paths, zero, call results, and unsupported arithmetic refuse.
+The existing `{4,8}` UDIV inventory and single-constant source selectors retain
+their original domains.
+
+Its inventory is
+`unsigned-divmod-thunk-divisor-choices-structural-inventory-v1`. Runtime and
+canonical thunk identities, complete native runtime closure, typed objects,
+saved-frame restoration and the conditional callee ABI are unchanged. The
+source manifest additionally binds `divisor_choices` as sorted runtime-site
+offsets and exact sorted value sets. Both the inventory and source manifest pin
+the actual finite-choice producer module. Verification re-derives those sets
+from the complete ROM CFG, then fresh source/ELF replay binds the original
+compiler relocations. It grants no fixed-frame, switch, arithmetic-equivalence,
+memory-safety or indirect-callee proof.
+
+The focused synthetic boundaries run with
+`python3 -m unittest discover -s tests -p test_unsigned_divisor_choices.py`.
+The parked game caller `080812E8` exercises the `[40,48]` join at runtime-call
+offset `0x62`, with the full 132-byte symbol and 59 reachable instructions.
+
 ### Analysis and split notes
 
 * `analyze.py` treats `pop {r0}; bx r0` as a return. Capstone does not flag the

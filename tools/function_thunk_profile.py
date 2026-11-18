@@ -23,7 +23,9 @@ INTERPOSED_SCHEMA = "elf-symbol-thumb-function-address-thunks-interposed-pool-v1
 from umod_r1_thunk_profile import SELECTOR as UMOD_R1_SELECTOR, SCHEMA as UMOD_R1_SCHEMA
 from thunk_pool_switch import INTERPOSED
 from unsigned_thunk_profile import SELECTOR as UNSIGNED_SELECTOR, SCHEMA as UNSIGNED_SCHEMA, \
-    FRAME_SELECTOR as UNSIGNED_FRAME_SELECTOR, FRAME_SCHEMA as UNSIGNED_FRAME_SCHEMA, SELECTORS as UNSIGNED_SELECTORS
+    FRAME_SELECTOR as UNSIGNED_FRAME_SELECTOR, FRAME_SCHEMA as UNSIGNED_FRAME_SCHEMA, SELECTORS as UNSIGNED_SELECTORS, \
+    CHOICES_SELECTOR as UNSIGNED_CHOICES_SELECTOR, CHOICES_SCHEMA as UNSIGNED_CHOICES_SCHEMA, \
+    PROOF_SELECTORS as UNSIGNED_PROOF_SELECTORS
 
 SELECTORS = (SELECTOR, ZERO_SELECTOR, UMOD_R1_SELECTOR, INTERPOSED_SELECTOR, *UNSIGNED_SELECTORS)
 # Selectors whose manifests carry their selector and producer-source digests.
@@ -50,7 +52,7 @@ def schema_for(selector):
     pool_words(selector)
     return {UMOD_R1_SELECTOR: UMOD_R1_SCHEMA, ZERO_SELECTOR: ZERO_SCHEMA,
             INTERPOSED_SELECTOR: INTERPOSED_SCHEMA, UNSIGNED_SELECTOR: UNSIGNED_SCHEMA,
-            UNSIGNED_FRAME_SELECTOR: UNSIGNED_FRAME_SCHEMA}.get(selector, SCHEMA)
+            UNSIGNED_FRAME_SELECTOR: UNSIGNED_FRAME_SCHEMA, UNSIGNED_CHOICES_SELECTOR: UNSIGNED_CHOICES_SCHEMA}.get(selector, SCHEMA)
 
 
 def selector_from_manifest(manifest):
@@ -509,7 +511,7 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                             raise ValueError("pool switch lacks exact original local relocations")
                     instructions = verify(got, address, rom, mapping, index, objects, manifest)
                     frame_proof = None
-                    if selector == UNSIGNED_FRAME_SELECTOR:
+                    if selector in UNSIGNED_PROOF_SELECTORS:
                         from unsigned_thunk_profile import prove as unsigned_prove
                         frame_proof, _ = unsigned_prove(got, address, rom, mapping, index, calls, selector=selector)
                     if make_manifest(calls, functions, literals, address, rom, objects, instructions, selector=selector,
