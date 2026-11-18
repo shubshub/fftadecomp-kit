@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "7d85c07aaf91cae0250250a20093ed05d538cfe5c10aaf7406fe88cec703a3c8",
-        "acknowledged_cursor": 6979885392,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7d85c07aaf91cae0250250a20093ed05d538cfe5c10aaf7406fe88cec703a3c8",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A848\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
-          "created_at": "2026-11-18T13:24:41Z",
-          "id": 6979878688,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:24:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
-        "result": {
-          "address": "0x0809A848",
-          "claim_id": 6979878688,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6979878688,
-          "status": "accepted",
-          "who": "rainbow-menu"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "676a3ffcd6c79f5d918317d31ca1333547c044ad0b21b5debca81243dba91ceb",
-        "acknowledged_cursor": 6980106788,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "676a3ffcd6c79f5d918317d31ca1333547c044ad0b21b5debca81243dba91ceb",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809A848\",\"who\":\"rainbow-menu\",\"claim_id\":6979878688,\"reason\":\"Matched 72/72 complete flagged state iterator wrapper, saved report replayed\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T13:33:42Z",
-          "id": 6980106788,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:33:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "41ac0efaba5faf4a5fd603adca9ad951ae7c99f06c22bc1775be04c39a4711b4",
-        "result": {
-          "address": "0x0809A848",
-          "claim_id": 6979878688,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6980106788,
-          "status": "accepted",
-          "who": "rainbow-menu"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "94f32fcd7b0dfe2358ebd99f9a30922cae9988ce2ad6b541993a608e228e62e2",
         "acknowledged_cursor": 6979943582,
         "body_provenance": "acceptance-time",
