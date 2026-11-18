@@ -62,12 +62,48 @@ class SceneScript(unittest.TestCase):
         self.assertEqual(contract['script']['entry']['signed_coordinates'], coordinates)
         self.assertEqual(contract['script']['entry']['parameter_count'], count)
         self.assertEqual(contract['script']['entry']['parameter_data'], script)
+        return manifest, contract
 
     def test_second_scene_script(self):
         self.check_sibling(0x08118B94, 184, 2, [56,280], 0x083A61C0)
 
     def test_overlay_scene_script(self):
         self.check_sibling(0x08118AC0, 210, 5, [216,248], 0x083A616C)
+
+    def test_timed_scene_script(self):
+        address = 0x08118C4C
+        manifest, contract = self.check_sibling(address, 212, 4, [120, 248], 0x083A6208)
+        self.assertEqual([(site - address, start, width, control)
+                          for site, start, width, control, _ in contract['bios_fill']['sites']],
+                         [(60, -28, 2, 0x01000040), (80, -26, 2, 0x01000070)])
+        self.assertEqual([(event['site'] - address, event['target'], event['pointer_words'])
+                          for event in contract['observations']], [
+            (60, 0x0814186C, []), (80, 0x0814186C, []), (98, 0x080E03F8, [[-36, -24]]),
+            (130, 0x080E05DC, []), (142, 0x080E5694, []), (182, 0x080DBED4, []),
+            (188, 0x080E051C, [])])
+        self.assertEqual(manifest['bindings']['data'],
+                         [[112, 'data_03003920', 0], [124, 'data_083A6208', 0]])
+        self.assertFalse(contract['actual_termination_proved'])
+        self.assertFalse(contract['physical_noninterference_proved'])
+
+    def test_timed_scene_rejects_owner_and_binding_changes(self):
+        address = 0x08118C4C
+        offset = address - 0x08000000
+        manifest, _ = self.check_sibling(address, 212, 4, [120, 248], 0x083A6208)
+        # First/second fills, outgoing position and parent, count/mode, ROM
+        # script, wait callback, timer, expiry callback and final phase store.
+        for delta in (60, 70, 72, 80, 90, 92, 94, 96, 108, 112, 116, 120,
+                      124, 130, 148, 182, 200):
+            rom = bytearray(self.rom)
+            rom[offset + delta] ^= 2
+            with self.subTest(delta=delta), self.assertRaises(ValueError):
+                owner.verify(bytes(rom[offset:offset+212]), address, bytes(rom), self.mapping,
+                             self.index, self.objects, bindings=manifest['bindings'], selector=scene.SELECTOR)
+        bindings = copy.deepcopy(manifest['bindings'])
+        bindings['data'][1][1] = 'data_083A61C0'
+        with self.assertRaises(ValueError):
+            owner.verify(self.rom[offset:offset+212], address, self.rom, self.mapping,
+                         self.index, self.objects, bindings=bindings, selector=scene.SELECTOR)
 
     def test_forged_report(self):
         for old,new in [('"signed_coordinates":[104,184]','"signed_coordinates":[104,180]'),

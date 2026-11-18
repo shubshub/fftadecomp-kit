@@ -1,4 +1,4 @@
-"""Conditional caller-local effects of the three mode-six scene constructors."""
+"""Conditional caller-local effects of the reviewed mode-six scene constructors."""
 from hashlib import sha256
 from pathlib import Path
 import struct
@@ -19,6 +19,7 @@ OWNERS = {
     0x08118A08: (3, 0x00B80068, 0x083A6110, 'b88a5a52e64831c00f918b9c9399762f8dabedd9d440ff9b3953839957e183c1'),
     0x08118AC0: (5, 0x00F800D8, 0x083A616C, 'fc61eb9ad6fba9d1e97012a9739eabcea2effe40f0e1dfb7bbb09a6c755a5fdd'),
     0x08118B94: (2, 0x01180038, 0x083A61C0, '403741710a2cd36c4d5316c17d39f43b3511bb16f60e4d52e86901cbb7cc39aa'),
+    0x08118C4C: (4, 0x00F80078, 0x083A6208, '0908854eb0be864cd2121ffc1c1a9ed77d6ff07afe4c9ec41cbca270e1aefb14'),
 }
 CALLEES = {
     helper.ADDRESS: helper.BODY_SHA256,
@@ -130,7 +131,7 @@ def bind(proof, data, address, calls):
         proof.dependencies[target] = body
         proof.records[target] = dict(address=target, end=target+len(body), bytes=len(body),
             body_sha256=expected, structure={'kind': 'mode-six script dependency'}, **proof.identities)
-    # All three calls supply a nonzero count and R3=6. The helper saves 20
+    # Each script call supplies a nonzero count and R3=6. The helper saves 20
     # bytes and allocates 52, so [SP+72] is the caller's first outgoing word.
     # Its unsigned guard admits slot 6; both outcomes of the geometry check
     # converge at 080E04F2. Other switch arms are never used by these owners.
