@@ -666,7 +666,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c89a21de1d0a35292a655293064caa206f6f11c131aec15a58631c1d95eaf4ad",
+        "acknowledged_cursor": 6981728683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c89a21de1d0a35292a655293064caa206f6f11c131aec15a58631c1d95eaf4ad",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DB944\",\"who\":\"rainbow-callback\",\"claim_id\":6981629834,\"reason\":\"Complete 246-byte linked C parked. Native guarded BIOS division replay rejects a retained allocator-path scratch pointer.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:37:24Z",
+          "id": 6981712237,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:37:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf6c060f73bf99dd796ab1f890e0f0c238bd153ee9531c4d9665172892a754b7",
+        "result": {
+          "address": "0x080DB944",
+          "claim_id": 6981629834,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981712237,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -696,6 +724,98 @@
           "request_id": 6981648612,
           "status": "accepted",
           "who": "rainbow-menu"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "06a2805077275eae8ad677f047d70f83350b0a7811fa457cf845b83fdff50a0c",
+        "acknowledged_cursor": 6981728683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "06a2805077275eae8ad677f047d70f83350b0a7811fa457cf845b83fdff50a0c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813569C\",\"who\":\"rainbow-menu\",\"claim_id\":6981648612,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:38:03Z",
+          "id": 6981728683,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:38:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf6c060f73bf99dd796ab1f890e0f0c238bd153ee9531c4d9665172892a754b7",
+        "result": {
+          "address": "0x0813569C",
+          "claim_id": 6981648612,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981728683,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1d2f2abb24a283867c1a5a5d22e038bae067b12f52747b7fd41687f233ba64b1",
+        "acknowledged_cursor": 6981728683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1d2f2abb24a283867c1a5a5d22e038bae067b12f52747b7fd41687f233ba64b1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800D324\",\"who\":\"rainbow-state\",\"note\":\"\"}",
+          "created_at": "2026-11-18T14:37:13Z",
+          "id": 6981707856,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:37:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf6c060f73bf99dd796ab1f890e0f0c238bd153ee9531c4d9665172892a754b7",
+        "result": {
+          "address": "0x0800D324",
+          "claim_id": 6981707856,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981707856,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3d3fd8d4ecbe77c9733c093be10e93ab23c1a77140199bd776883aa2604eae14",
+        "acknowledged_cursor": 6981728683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3d3fd8d4ecbe77c9733c093be10e93ab23c1a77140199bd776883aa2604eae14",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DE524\",\"who\":\"rainbow-callback\",\"note\":\"Recover linked sibling object command and conditional callback arguments\"}",
+          "created_at": "2026-11-18T14:37:53Z",
+          "id": 6981724419,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:37:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cf6c060f73bf99dd796ab1f890e0f0c238bd153ee9531c4d9665172892a754b7",
+        "result": {
+          "address": "0x080DE524",
+          "claim_id": 6981724419,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981724419,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null

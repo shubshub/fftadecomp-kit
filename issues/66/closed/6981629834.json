@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f1e2c3d4161989bc622fc24ec8d08c742ca06ab12c7b623f9223c459c6a9bc66",
+    "acknowledged_cursor": 6981629834,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f1e2c3d4161989bc622fc24ec8d08c742ca06ab12c7b623f9223c459c6a9bc66",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DB944\",\"who\":\"rainbow-callback\",\"note\":\"Matching indexed list operation and verified sibling ABI\"}",
+      "created_at": "2026-11-18T14:34:15Z",
+      "id": 6981629834,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:34:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0473549367498f5c8c4aa07e3f93627d7dc8d73e6579d34ee3c720b9024944d0",
+    "result": {
+      "address": "0x080DB944",
+      "claim_id": 6981629834,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6981629834,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c89a21de1d0a35292a655293064caa206f6f11c131aec15a58631c1d95eaf4ad",
+    "acknowledged_cursor": 6981728683,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c89a21de1d0a35292a655293064caa206f6f11c131aec15a58631c1d95eaf4ad",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DB944\",\"who\":\"rainbow-callback\",\"claim_id\":6981629834,\"reason\":\"Complete 246-byte linked C parked. Native guarded BIOS division replay rejects a retained allocator-path scratch pointer.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T14:37:24Z",
+      "id": 6981712237,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:37:24Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cf6c060f73bf99dd796ab1f890e0f0c238bd153ee9531c4d9665172892a754b7",
+    "result": {
+      "address": "0x080DB944",
+      "claim_id": 6981629834,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6981712237,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
