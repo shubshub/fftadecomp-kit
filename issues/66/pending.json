@@ -602,7 +602,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e18d6794365c0a1ddc764f0a629a34ecab3a2359963361f5586c9c5aea365f54",
+        "acknowledged_cursor": 6980334789,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e18d6794365c0a1ddc764f0a629a34ecab3a2359963361f5586c9c5aea365f54",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809D7E4\",\"who\":\"rainbow-menu\",\"claim_id\":6980183005,\"reason\":\"96/96 exact C parked: local output pointer in R1 survives void return; available profiles reject\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2; ordinary, conditional thunk, selective scratch and root-return scratch\"}",
+          "created_at": "2026-11-18T13:42:14Z",
+          "id": 6980321880,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:42:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9df62a1180e5c8df5b9baebd4434919f601a60c82f0a1325e9be437688cded62",
+        "result": {
+          "address": "0x0809D7E4",
+          "claim_id": 6980183005,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980321880,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -634,7 +662,35 @@
           "who": "rainbow-m4a"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9ee200100ffefce044bd6636b24bebb487476340b6f6add2b2f6fa1f7ca4a53e",
+        "acknowledged_cursor": 6980334789,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9ee200100ffefce044bd6636b24bebb487476340b6f6add2b2f6fa1f7ca4a53e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081457FC\",\"who\":\"rainbow-m4a\",\"claim_id\":6980274429,\"reason\":\"Parked genuine 56-byte byte-identical m4aSoundVSyncOn and diagnosed RAM qualifier; unqualified control is 52 bytes. No match credit.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T13:42:46Z",
+          "id": 6980334789,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:42:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9df62a1180e5c8df5b9baebd4434919f601a60c82f0a1325e9be437688cded62",
+        "result": {
+          "address": "0x081457FC",
+          "claim_id": 6980274429,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980334789,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      }
     }
   ],
   "issue": 66,
