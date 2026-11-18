@@ -2309,6 +2309,13 @@ and the two bytes of terminal alignment. It also replays the sector eraser's
 64-byte local buffer, the callback publication and the two halfword writes.
 The complete installer accounts for 62 ROM bytes.
 
+Full-sector verification at `08141BE0` copies the 46-byte compare routine at
+`08141BB0` and its two following alignment bytes into a 256-byte local.
+The initialized 64-KiB flash descriptors select 4096 bytes per sector.
+The copied routine returns zero on equality, otherwise the address of the
+first differing cartridge byte. The four copied source literals in the O1
+duplicate section are excluded from the 152-byte function extent.
+
 The same library unit compiles chip erase at `08141EB8` with
 `--unit-toolchain agbcc-O1-v1`. Its six flash byte writes issue the chip-erase
 command. All four setup records install the same callback and phase-3 wait.

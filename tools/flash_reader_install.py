@@ -36,48 +36,61 @@ def unit_owner(unit, address, orphan=None):
 
 def original_literals(image):
     """The O1 pool and its unreferenced duplicate must have the same three original bindings."""
+    pool_sites = {28 + 4 * i: (2, name) for i, name in enumerate(LITERALS)}
+    original_pools(image, ADDRESS, END, pool_sites, LITERALS, {SLOT}, bytes.fromhex('c046'))
+
+
+def original_pools(image, address, end, text_sites, duplicate_names, objects, trailing=b''):
+    """Check a pinned flash member's in-body RELs and its unreferenced O1 ABS32 mirror."""
+    owner_name = f'func_{address:08X}'
     text_index = image['text_index']
     names = image['section_names']
-    require(image['type'] == 1 and len(image['symbol_tables']) == 1 and names.count('.rodata') == 1, 'expected an original O1 duplicate pool')
+    require(image['type'] == 1 and len(image['symbol_tables']) == 1 and names.count('.rodata') == 1,
+            'expected an original O1 duplicate pool')
     rodata = names.index('.rodata')
     allocated = [i for i, section in enumerate(image['sections']) if section[2] & 2 and section[5]]
     require(sorted(allocated) == sorted((text_index, rodata)) and
             image['sections'][text_index][1:4] == (1, 6, 0) and image['sections'][text_index][8] == 4 and
             image['sections'][rodata][1:4] == (1, 2, 0) and image['sections'][rodata][8] == 4 and
-            image['section_data'][rodata] == bytes(12), 'unexpected allocated section or duplicate words')
-    symbol, offset = match.function_record(image, NAME, ADDRESS, True)
-    require(offset == 0 and symbol['bind'] == 1 and symbol['value'] == 1 and symbol['size'] == END-ADDRESS and
-            image['text'][END-ADDRESS:] == bytes.fromhex('c046') and
-            sorted(s['name'] for s in image['symbols'] if s['bind'] != 0) == sorted(LITERALS),
-            'expected the complete original owner, two externals and excluded terminal alignment')
-    expected = {'.rel.text': (text_index, 28), '.rel.rodata': (rodata, 0)}
+            image['section_data'][rodata] == bytes(len(duplicate_names) * 4),
+            'unexpected allocated section or duplicate words')
+    symbol, offset = match.function_record(image, owner_name, address, True)
+    global_names = sorted({name for _, name in text_sites.values()})
+    require(offset == 0 and symbol['bind'] == 1 and symbol['value'] == 1 and symbol['size'] == end-address and
+            image['text'][end-address:] == trailing and
+            sorted(s['name'] for s in image['symbols'] if s['bind'] != 0) == global_names,
+            'expected the complete original owner and its named externals')
+    duplicates = {i * 4: (2, name) for i, name in enumerate(duplicate_names)}
+    require(set(duplicates.values()) == {binding for binding in text_sites.values() if binding[0] == 2},
+            'duplicate words must mirror the in-body ABS32 bindings')
+    expected = {'.rel.text': (text_index, text_sites), '.rel.rodata': (rodata, duplicates)}
     found = set()
     for rel in image['relocations']:
         section = image['sections'][rel]
         name = names[rel]
         require(name in expected and name not in found, 'unknown or duplicated relocation section')
         found.add(name)
-        target, first = expected[name]
-        require(section[1:4] == (9, 64, 0) and section[7] == target and section[5] == 24 and section[8:] == (4, 8) and
-                section[6] in image['symbol_tables'] and image['section_data'][target][first:first+12] == bytes(12),
-                'wrong relocation section, words or addends')
+        target, sites = expected[name]
+        require(section[1:4] == (9, 64, 0) and section[7] == target and section[5] == 8 * len(sites) and
+                section[8:] == (4, 8) and section[6] in image['symbol_tables'], 'wrong relocation section')
         symbols = image['symbol_tables'][section[6]]
-        sites = {}
+        bindings = {}
         for site, info in struct.iter_unpack('<II', image['section_data'][rel]):
-            require(info & 255 == 2 and info >> 8 < len(symbols) and site not in sites,
-                    'expected unique complete ABS32 words')
-            symbol_index = info >> 8
-            require(image['section_data'][section[6]][16 * symbol_index + 13] == 0,
-                    'expected default symbol visibility')
+            kind, symbol_index = info & 255, info >> 8
+            require(kind in (2, 10) and symbol_index < len(symbols) and site not in bindings and
+                    image['section_data'][section[6]][16 * symbol_index + 13] == 0,
+                    'expected unique ordinary ABS32 words or Thumb calls')
             item = symbols[symbol_index]
-            sites[site] = item['name']
-            if item['name'] == NAME:
-                require(item == symbol, 'self-address does not name the defined Thumb installer')
+            bindings[site] = (kind, item['name'])
+            canonical = bytes(4) if kind == 2 else bytes.fromhex('fff7feff')
+            require(image['section_data'][target][site:site+4] == canonical, 'noncanonical relocation addend')
+            if item['name'] == owner_name:
+                require(item == symbol, 'self-address does not name the defined Thumb function')
             else:
-                require(item['name'] in (SLOT, READ) and item['section'] == item['value'] == item['size'] == 0 and
-                        item['bind'] == 1 and item['type'] in (0, 1 if item['name'] == SLOT else 2),
-                        'expected the external slot or Thumb reader')
-        require(sites == {first + i * 4: name for i, name in enumerate(LITERALS)}, 'incorrect pool bindings')
+                require(item['name'] in global_names and item['section'] == item['value'] == item['size'] == 0 and
+                        item['bind'] == 1 and item['type'] in (0, 1 if item['name'] in objects else 2),
+                        'incorrect external function or object binding')
+        require(bindings == sites, 'incorrect pool or call bindings')
     require(found == set(expected), 'missing original pool or duplicate bindings')
 
 
