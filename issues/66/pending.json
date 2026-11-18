@@ -574,7 +574,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "737dbda29e520961c0f7ee08d5550f285dbe497825f5d8384716d443ed7692f8",
+        "acknowledged_cursor": 6979722658,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "737dbda29e520961c0f7ee08d5550f285dbe497825f5d8384716d443ed7692f8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812BA08\",\"who\":\"rainbow-state\",\"claim_id\":6979580324,\"reason\":\"732/732 raw linked C bytes identical. Native volatile trace exceeds 32 unknown decisions. Compiler-emitted __divsi3 plus r4 thunk also need one binding policy. C and ROM evidence parked.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; addressed-signed-runtime-thunks-data-v1; native frame, quotient identity and all-path r4 target checks\"}",
+          "created_at": "2026-11-18T13:18:10Z",
+          "id": 6979722658,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:18:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c56637f1ad76c7b03cafb7fcde8bede408f7dd5e10871148d9af10b5e93d2688",
+        "result": {
+          "address": "0x0812BA08",
+          "claim_id": 6979580324,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6979722658,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     }
   ],
   "issue": 66,
