@@ -15,7 +15,10 @@ admits exactly the lines the writer produces for the claimed schema:
    not at all. On the buffer schemas, the other `* buffer ` lines (loop replay,
    BIOS, copy-helper and switch-callee summary lines) may repeat:
    `match_evidence.buffer_report_matches` requires them to equal the
-   recomputed proof lines exactly and in order;
+   recomputed proof lines exactly and in order. On the three framed schemas
+   without buffer calls, the `* DMA fill` lines may repeat:
+   `dma_fill_profile.check_report` requires them to equal the recomputed
+   block exactly, right after the stack-frame line;
 3. `* source:` names the file match.py compiles for the address (`source_path`:
    `src/<ADDR>.c`, else the first `<ADDR>.c` under `src/` in sorted order), and
    `* hand-asm allow list:` is `not listed` or `listed (...)`. The source
@@ -43,6 +46,8 @@ import os
 from pathlib import Path
 import re
 
+from dma_fill_profile import MARKER as DMA_FILL_LINES  # its summary, premise and manifest lines
+
 # Every bullet is a field line: the first non-blank character (Unicode blanks included) is `*`, `-`
 # or `+`, followed by a blank.
 FIELD = re.compile(r"\s*[*+-]\s")
@@ -61,7 +66,7 @@ UNIT = ("* library unit: ", "* unit toolchain: ", "* unit compiler SHA-256: ", "
 HAND_ASM = re.compile(r"not listed|listed \(.*\)")
 
 # The writer's field order (match.py's report writer); the buffer proof lines follow their fingerprint.
-ORDER = (COMMON[:3] + FRAME + BUFFER + (PROOF_LINES,) + CALLS + SELF_CALLS + DATA + UNIT + COMMON[3:])
+ORDER = (COMMON[:3] + FRAME + (DMA_FILL_LINES,) + BUFFER + (PROOF_LINES,) + CALLS + SELF_CALLS + DATA + UNIT + COMMON[3:])
 
 
 def layout(schema):
@@ -83,7 +88,7 @@ def layout(schema):
     required = COMMON + (FRAME if framed else ()) + (CALLS if calls else ()) + \
         (DATA if data else ()) + (BUFFER if buffer else ())
     optional = UNIT + (SELF_CALLS if calls and not buffer else ())
-    return required, optional, ((PROOF_LINES,) if buffer else ())
+    return required, optional, ((PROOF_LINES,) if buffer else ()) + ((DMA_FILL_LINES,) if framed and not buffer else ())
 
 
 def source_path(root, address):
@@ -106,8 +111,8 @@ def check(lines, schema, address, root):
         if not FIELD.match(line):
             continue
         prefix = next((prefix for prefix in allowed if line.startswith(prefix)), None)
-        if prefix is None and line.startswith(repeated):
-            prefix = PROOF_LINES
+        if prefix is None:
+            prefix = next((prefix for prefix in repeated if line.startswith(prefix)), None)
         if prefix is None:
             raise ValueError(f"plain report field is not written for this schema: {line[:60]}")
         if prefix in counts:
@@ -120,7 +125,7 @@ def check(lines, schema, address, root):
             raise ValueError(f"plain report field is missing: {prefix.strip()}")
     if counts.get(SELF_CALLS[0], 0) != counts.get(SELF_CALLS[1], 0):
         raise ValueError("plain report self-call lines are incomplete")
-    # Each prefix but the proof lines' occurs once, so a non-decreasing slot sequence is the writer's order.
+    # Each prefix but the repeated lines' occurs once, so a non-decreasing slot sequence is the writer's order.
     if [slot for _, slot in slots] != sorted(slot for _, slot in slots):
         raise ValueError("plain report fields are not in the writer's order")
     verdict = next((index for index, line in enumerate(lines) if line.startswith("**")), len(lines))

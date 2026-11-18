@@ -11,6 +11,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
+import dma_fill_profile as dma_fill
 import empty_body_profile as empty_body
 import plain_report_fields
 import switch_constants_profile as switch_constants
@@ -1282,6 +1283,10 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
                 return False
             self_sites = frozenset(address + offset for offset in offsets)
 
+        # report_matches admits DMA fill lines here only on the plain framed profiles (kit #239)
+        dma_lines = dma_fill.report_fields(lines)
+        fills = dma_fill.Fills(rom) if dma_lines else None
+
         thunk_calls = set()
         def resolve(target):
             if target == address and self_sites is not None:
@@ -1297,19 +1302,24 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
         try:
             reached = verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None,
                                                self_calls=self_sites,
-                                               incoming_narrow_reads=thumb and self_sites is None)
+                                               incoming_narrow_reads=thumb and self_sites is None,
+                                               dma_fills=fills)
             if self_sites is not None and {item.address for item in reached
                     if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
                 return False
             plain_report_fields.check_labels(profile, reached, address, data, thumb, calls)
+            if fills is not None:
+                dma_fill.check_report(fills, lines)
         except modsi3.AddressedRemainderRequired:
-            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None:
+            # that replay has no DMA fill rule, so its lines would go unchecked
+            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None or fills is not None:
                 return False
             reached = verify_addressed_modsi3_source(
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
                 profile == FRAMED_LINKED_SCHEMA)
         if parts is not None:
-            parts.update(instructions=reached, self_sites=self_sites or frozenset())
+            parts.update(instructions=reached, self_sites=self_sites or frozenset(),
+                         dma_lines=fills.report_lines() if fills is not None else ())
         if thunk_calls:
             # a library unit report replays with its unit's toolchain
             import library_units
@@ -1442,6 +1452,13 @@ def report_matches(report, root, address):
         if len(verdicts) != 1 or not (verdicts[0] in plain or
                 verdicts[0] in data and f"* control flow: {CALL_SUMMARY}" in stated):
             return False
+    stated = report.splitlines()
+    from data_buffer_profile import SCHEMA as DATA_BUFFER_SCHEMA
+    if dma_fill.report_fields(stated) and [line for line in stated if line.startswith("* verification:")] not in [
+            [f"* verification: `{schema}`"] for schema in (FRAMED_SCHEMA, FRAMED_LINKED_SCHEMA, FRAMED_DATA_SCHEMA,
+                                                          DATA_BUFFER_SCHEMA)]:
+        # DMA fill lines belong to the plain framed profiles and the plain data-buffer schema only
+        return False
     import plausible
     try:
         records = plausible.allowlisted_volatile_uses(root, address)
