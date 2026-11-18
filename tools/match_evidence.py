@@ -1161,6 +1161,10 @@ def report_matches(report, root, address):
             import boot_dma0_shadow
             if not boot_dma0_shadow.report_body(report, root):
                 return False
+        if address == 0x0800C720:
+            import scanline_wave
+            if not scanline_wave.report_body(report, root):
+                return False
         if address == 0x081457FC:
             import m4a_dma_counter
             if not m4a_dma_counter.report_body(report, root):
