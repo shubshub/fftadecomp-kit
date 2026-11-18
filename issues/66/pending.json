@@ -1214,7 +1214,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0656b8efcfc88eecedcc6bd555cd81b687ed44604e4bb7b6f4cc3b3d53c3aa09",
+        "acknowledged_cursor": 6990696917,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0656b8efcfc88eecedcc6bd555cd81b687ed44604e4bb7b6f4cc3b3d53c3aa09",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08005EF8\",\"who\":\"rainbow-menu\",\"claim_id\":6990249450,\"reason\":\"MATCH 204/204: conditional packed transfer task, original scheduler, heap, clear and record-copy verification. Toolkit #312.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:28:50Z",
+          "id": 6990696917,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:28:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1009e0ed6055bc659da7019a38c03966ce4487683818df8c5e2db2785baba325",
+        "result": {
+          "address": "0x08005EF8",
+          "claim_id": 6990249450,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990696917,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
