@@ -667,6 +667,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "12c5f4bbf4ec77e9c91f65881a19fc9b6542dcc7fe17d82c175f3858bf4bc77d",
+        "acknowledged_cursor": 6988159308,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "12c5f4bbf4ec77e9c91f65881a19fc9b6542dcc7fe17d82c175f3858bf4bc77d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08021618\",\"who\":\"rainbow-state\",\"note\":\"Check installed IWRAM clear and caller-origin halfword arguments of the original 224-byte routine.\"}",
+          "created_at": "2026-11-18T18:44:45Z",
+          "id": 6988150999,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:44:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a987a989e5d266732ab172285bde564bb2c6c6c44c6c425576362bc8340d81ca",
+        "result": {
+          "address": "0x08021618",
+          "claim_id": 6988150999,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6988150999,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "18315b791d32cf97d0ca402034e72f07bfb6bc8f31bbc642dbf44f4b783973de",
+        "acknowledged_cursor": 6988159308,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "18315b791d32cf97d0ca402034e72f07bfb6bc8f31bbc642dbf44f4b783973de",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08112AEC\",\"who\":\"astra-shift\",\"note\":\"Revisit 480-byte camera callback with a native sibling-proven typed bounds accessor\"}",
+          "created_at": "2026-11-18T18:45:07Z",
+          "id": 6988159308,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:45:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a987a989e5d266732ab172285bde564bb2c6c6c44c6c425576362bc8340d81ca",
+        "result": {
+          "address": "0x08112AEC",
+          "claim_id": 6988159308,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6988159308,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
