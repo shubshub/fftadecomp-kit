@@ -1483,6 +1483,23 @@ it), and, for direct calls, the scheduler reading the parent only through the
 outgoing word. Existing scheduler selectors retain their
 `func_08005B6C`-only guards.
 
+The constructor at `080D376C` first clears a 28-byte descriptor and passes
+it to the same direct scheduler entry. Use
+`--owner-runtime-profile conditional-scheduler-zero-descriptor-v1` for
+this caller. Its first call loads the Thumb target from the ROM word at
+`0836D4B8`. The installer passes 88 halfwords from `08A38A2C` to
+`03005E78` through CpuSet. Under the premise that the image remains
+installed and executable, its aligned path executes 43 instructions, writes
+seven zero words within the descriptor and restores its saved return address.
+The caller replaces the resulting one-past pointer in R2 before reading it.
+The second call passes the same descriptor in R3, a zero parent word on the
+stack, callback `080D3208`, and allocation size `0xB28`. The scheduler's
+return, nonretention and frame-isolation premises still apply. The saved
+report checks the original ELF bindings, image, both accesses to the local,
+and the complete 64-byte owner. Run `tests/test_scheduler_zero_descriptor.py`
+with `FFTA_SCHEDULER_ZERO_ROOT` set to the indexed game checkout for the
+USA ROM tests.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
