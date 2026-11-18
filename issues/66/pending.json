@@ -698,6 +698,66 @@
           "who": "rainbow-oam-sibling"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "8e65a78920ad16a92059be4ebd22c7ff85cd65c8afeffffe832cd4a5b41ad9fd",
+        "acknowledged_cursor": 6986935299,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8e65a78920ad16a92059be4ebd22c7ff85cd65c8afeffffe832cd4a5b41ad9fd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021F18\",\"who\":\"rainbow-oam-sibling\",\"claim_id\":6986819793,\"reason\":\"Parked natural C linked 154/154. Conditional thunk alias proof needed; callback observes uninitialized local byte +5 as renderer flip_x.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:55:33Z",
+          "id": 6986930007,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:55:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ff28fc599f7ada5974044acece70dc37705988dc3fc734c4e5fc2cb0a11c801a",
+        "result": {
+          "address": "0x08021F18",
+          "claim_id": 6986819793,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986930007,
+          "status": "accepted",
+          "who": "rainbow-oam-sibling"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6cbc100163eacbd5d8184f86fffe26a907ebefaf45a15dca1041c4db71b25c3a",
+        "acknowledged_cursor": 6986935299,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6cbc100163eacbd5d8184f86fffe26a907ebefaf45a15dca1041c4db71b25c3a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A827C\",\"who\":\"astra-sound\",\"note\":\"Recover native three-instruction original call target, genuine source and canonical report.\"}",
+          "created_at": "2026-11-18T17:55:46Z",
+          "id": 6986935299,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:55:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ff28fc599f7ada5974044acece70dc37705988dc3fc734c4e5fc2cb0a11c801a",
+        "result": {
+          "address": "0x080A827C",
+          "claim_id": 6986935299,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6986935299,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      },
       "release": null
     }
   ],

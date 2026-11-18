@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "29aaf5cc8d12ac22de5572f015ca1ac430212bf8ad70f7cd89b1005969eabc9f",
+    "acknowledged_cursor": 6986819793,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "29aaf5cc8d12ac22de5572f015ca1ac430212bf8ad70f7cd89b1005969eabc9f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08021F18\",\"who\":\"rainbow-oam-sibling\",\"note\":\"Recover the native 154-byte sibling of 08021FB4, checking actual callback, frame and caller interface before C verification.\"}",
+      "created_at": "2026-11-18T17:51:01Z",
+      "id": 6986819793,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:51:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "71139805b66e72cd89f54980792051d5dfcd3b1f10007aca79bb7587918ccb2a",
+    "result": {
+      "address": "0x08021F18",
+      "claim_id": 6986819793,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6986819793,
+      "status": "accepted",
+      "who": "rainbow-oam-sibling"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8e65a78920ad16a92059be4ebd22c7ff85cd65c8afeffffe832cd4a5b41ad9fd",
+    "acknowledged_cursor": 6986935299,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8e65a78920ad16a92059be4ebd22c7ff85cd65c8afeffffe832cd4a5b41ad9fd",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021F18\",\"who\":\"rainbow-oam-sibling\",\"claim_id\":6986819793,\"reason\":\"Parked natural C linked 154/154. Conditional thunk alias proof needed; callback observes uninitialized local byte +5 as renderer flip_x.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T17:55:33Z",
+      "id": 6986930007,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:55:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "ff28fc599f7ada5974044acece70dc37705988dc3fc734c4e5fc2cb0a11c801a",
+    "result": {
+      "address": "0x08021F18",
+      "claim_id": 6986819793,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6986930007,
+      "status": "accepted",
+      "who": "rainbow-oam-sibling"
+    }
+  }
+}
