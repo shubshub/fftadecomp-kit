@@ -1239,6 +1239,9 @@ def report_matches(report, root, address):
             return owner_admission_profile.report_matches(report, root, address)
         if software_float.selected(report):
             return software_float.report_matches(report, root, address)
+        import unit_double_add_parts as add_parts
+        if add_parts.SCHEMA in report:
+            return add_parts.report_matches(report, root, address)
         import unit_double_constructor as constructor
         if constructor.SCHEMA in report:
             return constructor.report_matches(report, root, address)

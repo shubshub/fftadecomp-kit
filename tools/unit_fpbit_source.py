@@ -3,11 +3,67 @@ import argparse
 import os
 from pathlib import Path
 import shutil
+import struct
 import sys
 import tempfile
 
 import library_units as units
 import software_float_profile as runtime
+
+
+DP_DIGEST = 'fd4260dbe23fa4058473ccd446851e3aa2a4e6a73ec65eebf4838bf401bcd7f0'
+
+
+def dp_unit(unit):
+    return (unit is not None and unit.name == 'libgcc dp-bit' and
+            unit.toolchain == 'old-agbcc-O2-v1' and
+            (unit.start, unit.end, unit.proof) == (0x08142BE8, 0x081439C8, 0x08142D34) and
+            unit.row['identity'] == [dict(address='0x08142BE8', size=3552, sha256=DP_DIGEST)])
+
+
+def reviewed_source(capture, relative, address, names, digest):
+    import plausible
+    from sdk_cpuset_halfword import TOKEN, base_header
+    path = capture / relative
+    text = path.read_text()
+    wanted = f'src/{address:08X}.c'
+    if relative.as_posix() != wanted or plausible.include_closure(capture, path) != (
+            {wanted, 'include/ffta.h'}, []) or not base_header((capture/'include/ffta.h').read_bytes(), names):
+        raise ValueError('dp-bit source requires the original public types and one addressed source')
+    tokens = TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text))
+    if any(marker in text for marker in ('\\', '??', '%:', '\0')) or units.sha(' '.join(tokens).encode()) != digest:
+        raise ValueError('dp-bit source differs from the reviewed library signature or arithmetic')
+
+
+def fixed_bindings(image, address, end, targets, sites, data_name):
+    """Require the original complete symbol and every specified zero-addend REL site."""
+    from addressed_signed_runtime_profile import original_function
+    if original_function(image, address)["size"] != end - address or len(image["text"]) != end - address:
+        raise ValueError("fp-bit member requires the complete original function")
+    undefined = [symbol["name"] for symbol in image["symbols"] if symbol["name"] and not symbol["section"]]
+    if sorted(undefined) != sorted(targets):
+        raise ValueError("fp-bit member requires its exact undefined symbol namespace")
+    seen = set()
+    for idx in image["relocations"]:
+        section = image["sections"][idx]
+        if section[1] != 9 or section[7] != image["text_index"] or section[9] != 8 or section[5] % 8:
+            raise ValueError("fp-bit member requires text REL relocations")
+        symbols = image["symbol_tables"].get(section[6])
+        for offset, info in struct.iter_unpack("<II", image["section_data"][idx]):
+            if symbols is None or info >> 8 >= len(symbols):
+                raise ValueError("fp-bit member REL has no matching symbol")
+            symbol = symbols[info >> 8]
+            name = sites.get(offset)
+            is_data = name == data_name
+            if name is None or offset in seen or symbol["name"] != name or symbol["section"] or \
+                    symbol["bind"] != 1 or symbol["type"] not in (0, 1 if is_data else 2) or \
+                    symbol["value"] or symbol["size"] or info & 255 != (2 if is_data else 10) or \
+                    sum(item["name"] == name for item in image["symbols"]) != 1 or \
+                    image["text"][offset:offset+4] != (bytes(4) if is_data else bytes.fromhex("fff7feff")):
+                raise ValueError("fp-bit member has an incorrect original relocation, symbol or addend")
+            seen.add(offset)
+    if seen != set(sites):
+        raise ValueError("fp-bit member lacks required original relocations")
 
 
 def build(member, root, address, args=None):

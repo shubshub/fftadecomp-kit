@@ -2258,7 +2258,7 @@ toolchain. It is refused outside a unit, for a different unit's toolchain,
 together with `--cc`/`--flags`, other toolchain options or non-default WSL
 options. Unit toolchains support ordinary Thumb leaf, frame, direct-call, named-data
 and function-address reports. The dp-bit packer supports its unit-bound logical
-right-shift proof. The dp-bit constructor, fp-bit multiply and m4a memory command have their
+right-shift proof. The dp-bit constructor and component adder, fp-bit multiply and m4a memory command have their
 own unit-bound proofs.
 Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
 nothing refers to it. Such a section is first authenticated with the
@@ -2347,6 +2347,15 @@ The return restores LR into R3, adjusts SP and branches to R3. Replay binds the
 single Thumb call relocation and excludes the compiler's two-byte alignment NOP
 from the function extent. Native numerical tests cover signed zero, NaN payloads,
 infinities, normal rounding ties and the original packer's truncated subnormals.
+
+For dp-bit `_fpadd_parts` at `0x08142E10`, the same unit selector verifies
+all 624 bytes and 302 reachable instructions. It checks two original Thumb
+relocations to `__negdi2` and an ABS32 relocation to the fixed RAM record at
+`0x03005E50`. Both original callers unpack into distinct component records,
+call the helper and pack the returned record. Subtraction toggles the second
+sign before the call. The helper can return either input, the output, or the
+fixed record for opposing infinities. Only the output receives writes. When
+the packer reads the fixed record, its five words are runtime inputs.
 
 For fp-bit `__mulsf3` at `0x08143CEC`, `--unit-toolchain old-agbcc-O2-v1`
 checks the original compiler-generated `__muldi3` call, two unpacks, one
