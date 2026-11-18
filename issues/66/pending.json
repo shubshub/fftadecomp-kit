@@ -578,66 +578,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "156796edb9c2ffb34d325d0703b702c5e7e6a180e48ac98fe9ca61282ca335b1",
-        "acknowledged_cursor": 6986961699,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "156796edb9c2ffb34d325d0703b702c5e7e6a180e48ac98fe9ca61282ca335b1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804413C\",\"who\":\"rainbow-gap-leaves\",\"note\":\"Recover the 28-byte 0804413C callable helper in the original dispatcher, check real register ABI, reference and native replay.\"}",
-          "created_at": "2026-11-18T17:56:24Z",
-          "id": 6986950404,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:56:24Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e195053b8334d27f4204e9b019d9b930a1363c7d07e6b96f6869efb5ecc5dfad",
-        "result": {
-          "address": "0x0804413C",
-          "claim_id": 6986950404,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6986950404,
-          "status": "accepted",
-          "who": "rainbow-gap-leaves"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "936207fd3ec56690bc3b129d10011911b4fcc1bb19132798fbd19ed03b337b1f",
-        "acknowledged_cursor": 6986995960,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "936207fd3ec56690bc3b129d10011911b4fcc1bb19132798fbd19ed03b337b1f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804413C\",\"who\":\"rainbow-gap-leaves\",\"claim_id\":6986950404,\"reason\":\"28-byte native leaf matches, saves state 4 in panel low three bits. Closed 12-instruction CFG and fresh saved report replay.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T17:58:04Z",
-          "id": 6986990286,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:58:04Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "df4b904a42858bc559565d9b3c00951c00243782cce0e6324c9109aed73a7cba",
-        "result": {
-          "address": "0x0804413C",
-          "claim_id": 6986950404,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6986990286,
-          "status": "accepted",
-          "who": "rainbow-gap-leaves"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "1e32e37878ba259cc7e37d0bed8d80523fc17e23b24e6891b9ce62f87890f6db",
         "acknowledged_cursor": 6986972003,
         "body_provenance": "acceptance-time",
