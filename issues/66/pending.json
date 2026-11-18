@@ -927,6 +927,230 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d467db6ead4238db4eccaf0708a6dadeea3e42c8275c60f387443444e9205266",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d467db6ead4238db4eccaf0708a6dadeea3e42c8275c60f387443444e9205266",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D9BC0\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:19:16Z",
+          "id": 6978363106,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:19:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x080D9BC0",
+          "claim_id": 6978363106,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978363106,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ef8265502c581c8a50b23e7c555aa9fe0ddf88365369f32e4695b1abef441369",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef8265502c581c8a50b23e7c555aa9fe0ddf88365369f32e4695b1abef441369",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DAE70\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:19:26Z",
+          "id": 6978366877,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:19:26Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x080DAE70",
+          "claim_id": 6978366877,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978366877,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5cdf7f5d42664f5d32ee7cd1868afc8ba0af072d869f8c1105936bf399e546ff",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5cdf7f5d42664f5d32ee7cd1868afc8ba0af072d869f8c1105936bf399e546ff",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080601A4\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:19:35Z",
+          "id": 6978370286,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:19:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x080601A4",
+          "claim_id": 6978370286,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978370286,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2c069a52fd8c4c2081c0d652e4f35926e3ea2e78ea30cb85061388503cd4ee77",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2c069a52fd8c4c2081c0d652e4f35926e3ea2e78ea30cb85061388503cd4ee77",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809ADDC\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:19:45Z",
+          "id": 6978373709,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:19:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x0809ADDC",
+          "claim_id": 6978373709,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978373709,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7d1252efb2d6b960be9c885bf27e328b7b862cd4b61ace56cf9830a8448b2ee7",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7d1252efb2d6b960be9c885bf27e328b7b862cd4b61ace56cf9830a8448b2ee7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809D844\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:19:55Z",
+          "id": 6978377363,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:19:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x0809D844",
+          "claim_id": 6978377363,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978377363,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "cab90a3d6bf0e2dbd1c0d3de4eafe554dda7d5a4ddd6b075ad66675b09d263e3",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cab90a3d6bf0e2dbd1c0d3de4eafe554dda7d5a4ddd6b075ad66675b09d263e3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080603F4\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:20:04Z",
+          "id": 6978380930,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:20:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x080603F4",
+          "claim_id": 6978380930,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978380930,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7dc10c9d321406fda30b649f920c0b344ef312d8011565129b7a9fccc6f02b66",
+        "acknowledged_cursor": 6978384589,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7dc10c9d321406fda30b649f920c0b344ef312d8011565129b7a9fccc6f02b66",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081465E4\",\"who\":\"rainbow-ffta\",\"note\":\"Hand recover the complete Thumb routine against callers and the ROM\"}",
+          "created_at": "2026-11-18T12:20:14Z",
+          "id": 6978384589,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:20:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f44acd9ff58529481eb73dc7f27a316178edd7611f5b72abdd5c8bf38b577438",
+        "result": {
+          "address": "0x081465E4",
+          "claim_id": 6978384589,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978384589,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
