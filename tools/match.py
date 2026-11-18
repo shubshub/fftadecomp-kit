@@ -5783,6 +5783,7 @@ def main():
     # inside a unit the default toolchain was checked against this source only
     consistent_source = gate["source"] if isinstance(gate, dict) and "source" in gate else None
     unit_orphan = None
+    flash_erase_evidence = None
     # an allowlisted volatile object is checked once, here, ahead of every
     # selector: the selectors below write their own reports
     volatile_records, volatile_finding, volatile_source = allowlisted_volatile_check(ROOT, addr, args)
@@ -6215,6 +6216,10 @@ def main():
                     verified_instructions, _ = verify_switches(
                         got, addr, rom, mapping, switch_evidence,
                         data_mapping=data_mapping if data_relocations else None)
+            elif unit_context is not None and addr == 0x08141F2C:
+                import flash_sector_erase
+                verified_instructions, flash_erase_evidence = flash_sector_erase.native_proof(
+                    got, rom, mapping, empty_index, data_mapping, calls, data_relocations, unit_context, unit_orphan)
             elif function_relocations:
                 objects = parse_data_symbols(data_mapping) if data_relocations else {}
                 address_manifest = {
@@ -6343,6 +6348,9 @@ def main():
         control_flow = inert_spin.CONTROL_FLOW
     if thunk_profile:
         control_flow = function_thunk.CONTROL_FLOW
+    if flash_erase_evidence is not None:
+        schema = flash_sector_erase.SCHEMA
+        control_flow = flash_sector_erase.CONTROL
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -6394,6 +6402,8 @@ def main():
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
+    if flash_erase_evidence is not None and empty_body.index_snapshot(ROOT) != empty_index:
+        sys.exit("flash sector index changed during verification; re-run match.py")
     if unit_context is not None:
         if schema not in library_units.schemas(unit_context["unit"], addr, unit_orphan):
             sys.exit(f"refused: library unit {unit_context['unit'].name} does not admit {schema} at 0x{addr:08X}")
@@ -6544,6 +6554,8 @@ def main():
                     f"{' (' + args.label + ')' if args.label else ''}\n\n")
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
+            if flash_erase_evidence is not None:
+                f.write(f"* flash sector reader: `{library_units.canonical(flash_erase_evidence)}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
             if empty_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
