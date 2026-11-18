@@ -667,6 +667,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ded24639babab13cd38f9ff7ba5e94cd6fccd400a2a0bea84e0ceaf29660d844",
+        "acknowledged_cursor": 6987279627,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ded24639babab13cd38f9ff7ba5e94cd6fccd400a2a0bea84e0ceaf29660d844",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804BBC0\",\"who\":\"rainbow-map-route\",\"note\":\"Independently rebuild the parked graph worker, check native accesses and real caller-domain conditions without assuming the 30-node input range.\"}",
+          "created_at": "2026-11-18T18:09:55Z",
+          "id": 6987279627,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:09:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "13f400a1396909560e1823638bd4192e5f1974f37e34de6ba0509c91121b12eb",
+        "result": {
+          "address": "0x0804BBC0",
+          "claim_id": 6987279627,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987279627,
+          "status": "accepted",
+          "who": "rainbow-map-route"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
