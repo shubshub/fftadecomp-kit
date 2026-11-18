@@ -134,16 +134,13 @@ def helper_effects(rom,graphs):
     require(graphs[byte.OWNER][2] == {0x08141FE6:0x08142250}, 'wrong byte-program wait call')
 
 
-def native_proof(data,rom,mapping,index,objects,calls,literals,context,orphan):
+def sdk_graphs(rom,mapping,index,extra_spans=None):
     from software_double_profile import indices,span_record
-    require(unit_owner(context['unit'],OWNER,orphan) and context['tool'] == units.resolve(erase.TOOL) and
-            data == rom[OWNER-bank.BASE:END-bank.BASE] and calls == CALLS and literals == OBJECTS and
-            all(match.parse_data_symbols(objects).get(name) == address for name,address in OBJECTS.values()),
-            'wrong O1 unit, original text or typed relocations')
     erase.provider(rom)
     entries,rows = indices(mapping,index)
     spans = {**erase.SPANS,byte.OWNER:(0x08142000,21),WRAPPER:(0x08141D9C,32),
              TIMER_START:(TIMER_STOP,65),TIMER_STOP:(erase.READER,23),IRQ:(0x08141984,16)}
+    spans.update(extra_spans or {})
     graphs = {}
     for a,(end,n) in spans.items():
         require(span_record(a,end,entries,rows,rom)['instrs'] == n,'inconsistent paired function indices')
@@ -159,14 +156,23 @@ def native_proof(data,rom,mapping,index,objects,calls,literals,context,orphan):
             'wrong IdentifyFlash slot or program/verify caller')
     block(graphs[WRAPPER][0],0x08141D6E,[('ldr','r2, [r0]'),('adds','r0, r4, #0'),
           ('adds','r1, r5, #0'),('bl','#0x814224c'),('lsls','r0, r0, #0x10'),('lsrs','r3, r0, #0x10')])
-    loop(graphs[OWNER])
     helper_effects(rom,graphs)
+    match.verify_leaf_instructions(rom[byte.OWNER-bank.BASE:0x142000],byte.OWNER,True,graphs[byte.OWNER][2])
+    return graphs
+
+
+def native_proof(data,rom,mapping,index,objects,calls,literals,context,orphan):
+    require(unit_owner(context['unit'],OWNER,orphan) and context['tool'] == units.resolve(erase.TOOL) and
+            data == rom[OWNER-bank.BASE:END-bank.BASE] and calls == CALLS and literals == OBJECTS and
+            all(match.parse_data_symbols(objects).get(name) == address for name,address in OBJECTS.values()),
+            'wrong O1 unit, original text or typed relocations')
+    graphs = sdk_graphs(rom,mapping,index)
+    loop(graphs[OWNER])
     for a,frame in ((erase.OWNER,erase.LocalReaderFrame(rom,mapping)),(OWNER,ProgramReaderFrame(rom,mapping))):
         ins,_,direct,_ = graphs[a]
-        checked = match.verify_leaf_instructions(rom[a-bank.BASE:spans[a][0]-bank.BASE],a,True,direct,buffer_proof=frame)
+        checked = match.verify_leaf_instructions(rom[a-bank.BASE:erase.SPANS[a][0]-bank.BASE],a,True,direct,buffer_proof=frame)
         require(getattr(frame,'installed',False) and {i.address for i in checked} == set(ins),
                 'local reader does not fit the live returning frame')
-    match.verify_leaf_instructions(rom[byte.OWNER-bank.BASE:0x142000],byte.OWNER,True,graphs[byte.OWNER][2])
     lifetime = erase.reader_lifetime(rom,graphs,graphs[erase.OWNER][3])
     return checked,dict(partition=graphs[OWNER][3],setup_ids=[0x1B32,0x1CC2],slot=0x0200F36C,
         caller=WRAPPER,guard=dict(sectors=16,invalid=0x80FF),counter=dict(address=REMAINING,initial=4096,
