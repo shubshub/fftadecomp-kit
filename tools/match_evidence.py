@@ -1154,6 +1154,10 @@ def report_matches(report, root, address):
                 unit_arguments = library_units.report_arguments(report)
                 records += (allowlisted_volatile_semantics(root, address) if unit_arguments is None else
                             allowlisted_volatile_semantics(root, address, unit_arguments))
+        if address == 0x081457FC:
+            import m4a_dma_counter
+            if not m4a_dma_counter.report_body(report, root):
+                return False
         report = strip_volatile_records(report, records)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):

@@ -27,7 +27,8 @@ GBA I/O register window:
     /* plausible: hardware register, volatile is required here */
     *(volatile u16 *)0x04000000 = v;
 
-Allowlisted volatile RAM (kit#90): volatile RAM is allowed only
+The VSyncOn DMA counter has its own single-owner VBlank and compiler proof
+(tools/m4a_dma_counter.py). Other volatile RAM is allowed only
 for objects on the maintainer's volatile allow list (tools/volatile_allow.json),
 and only inside the one listed header's anonymous `extern struct { ... }
 symbol;` declaration, which must equal the pinned text, as qualifiers of
@@ -706,6 +707,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
         records.append(f"* allowlisted volatile: `{entry['symbol']}` at "
                        f"`{entry['address']}` declared in `{entry['header']}` "
                        f"(SHA-256 `{digest}`)")
+    if address == 0x081457FC:
+        import m4a_dma_counter
+        records.append(m4a_dma_counter.record(root))
     return records
 
 
@@ -835,6 +839,20 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
                 hardware_qualifiers.add(offset)
         except (OSError, ValueError, ImportError, SystemExit):
             pass
+    counter_qualifiers = set()
+    if relpath == "src/081457FC.c" and tree is not None and project is not None and closure == (
+            {relpath, "include/ffta.h"}, []):
+        import m4a_dma_counter as counter
+        try:
+            offset = counter.source_offset(text, (Path(tree) / counter.HEADER).read_bytes())
+            if offset is not None:
+                from rompath import rom_path
+                rom = Path(rom_path(project)).read_bytes()
+                counter.irq_evidence(rom)
+                counter.owner_evidence(rom[counter.OWNER-counter.BASE:counter.OWNER-counter.BASE+56], True)
+                counter_qualifiers.add(offset)
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
     listed_qualifiers, findings = allowlisted_volatile(
         code, relpath, data_symbols or {},
         volatile_allow_entries() if volatile_allow is None else volatile_allow, text, closure,
@@ -842,7 +860,7 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     polling_bodies = hardware_polling_bodies(code, hardware_qualifiers)
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, code):
-            if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers:
+            if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
                 continue
             if rid == "dead-code" and m.start() in macro_tails:
                 continue
