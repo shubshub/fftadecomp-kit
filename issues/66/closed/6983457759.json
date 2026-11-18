@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ad09c224baa9da82b8cf8ea240333d46adf00560d840915715b555bb51b4c823",
+    "acknowledged_cursor": 6983484615,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ad09c224baa9da82b8cf8ea240333d46adf00560d840915715b555bb51b4c823",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131584\",\"who\":\"rainbow-action-evaluators\",\"note\":\"ActionEvaluator slot 7 (083A8714) points to 08131585; 4-byte zero-return leaf between independently referenced callbacks.\"}",
+      "created_at": "2026-11-18T15:42:43Z",
+      "id": 6983457759,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:42:43Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f3e23bf9abb2e5bb2d2c4a18c223967240b8f3a025b444be75941aa52db0bfb0",
+    "result": {
+      "address": "0x08131584",
+      "claim_id": 6983457759,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6983457759,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "9a34c451cbc497bd3652d275adb5836f206c3104a3ffa9e4fd7ce0557d38f77b",
+    "acknowledged_cursor": 6983553101,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9a34c451cbc497bd3652d275adb5836f206c3104a3ffa9e4fd7ce0557d38f77b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131584\",\"who\":\"rainbow-action-evaluators\",\"claim_id\":6983457759,\"reason\":\"Native MATCH 4/4 bytes, both instructions and saved report replayed. Slot 7 at 083A8714 uniquely names the Thumb entry.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:45:41Z",
+      "id": 6983537685,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:45:41Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c2636038c6fc08bb8a2b7454b85de6773461da85b011a4f7b068286cd39a3058",
+    "result": {
+      "address": "0x08131584",
+      "claim_id": 6983457759,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6983537685,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  }
+}
