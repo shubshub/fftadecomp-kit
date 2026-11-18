@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "08c2bda221fa09eefc248015320ee4505a340230961aaadd68ec2521f660193a",
+    "acknowledged_cursor": 6979904937,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "08c2bda221fa09eefc248015320ee4505a340230961aaadd68ec2521f660193a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08027528\",\"who\":\"rainbow-callback\",\"note\":\"Recover bounded indexed function using fixed native profiles\"}",
+      "created_at": "2026-11-18T13:25:45Z",
+      "id": 6979904937,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:25:45Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "27e3da4615ffa9314201b818c85e5f3463ea214ddd1db22a3ac0daaa7461a4dc",
+    "result": {
+      "address": "0x08027528",
+      "claim_id": 6979904937,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6979904937,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e0bb645edcd83e74f78ecfd3d796a42a41d300ff2ec8243a1cfbacbc30c036af",
+    "acknowledged_cursor": 6980003584,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e0bb645edcd83e74f78ecfd3d796a42a41d300ff2ec8243a1cfbacbc30c036af",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08027528\",\"who\":\"rainbow-callback\",\"claim_id\":6979904937,\"reason\":\"Parked exact 50-byte source; verifier rejects the advancing output pointer in func_0809F78C\",\"unmatchable\":true,\"tried\":\"fixed -O2, default and two buffer profiles\"}",
+      "created_at": "2026-11-18T13:29:47Z",
+      "id": 6980003584,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:29:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c95056f3668e694e95dedaa9bf082960263f6427498fd804404002b35e2f662f",
+    "result": {
+      "address": "0x08027528",
+      "claim_id": 6979904937,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6980003584,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
