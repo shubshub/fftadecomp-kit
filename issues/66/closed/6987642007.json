@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f7fa87d5dc5de6acd0bb08b1a59ad8115bdcde991e76f992ecb8af60765eed50",
+    "acknowledged_cursor": 6987655142,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f7fa87d5dc5de6acd0bb08b1a59ad8115bdcde991e76f992ecb8af60765eed50",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08112AEC\",\"who\":\"astra-shift\",\"note\":\"Hand-recover scene task callback and replay 480-byte source\"}",
+      "created_at": "2026-11-18T18:24:06Z",
+      "id": 6987642007,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:24:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "da3eb5a284ba4cebec39153308dbc4007bf2e6c0eeee8e6b727c8060c87d05e0",
+    "result": {
+      "address": "0x08112AEC",
+      "claim_id": 6987642007,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6987642007,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "16fde5cbe6b5ee35c4f0098346fe26b9563b9d77a24ec98766263fc2f32c8877",
+    "acknowledged_cursor": 6987918025,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "16fde5cbe6b5ee35c4f0098346fe26b9563b9d77a24ec98766263fc2f32c8877",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08112AEC\",\"who\":\"astra-shift\",\"claim_id\":6987642007,\"reason\":\"Parked natural 480B callback at 445 positional bytes; single getter address retained in R4 instead of rematerializing R1. Five original/compiled CPU comparisons agree at map-task call.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T18:35:14Z",
+      "id": 6987918025,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:35:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "684d8630389bb2a13e4ace8e58c439e22b4590429bf212965a795a25cf667c5b",
+    "result": {
+      "address": "0x08112AEC",
+      "claim_id": 6987642007,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6987918025,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  }
+}

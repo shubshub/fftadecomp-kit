@@ -542,7 +542,35 @@
           "who": "astra-shift"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "16fde5cbe6b5ee35c4f0098346fe26b9563b9d77a24ec98766263fc2f32c8877",
+        "acknowledged_cursor": 6987918025,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "16fde5cbe6b5ee35c4f0098346fe26b9563b9d77a24ec98766263fc2f32c8877",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08112AEC\",\"who\":\"astra-shift\",\"claim_id\":6987642007,\"reason\":\"Parked natural 480B callback at 445 positional bytes; single getter address retained in R4 instead of rematerializing R1. Five original/compiled CPU comparisons agree at map-task call.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:35:14Z",
+          "id": 6987918025,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:35:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "684d8630389bb2a13e4ace8e58c439e22b4590429bf212965a795a25cf667c5b",
+        "result": {
+          "address": "0x08112AEC",
+          "claim_id": 6987642007,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987918025,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      }
     },
     {
       "claim": {
@@ -606,7 +634,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "138876220324c6011dc5efed4d496e01160c565a65ed6b393edff4c4f852fe89",
+        "acknowledged_cursor": 6987918025,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "138876220324c6011dc5efed4d496e01160c565a65ed6b393edff4c4f852fe89",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DA074\",\"who\":\"rainbow-menu\",\"claim_id\":6987754973,\"reason\":\"336/336 natural C, 164/164 instructions plus strict candidate proof, scene bank-0 provider and replay under independent kit review.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:34:39Z",
+          "id": 6987903231,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:34:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "684d8630389bb2a13e4ace8e58c439e22b4590429bf212965a795a25cf667c5b",
+        "result": {
+          "address": "0x080DA074",
+          "claim_id": 6987754973,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987903231,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +694,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "802699425f69fd1210050c65833e4990f42f87c51eb46435e536512a761a6aff",
+        "acknowledged_cursor": 6987918025,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "802699425f69fd1210050c65833e4990f42f87c51eb46435e536512a761a6aff",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F7B18\",\"who\":\"rainbow-state\",\"claim_id\":6987825027,\"reason\":\"Exact 936-byte scene callback parked at the forwarded 080D8C58 output-buffer and scheduler proof.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:34:58Z",
+          "id": 6987911326,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:34:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "684d8630389bb2a13e4ace8e58c439e22b4590429bf212965a795a25cf667c5b",
+        "result": {
+          "address": "0x080F7B18",
+          "claim_id": 6987825027,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987911326,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
