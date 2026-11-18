@@ -5790,3 +5790,18 @@ synchronous zero-phase callback for each and the installed 20-byte
 copy from the effect record. The record must be readable and separate
 from the fresh task. Allocator success, valid independent manager
 storage and the IWRAM installation remain explicit premises.
+
+The USA starter at `080D3508` uses `--owner-runtime-profile conditional-effect-registry-scheduler-v1`.
+Its two eight-byte registries hold 341 and 20 entries. The owner passes the
+callback and size from the same entry to the direct scheduler. ID `0x159`
+overrides both, selecting the 40-byte `080E2398` callback and reading primary
+metadata using the full third argument. The selector checks both ROM tables,
+all 240 distinct non-null callback entry addresses in both function indexes,
+the two query routines and their dependencies, and the scheduler's descriptor
+and phase-zero dispatch. The normal per-site frame, manager and parent checks
+apply. Returning execution requires ID 1 through `0x169` except the empty
+dispatch row `0xDB`; special metadata indices range from 1 through 341,
+including `0xDB`. The caller supplies the needed readable object references.
+The other extended cases leave request halfwords at +22 and +24 uninitialized.
+Callback-specific effects and enforcement of these domains by callers remain
+premises.
