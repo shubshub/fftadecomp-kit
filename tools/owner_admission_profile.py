@@ -841,6 +841,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             bindings['calls'] != sorted(proof['calls'] + proof['runtime_calls']):
         raise ValueError('owner bindings do not cover every exact reached external call')
     ordinary.update(data=bindings['data'],functions=bindings['functions'])
+    if selector == local_calls.SCHEDULER_EVENT:
+        import scheduler_event_definition as event
+        event.check_bindings(bindings)
     if selector == local_calls.SCHEDULER_ZERO_DESCRIPTOR:
         import scheduler_zero_descriptor
         scheduler_zero_descriptor.check_bindings(proof['buffers']['conditional_local_calls'], bindings)

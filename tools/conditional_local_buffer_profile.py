@@ -24,7 +24,8 @@ SCHEDULER_24_FOLLOWING = 'conditional-scheduler-twenty-four-target-following-cal
 SCHEDULER_24 = 'conditional-scheduler-twenty-four-target-branches-v1'
 SCHEDULER_LIVE_ALIAS = 'conditional-scheduler-live-local-alias-calls-v1'
 SCHEDULER_LIVE_ALIAS_PAYLOAD = 'conditional-scheduler-live-local-alias-payload-calls-v1'
-LIVE_ALIAS = (SCHEDULER_LIVE_ALIAS, SCHEDULER_LIVE_ALIAS_PAYLOAD)
+SCHEDULER_EVENT = 'conditional-scheduler-event-definition-v1'
+LIVE_ALIAS = (SCHEDULER_LIVE_ALIAS, SCHEDULER_LIVE_ALIAS_PAYLOAD, SCHEDULER_EVENT)
 SCHEDULER_WIDE = 'conditional-scheduler-eight-target-branches-v1'
 SCHEDULER_LOOP = 'conditional-scheduler-u16-counted-loop-v1'
 SCHEDULER_LOOP_LIVE_ALIAS = 'conditional-scheduler-sequential-live-alias-counted-loops-v1'
@@ -45,7 +46,7 @@ SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
 CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2)
-PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4}
+PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
 OUTPUT = 'conditional-local-output-word-call-v1'
@@ -60,6 +61,7 @@ SCHEMAS = {
     SCHEDULER_24_FOLLOWING: 'elf-symbol-thumb-' + SCHEDULER_24_FOLLOWING,
     SCHEDULER_24: 'elf-symbol-thumb-' + SCHEDULER_24,
     SCHEDULER_LIVE_ALIAS: 'elf-symbol-thumb-' + SCHEDULER_LIVE_ALIAS,
+    SCHEDULER_EVENT: 'elf-symbol-thumb-' + SCHEDULER_EVENT,
     SCHEDULER_LIVE_ALIAS_PAYLOAD: 'elf-symbol-thumb-' + SCHEDULER_LIVE_ALIAS_PAYLOAD,
     SCHEDULER_WIDE: 'elf-symbol-thumb-conditional-scheduler-eight-target-branches-v1',
     SCHEDULER_LOOP: 'elf-symbol-thumb-conditional-scheduler-u16-counted-loop-v1',
@@ -139,6 +141,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                 'local-buffer contracts exclude local BL and switches')
         self.root, self.calls = (address, bytes(data)), dict(calls)
         self.environment = environment_fingerprint()
+        if self.policy == SCHEDULER_EVENT:
+            import scheduler_event_definition as event
+            self.event_definition = event.bind(self, data, address, ins, edges, calls)
         if self.policy == SCHEDULER_PROJECTED:
             import scheduler_projected_outputs_profile as projected
             self.projected_outputs = projected.bind(self, edges, calls)
@@ -361,6 +366,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if self.policy == SCHEDULER_HALFWORD_PAYLOAD:
             import scheduler_halfword_payload_profile as halfword
             return halfword.check_call(self, address, aliases, stack, slots, site=site)
+        if self.policy == SCHEDULER_EVENT and address == 0x08005B6C:
+            import scheduler_event_definition as event
+            return event.check_call(self, aliases, stack, slots, site)
         if self.policy in (*LIVE_ALIAS, *LOOP_LIVE_ALIAS) and address != 0x08005B6C:
             import scheduler_live_alias_profile as live
             return live.check_call(self, address, aliases, stack, slots, constants=constants, site=site, words=words,
@@ -479,6 +487,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         require(set(self.observations) == set(self.calls), 'every conditional local-buffer call must be observed')
         return dict(schema=SCHEMAS[self.policy], runtime_dependencies=self.runtime_dependencies,
             environment=self.environment,
+            **({'event_definition': self.event_definition} if self.policy == SCHEDULER_EVENT else {}),
             **({'predicates': self.predicates} if self.policy == SCHEDULER_GUARDED else {}),
             **({'owner_list_load': self.owner_list_load} if self.policy in (STATE, FLAGGED_STATE) else {}),
             **({'state_flag_update': self.state_update} if self.policy == FLAGGED_STATE else {}),
@@ -516,7 +525,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                      'that bound, its initialization and the callback read bound are premises, not proofs. Callee-saved '
                      'register aliases to the descriptor or payload are admitted and recorded, as in the descriptor '
                      f'profile; the read-through-descriptor+{PAYLOAD_FIELDS[self.policy]} premise covers them.')]
-                   if self.policy in PAYLOAD_FIELDS else [])
+                   if self.policy in PAYLOAD_FIELDS and self.policy != SCHEDULER_EVENT else [])
                 + (['Every sequential scheduler invocation separately requires compatible return, exact SP and '
                     'protected caller/saved words, readable descriptor representation, allocation separation, '
                     'callback frame noninterference and nonretention. The copied R1 descriptor and original '
