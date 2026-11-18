@@ -124,6 +124,84 @@ class JumpTableTests(unittest.TestCase):
             with self.subTest(entry=entry):
                 self.refused("not a local code label", assembly(table=TABLE[:2] + (f".word\t{entry}",)))
 
+    def test_the_pointer_may_share_the_pool_dumped_at_the_jump(self):
+        # agbcc dumps the literals still pending at `mov pc` into one pool
+        # there, so the table pointer can be any word of it (`.L42+40`)
+        shared = assembly(dispatch=DISPATCH[:1] + ("ldr\tr2, .L12+4",) + DISPATCH[2:],
+                          pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11",
+                                ".align\t2, 0", ".L11:"))
+        self.assertEqual(compare(shared)[0][1], 3)
+        first = assembly(pool=(".L13:", ".align\t2, 0", ".L12:", ".word\t.L11", f".word\t{SYMBOL}",
+                               ".align\t2, 0", ".L11:"))
+        self.assertEqual(compare(first)[0][1], 3)
+        # the stripped compile may hold the pointer at another offset
+        self.assertEqual(compare(shared, stripped(assembly()))[0][1], 3)
+        self.assertEqual(compare(assembly(), stripped(shared))[0][1], 3)
+        # a table that follows its pool with no alignment in between
+        self.assertEqual(compare(assembly(
+            dispatch=DISPATCH[:1] + ("ldr\tr2, .L12+4",) + DISPATCH[2:],
+            pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".L11:")))[0][1], 3)
+
+    def test_a_shared_pointer_word_must_be_exactly_the_adjacent_table_label(self):
+        pool = (".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".align\t2, 0", ".L11:")
+        def via(operand, pool=pool, cases=CASES):
+            return assembly(dispatch=DISPATCH[:1] + (f"ldr\tr2, {operand}",) + DISPATCH[2:], pool=pool,
+                            cases=cases)
+        reason = "pointer is not a local label word"
+        # the other word of the pool, a misaligned or out-of-pool offset
+        for operand in (".L12", ".L12+2", ".L12+6", ".L12+8", ".L12+12"):
+            with self.subTest(operand=operand):
+                self.refused(reason, via(operand))
+        # a misaligned offset whose word index is the pointer's
+        self.refused(reason, assembly(dispatch=DISPATCH[:1] + ("ldr\tr2, .L12+2",) + DISPATCH[2:]))
+        # an offset label word, or a pool that is not the one at the jump
+        self.refused(reason, via(".L12+4", pool=pool[:4] + (".word\t.L11+4",) + pool[5:]))
+        self.refused(reason, via(".L12+4", pool=(".L13:", ".align\t2, 0", ".L11:"),
+                                 cases=CASES + (".L14:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}",
+                                                ".word\t.L11")))
+        # an offset that runs from the pool into the table reads a case label,
+        # which is no table
+        self.refused("does not immediately follow", via(
+            ".L12+8", pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".L11:")))
+
+    def test_a_shared_pointer_dispatches_through_the_table_it_names(self):
+        # the pointer may name either of two tables at the jump; the model
+        # reads the one the `ldr` loads, and a compile that names another
+        # is a different program
+        dispatch = DISPATCH[:1] + ("ldr\tr2, .L12+4",) + DISPATCH[2:]
+        def decoy(*entries):
+            return assembly(dispatch=dispatch, pool=(
+                ".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L31", ".align\t2, 0",
+                ".L31:") +
+                tuple(f".word\t{entry}" for entry in entries) + (".align\t2, 0", ".L11:"))
+        # one shared label: the default and that label, not the adjacent table's three paths
+        self.assertEqual(compare(decoy(".L5", ".L5", ".L5"))[0][1], 2)
+        # the same partition with the cases swapped, and another partition
+        swapped, merged = decoy(".L6", ".L5", ".L6"), decoy(".L5", ".L5", ".L6")
+        self.assertEqual(compare(swapped)[0][1], 3)
+        self.refused("differ in observable behaviour", swapped, stripped(assembly()), moved(swapped))
+        self.refused("a jump table where the explored compile branches otherwise", merged,
+                     stripped(assembly()), moved(merged))
+        # a shared pointer to a table that is not at the jump
+        self.refused("does not immediately follow", assembly(
+            dispatch=dispatch,
+            pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".align\t2, 0",
+                  ".L14:"),
+            table=(), cases=CASES[:-1] + (".align\t2, 0", ".L11:") + TABLE + ("bx\tlr",)))
+
+    def test_a_leading_zero_offset_is_refused(self):
+        # GAS reads `.L12+020` as octal 16: word 4, the table .L31, where a
+        # decimal reading takes word 5, the table .L11
+        octal = assembly(dispatch=DISPATCH[:1] + ("ldr\tr2, .L12+020",) + DISPATCH[2:], pool=(
+            ".L13:", ".align\t2, 0", ".L12:") + (f".word\t{SYMBOL}",) * 4 + (
+            ".word\t.L31", ".word\t.L11", ".align\t2, 0", ".L31:", ".word\t.L6", ".word\t.L5", ".word\t.L6",
+            ".align\t2, 0", ".L11:"))
+        self.refused("unsupported memory operand `.L12+020`", octal)
+        # the ordinary literal load reads its offset the same way
+        literal = assembly().replace("ldr\tr1, .L3\n", "ldr\tr1, .L3+00\n")
+        self.refused("unsupported memory operand `.L3+00`", literal)
+        self.assertEqual(compare(literal.replace(".L3+00", ".L3+0"))[0][1], 3)
+
     def test_any_other_computed_jump_fails_closed(self):
         reason = "computed jumps are not modelled"
         for index, change in ((4, "mov\tpc, r2"), (4, "bx\tr0"), (3, "ldr\tr0, [r0, #4]"),
@@ -131,6 +209,11 @@ class JumpTableTests(unittest.TestCase):
             with self.subTest(change=change):
                 dispatch = DISPATCH[:index] + (change,) + DISPATCH[index + 1:]
                 self.refused(reason, assembly(dispatch=dispatch))
+        # a pointer below its pool label is no dispatch (and no literal load)
+        self.refused("unsupported memory operand `.L12-4`", assembly(
+            dispatch=DISPATCH[:1] + ("ldr\tr2, .L12-4",) + DISPATCH[2:],
+            pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".align\t2, 0",
+                  ".L11:")))
         # the table pointer loaded over the scaled index: `add r0, r0, r0`
         # doubles the pointer and is no dispatch
         self.refused(reason, assembly(dispatch=DISPATCH[:1] + ("ldr\tr0, .L12", "add\tr0, r0, r0") +
