@@ -539,6 +539,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c0331b99acbcca3cda7541ba2c79e559d6c95f64eb025e69f7fee96935b6fb19",
+        "acknowledged_cursor": 6978244483,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c0331b99acbcca3cda7541ba2c79e559d6c95f64eb025e69f7fee96935b6fb19",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDA30\",\"who\":\"rainbow-ffta\",\"note\":\"Verify and integrate the parked record sorter with the merged copy-helper proof\"}",
+          "created_at": "2026-11-18T12:14:08Z",
+          "id": 6978244483,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:14:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e2a33e3691e762342c012a54a23413cf27abeef37b5cce4e4549bb73eb085ec8",
+        "result": {
+          "address": "0x080BDA30",
+          "claim_id": 6978244483,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978244483,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
