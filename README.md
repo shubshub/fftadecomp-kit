@@ -3135,6 +3135,23 @@ caller and platform premises. The existing
 sites, local width and control. Replay repeats the source and native checks.
 Run `python3 tests/test_sdk_cpuset_halfword.py` with agbcc installed.
 
+At `081457FC`, the mono m4a `m4aSoundVSyncOn` source resets the
+historical `volatile u8 dmaCounter` at mixer offset four. The USA VBlank
+dispatcher selects slot 2 of the installed callback table and calls
+`08144AF0`. The handler reads the byte through the mixer pointer at
+`03007FF0`, decrements it, and reloads it from offset eleven when its
+counter expires. The foreground owner writes the DMA1 halfword register
+and reads the counter immediately before zeroing it. The fixed m4a unit's
+`old_agbcc` build with only the counter qualifier removed drops precisely
+that read. Both complete instruction streams, literal destinations, and
+original mixer-pointer relocations are checked. The report records the
+IRQ and owner access sites and both body digests. Replay repeats the
+two compilations. These checks establish the accesses under their
+respective lock guards. Interrupt timing and interleaving are unspecified.
+The register cast still requires the ordinary documented-MMIO rule.
+Set `FFTA_M4A_VSYNC_ROOT` to the game checkout to run the native
+cases in `tests/test_m4a_dma_counter.py`.
+
 **Allowlisted volatile RAM (kit#90):** volatile RAM is otherwise
 allowed only for an object on the maintainer's `tools/volatile_allow.json`
 (agents never edit it). An entry names a symbol, its address, one header, the
