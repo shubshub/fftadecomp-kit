@@ -52,27 +52,37 @@ def provider(rom):
     require(sha256(rom[OWNER-BASE:OWNER-BASE+36]).hexdigest() == QUALIFIED, 'original command width, value, order or address changed')
 
 
-def qualifier_offsets(text, tree, project, closure):
-    import library_units
+def source_qualifiers(text, tree, closure, owner, source, body):
     import plausible
-    from rompath import rom_path
-    if closure != ({SOURCE, HEADER}, []) or any(marker in text for marker in ('\\', '??', '%:', '\0')):
+    if closure != ({source, HEADER}, []) or any(marker in text for marker in ('\\', '??', '%:', '\0')):
         return set()
-    if not base_header((Path(tree) / HEADER).read_bytes(), ('func_0814189C',)):
+    if not base_header((Path(tree) / HEADER).read_bytes(), (f'func_{owner:08X}',)):
         return set()
     clean = plausible.strip_comments_and_strings_keep_strings(text)
     include = re.match(r'\A[ \t\n]*#[ \t]*include[ \t]+"ffta\.h"[ \t]*\n', clean)
     if include is None:
         return set()
     tokens = list(TOKEN.finditer(clean, include.end()))
-    if [t[0] for t in tokens] != TOKEN.findall(BODY):
+    if [t[0] for t in tokens] != TOKEN.findall(body):
         return set()
-    unit = library_units.containing(library_units.load(project), OWNER, OWNER+36)
+    return {t.start() for t in tokens if t[0] == 'volatile'}
+
+
+def verify_unit(project, owner, size):
+    import library_units
+    unit = library_units.containing(library_units.load(project), owner, owner+size)
     require(unit is not None and (unit.name, unit.start, unit.end, unit.toolchain, unit.proof) ==
             ('agb_flash FLASH512_V130', OWNER, 0x0814220C, TOOL, 0x0814195C) and
             unit.row['identity'] == [{'address': '0x0836CE28', 'ascii': 'FLASH512_V130'}], 'wrong library unit or build configuration')
-    provider(Path(rom_path(project)).read_bytes())
-    return {t.start() for t in tokens if t[0] == 'volatile'}
+
+
+def qualifier_offsets(text, tree, project, closure):
+    from rompath import rom_path
+    offsets = source_qualifiers(text, tree, closure, OWNER, SOURCE, BODY)
+    if offsets:
+        verify_unit(project, OWNER, 36)
+        provider(Path(rom_path(project)).read_bytes())
+    return offsets
 
 
 def compile_bodies(root):
