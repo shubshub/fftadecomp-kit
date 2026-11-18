@@ -602,6 +602,130 @@
           "who": "rainbow-scene"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "1d1346cb8de5739a66fc0ac3ecc2b5f891dd5321084efab50834b57bea8743ea",
+        "acknowledged_cursor": 6982442101,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1d1346cb8de5739a66fc0ac3ecc2b5f891dd5321084efab50834b57bea8743ea",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118AC0\",\"who\":\"rainbow-scene\",\"claim_id\":6982371895,\"reason\":\"Overlay scene callback matched 210 ROM bytes and 84 instructions, and live saved report replay passed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:05:07Z",
+          "id": 6982442101,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:05:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+        "result": {
+          "address": "0x08118AC0",
+          "claim_id": 6982371895,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982442101,
+          "status": "accepted",
+          "who": "rainbow-scene"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "11da42001085d3b8bc885abbac13d7b2ff7a1d49a92d5aa52a9a84edfecce4d9",
+        "acknowledged_cursor": 6982442101,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "11da42001085d3b8bc885abbac13d7b2ff7a1d49a92d5aa52a9a84edfecce4d9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A39884\",\"who\":\"rainbow-affine\",\"note\":\"Recover table-confirmed installed Thumb sprite halfword flag setter, check physical 36-byte extent\"}",
+          "created_at": "2026-11-18T15:04:32Z",
+          "id": 6982426410,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:04:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+        "result": {
+          "address": "0x08A39884",
+          "claim_id": 6982426410,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982426410,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "fce23e21474d6f975175fef8509e62bcbe401163d1455d4fe66ebb2da262ac98",
+        "acknowledged_cursor": 6982442101,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fce23e21474d6f975175fef8509e62bcbe401163d1455d4fe66ebb2da262ac98",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A39708\",\"who\":\"rainbow-late-object-fields\",\"note\":\"Second IWRAM image offset C2C; mapped callback 08394034=03006B55; native caller 0809E962 invokes BX r4, 6 argument setter. Both indexes 22 bytes.\"}",
+          "created_at": "2026-11-18T15:04:37Z",
+          "id": 6982428583,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:04:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+        "result": {
+          "address": "0x08A39708",
+          "claim_id": 6982428583,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982428583,
+          "status": "accepted",
+          "who": "rainbow-late-object-fields"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0d7454ad15c9234ecc8e11d4b10ff972d6e7e3c880f017982e7d58993b2c39e2",
+        "acknowledged_cursor": 6982442101,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0d7454ad15c9234ecc8e11d4b10ff972d6e7e3c880f017982e7d58993b2c39e2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A398B8\",\"who\":\"rainbow-state\",\"note\":\"Recover object flag callback installed at 03006D05 by 0808F74C\"}",
+          "created_at": "2026-11-18T15:04:50Z",
+          "id": 6982434165,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:04:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+        "result": {
+          "address": "0x08A398B8",
+          "claim_id": 6982434165,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982434165,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
       "release": null
     }
   ],
