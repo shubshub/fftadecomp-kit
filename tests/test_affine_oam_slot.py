@@ -52,7 +52,9 @@ class AffineTests(unittest.TestCase):
                 affine.check_bodies(changed)
         for sibling in ('0800105C', '08001194'):
             sibling_path = self.root / 'src' / f'{sibling}.c'
-            sibling_source = sibling_path.read_text()
+            reached, escapes = plausible.include_closure(self.root, sibling_path)
+            self.assertFalse(escapes)
+            sibling_source = '\n'.join((self.root / name).read_text() for name in reached)
             self.assertIn('extern AffineMatrix data_030032B0[2][32];', sibling_source)
             self.assertIn('extern u8 data_03003270[2][32];', sibling_source)
             self.assertFalse(plausible.check_file(sibling_path))
