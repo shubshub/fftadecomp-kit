@@ -5488,3 +5488,19 @@ For all 65,536 halfword inputs, the divisor is odd and lies in 1 through 32,767.
 The signed dividend lies in −32,768 through 32,767. This rules out division by zero
 and signed division overflow. The report records the defining instructions, preserved
 register and intervening call. Its acceptance reruns the fixed compiler and both proofs.
+
+
+### Weighted effect descriptor callback
+
+`--signed-runtime-profile conditional-four-choice-effect-v1` recovers slot 30 at
+`081323D0`. The original ELF binds the signed remainder, the R1 call veneer, and
+the descriptor table. The picker writes one signed halfword in the caller's
+four-byte local. A roll modulo 101 selects one of four ROM records. The caller
+uses a second roll modulo 1001 and dispatches a successful choice through the
+record's actual Thumb callback.
+
+The report records the picker and scorer stack arguments, the four descriptor
+words, the restoring callback bodies, and their leaf callees. Ordinary scorer
+calls retain the existing returning ABI premise. The game objects and RNG state
+must be accessible and separate from private stack storage. Slot 29 has a
+different picker with an additional fallback and remains outside this selector.
