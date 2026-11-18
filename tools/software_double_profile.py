@@ -105,11 +105,16 @@ UNSIGNED_WORD_OWNER = (0x08142864, 0x081428AC, 24,
     "fd5184d8b27f51a2488233b7489aedd3be4912345a47329f6e54feb91c872fd1")
 UNSIGNED_WORD_BINDINGS = {0x0814286E: "__gedf2", 0x0814287A: "__fixdfsi",
                           0x08142890: "__adddf3", 0x08142894: "__fixdfsi"}
+SIGNED_WIDE_TO_DOUBLE_OWNER = (0x081428E4, 0x08142950, 40,
+    "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399")
+SIGNED_WIDE_TO_DOUBLE_BINDINGS = {
+    0x081428EE: "__floatsidf", 0x081428FA: "__muldf3", 0x08142906: "__muldf3",
+    0x08142910: "__floatsidf", 0x08142920: "__adddf3", 0x08142930: "__adddf3",
+}
 IDENTITIES = (
     UNSIGNED_WIDE_OWNER,
     UNSIGNED_WORD_OWNER,
-    (0x081428E4, 0x08142950, 40,
-     "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
+    SIGNED_WIDE_TO_DOUBLE_OWNER,
     (0x08142A20, 0x08142A94, 56,
      "f642a6a21668da428cbb8304f9710064aca75ff16130add649b86ff4b9e73be3"),
     (0x08142A94, 0x08142AAE, 13,
@@ -574,7 +579,8 @@ def validate_span(data, address, rom, mapping, index):
     entry = span_record(address, address + len(data), entries, rows, rom)
     authored_owner = any(address == start and address + len(data) == end and
                          entry["instrs"] == count and hashlib.sha256(data).hexdigest() == digest
-                         for start, end, count, digest in (UNSIGNED_WIDE_OWNER, UNSIGNED_WORD_OWNER))
+                         for start, end, count, digest in (UNSIGNED_WIDE_OWNER, UNSIGNED_WORD_OWNER,
+                                                          SIGNED_WIDE_TO_DOUBLE_OWNER))
     if reserved(address) and not authored_owner or not data or len(data) % 2 or \
             data != rom[address - 0x08000000:address - 0x08000000 + len(data)]:
         raise ValueError("software-double complete caller differs from mapped ROM")
@@ -722,6 +728,9 @@ def verify_context(data, address, calls, context):
         raise ValueError("software double requires an isolated canonical runtime context")
     rom, mapping, index, bindings = context[:4]
     validate_span(data, address, rom, mapping, index)
+    if address == SIGNED_WIDE_TO_DOUBLE_OWNER[0] and (
+            bindings != SIGNED_WIDE_TO_DOUBLE_BINDINGS or set(calls) != set(bindings)):
+        raise ValueError("signed wide conversion requires its six original runtime relocations")
     if address == UNSIGNED_WORD_OWNER[0] and (bindings != UNSIGNED_WORD_BINDINGS or set(calls) != set(bindings)):
         raise ValueError("unsigned word conversion requires its four original runtime relocations")
     if not any(name in OPERATIONS or name in WIDE_OPERATIONS for name in bindings.values()) or \
@@ -924,6 +933,34 @@ def make_manifest(calls, address, bindings, instructions, *, literals=None, data
     return manifest
 
 
+def signed_wide_relocations(image, address):
+    """Verify the original compiler's six BLs before typed linking and ROM comparison."""
+    expected = set(SIGNED_WIDE_TO_DOUBLE_BINDINGS.values())
+    externals = [symbol for symbol in image["symbols"] if symbol["name"] and not symbol["section"]]
+    if len(externals) != len(expected) or {symbol["name"] for symbol in externals} != expected:
+        raise ValueError("signed wide conversion requires its three compiler helper symbols")
+    for table, symbols in image["symbol_tables"].items():
+        for number, symbol in enumerate(symbols):
+            if symbol["name"] in expected and (symbol["bind"] != 1 or symbol["size"] or
+                    symbol["value"] or symbol["type"] or image["section_data"][table][16*number+13]):
+                raise ValueError("signed wide conversion requires default-visible original compiler helpers")
+    calls = {}
+    for table in image["relocations"]:
+        section = image["sections"][table]
+        symbols = image["symbol_tables"].get(section[6])
+        data = image["section_data"][table]
+        if (section[1] != 9 or section[7] != image["text_index"] or section[9] != 8 or
+                section[5] != len(data) or len(data) % 8 or symbols is None):
+            raise ValueError("signed wide conversion requires original text REL calls")
+        for offset, info in struct.iter_unpack("<II", data):
+            site = address + offset
+            if info & 255 != 10 or info >> 8 >= len(symbols) or site in calls:
+                raise ValueError("invalid signed wide conversion call relocation")
+            calls[site] = symbols[info >> 8]["name"]
+    if calls != SIGNED_WIDE_TO_DOUBLE_BINDINGS:
+        raise ValueError("signed wide conversion original call sites differ")
+
+
 def object_bytes(runner, workspace, args, original, address, mapping, rom, index, *,
                  data_mapping=None, data_relocations=None, switch_relocations=None):
     from match import (allocated_text_only, function_record, function_address_target,
@@ -945,12 +982,17 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
         raise ValueError("software-double data provenance requires an empty collection")
     if switch_relocations is not None and (type(switch_relocations) is not dict or switch_relocations):
         raise ValueError("software-double switch provenance requires an empty collection")
-    if address == UNSIGNED_WORD_OWNER[0]:
+    if address == SIGNED_WIDE_TO_DOUBLE_OWNER[0]:
+        signed_wide_relocations(original, address)
+    if address in (UNSIGNED_WORD_OWNER[0], SIGNED_WIDE_TO_DOUBLE_OWNER[0]):
         import plausible
         preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
         code = plausible.strip_comments_and_strings(preprocessed)
-        if re.search(r"\b(?:__gedf2|__adddf3|__fixdfsi|__asm__|__asm|asm)\b", code):
-            raise ValueError("unsigned word conversion requires compiler-generated runtime calls")
+        helpers = (UNSIGNED_WORD_BINDINGS if address == UNSIGNED_WORD_OWNER[0]
+                   else SIGNED_WIDE_TO_DOUBLE_BINDINGS)
+        reserved_names = {*helpers.values(), "asm", "__asm", "__asm__"}
+        if reserved_names.intersection(re.findall(r"\b[A-Za-z_]\w*\b", code)):
+            raise ValueError("conversion requires compiler-generated runtime calls")
     objects, has_data, has_remainder, has_double, has_switch = None, False, False, False, False
     for section_index in original["relocations"]:
         section = original["sections"][section_index]

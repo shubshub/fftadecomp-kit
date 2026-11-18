@@ -135,7 +135,7 @@ class PublicUnsignedConversionTests(unittest.TestCase):
         self.fixture(SOURCE)
         start, end, _, _ = profile.UNSIGNED_WIDE_OWNER
         for a, b, _, _ in profile.IDENTITIES:
-            if a in (start, profile.UNSIGNED_WORD_OWNER[0]):
+            if a in (start, profile.UNSIGNED_WORD_OWNER[0], profile.SIGNED_WIDE_TO_DOUBLE_OWNER[0]):
                 continue
             with self.subTest(owner=a), self.assertRaises(ValueError):
                 profile.validate_span(self.rom[a-BASE:b-BASE], a, self.rom, self.mapping, self.index)

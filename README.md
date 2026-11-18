@@ -4143,6 +4143,16 @@ and signed16/nonzero remainder policies retain their operand requirements;
 old reports keep their formats. Saved target-state reports retain the explicit
 selector during verification and rebuild replay.
 
+The same selector admits the complete 108-byte libgcc2 `__floatdidf` owner
+at `081428E4`. The signed upper word is scaled by 65536 twice, then the
+unsigned lower word is added. The original object has six compiler-generated
+Thumb call relocations across `__floatsidf`, `__muldf3` and `__adddf3`. The
+selector binds each site to its named helper and replays the original frame
+and binary64 call closure. The `L_floatdidf` upstream member under old_agbcc
+and the recovered C under the default agbcc both produce the complete ROM
+body. The native test compares integer rounding boundaries and ties with
+binary64, including both signs and both endpoints of the signed 64-bit range.
+
 Plain `long long` `*` and `/` compose through the separately versioned
 `agbcc-thumb-muldi3-divdi3-target-state-closure-v1` record. It binds only the
 original compiler symbols `__muldi3` (`08142A20`, 116 bytes/56 instructions)
