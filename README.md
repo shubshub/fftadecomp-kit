@@ -3123,6 +3123,17 @@ source macros. It permits the qualifiers on those five declarations and
 twenty fixed assignments. Direct wave RAM and sound-control accesses still
 need their own hardware justifications.
 
+The boot routine at `08000718` programs DMA0 to copy 39 halfwords from
+the LCD shadow at `03000942` to BG0CNT through BLDY (`04000008..04000054`).
+The `agbcc-O0-v1` frame/data report records the three 32-bit register
+writes, the immediate control readback, and a fresh control read on every
+iteration. Bit 31 set retries the poll. A clear bit reaches the halfword
+copy from the DISPCNT shadow at `03000940` to `03002BBC`. A permanently
+busy DMA channel stays in the loop. Replay checks the original two IWRAM
+relocations, the complete 112-byte function against the ROM, and the
+qualifiers on the two block-local MMIO pointers.
+Run `python3 tests/test_boot_dma0_shadow.py` with agbcc installed.
+
 At `0813FB7C`, the palette fill uses the SDK's CpuFill16 idiom. The
 qualifier is confined to the halfword initializer in the reviewed source
 and base-header closure. The Thumb caller saves the destination, calculates

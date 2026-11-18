@@ -707,6 +707,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
         records.append(f"* allowlisted volatile: `{entry['symbol']}` at "
                        f"`{entry['address']}` declared in `{entry['header']}` "
                        f"(SHA-256 `{digest}`)")
+    if address == 0x08000718:
+        import boot_dma0_shadow as dma
+        records.append(dma.record(root))
     if address == 0x081457FC:
         import m4a_dma_counter
         records.append(m4a_dma_counter.record(root))
@@ -820,6 +823,14 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     code = strip_comments_and_strings(text)
     macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
+    if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
+            {relpath, "include/ffta.h"}, []):
+        import boot_dma0_shadow as dma
+        try:
+            offsets, _ = dma.selected(text, tree, project, data_symbols or {})
+            hardware_qualifiers.update(offsets)
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
     if relpath == "src/08145CAC.c" and tree is not None and closure == (
             {relpath, "include/ffta.h"}, []):
         import cgb_registers

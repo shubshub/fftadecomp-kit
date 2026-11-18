@@ -17,7 +17,7 @@ void func_0813FB7C(void *destination, u8 color) {
 """
 
 
-def base_header(header):
+def base_header(header, reserved_names=('func_0814186C', 'func_0813FB7C')):
     """Only the base typedefs, passive struct declarations and other prototypes."""
     import plausible
     text = header.decode('utf-8')
@@ -34,7 +34,7 @@ def base_header(header):
             ('unsigned', f'u{bits}'), ('signed', f's{bits}')))
     if not declarations.startswith(types):
         return False
-    if re.search(r'\b(?:func_0814186C|func_0813FB7C)\b', declarations):
+    if any(re.search(r'\b' + re.escape(name) + r'\b', declarations) for name in reserved_names):
         return False
     # The remainder cannot introduce macros, attributes, initializers, code,
     # aliases of the base types, or declarations of the two bound functions.
