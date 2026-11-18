@@ -90,7 +90,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a64759da2d9602267f322e833024e7e175cc1bf5e88cc4e4fbfea84d416f4bae",
+        "acknowledged_cursor": 6989469959,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a64759da2d9602267f322e833024e7e175cc1bf5e88cc4e4fbfea84d416f4bae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142E10\",\"who\":\"claude-ffta2\",\"claim_id\":6926410712,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:38:57Z",
+          "id": 6989469959,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:38:57Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "907e9f91bc181067e15c348c3a51ccc64f07479b5942482e3c313f016d1f6a98",
+        "result": {
+          "address": "0x08142E10",
+          "claim_id": 6926410712,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989469959,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -218,7 +246,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7f675e4bca301518cf80e8fedcceccc6fc109de801e336640fd959ec03867276",
+        "acknowledged_cursor": 6989469959,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7f675e4bca301518cf80e8fedcceccc6fc109de801e336640fd959ec03867276",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800DB0C\",\"who\":\"rainbow-menu\",\"claim_id\":6989175042,\"reason\":\"BLDALPHA ramp 218/218, strict and fresh saved-report replay on toolkit 602e1d7 (#299).\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:38:46Z",
+          "id": 6989466227,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:38:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "907e9f91bc181067e15c348c3a51ccc64f07479b5942482e3c313f016d1f6a98",
+        "result": {
+          "address": "0x0800DB0C",
+          "claim_id": 6989175042,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989466227,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
