@@ -5517,3 +5517,23 @@ words, the restoring callback bodies, and their leaf callees. Ordinary scorer
 calls retain the existing returning ABI premise. The game objects and RNG state
 must be accessible and separate from private stack storage. Slot 29 has a
 different picker with an additional fallback and remains outside this selector.
+
+### Stat-drain divisor switch
+
+`--signed-runtime-profile stat-drain-divisor-switch-v1` verifies the 514-byte
+function at `08128C3C`. The original ELF has one named divisor-table relocation,
+eight local switch relocations and thirteen Thumb calls. The assembler's two
+alignment bytes follow the end of the function symbol.
+
+The owner indexes the ROM table at `083A8260` with the low three bits of key
+byte 2. Its eight divisors are 10, 5, 2, 1, 3, 5, 10 and 20. Six cases call
+the stat getter and use unsigned division. The seventh divides ten by the
+selected byte using signed division. The complete getter and its read-only
+lookup preserve the divisor in R4 on every return. The lookup can follow a
+record redirect loop. The report binds the original ELF, linked bytes,
+complete DIV/UDIV implementation and both indexes on each replay.
+
+Set `FFTA_STAT_DRAIN_ROOT` to a recovered USA game tree to run
+`tests/test_stat_drain_profile.py`. The CPU test executes the original getter
+and both division helpers for all 256 key bytes across seven cases and the
+default path. It checks the return value, unit writes and preserved registers.

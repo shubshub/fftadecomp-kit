@@ -20,6 +20,7 @@ import analyze
 import installed_shuffle_profile as installed_shuffle
 import particle_return_scratch_profile as particle
 import weighted_effect_profile as weighted_effect
+import stat_drain_profile as stat_drain
 import entry_recursive_ordinary_call_profile as entry
 import mutable_three_call_native_profile as mutable_native
 import multiple_switch_native_profile as multiple_native
@@ -1096,12 +1097,12 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
     if selector in (integer_native.SELECTOR, numeric_switch.SELECTOR, multiple_native.SELECTOR):
         import addressed_signed_runtime_profile as alignment
         alignment.terminal_alignment(image,symbol)
-    if selector in (ALIGNED_SELECTOR,CYCLIC_SELECTOR,integer_aligned_two.SELECTOR,*r6_buffer.ALIGNED_POLICIES):
+    if selector in (ALIGNED_SELECTOR,CYCLIC_SELECTOR,integer_aligned_two.SELECTOR,stat_drain.SELECTOR,*r6_buffer.ALIGNED_POLICIES):
         import addressed_signed_runtime_profile as alignment
         alignment.terminal_alignment(image,symbol)
         if len(image['text']) != size+2:
             raise ValueError('aligned owner requires actual external two-byte Thumb alignment')
-    external_alignment=(selector in (multiple_native.SELECTOR, stack_query.DIVISION_SELECTOR, numeric_switch.SELECTOR,integer_native.SELECTOR,integer_aligned_two.SELECTOR,*named_buffer.SELECTORS,ALIGNED_SELECTOR,CYCLIC_SELECTOR,*r6_buffer.ALIGNED_POLICIES) and size%4==2 and
+    external_alignment=(selector in (stat_drain.SELECTOR,multiple_native.SELECTOR, stack_query.DIVISION_SELECTOR, numeric_switch.SELECTOR,integer_native.SELECTOR,integer_aligned_two.SELECTOR,*named_buffer.SELECTORS,ALIGNED_SELECTOR,CYCLIC_SELECTOR,*r6_buffer.ALIGNED_POLICIES) and size%4==2 and
                         len(image['text'])==size+2 and image['text'][size:]==b'\xc0\x46')
     if offset or (size!=len(image['text']) and not external_alignment) or any(
             item['type']==2 and item is not symbol and item['section'] or
@@ -1137,7 +1138,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                 addend=struct.unpack_from('<I',image['text'],site)[0]
                 result['switches'].append([site,addend]);continue
             if target['section'] or target['value'] or target['bind']!=1 or \
-                    selector in (installed_shuffle.SELECTOR, weighted_effect.SELECTOR) and target['size'] or \
+                    selector in (installed_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR) and target['size'] or \
                     selector == dma_fill.SELECTOR and (target['size'] or target['type']) or \
                     sum(item['name']==name for item in image['symbols'])!=1:
                 raise ValueError('owner requires unique undefined zero-valued global symbols')
@@ -1152,6 +1153,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                     if selector == small_copy_binding.SELECTOR and name == 'memcpy' else
                     copy_binding.original_target(image,address,rom,mapping,index,objects,site,target)
                     if selector == copy_binding.SELECTOR and name == 'memcpy' else
+                    stat_drain.DIV if selector == stat_drain.SELECTOR and name == '__divsi3' else
                     installed_shuffle.REMAINDER if selector in (installed_shuffle.SELECTOR, weighted_effect.SELECTOR) and name == '__modsi3' else
                     integer_native.scalar.OPERATIONS[name] if selector in (integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) and name in integer_native.scalar.OPERATIONS else
                     runtime_summary.NAMES[name] if selector in runtime_summary.SELECTORS and name in runtime_summary.NAMES else
@@ -1182,7 +1184,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
         copy_binding.check_original(result,targets,image,address,rom,mapping,index,objects)
     if selector == runtime_summary.PARTICLE_SELECTOR:
         particle.check_bindings(address, result)
-    if selector == weighted_effect.SELECTOR:
+    if selector == stat_drain.SELECTOR:
+        stat_drain.check_original(image,address,result,targets)
+    elif selector == weighted_effect.SELECTOR:
         weighted_effect.check_bindings(address, result, targets)
     elif selector == installed_shuffle.SELECTOR:
         installed_shuffle.check_bindings(address, result, targets)
@@ -1249,7 +1253,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     thunk.namespace(preprocessed)
     from plausible import strip_comments_and_strings
     reserved = (r'\b(?:__divsi3|__modsi3|__udivsi3|__umodsi3)\b'
-                if selector in (installed_shuffle.SELECTOR, weighted_effect.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
+                if selector in (installed_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
     if re.search(reserved,strip_comments_and_strings(preprocessed)):
         raise ValueError('division identifiers are reserved for compiler emission')
     bindings,targets=original_bindings(original,address,rom,mapping,objects,selector=selector,index=index)
@@ -1281,7 +1285,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
         match.allocated_text_only(linked)
     record,offset=match.function_record(linked,f'func_{address:08X}',address,True)
     original_record,_=match.function_record(original,f'func_{address:08X}',address,True)
-    if selector in (ALIGNED_SELECTOR,CYCLIC_SELECTOR,integer_aligned_two.SELECTOR,*r6_buffer.ALIGNED_POLICIES):
+    if selector in (ALIGNED_SELECTOR,CYCLIC_SELECTOR,integer_aligned_two.SELECTOR,stat_drain.SELECTOR,*r6_buffer.ALIGNED_POLICIES):
         import addressed_signed_runtime_profile as alignment
         alignment.terminal_alignment(linked,record)
     if linked['type']!=2 or offset or linked['relocations'] or \
@@ -1301,7 +1305,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
         for site,addend in rodata['sites']:struct.pack_into('<I',expected,site,rodata['base']+addend)
     if bytes(expected)!=linked['text']:
         raise ValueError('linker changed bytes outside exact original relocations')
-    if selector in (small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, weighted_effect.SELECTOR):
+    if selector in (small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR):
         small_copy_binding.check_linked(linked,address,targets)
     return linked['text'][:record['size']],bindings
 
