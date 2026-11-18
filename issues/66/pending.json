@@ -1915,6 +1915,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1236d4cf6fd6cab24683b35ac9d17df34b7981be860a34b365a34b3d9abc266c",
+        "acknowledged_cursor": 6992812734,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1236d4cf6fd6cab24683b35ac9d17df34b7981be860a34b365a34b3d9abc266c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141B14\",\"who\":\"astra-combat\",\"note\":\"Recover FLASH512 ReadFlash and its real caller-local byte-copy helper under initialized save setups.\"}",
+          "created_at": "2026-11-18T21:57:36Z",
+          "id": 6992812734,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:57:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "85db5f218ac98ef8959d929c650b3c2011dbfb0cf7576317e25ec41a9d72c8b9",
+        "result": {
+          "address": "0x08141B14",
+          "claim_id": 6992812734,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992812734,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
