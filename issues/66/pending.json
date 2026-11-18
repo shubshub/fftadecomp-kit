@@ -730,7 +730,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4ca3ba86c85f640f0d8d76c0fe4881bd78eb9b7f1467783711f349ad6ee81497",
+        "acknowledged_cursor": 6979012705,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4ca3ba86c85f640f0d8d76c0fe4881bd78eb9b7f1467783711f349ad6ee81497",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806EC60\",\"who\":\"rainbow-menu\",\"claim_id\":6978984237,\"reason\":\"Unchanged exact parked208B still refused: stack-index-v2 reaches080CBD34->080CA7A4 unresolved PC; guarded-switch refuses owner variable local index. Recheck appended to Parked README.\",\"unmatchable\":true,\"tried\":\"Current default, named-data-buffer-stack-index-v2, bounded-buffer-guarded-switch-v1; all exit1. No source edits or available proof composition found.\"}",
+          "created_at": "2026-11-18T12:48:24Z",
+          "id": 6979012705,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:48:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "666cf737cee484d8dc1cf25d098e770a7604ab0a6c426678bd13764454b44811",
+        "result": {
+          "address": "0x0806EC60",
+          "claim_id": 6978984237,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6979012705,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
