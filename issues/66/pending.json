@@ -602,6 +602,190 @@
           "who": "rainbow-menu"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "6f5a43353bd77596bf30d20d4d7d4d7e2bd02b900c310521b2abac343977437e",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6f5a43353bd77596bf30d20d4d7d4d7e2bd02b900c310521b2abac343977437e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08122DBC\",\"who\":\"rainbow-menu\",\"claim_id\":6984650351,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T16:28:24Z",
+          "id": 6984686277,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:28:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x08122DBC",
+          "claim_id": 6984650351,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6984686277,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e69aba4e9e4d7184c6fbc1b475d9353bb7dd09d8981e6afea5d69746c1dd4fc9",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e69aba4e9e4d7184c6fbc1b475d9353bb7dd09d8981e6afea5d69746c1dd4fc9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08125884\",\"who\":\"rainbow-state\",\"note\":\"Task array reset helper called by script slot 5\"}",
+          "created_at": "2026-11-18T16:27:54Z",
+          "id": 6984672974,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:27:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x08125884",
+          "claim_id": 6984672974,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6984672974,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "0206e4db217993df2a26b2bcecfb099863b62197406d50bb88db7250919f25f5",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0206e4db217993df2a26b2bcecfb099863b62197406d50bb88db7250919f25f5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08125884\",\"who\":\"rainbow-state\",\"claim_id\":6984672974,\"reason\":\"Native 38-byte task array reset matched and saved report replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T16:28:56Z",
+          "id": 6984700328,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:28:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x08125884",
+          "claim_id": 6984672974,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6984700328,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b7ac42777052479ecc8ceb09cbf98b4f4815ae333a47c31fab474644e0e495e8",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b7ac42777052479ecc8ceb09cbf98b4f4815ae333a47c31fab474644e0e495e8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081315F8\",\"who\":\"rainbow-action-evaluators\",\"note\":\"Toolkit PR 270 merged. Reissue complete 66-byte source with the new bounded positive odd divisor numeric proof, then replay.\"}",
+          "created_at": "2026-11-18T16:27:59Z",
+          "id": 6984675373,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:27:59Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x081315F8",
+          "claim_id": 6984675373,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6984675373,
+          "status": "accepted",
+          "who": "rainbow-action-evaluators"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "36d93c2016748b8522d03afcc0281023fae5d69abf87068c9ddcfbdee6098ab2",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "36d93c2016748b8522d03afcc0281023fae5d69abf87068c9ddcfbdee6098ab2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08130E48\",\"who\":\"astra-sound\",\"note\":\"Recover action condition table 083A8604 slot 26 from the indexed native routine\"}",
+          "created_at": "2026-11-18T16:28:06Z",
+          "id": 6984678286,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:28:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x08130E48",
+          "claim_id": 6984678286,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6984678286,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a5a0de05cce64e6942d0f429d188f0bab40b82aa4f1b0734fd26faf0466ba01e",
+        "acknowledged_cursor": 6984700328,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a5a0de05cce64e6942d0f429d188f0bab40b82aa4f1b0734fd26faf0466ba01e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131AC0\",\"who\":\"rainbow-callback\",\"note\":\"Recover indexed evaluator slot 44 native C and report.\"}",
+          "created_at": "2026-11-18T16:28:07Z",
+          "id": 6984678817,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:28:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+        "result": {
+          "address": "0x08131AC0",
+          "claim_id": 6984678817,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6984678817,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
       "release": null
     }
   ],
