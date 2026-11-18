@@ -606,7 +606,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f6680832674b74e05169d1a686b763b2f26fad62fc2d6c149bed501872f2e097",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f6680832674b74e05169d1a686b763b2f26fad62fc2d6c149bed501872f2e097",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812C8DC\",\"who\":\"rainbow-state\",\"claim_id\":6978473096,\"reason\":\"Verifier walks the five-entry path in 0812E4F4 and refuses writes past the four-byte local entry array; source retained in NTFS scratch\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:25:34Z",
+          "id": 6978503292,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:25:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x0812C8DC",
+          "claim_id": 6978473096,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978503292,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c5f5adce05142c688d269b4682d4fdc0e501f4eef6b972d51c333d0a2f9b8d50",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c5f5adce05142c688d269b4682d4fdc0e501f4eef6b972d51c333d0a2f9b8d50",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08043DF4\",\"who\":\"rainbow-affine\",\"claim_id\":6978474426,\"reason\":\"Parked C remains byte-identical; current merged verifier refuses inconsistent possible pointer offsets at control-flow join under default and stack-index/ROM-table-copy selectors; README updated\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:26:02Z",
+          "id": 6978513999,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08043DF4",
+          "claim_id": 6978474426,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978513999,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -828,6 +884,454 @@
           "request_id": 6978497984,
           "status": "accepted",
           "who": "rainbow-tile"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dc2cae93e6feb309dad61c12393d69ab0d2247b56d01154e50340d5198a72dee",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dc2cae93e6feb309dad61c12393d69ab0d2247b56d01154e50340d5198a72dee",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08146540\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:25:52Z",
+          "id": 6978510218,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:25:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08146540",
+          "claim_id": 6978510218,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978510218,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8a3e7611e62b5f946c0b705d4199a9b27df1818be80371c78a6846568194dfe1",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8a3e7611e62b5f946c0b705d4199a9b27df1818be80371c78a6846568194dfe1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08146554\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:04Z",
+          "id": 6978514495,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08146554",
+          "claim_id": 6978514495,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978514495,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4dcb5a2583e4aa0bb099e374d9ca066c6d2c9cd567e8d3dadadedd6838f24dac",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4dcb5a2583e4aa0bb099e374d9ca066c6d2c9cd567e8d3dadadedd6838f24dac",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08146568\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:14Z",
+          "id": 6978518259,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08146568",
+          "claim_id": 6978518259,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978518259,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "87b3cd1777ee54fca85bd2d120e8f86e7053df8bee76edc2da287b335686eddb",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "87b3cd1777ee54fca85bd2d120e8f86e7053df8bee76edc2da287b335686eddb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081379F0\",\"who\":\"rainbow-state\",\"note\":\"Recover interpolation routine using merged control-flags fields and matched siblings\"}",
+          "created_at": "2026-11-18T12:26:19Z",
+          "id": 6978520073,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x081379F0",
+          "claim_id": 6978520073,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978520073,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "34b55ec18bc56812d2c623c7fc7e8b85f201adca03e21e524a02b4d561451930",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "34b55ec18bc56812d2c623c7fc7e8b85f201adca03e21e524a02b4d561451930",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0814657C\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:24Z",
+          "id": 6978521896,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x0814657C",
+          "claim_id": 6978521896,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978521896,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e490cbe0f629b320b6722425092405c9b1fe38dfc1d282d1b10bdd80513e1082",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e490cbe0f629b320b6722425092405c9b1fe38dfc1d282d1b10bdd80513e1082",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FDEE8\",\"who\":\"rainbow-tile\",\"note\":\"Retry the parked complete area-check source with merged nested BIOS Sqrt summaries\"}",
+          "created_at": "2026-11-18T12:26:27Z",
+          "id": 6978522921,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:27Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x080FDEE8",
+          "claim_id": 6978522921,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978522921,
+          "status": "accepted",
+          "who": "rainbow-tile"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b339bcfa1cff1790d1d43450fa610b3b9854f3a6837c09bbcac906b6e71df3c4",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b339bcfa1cff1790d1d43450fa610b3b9854f3a6837c09bbcac906b6e71df3c4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813ED14\",\"who\":\"rainbow-state\",\"note\":\"Recover interpolation routine using merged control-flags fields and matched siblings\"}",
+          "created_at": "2026-11-18T12:26:28Z",
+          "id": 6978523485,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x0813ED14",
+          "claim_id": 6978523485,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978523485,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "89d8a01c8102da405649dc8b4eb21b119f2884c9e91e3381178131ddb1b957d5",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "89d8a01c8102da405649dc8b4eb21b119f2884c9e91e3381178131ddb1b957d5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08146590\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:33Z",
+          "id": 6978525144,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08146590",
+          "claim_id": 6978525144,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978525144,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5f962040f752206c72091cbbce7ac0cc73e4bfa7bea222881ba1507e55fb3106",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5f962040f752206c72091cbbce7ac0cc73e4bfa7bea222881ba1507e55fb3106",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813EB64\",\"who\":\"rainbow-state\",\"note\":\"Recover interpolation routine using merged control-flags fields and matched siblings\"}",
+          "created_at": "2026-11-18T12:26:38Z",
+          "id": 6978526908,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x0813EB64",
+          "claim_id": 6978526908,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978526908,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "af25d1e176e219f4a59b0083bd23eac3478440e028d439c5bd50866eeb3107b8",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "af25d1e176e219f4a59b0083bd23eac3478440e028d439c5bd50866eeb3107b8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08057454\",\"who\":\"rainbow-affine\",\"note\":\"Recover 172-byte message/map menu setup from ROM and sibling callers\"}",
+          "created_at": "2026-11-18T12:26:41Z",
+          "id": 6978528130,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08057454",
+          "claim_id": 6978528130,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978528130,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d61c8e34480df6f29a027d4f080eca72c93a2815db6855fea658b3a7f555d698",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d61c8e34480df6f29a027d4f080eca72c93a2815db6855fea658b3a7f555d698",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081465A4\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:42Z",
+          "id": 6978528434,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x081465A4",
+          "claim_id": 6978528434,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978528434,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "df158c0fc3878acf6ec660d8b9b90616c232903115799c5757e69f2eec121581",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "df158c0fc3878acf6ec660d8b9b90616c232903115799c5757e69f2eec121581",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081465B0\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:26:51Z",
+          "id": 6978531866,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x081465B0",
+          "claim_id": 6978531866,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978531866,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6fba0ba670ff8617bbaa07f04db5090f8783475c55cdf7fb3bf38c8019afebf5",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6fba0ba670ff8617bbaa07f04db5090f8783475c55cdf7fb3bf38c8019afebf5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08016A98\",\"who\":\"rainbow-callback\",\"note\":\"Recover row fill helper with BIOS local zero and fixed-width tile rows\"}",
+          "created_at": "2026-11-18T12:26:52Z",
+          "id": 6978531965,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:26:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x08016A98",
+          "claim_id": 6978531965,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978531965,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "8e25ff9098ac2a27cb7495ee7ea4e6718d5166620aab6a614e4280760a8f407b",
+        "acknowledged_cursor": 6978535132,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8e25ff9098ac2a27cb7495ee7ea4e6718d5166620aab6a614e4280760a8f407b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081465BC\",\"who\":\"rainbow-m4a\",\"note\":\"Recover unindexed MusicPlayer2000 leaf command handler, original C and ROM evidence\"}",
+          "created_at": "2026-11-18T12:27:00Z",
+          "id": 6978535132,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:27:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+        "result": {
+          "address": "0x081465BC",
+          "claim_id": 6978535132,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978535132,
+          "status": "accepted",
+          "who": "rainbow-m4a"
         }
       },
       "release": null
