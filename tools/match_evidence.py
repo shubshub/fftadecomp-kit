@@ -1130,6 +1130,12 @@ def report_matches(report, root, address):
     if address == 0x08141F2C or '* verification: `elf-symbol-thumb-flash-sector-reader-v1`' in report.splitlines():
         import flash_sector_erase
         return flash_sector_erase.replay(report, root, address)
+    if address == 0x08142280 or "* verification: `elf-symbol-thumb-libgcc-divdi3-v1`" in report.splitlines():
+        import libgcc_divdi3
+        try:
+            return libgcc_divdi3.report_matches(report, root, address)
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
+            return False
     if address == 0x08001244 or "* verification: `original-oam-list-context-v1`" in report.splitlines():
         import oam_list_context
         return oam_list_context.replay(report, root, address)

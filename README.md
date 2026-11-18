@@ -4179,6 +4179,18 @@ entry-only calls, and are now refused, because inside the selector any call to
 and `__divdi3` stay unbound, and an explicit `func_08142280` keeps its existing
 ordinary entry-only binding.
 
+The standalone source of `__divdi3` at `08142280` uses
+`--owner-runtime-profile libgcc-divdi3-v1`. Both the default compiler and
+the fixed old agbcc build of the historical two-word division algorithm must
+reproduce the original 1,080 bytes of text and the private 256-byte
+`__clz_tab` at `0836CF98`. The original ELF contains seventeen Thumb calls to
+`__udivsi3` and `__umodsi3`, plus three zero-addend ABS32 references to its
+local read-only section. Each of the three reached byte loads extracts the
+highest occupied byte of a 32-bit divisor limb using shifts of 0, 8, 16 or 24.
+The two movement callers pass word pairs in R0:R1 and R2:R3 and consume the
+returned pair in R0:R1. The signed quotient truncates toward zero for a
+nonzero divisor and a representable result.
+
 Ordinary callees retain entry-only binding and ABI assumptions: their complete
 bodies, semantics and return behavior are not proved.
 

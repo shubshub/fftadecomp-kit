@@ -1457,8 +1457,14 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     return linked["text"][:after["size"]]
 
 
-def link_typed_targets(runner, workspace, args, name, address, targets, data_names):
+def link_typed_targets(runner, workspace, args, name, address, targets, data_names, *, libgcc_divdi3_table=False):
     """Link an authenticated symbol plan and compare objcopy output with the executable ELF."""
+    readonly = ""
+    if libgcc_divdi3_table:
+        import libgcc_divdi3 as division
+        if (address, name, targets, data_names) != (division.ADDRESS, "func_08142280", division.TARGETS, set()):
+            raise ValueError("private libgcc division table requires its original owner and helpers")
+        readonly = f".rodata 0x{division.TABLE:08X} : {{ *(.rodata) }} "
     definitions = [".syntax unified", ".thumb"]
     for target_name, target in sorted(targets.items()):
         if target_name in data_names:
@@ -1469,6 +1475,7 @@ def link_typed_targets(runner, workspace, args, name, address, targets, data_nam
                                 f".thumb_set {target_name}, 0x{target | 1:08X}"))
     runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
     script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
+              f"{readonly}"
               ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
               ".ARM.attributes 0 : { *(.ARM.attributes) } "
               ".unexpected 0 : { *(.vfp11_veneer) *(.v4_bx) *(.iplt) *(.igot.plt) } "
@@ -5738,7 +5745,7 @@ def main():
                                                       "descriptor-callee-constant-v1",
                                                       "descriptor-restoring-callee-constant-v1",
                                                       "descriptor-cursor-value-v1",
-                                                      "private-float-unpack-pack-v1", "private-float-extension-v1", "private-float-comparison-v1", "private-double-comparison-v1", "private-float-scalar-conversion-v1", "private-double-scalar-conversion-v1", "private-double-unpack-pack-v1", "private-double-truncation-v1", "private-double-scalar-pack-v1", "private-scalar-division-byte-locals-v1", "private-float-selected-record-v1", "private-double-inline-division-v1", "private-double-selected-record-v1", "private-float-inline-division-v1", "private-float-unsigned-conversion-v1"))
+                                                      "private-float-unpack-pack-v1", "private-float-extension-v1", "private-float-comparison-v1", "private-double-comparison-v1", "private-float-scalar-conversion-v1", "private-double-scalar-conversion-v1", "private-double-unpack-pack-v1", "private-double-truncation-v1", "private-double-scalar-pack-v1", "private-scalar-division-byte-locals-v1", "private-float-selected-record-v1", "private-double-inline-division-v1", "private-double-selected-record-v1", "private-float-inline-division-v1", "libgcc-divdi3-v1", "private-float-unsigned-conversion-v1"))
     args = ap.parse_args()
     isolated_signed = {signed_divmod.odd_remainder.SELECTOR: 'bounded odd remainder',
                        signed_divmod.shuffle.SELECTOR: 'installed action shuffle',
@@ -5796,6 +5803,13 @@ def main():
         if consistent_source is not None and source_fingerprint(ROOT, addr) != consistent_source:
             sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
         return result
+
+    if args.owner_runtime_profile == "libgcc-divdi3-v1":
+        import libgcc_divdi3
+        try:
+            return selector_issue(libgcc_divdi3.issue)
+        except (ValueError, OSError, KeyError, IndexError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if addr == 0x08001244:
         import oam_list_context

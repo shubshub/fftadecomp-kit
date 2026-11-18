@@ -95,6 +95,13 @@ def multiply_effects(data, rom, mapping, entries, dependencies, address, end, co
             "helper_proofs_sha256": units.sha(units.canonical(dependencies).encode())}
 
 
+def compiler_hashes(args):
+    import match
+    path = os.path.expandvars(match.DEFAULT_WSL_PATH) + os.pathsep + os.environ["PATH"]
+    names = (args.cc, args.cpp, args.assembler, args.linker, args.objcopy)
+    return {name: units.sha(Path(shutil.which(os.path.expandvars(name), path=path)).read_bytes()) for name in names}
+
+
 def build(member, root, address, args=None):
     import match
     from match_evidence import source_fingerprint, source_paths, mapping_snapshot, data_snapshot, report_rom_path
@@ -116,12 +123,7 @@ def build(member, root, address, args=None):
         raise ValueError("fp-bit source requires the fixed old compiler configuration")
     args = argparse.Namespace(**config)
 
-    def executables():
-        path = os.path.expandvars(match.DEFAULT_WSL_PATH) + os.pathsep + os.environ["PATH"]
-        names = (args.cc, args.cpp, args.assembler, args.linker, args.objcopy)
-        return {name: units.sha(Path(shutil.which(os.path.expandvars(name), path=path)).read_bytes()) for name in names}
-
-    binaries = executables()
+    binaries = compiler_hashes(args)
     candidates = list((root/"src").rglob(f"{address:08X}.c"))
     if len(candidates) != 1:
         raise ValueError("fp-bit source requires exactly one source file")
@@ -147,7 +149,7 @@ def build(member, root, address, args=None):
         if findings or allowed or source_fingerprint(capture, address) != source:
             raise ValueError("captured fp-bit source changed or is implausible")
     proof = member.native_proof(body, rom, mapping, index, objects)
-    if inputs() != before or units.resolve(member.TOOLCHAIN) != tool or executables() != binaries:
+    if inputs() != before or units.resolve(member.TOOLCHAIN) != tool or compiler_hashes(args) != binaries:
         raise ValueError("fp-bit source, ROM, indexes, unit or tool changed during replay")
     evidence = dict(source=source, functions=units.sha(mapping), index=units.sha(index), objects=units.sha(objects),
                     rom=units.sha(rom), unit=unit.text, compiler=tool, tool_binaries=binaries, original_elf=units.sha(raw),
@@ -167,7 +169,7 @@ def build(member, root, address, args=None):
 def issue(member, root, address, args):
     if args.label:
         raise ValueError("fp-bit source requires the canonical report name")
-    body, report = build(member, root, address, args)
+    body, report = member.build(root, address, args)
     if args.emit:
         output = (Path(root) / args.emit).resolve()
         if (Path(root) / "build").resolve() not in output.parents:
