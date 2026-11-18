@@ -510,7 +510,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "14daf514394cc073045cb908da30952df43e09b909f4c1400ed0860c4114e819",
+        "acknowledged_cursor": 6988065067,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "14daf514394cc073045cb908da30952df43e09b909f4c1400ed0860c4114e819",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C720\",\"who\":\"rainbow-affine\",\"claim_id\":6987553727,\"reason\":\"Published official toolkit #288; live 226/226 and 112/112 native packed scanline owner with canonical replay true\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:41:19Z",
+          "id": 6988065067,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:41:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a1b188e6ac95dcb7b0445503a79ce2c8f249a866aef144d1320a095fdfd22e31",
+        "result": {
+          "address": "0x0800C720",
+          "claim_id": 6987553727,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6988065067,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -696,6 +724,38 @@
           "request_id": 6988029500,
           "status": "accepted",
           "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "63994b1c71fbc4769cc6b8f4e9c6ec6a484601f3ce443b9c880d53f8b57592dd",
+        "acknowledged_cursor": 6988065067,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "63994b1c71fbc4769cc6b8f4e9c6ec6a484601f3ce443b9c880d53f8b57592dd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801B5D4\",\"who\":\"rainbow-state\",\"note\":\"Inspect real local map-state paths and shared DMA-renderer consumption on 0801B5D4.\"}",
+          "created_at": "2026-11-18T18:41:16Z",
+          "id": 6988063747,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:41:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a1b188e6ac95dcb7b0445503a79ce2c8f249a866aef144d1320a095fdfd22e31",
+        "result": {
+          "address": "0x0801B5D4",
+          "claim_id": 6988063747,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6988063747,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
