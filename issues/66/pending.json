@@ -574,7 +574,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "bb5033ff6385a3b14c958fed29417a8fe65bfec0508f1fcf7c1d7c68dd913c08",
+        "acknowledged_cursor": 6986402884,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bb5033ff6385a3b14c958fed29417a8fe65bfec0508f1fcf7c1d7c68dd913c08",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118C4C\",\"who\":\"rainbow-state\",\"claim_id\":6986193119,\"reason\":\"Kit PR 273 merged; live complete scene callback 212/212 bytes and 88/88 instructions, saved report replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:33:42Z",
+          "id": 6986396878,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:33:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "97e0874c4a414756e418a5417e05be3c4f458d88979f0e719e84ae738e137aa9",
+        "result": {
+          "address": "0x08118C4C",
+          "claim_id": 6986193119,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986396878,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "98323a21cbea7126da2c219adca88e77553f0eb3cbe74bd3a54f5175a16756b8",
+        "acknowledged_cursor": 6986402884,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "98323a21cbea7126da2c219adca88e77553f0eb3cbe74bd3a54f5175a16756b8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813233C\",\"who\":\"astra-sound\",\"claim_id\":6986275552,\"reason\":\"Confirmed reachable nested fallback requires an independent equipment bound. Retaining exact candidate in Parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:33:57Z",
+          "id": 6986402884,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:33:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "97e0874c4a414756e418a5417e05be3c4f458d88979f0e719e84ae738e137aa9",
+        "result": {
+          "address": "0x0813233C",
+          "claim_id": 6986275552,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986402884,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -670,7 +726,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "53d375cf5475b90439009d98ef1e337916ec114281e3202e3e497ed0ac95b2a7",
+        "acknowledged_cursor": 6986402884,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "53d375cf5475b90439009d98ef1e337916ec114281e3202e3e497ed0ac95b2a7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080027FC\",\"who\":\"rainbow-menu\",\"claim_id\":6986345602,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:33:34Z",
+          "id": 6986393348,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:33:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "97e0874c4a414756e418a5417e05be3c4f458d88979f0e719e84ae738e137aa9",
+        "result": {
+          "address": "0x080027FC",
+          "claim_id": 6986345602,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986393348,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     }
   ],
   "issue": 66,

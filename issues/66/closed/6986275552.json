@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c8cf18af0650e0e8da54e4ba9dbb7283df1ca5e3b3592fddf96a8ea6683f8d45",
+    "acknowledged_cursor": 6986282755,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c8cf18af0650e0e8da54e4ba9dbb7283df1ca5e3b3592fddf96a8ea6683f8d45",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813233C\",\"who\":\"astra-sound\",\"note\":\"Develop the tightly scoped weighted effect callback native proof with checked callee outputs and descriptor targets.\"}",
+      "created_at": "2026-11-18T17:28:46Z",
+      "id": 6986275552,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:28:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c3b2a61b95efc0c40d8c22eb8bf7806c0c5e588f9b40eab18c37a1a1a1ec538f",
+    "result": {
+      "address": "0x0813233C",
+      "claim_id": 6986275552,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6986275552,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "98323a21cbea7126da2c219adca88e77553f0eb3cbe74bd3a54f5175a16756b8",
+    "acknowledged_cursor": 6986402884,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "98323a21cbea7126da2c219adca88e77553f0eb3cbe74bd3a54f5175a16756b8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813233C\",\"who\":\"astra-sound\",\"claim_id\":6986275552,\"reason\":\"Confirmed reachable nested fallback requires an independent equipment bound. Retaining exact candidate in Parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T17:33:57Z",
+      "id": 6986402884,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:33:57Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "97e0874c4a414756e418a5417e05be3c4f458d88979f0e719e84ae738e137aa9",
+    "result": {
+      "address": "0x0813233C",
+      "claim_id": 6986275552,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6986402884,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  }
+}
