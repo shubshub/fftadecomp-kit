@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ec893856656e4cee70753a8205b98b21af03c5740e0fe17520aa2f776fce994d",
+    "acknowledged_cursor": 6982219060,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ec893856656e4cee70753a8205b98b21af03c5740e0fe17520aa2f776fce994d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A38A2C\",\"who\":\"rainbow-iwram-zero\",\"note\":\"Recover late-ROM IWRAM-installed zeroing leaf, original installer 08002768 and image table 0836D4B8. Native saved proof scoped to the 50-byte ROM function.\"}",
+      "created_at": "2026-11-18T14:55:46Z",
+      "id": 6982195805,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:55:46Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a45a00ec6671026828c950dbb39fbc56c327dd9627bc0e397ca1a4625adbc5a7",
+    "result": {
+      "address": "0x08A38A2C",
+      "claim_id": 6982195805,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6982195805,
+      "status": "accepted",
+      "who": "rainbow-iwram-zero"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e5c0f86aa7a6cb32dd854c037e2182f333815b19012772c3905839a0417f9676",
+    "acknowledged_cursor": 6982286721,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e5c0f86aa7a6cb32dd854c037e2182f333815b19012772c3905839a0417f9676",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A38A2C\",\"who\":\"rainbow-iwram-zero\",\"claim_id\":6982195805,\"reason\":\"Authentic late-ROM zero leaf: native 50/50 bytes, 25/25 Thumb instructions, ELF closed CFG leaf, strict saved late-body proof, unique nonoverlapping index. Only ROM entry 08A38A2C counted.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T14:59:16Z",
+      "id": 6982286721,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:59:16Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "acb960341e32c06cbbcb2d9dbc8e03a883bcd17384641c0658552420c81476f8",
+    "result": {
+      "address": "0x08A38A2C",
+      "claim_id": 6982195805,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6982286721,
+      "status": "accepted",
+      "who": "rainbow-iwram-zero"
+    }
+  }
+}
