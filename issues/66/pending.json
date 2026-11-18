@@ -698,7 +698,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "841c6c1a7bf2c945829616d645e4d7602f3a2a79422b4fccbe15a9634924d273",
+        "acknowledged_cursor": 6988473747,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "841c6c1a7bf2c945829616d645e4d7602f3a2a79422b4fccbe15a9634924d273",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000FC8\",\"who\":\"rainbow-menu\",\"claim_id\":6988370544,\"reason\":\"Live exact 148/148, both reset routine declarations and reports reconciled; strict and saved replay pass on upstream #291.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:58:23Z",
+          "id": 6988473747,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:58:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "604efe530e6b0fb9a94196344ce084a269113ee002c9f2a19c3b7db7805a4835",
+        "result": {
+          "address": "0x08000FC8",
+          "claim_id": 6988370544,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6988473747,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     }
   ],
   "issue": 66,
