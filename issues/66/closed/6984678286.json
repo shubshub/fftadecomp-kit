@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "36d93c2016748b8522d03afcc0281023fae5d69abf87068c9ddcfbdee6098ab2",
+    "acknowledged_cursor": 6984700328,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "36d93c2016748b8522d03afcc0281023fae5d69abf87068c9ddcfbdee6098ab2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08130E48\",\"who\":\"astra-sound\",\"note\":\"Recover action condition table 083A8604 slot 26 from the indexed native routine\"}",
+      "created_at": "2026-11-18T16:28:06Z",
+      "id": 6984678286,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:28:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "45e4e477c9acfe10777c6074f83cf66d17b110b9f4f1c4f0f11c7db93b9d70ad",
+    "result": {
+      "address": "0x08130E48",
+      "claim_id": 6984678286,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6984678286,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "32a1eb333cfdc558684b6e4ac07b208668c75f2642431c0da0c067cb746f9ef9",
+    "acknowledged_cursor": 6984725840,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "32a1eb333cfdc558684b6e4ac07b208668c75f2642431c0da0c067cb746f9ef9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08130E48\",\"who\":\"astra-sound\",\"claim_id\":6984678286,\"reason\":\"Complete action condition source compiled and canonical report replayed in the live USA game tree.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:29:47Z",
+      "id": 6984723529,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:29:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fab67950a05c4a27efd55ba7f3d78ab66b8b9c2f3db3d89af764ed02199f78c2",
+    "result": {
+      "address": "0x08130E48",
+      "claim_id": 6984678286,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6984723529,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  }
+}
