@@ -5819,6 +5819,10 @@ def main():
             sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if unit_context is not None:
+        if addr == 0x08141AB0:
+            import flash_reader_install
+            if flash_reader_install.unit_owner(unit_context["unit"], addr):
+                return selector_issue(flash_reader_install.issue)
         import unit_double_multiply as double_mul
         if double_mul.unit_owner(unit_context["unit"], addr):
             return selector_issue(double_mul.issue)

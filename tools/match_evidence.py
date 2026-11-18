@@ -1127,6 +1127,12 @@ def report_matches(report, root, address):
         # report must use the default toolchain, and inside a unit the unit's
         # toolchain must emit the same function
         return False
+    if address == 0x08141AB0 or '* verification: `elf-symbol-thumb-flash512-set-read-flash1-v1`' in report.splitlines():
+        import flash_reader_install
+        try:
+            return flash_reader_install.report_matches(report, root, address)
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
+            return False
     if address == 0x08141EB8 or '* verification: `elf-symbol-thumb-flash-chip-reader-v1`' in report.splitlines():
         import flash_chip_erase
         return flash_chip_erase.replay(report, root, address)
