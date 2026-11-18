@@ -1762,66 +1762,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "9ab3893d92b2159b7e8151b4e61ccfc5992529f1bed372cda2f4097e34846cc9",
-        "acknowledged_cursor": 6992910898,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "9ab3893d92b2159b7e8151b4e61ccfc5992529f1bed372cda2f4097e34846cc9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080920F8\",\"who\":\"rainbow-callback\",\"note\":\"Original scanline context family; one active address.\"}",
-          "created_at": "2026-11-18T22:01:56Z",
-          "id": 6992905706,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T22:01:56Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "63eb5e05487abd9c82bdf47dd602a2a3290ebfa0980889eedd55914a1b97f8c0",
-        "result": {
-          "address": "0x080920F8",
-          "claim_id": 6992905706,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6992905706,
-          "status": "accepted",
-          "who": "rainbow-callback"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "15ae38b712136a966933c663bd07834e706b747a1b45d5249b4b98cdc36a17aa",
-        "acknowledged_cursor": 6993060734,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "15ae38b712136a966933c663bd07834e706b747a1b45d5249b4b98cdc36a17aa",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080920F8\",\"who\":\"rainbow-callback\",\"claim_id\":6992905706,\"reason\":\"Parked genuine C 132/136, four equivalent constant-register differences; native constructor, display checks and DMA behavior verified.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T22:09:03Z",
-          "id": 6993060734,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T22:09:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b38cdf9cb13b7a8c0790e6e4498a3ccb4a8f365a343b43740efb4b75a0aaf019",
-        "result": {
-          "address": "0x080920F8",
-          "claim_id": 6992905706,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6993060734,
-          "status": "accepted",
-          "who": "rainbow-callback"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "2e4d4d7a10fccb00bcfd44dd32d10c85a7995c0ac2f002d6b1d0758c7917da1a",
         "acknowledged_cursor": 6992910898,
         "body_provenance": "acceptance-time",
