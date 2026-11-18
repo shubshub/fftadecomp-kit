@@ -3577,6 +3577,20 @@ writes display shadow RAM at `0x0300098C/D`. Updater `0x08000718` programs DMA0
 to upload those bytes to BLDALPHA. A native execution test follows the original
 installer and scheduler on a three-keyframe input.
 
+The USA window writer at `0x0811435C` uses the existing
+`--owner-runtime-profile bounded-buffer-root-return-scratch-v1` for its
+12-byte local interpolator. The two original scene calls at `0x081147F0`
+and `0x08114820` use window tasks retained from the WIN1H/WIN0H constructors
+and centers at rows 72 and 71. The recovered loop visits each admitted row's
+left and right byte. Their packed volatile fields reproduce the four original
+reads immediately preceding stores. A qualifier-stripped build retains the
+four reads that supply the values. Swapping the field names moves all twelve
+accesses to the other byte. Replay checks the caller, live payload getter,
+two interpolators, nested geometry and the shared scanline transfer to HBlank DMA.
+The row bound assumes the original initialized scene and live exclusive buffers.
+For the native controls and 21-frame scene test, set `FFTA_SHIFTED_WINDOW_ROOT`
+to the matching game checkout.
+
 The finite local-word verifier also handles the 148-byte caller at
 `0x080C6858`. It builds a 48-byte stack list containing pointers to the game's
 264-byte unit records. Both script sites pass exactly twelve records. The
