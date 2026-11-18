@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "de65715b791068c3744caff49462f1f48a2ef3bc0b57cccc4e49de5525da3a03",
+    "acknowledged_cursor": 6984534558,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "de65715b791068c3744caff49462f1f48a2ef3bc0b57cccc4e49de5525da3a03",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131838\",\"who\":\"rainbow-callback\",\"note\":\"Recover indexed evaluator slot 25 native C and report.\"}",
+      "created_at": "2026-11-18T16:21:45Z",
+      "id": 6984499672,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:21:45Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "265c3430aca865b0dc1caf4a591219442555e52073e4d1c68ec55a114c839717",
+    "result": {
+      "address": "0x08131838",
+      "claim_id": 6984499672,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6984499672,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e619eb5c81ef0e36ebfd4e121d7ae16cbf26ef59d3adde05960900da856ef7d6",
+    "acknowledged_cursor": 6984534558,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e619eb5c81ef0e36ebfd4e121d7ae16cbf26ef59d3adde05960900da856ef7d6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131838\",\"who\":\"rainbow-callback\",\"claim_id\":6984499672,\"reason\":\"Native evaluator slot 25 matched and replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:22:53Z",
+      "id": 6984531134,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:22:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "265c3430aca865b0dc1caf4a591219442555e52073e4d1c68ec55a114c839717",
+    "result": {
+      "address": "0x08131838",
+      "claim_id": 6984499672,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6984531134,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
