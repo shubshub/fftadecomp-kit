@@ -543,6 +543,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "66fa3f82d3969c09690dff5331a934faef0f80d8595a6a8b2d20369c6872a9c2",
+        "acknowledged_cursor": 6980851861,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "66fa3f82d3969c09690dff5331a934faef0f80d8595a6a8b2d20369c6872a9c2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812260C\",\"who\":\"rainbow-state\",\"note\":\"Recover script unit selection and roster flag update with current mapped rosters and known 13-entry list query.\"}",
+          "created_at": "2026-11-18T14:03:33Z",
+          "id": 6980846190,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:03:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a67a9cb0cff3dd4d03f52b3e52ca008c0e6010b6d13980134dc6151275c66ca1",
+        "result": {
+          "address": "0x0812260C",
+          "claim_id": 6980846190,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980846190,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c4be6b1a5ac5a37388d238fa9d40779040249334a22480d841961193de406721",
+        "acknowledged_cursor": 6980851861,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c4be6b1a5ac5a37388d238fa9d40779040249334a22480d841961193de406721",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D8858\",\"who\":\"rainbow-display-impact\",\"note\":\"Recover immediate impact helper from adjacent matched delayed form, coordinate converter and sound dispatch. 202 complete bytes/93 instructions.\"}",
+          "created_at": "2026-11-18T14:03:47Z",
+          "id": 6980851861,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:03:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a67a9cb0cff3dd4d03f52b3e52ca008c0e6010b6d13980134dc6151275c66ca1",
+        "result": {
+          "address": "0x080D8858",
+          "claim_id": 6980851861,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980851861,
+          "status": "accepted",
+          "who": "rainbow-display-impact"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
