@@ -76,6 +76,7 @@ import descriptor_disjunctive_alias_profile as disjunctive
 import descriptor_callee_constant_profile as callee_constant
 import descriptor_cursor_value_profile as cursor
 import ordinary_formal_output_spill_profile as formal_spill
+import scaled_polygon
 import two_word_callback_closure_profile as callback_closure
 import tree_two_word_callback_closure_profile as tree_callback
 import literal_callback_closure_profile as literal_callback
@@ -615,6 +616,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                    r6_buffer.R6FrameCallbackProof if selector in r6_buffer.PROFILES else
                    word_buffer.WordResultCallbackProof if selector == word_buffer.SELECTOR else
                    r7_buffer.StaticCallbackTargetPreservationProof if selector == r7_buffer.SELECTOR else
+                   scaled_polygon.PolygonProof if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER else
                    formal_spill.BiosRemainderSpillProof if selector == formal_spill.BIOS_SELECTOR else
                    formal_spill.FormalOutputSpillProof if selector == formal_spill.SELECTOR else
                    cursor.DescriptorCursorValueProof if selector == cursor.SELECTOR else
@@ -651,6 +653,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
+        if type(buffers) is scaled_polygon.PolygonProof:
+            buffers.bind_polygon(data, address, ins, edges, calls)
         if selector == runtime_summary.PARTICLE_SELECTOR:
             buffers.bind_particle(address, data, calls)
         if selector == disjunctive.BOUNDED_SELECTOR:
@@ -820,6 +824,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             proof['buffers']['formal_output_spill'] = buffers.spill_manifest()
         if selector == formal_spill.BIOS_SELECTOR:
             proof['buffers']['bios_remainder'] = buffers.bios_manifest()
+            if type(buffers) is scaled_polygon.PolygonProof:
+                proof['buffers']['scaled_polygon'] = buffers.polygon_manifest()
         if selector in (static_buffer.SELECTOR, *r6_buffer.PROFILES, r7_buffer.SELECTOR, word_buffer.SELECTOR, descriptor.SELECTOR, watched_switch.SELECTOR, output_alias.SELECTOR, single_store.SELECTOR, *disjunctive.PROFILES, *callee_constant.PROFILES, cursor.SELECTOR):
             proof['buffers'].update(context_budget=static_buffer.MAX_CONTEXTS,
                                     callbacks=buffers.observations())
@@ -1143,6 +1149,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
             raise ValueError('aligned owner requires actual external two-byte Thumb alignment')
     external_alignment=(selector in (stat_drain.SELECTOR,multiple_native.SELECTOR, stack_query.DIVISION_SELECTOR, numeric_switch.SELECTOR,integer_native.SELECTOR,integer_aligned_two.SELECTOR,*named_buffer.SELECTORS,ALIGNED_SELECTOR,CYCLIC_SELECTOR,*r6_buffer.ALIGNED_POLICIES) and size%4==2 and
                         len(image['text'])==size+2 and image['text'][size:]==b'\xc0\x46')
+    if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER:
+        scaled_polygon.elf_alignment(image, symbol)
+        external_alignment = True
     if offset or (size!=len(image['text']) and not external_alignment) or any(
             item['type']==2 and item is not symbol and item['section'] or
             item['type']==1 and item['section'] or re.fullmatch(r'\$a(?:\..*)?',item['name'])
@@ -1340,6 +1349,8 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     if selector in (ALIGNED_SELECTOR,CYCLIC_SELECTOR,integer_aligned_two.SELECTOR,stat_drain.SELECTOR,*r6_buffer.ALIGNED_POLICIES):
         import addressed_signed_runtime_profile as alignment
         alignment.terminal_alignment(linked,record)
+    if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER:
+        scaled_polygon.elf_alignment(linked, record)
     if linked['type']!=2 or offset or linked['relocations'] or \
             record['size']!=original_record['size'] or len(linked['text'])!=len(original['text']):
         raise ValueError('linker altered complete owner extent or retained relocations')
@@ -1412,6 +1423,8 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         else entry.environment_fingerprint if selector in (entry.SELECTOR, named_buffer.BG_AFFINE_TRANSPARENT_SELECTOR)
         else known_query.environment_fingerprint if selector in (named_buffer.ABILITY_RANGE_SELECTOR, named_buffer.UNIT_OUTPUT_SELECTOR, named_buffer.ROSTER_SORT_SELECTOR, shadow_matrix.SELECTOR, dma_fill.SELECTOR, transfer_mask.SELECTOR, rom_table.SELECTOR, known_query.SELECTOR)
         else list_query.environment_fingerprint if selector in (spilled_loop.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, nested_query.SELECTOR, query_cont.SELECTOR, list_query.SELECTOR) else None)
+    if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER:
+        environment_reader = scaled_polygon.environment_fingerprint
     environment=environment_reader() if environment_reader else None
     source=source_fingerprint(root,address);mapping=mapping_snapshot(root);index=index_snapshot(root)
     objects=data_snapshot(root);rom_path=report_rom_path(root);rom=Path(rom_path).read_bytes()

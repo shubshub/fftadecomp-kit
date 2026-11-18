@@ -528,6 +528,9 @@ def root_scratch_join_dead(proof, data, address, successor, register, previous, 
     """A differing R2/R3 root-frame alias at a root join is dead if every path
     from the join kills it or reaches an exact bound root normal return with no
     read and no call in between (the same boundary the return projection uses)."""
+    from scaled_polygon import PolygonProof
+    if type(proof) is PolygonProof:
+        return proof.join_dead(data, address, successor, register, previous, incoming)
     if type(proof) not in (RootReturnScratchBufferProof, ConditionalThunkRootScratchBufferProof):
         return False
     root = getattr(proof, '_return_root', None)
