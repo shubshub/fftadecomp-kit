@@ -293,6 +293,9 @@ def schemas(unit=None, address=None, orphan=None):
         admitted.add(lshrdi3_profile.UNIT_SCHEMA)
     if music.unit_owner(unit, address, orphan):
         admitted.add(music.SCHEMA)
+    import unit_double_constructor as constructor
+    if constructor.unit_owner(unit, address, orphan):
+        admitted.add(constructor.SCHEMA)
     if multiply.unit_owner(unit, address, orphan):
         admitted.add(multiply.SCHEMA)
     return frozenset(admitted)
