@@ -21,12 +21,12 @@ class WindowFieldTests(unittest.TestCase):
                 window.rewrite_element(changed)
 
     def test_general_provider_does_not_admit_other_writers(self):
-        for address in (0x0800CF08, 0x0800D23C, 0x080D9C58, 0x080D9F60):
+        for address in (0x0800CF08, 0x0800D23C, 0x080D9C58, 0x080DA074):
             with self.subTest(address=address), self.assertRaises(ValueError):
                 window.provider_evidence(b'', address)
 
 
-@unittest.skipUnless(os.getenv('FFTA_WINDOW_SCANLINE_ROOT'), 'requires the USA ROM, both reviewed sources and native agbcc')
+@unittest.skipUnless(os.getenv('FFTA_WINDOW_SCANLINE_ROOT'), 'requires the USA ROM, the reviewed sources and native agbcc')
 class NativeWindowTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -51,7 +51,7 @@ class NativeWindowTests(unittest.TestCase):
                         window.check_bodies(address, *variant)
             # Keep every other perturbed instruction correct but make just one
             # read access the original field through an alias.
-            site = 0x84 if address == window.RECT else 0xEA
+            site = {window.CIRCLE: 0x74, window.RECT: 0x84, window.ELLIPSE: 0xEA}[address]
             wrong = bytearray(swapped)
             wrong[site:site+2] = actual[site:site+2]
             with self.assertRaises(ValueError):
@@ -73,6 +73,9 @@ class NativeWindowTests(unittest.TestCase):
             if address == window.RECT:
                 mutations += [('state->object', '(void *)task'), ('        lines[row].left =',
                               '        (void)lines[row].right;\n        lines[row].left =')]
+            elif address == window.CIRCLE:
+                mutations += [('(u16)row < 160', '(u16)row <= 160'), ('mode != 2', 'mode != 1'),
+                              ('y - offset', 'y + offset'), ('decision >= 0', 'decision > 0')]
             else:
                 mutations += [('right >', 'right >='), ('row < 160', 'row < 161'),
                               ('right--;', 'right = 0;'), ('radius >> 1, buffer', 'radius >> 1, (u8 *)buffer + 2')]
@@ -148,6 +151,9 @@ class NativeWindowTests(unittest.TestCase):
                 payload = call(0x0800C614, obj)
                 self.assertEqual(payload, obj+32)
                 self.assertEqual(uc.mem_read(payload, 320), bytes((145,73))*160)
+                # This wrapper is also the scene's real provider for the circle.
+                call(0x080DAC40, task, 100, 80, 2)
+                self.assertEqual(uc.mem_read(payload+160, 2), bytes((103,98)))
                 buffers = (readword(obj+24), readword(obj+28))
                 self.assertEqual(buffers, (payload+320, payload+644))
                 for frame, expectedbank in enumerate(reversed(buffers)):
@@ -175,6 +181,9 @@ class NativeWindowTests(unittest.TestCase):
                      0xDAE72, 0x14186C, 0x009AC, 0x00980, 0xC694)
             if address == window.ELLIPSE:
                 sites += (0xEEC50, 0xEEC58, 0xEEC64, 0xEEC66, 0xEEC68, 0xDAD56, 0xDAD6A, 0xDA128)
+            elif address == window.CIRCLE:
+                sites += (0xE0DC4, 0xE0DC8, 0xE0DD2, 0xE0DD6, 0xE0DFE, 0xE0E0A,
+                          0xE0E32, 0xDAC56, 0xDAC5A, 0xDAC5C, 0xDAC6C, 0xDAC74, 0xDA8E2, 0xDAD26)
             for site in sites:
                 rom[site] ^= 2
                 with self.subTest(address=hex(address), site=hex(site)), self.assertRaises(ValueError):
@@ -189,8 +198,9 @@ class NativeWindowTests(unittest.TestCase):
             self.assertIn(record, report)
             self.assertTrue(match_evidence.report_matches(report, self.root, address))
             for changed in (report.replace(record + '\n', ''), report.replace(record, record + '\n' + record),
-                            report.replace('requires signed y <= 160', 'proves signed y <= 160')
-                            if address == window.ELLIPSE else report.replace('caller unknown', 'caller authenticated'),
+                            report.replace({window.RECT: 'caller unknown', window.ELLIPSE: 'requires signed y <= 160',
+                                            window.CIRCLE: 'the same live tasks must reach phase 0x101'}[address],
+                                           'unconditional'),
                             report.replace('* compiled : `', '* compiled : `00')):
                 with self.subTest(address=hex(address)):
                     self.assertFalse(match_evidence.report_matches(changed, self.root, address))
@@ -217,6 +227,8 @@ class NativeWindowTests(unittest.TestCase):
             arguments = (task, x, y, size)
         else:
             arguments = (x, y, size, buffer)
+            if address == window.CIRCLE:
+                machine.mem_write(stack, struct.pack('<I', height))
         for reg, val in zip((UC_ARM_REG_R0, UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3,
                              UC_ARM_REG_SP, UC_ARM_REG_LR), (*arguments, stack, stop|1)):
             machine.reg_write(reg, val & 0xFFFFFFFF)
@@ -242,6 +254,45 @@ class NativeWindowTests(unittest.TestCase):
         machine.emu_start(address|1, stop, count=250000)
         self.assertEqual(machine.reg_read(UC_ARM_REG_PC), stop)
         return bytes(machine.mem_read(buffer, 512)), events
+
+    def test_circle_pixels_modes_and_all_four_store_sites(self):
+        from unicorn import UC_MEM_READ, UC_MEM_WRITE
+        actual, stripped, swapped = self.bodies[window.CIRCLE]
+        for site in (0x74, 0x90, 0xCC, 0xE8):
+            changed = bytearray(actual)
+            changed[site-8] = 160  # Admit row 160 instead of stopping at 159.
+            with self.subTest(site=site), self.assertRaisesRegex(ValueError, 'circle row guard'):
+                window.check_bodies(window.CIRCLE, changed, stripped, swapped)
+        # The halfword conversion precedes the unsigned row check. Horizontal
+        # bounds are clipped on one side each and finally narrowed to bytes.
+        signed = lambda n: (n + 32768) % 65536 - 32768
+        for x, y, radius in ((100,80,0), (100,80,2), (2,0,12), (239,159,8), (120,80,80),
+                             (-3,-1,7), (32767,32766,4), (-32768,-32768,5)):
+            for mode in (0, 1, 2, 3):
+                expected = bytearray((i*41+7) % 256 for i in range(512))
+                sites = []
+                dx, dy, error = radius, 0, 3-2*radius
+                while radius and dx >= dy:
+                    for span, step in ((dx, dy), (dy, dx)):
+                        lo = max(0, signed(x-span)) & 255
+                        hi = min(240, signed(x+span+1)) & 255
+                        for row, disabled in ((y+step, 1), (y-step, 2)):
+                            row &= 65535
+                            if row < 160 and mode != disabled:
+                                sites.extend((2*row+1, 2*row))
+                                expected[2*row:2*row+2] = bytes((hi, lo))
+                    if error >= 0:
+                        dx -= 1
+                        error -= 4*dx
+                    dy += 1
+                    error += 2 + 4*dy
+                with self.subTest(x=x, y=y, r=radius, mode=mode):
+                    for index, qualified in ((0, True), (1, False)):
+                        pixels, events = self.execute_writer(window.CIRCLE, self.bodies[window.CIRCLE][index],
+                                                             x, y, radius, mode)
+                        self.assertEqual(pixels, expected)
+                        kinds = (UC_MEM_READ, UC_MEM_WRITE) if qualified else (UC_MEM_WRITE,)
+                        self.assertEqual(events, [(kind, byte, 1) for byte in sites for kind in kinds])
 
     def test_real_execution_and_nonvolatile_counterfactual(self):
         from unicorn import UC_MEM_READ, UC_MEM_WRITE

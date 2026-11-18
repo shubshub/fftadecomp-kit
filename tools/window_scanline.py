@@ -1,4 +1,4 @@
-"""Volatile WINxH fields in two specific USA scanline payload writers (kit #168).
+"""Volatile WINxH fields in specific USA scanline payload writers (kit #168).
 
 The writers edit heap RAM. The allocator, event-zero callback, bank switch and
 HBlank DMA programming establish what that RAM represents. The constructor
@@ -14,6 +14,7 @@ import struct
 from sdk_cpuset_halfword import TOKEN, base_header
 
 BASE = 0x08000000
+CIRCLE = 0x080D9F60
 RECT = 0x080DA968
 ELLIPSE = 0x080DA1C4
 HEADER = 'include/ffta.h'
@@ -21,10 +22,11 @@ ELEMENT = re.compile(
     r'\btypedef\s+struct\s+__attribute__\s*\(\s*\(\s*packed\s*\)\s*\)\s*\{'
     r'\s*(?P<right>volatile)\s+u8\s+right\s*:\s*8\s*;'
     r'\s*(?P<left>volatile)\s+u8\s+left\s*:\s*8\s*;\s*\}\s*WindowLine\s*;')
-# The source token fingerprints bind only the two reviewed C programs. This
+# The source token fingerprints bind only the reviewed C programs. This
 # prevents extra expression-level reads or an alias that happens to compile
 # identically. Body and transfer evidence below are independently required.
 SOURCE_TOKENS = {
+    CIRCLE: '9ef6da9a5d9b377ab691da1170a8713b15b01ed29cd6d5f58bd29619e6d3f74a',
     RECT: 'e932b2672df436650fe5331575191662cc8a2722dc36591565e2a767a13857cb',
     ELLIPSE: '9cbc279cf9136df898b107ecad1f41c0e2dfa645da10d570a62e4a9d63e0f269',
 }
@@ -32,12 +34,14 @@ SOURCE_TOKENS = {
 # Stripping can change the whole frame and register allocation. Both audited
 # controls retain their rectangle bounds or their even-diameter/row conditions.
 OWNER_SHAPES = {
+    CIRCLE: ((276, 'ebc7f7c2f9ec6b910932b086e1be2cbffcbea48f47f2cc62e050c3756b539d3c'),
+             (260, '72503100a8953af693b6df4f81865c9144a475ab0820316b4db48ed55b86a60b')),
     RECT: ((166, 'ac85d657e591e6e33da7fbf0754b93a1799205cddb5f1109ff94a396d1ff4a55'),
            (150, 'dc10536a4b99d8817e2f41903ff1bedf56169b4492e19ff7f189dfb405ed8fe0')),
     ELLIPSE: ((272, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),
               (262, '88843664ee85ce57d3278ca8b1b574436bbca58f189fa68650b1e4bcf151b452')),
 }
-CALLEES = {RECT: (0x08005BFC, 0x0800C614),
+CALLEES = {CIRCLE: (), RECT: (0x08005BFC, 0x0800C614),
            ELLIPSE: (0x08141870, 0x08141870, 0x080DA074, 0x080D9F60)}
 
 PROVIDER = (
@@ -82,6 +86,18 @@ ELLIPSE_PATH = (
 )
 
 
+CIRCLE_PATH = (
+    # 080E0CC4 constructs bank 1 at 080E0DC4, bank 0 at 080E0DD2 and stores
+    # them at +0x24/+0x28. Its later phase passes those slots to DAC40 twice.
+    (0x080E0CC4, 0x080E0E98, '17dc0aa4349bd5acb181f7e174b2562b34643e56bf2be325e9a3744549e0efde'),
+    # The ordinary wrapper forwards live +4/C614 payload as argument four and mode zero.
+    (0x080DAC40, 0x080DAC80, '280660f3ad1f8ebe9885680eb1e5e8e5e9473ddd5a44ea063a01d47ad405f589'),
+    # The independent circle-plus-ellipse wrapper forwards mode 1 on the first call.
+    (0x080DA8A0, 0x080DA966, 'e88d1a850224f07f5d4c3d0ee51971503e21ec25e812d6c9eed527d249417834'),
+    # For nonzero equal axes the general ellipse wrapper forwards the same buffer.
+    (0x080DAC80, 0x080DAD3A, '4f4d69d9b06146380f60d1b12f68d849c91ef72c3ea50bf0fac9292f27f4d8a9'),
+)
+
 def uses_element(root, address):
     import plausible
     path = Path(root) / 'src' / f'{address:08X}.c'
@@ -119,7 +135,8 @@ def provider_evidence(rom, address):
     zero_image = (*installed.BOOT,
                   (0x08002768, 0x080027B8, '6e9dc4c6a9f37a50fb532938d3c1d4e5bd2eb08e1e45744ec654f057d08dd718'),
                   (installed.IMAGE, installed.IMAGE + 176, installed.IMAGE_SHA256))
-    for start, end, digest in zero_image + PROVIDER + (ELLIPSE_PATH if address == ELLIPSE else ()):
+    caller_path = {RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH}[address]
+    for start, end, digest in zero_image + PROVIDER + caller_path:
         if sha256(rom[start-BASE:end-BASE]).hexdigest() != digest:
             raise ValueError(f'changed window provider, bank transfer or caller at {start:08X}')
     # The event loads this exact pair through its pool; destination index must
@@ -167,10 +184,27 @@ def check_bodies(address, qualified, stripped, swapped):
     # ellipse's even-diameter path the first two reads form the unsigned right
     # > left test; the next right read supplies the decrement. The last right
     # read is the dead insertion read, immediately before that byte's write.
-    actual = ((0x84, 0x86, 0x88, 0x8A) if address == RECT else
-              (0xB4, 0xB6, 0xB8, 0xBA, 0xE2, 0xE4, 0xEA, 0xEE, 0xF0))
-    control = (('strb', 'strb') if address == RECT else
-               ('strb', 'strb', 'ldrb', 'ldrb', 'strb'))
+    if address == CIRCLE:
+        # Each of four guarded rows writes left then right. Each full-byte
+        # store loses just its dead insertion read when the fields are ordinary.
+        actual = tuple(site + delta for site in (0x74, 0x90, 0xCC, 0xE8) for delta in (0, 2, 4, 6))
+        control = ('strb',) * 8
+        # A value outside 0..159 branches past both stores. Inside the true
+        # arm, sign-extending the halfword shifted by one gives 2*row.
+        dis = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        for site in actual[::4]:
+            block = dis.disasm(qualified[site-12:site+8], address+site-12)
+            ops = [f'{i.mnemonic} {i.op_str}' for i in block]
+            if ops != ['lsls r1, r0, #0x10', 'lsrs r0, r1, #0x10', 'cmp r0, #0x9f',
+                       f'bhi #{address+site+8:#x}', 'asrs r0, r1, #0xf', 'add r0, r8',
+                       'ldrb r1, [r0, #1]', 'strb r3, [r0, #1]', 'ldrb r1, [r0]', 'strb r2, [r0]']:
+                raise ValueError('circle row guard or same-row field accesses changed')
+    elif address == RECT:
+        actual = (0x84, 0x86, 0x88, 0x8A)
+        control = ('strb', 'strb')
+    else:
+        actual = (0xB4, 0xB6, 0xB8, 0xBA, 0xE2, 0xE4, 0xEA, 0xEE, 0xF0)
+        control = ('strb', 'strb', 'ldrb', 'ldrb', 'strb')
     for data, shape in zip((qualified, stripped), OWNER_SHAPES[address]):
         if (len(data), sha256(data).hexdigest()) != shape:
             raise ValueError('changed complete qualified or qualifier-stripped window writer')
@@ -201,11 +235,16 @@ def compile_bodies(root, address, rom):
     bodies = []
     with runner.workspace() as workspace:
         for rewrite in (None, rewrite_element, lambda s: rewrite_element(s, swap=True)):
-            _, _, image = match.compile_object(runner, workspace, args, str(root), address, source, rewrite=rewrite)
+            obj, text, image = match.compile_object(runner, workspace, args, str(root), address, source, rewrite=rewrite)
             match.allocated_text_only(image)
-            body, calls, data = match.link_calls(runner, workspace, args, image, address, mapping, len(rom), rom)
-            if data or tuple(calls[k] for k in sorted(calls)) != CALLEES[address]:
-                raise ValueError('unexpected external reference in window writer')
+            if address == CIRCLE:
+                body = match.function_bytes(obj, text, f'func_{address:08X}', address, True)
+                if body != text:
+                    raise ValueError('expected a single complete relocation-free circle owner')
+            else:
+                body, calls, data = match.link_calls(runner, workspace, args, image, address, mapping, len(rom), rom)
+                if data or tuple(calls[k] for k in sorted(calls)) != CALLEES[address]:
+                    raise ValueError('unexpected external reference in window writer')
             bodies.append(body)
     check_bodies(address, *bodies)
     return bodies
@@ -225,14 +264,20 @@ def record(root, address):
     size = len(bodies[0])
     if bodies[0] != rom[address-BASE:address-BASE+size]:
         raise ValueError('complete linked window writer differs from the ROM')
-    condition = ('caller unknown; input must be a live window task created with bank 0 or 1; '
-                 'signed clipping bounds every accessed row to [0,160)' if address == RECT else
-                 '080EEC58 creates bank 0; 080EEC68/080DAD6A deliver its payload, diameter 32; '
-                 'entry requires signed y <= 160 for the uncapped first loop')
+    condition = {
+        RECT: ('caller unknown; input must be a live window task created with bank 0 or 1; '
+               'signed clipping bounds every accessed row to [0,160)'),
+        ELLIPSE: ('080EEC58 creates bank 0; 080EEC68/080DAD6A deliver its payload, diameter 32; '
+                  'entry requires signed y <= 160 for the uncapped first loop'),
+        CIRCLE: ('080E0CC4 banks 1/0 in phase 0x100; the same live tasks must reach phase 0x101; '
+                 '080E0E0A/080E0E32 call 080DAC40, passing its 0800C614 payload as r3 to 080DAC74; '
+                 'four unsigned-halfword guards constrain every written row to [0,160)'),
+    }[address]
+    stability = '' if address == CIRCLE else 'stable values between compare/re-read and '
     hashes = '/'.join(sha256(body).hexdigest() for body in bodies)
     return ('* allowlisted volatile scanline: `window-row-bytes-v1` original/stripped/swapped '
             f'`{hashes}`; {condition}; assumes initialized live task, intact installed clear routine, successful allocation, exclusive 320-byte '
-            'payload, stable values between compare/re-read and no concurrent mutation or teardown; '
+            f'payload, {stability}no concurrent mutation or teardown; '
             '160 two-byte WIN0H/WIN1H rows copied into alternating 324-byte banks before HBlank DMA')
 
 
@@ -243,7 +288,8 @@ def report_body(report, root, address):
         stream.seek(address-BASE)
         body = stream.read(length)
     lines = report.splitlines()
+    schema = 'elf-symbol-thumb-frame-v1' if address == CIRCLE else 'elf-symbol-thumb-frame-calls-v1'
     return len(body) == length and all(lines.count(line) == 1 for line in (
-        '* verification: `elf-symbol-thumb-frame-calls-v1`',
+        f'* verification: `{schema}`',
         f'* ROM bytes: `{body.hex()}` ({length} bytes)', f'* compiled : `{body.hex()}`',
         f'**MATCH - byte identical** - {length}/{length} bytes'))
