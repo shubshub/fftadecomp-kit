@@ -510,7 +510,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b162b0078df55fda48492aa9fe53c6fe7dd9c0ab0a729106b27517eb90b9a646",
+        "acknowledged_cursor": 6986900920,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b162b0078df55fda48492aa9fe53c6fe7dd9c0ab0a729106b27517eb90b9a646",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081323D0\",\"who\":\"astra-sound\",\"claim_id\":6986415032,\"reason\":\"Complete 128-byte effect source and saved live canonical report replayed on published toolkit.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:54:21Z",
+          "id": 6986900920,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:54:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8f3cf689bc4f98f0f77472389f25620c85254839fede9d07b46cf3b14f137cd0",
+        "result": {
+          "address": "0x081323D0",
+          "claim_id": 6986415032,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986900920,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
