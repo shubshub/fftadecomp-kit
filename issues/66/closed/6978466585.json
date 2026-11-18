@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "abd657d6520a453c719e8e0023f9a778bf3e8d76d9b13b38ed2d5f8f1989eca1",
+    "acknowledged_cursor": 6978474726,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "abd657d6520a453c719e8e0023f9a778bf3e8d76d9b13b38ed2d5f8f1989eca1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080812E8\",\"who\":\"rainbow-menu\",\"note\":\"Recover menu record timer and recolour callback from complete ROM CFG\"}",
+      "created_at": "2026-11-18T12:23:55Z",
+      "id": 6978466585,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:23:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7cb719067ea9ecdc1049529af74137e2132f5874c81bf4a1335c3fa7c834ee23",
+    "result": {
+      "address": "0x080812E8",
+      "claim_id": 6978466585,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978466585,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "4f33dc9d12c42485546a36831586a1cbd3c775cde9d600b035d003f46e612eaa",
+    "acknowledged_cursor": 6978675127,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4f33dc9d12c42485546a36831586a1cbd3c775cde9d600b035d003f46e612eaa",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080812E8\",\"who\":\"rainbow-menu\",\"claim_id\":6978466585,\"reason\":\"Byte-identical natural C parked; proof refuses r1 finite divisor join 48 or 40 at 0808134A. 132 bytes SHA256 bcb8ed733b6f19c5d85bd619d8c3677d5d28f00055910497dcb2d6d688b39e28.\",\"unmatchable\":true,\"tried\":\"Canonical -mthumb-interwork -O2; unsigned-divmod-thunks-v1; complete CFG 59 instructions; typed linked identity 132/132. See Parked/080812E8/README.md.\"}",
+      "created_at": "2026-11-18T12:33:19Z",
+      "id": 6978675127,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:33:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "35046c972cfc56f626f9b65c50ecc9e0e04e99a52029c53ebfc8eb5e60a7adf5",
+    "result": {
+      "address": "0x080812E8",
+      "claim_id": 6978466585,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978675127,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  }
+}

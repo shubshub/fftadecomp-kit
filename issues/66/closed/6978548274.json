@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ae70302033c73aeac37b56fbc02d52bab4e4a2461072302a018354f9f86bbc11",
+    "acknowledged_cursor": 6978587225,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ae70302033c73aeac37b56fbc02d52bab4e4a2461072302a018354f9f86bbc11",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08145320\",\"who\":\"rainbow-m4a\",\"note\":\"Recover missing original MusicPlayer2000 wrapper or leaf, ROM boundary verified\"}",
+      "created_at": "2026-11-18T12:27:37Z",
+      "id": 6978548274,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:27:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "67ed32540f7ba2696918bbbd319689f2fe5cb2aef12f5497e9fee66335eec118",
+    "result": {
+      "address": "0x08145320",
+      "claim_id": 6978548274,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978548274,
+      "status": "accepted",
+      "who": "rainbow-m4a"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e72082bea1037ea986397a9890bbc59b3a10dac8b289d283caa924c0e3a67922",
+    "acknowledged_cursor": 6978675127,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e72082bea1037ea986397a9890bbc59b3a10dac8b289d283caa924c0e3a67922",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08145320\",\"who\":\"rainbow-m4a\",\"claim_id\":6978548274,\"reason\":\"Recovered original m4a wrapper; byte-exact match and saved report replay accepted at final function map; source/report in NTFS matching checkout\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T12:33:10Z",
+      "id": 6978672104,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:33:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "35046c972cfc56f626f9b65c50ecc9e0e04e99a52029c53ebfc8eb5e60a7adf5",
+    "result": {
+      "address": "0x08145320",
+      "claim_id": 6978548274,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978672104,
+      "status": "accepted",
+      "who": "rainbow-m4a"
+    }
+  }
+}
