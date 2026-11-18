@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8474549324844089d024644365c2d66a838f4469b67ebfe702cea9b3a0261a73",
+    "acknowledged_cursor": 6984424506,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8474549324844089d024644365c2d66a838f4469b67ebfe702cea9b3a0261a73",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08063BB8\",\"who\":\"rainbow-affine\",\"note\":\"State dispatcher slot 35, 864-byte command and resource check\"}",
+      "created_at": "2026-11-18T16:18:54Z",
+      "id": 6984424506,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:18:54Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "33f12fe706afb2c7d09063ed3046152e0b0ab8e34fe22f0303dbd3d1b9f2c0a5",
+    "result": {
+      "address": "0x08063BB8",
+      "claim_id": 6984424506,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6984424506,
+      "status": "accepted",
+      "who": "rainbow-affine"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b602510024b78c9f4acde0059ab95bcda533ecfebc8f32f508da0741057ca277",
+    "acknowledged_cursor": 6984486050,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b602510024b78c9f4acde0059ab95bcda533ecfebc8f32f508da0741057ca277",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08063BB8\",\"who\":\"rainbow-affine\",\"claim_id\":6984424506,\"reason\":\"State handler: native full match 864/864 bytes and positive canonical replay\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:20:39Z",
+      "id": 6984470336,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:20:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bcbf158d8f78141a982752ff81bb9ed0d10a45e20ec57cdb028d270fba900b9b",
+    "result": {
+      "address": "0x08063BB8",
+      "claim_id": 6984424506,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6984470336,
+      "status": "accepted",
+      "who": "rainbow-affine"
+    }
+  }
+}
