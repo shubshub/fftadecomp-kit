@@ -196,8 +196,17 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
         tainted, stored = old_tainted | incoming, old_stored or dirty_in
         revisits[site] = revisits.get(site, 0) + 1
         if revisits[site] > CONSTANT_BUDGET:
-            tainted |= frozenset(merged)
-            merged = {}
+            # Widen only what this visit changed: an unchanged entry is already the
+            # join of every path seen here. MIXED tops the constant lattice but does
+            # not cover an exact interval for taint (the interval's ROM check would be
+            # lost), so an exact incoming value absorbed into MIXED is also a change.
+            # The kept map only shrinks from here on.
+            exact_in = {register for register, low, high in known if (low, high) != MIXED}
+            changing = frozenset(register for register, value in merged.items()
+                                 if old_known.get(register) != value or
+                                 value == MIXED and register in exact_in)
+            tainted |= changing
+            merged = {register: value for register, value in merged.items() if register not in changing}
         states[site] = (tainted, merged, stored)
         constants = dict(merged)
         item = instructions[site]
