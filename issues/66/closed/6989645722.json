@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "df58bd177e55a4e676cb682f5caa2b902977c23a89f1e9a7bfe9b782b0b97b0e",
+    "acknowledged_cursor": 6989682385,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "df58bd177e55a4e676cb682f5caa2b902977c23a89f1e9a7bfe9b782b0b97b0e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0814189C\",\"who\":\"astra-shift\",\"note\":\"Recover audited FLASH512_V130 O1 SwitchFlashBank and prove its ordered cartridge command writes.\"}",
+      "created_at": "2026-11-18T19:46:44Z",
+      "id": 6989645722,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:46:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bf93fabe5e8e25934a344640a9606995aaf242e45f300f6e8d857b94f29ed39f",
+    "result": {
+      "address": "0x0814189C",
+      "claim_id": 6989645722,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6989645722,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "78ba5aa9c580a66b962975fd7b10e54e7063bc9df7ddb21ab18ace6213106bed",
+    "acknowledged_cursor": 6989995955,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "78ba5aa9c580a66b962975fd7b10e54e7063bc9df7ddb21ab18ace6213106bed",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814189C\",\"who\":\"astra-shift\",\"claim_id\":6989645722,\"reason\":\"FLASH512_V130 bank command matched 36/36 at O1, mutable flash bus protocol checked against two native compiles and actual descriptor guards; replayed with merged toolkit #305.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T20:00:47Z",
+      "id": 6989990638,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:00:47Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "07b49dc4d25975919c6b5a5ccb43fe7c20ab370907aa945ce6533c52f4c12ce0",
+    "result": {
+      "address": "0x0814189C",
+      "claim_id": 6989645722,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6989990638,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  }
+}
