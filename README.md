@@ -1597,6 +1597,17 @@ and the physical-isolation, allocator, BIOS and ordinary-return premises.
 Run `tests/test_scene_script_position.py` with `FFTA_SCENE_SCRIPT_ROOT` set to
 an indexed game checkout containing the saved `08118A08` report.
 
+The movement query at `080989AC` uses
+`--owner-runtime-profile conditional-movement-path-prefix-v1`. It rejects an
+unreachable or occupied destination, reconstructs the movement path into the
+caller's buffer, and scans its four-byte steps backward for an eligible empty
+or self-occupied tile. Two action-state callers supply 128 bytes. The provider
+requires an initialized grid with a terminating path of up to 24 steps, which
+fits the 96-byte IWRAM scratch area. The verifier replays the original tile
+callback and checks the installed copy image for each supported byte count.
+Set `FFTA_MOVEMENT_PATH_ROOT` to a USA checkout containing the C source to run
+`tests/test_movement_path_prefix.py`.
+
 The menu routine at `08027528` uses
 `--owner-runtime-profile conditional-unit-entry-output-array-v1`. The producer at
 `0809F78C` treats the low 16 count bits as signed. For a positive count it writes
