@@ -574,7 +574,35 @@
           "who": "rainbow-scene"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "146de242dca8d95eceda3f616cbec76ccc970f92c1cebdd28cbc1b21825c4eba",
+        "acknowledged_cursor": 6982338789,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "146de242dca8d95eceda3f616cbec76ccc970f92c1cebdd28cbc1b21825c4eba",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118B94\",\"who\":\"rainbow-scene\",\"claim_id\":6982212213,\"reason\":\"184-byte scene callback matches, live original source and saved ROM report replay passed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:01:14Z",
+          "id": 6982338789,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:01:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0a58117b9f76d3ae7787d888639d00e32a9c7c0ca09d4d71ad67640b89ef324b",
+        "result": {
+          "address": "0x08118B94",
+          "claim_id": 6982212213,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982338789,
+          "status": "accepted",
+          "who": "rainbow-scene"
+        }
+      }
     },
     {
       "claim": {
