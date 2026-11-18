@@ -851,7 +851,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         else:
             import scheduler_entry_profile as scheduler_entry
         scheduler_entry.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
-    if selector == local_calls.SCHEDULER_CALL_SITES:
+    if selector in local_calls.CALL_SITE_POLICIES:
         import scheduler_call_site_profile as call_sites
         call_sites.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
     if selector == shadow_matrix.SELECTOR:
@@ -1404,6 +1404,8 @@ def render(address,result):
           if manifest['profile'] in stack_index.SCHEMAS.values() else []),
         *(stack_index.forwarded_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if manifest['profile'] == stack_index.SCHEMA_V2 else []),
+        *(stack_index.forwarded_lines(manifest['proof']['buffers']['conditional_local_calls'])
+          if manifest['profile'] == local_calls.SCHEMAS[local_calls.SCHEDULER_CALL_SITES_V2] else []),
         *(manifest['proof']['buffers']['loop_replay']['lines']
           if manifest['profile'] == named_buffer.SCHEMA and 'loop_replay' in manifest['proof']['buffers'] else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',

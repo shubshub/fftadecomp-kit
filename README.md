@@ -4923,6 +4923,40 @@ of the recorded chain, and payload reads only through the payload word, within
 its recorded extent and before the call returns. Callback effects, nonescape,
 manager memory access and termination are not proved.
 
+#### Version 2: forwarded callee stack arguments
+
+`--owner-runtime-profile conditional-scheduler-call-site-summaries-v2` is v1
+with the forwarded callee stack arguments of `named-data-buffer-stack-index-v2`
+(see "Version 2: forwarded callee stack arguments and sign-extended indices"
+above). The coordinate wrappers `func_080DBD78`, `func_080DBDA0` and
+`func_080DBDC8` pass the owner's local `s16` outputs on to their own callee as
+stack arguments (`str r2,[sp]; bl func_0801C984`), which v1 refuses
+("unsupported buffer pointer use or escape"). Under v2 every buffer callee the
+walk inspects applies the same rule as stack-index v2, with the same code in
+`match.BufferCallProof`. A pointer into the owner's frame may be stored into an
+aligned word of the callee's own frame, only in a callee whose every SP use is
+`push`, `pop`, `add/sub sp,#imm` or an immediate `[sp,#imm]` access. The next
+callee is walked with that word as an incoming stack argument, so every access
+through it is still bounded against the owner's frame. A released word is
+tracked until it is written, walked callees inherit it, and the calls trusted
+while it lies below SP are recorded. A call an inspected callee makes with its
+own frame keeps v1's buffer rules, with no forwarding: a slot holding the
+callee's own frame would not be in the owner's terms.
+
+The owner rule is also the same. The words a walked root call's callee
+released are recorded and removed from the call's result. On every owner CFG
+path after that call the selector refuses `sub sp,#imm` (the core walk already
+refuses `add sp,Rm` and `mov sp,Rm`). It also refuses every call the walk
+inspects there: one that receives a stack pointer in R0-R3, R12 or LR, or while
+a frame word holds one, and every scheduler site, whose summary says nothing
+about the word. Every other later call is trusted under the forwarded stack argument
+premise of stack-index v2, recorded in the evidence
+(`forwarded_stack_arguments`: slots, released words, trusted owner and callee
+calls, `premise`, `premise_proved: false`) and as the same report line. This
+walk never replays loops, so forwarding and replay never meet. v2 requires at
+least one forwarded slot, so a function v1 admits stays v1's, and a v2 report
+relabelled as v1 fails replay.
+
 ### Conditional coordinate outputs before a scheduler call
 
 `--owner-runtime-profile conditional-scheduler-projected-outputs-v1` composes
