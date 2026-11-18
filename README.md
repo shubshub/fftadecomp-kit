@@ -4495,7 +4495,7 @@ external prefix bytes. These are finite verifier tests, not game-match credit.
 
 `--owner-runtime-profile conditional-cone-tile-stack-footprint-v1` verifies the 336-byte cone writer. At its eligibility and height calls, the compiler keeps a local byte pointer at call-site SP+52. The verifier requires empty register aliases at both calls, traces the incoming and outgoing stack offsets across the 29 complete Thumb owners, and replays their native frame checks. Only the map query at `0801CC7C` materializes a stack address. Its private byte pointer can survive in R2 on a false return. The checker follows the known return values through each consumer until the cone loop overwrites R2.
 
-The 132-byte word fill at `08000DBC` uses
+The 132-byte word fill at `08000DBC` and 136-byte halfword fill at `08000E40` use
 `--owner-runtime-profile immediate-dma-stack-fill-v1`. The verifier checks
 each reachable Thumb instruction, the complete frame, all three original
 ELF object bindings and the four hardware register bases in the ROM table.
@@ -4504,6 +4504,9 @@ and immediate fixed-source DMA control. Exhaustion returns -1. The local
 MMIO qualifier must produce the same original ELF when removed. The report
 states the effective count rules, hardware completion and stack-use premises,
 including replacement of the programmed source before subsequent channel reuse.
+The halfword fill initializes and transfers only the low halfword of the
+four-byte slot. The verifier follows all four known caller continuations to
+where they overwrite the returned channel.
 
 `--owner-runtime-profile transfer-masked-stack-argument-v1` verifies the 364-byte transfer setup at 0x08037C84. Its one-bit resource update compiles to a word load, mask and store into the eighth incoming argument, followed by a reload of the same word. The selector authenticates all ten raw Thumb calls in eight indexed caller graphs. Each call allocates four writable argument words and initializes the eighth argument with zero or one. Two phase-byte cases require their taken zero edge to dominate the call. The store therefore preserves the caller's bits, including when another function subsequently uses the outgoing area. The ordinary frame checker still rejects incoming writes. Any additional computed or external caller must supply a writable Boolean word, and non-stack objects must be distinct from active frames.
 

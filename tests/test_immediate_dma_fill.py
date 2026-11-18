@@ -17,6 +17,11 @@ import owner_admission_profile as owner
 
 @unittest.skipUnless(os.environ.get("FFTA_DMA_FILL_ROOT"), "requires USA ROM, source and checked index")
 class NativeFill(unittest.TestCase):
+    ADDRESS = dma.WORD
+    SIZE = 132
+    WIDTH = 4
+    CONTROL = 0x85000000
+
     @classmethod
     def setUpClass(cls):
         cls.root = Path(os.environ["FFTA_DMA_FILL_ROOT"]).resolve()
@@ -24,8 +29,8 @@ class NativeFill(unittest.TestCase):
         cls.mapping = match_evidence.mapping_snapshot(cls.root)
         cls.index = (cls.root/"symbols/functions.txt").read_bytes()
         cls.objects = match_evidence.data_snapshot(cls.root)
-        cls.address = dma.WORD
-        cls.offset, cls.size = cls.address - dma.BASE, 132
+        cls.address = cls.ADDRESS
+        cls.offset, cls.size = cls.address - dma.BASE, cls.SIZE
         cls.body = cls.rom[cls.offset:cls.offset+cls.size]
         cls.report = (cls.root/f"docs/match/{cls.address:08X}.md").read_text()
         marker = "* owner runtime evidence: `"
@@ -45,7 +50,7 @@ class NativeFill(unittest.TestCase):
     def test_canonical_positive_and_report_negatives(self):
         self.assertTrue(match_evidence.report_matches(self.report, str(self.root), self.address))
         self.assertIn("before re-enabling", self.report)
-        for marker in ("immediate-dma-stack-fill-v1", "before re-enabling", "132/132"):
+        for marker in ("immediate-dma-stack-fill-v1", "before re-enabling", f"{self.size}/{self.size}"):
             self.assertFalse(match_evidence.report_matches(self.report.replace(marker, "altered", 1),
                                                           str(self.root), self.address))
         command = [sys.executable, str(TOOLS/"match.py"), "--root", str(self.root), "--no-write",
@@ -56,7 +61,8 @@ class NativeFill(unittest.TestCase):
 
     def test_changed_machine_semantics_and_data_cells(self):
         proof = self.verify(self.body)
-        self.assertEqual(proof["instructions"], 57)
+        self.assertEqual(proof["instructions"], 58 if self.WIDTH == 2 else 57)
+        self.assertEqual((proof["dma_fill"]["unit_bytes"], proof["dma_fill"]["control"]), (self.WIDTH, self.CONTROL))
         # Stacked source, count narrowing, physical comparisons, lock and state
         # predicates, progression, fallback, register writes, return and pop.
         for offset in (0, 2, 4, 8, 10, 0x0C, 0x12, 0x16, 0x18, 0x1E,
@@ -108,6 +114,7 @@ class NativeFill(unittest.TestCase):
             for base, size in ((dma.BASE, 0x400000), (0x03000000, 0x8000), (0x04000000, 0x1000)):
                 cpu.mem_map(base, size)
             cpu.mem_write(dma.BASE, self.rom[:0x400000])
+            cpu.mem_write(stack - 20, bytes.fromhex("5555a75c"))
             for i in range(4):
                 cpu.mem_write(dma.LOCKS + 2*i, struct.pack("<H", int(i != channel and i % 2 == 0)))
                 cpu.mem_write(dma.STATES + 16*i + 12, bytes([2 if i == channel else 3]))
@@ -116,7 +123,10 @@ class NativeFill(unittest.TestCase):
                 if 0x040000B0 <= address <= 0x040000DC:
                     writes.append((address, width, data))
                     if len(writes) == 3:
-                        self.assertEqual(uc.mem_read(stack-20, 4), struct.pack("<I", value))
+                        expected = struct.pack("<I", value)
+                        if self.WIDTH == 2:
+                            expected = expected[:2] + bytes.fromhex("a75c")
+                        self.assertEqual(uc.mem_read(stack-20, 4), expected)
                         self.assertEqual(uc.reg_read(UC_ARM_REG_SP), stack-20)
             cpu.hook_add(UC_HOOK_MEM_WRITE, capture)
             for reg, data in ((UC_ARM_REG_SP, stack), (UC_ARM_REG_LR, stop | 1),
@@ -133,9 +143,32 @@ class NativeFill(unittest.TestCase):
             else:
                 sad = dma.REGISTERS[channel]
                 self.assertEqual(writes, [(sad, 4, stack-20), (sad+4, 4, dest),
-                                           (sad+8, 4, 0x85000000 | (count & 0xFFFF))])
+                                           (sad+8, 4, self.CONTROL | (count & 0xFFFF))])
                 # CPU traces only establish programming. The physical transfer
                 # length and synchronous completion are GBA hardware premises.
+
+
+class NativeHalfwordFill(NativeFill):
+    ADDRESS = dma.HALFWORD
+    SIZE = 136
+    WIDTH = 2
+    CONTROL = 0x81000000
+
+    def test_halfword_width_padding_and_caller_return_contract(self):
+        proof = self.verify(self.body)["dma_fill"]
+        self.assertEqual(proof["known_callers_discarding_channel"],
+                         [0x0808A89A, 0x0808A8A6, 0x0808A922, 0x0808A92E])
+        for offset in (0x06, 0x08, 0x42, 0x44, 0x4C, 0x62, 0x70, 0x72, 0x74, 0x76, 0x78, 0x82, 0x84):
+            changed = bytearray(self.body)
+            changed[offset] ^= 2
+            with self.subTest(offset=offset), self.assertRaises(ValueError):
+                self.verify(bytes(changed))
+        for header in (0x0808A894, 0x0808A91C):
+            for delta in (0, 6, 12, 18, 28, 36):
+                image = bytearray(self.rom)
+                image[header-dma.BASE+delta] ^= 2
+                with self.subTest(header=header, delta=delta), self.assertRaisesRegex(ValueError, "caller"):
+                    dma.halfword_callers(image)
 
 
 if __name__ == "__main__":
