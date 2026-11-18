@@ -570,7 +570,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4a70f09d5dad822edbdd67dd956e2a2a03556168b08b50959038a2f807d370c5",
+        "acknowledged_cursor": 6978849419,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4a70f09d5dad822edbdd67dd956e2a2a03556168b08b50959038a2f807d370c5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800A0B8\",\"who\":\"rainbow-callback\",\"claim_id\":6978759589,\"reason\":\"Parked exact 84-byte context wrapper; transitive stack-buffer indirect handler proof refused\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:40:56Z",
+          "id": 6978842760,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:40:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4b896a18c910c4cc2181ab2baaf6d32292818c2c2009617656664437c9f56476",
+        "result": {
+          "address": "0x0800A0B8",
+          "claim_id": 6978759589,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978842760,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -600,6 +628,38 @@
           "request_id": 6978803761,
           "status": "accepted",
           "who": "rainbow-affine"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "48172b9fc79ce12605bb352ef8c8beba35765995f8106d7c5f8e6db07b298f5a",
+        "acknowledged_cursor": 6978849419,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "48172b9fc79ce12605bb352ef8c8beba35765995f8106d7c5f8e6db07b298f5a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812803C\",\"who\":\"rainbow-state\",\"note\":\"Recover parked panel callback using shared control_flags declaration\"}",
+          "created_at": "2026-11-18T12:41:14Z",
+          "id": 6978849419,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:41:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4b896a18c910c4cc2181ab2baaf6d32292818c2c2009617656664437c9f56476",
+        "result": {
+          "address": "0x0812803C",
+          "claim_id": 6978849419,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978849419,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
