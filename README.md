@@ -1627,6 +1627,19 @@ edits and the second battle caller retain the same loadout precondition.
 Set `FFTA_EQUIPMENT_ATTRIBUTE_ROOT` to an indexed USA game checkout with
 the saved report to run `tests/test_unit_equipment_attribute.py`.
 
+The same equipment profile verifies the four original calls and the complete
+206-byte battle evaluator at `080BDECC`. The eligibility test collects into
+its own two-halfword frame. The evaluator collects a fresh selection at
+SP+8, supplies item zero for an empty result and uses only the first item
+for action zero. Its other two stack words hold outgoing scalar arguments.
+The subtotal and signed adjustment follow the original halfword arithmetic.
+All actors inspected by the battle helpers must meet the loadout condition.
+
+Set `FFTA_BATTLE_ACTION_ROOT` to the indexed USA checkout with the saved
+report to run `tests/test_battle_action_value.py`. Both original AI callers
+execute on map 0, loaded from its three original ROM resources. They observe
+the actor initialization, range output, item arguments and returned score.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
