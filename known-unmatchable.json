@@ -7,13 +7,6 @@
     "tried": "literal base + offsets; offsets in u32 locals; wide offsets; four separate literal pointers; six field/store orderings with a symbol base"
   },
   {
-    "address": "0x0800BC28",
-    "reason": "cannot be verified in isolation: the source needs a *named* data symbol (a real 40-byte record table at 0x02009000). That form compiles to the exact 30 bytes but leaves an unresolved pool relocation, which match.py rejects. Same wall as func_0800BC08.",
-    "released_at": "2026-10-18T07:41:11Z",
-    "who": "opencode",
-    "tried": "literal base: 28 B, base lands in r0, no frame; symbol form: exact 30 B but unverifiable without a linked build"
-  },
-  {
     "address": "0x0801CA10",
     "reason": "exhausted: 13 source shapes probed with probe.py, all land at 52 bytes / 19 of 34 slots. The ROM keeps &scaled[0..2] in three registers; agbcc folds each into one sp base plus an immediate, and every shape that forces the addresses into registers pays in spill traffic (5 regs -> 8 slots).",
     "released_at": "2026-10-18T09:54:44Z",
