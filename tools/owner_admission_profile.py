@@ -1381,7 +1381,7 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         else integer_two.environment_fingerprint if selector == integer_two.SELECTOR
         else integer_words.environment_fingerprint if selector == integer_words.SELECTOR
         else integer_native.environment_fingerprint if selector == integer_native.SELECTOR
-        else menu_icon_row.environment_fingerprint if selector == runtime_summary.SELECTOR and address == menu_icon_row.OWNER
+        else menu_icon_row.environment_fingerprint if selector == runtime_summary.SELECTOR and address in (menu_icon_row.OWNER, menu_icon_row.CLAMPED)
         else menu_runner.environment_fingerprint if selector == multiple_native.SELECTOR and address == menu_runner.OWNER
         else menu_switches.environment_fingerprint if selector == multiple_native.SELECTOR and address == menu_switches.OWNER
         else multiple_native.environment_fingerprint if selector == multiple_native.SELECTOR
@@ -1425,7 +1425,7 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
                 native = integer_aligned_two if selector == integer_aligned_two.SELECTOR else numeric_switch if selector == numeric_switch.SELECTOR else integer_two if selector == integer_two.SELECTOR else integer_words if selector == integer_words.SELECTOR else integer_data if selector == integer_data.SELECTOR else integer_locals
                 manifest,count=native.verify_original(raw,runner.read_binary(workspace+'/f.elf'),
                     address,rom,mapping,index,bindings,expected,objects=objects)
-            elif selector == runtime_summary.SELECTOR and address == menu_icon_row.OWNER:
+            elif selector == runtime_summary.SELECTOR and address in (menu_icon_row.OWNER, menu_icon_row.CLAMPED):
                 manifest,count=menu_icon_row.verify_original(raw,runner.read_binary(workspace+'/f.elf'),
                     address,rom,mapping,index,bindings,expected,objects=objects)
             elif selector == multiple_native.SELECTOR and address in (menu_switches.OWNER, menu_runner.OWNER):

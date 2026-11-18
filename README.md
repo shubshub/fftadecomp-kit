@@ -5270,6 +5270,17 @@ and one wrap the clear count, and width two programs zero. The native tests
 exercise these descriptors without assigning zero-length BIOS semantics.
 A fifth argument of one reaches the text renderer for both icon cases.
 
+The same selector covers the sibling at `08054314`. Its known caller at
+`080539F0` passes row zero, a halfword entry and stack style five. The
+getter at `08017B68` sign-extends the low row byte, adds the list position,
+narrows the sum to a signed halfword and compares it to the signed list count
+minus one. A negative sum returns zero. For a nonnegative sum and empty list
+the upper clamp returns 65535. The original signed-remainder helper then
+receives this zero-extended halfword and a divisor between 1 and 256, taken
+from the byte height plus one. The doubled row offset wraps to 16 bits before
+adding the base tile. The caller still supplies the physical allocation and
+the name pointer within the common renderer contract.
+
 ### Complete ordinary owners with multiple guarded switches
 
 The explicit owner selector `ordinary-multiple-switch-source-v1` compiles plausible
