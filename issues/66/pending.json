@@ -510,7 +510,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e37a49ecd35a2a221ca037a4181324d29397edc25c8bf5b64006ae2ae38b0668",
+        "acknowledged_cursor": 6987326764,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e37a49ecd35a2a221ca037a4181324d29397edc25c8bf5b64006ae2ae38b0668",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000E40\",\"who\":\"rainbow-affine\",\"claim_id\":6987134546,\"reason\":\"136/136 original halfword DMA fill, 58 Thumb instructions; native evidence and two caller declarations replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:11:50Z",
+          "id": 6987326764,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:11:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f7604df4b8276bcb0503013834f0171aae82a578b5d544628c331defc1e9547b",
+        "result": {
+          "address": "0x08000E40",
+          "claim_id": 6987134546,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987326764,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,38 @@
           "request_id": 6987304131,
           "status": "accepted",
           "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "001351fca61b793fb79f513ab966266a23be5f16562e92073285dff8f619720c",
+        "acknowledged_cursor": 6987326764,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "001351fca61b793fb79f513ab966266a23be5f16562e92073285dff8f619720c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080005CC\",\"who\":\"rainbow-state\",\"note\":\"Recover the original reset-path input/system initialization called by 08000360\"}",
+          "created_at": "2026-11-18T18:11:39Z",
+          "id": 6987322164,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:11:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f7604df4b8276bcb0503013834f0171aae82a578b5d544628c331defc1e9547b",
+        "result": {
+          "address": "0x080005CC",
+          "claim_id": 6987322164,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987322164,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
