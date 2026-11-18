@@ -83,7 +83,10 @@ WIDE_PC_RETURNS = {0x0814274C: (0x0814274C,), 0x08142AB0: (0x08142B1C, 0x08142B2
                    0x08142B28: (0x08142B32, 0x08142BAE, 0x08142BDC, 0x08142BE6)}
 
 
-def call_target(name):
+def call_target(name, owner=None, site=None):
+    # __gedf2 stays private everywhere except its original libgcc2 call site.
+    if name == "__gedf2" and owner == UNSIGNED_WORD_OWNER[0] and site == 0x0814286E:
+        return 0x0814374C
     return OPERATIONS.get(name, DIVISION_OPERATION.get(name, WIDE_OPERATIONS.get(name)))
 
 
@@ -95,14 +98,16 @@ def shared_division_call(name, target):
     return name == "__divsi3" and target == DIVISION_OPERATION[name]
 
 
-# The one runtime owner admitted as authored C must retain this complete
-# canonical identity; ordinary runtime owners remain excluded below.
+# Authored libgcc2 conversions must retain their complete canonical identity.
 UNSIGNED_WIDE_OWNER = (0x0814278C, 0x08142862, 80,
     "f73dcb3cef4b4139a1a556d79f806d5157e9c5ec9148782cdbb5c8d1194eb436")
+UNSIGNED_WORD_OWNER = (0x08142864, 0x081428AC, 24,
+    "fd5184d8b27f51a2488233b7489aedd3be4912345a47329f6e54feb91c872fd1")
+UNSIGNED_WORD_BINDINGS = {0x0814286E: "__gedf2", 0x0814287A: "__fixdfsi",
+                          0x08142890: "__adddf3", 0x08142894: "__fixdfsi"}
 IDENTITIES = (
     UNSIGNED_WIDE_OWNER,
-    (0x08142864, 0x081428AC, 24,
-     "fd5184d8b27f51a2488233b7489aedd3be4912345a47329f6e54feb91c872fd1"),
+    UNSIGNED_WORD_OWNER,
     (0x081428E4, 0x08142950, 40,
      "a6d6bb1e52f8722074d02e2636c989190539cb12779065909bc2bb61093fe399"),
     (0x08142A20, 0x08142A94, 56,
@@ -567,12 +572,9 @@ def prove_unsigned_conversion_closure(rom, entries):
 def validate_span(data, address, rom, mapping, index):
     entries, rows = verify_identity(rom, mapping, index)
     entry = span_record(address, address + len(data), entries, rows, rom)
-    start, end, count, digest = UNSIGNED_WIDE_OWNER
-    # The public helper is also authored C. Its exact pinned owner, body and
-    # dual-index count are mandatory; fresh fixed-compiler ELF/source replay
-    # remains required before any report can credit this reserved owner.
-    authored_owner = address == start and address + len(data) == end and \
-        entry["instrs"] == count and hashlib.sha256(data).hexdigest() == digest
+    authored_owner = any(address == start and address + len(data) == end and
+                         entry["instrs"] == count and hashlib.sha256(data).hexdigest() == digest
+                         for start, end, count, digest in (UNSIGNED_WIDE_OWNER, UNSIGNED_WORD_OWNER))
     if reserved(address) and not authored_owner or not data or len(data) % 2 or \
             data != rom[address - 0x08000000:address - 0x08000000 + len(data)]:
         raise ValueError("software-double complete caller differs from mapped ROM")
@@ -720,9 +722,11 @@ def verify_context(data, address, calls, context):
         raise ValueError("software double requires an isolated canonical runtime context")
     rom, mapping, index, bindings = context[:4]
     validate_span(data, address, rom, mapping, index)
-    operations = dict(OPERATIONS, **DIVISION_OPERATION, **WIDE_OPERATIONS, __modsi3=modsi3.ADDRESS)
+    if address == UNSIGNED_WORD_OWNER[0] and (bindings != UNSIGNED_WORD_BINDINGS or set(calls) != set(bindings)):
+        raise ValueError("unsigned word conversion requires its four original runtime relocations")
     if not any(name in OPERATIONS or name in WIDE_OPERATIONS for name in bindings.values()) or \
-            any(type(site) is not int or name not in operations or calls.get(site) != operations[name]
+            any(type(site) is not int or calls.get(site) is None or
+                calls[site] != (modsi3.ADDRESS if name == "__modsi3" else call_target(name, address, site))
                 for site, name in bindings.items()) or \
             set(bindings) != {site for site, target in calls.items()
                               if reserved(target) or modsi3.reserved(target) or
@@ -793,8 +797,9 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
         if type(offset) is not int or not isinstance(name, str) or offset % 2 or \
                 offset < previous + 4 or offset < 0 or offset + 4 > len(data):
             raise ValueError("software-double calls must be ordered nonoverlapping instructions")
-        if call_target(name) is not None or name == "__modsi3":
-            calls[address + offset] = modsi3.ADDRESS if name == "__modsi3" else call_target(name)
+        target = call_target(name, address, address + offset)
+        if target is not None or name == "__modsi3":
+            calls[address + offset] = modsi3.ADDRESS if name == "__modsi3" else target
             bindings[address + offset] = name
         else:
             calls[address + offset] = function_address_target(name, entries, address, len(data), len(rom))
@@ -940,6 +945,12 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
         raise ValueError("software-double data provenance requires an empty collection")
     if switch_relocations is not None and (type(switch_relocations) is not dict or switch_relocations):
         raise ValueError("software-double switch provenance requires an empty collection")
+    if address == UNSIGNED_WORD_OWNER[0]:
+        import plausible
+        preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
+        code = plausible.strip_comments_and_strings(preprocessed)
+        if re.search(r"\b(?:__gedf2|__adddf3|__fixdfsi|__asm__|__asm|asm)\b", code):
+            raise ValueError("unsigned word conversion requires compiler-generated runtime calls")
     objects, has_data, has_remainder, has_double, has_switch = None, False, False, False, False
     for section_index in original["relocations"]:
         section = original["sections"][section_index]
@@ -947,7 +958,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
             raise ValueError("software double requires ordinary Thumb call or mapped data relocations")
         symbols = original["symbol_tables"].get(section[6])
         for position in range(0, section[5], 8):
-            _, info = struct.unpack_from("<II", original["section_data"][section_index], position)
+            offset, info = struct.unpack_from("<II", original["section_data"][section_index], position)
             if info & 255 not in (2, 10) or symbols is None or info >> 8 >= len(symbols):
                 raise ValueError("software double excludes unsupported relocations")
             target = symbols[info >> 8]
@@ -971,7 +982,7 @@ def object_bytes(runner, workspace, args, original, address, mapping, rom, index
                 has_double = True
             if target["name"] == "__modsi3":
                 has_remainder = True
-            elif call_target(target["name"]) is None:
+            elif call_target(target["name"], address, address + offset) is None:
                 function_address_target(target["name"], entries, address, symbol["size"], len(rom))
             if target["section"] or target["bind"] != 1 or target["type"] not in (0, 2) or \
                     target["value"] or sum(item["name"] == target["name"]

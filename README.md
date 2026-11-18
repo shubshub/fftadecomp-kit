@@ -3797,6 +3797,12 @@ recursive calls, addressed aliases, forged bodies and stale manifests remain
 refused. Credited source still requires fixed-toolchain original ELF provenance,
 complete native byte/CFG/ABI checks, plausibility and fresh report/source replay.
 
+The unsigned word conversion `__fixunsdfsi` at `08142864..081428AC`
+uses the same selector. Its complete 72-byte body contains 24 reachable
+instructions and four compiler-generated calls. The comparison at `0814286E`
+may bind `__gedf2` to `0814374C` only in this function. The other three calls
+must bind `__adddf3` once and `__fixdfsi` twice at their original sites.
+
 The original ELF must contain one complete Thumb function, canonical undefined
 global call symbols and canonical BL addends. Typed linking must preserve all
 other bytes, with no veneers, residual relocations or unexpected allocated

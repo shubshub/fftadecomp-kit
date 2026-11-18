@@ -852,10 +852,9 @@ def call_bindings(image, name, address, mapping, rom_size,
                 target_symbol["section"] == image["text_index"] and target_symbol["value"] == symbol["value"] and \
                 target_symbol["bind"] == 1 and target_symbol["type"] == 2 and \
                 sum(item["name"] == name for item in image["symbols"]) == 1
+            double_target = software_double.call_target(target_symbol["name"], address, address + relocation)
             double_operation = target_symbol["name"] in software_double.OPERATIONS or (
-                double_bindings is not None and
-                software_double.shared_division_call(target_symbol["name"], divsi3.ADDRESS)) or (
-                double_bindings is not None and target_symbol["name"] in software_double.WIDE_OPERATIONS)
+                double_bindings is not None and double_target is not None)
             float_operation = target_symbol["name"] in software_float.OPERATIONS and not (
                 double_operation and double_bindings is not None)
             if float_operation:
@@ -886,7 +885,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                         target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
                         sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
                     raise ValueError("software double requires one undefined global function symbol")
-                target = software_double.call_target(target_symbol["name"])
+                target = double_target
                 candidates = []
             elif unsigned_remainder:
                 if umodsi3_bindings is None:
@@ -1289,9 +1288,9 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           ashldi3_bindings and target == ashldi3.for_bindings(ashldi3_bindings).ADDRESS)}
     if double_targets:
         if not isinstance(double_bindings, dict) or not double_bindings or \
-                any(software_double.call_target(alias) is None or calls.get(site) != software_double.call_target(alias)
+                any(calls.get(site) is None or calls[site] != software_double.call_target(alias, address, site)
                     for site, alias in double_bindings.items()) or \
-                double_targets != {alias: software_double.call_target(alias) for alias in double_bindings.values()} or \
+                double_targets != {alias: calls[site] for site, alias in double_bindings.items()} or \
                 set(double_bindings) != {site for site, target in calls.items() if software_double.reserved(target) or
                                              target in software_double.DIVISION_OPERATION.values() or
                                              target in software_double.WIDE_OPERATIONS.values()} or \
@@ -4733,8 +4732,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     ashldi3_context is not None and
                     target == ashldi3.for_bindings(ashldi3_context[3]).ADDRESS):
                 if double_context is None or current not in double_context[3] or \
-                        software_double.OPERATIONS.get(double_context[3][current],
-                                                       software_double.WIDE_OPERATIONS.get(double_context[3][current])) != target:
+                        software_double.call_target(double_context[3][current], address, current) != target:
                     raise ValueError("software double requires its canonical runtime proof")
             if not summarized and divsi3.reserved(target) and target != 0x0814274C and not (
                     addressed_signed_runtime_context is not None and
