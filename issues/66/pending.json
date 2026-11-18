@@ -543,6 +543,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3202526f2d19d4f8f12caf26d2d5ba3dc97356372901d8f3bb30865ebf127e8a",
+        "acknowledged_cursor": 6978880462,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3202526f2d19d4f8f12caf26d2d5ba3dc97356372901d8f3bb30865ebf127e8a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080701BC\",\"who\":\"rainbow-menu\",\"note\":\"Recover two-row glyph drawing with stack buffer and supported CpuSet copy proof\"}",
+          "created_at": "2026-11-18T12:42:16Z",
+          "id": 6978872663,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:42:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4127c681904058bfed7473448d4539f7920beeabb4b01b607c590e8af30397e3",
+        "result": {
+          "address": "0x080701BC",
+          "claim_id": 6978872663,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978872663,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d9c397c422aed27ecade66f169cb4140b9bbfc65d604c8bf5956ecce015bfd98",
+        "acknowledged_cursor": 6978880462,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d9c397c422aed27ecade66f169cb4140b9bbfc65d604c8bf5956ecce015bfd98",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080142DC\",\"who\":\"rainbow-callback\",\"note\":\"\"}",
+          "created_at": "2026-11-18T12:42:37Z",
+          "id": 6978880462,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:42:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4127c681904058bfed7473448d4539f7920beeabb4b01b607c590e8af30397e3",
+        "result": {
+          "address": "0x080142DC",
+          "claim_id": 6978880462,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978880462,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
