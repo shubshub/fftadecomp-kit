@@ -261,15 +261,22 @@ class Runner:
 
 
 def compile_object(runner, workspace, args, root, address, source, thumb=True, rewrite=None,
-                   diagnostics=None):
+                   diagnostics=None, oam_prefix=()):
     """cpp -> cc1 -> as -> objcopy; rewrite, if given, maps the verified .i text first.
     diagnostics, if given, is a list that receives cc1's warning output."""
     temporary = shlex.quote(workspace)
     environment = f"export TMPDIR={temporary}; "
-    runner.sh(f"{environment}{args.cpp} -nostdinc -undef -I include {shlex.quote(source)} "
+    includes = ""
+    if oam_prefix:
+        import oam_list_context as oam
+        includes = oam.prefix_options(address, source, oam_prefix)
+    runner.sh(f"{environment}{args.cpp} -nostdinc -undef -I include {includes}{shlex.quote(source)} "
               f"-o {temporary}/f.i")
     preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
-    verify_dependencies(preprocessed, root, address)
+    if oam_prefix:
+        oam.verify_dependencies(preprocessed, root, oam_prefix)
+    else:
+        verify_dependencies(preprocessed, root, address)
     if rewrite is not None:
         runner.write_text(f"{workspace}/f.i", rewrite(preprocessed))
     output = runner.sh(f"{environment}{args.cc} {args.flags} {temporary}/f.i -o {temporary}/f.s" +
@@ -5760,6 +5767,13 @@ def main():
         if consistent_source is not None and source_fingerprint(ROOT, addr) != consistent_source:
             sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
         return result
+
+    if addr == 0x08001244:
+        import oam_list_context
+        try:
+            return selector_issue(oam_list_context.issue)
+        except (ValueError, OSError, KeyError, IndexError, TypeError, RuntimeError, subprocess.SubprocessError) as error:
+            sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if unit_context is not None:
         import unit_float_multiply_profile as multiply

@@ -423,7 +423,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 command.append("--no-write")
             result = subprocess.run(command, capture_output=True, text=True)
             ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or spin_profile or double_profile or thunk_profile or constants_profile or typed_outgoing_profile or u16_switch_profile or owner_profile or quotient_frame or unsigned_quotient_frame or signed_runtime_profile or unsigned_runtime_profile or addressed_runtime_profile or private_float_profile or palette_source_profile) and ok:
+        if not verify or (write_reports or addr == "08001244" or spin_profile or double_profile or thunk_profile or constants_profile or typed_outgoing_profile or u16_switch_profile or owner_profile or quotient_frame or unsigned_quotient_frame or signed_runtime_profile or unsigned_runtime_profile or addressed_runtime_profile or private_float_profile or palette_source_profile) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()

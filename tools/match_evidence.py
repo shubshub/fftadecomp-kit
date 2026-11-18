@@ -1123,6 +1123,9 @@ def report_matches(report, root, address):
         # report must use the default toolchain, and inside a unit the unit's
         # toolchain must emit the same function
         return False
+    if address == 0x08001244 or "* verification: `original-oam-list-context-v1`" in report.splitlines():
+        import oam_list_context
+        return oam_list_context.replay(report, root, address)
     if any(line.lstrip().startswith("* self call") for line in report.splitlines()):
         # self-call lines belong to the plain call profiles only; anything
         # else carrying them is a forged or misplaced claim
