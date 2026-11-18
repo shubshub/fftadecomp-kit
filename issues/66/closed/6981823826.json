@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "a4a549ff37c75b89630473634cf85a074e3d422dc9370fbddfb3a92070440128",
+    "acknowledged_cursor": 6981836011,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a4a549ff37c75b89630473634cf85a074e3d422dc9370fbddfb3a92070440128",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08118A08\",\"who\":\"rainbow-scene\",\"note\":\"Re-evaluate the parked scene callback and its typed BIOS/script dependencies\"}",
+      "created_at": "2026-11-18T14:41:42Z",
+      "id": 6981823826,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:41:42Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "163395a7e8b566019e61d750085a485635867bd73b8c5245d5107548434f6a14",
+    "result": {
+      "address": "0x08118A08",
+      "claim_id": 6981823826,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6981823826,
+      "status": "accepted",
+      "who": "rainbow-scene"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1614660696b4ac77ef5e25c282921d083a644bd640daa065ba8dbb20e95e79f9",
+    "acknowledged_cursor": 6982186185,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1614660696b4ac77ef5e25c282921d083a644bd640daa065ba8dbb20e95e79f9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118A08\",\"who\":\"rainbow-scene\",\"claim_id\":6981823826,\"reason\":\"184 ROM bytes and 75 reachable instructions match with checked mode-six helper and BIOS fills; live saved report replays\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T14:55:24Z",
+      "id": 6982186185,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:55:24Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
+    "result": {
+      "address": "0x08118A08",
+      "claim_id": 6981823826,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6982186185,
+      "status": "accepted",
+      "who": "rainbow-scene"
+    }
+  }
+}

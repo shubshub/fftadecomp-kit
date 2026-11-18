@@ -542,7 +542,35 @@
           "who": "rainbow-scene"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "1614660696b4ac77ef5e25c282921d083a644bd640daa065ba8dbb20e95e79f9",
+        "acknowledged_cursor": 6982186185,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1614660696b4ac77ef5e25c282921d083a644bd640daa065ba8dbb20e95e79f9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118A08\",\"who\":\"rainbow-scene\",\"claim_id\":6981823826,\"reason\":\"184 ROM bytes and 75 reachable instructions match with checked mode-six helper and BIOS fills; live saved report replays\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:55:24Z",
+          "id": 6982186185,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:55:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
+        "result": {
+          "address": "0x08118A08",
+          "claim_id": 6981823826,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982186185,
+          "status": "accepted",
+          "who": "rainbow-scene"
+        }
+      }
     },
     {
       "claim": {
@@ -606,7 +634,35 @@
           "who": "rainbow-circle-scanline"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "66c8bc7532d17b8c79215b0f595ed04b57c16d7769921efe3bf5f33b10af4251",
+        "acknowledged_cursor": 6982186185,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "66c8bc7532d17b8c79215b0f595ed04b57c16d7769921efe3bf5f33b10af4251",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D9F60\",\"who\":\"rainbow-circle-scanline\",\"claim_id\":6982035467,\"reason\":\"Ordinary clipped-circle writer 260/276 bytes. Eight missing ldrb on dynamic scanline buffer. Volatile member diagnostic reproduces 276/276 and 138/138, but kit rejects qualifiers (issue 168). C and evidence in Parked/080D9F60.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; byte bitfields; inline and direct symmetric writes; source qualifier comparison; strict native match.py.\"}",
+          "created_at": "2026-11-18T14:55:10Z",
+          "id": 6982180145,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:55:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
+        "result": {
+          "address": "0x080D9F60",
+          "claim_id": 6982035467,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982180145,
+          "status": "accepted",
+          "who": "rainbow-circle-scanline"
+        }
+      }
     },
     {
       "claim": {
@@ -670,7 +726,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "1314283fd62e082c592bc01d24266aa710dbd8343054853beabe868956a3f005",
+        "acknowledged_cursor": 6982186185,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1314283fd62e082c592bc01d24266aa710dbd8343054853beabe868956a3f005",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805F69C\",\"who\":\"rainbow-affine\",\"claim_id\":6982112056,\"reason\":\"80/80 raw exact; actual 0x102 callback uses only phase; mutable callback lifetime remains beyond current selectors. Parked source and trace updated.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:55:03Z",
+          "id": 6982177165,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:55:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
+        "result": {
+          "address": "0x0805F69C",
+          "claim_id": 6982112056,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982177165,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     }
   ],
   "issue": 66,
