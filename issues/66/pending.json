@@ -570,7 +570,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "51f6a5b807dc596c777d109e3ef797a432799569fcd768c251e749c98020bd2a",
+        "acknowledged_cursor": 6986665871,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "51f6a5b807dc596c777d109e3ef797a432799569fcd768c251e749c98020bd2a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08006720\",\"who\":\"rainbow-affine\",\"claim_id\":6986016889,\"reason\":\"Original BLDALPHA keyframe callback recovered. Native 344/344 bytes, full 164 instructions, signed runtime and keyframe induction, canonical live report replay accepted.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:44:37Z",
+          "id": 6986665871,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:44:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "92057a8e88c60b0bffe95f87f859bb7b8a750d0d14f701047bc7f731bd3e2156",
+        "result": {
+          "address": "0x08006720",
+          "claim_id": 6986016889,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986665871,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -696,6 +724,66 @@
           "request_id": 6986602425,
           "status": "accepted",
           "who": "rainbow-menu"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "05c1e4e0f002df67460a929de40c5ce667911c07e3e9f4f9d126b314275a9ba8",
+        "acknowledged_cursor": 6986665871,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "05c1e4e0f002df67460a929de40c5ce667911c07e3e9f4f9d126b314275a9ba8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DA1C4\",\"who\":\"rainbow-menu\",\"claim_id\":6986602425,\"reason\":\"Parked native exact (272/272); verified caller, two dynamic scanline volatile field declarations fail source gate.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:44:32Z",
+          "id": 6986663619,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:44:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "92057a8e88c60b0bffe95f87f859bb7b8a750d0d14f701047bc7f731bd3e2156",
+        "result": {
+          "address": "0x080DA1C4",
+          "claim_id": 6986602425,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986663619,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ae335f2285b53e1afbb3d6df0e8666bf0a86df1851a3f921d672b26c6414f053",
+        "acknowledged_cursor": 6986665871,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ae335f2285b53e1afbb3d6df0e8666bf0a86df1851a3f921d672b26c6414f053",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080570D8\",\"who\":\"rainbow-callback\",\"note\":\"Roster list twin source recovery with authenticated BIOS fill and two callback bindings\"}",
+          "created_at": "2026-11-18T17:44:25Z",
+          "id": 6986660807,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:44:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "92057a8e88c60b0bffe95f87f859bb7b8a750d0d14f701047bc7f731bd3e2156",
+        "result": {
+          "address": "0x080570D8",
+          "claim_id": 6986660807,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6986660807,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null
