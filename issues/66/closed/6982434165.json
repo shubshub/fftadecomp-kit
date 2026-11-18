@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "0d7454ad15c9234ecc8e11d4b10ff972d6e7e3c880f017982e7d58993b2c39e2",
+    "acknowledged_cursor": 6982442101,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0d7454ad15c9234ecc8e11d4b10ff972d6e7e3c880f017982e7d58993b2c39e2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A398B8\",\"who\":\"rainbow-state\",\"note\":\"Recover object flag callback installed at 03006D05 by 0808F74C\"}",
+      "created_at": "2026-11-18T15:04:50Z",
+      "id": 6982434165,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:04:50Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+    "result": {
+      "address": "0x08A398B8",
+      "claim_id": 6982434165,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6982434165,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d9d6e8b4b08e630747335806a10aebfe557c020bfa23bef4aeda684b4c7ce6c4",
+    "acknowledged_cursor": 6982542083,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d9d6e8b4b08e630747335806a10aebfe557c020bfa23bef4aeda684b4c7ce6c4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A398B8\",\"who\":\"rainbow-state\",\"claim_id\":6982434165,\"reason\":\"Kit11 native 15/15, 36/36. Strict late ROM extent includes alignment/mask. Live source-bound report replay passes.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:08:33Z",
+      "id": 6982533348,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:08:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fe4ae1c7e284d25bb04dc413dad3ba4bac86bdd5703037da72447ed23ae1eaae",
+    "result": {
+      "address": "0x08A398B8",
+      "claim_id": 6982434165,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6982533348,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
