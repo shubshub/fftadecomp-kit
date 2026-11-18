@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9995effd07fe4a440e185742ddba381ff1d58118a4f567f97a8d5a321aeebc07",
+    "acknowledged_cursor": 6983926635,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9995effd07fe4a440e185742ddba381ff1d58118a4f567f97a8d5a321aeebc07",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131544\",\"who\":\"rainbow-action-evaluators\",\"note\":\"Action evaluator table slot 5. Uses the unsigned halfword at target+0x18 for a quarter value with floor of one.\"}",
+      "created_at": "2026-11-18T16:00:08Z",
+      "id": 6983925734,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:00:08Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "40eb5d98bd4de2cae33bf38f3f5e5c89be279a16f5509fe1e10146ad0cb976cf",
+    "result": {
+      "address": "0x08131544",
+      "claim_id": 6983925734,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6983925734,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7811209feea2ff1aa35da0ceed8af1f4479579a95f2336ec5d3ce3a62f195a3c",
+    "acknowledged_cursor": 6983961176,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7811209feea2ff1aa35da0ceed8af1f4479579a95f2336ec5d3ce3a62f195a3c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131544\",\"who\":\"rainbow-action-evaluators\",\"claim_id\":6983925734,\"reason\":\"Native full 38/38 bytes, 18 reachable instructions, saved report replayed. Action evaluator table slot 5.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:01:02Z",
+      "id": 6983949822,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:01:02Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d7b78e77413f550f31a02e930d6596c472ede2535073b74152abb3d21356780e",
+    "result": {
+      "address": "0x08131544",
+      "claim_id": 6983925734,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6983949822,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  }
+}
