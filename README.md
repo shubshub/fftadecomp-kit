@@ -3577,6 +3577,14 @@ writes display shadow RAM at `0x0300098C/D`. Updater `0x08000718` programs DMA0
 to upload those bytes to BLDALPHA. A native execution test follows the original
 installer and scheduler on a three-keyframe input.
 
+The finite local-word verifier also handles the 148-byte caller at
+`0x080C6858`. It builds a 48-byte stack list containing pointers to the game's
+264-byte unit records. Both script sites pass exactly twelve records. The
+active branch selects a prefix of zero through twelve pointers in traversal
+order. The other branch clears the records and selects all of them. The list
+is read by the history initializer before its caller releases the stack
+frame. Only the pointers to units survive in the allocated state.
+
 The USA history initializer at `0x080C62CC` copies an ordinary word list
 before reading and updating the display shadow. Two script call sites pass
 exactly twelve unit records to a builder with twelve stack slots. Filtering
