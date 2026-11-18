@@ -1794,66 +1794,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "07f690336bf2e51a73f73d2ba2882f27003c6e8b2f62cd90ea222c509c01f1a0",
-        "acknowledged_cursor": 6992028105,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "07f690336bf2e51a73f73d2ba2882f27003c6e8b2f62cd90ea222c509c01f1a0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003950\",\"who\":\"astra-combat\",\"note\":\"Recover the demonstrated IWRAM halfword getter, verify initializer linkage and full symbol including its literal\"}",
-          "created_at": "2026-11-18T21:22:32Z",
-          "id": 6992024941,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:22:32Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "febbda01bf11b5d7e02d8cff4842a72fd269ff226630b0a19cdbced87dfd3d76",
-        "result": {
-          "address": "0x08003950",
-          "claim_id": 6992024941,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6992024941,
-          "status": "accepted",
-          "who": "astra-combat"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "2b2a04f8d35fdcf2dd0758601ec90bcb7bcc1270f78bbf6a419e2c51f33af967",
-        "acknowledged_cursor": 6992047830,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "2b2a04f8d35fdcf2dd0758601ec90bcb7bcc1270f78bbf6a419e2c51f33af967",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08003950\",\"who\":\"astra-combat\",\"claim_id\":6992024941,\"reason\":\"Canonical live typed literal reader matches 12 bytes including alignment and pool; report replay, both native initializer branches and unsigned loads passed.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T21:23:34Z",
-          "id": 6992047830,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:23:34Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c132cbb918cdfc6b5e46a64c393b7d461abe293c57b0e485e8c03f052cc2e14d",
-        "result": {
-          "address": "0x08003950",
-          "claim_id": 6992024941,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6992047830,
-          "status": "accepted",
-          "who": "astra-combat"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "ea81aa01d462cb6310ab7028b14b8d54d22d96ee5a621bae21b7340d0be72d74",
         "acknowledged_cursor": 6992067103,
         "body_provenance": "acceptance-time",
