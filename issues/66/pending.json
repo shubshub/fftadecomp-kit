@@ -2,66 +2,6 @@
   "generations": [
     {
       "claim": {
-        "acceptance_body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
-        "acknowledged_cursor": 6989250923,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08034E88\",\"who\":\"astra-shift\",\"note\":\"Original switch-list callback registered at 08031FE6, two real jump tables and complete outgoing extent. Primary owns maps.\"}",
-          "created_at": "2026-11-18T19:28:33Z",
-          "id": 6989231717,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:28:33Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
-        "result": {
-          "address": "0x08034E88",
-          "claim_id": 6989231717,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6989231717,
-          "status": "accepted",
-          "who": "astra-shift"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "ccc99230ad54ab6ce72e2d0fd4b9bf8892a80ea9eb6fca1bc24627fd022df8dc",
-        "acknowledged_cursor": 6989630519,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ccc99230ad54ab6ce72e2d0fd4b9bf8892a80ea9eb6fca1bc24627fd022df8dc",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08034E88\",\"who\":\"astra-shift\",\"claim_id\":6989231717,\"reason\":\"Recovered five-slot menu runner callback; native 364/364 bytes, 89/89 instructions and source-bound replay under merged toolkit PR 300.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T19:45:23Z",
-          "id": 6989615181,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:45:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "59646c9b109a25aa59d8e94d07adeb61e7ec89ac0f5342711129018c604848a3",
-        "result": {
-          "address": "0x08034E88",
-          "claim_id": 6989231717,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6989615181,
-          "status": "accepted",
-          "who": "astra-shift"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "ec5d00f24d34d069d0900ecd8c2c6dcb4f95a40f5aa2e278c992653d85f749aa",
         "acknowledged_cursor": 6989309073,
         "body_provenance": "acceptance-time",
@@ -91,66 +31,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "01f1df7cdbee997b0696e4f651d2e55fa57fafebc8dd248629dd3c821bc81e50",
-        "acknowledged_cursor": 6989359627,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "01f1df7cdbee997b0696e4f651d2e55fa57fafebc8dd248629dd3c821bc81e50",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DD09C\",\"who\":\"rainbow-callback\",\"note\":\"Recover two-branch scheduler construction using matched 080DCF64 and 080DD1E0 callback layouts and genuine source prototypes.\"}",
-          "created_at": "2026-11-18T19:33:10Z",
-          "id": 6989344711,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:33:10Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f1d0edee2a4123f49e343a93282780616b0d3f55e7d7b0ebb3d94c6960da8437",
-        "result": {
-          "address": "0x080DD09C",
-          "claim_id": 6989344711,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6989344711,
-          "status": "accepted",
-          "who": "rainbow-callback"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "078a0a20399196ebc5de0b2016e63093883f3129942e9a48cd9d6fa1b969d109",
-        "acknowledged_cursor": 6989597233,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "078a0a20399196ebc5de0b2016e63093883f3129942e9a48cd9d6fa1b969d109",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DD09C\",\"who\":\"rainbow-callback\",\"claim_id\":6989344711,\"reason\":\"270-byte candidate parked, 186/270 typed linked bytes agree; original and candidate use different stack/register allocation.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T19:44:36Z",
-          "id": 6989597233,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:44:36Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "fff8fd59914dcf2353998923cd8d7e92e91fc4d29e6388b2c0d3e85e3057bbf5",
-        "result": {
-          "address": "0x080DD09C",
-          "claim_id": 6989344711,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6989597233,
-          "status": "accepted",
-          "who": "rainbow-callback"
-        }
-      }
     },
     {
       "claim": {
@@ -279,66 +159,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "ab0c759fc68f623d86f0ba2b51590dacf000ceedcc514e7afa64262f077c317f",
-        "acknowledged_cursor": 6989372990,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ab0c759fc68f623d86f0ba2b51590dacf000ceedcc514e7afa64262f077c317f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DF08\",\"who\":\"claude-ffta2\",\"note\":\"hand match (wave 1, 2026-11-19)\"}",
-          "created_at": "2026-11-18T19:34:14Z",
-          "id": 6989368091,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:34:14Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "7ae36d3cf8c15169896dd01bf7237a25c6bd5718521db222a1cce9029c085980",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6989368091,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 6989368091,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "be945a648a451bf59bf7a3feccaf4db0609960948bab79636f54c52f23083102",
-        "acknowledged_cursor": 6989630519,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "be945a648a451bf59bf7a3feccaf4db0609960948bab79636f54c52f23083102",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DF08\",\"who\":\"claude-ffta2\",\"claim_id\":6989368091,\"reason\":\"retry stopped: already parked in staging with a documented reason; the parked re-check covers it at the current kit\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T19:45:30Z",
-          "id": 6989617618,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:45:30Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "59646c9b109a25aa59d8e94d07adeb61e7ec89ac0f5342711129018c604848a3",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6989368091,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 6989617618,
-          "status": "accepted",
-          "who": "claude-ffta2"
-        }
-      }
     },
     {
       "claim": {
