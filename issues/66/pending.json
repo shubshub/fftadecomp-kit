@@ -1666,66 +1666,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "f3f41eb454a89a2417b0e659e59bee4f8cfead909669ff610e0d24ce3e2e765d",
-        "acknowledged_cursor": 6990919396,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f3f41eb454a89a2417b0e659e59bee4f8cfead909669ff610e0d24ce3e2e765d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800F480\",\"who\":\"rainbow-state\",\"note\":\"Recover original polygon scan converter and verify helper output lifetime, clipping and edge ties\"}",
-          "created_at": "2026-11-18T20:37:18Z",
-          "id": 6990919396,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T20:37:18Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "594c8664a2b996edded8d4adcd1174d77eed7d3e0ebb3b7f06da4e75efac07b2",
-        "result": {
-          "address": "0x0800F480",
-          "claim_id": 6990919396,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6990919396,
-          "status": "accepted",
-          "who": "rainbow-state"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "8b4314c5aa1b8fffcd4c906720751feeb99cc3d13dc5ad4d4732591821074b03",
-        "acknowledged_cursor": 6991867246,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "8b4314c5aa1b8fffcd4c906720751feeb99cc3d13dc5ad4d4732591821074b03",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800F480\",\"who\":\"rainbow-state\",\"claim_id\":6990919396,\"reason\":\"Checkpoint 66 verified full 550/550 bytes, 266 instructions; 11 consistent polygon API sources and saved native reports issued and replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T21:15:48Z",
-          "id": 6991867246,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:15:48Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bec02af5f202c5196cfa677bf09ad983838f36d3d2004c2b008aec216e8f34c2",
-        "result": {
-          "address": "0x0800F480",
-          "claim_id": 6990919396,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6991867246,
-          "status": "accepted",
-          "who": "rainbow-state"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "f7dde2fc20f42a4a5f83693362c005447d3b8ba4f292b283c5f1eaad66095937",
         "acknowledged_cursor": 6991350656,
         "body_provenance": "acceptance-time",
