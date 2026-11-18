@@ -221,6 +221,19 @@ class PublicationSessionTests(unittest.TestCase):
                     self.verify()
         self.assertEqual(self.calls, ["08000000"])
 
+    def test_session_forwards_worker_count_to_plausibility_sweep(self):
+        self.session.worker_processes = 3
+        collect = status.collect
+
+        def collect_serially(*args, **kwargs):
+            self.assertEqual(kwargs.pop("worker_processes"), 3)
+            return collect(*args, **kwargs)
+
+        with patch.object(status, "collect", side_effect=collect_serially), \
+                patch.object(push, "check_plausible", return_value=True) as gate:
+            self.verify()
+        self.assertEqual(gate.call_args.kwargs, {"worker_processes": 3})
+
     def test_removed_source_and_unowned_report_addition_refuse(self):
         self.accept_progress()
         path = self.repo / "src/08000000.c"

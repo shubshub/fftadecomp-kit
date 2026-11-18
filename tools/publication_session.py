@@ -327,7 +327,7 @@ class VerificationSession:
             if problems:
                 raise ValueError("native verification failed: " + "; ".join(problems))
             check_complete_bodies(results)
-            if not push.check_plausible(tree) or not push.check_reports(tree):
+            if not push.check_plausible(tree, worker_processes=self.worker_processes) or not push.check_reports(tree):
                 raise ValueError("native plausibility/report gate failed")
             badge = push.badge_base(self.repo) or os.environ.get("FFTA_BADGE_BASE") or ""
             block, _, _ = status.render(tf, mf, tb, mb, problems, badge_base=badge,

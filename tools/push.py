@@ -153,27 +153,49 @@ def check_matches(root, badge="", jobs=1, worker_processes=0):
     return True
 
 
-def check_plausible(root):
+def _plausibility_findings(root, path):
+    findings = plausible.check_file(path)
+    if len(findings) == 1 and findings[0][1] == "empty-body" and \
+            path.relative_to(root).parts[0] == "src" and re.fullmatch(r"[0-9A-F]{8}\.c", path.name):
+        report = root / "docs" / "match" / f"{path.stem}.md"
+        try:
+            if empty_body.report_matches(report.read_text(encoding="utf-8"), root, int(path.stem, 16)):
+                findings = []
+        except OSError:
+            pass
+    return path, findings
+
+
+def check_plausible(root, worker_processes=0):
+    from concurrent.futures import ProcessPoolExecutor
+    from contextlib import nullcontext
+    from functools import partial
+    import multiprocessing
+    from threading import active_count
+
     log("[4/5] sources are plausible")
-    for target in ("src", "include"):
-        for path in sorted((Path(root) / target).rglob("*")):
-            if not path.is_file() or path.suffix not in (".c", ".h"):
-                continue
-            findings = plausible.check_file(path)
-            if not findings:
-                continue
-            if target == "src" and re.fullmatch(r"[0-9A-F]{8}\.c", path.name) and \
-                    len(findings) == 1 and findings[0][1] == "empty-body":
-                report = Path(root) / "docs" / "match" / f"{path.stem}.md"
-                try:
-                    if empty_body.report_matches(report.read_text(encoding="utf-8"), root, int(path.stem, 16)):
-                        continue
-                except OSError:
-                    pass
-            log(f"    FAIL  {path.relative_to(root)} contains implausible source")
-            for line, rule, severity, _ in findings[-10:]:
-                log(f"    {line}: {severity.upper()}: {rule}")
-            return False
+    root = Path(root)
+    if not 0 <= worker_processes <= 64:
+        raise ValueError("worker_processes must be between 0 and 64")
+    if worker_processes and ("fork" not in multiprocessing.get_all_start_methods() or active_count() != 1):
+        raise ValueError("worker processes require fork and a single-threaded caller")
+    paths = (path for target in ("src", "include") for path in sorted((root / target).rglob("*"))
+             if path.is_file() and path.suffix in (".c", ".h"))
+    check = partial(_plausibility_findings, root)
+    pool = ProcessPoolExecutor(max_workers=worker_processes, mp_context=multiprocessing.get_context("fork")) \
+        if worker_processes else nullcontext()
+    with pool as executor:
+        results = executor.map(check, paths) if executor else map(check, paths)
+        try:
+            for path, findings in results:
+                if findings:
+                    log(f"    FAIL  {path.relative_to(root)} contains implausible source")
+                    for line, rule, severity, _ in findings[-10:]:
+                        log(f"    {line}: {severity.upper()}: {rule}")
+                    return False
+        finally:
+            if executor:
+                results.close()  # Cancel queued work after the first ordered failure.
     log("    ok: no inline asm, no steering pragmas, no inert control flow")
     return True
 
@@ -583,7 +605,7 @@ def main():
     try:
         checks += (check_kit_tools(repo),) if args.kit else (
             check_matches(tree, badge_base(repo), jobs=args.jobs, **process_options),
-            check_plausible(tree),
+            check_plausible(tree, **process_options),
             check_reports(tree),
         )
     finally:

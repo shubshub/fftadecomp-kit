@@ -3,6 +3,7 @@ import contextlib
 import copy
 import io
 import json
+import multiprocessing
 import os
 from pathlib import Path
 import struct
@@ -107,6 +108,31 @@ class EmptyBodyTests(unittest.TestCase):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertTrue(push.check_plausible(str(self.root)))
             self.assertTrue(push.check_reports(str(self.root)))
+
+    @unittest.skipUnless("fork" in multiprocessing.get_all_start_methods(), "requires fork")
+    def test_plausibility_workers_replay_and_report_the_first_failure_in_order(self):
+        def compare(accepted, expected_path=None):
+            outputs = []
+            for workers in (0, 2):
+                with contextlib.redirect_stdout(io.StringIO()) as capture:
+                    self.assertEqual(push.check_plausible(self.root, worker_processes=workers), accepted)
+                outputs.append(capture.getvalue())
+            self.assertEqual(outputs[0], outputs[1])
+            if expected_path is not None:
+                self.assertIn(f"FAIL  {expected_path} contains implausible source", outputs[0])
+
+        compare(True)
+        # The saved empty-body report still looks authentic. Its ROM now disagrees.
+        with self.changed(self.root / "baserom.bin", bytes.fromhex("c0460000")):
+            compare(False, "src/08000000.c")
+        # The source and header phases must retain their original diagnostic order.
+        bad = 'void bad(void) { __asm__("nop"); }\n'
+        with self.changed(self.source, "int f(int x) { return x + 1; }\n"), \
+                self.changed(self.root / "include" / "a.h", bad):
+            with self.changed(self.root / "src" / "nested" / "b.c", bad), \
+                    self.changed(self.root / "src" / "z.c", bad):
+                compare(False, "src/nested/b.c")
+            compare(False, "include/a.h")
 
     def test_standalone_still_rejects_empty_body(self):
         result = self.command("plausible.py", "--json", str(self.source))

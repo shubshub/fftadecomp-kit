@@ -257,7 +257,8 @@ history, tracked-file restrictions, fresh ROM matches, plausibility and reports.
 Use `--check-only` to run the gate without publishing.
 
 On fork-capable hosts, `--worker-processes N` instead runs complete verification
-in 1 through 64 separate processes, including saved-report replay. This is
+in 1 through 64 separate processes, including saved-report replay. Game publication
+also uses these workers for its source and header plausibility checks. This is
 opt-in, requires a single-threaded caller and `--jobs 1`, and applies only to
 game verification (`status.py --verify` or the game push gate). Duplicate
 destinations stay in one sequential group; results and errors retain source
