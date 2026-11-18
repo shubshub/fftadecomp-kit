@@ -1165,6 +1165,10 @@ def report_matches(report, root, address):
             import boot_dma0_shadow
             if not boot_dma0_shadow.report_body(report, root):
                 return False
+        if address == 0x08000FC8:
+            import affine_oam_slot
+            if not affine_oam_slot.report_body(report, root):
+                return False
         if address == 0x0800C720:
             import scanline_wave
             if not scanline_wave.report_body(report, root):
