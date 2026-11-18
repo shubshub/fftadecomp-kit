@@ -21,7 +21,7 @@ class WindowFieldTests(unittest.TestCase):
                 window.rewrite_element(changed)
 
     def test_general_provider_does_not_admit_other_writers(self):
-        for address in (0x0800CF08, 0x0800D23C, 0x080D9C58, 0x080DA074):
+        for address in (0x0800CF08, 0x0800D23C, 0x080D9C58, 0x080DA2D4):
             with self.subTest(address=address), self.assertRaises(ValueError):
                 window.provider_evidence(b'', address)
 
@@ -51,7 +51,7 @@ class NativeWindowTests(unittest.TestCase):
                         window.check_bodies(address, *variant)
             # Keep every other perturbed instruction correct but make just one
             # read access the original field through an alias.
-            site = {window.CIRCLE: 0x74, window.RECT: 0x84, window.ELLIPSE: 0xEA,
+            site = {window.CIRCLE: 0x74, window.RECT: 0x84, window.ELLIPSE: 0xEA, window.SCALED_ELLIPSE: 0xBE,
                     window.LEFT_EDGE: 0x134, window.RIGHT_EDGE: 0x136}[address]
             wrong = bytearray(swapped)
             wrong[site:site+2] = actual[site:site+2]
@@ -77,6 +77,10 @@ class NativeWindowTests(unittest.TestCase):
             elif address == window.CIRCLE:
                 mutations += [('(u16)row < 160', '(u16)row <= 160'), ('mode != 2', 'mode != 1'),
                               ('y - offset', 'y + offset'), ('decision >= 0', 'decision > 0')]
+            elif address == window.SCALED_ELLIPSE:
+                mutations += [('(u16)row < 160', '(u16)row <= 160'), ('mode != 2', 'mode != 1'),
+                              ('offset++', 'offset--'), ('func_08141898(x_scale)', 'func_08141898(y_scale)'),
+                              ('func_08141870(size,', 'func_08141870(x_scale,')]
             elif address in window.EDGES:
                 mutations += [('upper_y < 160', 'upper_y <= 160'), ('lower_y >= 0', 'lower_y > 0'),
                               ('(u16)y1 < 160', '(u16)y1 <= 160'), ('error += adjustment', 'error -= adjustment'),
@@ -99,6 +103,7 @@ class NativeWindowTests(unittest.TestCase):
             self.assertEqual(i.mnemonic, mnemonic)
 
     def test_constructor_bank_rotation_dma_programming_and_release(self):
+        from math import isqrt
         from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE, UC_HOOK_INTR
         from unicorn.arm_const import (UC_ARM_REG_PC, UC_ARM_REG_LR, UC_ARM_REG_SP, UC_ARM_REG_R0,
                                       UC_ARM_REG_R1, UC_ARM_REG_R2, UC_ARM_REG_R3)
@@ -130,15 +135,27 @@ class NativeWindowTests(unittest.TestCase):
                 def free(u, _, __, ___):
                     frees.append(u.reg_read(UC_ARM_REG_R1))
                     u.reg_write(UC_ARM_REG_PC, u.reg_read(UC_ARM_REG_LR))
-                def cpuset(u, _, __):
+                def bios(u, _, __):
                     pc = u.reg_read(UC_ARM_REG_PC)
+                    swi = u.mem_read(pc-2, 1)[0]
+                    if swi == 8:
+                        u.reg_write(UC_ARM_REG_R0, isqrt(u.reg_read(UC_ARM_REG_R0)))
+                        return
+                    if swi == 6:
+                        # The diameter-32 provider supplies only positive operands.
+                        numerator, divisor = (u.reg_read(reg) for reg in registers[:2])
+                        quotient, remainder = divmod(numerator, divisor)
+                        for reg, value in ((UC_ARM_REG_R0, quotient), (UC_ARM_REG_R1, remainder),
+                                           (UC_ARM_REG_R3, quotient)):
+                            u.reg_write(reg, value)
+                        return
                     self.assertEqual(u.mem_read(pc-2, 2), b'\x0b\xdf')
                     source, destination, count = (u.reg_read(k) for k in registers[:3])
                     self.assertIn(count, (1,160))
                     u.mem_write(destination, bytes(u.mem_read(source, 2*count)))
                 for site, callback in ((0x08007138, allocate), (0x08007170, free)):
                     uc.hook_add(UC_HOOK_CODE, callback, begin=site, end=site)
-                uc.hook_add(UC_HOOK_INTR, cpuset)
+                uc.hook_add(UC_HOOK_INTR, bios)
                 def call(address, *args):
                     for register, value in zip(registers, args):
                         uc.reg_write(register, value)
@@ -167,6 +184,15 @@ class NativeWindowTests(unittest.TestCase):
                 call(0x080DABC4, task, 30, 10, 30, 12, 0)
                 call(0x080DABC4, task, 240, 10, 240, 12, 1)
                 self.assertEqual(uc.mem_read(payload+20, 6), bytes((241,30))*3)
+                raster_calls = []
+                def enter_raster(u, _, __, ___):
+                    stack = u.reg_read(UC_ARM_REG_SP)
+                    raster_calls.append((*[u.reg_read(r) for r in registers],
+                                         *struct.unpack('<III', u.mem_read(stack,12))))
+                uc.hook_add(UC_HOOK_CODE, enter_raster, begin=window.SCALED_ELLIPSE, end=window.SCALED_ELLIPSE)
+                call(0x080DAD3C, task, 100, 80, 32)
+                self.assertEqual(raster_calls, [(100,80,256,256,1024,payload,2)])
+                self.assertEqual(uc.mem_read(payload+160, 2), bytes((116,84)))
                 rendered = bytes(uc.mem_read(payload, 320))
                 buffers = (readword(obj+24), readword(obj+28))
                 self.assertEqual(buffers, (payload+320, payload+644))
@@ -195,6 +221,9 @@ class NativeWindowTests(unittest.TestCase):
                      0xDAE72, 0x14186C, 0x009AC, 0x00980, 0xC694)
             if address == window.ELLIPSE:
                 sites += (0xEEC50, 0xEEC58, 0xEEC64, 0xEEC66, 0xEEC68, 0xDAD56, 0xDAD6A, 0xDA128)
+            elif address == window.SCALED_ELLIPSE:
+                sites += (0xEEC58, 0xEEC66, 0xEEC68, 0xDAD50, 0xDAD56, 0xDAD6A,
+                          0xDA214, 0xDA248, 0x141870, 0x141898)
             elif address == window.CIRCLE:
                 sites += (0xE0DC4, 0xE0DC8, 0xE0DD2, 0xE0DD6, 0xE0DFE, 0xE0E0A,
                           0xE0E32, 0xDAC56, 0xDAC5A, 0xDAC5C, 0xDAC6C, 0xDAC74, 0xDA8E2, 0xDAD26)
@@ -217,13 +246,14 @@ class NativeWindowTests(unittest.TestCase):
             for changed in (report.replace(record + '\n', ''), report.replace(record, record + '\n' + record),
                             report.replace({window.RECT: 'caller unknown', window.ELLIPSE: 'requires signed y <= 160',
                                             window.CIRCLE: 'the same live tasks must reach phase 0x101',
+                                            window.SCALED_ELLIPSE: 'scene scales 256/1024, size 256',
                                             **dict.fromkeys(window.EDGES, 'phase 0x100 must retain its live +0x44 task')}[address],
                                            'unconditional'),
                             report.replace('* compiled : `', '* compiled : `00')):
                 with self.subTest(address=hex(address)):
                     self.assertFalse(match_evidence.report_matches(changed, self.root, address))
 
-    def execute_writer(self, address, body, x, y, size, height=0):
+    def execute_writer(self, address, body, x, y, size, height=0, scales=None):
         """Run the original code and its callees in RAM, servicing the two BIOS arithmetic SWIs."""
         import math
         from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_MEM_READ, UC_HOOK_MEM_WRITE, UC_HOOK_INTR
@@ -243,6 +273,10 @@ class NativeWindowTests(unittest.TestCase):
             machine.mem_write(obj+0x10, struct.pack('<HHI', 320, 2, buffer))
             machine.mem_write(stack, struct.pack('<I', height))
             arguments = (task, x, y, size)
+        elif address == window.SCALED_ELLIPSE:
+            x_scale, y_scale = scales
+            arguments = (x, y, size, x_scale)
+            machine.mem_write(stack, struct.pack('<III', y_scale, buffer, height))
         elif address in window.EDGES:
             arguments = (x, y, size, height)
             machine.mem_write(stack, struct.pack('<I', buffer))
@@ -270,7 +304,8 @@ class NativeWindowTests(unittest.TestCase):
             q = (1 if a*b >= 0 else -1) * (abs(a)//abs(b))
             for reg, val in ((UC_ARM_REG_R0, q), (UC_ARM_REG_R1, a-b*q), (UC_ARM_REG_R3, abs(q))):
                 uc.reg_write(reg, val & 0xFFFFFFFF)
-        machine.hook_add(UC_HOOK_MEM_READ|UC_HOOK_MEM_WRITE, access, begin=buffer, end=buffer+511)
+        first, last = (0x02000000, 0x0200FFFF) if address == window.SCALED_ELLIPSE else (buffer, buffer+511)
+        machine.hook_add(UC_HOOK_MEM_READ|UC_HOOK_MEM_WRITE, access, begin=first, end=last)
         machine.hook_add(UC_HOOK_INTR, interrupt)
         machine.emu_start(address|1, stop, count=250000)
         self.assertEqual(machine.reg_read(UC_ARM_REG_PC), stop)
@@ -358,6 +393,51 @@ class NativeWindowTests(unittest.TestCase):
                         output, trace = self.execute_writer(address, self.bodies[address][index], x1,y1,x2,y2)
                         self.assertEqual(output, expected)
                         self.assertEqual(trace, [(event, byte, 1) for byte, _ in stores for event in events])
+
+    def test_scaled_ellipse_pixels_modes_and_qualifier_controls(self):
+        from math import isqrt
+        from unicorn import UC_MEM_READ, UC_MEM_WRITE
+        address = window.SCALED_ELLIPSE
+        actual, stripped, swapped = self.bodies[address]
+        for site in (0xB4, 0xD6, 0xBA, 0xDC):
+            changed = bytearray(actual)
+            changed[site] ^= 1
+            with self.subTest(site=hex(site)), self.assertRaisesRegex(ValueError, 'scaled ellipse row guard'):
+                window.check_bodies(address, changed, stripped, swapped)
+        # Recompute the decision surfaces from the coordinates before every
+        # step, independently of the incremental additions in the compiled code.
+        signed_half = lambda n: (n + 32768) % 65536 - 32768
+        for x,y,size,a,b in ((100,80,0,0,0), (100,80,256,256,1024), (100,80,256,1024,256),
+                             (100,-2,32,4,16), (238,159,40,4,9), (-20,160,50,9,3),
+                             (32767,32767,16,4,9), (-32768,-32768,16,4,9)):
+            for mode in (0,1,2,3):
+                expected = bytearray((i*41+7)%256 for i in range(512))
+                sites = []
+                width = initial = size//isqrt(a) if size else 0
+                offset = 0
+                while width > 0:
+                    lo = max(0, signed_half(x-width)) & 255
+                    hi = min(240, signed_half(x+width+1)) & 255
+                    for row, suppressed in ((y+offset,1), (y-offset,2)):
+                        row &= 65535
+                        if row < 160 and mode != suppressed:
+                            sites.extend((2*row+1, 2*row))
+                            expected[2*row:2*row+2] = bytes((hi,lo))
+                    common = 2*a*(width*width-initial*initial) + 2*b*offset*offset
+                    vertical = common + 2*a*(initial-width) + 4*b*offset + a + 2*b - 2*isqrt(a)*size
+                    horizontal = common + 4*a*(initial-width) + 2*b*offset + 2*a + b - 4*isqrt(a)*size
+                    if vertical < 0:
+                        offset += 1
+                    elif horizontal >= 0:
+                        width -= 1
+                    else:
+                        width -= 1
+                        offset += 1
+                for body, events in ((actual, (UC_MEM_READ, UC_MEM_WRITE)), (stripped, (UC_MEM_WRITE,))):
+                    with self.subTest(x=x,y=y,size=size,scales=(a,b),mode=mode):
+                        pixels, trace = self.execute_writer(address, body, x,y,size,mode,(a,b))
+                        self.assertEqual(pixels, expected)
+                        self.assertEqual(trace, [(kind, byte, 1) for byte in sites for kind in events])
 
     def test_real_execution_and_nonvolatile_counterfactual(self):
         from unicorn import UC_MEM_READ, UC_MEM_WRITE

@@ -15,6 +15,7 @@ from sdk_cpuset_halfword import TOKEN, base_header
 
 BASE = 0x08000000
 CIRCLE = 0x080D9F60
+SCALED_ELLIPSE = 0x080DA074
 RECT = 0x080DA968
 ELLIPSE = 0x080DA1C4
 LEFT_EDGE = 0x080DA3B8
@@ -29,6 +30,7 @@ ELEMENT = re.compile(
 # prevents extra expression-level reads or an alias that happens to compile
 # identically. Body and transfer evidence below are independently required.
 SOURCE_TOKENS = {
+    SCALED_ELLIPSE: '9cca4d6cb5797026cc124773aa87450d6cba1a3e4f7d3844feccc260e798af84',
     RIGHT_EDGE: '057a6c5c38064f6e2f3b799cd1fbe9ec47930b93059a2896cb134598c4fa5edb',
     LEFT_EDGE: 'f6c3b249738c7398cfa56d195d6411404a357310da12084bd4eb9628c4012069',
     CIRCLE: '9ef6da9a5d9b377ab691da1170a8713b15b01ed29cd6d5f58bd29619e6d3f74a',
@@ -39,6 +41,8 @@ SOURCE_TOKENS = {
 # Stripping can change the whole frame and register allocation. Both audited
 # controls retain their rectangle bounds or their even-diameter/row conditions.
 OWNER_SHAPES = {
+    SCALED_ELLIPSE: ((336, '587185662bf2bbd2e60269989268113844ac1d399ce7c9583b2baff340cb9997'),
+                     (328, '507c1e6e4457f121b5dbcc4736fd45b67371957fb4e184a0683eb1ec73e8fe7e')),
     RIGHT_EDGE: ((484, '8fb2409fb08f2853626a741237d99e8a6fd6cd3bc12268a5c1cf2323e3a66592'),
                  (472, '9503ea2c41c8640e0371443903d57df52ee70a5ffd16b534c8dc562333415bd7')),
     LEFT_EDGE: ((480, '81c63e67b7d72e159c7a3d432bd20934234c8013e83cbac4d7afe906ef6a682e'),
@@ -50,7 +54,8 @@ OWNER_SHAPES = {
     ELLIPSE: ((272, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),
               (262, '88843664ee85ce57d3278ca8b1b574436bbca58f189fa68650b1e4bcf151b452')),
 }
-CALLEES = {CIRCLE: (), LEFT_EDGE: (), RIGHT_EDGE: (), RECT: (0x08005BFC, 0x0800C614),
+CALLEES = {SCALED_ELLIPSE: (0x08141898, 0x08141870, 0x08141898, 0x08141898),
+           CIRCLE: (), LEFT_EDGE: (), RIGHT_EDGE: (), RECT: (0x08005BFC, 0x0800C614),
            ELLIPSE: (0x08141870, 0x08141870, 0x080DA074, 0x080D9F60)}
 
 PROVIDER = (
@@ -153,7 +158,11 @@ def provider_evidence(rom, address):
     zero_image = (*installed.BOOT,
                   (0x08002768, 0x080027B8, '6e9dc4c6a9f37a50fb532938d3c1d4e5bd2eb08e1e45744ec654f057d08dd718'),
                   (installed.IMAGE, installed.IMAGE + 176, installed.IMAGE_SHA256))
-    caller_path = {RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH,
+    # Its diameter-32 caller chooses axes 16 and 8 and passes the unchanged
+    # payload as argument 6 with size 256, scales 256/1024 and mode 2.
+    raster_path = ELLIPSE_PATH + (
+        (0x080DA1C4, 0x080DA2D4, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),)
+    caller_path = {SCALED_ELLIPSE: raster_path, RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH,
                    LEFT_EDGE: EDGE_PATH, RIGHT_EDGE: EDGE_PATH}[address]
     for start, end, digest in zero_image + PROVIDER + caller_path:
         if sha256(rom[start-BASE:end-BASE]).hexdigest() != digest:
@@ -244,6 +253,18 @@ def check_bodies(address, qualified, stripped, swapped):
                        f'bhi #{address+site+8:#x}', 'asrs r0, r1, #0xf', 'add r0, r8',
                        'ldrb r1, [r0, #1]', 'strb r3, [r0, #1]', 'ldrb r1, [r0]', 'strb r2, [r0]']:
                 raise ValueError('circle row guard or same-row field accesses changed')
+    elif address == SCALED_ELLIPSE:
+        actual = tuple(site + delta for site in (0xBE, 0xE0) for delta in (0, 2, 4, 6))
+        control = ('strb',) * 4
+        decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
+        for site in actual[::4]:
+            instructions = decoder.disasm(qualified[site-14:site+8], address+site-14)
+            if [f'{i.mnemonic} {i.op_str}' for i in instructions] != [
+                    'lsls r1, r0, #0x10', 'lsrs r0, r1, #0x10', 'cmp r0, #0x9f',
+                    f'bhi #{address+site+8:#x}', 'asrs r0, r1, #0xf', 'ldr r1, [sp, #0x40]',
+                    'adds r0, r0, r1', 'ldrb r1, [r0, #1]', 'strb r6, [r0, #1]',
+                    'ldrb r1, [r0]', 'strb r2, [r0]']:
+                raise ValueError('scaled ellipse row guard or argument-six field access changed')
     elif address in EDGES:
         actual = edge_access_sites(address, qualified)
         control = ('strb',) * 6
@@ -323,6 +344,12 @@ def record(root, address):
     if bodies[0] != rom[address-BASE:address-BASE+size]:
         raise ValueError('complete linked window writer differs from the ROM')
     condition = {
+        SCALED_ELLIPSE: ('080EEC58 creates bank 0; 080EEC68 forwards its task and diameter 32; '
+                         '080DAD6A/080DA248 forward its C614 payload as argument 6, mode 2; '
+                         'scene scales 256/1024, size 256; signed y <= 160 for the outer writer; '
+                         'two unsigned-halfword row guards constrain stores to [0,160); '
+                         'other nonzero-size calls require a live payload, nonzero sqrt(x_scale), '
+                         'defined signed geometry arithmetic and a valid BIOS division'),
         RECT: ('caller unknown; input must be a live window task created with bank 0 or 1; '
                'signed clipping bounds every accessed row to [0,160)'),
         ELLIPSE: ('080EEC58 creates bank 0; 080EEC68/080DAD6A deliver its payload, diameter 32; '
@@ -336,7 +363,7 @@ def record(root, address):
                         'unsigned horizontal and signed endpoint guards constrain rows to [0,160); '
                         'signed halfword geometry; no termination claim for arbitrary wrapped deltas'),
     }[address]
-    stability = '' if not CALLEES[address] else 'stable values between compare/re-read and '
+    stability = '' if address == SCALED_ELLIPSE or not CALLEES[address] else 'stable values between compare/re-read and '
     hashes = '/'.join(sha256(body).hexdigest() for body in bodies)
     return ('* allowlisted volatile scanline: `window-row-bytes-v1` original/stripped/swapped '
             f'`{hashes}`; {condition}; assumes initialized live task, intact installed clear routine, successful allocation, exclusive 320-byte '
