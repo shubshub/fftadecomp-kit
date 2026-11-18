@@ -1343,6 +1343,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bab08fced8dbb724d064ee3148a0e32482c88a4ec1ebeaa211831f7422deaf6b",
+        "acknowledged_cursor": 6990270616,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bab08fced8dbb724d064ee3148a0e32482c88a4ec1ebeaa211831f7422deaf6b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C080\",\"who\":\"rainbow-state\",\"note\":\"Recover independent original tile-animation accessor and check it against the same game-created node\"}",
+          "created_at": "2026-11-18T20:11:19Z",
+          "id": 6990263643,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:11:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dd8f9ff4b9cdff806bdee6324c1df23de20c4ecf52843cb9c030c35db99018c3",
+        "result": {
+          "address": "0x0800C080",
+          "claim_id": 6990263643,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990263643,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bb56bf027112bd0b5dec9531da753df0c5d8720d5bb3c46a186f609f2259cc1c",
+        "acknowledged_cursor": 6990270616,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bb56bf027112bd0b5dec9531da753df0c5d8720d5bb3c46a186f609f2259cc1c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C68EC\",\"who\":\"ntfs-maintainer\",\"note\":\"Cross-check original roster query, callback installation, and 13-word slot output bound for the existing parked reconstruction.\"}",
+          "created_at": "2026-11-18T20:11:35Z",
+          "id": 6990270616,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:11:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "dd8f9ff4b9cdff806bdee6324c1df23de20c4ecf52843cb9c030c35db99018c3",
+        "result": {
+          "address": "0x080C68EC",
+          "claim_id": 6990270616,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990270616,
+          "status": "accepted",
+          "who": "ntfs-maintainer"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
