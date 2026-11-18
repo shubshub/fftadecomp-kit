@@ -667,66 +667,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "ba7e616552b564471fbeaa6ae8d885986bc1df0423ff9d0b258ec8126d24cc1c",
-        "acknowledged_cursor": 6978995044,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ba7e616552b564471fbeaa6ae8d885986bc1df0423ff9d0b258ec8126d24cc1c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080812E8\",\"who\":\"rainbow-m4a\",\"note\":\"Promote132-byte parked callback with independently verified finite40/48 unsigned-divisor proof; native child of rainbow-ffta\"}",
-          "created_at": "2026-11-18T12:47:25Z",
-          "id": 6978990681,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:47:25Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "01e099044ce1c9a2a08018920f467526056f8c699c2428c545c71bb4efa2fea4",
-        "result": {
-          "address": "0x080812E8",
-          "claim_id": 6978990681,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978990681,
-          "status": "accepted",
-          "who": "rainbow-m4a"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "acb6ada33ea3094b9cd8c23fe1ed4227a609165b5344ae41e94e556df9354c7f",
-        "acknowledged_cursor": 6979036056,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "acb6ada33ea3094b9cd8c23fe1ed4227a609165b5344ae41e94e556df9354c7f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080812E8\",\"who\":\"rainbow-m4a\",\"claim_id\":6978990681,\"reason\":\"Promoted source/report:132/132B59instr with finite40/48 divisor selector; fresh private source/ELF replay accepted; toolkit integration delegated to leader\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T12:49:27Z",
-          "id": 6979036056,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:49:27Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "29d65504337b4b8732bbfe1afc53c34a909d33ac375e7584119d0bac8cdfc9ce",
-        "result": {
-          "address": "0x080812E8",
-          "claim_id": 6978990681,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6979036056,
-          "status": "accepted",
-          "who": "rainbow-m4a"
-        }
-      }
     }
   ],
   "issue": 66,
