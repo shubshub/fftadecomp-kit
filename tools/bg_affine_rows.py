@@ -38,8 +38,8 @@ def require(condition, message):
         raise ValueError('BG affine rows: ' + message)
 
 
-def provider(rom):
-    import bios_bg_affine_set_profile as bios
+def scanline_pipeline(rom):
+    """Authenticate the common task, IRQ, double-bank and shadow DMA path."""
     import scheduler_zero_descriptor as install
     from affine_oam_slot import PROVIDER as irq_code
     from window_scanline import PROVIDER as manager_code
@@ -60,7 +60,6 @@ def provider(rom):
     pipeline += [item for item in irq_code if item[0] in irq]
     require(len(pipeline) == len(shared) + len(irq), 'incomplete manager or IRQ evidence')
     for start, end, digest in (
-        *CONSTRUCTORS,
         *pipeline,
         *install.BOOT,
         (0x0800A640, 0x0800A652, 'de05784b78f2014a09b57caf7a381fad80d0c3c25ea76f41487b35be1fc3e2ba'),
@@ -79,7 +78,6 @@ def provider(rom):
         (install.POINTER, (install.DESTINATION | 1,)),
         (0x08000388, (0x030008D0, 0x0814942C)),
         (0x08149434, (0x080004B1,)),
-        (0x08149820, (0x04000020, 0x04000030)),
         (0x0836D480, (0x040000B0, 0x040000BC, 0x040000C8, 0x040000D4)),
         (0x0836D470, (0x040000B0, 0x040000BC, 0x040000C8, 0x040000D4)),
     ):
@@ -87,6 +85,15 @@ def provider(rom):
             rom[address - BASE : address - BASE + 4 * len(values)] == struct.pack('<' + 'I' * len(values), *values),
             'changed boot or hardware table',
         )
+
+
+def provider(rom):
+    import bios_bg_affine_set_profile as bios
+
+    scanline_pipeline(rom)
+    for start, end, digest in CONSTRUCTORS:
+        require(sha256(rom[start - BASE : end - BASE]).hexdigest() == digest, f'changed constructor at {start:08X}')
+    require(rom[0x149820:0x149828] == struct.pack('<2I', 0x04000020, 0x04000030), 'changed BG target table')
     require(rom[BIOS - BASE : BIOS - BASE + 4] == bios.WRAPPER, 'changed BgAffineSet wrapper')
 
 
