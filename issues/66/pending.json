@@ -1883,6 +1883,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "df639f4b0704005ba0fdfa39f30a18ad44a857a897bd1fff128502e836e26c36",
+        "acknowledged_cursor": 6992480387,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "df639f4b0704005ba0fdfa39f30a18ad44a857a897bd1fff128502e836e26c36",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080BDECC\",\"who\":\"astra-roster\",\"note\":\"Battle equipment caller, C/ROM comparison and ordinary native validation.\"}",
+          "created_at": "2026-11-18T21:42:36Z",
+          "id": 6992480387,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:42:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9a06827b3616036843937a1c2c490afc2a2898c41a17046d8cdf2ce8aaba30bf",
+        "result": {
+          "address": "0x080BDECC",
+          "claim_id": 6992480387,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992480387,
+          "status": "accepted",
+          "who": "astra-roster"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
