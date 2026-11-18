@@ -1851,6 +1851,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1c3f6afbab55e9eef29906f4c6b152fe9803cb35a21421851c10dcb321e887f8",
+        "acknowledged_cursor": 6992366851,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1c3f6afbab55e9eef29906f4c6b152fe9803cb35a21421851c10dcb321e887f8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080058A4\",\"who\":\"rainbow-state\",\"note\":\"Recover scheduler descriptor release/iteration and native callback/heap lifetime\"}",
+          "created_at": "2026-11-18T21:37:49Z",
+          "id": 6992366851,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:37:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5ae94bbe57e7436cf75855c2dff5aa984479141f8c719938cc0ec22762d14af8",
+        "result": {
+          "address": "0x080058A4",
+          "claim_id": 6992366851,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992366851,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
