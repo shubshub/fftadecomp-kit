@@ -603,6 +603,38 @@
           "who": "rainbow-parked"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "34b9a6d0ebb1c1f3cdeec735f11190cdbf57ef213998cc53b09193ecd1e6be77",
+        "acknowledged_cursor": 6979580324,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "34b9a6d0ebb1c1f3cdeec735f11190cdbf57ef213998cc53b09193ecd1e6be77",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812BA08\",\"who\":\"rainbow-state\",\"note\":\"Recover complete 732-byte scene task and verify its compiler division and r4 callback\"}",
+          "created_at": "2026-11-18T13:12:16Z",
+          "id": 6979580324,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:12:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6e52a65bbe0f95031c2ea495094eb85db9b8c1d3a3a813eb8fb9ec4991463722",
+        "result": {
+          "address": "0x0812BA08",
+          "claim_id": 6979580324,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979580324,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
