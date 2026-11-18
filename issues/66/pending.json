@@ -639,6 +639,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "6cf69b15b331912f9296150e8f58e1fab8d3194499b893a9b446775c54a8fa53",
+        "acknowledged_cursor": 6986765301,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6cf69b15b331912f9296150e8f58e1fab8d3194499b893a9b446775c54a8fa53",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0810CC44\",\"who\":\"rainbow-state\",\"note\":\"Recover original multi-phase effect scheduler sibling\"}",
+          "created_at": "2026-11-18T17:48:43Z",
+          "id": 6986765301,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:48:43Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "0148e30dfd2f55c45474656007424ec7ed0cb978d0756a431f81d42ddeffc0c2",
+        "result": {
+          "address": "0x0810CC44",
+          "claim_id": 6986765301,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6986765301,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
