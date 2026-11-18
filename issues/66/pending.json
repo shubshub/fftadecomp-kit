@@ -514,66 +514,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "352e520ef1c90e82062768fa25a10e6864536ebc5775cab25ca63847802b5278",
-        "acknowledged_cursor": 6980353171,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "352e520ef1c90e82062768fa25a10e6864536ebc5775cab25ca63847802b5278",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D984C\",\"who\":\"rainbow-window-range\",\"note\":\"Recover the window byte-pair layout and test the ordinary compiler and verifier against the complete 46-byte owner.\"}",
-          "created_at": "2026-11-18T13:43:31Z",
-          "id": 6980353171,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:43:31Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "c8ad7228609f5821f631913ab8985fdfa3b8abd21fa4702fe073c127cce5875d",
-        "result": {
-          "address": "0x080D984C",
-          "claim_id": 6980353171,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6980353171,
-          "status": "accepted",
-          "who": "rainbow-window-range"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "972165b99d63d92c4f917ca957f964186875bde1726912be9fb0e3a0ca99a4e0",
-        "acknowledged_cursor": 6980439353,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "972165b99d63d92c4f917ca957f964186875bde1726912be9fb0e3a0ca99a4e0",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D984C\",\"who\":\"rainbow-window-range\",\"claim_id\":6980353171,\"reason\":\"Recovered display range branch writes in ordinary C. Native default agbcc matches all 46 bytes and 22 instructions and saved game report replays.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T13:46:58Z",
-          "id": 6980439353,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:46:58Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "1b445d2d98681f698070fe54a986dbbfa3d5b9383faff7b47283dfe57ca7c8f8",
-        "result": {
-          "address": "0x080D984C",
-          "claim_id": 6980353171,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6980439353,
-          "status": "accepted",
-          "who": "rainbow-window-range"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "f45d59ce66f3bc3ce372557cb56fa318e5ea50b56f9f2677ac9d0dfc2846d486",
         "acknowledged_cursor": 6980388472,
         "body_provenance": "acceptance-time",
