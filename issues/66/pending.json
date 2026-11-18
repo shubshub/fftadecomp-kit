@@ -606,7 +606,35 @@
           "who": "rainbow-gap-leaves"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "936207fd3ec56690bc3b129d10011911b4fcc1bb19132798fbd19ed03b337b1f",
+        "acknowledged_cursor": 6986995960,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "936207fd3ec56690bc3b129d10011911b4fcc1bb19132798fbd19ed03b337b1f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804413C\",\"who\":\"rainbow-gap-leaves\",\"claim_id\":6986950404,\"reason\":\"28-byte native leaf matches, saves state 4 in panel low three bits. Closed 12-instruction CFG and fresh saved report replay.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:58:04Z",
+          "id": 6986990286,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:58:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "df4b904a42858bc559565d9b3c00951c00243782cce0e6324c9109aed73a7cba",
+        "result": {
+          "address": "0x0804413C",
+          "claim_id": 6986950404,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986990286,
+          "status": "accepted",
+          "who": "rainbow-gap-leaves"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "48e58443f45b8616458af03d2ccee76b7fea34c70794c87e751dab3d9cb03176",
+        "acknowledged_cursor": 6986995960,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "48e58443f45b8616458af03d2ccee76b7fea34c70794c87e751dab3d9cb03176",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080748A8\",\"who\":\"astra-sound\",\"claim_id\":6986972003,\"reason\":\"Original complete two-byte BX LR and captured live report replay verified.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:58:18Z",
+          "id": 6986995960,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:58:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "df4b904a42858bc559565d9b3c00951c00243782cce0e6324c9109aed73a7cba",
+        "result": {
+          "address": "0x080748A8",
+          "claim_id": 6986972003,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986995960,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     }
   ],
   "issue": 66,
