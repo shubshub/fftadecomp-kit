@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "2f6b24b72b189c40aa6d82cbba010d6a098379c30b4ac0466bfa0def7ced6a5c",
+    "acknowledged_cursor": 6979511756,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "2f6b24b72b189c40aa6d82cbba010d6a098379c30b4ac0466bfa0def7ced6a5c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08143CEC\",\"who\":\"rainbow-libgcc-mul\",\"note\":\"Historical libgcc fp-bit multiply source recovery and native verification\"}",
+      "created_at": "2026-11-18T13:09:13Z",
+      "id": 6979500096,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:09:13Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0c30b270e6c5437fd12515604d205024d7c6b7822c3d63f91eb541d5b449aa0d",
+    "result": {
+      "address": "0x08143CEC",
+      "claim_id": 6979500096,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6979500096,
+      "status": "accepted",
+      "who": "rainbow-libgcc-mul"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "5897fc10b9b8ac5013ce1252704690095442fd8adcecdb8dc027cb6f8c27342c",
+    "acknowledged_cursor": 6979823547,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5897fc10b9b8ac5013ce1252704690095442fd8adcecdb8dc027cb6f8c27342c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08143CEC\",\"who\":\"rainbow-libgcc-mul\",\"claim_id\":6979500096,\"reason\":\"Recovered libgcc __mulsf3 source, 360/360 bytes and 171 instructions; promoted with native old-agbcc unit replay\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T13:22:23Z",
+      "id": 6979823547,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T13:22:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e5a58389734b0521983228c8a36d626cfe65d8eb623933167af631c1c3a60e80",
+    "result": {
+      "address": "0x08143CEC",
+      "claim_id": 6979500096,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6979823547,
+      "status": "accepted",
+      "who": "rainbow-libgcc-mul"
+    }
+  }
+}
