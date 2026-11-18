@@ -5819,6 +5819,10 @@ def main():
             sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if unit_context is not None:
+        if addr == 0x08141C78:
+            import flash_sized_verify
+            if flash_sized_verify.unit_owner(unit_context["unit"], addr):
+                return selector_issue(flash_sized_verify.issue)
         if addr == 0x08141BE0:
             import flash_sector_verify
             if flash_sector_verify.unit_owner(unit_context["unit"], addr):

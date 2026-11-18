@@ -2316,6 +2316,11 @@ The copied routine returns zero on equality, otherwise the address of the
 first differing cartridge byte. The four copied source literals in the O1
 duplicate section are excluded from the 152-byte function extent.
 
+The 152-byte size-limited entry at `08141C78` uses the same 48-byte copy.
+Its program-and-verify caller preserves the unsigned byte count across the
+sector program operation and forwards it to the local comparator. A count
+of zero reads neither input. A difference just beyond the prefix is ignored.
+
 The same library unit compiles chip erase at `08141EB8` with
 `--unit-toolchain agbcc-O1-v1`. Its six flash byte writes issue the chip-erase
 command. All four setup records install the same callback and phase-3 wait.
