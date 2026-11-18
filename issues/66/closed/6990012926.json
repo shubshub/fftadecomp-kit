@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dd19821ba6bcbe9e4cc24e67eddd10600567665456fa364716122a226d2b1935",
+    "acknowledged_cursor": 6990012926,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dd19821ba6bcbe9e4cc24e67eddd10600567665456fa364716122a226d2b1935",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141FC8\",\"who\":\"astra-shift\",\"note\":\"Recover FLASH512_V130 ProgramByte ordered flash commands and wait callback under native O1.\"}",
+      "created_at": "2026-11-18T20:01:44Z",
+      "id": 6990012926,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:01:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6f58528271a79a3f09d1c028433d0ce143a2463c7a77dbad5f4fbe090408a879",
+    "result": {
+      "address": "0x08141FC8",
+      "claim_id": 6990012926,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6990012926,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f2921df2395f658ca5a96329e256a56ddfa826886c9d4603d4c35bc9e13bcb60",
+    "acknowledged_cursor": 6990425833,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f2921df2395f658ca5a96329e256a56ddfa826886c9d4603d4c35bc9e13bcb60",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141FC8\",\"who\":\"astra-shift\",\"claim_id\":6990012926,\"reason\":\"MATCH 56/56 native agbcc-O1 and live saved replay under toolkit #309.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T20:17:53Z",
+      "id": 6990425833,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:17:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "cfd04227827d0ca29fa33ef8f411769999f01121ee15aa2bbe9f9318cb5c3db7",
+    "result": {
+      "address": "0x08141FC8",
+      "claim_id": 6990012926,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6990425833,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  }
+}
