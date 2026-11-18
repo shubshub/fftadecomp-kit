@@ -574,66 +574,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "cd9693ed2c63eee06e9e909b040ca4418f20b296afecc9af58ef4520c1cce745",
-        "acknowledged_cursor": 6981160432,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cd9693ed2c63eee06e9e909b040ca4418f20b296afecc9af58ef4520c1cce745",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D3BD0\",\"who\":\"rainbow-display-transition\",\"note\":\"Reconstruct packed interpolation sequence and use verified control shadow and helper declarations\"}",
-          "created_at": "2026-11-18T14:15:56Z",
-          "id": 6981160432,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:15:56Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "cf5eded6bbcddc9942a6b7ab9384b92eb027770d1ef1668f1b99b9108746431b",
-        "result": {
-          "address": "0x080D3BD0",
-          "claim_id": 6981160432,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6981160432,
-          "status": "accepted",
-          "who": "rainbow-display-transition"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "97af6a5091be6743d02de6e1eb71129fb23e0005f0d1a49c9d80f91ed92e4a1b",
-        "acknowledged_cursor": 6981245212,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "97af6a5091be6743d02de6e1eb71129fb23e0005f0d1a49c9d80f91ed92e4a1b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3BD0\",\"who\":\"rainbow-display-transition\",\"claim_id\":6981160432,\"reason\":\"228/228 bytes and 105/105 instructions exact with project control header and typed helper; Parked for unbounded common loop in volatile three-compile proof\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T14:19:19Z",
-          "id": 6981245212,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:19:19Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "991dfdf2865a78ba4cb65ee56534ff99874ea07ea7a93a319771a718062560f0",
-        "result": {
-          "address": "0x080D3BD0",
-          "claim_id": 6981160432,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6981245212,
-          "status": "accepted",
-          "who": "rainbow-display-transition"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "ddb531ec075616bdc318d391d8cb9c3918d7f81b9593356a70d4b81c97c60cef",
         "acknowledged_cursor": 6981176884,
         "body_provenance": "acceptance-time",
