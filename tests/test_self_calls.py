@@ -175,15 +175,17 @@ class SelfCallReportTests(unittest.TestCase):
 
     def report(self, data=None, *, sites='[8]', lines=True, schema=evidence.LINKED_SCHEMA):
         data = body() if data is None else data
-        out = [f'* verification: `{schema}`',
+        out = [f'* source: `src/{A:08X}.c`', f'* verification: `{schema}`',
                f'* source SHA-256: `{evidence.source_fingerprint(self.root, A)}`',
                f'* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`',
                f'* control flow: {evidence.CALL_SUMMARY}']
         if lines:
             out += [f'* self calls: {evidence.SELF_CALL_SUMMARY}', f'* self call sites: `{sites}`']
-        out += ['* verified extent: complete ELF function symbol, including literal pools',
+        out += [f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
+                '* verified extent: complete ELF function symbol, including literal pools',
                 '* relocations: none', f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)',
                 f'* compiled : `{data.hex()}`', '* source plausibility: plausible',
+                '* hand-asm allow list: not listed',
                 f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes']
         return '\n'.join(out)
 
@@ -212,6 +214,16 @@ class SelfCallReportTests(unittest.TestCase):
         (self.root / 'baserom.bin').write_bytes(rom)
         self.assertFalse(evidence.report_matches(self.report(bytes(data)), self.root, A))
         self.assertTrue(evidence.report_matches(self.report(bytes(data), lines=False), self.root, A))
+
+    def test_self_calls_alone_take_the_call_schema(self):
+        # kit #247: replay derives the call label from the walk, and a BL to the function's own
+        # entry is a call there, as match.py counts it (linked_profile = bool(calls)).
+        data = bytearray(body())
+        data[14:18] = bl(A + 14, A)
+        rom = bytearray(self.rom)
+        rom[A - match.ROM_BASE:A - match.ROM_BASE + len(data)] = data
+        (self.root / 'baserom.bin').write_bytes(rom)
+        self.assertTrue(evidence.report_matches(self.report(bytes(data), sites='[8,14]'), self.root, A))
 
     def test_claim_under_a_non_call_schema_is_rejected(self):
         self.assertFalse(evidence.report_matches(self.report(schema=evidence.SCHEMA), self.root, A))

@@ -12,6 +12,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import empty_body_profile as empty_body
+import plain_report_fields
 import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
@@ -1047,6 +1048,7 @@ def legacy_report_control_flow(lines, root, address, profile):
             if self_sites is not None and {item.address for item in reached
                     if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
                 return False
+            plain_report_fields.check_labels(profile, reached, address, data, thumb, calls)
         except modsi3.AddressedRemainderRequired:
             if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None:
                 return False
@@ -1373,6 +1375,12 @@ def report_matches(report, root, address):
     if any(line.startswith(("* function addresses:", "* function address manifest:",
                             "* function address proof SHA-256:")) for line in lines):
         return False
+    claimed = re.fullmatch(r"\* verification: `([^`]*)`", profiles[0]) if len(profiles) == 1 else None
+    if claimed is not None and plain_report_fields.layout(claimed[1]) is not None:
+        try:
+            plain_report_fields.check(lines, claimed[1], address, root)
+        except ValueError:
+            return False
     profile_valid = profiles in ([f"* verification: `{SCHEMA}`"],
                                  [f"* verification: `{FRAMED_SCHEMA}`"])
     if profiles in ([f"* verification: `{LINKED_SCHEMA}`"],

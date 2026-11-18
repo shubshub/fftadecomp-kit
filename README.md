@@ -625,6 +625,69 @@ retain it only when all incoming paths agree, and calls still invalidate
 caller-clobbered registers. Arithmetic, unknown inputs and wider or conditional
 moves do not establish return-address provenance.
 
+### Plain report fields and labels
+
+The plain schemas are `elf-symbol-cfg-leaf-v2`, `elf-symbol-thumb-frame-v1`,
+`elf-symbol-thumb-calls-v1`, `elf-symbol-thumb-frame-calls-v1`,
+`elf-symbol-thumb-data-v1`, `elf-symbol-thumb-frame-data-v1` and
+`elf-symbol-thumb-frame-buffer-calls-v1`/`-v2`. A saved report for one of them
+must hold exactly the field lines that `match.py` writes for that schema (kit
+`#247`, `tools/plain_report_fields.py`). A field line is any bullet: a line
+whose first non-blank character (Unicode blanks included) is `*`, `-` or `+`
+followed by a blank. After the allowlisted volatile records are removed, replay
+refuses a report in which:
+
+1. a field line uses a prefix the writer does not emit for the claimed schema.
+   Only the writer's own `* name: ` form at the start of a line can match, so
+   indented, `-`, `+` and non-breaking-space bullets refuse. A plausible
+   report has no findings list, so the writer emits no other bullet;
+2. a field is missing, or appears more than once. On the buffer schemas, the
+   other `* buffer ` lines (loop replay, and the BIOS, copy-helper and
+   switch-callee summary lines) are exempt: they may repeat, because the
+   buffer proof requires them to equal its recomputed lines exactly and in
+   order. The two self-call lines appear together or not at all.
+   `* compiler:` is required, even though `library_units` alone admits a
+   report without it;
+3. `* source:` does not name the file `match.py` compiles for this address
+   (`src/<ADDR>.c`, else the first `<ADDR>.c` under `src/` in sorted order),
+   or `* hand-asm allow list:` is neither `not listed` nor `listed (...)`.
+   The source fingerprint already binds that path, so moving a source into a
+   module folder needs a regenerated report, as before; the regenerated report
+   names the new folder. The hand-asm reason is checked for form only;
+4. the field lines are out of the writer's order, or any of them follows the
+   `**MATCH` verdict line.
+
+Replay also derives each label from the walk it already runs, as `match.py`
+does:
+
+* a `frame` schema requires that the reached Thumb code uses the stack frame,
+  and any other plain schema requires that it does not;
+* a call schema, or the call summary on a data schema, requires a reached BL
+  that leaves the function or re-enters its entry, and any other label
+  requires that there is none;
+* a data schema requires a literal word that a data relocation could occupy:
+  a reached `ldr rd, [pc, #imm]` must load a word inside the function whose
+  value lies outside it. `match.py` binds data only through such a word, and
+  the walk admits no other PC-relative access.
+
+The addressed signed-remainder path compares the frame label in its own source
+check.
+
+**Limit:** replay cannot see relocations, so it cannot tell a named data
+literal from a raw constant. In both directions, a relabelled data label still
+replays:
+
+* **Downgrade.** A data report relabelled to the call or leaf schema, with its
+  data-symbol line removed, replays if the bytes also verify without the data
+  map.
+* **Upgrade.** A call or leaf report relabelled to a data schema, with a
+  current data-symbol line added, replays if its body loads a literal word
+  from outside the function, such as a hardware address or another constant.
+  A body that loads no such word is refused.
+
+The complete fix is for `status.py --verify` to diff the regenerated report
+against the saved one; that is follow-up work for kit `#247`.
+
 ### Archiving closed reservation receipts
 
 Deploy `tools/reserve.py` and the `reservations` workflow together on the trusted

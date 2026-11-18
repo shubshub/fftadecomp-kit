@@ -136,17 +136,18 @@ class BufferNullOutputTests(unittest.TestCase):
             f'{int(row["end"], 16) - int(row["rom"], 16)} '
             f'{(int(row["end"], 16) - int(row["rom"], 16)) // 2} return\n' for row in entries))
         report = '\n'.join((
-            f'* verification: `{evidence.STACK_BUFFER_SCHEMA}`',
+            f'* source: `src/{BASE:08X}.c`', f'* verification: `{evidence.STACK_BUFFER_SCHEMA}`',
             f'* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`',
-            f'* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`',
             f'* stack frame: {evidence.STACK_SUMMARY}',
-            f'* control flow: {evidence.CALL_SUMMARY}',
             f'* buffer calls: {evidence.STACK_BUFFER_SUMMARY}',
             f'* buffer proof SHA-256: `{proof.fingerprint()}`',
-            '* verified extent: complete ELF function symbol, including literal pools',
+            f'* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`',
+            f'* control flow: {evidence.CALL_SUMMARY}',
+            f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
+            '* verified extent: complete ELF function symbol, including literal pools', '* relocations: none',
             f'* ROM bytes: `{body.hex()}` ({len(body)} bytes)',
             f'* compiled : `{body.hex()}`', '* source plausibility: plausible',
-            '* relocations: none', f'**MATCH - byte identical** - {len(body)}/{len(body)} bytes'))
+            '* hand-asm allow list: not listed', f'**MATCH - byte identical** - {len(body)}/{len(body)} bytes'))
         self.assertTrue(evidence.report_matches(report, self.root, BASE))
         legacy = report.replace(evidence.STACK_BUFFER_SCHEMA, evidence.BUFFER_SCHEMA).replace(
             evidence.STACK_BUFFER_SUMMARY, evidence.BUFFER_SUMMARY)

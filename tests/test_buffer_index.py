@@ -234,17 +234,18 @@ class BufferIndexTests(unittest.TestCase):
         match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=proof,
                                        call_resolver=proof.target)
         report = "\n".join((
-            f"* verification: `{evidence.STACK_BUFFER_SCHEMA}`",
+            f"* source: `src/{BASE:08X}.c`", f"* verification: `{evidence.STACK_BUFFER_SCHEMA}`",
             f"* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`",
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`",
             f"* stack frame: {evidence.STACK_SUMMARY}",
-            f"* control flow: {evidence.CALL_SUMMARY}",
             f"* buffer calls: {evidence.STACK_BUFFER_SUMMARY}",
             f"* buffer proof SHA-256: `{proof.fingerprint()}`",
-            "* verified extent: complete ELF function symbol, including literal pools",
+            f"* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`",
+            f"* control flow: {evidence.CALL_SUMMARY}",
+            f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`",
+            "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
             f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
             f"* compiled : `{self.body.hex()}`", "* source plausibility: plausible",
-            "* relocations: none",
+            "* hand-asm allow list: not listed",
             f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
         ))
         self.assertTrue(evidence.report_matches(report, self.root, BASE))
