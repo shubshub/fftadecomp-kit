@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "81751dbdad5d3063eca5c8d9cf07b5467b1c41f5ba6d2d53f71985bc8e04660d",
-        "acknowledged_cursor": 6986042418,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "81751dbdad5d3063eca5c8d9cf07b5467b1c41f5ba6d2d53f71985bc8e04660d",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08006720\",\"who\":\"rainbow-affine\",\"note\":\"Recover keyframe BLDALPHA shadow setter with real loop, blend coefficients and canonical signed division proof.\"}",
-          "created_at": "2026-11-18T17:18:33Z",
-          "id": 6986016889,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:18:33Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "b40161b46446746bc3962a9d294ae3c9058d85617fe25c20a62d73da9734c48b",
-        "result": {
-          "address": "0x08006720",
-          "claim_id": 6986016889,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6986016889,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "51f6a5b807dc596c777d109e3ef797a432799569fcd768c251e749c98020bd2a",
-        "acknowledged_cursor": 6986665871,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "51f6a5b807dc596c777d109e3ef797a432799569fcd768c251e749c98020bd2a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08006720\",\"who\":\"rainbow-affine\",\"claim_id\":6986016889,\"reason\":\"Original BLDALPHA keyframe callback recovered. Native 344/344 bytes, full 164 instructions, signed runtime and keyframe induction, canonical live report replay accepted.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T17:44:37Z",
-          "id": 6986665871,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:44:37Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "92057a8e88c60b0bffe95f87f859bb7b8a750d0d14f701047bc7f731bd3e2156",
-        "result": {
-          "address": "0x08006720",
-          "claim_id": 6986016889,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6986665871,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "11f15d743dbc943a7549b0d39b7404426d12861dc6e3d089c0e9d2a7c37bbf3c",
         "acknowledged_cursor": 6986232721,
         "body_provenance": "acceptance-time",
