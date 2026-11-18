@@ -154,6 +154,12 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                 'local-buffer contracts exclude local BL and switches')
         self.root, self.calls = (address, bytes(data)), dict(calls)
         self.environment = environment_fingerprint()
+        if self.policy == SCHEDULER_PAYLOAD and address == 0x080DCFE4:
+            import effect_or_delay_task as choice
+            self.dependency_budget = 8
+            self.effect_or_delay = choice.bind(self, data, address, ins, edges, calls)
+            self.callee_frames = True
+            self.exact_alias_state_budget = 256
         if self.policy == SCHEDULER_EVENT:
             import scheduler_event_definition as event
             self.event_definition = event.bind(self, data, address, ins, edges, calls)
@@ -395,6 +401,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             else:
                 import scheduler_entry_profile as entry
             return entry.check_call(self, address, aliases, stack, slots, site=site)
+        if hasattr(self, 'effect_or_delay'):
+            import effect_or_delay_task as choice
+            return choice.check_call(self, aliases, stack, slots, constants, site)
         if self.policy == SCHEDULER_TWO_PAYLOAD:
             import scheduler_two_payload_profile as two
             return two.check_call(self, address, aliases, stack, slots, site=site)
@@ -521,6 +530,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             else:
                 import scheduler_entry_profile as entry
             return entry.manifest(self)
+        if hasattr(self, 'effect_or_delay'):
+            import effect_or_delay_task as choice
+            return choice.manifest(self)
         if self.policy == SCHEDULER_TWO_PAYLOAD:
             import scheduler_two_payload_profile as two
             return two.manifest(self)
