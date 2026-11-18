@@ -40,6 +40,8 @@ class FlashChip:
                 self.id_mode = True
             elif value == 0x80:
                 self.state = 4
+        elif step == 6 and (offset,value) == (0x5555,0x10):
+            self.storage[:] = bytes([255])*len(self.storage)
         elif step == 6 and value == 0x30:
             start = offset & 0xf000
             self.storage[start:start+4096] = bytes([255])*4096

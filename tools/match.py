@@ -6230,9 +6230,12 @@ def main():
                     verified_instructions, _ = verify_switches(
                         got, addr, rom, mapping, switch_evidence,
                         data_mapping=data_mapping if data_relocations else None)
-            elif unit_context is not None and addr == 0x08141F2C:
-                import flash_sector_erase
-                verified_instructions, flash_erase_evidence = flash_sector_erase.native_proof(
+            elif unit_context is not None and addr in (0x08141EB8, 0x08141F2C):
+                if addr == 0x08141EB8:
+                    import flash_chip_erase as erase_profile
+                else:
+                    import flash_sector_erase as erase_profile
+                verified_instructions, flash_erase_evidence = erase_profile.native_proof(
                     got, rom, mapping, empty_index, data_mapping, calls, data_relocations, unit_context, unit_orphan)
             elif function_relocations:
                 objects = parse_data_symbols(data_mapping) if data_relocations else {}
@@ -6363,8 +6366,8 @@ def main():
     if thunk_profile:
         control_flow = function_thunk.CONTROL_FLOW
     if flash_erase_evidence is not None:
-        schema = flash_sector_erase.SCHEMA
-        control_flow = flash_sector_erase.CONTROL
+        schema = erase_profile.SCHEMA
+        control_flow = erase_profile.CONTROL
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -6569,7 +6572,7 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
             if flash_erase_evidence is not None:
-                f.write(f"* flash sector reader: `{library_units.canonical(flash_erase_evidence)}`\n")
+                f.write(f"* flash {'chip' if addr == 0x08141EB8 else 'sector'} reader: `{library_units.canonical(flash_erase_evidence)}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
             if empty_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")

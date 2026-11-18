@@ -1127,6 +1127,9 @@ def report_matches(report, root, address):
         # report must use the default toolchain, and inside a unit the unit's
         # toolchain must emit the same function
         return False
+    if address == 0x08141EB8 or '* verification: `elf-symbol-thumb-flash-chip-reader-v1`' in report.splitlines():
+        import flash_chip_erase
+        return flash_chip_erase.replay(report, root, address)
     if address == 0x08141F2C or '* verification: `elf-symbol-thumb-flash-sector-reader-v1`' in report.splitlines():
         import flash_sector_erase
         return flash_sector_erase.replay(report, root, address)
