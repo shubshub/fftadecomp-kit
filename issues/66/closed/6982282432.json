@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "7d72392434bab1f88adb4fee4f6964ddc268b74ecdfc5cd90a7187d25718ba1f",
+    "acknowledged_cursor": 6982286721,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7d72392434bab1f88adb4fee4f6964ddc268b74ecdfc5cd90a7187d25718ba1f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A38A9C\",\"who\":\"rainbow-state\",\"note\":\"Recover ROM boot-copied aligned copy kernel from 08A38A9C\"}",
+      "created_at": "2026-11-18T14:59:06Z",
+      "id": 6982282432,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:59:06Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "acb960341e32c06cbbcb2d9dbc8e03a883bcd17384641c0658552420c81476f8",
+    "result": {
+      "address": "0x08A38A9C",
+      "claim_id": 6982282432,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6982282432,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7b151f03d2fb7ba5af4c2fea773f89dd3c77ac7550e3e99f58fcaeb73a962e70",
+    "acknowledged_cursor": 6982371895,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7b151f03d2fb7ba5af4c2fea773f89dd3c77ac7550e3e99f58fcaeb73a962e70",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A38A9C\",\"who\":\"rainbow-state\",\"claim_id\":6982282432,\"reason\":\"Kit11 MATCH 62/62 bytes, 31/31 instructions, strict late ROM extent and live saved replay confirmed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:02:01Z",
+      "id": 6982359425,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:02:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "af76f01b56f2e515bdb0c9821cd8b56cf9d5a8f04d9cbc34cd733cd3e444607b",
+    "result": {
+      "address": "0x08A38A9C",
+      "claim_id": 6982282432,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6982359425,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
