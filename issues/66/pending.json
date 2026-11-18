@@ -1819,6 +1819,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "d6f5e7a297c5509829f16a21de2e15763b4216ab976f74ca81d7179ba7894336",
+        "acknowledged_cursor": 6991937353,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d6f5e7a297c5509829f16a21de2e15763b4216ab976f74ca81d7179ba7894336",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08007AC4\",\"who\":\"astra-combat\",\"note\":\"Recover original first movement-count reader and verify its constructor and decrement ABI\"}",
+          "created_at": "2026-11-18T21:18:38Z",
+          "id": 6991937353,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:18:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5d20be38f1fd9233c7d4ccc4914844c15db0aaea3076f42fe23619f47770975b",
+        "result": {
+          "address": "0x08007AC4",
+          "claim_id": 6991937353,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6991937353,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
