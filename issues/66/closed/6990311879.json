@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "fcc72b7207f41dda14b5c550a48a52d932d9b4db32e1ced467918a3b8ee11e20",
+    "acknowledged_cursor": 6990311879,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fcc72b7207f41dda14b5c550a48a52d932d9b4db32e1ced467918a3b8ee11e20",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800C4B4\",\"who\":\"rainbow-state\",\"note\":\"Verify original four-slot scanline dispatcher, real callback producers, DMA and shadow register writes\"}",
+      "created_at": "2026-11-18T20:13:15Z",
+      "id": 6990311879,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:13:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "02c105228cbe97a579f07b8df769a5fd75bae550b5668ad7775dea31fe0de15e",
+    "result": {
+      "address": "0x0800C4B4",
+      "claim_id": 6990311879,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6990311879,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1b89620f69fe21bdd4bc4060b4c07f07d2f2a7c8d4cbf7c83ea0aac0b5ce9fa0",
+    "acknowledged_cursor": 6990877855,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1b89620f69fe21bdd4bc4060b4c07f07d2f2a7c8d4cbf7c83ea0aac0b5ce9fa0",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C4B4\",\"who\":\"rainbow-state\",\"claim_id\":6990311879,\"reason\":\"All 320 bytes and 139 Thumb instructions verified in live game; toolkit PR 314 merged, saved native report replayed on checkpoint 60\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T20:35:41Z",
+      "id": 6990877855,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:35:41Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1e30e97656887e0455079f8c8cc64632e7c8424efe3ad3b23432f71d1d5a73c6",
+    "result": {
+      "address": "0x0800C4B4",
+      "claim_id": 6990311879,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6990877855,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
