@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "19c10f3323a358f6e073c00682dd69c245b1296e5855235ac4cc0aa8cb7a0561",
-        "acknowledged_cursor": 6988082179,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "19c10f3323a358f6e073c00682dd69c245b1296e5855235ac4cc0aa8cb7a0561",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003410\",\"who\":\"rainbow-affine\",\"note\":\"Recover boot DMA3 halfword clears of full VRAM and palette with original affine OAM initialization\"}",
-          "created_at": "2026-11-18T18:42:03Z",
-          "id": 6988082179,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T18:42:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "1fac80ac6a059d93204ef966f0017620149826912fae210de75b379b1d7f90f3",
-        "result": {
-          "address": "0x08003410",
-          "claim_id": 6988082179,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6988082179,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f9aefee24d9ff4ff21e345e46881b4a67f38586ed268fe11270439cb26c1a0be",
-        "acknowledged_cursor": 6988527056,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f9aefee24d9ff4ff21e345e46881b4a67f38586ed268fe11270439cb26c1a0be",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08003410\",\"who\":\"rainbow-affine\",\"claim_id\":6988082179,\"reason\":\"Native 68/68 from merged toolkit PR 292, canonical live report replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T19:00:37Z",
-          "id": 6988527056,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T19:00:37Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "e4587abb23c315bfc6de4a8e7ea2db9e4a0fa46e6e7eaad0b8987c1dbdfeb7b6",
-        "result": {
-          "address": "0x08003410",
-          "claim_id": 6988082179,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6988527056,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "12c5f4bbf4ec77e9c91f65881a19fc9b6542dcc7fe17d82c175f3858bf4bc77d",
         "acknowledged_cursor": 6988159308,
         "body_provenance": "acceptance-time",
