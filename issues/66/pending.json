@@ -606,66 +606,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "296a24278d2ff772bb30bffcd8ce897ceb1dc7cdc78f8878c0facc6077865885",
-        "acknowledged_cursor": 6982042657,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "296a24278d2ff772bb30bffcd8ce897ceb1dc7cdc78f8878c0facc6077865885",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D9F60\",\"who\":\"rainbow-circle-scanline\",\"note\":\"Recover midpoint circle scanline window writer from the verified signed-coordinate callers and ROM layout.\"}",
-          "created_at": "2026-11-18T14:49:45Z",
-          "id": 6982035467,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:49:45Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5be58c3bda0b8f7e712eafac894141e2c31003ecc15cd8483df2f8f3cee07fe1",
-        "result": {
-          "address": "0x080D9F60",
-          "claim_id": 6982035467,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6982035467,
-          "status": "accepted",
-          "who": "rainbow-circle-scanline"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "66c8bc7532d17b8c79215b0f595ed04b57c16d7769921efe3bf5f33b10af4251",
-        "acknowledged_cursor": 6982186185,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "66c8bc7532d17b8c79215b0f595ed04b57c16d7769921efe3bf5f33b10af4251",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D9F60\",\"who\":\"rainbow-circle-scanline\",\"claim_id\":6982035467,\"reason\":\"Ordinary clipped-circle writer 260/276 bytes. Eight missing ldrb on dynamic scanline buffer. Volatile member diagnostic reproduces 276/276 and 138/138, but kit rejects qualifiers (issue 168). C and evidence in Parked/080D9F60.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; byte bitfields; inline and direct symmetric writes; source qualifier comparison; strict native match.py.\"}",
-          "created_at": "2026-11-18T14:55:10Z",
-          "id": 6982180145,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:55:10Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
-        "result": {
-          "address": "0x080D9F60",
-          "claim_id": 6982035467,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6982180145,
-          "status": "accepted",
-          "who": "rainbow-circle-scanline"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e77314a8692f47b23b74f874386903e6c54b9efe1476be7328888879963d66af",
         "acknowledged_cursor": 6982088273,
         "body_provenance": "acceptance-time",
@@ -695,66 +635,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "c2f8a1b82fdc90d161713a1ecb6a546529686142d9db167c2d0dc467bae2c656",
-        "acknowledged_cursor": 6982112056,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "c2f8a1b82fdc90d161713a1ecb6a546529686142d9db167c2d0dc467bae2c656",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805F69C\",\"who\":\"rainbow-affine\",\"note\":\"Recheck payload store, phase 0x102 sender and callback closure in current official kit\"}",
-          "created_at": "2026-11-18T14:52:38Z",
-          "id": 6982112056,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:52:38Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "d9c8efc6ceac28f47da6528227f50d4a2d91b364fb919a5a0837fbb750f1b595",
-        "result": {
-          "address": "0x0805F69C",
-          "claim_id": 6982112056,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6982112056,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "1314283fd62e082c592bc01d24266aa710dbd8343054853beabe868956a3f005",
-        "acknowledged_cursor": 6982186185,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1314283fd62e082c592bc01d24266aa710dbd8343054853beabe868956a3f005",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805F69C\",\"who\":\"rainbow-affine\",\"claim_id\":6982112056,\"reason\":\"80/80 raw exact; actual 0x102 callback uses only phase; mutable callback lifetime remains beyond current selectors. Parked source and trace updated.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T14:55:03Z",
-          "id": 6982177165,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T14:55:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4846ed9327712074d908cd0705c38a7e6dc6640bafe4b4af798386db18169b8b",
-        "result": {
-          "address": "0x0805F69C",
-          "claim_id": 6982112056,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6982177165,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      }
     }
   ],
   "issue": 66,
