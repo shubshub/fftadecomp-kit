@@ -1915,6 +1915,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1ce9bc5fa051387e2575f21d34a6339b9407aa13eba84f8cf977304d92007e4b",
+        "acknowledged_cursor": 6992982449,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1ce9bc5fa051387e2575f21d34a6339b9407aa13eba84f8cf977304d92007e4b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080989AC\",\"who\":\"astra-combat\",\"note\":\"Recover original game grid lookup and linked list searches using its indexed caller and map data.\"}",
+          "created_at": "2026-11-18T22:05:29Z",
+          "id": 6992982449,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:05:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c68dde3854abcd016b020b005da091806697f034efba978a6480bde35620778b",
+        "result": {
+          "address": "0x080989AC",
+          "claim_id": 6992982449,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992982449,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
