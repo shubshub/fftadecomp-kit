@@ -331,7 +331,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                 spin_profile = inert_spin.selected(saved_report)
                 from match_evidence import UDIVSI3_FRAMED_SCHEMA
                 unsigned_quotient_frame = f"* verification: `{UDIVSI3_FRAMED_SCHEMA}`" in saved_report.splitlines()
-                quotient_frame = f"* verification: `{divsi3.FRAMED_SCHEMA}`" in saved_report.splitlines()
+                quotient_frame = any(f"* verification: `{schema}`" in saved_report.splitlines()
+                                     for schema in (divsi3.FRAMED_SCHEMA, divsi3.FRAMED_SWITCH_SCHEMA))
                 saved_flags = compiler_flags(saved_report)
                 unit_toolchain = library_units.report_toolchain(saved_report)
             except ValueError as error:

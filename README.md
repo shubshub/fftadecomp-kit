@@ -2672,6 +2672,20 @@ calls and register PUSH/POP saves may coexist. Explicit frames, stack aliases
 or arguments, buffers, switches, indirect thunks, callbacks, named object
 relocations and other arithmetic runtime profiles remain excluded.
 
+One guarded local jump table may coexist, under schema
+`elf-symbol-thumb-divsi3-positive-constant-switch-v1` (on the default path) or
+`elf-symbol-thumb-divsi3-positive-constant-frame-switch-v1` (with the framed
+selector below). The table is the default switch path's guarded dispatch, derived
+from the bytes by `switch_layout` with forward cases only. Its case edges are part
+of the closed CFG on which the positive-constant divisor pass runs, so a divisor
+that joins different constants across cases still refuses. The quotient manifest
+gains a `switch` descriptor. Every replay rechecks it against the bytes, source
+replay also requires the fresh ELF's switch relocations to equal it, and the
+report carries no separate switch evidence. Data, function literals, thunks and
+other runtimes still refuse beside a switch, and a frame still needs the framed
+selector. `division_switch_profile.POLICY.enabled = False` restores the old
+refusals.
+
 The explicit companion `--signed-quotient-profile positive-constant-frame-v1`
 uses schema `elf-symbol-thumb-divsi3-positive-constant-frame-v1`. It requires
 an allocated caller SP frame and reuses the complete native CFG, balanced
