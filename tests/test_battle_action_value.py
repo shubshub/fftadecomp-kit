@@ -42,6 +42,65 @@ def lz77(memory, source):
     return bytes(output)
 
 
+def battle_environment(test):
+    from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_INTR, UC_PROT_READ, UC_PROT_EXEC
+    from unicorn import arm_const as reg
+    from test_bg_affine_rows import NativeAffineRows
+
+    cpu = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
+    for address, size in ((equip.BASE, len(test.rom)), (0x02000000, 0x40000),
+                          (0x03000000, 0x8000), (0x04000000, 0x1000)):
+        cpu.mem_map(address, size)
+    cpu.mem_write(equip.BASE, test.rom)
+    cpu.mem_protect(equip.BASE, len(test.rom), UC_PROT_READ | UC_PROT_EXEC)
+
+    def bios(machine, _, context):
+        pc = machine.reg_read(reg.UC_ARM_REG_PC)
+        service, opcode = machine.mem_read(pc-2, 2)
+        test.assertEqual(opcode, 0xdf)
+        source, dest, control = (machine.reg_read(reg.UC_ARM_REG_R0+i) for i in range(3))
+        if service == 0x11:
+            data = lz77(machine, source)
+        else:
+            test.assertIn(service, (11, 12))
+            count = control & 0x1fffff
+            width = 4 if service == 12 or control & (1 << 26) else 2
+            fill = bool(control & (1 << 24))
+            data = bytes(machine.mem_read(source, width if fill else count*width))
+            if fill:
+                data *= count
+        machine.mem_write(dest, data)
+
+    def call(address, *args):
+        saved = {r: 0x63120000+r for r in range(reg.UC_ARM_REG_R4, reg.UC_ARM_REG_R11+1)}
+        for r, value in saved.items():
+            cpu.reg_write(r, value)
+        result = NativeAffineRows.call(test, cpu, address, *args)
+        test.assertEqual({r: cpu.reg_read(r) for r in saved}, saved)
+        return result
+
+    def write(ptr, fmt, *args):
+        cpu.mem_write(ptr, struct.pack('<'+fmt, *args))
+
+    def allocate(count):
+        ptr = call(0x08022840, count)
+        test.assertTrue(0x02000000 <= ptr and ptr+count <= 0x02040000)
+        cpu.mem_write(ptr, bytes(count))
+        return ptr
+
+    cpu.hook_add(UC_HOOK_INTR, bios)
+    call(0x08002768)
+    test.assertEqual(bytes(cpu.mem_read(0x03005E78, 176)), test.rom[0xA38A2C:0xA38ADC])
+    call(0x080227E8)
+    # Map 0. Original 0801A980 passes these three resource offsets to the loader.
+    table = 0x08569104
+    resources = [table + equip.word(test.rom, table+field) for field in (16, 4, 8)]
+    call(0x08019D18, *resources, 32, 32)
+    test.assertEqual(struct.unpack('<IBB', cpu.mem_read(0x02007F14, 6)), (0x02007CB0, 16, 16))
+
+    return cpu, call, write, allocate
+
+
 @unittest.skipUnless(os.getenv('FFTA_BATTLE_ACTION_ROOT'), 'requires USA ROM and recovered battle evaluator')
 class BattleActionTests(unittest.TestCase):
     @classmethod
@@ -89,61 +148,9 @@ class BattleActionTests(unittest.TestCase):
             self.assertEqual(row['fallback'], count == 0)
 
     def test_native_scene_units_and_both_callers(self):
-        from unicorn import Uc, UC_ARCH_ARM, UC_MODE_THUMB, UC_HOOK_CODE, UC_HOOK_INTR, UC_PROT_READ, UC_PROT_EXEC
+        from unicorn import UC_HOOK_CODE
         from unicorn import arm_const as reg
-        from test_bg_affine_rows import NativeAffineRows
-
-        cpu = Uc(UC_ARCH_ARM, UC_MODE_THUMB)
-        for address, size in ((equip.BASE, len(self.rom)), (0x02000000, 0x40000),
-                              (0x03000000, 0x8000), (0x04000000, 0x1000)):
-            cpu.mem_map(address, size)
-        cpu.mem_write(equip.BASE, self.rom)
-        cpu.mem_protect(equip.BASE, len(self.rom), UC_PROT_READ | UC_PROT_EXEC)
-
-        def bios(machine, _, context):
-            pc = machine.reg_read(reg.UC_ARM_REG_PC)
-            service, opcode = machine.mem_read(pc-2, 2)
-            self.assertEqual(opcode, 0xdf)
-            source, dest, control = (machine.reg_read(reg.UC_ARM_REG_R0+i) for i in range(3))
-            if service == 0x11:
-                data = lz77(machine, source)
-            else:
-                self.assertIn(service, (11, 12))
-                count = control & 0x1fffff
-                width = 4 if service == 12 or control & (1 << 26) else 2
-                fill = bool(control & (1 << 24))
-                data = bytes(machine.mem_read(source, width if fill else count*width))
-                if fill:
-                    data *= count
-            machine.mem_write(dest, data)
-
-        def call(address, *args):
-            saved = {r: 0x63120000+r for r in range(reg.UC_ARM_REG_R4, reg.UC_ARM_REG_R11+1)}
-            for r, value in saved.items():
-                cpu.reg_write(r, value)
-            result = NativeAffineRows.call(self, cpu, address, *args)
-            self.assertEqual({r: cpu.reg_read(r) for r in saved}, saved)
-            return result
-
-        def write(ptr, fmt, *args):
-            cpu.mem_write(ptr, struct.pack('<'+fmt, *args))
-
-        def allocate(count):
-            ptr = call(0x08022840, count)
-            self.assertTrue(0x02000000 <= ptr and ptr+count <= 0x02040000)
-            cpu.mem_write(ptr, bytes(count))
-            return ptr
-
-        cpu.hook_add(UC_HOOK_INTR, bios)
-        call(0x08002768)
-        self.assertEqual(bytes(cpu.mem_read(0x03005E78, 176)), self.rom[0xA38A2C:0xA38ADC])
-        call(0x080227E8)
-        # Map 0. Original 0801A980 passes these three resource offsets to the loader.
-        table = 0x08569104
-        resources = [table + equip.word(self.rom, table+field) for field in (16, 4, 8)]
-        call(0x08019D18, *resources, 32, 32)
-        self.assertEqual(struct.unpack('<IBB', cpu.mem_read(0x02007F14, 6)), (0x02007CB0, 16, 16))
-
+        cpu, call, write, allocate = battle_environment(self)
         source, target = 0x02002FC4, 0x020030CC
         left, right = allocate(0x24), allocate(0x24)
         context, group, other = allocate(0x21C), allocate(0x290C), allocate(0x290C)

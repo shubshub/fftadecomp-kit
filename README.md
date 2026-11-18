@@ -1640,6 +1640,20 @@ report to run `tests/test_battle_action_value.py`. Both original AI callers
 execute on map 0, loaded from its three original ROM resources. They observe
 the actor initialization, range output, item arguments and returned score.
 
+The equipment profile also covers the 192-byte eligibility predicate at
+`080C48A4`. Its signed halfword temporary receives the collector count
+before the action paths assign the Boolean result. Returning that value as
+an unsigned byte reproduces both shifts in the original common return.
+The verifier checks all ten calls, the action-state pointer, the frame's two
+equipment halfwords and the loop over three action variants. It retains the
+same five-slot equipment precondition for all three direct callers.
+
+The ROM test runs original actions which succeed on the first, second and
+third variant, and others that exhaust all three. It observes the selected
+index, target, output halfwords and byte result on initialized scene actors.
+Set `FFTA_BATTLE_ELIGIBILITY_ROOT` to the indexed checkout with its saved
+report to run `tests/test_battle_eligibility.py`.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 

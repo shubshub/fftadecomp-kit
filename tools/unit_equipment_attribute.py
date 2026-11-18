@@ -49,9 +49,15 @@ def bindings(calls=CALLS):
 def check_original(image, address, original, targets):
     from active_entry_shuffle_profile import compiler_symbol_roles
     import battle_action_value as battle
-    calls = {OWNER: CALLS, battle.OWNER: battle.CALLS}.get(address)
-    require(calls is not None and original == bindings(calls) and
-            targets == {f'func_{target:08X}': (target, False) for target in calls.values()},
+    import battle_eligibility as guard
+    calls = {OWNER: CALLS, battle.OWNER: battle.CALLS, guard.OWNER: guard.CALLS}.get(address)
+    require(calls is not None, 'unexpected equipment owner')
+    expected = bindings(calls)
+    expected_targets = {f'func_{target:08X}': (target, False) for target in calls.values()}
+    if address == guard.OWNER:
+        expected['data'] = guard.DATA
+        expected_targets[guard.STATE_NAME] = (guard.STATE, True)
+    require(original == expected and targets == expected_targets,
             'equipment owner original call roles differ')
     compiler_symbol_roles(image, targets)
     require(all(not s['size'] for s in image['symbols'] if s['name'] in targets),
@@ -62,18 +68,19 @@ def check_source(root, address):
     import plausible
     root = Path(root)
     import battle_action_value as battle
+    import battle_eligibility as guard
     name = f'func_{address:08X}'
     source_name = f'src/{address:08X}.c'
     source = root / source_name
     text = source.read_text()
-    require(address in (OWNER, battle.OWNER) and plausible.include_closure(root, source) ==
+    require(address in (OWNER, battle.OWNER, guard.OWNER) and plausible.include_closure(root, source) ==
             ({source_name, 'include/ffta.h'}, []) and
             base_header((root/'include/ffta.h').read_bytes(), (name,)) and
             not any(s in text for s in (chr(92), '??', '%:', chr(0))),
             'equipment owner requires its reviewed C types and local array')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
-    expected = (battle.SOURCE_HASH if address == battle.OWNER else
-                'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c')
+    expected = {OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
+                battle.OWNER: battle.SOURCE_HASH, guard.OWNER: guard.SOURCE_HASH}[address]
     require(sha256(tokens.encode()).hexdigest() == expected,
             'equipment declarations, local array, or reviewed arithmetic differ')
 
@@ -234,6 +241,9 @@ def scene_rows(rom):
 def prove(data, address, rom, mapping, index, objects, original, ins, calls, refinement, words):
     from software_float_profile import ROM_SHA256
     import battle_action_value as battle
+    import battle_eligibility as guard
+    if address == guard.OWNER:
+        return guard.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == battle.OWNER:
         return battle.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     require(address == OWNER and sha256(rom).hexdigest() == ROM_SHA256 and
