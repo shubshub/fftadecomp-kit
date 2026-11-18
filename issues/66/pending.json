@@ -1822,7 +1822,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "064a944eb18b1c22dbe0dd4f4fbbb8c01a50164d4221ed6c2583f80be32abc29",
+        "acknowledged_cursor": 6992165023,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "064a944eb18b1c22dbe0dd4f4fbbb8c01a50164d4221ed6c2583f80be32abc29",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800CAF0\",\"who\":\"rainbow-state\",\"claim_id\":6992119887,\"reason\":\"Parked natural 258-byte affine ellipse source against 268-byte original. Eight valid full-payload CPU comparisons pass. Game callers do not establish render-domain bounds.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T21:28:46Z",
+          "id": 6992165023,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:28:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b4169df6c05d7a7757d6fc70151d28ab6afbbd9da21c73e9a271cffda0171dee",
+        "result": {
+          "address": "0x0800CAF0",
+          "claim_id": 6992119887,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6992165023,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
