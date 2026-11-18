@@ -669,6 +669,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
+        if selector == named_buffer.SCRATCH_SELECTOR and address == 0x08132208:
+            buffers.action_coordinate_root = address
         if type(buffers) is scaled_polygon.PolygonProof:
             buffers.bind_polygon(data, address, ins, edges, calls)
         if selector == runtime_summary.PARTICLE_SELECTOR:
@@ -938,6 +940,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
+    if selector == named_buffer.SCRATCH_SELECTOR and address == 0x08132208:
+        import action_coordinate_query
+        if bindings != action_coordinate_query.BINDINGS or not hasattr(buffers, 'action_coordinates'):
+            raise ValueError('action coordinates require the original four calls and the two-output query')
+        proof['buffers']['action_coordinates'] = buffers.action_coordinates
     if selector == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR and address == 0x0809A48C:
         import scene_sprite_visitor
         proof['buffers']['scene_sprite_visitor'] = scene_sprite_visitor.manifest(buffers, data, bindings)

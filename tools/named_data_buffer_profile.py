@@ -570,6 +570,13 @@ class DiscardedReturnScratchProof(NamedDataBufferProof):
         self._consumers = []
         self._scratch_returns = {}
 
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
+        if (type(self) is DiscardedReturnScratchProof and getattr(self, 'action_coordinate_root', None) == 0x08132208
+                and site == 0x0813223E and address == 0x08098E7C):
+            import action_coordinate_query
+            return action_coordinate_query.verify_call(self, aliases, stack, slots, words)
+        return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
+
     def check_arguments(self, address, arguments, stack, incoming, protected,
                         *, constants=None, site=None, **context):
         self._consumers.append((address, site))

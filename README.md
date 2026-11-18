@@ -5909,3 +5909,15 @@ live sprites and frame indices zero through three. The copied code must remain
 installed, and external objects must remain separate from the private frames.
 Set `FFTA_SCENE_SPRITE_ROOT` to the game tree for the original-code regressions
 in `tests/test_scene_sprite_visitor.py`.
+
+The USA combat action dispatcher selects `08132208` from row 26 of its
+12-byte records. Under `bounded-buffer-discarded-return-scratch-v1`, the
+coordinate query at `08098E7C` initializes two caller bytes on success.
+Its actor-flag failure can leave the address of a released local in R2.
+The native proof follows R2 and R3 through the action and original dispatcher
+until both are overwritten. It verifies the collector's 13-pointer local
+array under the scene contract of at most 13 live list nodes. Actor, scene
+and tile data must be initialized, valid for the original accesses, and
+separate from active frames. Set `FFTA_ACTION_COORDINATE_ROOT` to the game
+tree to run `tests/test_action_coordinate_query.py` against the original ROM
+and both coordinate-query callers' match reports.
