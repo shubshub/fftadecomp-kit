@@ -37,8 +37,6 @@ def original_bindings(image):
 
 def native_proof(data, rom, mapping, index, objects):
     import match
-    import owner_admission_profile as owner
-    import owner_graph_profile as graph
     from software_double_profile import indices, span_record
     if units.sha(rom) != runtime.ROM_SHA256 or match.parse_data_symbols(objects).get(OBJECT) != TARGETS[OBJECT]:
         raise ValueError("fp-bit multiply requires the approved ROM and named NaN record")
@@ -57,26 +55,8 @@ def native_proof(data, rom, mapping, index, objects):
             bounds = next((bounds for _, identity, bounds in parts.HELPERS if identity[0] == start), parts.policy())
             dependencies[start] = runtime.prove_runtime(rom, entries, start, end, count, {}, call_edges=(),
                 scalar_entries=(), argument_effect_policy=bounds)
-    count = identities[ADDRESS][2]
-    refinement = owner.refine(data, ADDRESS, mapping)
-    ins, edges, branches, calls, words = graph.graph(data, ADDRESS, refinement)
-    if calls != CALLS or branches or words or len(ins) != count:
-        raise ValueError("fp-bit multiply has a different CFG or helper bindings")
-    partition = graph.partition(data, ADDRESS, refinement, ins, words)
-    if not any(word['address'] == ADDRESS + 0x80 and word['value'] == TARGETS[OBJECT] and
-               word['load_sites'] and not word['switch_word'] for word in partition['words']):
-        raise ValueError("fp-bit multiply requires its reached named data literal")
-    caller = runtime.prove_runtime(rom, entries, ADDRESS, END, count, dependencies,
-        call_edges=tuple(sorted(calls.items())), scalar_entries=(ADDRESS,), argument_effect_policy=parts.policy(),
-        compose_pointer_returns=True, absolute_read_policy=parts.ABSOLUTE_POLICY)
-    if caller['native_edges'] != [[site, list(succ)] for site, succ in sorted(edges.items())] or \
-            caller['absolute_reads']['reads'] != parts.ABSOLUTE_POLICY['reads'] or \
-            caller['argument_effects']['reads'] or caller['writes'] or caller['stack_reads']:
-        raise ValueError("fp-bit multiply has unaccounted reachable effects")
-    return {"instructions": count, "partition": partition, "returns": caller["returns"],
-            "helper_calls": sorted(calls.items()), "conditional_reads": caller["absolute_reads"]["reads"],
-            "caller_cfg_and_effects_sha256": units.sha(units.canonical(caller).encode()),
-            "helper_proofs_sha256": units.sha(units.canonical(dependencies).encode())}
+    return source.multiply_effects(data, rom, mapping, entries, dependencies, ADDRESS, END, COUNT, CALLS,
+                                   ADDRESS+0x80, TARGETS[OBJECT], parts.ABSOLUTE_POLICY)
 
 
 def link_object(runner, workspace, args, original, capture, relative, rom, mapping, index):

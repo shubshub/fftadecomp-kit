@@ -293,6 +293,9 @@ def schemas(unit=None, address=None, orphan=None):
         admitted.add(lshrdi3_profile.UNIT_SCHEMA)
     if music.unit_owner(unit, address, orphan):
         admitted.add(music.SCHEMA)
+    import unit_double_multiply as double_mul
+    if double_mul.unit_owner(unit, address, orphan):
+        admitted.add(double_mul.SCHEMA)
     import unit_double_add_parts as add_parts
     if add_parts.unit_owner(unit, address, orphan):
         admitted.add(add_parts.SCHEMA)

@@ -21,14 +21,17 @@ def dp_unit(unit):
             unit.row['identity'] == [dict(address='0x08142BE8', size=3552, sha256=DP_DIGEST)])
 
 
-def reviewed_source(capture, relative, address, names, digest):
+def reviewed_source(capture, relative, address, names, digest, *, headers=()):
     import plausible
     from sdk_cpuset_halfword import TOKEN, base_header
     path = capture / relative
     text = path.read_text()
     wanted = f'src/{address:08X}.c'
+    includes = {wanted, 'include/ffta.h', *(name for name, _ in headers)}
+    if any(units.sha((capture/name).read_bytes()) != checksum for name, checksum in headers):
+        raise ValueError('dp-bit private type header differs from its reviewed definition')
     if relative.as_posix() != wanted or plausible.include_closure(capture, path) != (
-            {wanted, 'include/ffta.h'}, []) or not base_header((capture/'include/ffta.h').read_bytes(), names):
+            includes, []) or not base_header((capture/'include/ffta.h').read_bytes(), names):
         raise ValueError('dp-bit source requires the original public types and one addressed source')
     tokens = TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text))
     if any(marker in text for marker in ('\\', '??', '%:', '\0')) or units.sha(' '.join(tokens).encode()) != digest:
@@ -64,6 +67,32 @@ def fixed_bindings(image, address, end, targets, sites, data_name):
             seen.add(offset)
     if seen != set(sites):
         raise ValueError("fp-bit member lacks required original relocations")
+
+
+def multiply_effects(data, rom, mapping, entries, dependencies, address, end, count, bindings,
+                     literal, record, absolute_policy):
+    import owner_admission_profile as owner
+    import owner_graph_profile as graph
+    import private_float_argument_effects_inventory as parts
+    refinement = owner.refine(data, address, mapping)
+    ins, edges, branches, calls, words = graph.graph(data, address, refinement)
+    if calls != bindings or branches or words or len(ins) != count:
+        raise ValueError("fp-bit multiply has a different CFG or helper bindings")
+    partition = graph.partition(data, address, refinement, ins, words)
+    if not any(word['address'] == literal and word['value'] == record and
+               word['load_sites'] and not word['switch_word'] for word in partition['words']):
+        raise ValueError("fp-bit multiply requires its reached named data literal")
+    caller = runtime.prove_runtime(rom, entries, address, end, count, dependencies,
+        call_edges=tuple(sorted(calls.items())), scalar_entries=(address,), argument_effect_policy=parts.policy(),
+        compose_pointer_returns=True, absolute_read_policy=absolute_policy)
+    if caller['native_edges'] != [[site, list(succ)] for site, succ in sorted(edges.items())] or \
+            caller['absolute_reads']['reads'] != absolute_policy['reads'] or \
+            caller['argument_effects']['reads'] or caller['writes'] or caller['stack_reads']:
+        raise ValueError("fp-bit multiply has unaccounted reachable effects")
+    return {"instructions": count, "partition": partition, "returns": caller["returns"],
+            "helper_calls": sorted(calls.items()), "conditional_reads": caller["absolute_reads"]["reads"],
+            "caller_cfg_and_effects_sha256": units.sha(units.canonical(caller).encode()),
+            "helper_proofs_sha256": units.sha(units.canonical(dependencies).encode())}
 
 
 def build(member, root, address, args=None):
