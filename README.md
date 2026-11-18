@@ -5537,3 +5537,22 @@ Set `FFTA_STAT_DRAIN_ROOT` to a recovered USA game tree to run
 `tests/test_stat_drain_profile.py`. The CPU test executes the original getter
 and both division helpers for all 256 key bytes across seven cases and the
 default path. It checks the return value, unit writes and preserved registers.
+
+### Active-entry removal shuffle
+
+`--signed-runtime-profile active-entry-shuffle-v1` verifies the 160-byte routine
+at `08128E40`. It scans the 20 halfwords at `02001F3C` and appends the indices
+of nonzero entries to a 20-byte local. An empty table returns immediately.
+For every nonempty prefix, four shuffle passes use the original 15-bit RNG
+and signed remainder with the initialized length as divisor. Each exchange
+reads and writes two bytes within that prefix. The routine clears the first
+`min(requested, length)` selected table entries, then compacts the table.
+A zero removal request still shuffles and compacts a nonempty table.
+
+The proof binds all four compiler call relocations, the state-base relocation,
+both table helpers and the complete signed remainder implementation. Its private
+stack premise keeps the live prefix separate from the table and RNG seed.
+Set `FFTA_ACTIVE_SHUFFLE_ROOT` to a recovered USA game tree to run
+`tests/test_active_entry_shuffle.py`. Its CPU test compares the original local
+accesses, table contents, RNG state and register restoration for every active
+length from zero to twenty.
