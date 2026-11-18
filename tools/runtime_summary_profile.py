@@ -306,7 +306,17 @@ class RuntimeSummaryFastFillProof(fast_fill.MixedFastFillSourceProof):
         return self.runtime_summaries.manifest()
 
 
-SELECTORS = (SELECTOR, FAST_FILL_SELECTOR)
-SCHEMAS = {SELECTOR: SCHEMA, FAST_FILL_SELECTOR: FAST_FILL_SCHEMA}
-CONTROL_FLOWS = {SELECTOR: CONTROL_FLOW, FAST_FILL_SELECTOR: FAST_FILL_CONTROL_FLOW}
-PROOFS = {SELECTOR: RuntimeSummaryBufferProof, FAST_FILL_SELECTOR: RuntimeSummaryFastFillProof}
+from particle_return_scratch_profile import ParticleReturnMixin
+
+
+class ParticleReturnScratchProof(ParticleReturnMixin, RuntimeSummaryBufferProof):
+    """Project the exact expired halfword only with its verified caller continuations."""
+
+
+PARTICLE_SELECTOR = named.PARTICLE_SELECTOR
+SELECTORS = (SELECTOR, FAST_FILL_SELECTOR, PARTICLE_SELECTOR)
+SCHEMAS = {SELECTOR: SCHEMA, FAST_FILL_SELECTOR: FAST_FILL_SCHEMA, PARTICLE_SELECTOR: named.PARTICLE_SCHEMA}
+CONTROL_FLOWS = {SELECTOR: CONTROL_FLOW, FAST_FILL_SELECTOR: FAST_FILL_CONTROL_FLOW,
+                 PARTICLE_SELECTOR: 'complete projected particle initializer with canonical signed remainder and caller-proved R3 overwrites'}
+PROOFS = {SELECTOR: RuntimeSummaryBufferProof, FAST_FILL_SELECTOR: RuntimeSummaryFastFillProof,
+          PARTICLE_SELECTOR: ParticleReturnScratchProof}

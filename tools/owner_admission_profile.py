@@ -18,6 +18,7 @@ import tempfile
 
 import analyze
 import installed_shuffle_profile as installed_shuffle
+import particle_return_scratch_profile as particle
 import entry_recursive_ordinary_call_profile as entry
 import mutable_three_call_native_profile as mutable_native
 import multiple_switch_native_profile as multiple_native
@@ -149,8 +150,7 @@ def selected(report):
                       [f'* verification: `{small_copy_binding.SCHEMA}`'],
                       [f'* verification: `{copy_binding.SCHEMA}`'],
                       [f'* verification: `{named_buffer.SCHEMA}`'],
-                      [f'* verification: `{runtime_summary.SCHEMA}`'],
-                      [f'* verification: `{runtime_summary.FAST_FILL_SCHEMA}`'],
+                      *([f'* verification: `{schema}`'] for schema in runtime_summary.SCHEMAS.values()),
                       [f'* verification: `{named_buffer.UNIT_OUTPUT_SCHEMA}`'],
                       [f'* verification: `{named_buffer.DATAFREE_SCHEMA}`'],
                       [f'* verification: `{named_buffer.ROOT_SCRATCH_SCHEMA}`'],
@@ -614,6 +614,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
+        if selector == runtime_summary.PARTICLE_SELECTOR:
+            buffers.bind_particle(address, data, calls)
         if selector == disjunctive.BOUNDED_SELECTOR:
             buffers.bind_root(address,data)
         if selector == direct_output.SELECTOR:
@@ -678,6 +680,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                 if runtime_summary.NAMES.get(name) != calls[address+offset]:
                     raise ValueError('runtime summary call name does not bind its exact entry')
             proof['buffers']['runtime_summaries'] = buffers.manifest()
+        if selector == runtime_summary.PARTICLE_SELECTOR:
+            particle.check_bindings(address, bindings if bindings is not None else (manifest or {}).get('bindings'))
+            proof['buffers']['particle_return'] = buffers.particle_manifest()
         if selector in (named_three.SELECTOR, three_output.SELECTOR, dynamic_div.SELECTOR):
             proof['buffers']['three_halfword_outputs'] = buffers.nested_manifest()
             proof['buffers']['normal_return_scratch'] = buffers.scratch_manifest()
@@ -1017,7 +1022,7 @@ def preflight(data,address,rom,mapping,index,objects, *, selector=SELECTOR):
         raise ValueError('native admission requires original resident-owner ELF bindings')
     if selector == entry.SELECTOR:
         raise ValueError('entry native admission requires original resident-owner ELF bindings')
-    if selector in (named_buffer.UNIT_OUTPUT_SELECTOR, shadow_matrix.SELECTOR, transfer_mask.SELECTOR, rom_table.SELECTOR, resident_word.SELECTOR):
+    if selector in (runtime_summary.PARTICLE_SELECTOR, named_buffer.UNIT_OUTPUT_SELECTOR, shadow_matrix.SELECTOR, transfer_mask.SELECTOR, rom_table.SELECTOR, resident_word.SELECTOR):
         raise ValueError('resident native admission requires original ELF and source bindings')
     refinement=(bios_switch.refine if selector == bios_switch.SELECTOR else refine)(data,address,mapping)
     instructions,edges,branches,calls,words=graph.graph(data,address,refinement,
@@ -1153,6 +1158,8 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
         small_copy_binding.check_original(result,targets,image,address,rom,mapping,index,objects)
     if selector == copy_binding.SELECTOR:
         copy_binding.check_original(result,targets,image,address,rom,mapping,index,objects)
+    if selector == runtime_summary.PARTICLE_SELECTOR:
+        particle.check_bindings(address, result)
     if selector == installed_shuffle.SELECTOR:
         installed_shuffle.check_bindings(address, result, targets)
     elif selector == numeric_switch.SELECTOR:
@@ -1303,7 +1310,7 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     args=args or argparse.Namespace(cc=match.DEFAULT_CC,cpp=match.DEFAULT_CPP,assembler=match.DEFAULT_AS,
         objcopy=match.DEFAULT_OBJCOPY,linker=match.DEFAULT_LD,flags=match.DEFAULT_FLAGS)
     fixed_configuration(args)
-    environment_reader = (known_query.environment_fingerprint if selector in (bios_switch.SELECTOR, small_copy_binding.SELECTOR, *local_calls.SELECTORS, named_buffer.BIOS_OVERWRITE_SELECTOR)
+    environment_reader = (known_query.environment_fingerprint if selector in (runtime_summary.PARTICLE_SELECTOR, bios_switch.SELECTOR, small_copy_binding.SELECTOR, *local_calls.SELECTORS, named_buffer.BIOS_OVERWRITE_SELECTOR)
         else integer_pair.environment_fingerprint if selector == integer_pair.SELECTOR
         else integer_three.environment_fingerprint if selector == integer_three.SELECTOR
         else numeric_switch.environment_fingerprint if selector == numeric_switch.SELECTOR

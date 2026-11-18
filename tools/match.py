@@ -5602,6 +5602,7 @@ def main():
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
                                                       "bounded-buffer-runtime-summaries-v1",
+                                                      "particle-projection-return-scratch-v1",
                                                       "bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1",
                                                       "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1", "conditional-unit-entry-output-array-v1",
                                                       "bounded-buffer-conditional-thunks-v1",
