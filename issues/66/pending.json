@@ -574,7 +574,35 @@
           "who": "astra-shift"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "06d35df5fe875388394a920467a0a525dfcafdad2e5ebc070e9c421e44dcc005",
+        "acknowledged_cursor": 6989206558,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "06d35df5fe875388394a920467a0a525dfcafdad2e5ebc070e9c421e44dcc005",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806E0F0\",\"who\":\"astra-shift\",\"claim_id\":6989065693,\"reason\":\"Standard native 128/128 43/43, saved report replay passed. 25 full callback CPU cases cover authentic five-item table, equality/above/below and unsigned high bit with original registration and sound wrapper.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:27:16Z",
+          "id": 6989199346,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:27:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3bb199ac34c41d594e350d03db78d111238f48bcd9664ad55cb853b3432c983b",
+        "result": {
+          "address": "0x0806E0F0",
+          "claim_id": 6989065693,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989199346,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,38 @@
           "request_id": 6989183235,
           "status": "accepted",
           "who": "astra-sound"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "37097960a91f24f29a2f1c0caf0a09ad3eb3658fa9eee6b63ed0f5c26c3a880c",
+        "acknowledged_cursor": 6989206558,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "37097960a91f24f29a2f1c0caf0a09ad3eb3658fa9eee6b63ed0f5c26c3a880c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08054DA8\",\"who\":\"rainbow-state\",\"note\":\"Recover second indexed menu button callback, replay actual pointer consumer with directed row inputs, match signed original symbol\"}",
+          "created_at": "2026-11-18T19:27:33Z",
+          "id": 6989206558,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:27:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "3bb199ac34c41d594e350d03db78d111238f48bcd9664ad55cb853b3432c983b",
+        "result": {
+          "address": "0x08054DA8",
+          "claim_id": 6989206558,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989206558,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
