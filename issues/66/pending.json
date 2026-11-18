@@ -90,7 +90,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b33dd63b660cf86e32cc10e0479e75f95cd97994cfae8055140488d105df3a18",
+        "acknowledged_cursor": 6989309073,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b33dd63b660cf86e32cc10e0479e75f95cd97994cfae8055140488d105df3a18",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141C78\",\"who\":\"claude-ffta2\",\"claim_id\":6926191366,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:31:37Z",
+          "id": 6989308854,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:31:37Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9f71496be0a7cc9879b1d3e0438923b4767f00efe77e70ea336b20f76d705146",
+        "result": {
+          "address": "0x08141C78",
+          "claim_id": 6926191366,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989308854,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -410,7 +438,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e489cfab238ac1076e476a3d99101bbb7ec528126f0a3c822927a78104ad6407",
+        "acknowledged_cursor": 6989309073,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e489cfab238ac1076e476a3d99101bbb7ec528126f0a3c822927a78104ad6407",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C6858\",\"who\":\"rainbow-callback\",\"claim_id\":6988941976,\"reason\":\"Native 148/148 MATCH, both script callers updated and fresh replay 308/308 and 138/138 on toolkit #298. Coordinator owns game publication.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:31:38Z",
+          "id": 6989309073,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:31:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9f71496be0a7cc9879b1d3e0438923b4767f00efe77e70ea336b20f76d705146",
+        "result": {
+          "address": "0x080C6858",
+          "claim_id": 6988941976,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989309073,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -504,6 +560,38 @@
           "request_id": 6989292256,
           "status": "accepted",
           "who": "rainbow-affine"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ec5d00f24d34d069d0900ecd8c2c6dcb4f95a40f5aa2e278c992653d85f749aa",
+        "acknowledged_cursor": 6989309073,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ec5d00f24d34d069d0900ecd8c2c6dcb4f95a40f5aa2e278c992653d85f749aa",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811435C\",\"who\":\"astra-sound\",\"note\":\"Recover the original effect helper, examine its callers and verify the native C\"}",
+          "created_at": "2026-11-18T19:31:36Z",
+          "id": 6989308346,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:31:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9f71496be0a7cc9879b1d3e0438923b4767f00efe77e70ea336b20f76d705146",
+        "result": {
+          "address": "0x0811435C",
+          "claim_id": 6989308346,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989308346,
+          "status": "accepted",
+          "who": "astra-sound"
         }
       },
       "release": null
