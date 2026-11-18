@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "57d1da389ec3e6835f15431da4a3c5a6723144e484a66ab4964dcf9e9ac33e73",
+    "acknowledged_cursor": 6990226923,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "57d1da389ec3e6835f15431da4a3c5a6723144e484a66ab4964dcf9e9ac33e73",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BE0C\",\"who\":\"rainbow-state\",\"note\":\"Recover independent original tile-animation accessor and check it against the same game-created node\"}",
+      "created_at": "2026-11-18T20:09:55Z",
+      "id": 6990226923,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:09:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a86618b4b10533df18de18c0cfdf2bac4a7418f49350becc01d13ee8bf986a4b",
+    "result": {
+      "address": "0x0800BE0C",
+      "claim_id": 6990226923,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6990226923,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "29c85ea9f8649006d31908489feb42ae2a085fa4aeb3bc404b1b4ddca80708d8",
+    "acknowledged_cursor": 6990249450,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "29c85ea9f8649006d31908489feb42ae2a085fa4aeb3bc404b1b4ddca80708d8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800BE0C\",\"who\":\"rainbow-state\",\"claim_id\":6990226923,\"reason\":\"Original tile animation accessor matched all 4 bytes; live canonical saved report and original game-created-node behavior replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T20:10:42Z",
+      "id": 6990248081,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:10:42Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9d3b9bd4c57699578d4c6c1369ad87b0d74c1aabd15857caa63832062de095e6",
+    "result": {
+      "address": "0x0800BE0C",
+      "claim_id": 6990226923,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6990248081,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
