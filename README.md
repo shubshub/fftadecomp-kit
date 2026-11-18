@@ -4512,6 +4512,12 @@ where they overwrite the returned channel.
 
 The cone writer advances its output cursor in incoming stack word 3. Its identified caller `080B4A1C` provides this word inside a 32-byte outgoing area, copies the entry output argument through two exact Thumb MOV instructions, and discards the slot without reading it after return. The initialization dominates the call. A scan of the hash-verified 16 MiB USA ROM finds exactly one encoded Thumb BL targeting the writer and zero literal Thumb pointers to it. Computed indirect targets remain outside this inventory. The report assumes sufficient writable output records, writable outgoing arguments, and ordinary separation between external memory and active private frames. The profile covers only this owner and its specified calls.
 
+### Packed scanline wave samples
+
+The ordinary matcher verifies the packed signed halfword written by `0800C720`. The original compiler emits a byte read before each low and high byte store in its three loops. Stripping the single qualifier removes those six reads. The saved report binds both complete objects, the sine-table call, and the original callback and DMA tables.
+
+The original constructor at `0800CC8C` initializes visible rows 0 through 159 and registers one, two, or four interleaved samples. Its caller is unknown. Given a live task, a valid caller-supplied hardware destination and successful DMA submission, the manager duplicates row zero into row 160 and submits the next row for repeated HBlank transfers. Direct use requires a sufficiently large disjoint bank, valid stride and lane offset, and stable row bounds. An inclusive end row of 255 wraps the byte counter.
+
 ### Explicit named-data buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile named-data-buffer-v1 <address>`
