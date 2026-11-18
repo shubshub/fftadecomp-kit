@@ -570,7 +570,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a9d5b6dd7101b23584b9ca1e3d27fbfe2a265c3ad6dabbef723feceb32205a08",
+        "acknowledged_cursor": 6981776156,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a9d5b6dd7101b23584b9ca1e3d27fbfe2a265c3ad6dabbef723feceb32205a08",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08099FB0\",\"who\":\"rainbow-affine\",\"claim_id\":6981554874,\"reason\":\"Parked native-exact 104/104: kit 09 cannot compose compiler-generated unsigned division and the verified indirect list callback.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:39:33Z",
+          "id": 6981767435,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:39:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "489da2b69371f15f7d3d1dd9cf7291cfcd68ebe2a0086431b4b628a9f2b39f8a",
+        "result": {
+          "address": "0x08099FB0",
+          "claim_id": 6981554874,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981767435,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -634,7 +662,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6609894e070140aef15b758689e622e53e9ae011580b5c95a4dd9ea9f46e58fd",
+        "acknowledged_cursor": 6981776156,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6609894e070140aef15b758689e622e53e9ae011580b5c95a4dd9ea9f46e58fd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D324\",\"who\":\"rainbow-state\",\"claim_id\":6981707856,\"reason\":\"Parked 150/150, 75/75: volatile packed dynamic scanline output rejected by source gate\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:39:54Z",
+          "id": 6981776156,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:39:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "489da2b69371f15f7d3d1dd9cf7291cfcd68ebe2a0086431b4b628a9f2b39f8a",
+        "result": {
+          "address": "0x0800D324",
+          "claim_id": 6981707856,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981776156,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -664,6 +720,38 @@
           "request_id": 6981724419,
           "status": "accepted",
           "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a40bdac804f79871e17680975684d05bebb39f4c929e2f32065c842804bb9df1",
+        "acknowledged_cursor": 6981776156,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a40bdac804f79871e17680975684d05bebb39f4c929e2f32065c842804bb9df1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804BBC0\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T14:39:33Z",
+          "id": 6981767127,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:39:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "489da2b69371f15f7d3d1dd9cf7291cfcd68ebe2a0086431b4b628a9f2b39f8a",
+        "result": {
+          "address": "0x0804BBC0",
+          "claim_id": 6981767127,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981767127,
+          "status": "accepted",
+          "who": "rainbow-menu"
         }
       },
       "release": null
