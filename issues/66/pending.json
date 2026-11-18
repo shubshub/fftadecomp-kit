@@ -1823,6 +1823,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "34dd9f1087012bb4150c182fe702c3b4b2931bb782aa04a54dfad2c62aee2085",
+        "acknowledged_cursor": 6992394792,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "34dd9f1087012bb4150c182fe702c3b4b2931bb782aa04a54dfad2c62aee2085",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141BE0\",\"who\":\"astra-combat\",\"note\":\"Recover FLASH512 sector verification in initialized save configurations and replay original local compare routine.\"}",
+          "created_at": "2026-11-18T21:39:05Z",
+          "id": 6992394792,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:39:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "19063c26056cf41aef2965e75665277db25f62d8f9d8f583bd0f93c4ff564076",
+        "result": {
+          "address": "0x08141BE0",
+          "claim_id": 6992394792,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992394792,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
