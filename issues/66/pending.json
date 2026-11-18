@@ -1374,7 +1374,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c7dde2e4dddecd94d9f686e6a6764e311f12c16ee993ce3794d04d2d5f40c310",
+        "acknowledged_cursor": 6990290202,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c7dde2e4dddecd94d9f686e6a6764e311f12c16ee993ce3794d04d2d5f40c310",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C080\",\"who\":\"rainbow-state\",\"claim_id\":6990263643,\"reason\":\"Original tile animation accessor matched all 4 bytes; live canonical saved report and original game-created-node behavior replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:12:22Z",
+          "id": 6990290202,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:12:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "27a44d015a28a008a5660b8cb0d40790076df06b3fd7ca3e1bd7e8fc70c19ba2",
+        "result": {
+          "address": "0x0800C080",
+          "claim_id": 6990263643,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990290202,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
