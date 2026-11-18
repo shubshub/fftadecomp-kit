@@ -2313,7 +2313,7 @@ toolchain. It is refused outside a unit, for a different unit's toolchain,
 together with `--cc`/`--flags`, other toolchain options or non-default WSL
 options. Unit toolchains support ordinary Thumb leaf, frame, direct-call, named-data
 and function-address reports. The dp-bit packer supports its unit-bound logical
-right-shift proof. The dp-bit constructor and component adder, fp-bit multiply and m4a memory command have their
+right-shift proof. The dp-bit constructor and component adder, fp-bit and dp-bit multiplies, and m4a memory command have their
 own unit-bound proofs.
 Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
 nothing refers to it. Such a section is first authenticated with the
@@ -2411,6 +2411,15 @@ call the helper and pack the returned record. Subtraction toggles the second
 sign before the call. The helper can return either input, the output, or the
 fixed record for opposing infinities. Only the output receives writes. When
 the packer reads the fixed record, its five words are runtime inputs.
+
+For dp-bit `__muldf3` at `0x081430F0`, the same unit selector checks the
+684-byte function, its two unpack calls, four compiler-generated wide integer
+products, final pack and fixed RAM literal. Two original conversion functions
+contain three calls to the public binary64 entry. Zero times infinity selects
+the RAM record at `0x03005E50`; the packer reads fields according to its
+runtime class. Finite inputs use the original four-limb multiplication and
+guard-bit rounding. The native tests also cover the historical packer's
+truncation when a result falls in the subnormal range.
 
 For fp-bit `__mulsf3` at `0x08143CEC`, `--unit-toolchain old-agbcc-O2-v1`
 checks the original compiler-generated `__muldi3` call, two unpacks, one
