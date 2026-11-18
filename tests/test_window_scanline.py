@@ -33,7 +33,8 @@ class NativeWindowTests(unittest.TestCase):
         from rompath import rom_path
         cls.root = Path(os.environ['FFTA_WINDOW_SCANLINE_ROOT']).resolve()
         cls.rom = Path(rom_path(cls.root)).read_bytes()
-        cls.bodies = {a: window.compile_bodies(cls.root, a, cls.rom) for a in window.OWNER_SHAPES}
+        cls.bodies = {a: window.compile_bodies(cls.root, a, cls.rom) for a in (
+            window.CIRCLE, window.SCALED_ELLIPSE, window.RECT, window.ELLIPSE, *window.EDGES)}
 
     def test_qualified_stripped_and_swapped_compiler_effects(self):
         for address, bodies in self.bodies.items():

@@ -21,6 +21,7 @@ ELLIPSE = 0x080DA1C4
 LEFT_EDGE = 0x080DA3B8
 RIGHT_EDGE = 0x080DA598
 EDGES = (LEFT_EDGE, RIGHT_EDGE)
+SHIFTED_ELLIPSE = 0x0811435C
 HEADER = 'include/ffta.h'
 ELEMENT = re.compile(
     r'\btypedef\s+struct\s+__attribute__\s*\(\s*\(\s*packed\s*\)\s*\)\s*\{'
@@ -30,6 +31,7 @@ ELEMENT = re.compile(
 # prevents extra expression-level reads or an alias that happens to compile
 # identically. Body and transfer evidence below are independently required.
 SOURCE_TOKENS = {
+    SHIFTED_ELLIPSE: 'c20738ab6ecbf4cfdff59bc164e4b310d92cd4521fac47d43f850d9c65e8b837',
     SCALED_ELLIPSE: '9cca4d6cb5797026cc124773aa87450d6cba1a3e4f7d3844feccc260e798af84',
     RIGHT_EDGE: '057a6c5c38064f6e2f3b799cd1fbe9ec47930b93059a2896cb134598c4fa5edb',
     LEFT_EDGE: 'f6c3b249738c7398cfa56d195d6411404a357310da12084bd4eb9628c4012069',
@@ -41,6 +43,8 @@ SOURCE_TOKENS = {
 # Stripping can change the whole frame and register allocation. Both audited
 # controls retain their rectangle bounds or their even-diameter/row conditions.
 OWNER_SHAPES = {
+    SHIFTED_ELLIPSE: ((220, '60543fe9629659ccff3cee199b6e0b220efdb6050e628deb3c8e0580ed27c215'),
+                      (212, '15c0ef25b9072ba3ff58876a5c79d497d69d680746e10a26964f561d1ee40c69')),
     SCALED_ELLIPSE: ((336, '587185662bf2bbd2e60269989268113844ac1d399ce7c9583b2baff340cb9997'),
                      (328, '507c1e6e4457f121b5dbcc4736fd45b67371957fb4e184a0683eb1ec73e8fe7e')),
     RIGHT_EDGE: ((484, '8fb2409fb08f2853626a741237d99e8a6fd6cd3bc12268a5c1cf2323e3a66592'),
@@ -54,7 +58,8 @@ OWNER_SHAPES = {
     ELLIPSE: ((272, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),
               (262, '88843664ee85ce57d3278ca8b1b574436bbca58f189fa68650b1e4bcf151b452')),
 }
-CALLEES = {SCALED_ELLIPSE: (0x08141898, 0x08141870, 0x08141898, 0x08141898),
+CALLEES = {SHIFTED_ELLIPSE: (0x080DAC80, 0x080E0608, 0x080DABB4, 0x080E064C),
+           SCALED_ELLIPSE: (0x08141898, 0x08141870, 0x08141898, 0x08141898),
            CIRCLE: (), LEFT_EDGE: (), RIGHT_EDGE: (), RECT: (0x08005BFC, 0x0800C614),
            ELLIPSE: (0x08141870, 0x08141870, 0x080DA074, 0x080D9F60)}
 
@@ -85,11 +90,7 @@ PROVIDER = (
     (0x0800C614, 0x0800C628, 'be9c09e26151bf59569681249059d598963aaba6fc3520290ee1ffce08e7da0e'),
 )
 
-ELLIPSE_PATH = (
-    # Scene creates WIN0H and passes its return immediately to DAD3C with diameter 32.
-    (0x080EEC50, 0x080EEC6C, '06aa2a9cce13fee13b5ee325b002adf69684c5818b788e16c0ad5d0eeac6dbe5'),
-    # DAD3C forwards the result of the payload accessor unchanged as the fourth argument.
-    (0x080DAD3C, 0x080DAD74, 'bdb05d21087365cce5c36c1649119f95d277704b37eaf3fe82b00d0bcc9f13c2'),
+RASTERIZERS = (
     # The nested geometry writers reject out-of-range rows before each pair of byte stores.
     (0x080D9F60, 0x080DA074, 'ebc7f7c2f9ec6b910932b086e1be2cbffcbea48f47f2cc62e050c3756b539d3c'),
     (0x080DA074, 0x080DA1C4, '587185662bf2bbd2e60269989268113844ac1d399ce7c9583b2baff340cb9997'),
@@ -99,6 +100,16 @@ ELLIPSE_PATH = (
     (0x08141898, 0x0814189C, 'de4a71d0d630472b454682d19fb9bad740be092c8543ac383d1aab54f492cff4'),
 )
 
+ELLIPSE_PATH = (
+    # Scene creates WIN0H and passes its return immediately to DAD3C with diameter 32.
+    (0x080EEC50, 0x080EEC6C, '06aa2a9cce13fee13b5ee325b002adf69684c5818b788e16c0ad5d0eeac6dbe5'),
+    # DAD3C forwards the result of the payload accessor unchanged as the fourth argument.
+    (0x080DAD3C, 0x080DAD74, 'bdb05d21087365cce5c36c1649119f95d277704b37eaf3fe82b00d0bcc9f13c2'),
+) + RASTERIZERS
+
+
+# For nonzero equal axes the general ellipse wrapper forwards the same buffer.
+AXES_WRAPPER = (0x080DAC80, 0x080DAD3A, '4f4d69d9b06146380f60d1b12f68d849c91ef72c3ea50bf0fac9292f27f4d8a9')
 
 CIRCLE_PATH = (
     # 080E0CC4 constructs bank 1 at 080E0DC4, bank 0 at 080E0DD2 and stores
@@ -108,9 +119,16 @@ CIRCLE_PATH = (
     (0x080DAC40, 0x080DAC80, '280660f3ad1f8ebe9885680eb1e5e8e5e9473ddd5a44ea063a01d47ad405f589'),
     # The independent circle-plus-ellipse wrapper forwards mode 1 on the first call.
     (0x080DA8A0, 0x080DA966, 'e88d1a850224f07f5d4c3d0ee51971503e21ec25e812d6c9eed527d249417834'),
-    # For nonzero equal axes the general ellipse wrapper forwards the same buffer.
-    (0x080DAC80, 0x080DAD3A, '4f4d69d9b06146380f60d1b12f68d849c91ef72c3ea50bf0fac9292f27f4d8a9'),
-)
+) + (AXES_WRAPPER,)
+
+# The original scene retains two window tasks. Its later phase advances four
+# halfword interpolators, then passes both task slots with fixed signed centers.
+SHIFTED_PATH = (
+    (0x08114438, 0x0811490E, 'da8dd98847d1c31af894d53e3489d189f55a523318b0748038fdc2ba1054642d'),
+    (0x080DABB4, 0x080DABC4, '502c18b4fa9b7f56bf20af9f00382302e63dea7ec6daa070c4cb9ba032f122f4'),
+    (0x080E0608, 0x080E064A, '1fcc74a21cc03ae43fe95df667bba22767c65c3552f22ab68f536942e4edcc72'),
+    (0x080E064C, 0x080E0690, 'b14e57b3370c5f00016b6b281a0baa3437fd9e611079b90e7e6b78162549ca61'),
+) + (AXES_WRAPPER,) + RASTERIZERS
 
 EDGE_PATH = (
     # Scene 081120CC saves the bank-1 window at +0x44 in phase 0. In phase
@@ -129,7 +147,8 @@ def uses_element(root, address):
 
 def source_offsets(text, header, address):
     import plausible
-    if address not in SOURCE_TOKENS or not base_header(header, (
+    extra_names = ('InterpolationState',) if address == SHIFTED_ELLIPSE else ()
+    if address not in SOURCE_TOKENS or not base_header(header, (*extra_names,
             'WindowLine', 'DrawingState', 'Object0800C614', 'draw_ellipse',
             f'func_{address:08X}', *(f'func_{target:08X}' for target in CALLEES[address]))):
         return set()
@@ -162,7 +181,10 @@ def provider_evidence(rom, address):
     # payload as argument 6 with size 256, scales 256/1024 and mode 2.
     raster_path = ELLIPSE_PATH + (
         (0x080DA1C4, 0x080DA2D4, '850c0ba131a4815366f2d7261a8a5861b7f5ebcf96e3c9c32cb44f9fab928e32'),)
-    caller_path = {SCALED_ELLIPSE: raster_path, RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH,
+    if address == SHIFTED_ELLIPSE:
+        from bg_affine_rows import scanline_pipeline
+        scanline_pipeline(rom)
+    caller_path = {SHIFTED_ELLIPSE: SHIFTED_PATH, SCALED_ELLIPSE: raster_path, RECT: (), ELLIPSE: ELLIPSE_PATH, CIRCLE: CIRCLE_PATH,
                    LEFT_EDGE: EDGE_PATH, RIGHT_EDGE: EDGE_PATH}[address]
     for start, end, digest in zero_image + PROVIDER + caller_path:
         if sha256(rom[start-BASE:end-BASE]).hexdigest() != digest:
@@ -238,7 +260,12 @@ def check_bodies(address, qualified, stripped, swapped):
     # ellipse's even-diameter path the first two reads form the unsigned right
     # > left test; the next right read supplies the decrement. The last right
     # read is the dead insertion read, immediately before that byte's write.
-    if address == CIRCLE:
+    if address == SHIFTED_ELLIPSE:
+        # Each field supplies its old value, then agbcc reads it once more
+        # immediately before the full-byte store. Both rows use a 2-byte stride.
+        actual = (0x66, 0x78, 0x7A, 0x7C, 0x8E, 0x90, 0x9E, 0xAE, 0xB0, 0xB2, 0xC2, 0xC4)
+        control = ('ldrb', 'strb') * 4
+    elif address == CIRCLE:
         # Each of four guarded rows writes left then right. Each full-byte
         # store loses just its dead insertion read when the fields are ordinary.
         actual = tuple(site + delta for site in (0x74, 0x90, 0xCC, 0xE8) for delta in (0, 2, 4, 6))
@@ -344,6 +371,12 @@ def record(root, address):
     if bodies[0] != rom[address-BASE:address-BASE+size]:
         raise ValueError('complete linked window writer differs from the ROM')
     condition = {
+        SHIFTED_ELLIPSE: ('08114504/08114512 create banks 1/0; 081147F0/08114820 require those same '
+                          'live +0x2c/+0x30 tasks and the original initialized scene interpolators; '
+                          'centers (160,72)/(159,71), widths 4..40, heights 8..80, shift = height >> 3; '
+                          'row descends from height-1 through zero; y-row >= 0 and y+row < 160 with '
+                          'those centers constrain both byte pairs to [0,320); 080DAC80 draws first, '
+                          '080DABB4 resolves its live payload, 080E0608/080E064C interpolate shift to zero'),
         SCALED_ELLIPSE: ('080EEC58 creates bank 0; 080EEC68 forwards its task and diameter 32; '
                          '080DAD6A/080DA248 forward its C614 payload as argument 6, mode 2; '
                          'scene scales 256/1024, size 256; signed y <= 160 for the outer writer; '
@@ -363,7 +396,7 @@ def record(root, address):
                         'unsigned horizontal and signed endpoint guards constrain rows to [0,160); '
                         'signed halfword geometry; no termination claim for arbitrary wrapped deltas'),
     }[address]
-    stability = '' if address == SCALED_ELLIPSE or not CALLEES[address] else 'stable values between compare/re-read and '
+    stability = '' if address in (SCALED_ELLIPSE, SHIFTED_ELLIPSE) or not CALLEES[address] else 'stable values between compare/re-read and '
     hashes = '/'.join(sha256(body).hexdigest() for body in bodies)
     return ('* allowlisted volatile scanline: `window-row-bytes-v1` original/stripped/swapped '
             f'`{hashes}`; {condition}; assumes initialized live task, intact installed clear routine, successful allocation, exclusive 320-byte '
@@ -379,6 +412,9 @@ def report_body(report, root, address):
         body = stream.read(length)
     lines = report.splitlines()
     schema = 'elf-symbol-thumb-frame-v1' if not CALLEES[address] else 'elf-symbol-thumb-frame-calls-v1'
+    if address == SHIFTED_ELLIPSE:
+        from named_data_buffer_profile import ROOT_SCRATCH_SCHEMA
+        schema = ROOT_SCRATCH_SCHEMA
     return len(body) == length and all(lines.count(line) == 1 for line in (
         f'* verification: `{schema}`',
         f'* ROM bytes: `{body.hex()}` ({length} bytes)', f'* compiled : `{body.hex()}`',
