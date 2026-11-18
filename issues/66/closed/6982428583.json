@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "fce23e21474d6f975175fef8509e62bcbe401163d1455d4fe66ebb2da262ac98",
+    "acknowledged_cursor": 6982442101,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "fce23e21474d6f975175fef8509e62bcbe401163d1455d4fe66ebb2da262ac98",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A39708\",\"who\":\"rainbow-late-object-fields\",\"note\":\"Second IWRAM image offset C2C; mapped callback 08394034=03006B55; native caller 0809E962 invokes BX r4, 6 argument setter. Both indexes 22 bytes.\"}",
+      "created_at": "2026-11-18T15:04:37Z",
+      "id": 6982428583,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:04:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
+    "result": {
+      "address": "0x08A39708",
+      "claim_id": 6982428583,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6982428583,
+      "status": "accepted",
+      "who": "rainbow-late-object-fields"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "170de84a71dbaa8a5bf78549a175cd89213e3919e34def2e2dbd2a09a5f72039",
+    "acknowledged_cursor": 6982487480,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "170de84a71dbaa8a5bf78549a175cd89213e3919e34def2e2dbd2a09a5f72039",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A39708\",\"who\":\"rainbow-late-object-fields\",\"claim_id\":6982428583,\"reason\":\"Native ROM MATCH 22/22 bytes 11/11 Thumb instructions, unique strict late symbol and report replay. 0808F74C installs at 03006B54; caller 0809E962 calls Thumb callback 08394034=03006B55 via BX r4.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:06:43Z",
+      "id": 6982484914,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:06:43Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0093012e1f8d83729024cedc820d1e129e6aa828a037989713e6bb56ccb6e2e1",
+    "result": {
+      "address": "0x08A39708",
+      "claim_id": 6982428583,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6982484914,
+      "status": "accepted",
+      "who": "rainbow-late-object-fields"
+    }
+  }
+}
