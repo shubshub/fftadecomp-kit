@@ -48,9 +48,13 @@ def sha(data):
 
 
 def references(rom):
+    return references_at(rom, ROOT, CALLERS)
+
+
+def references_at(rom, address, callers):
     """Index raw immediate transfers and unaligned address literals; computed targets are conditional."""
     require(len(rom) == 0x1000000, "complete USA ROM required")
-    target = ROOT - match.ROM_BASE
+    target = address - match.ROM_BASE
     pairs = []
     short = []
     arm = []
@@ -69,10 +73,10 @@ def references(rom):
         if word >> 28 != 15 and (word >> 25 & 7) == 5 and (
                 (word & 0xFFFFFF) == (displacement >> 2 & 0xFFFFFF)):
             arm.append(off * 4 + match.ROM_BASE)
-    require(pairs == sorted(pc for sites in CALLERS.values() for pc in sites)
+    require(pairs == sorted(pc for sites in callers.values() for pc in sites)
             and not short and not arm, "incoming immediate reference set differs")
-    require(all(struct.pack("<I", value) not in rom for value in (ROOT, ROOT | 1)),
-            "unexpected address literal naming transfer setup")
+    require(all(struct.pack("<I", value) not in rom for value in (address, address | 1)),
+            "unexpected address literal naming the inventoried entry")
     require(sha(rom) == ROM_SHA256, "approved USA ROM required for reference inventory")
     return dict(thumb_bl=pairs, thumb_short=short, arm_b_bl=arm, address_literals=[])
 

@@ -4091,7 +4091,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
-                             incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None):
+                             incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4108,6 +4108,16 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 value is not None and value is not False for name, value in locals().items()
                 if name not in INCOMING_NARROW_READ_PARAMETERS)):
         raise ValueError("incoming narrow reads require the plain Thumb direct-call path")
+    if resource_arguments is not None:
+        from resource_state_arguments import ResourceArguments, ROOT
+        from named_data_buffer_profile import ConditionalThunkBufferProof
+        if type(resource_arguments) is not ResourceArguments or type(buffer_proof) is not ConditionalThunkBufferProof or \
+                thumb is not True or address != ROOT or resource_arguments.data != data or \
+                resource_arguments.buffers is not buffer_proof or any(value is not None and value is not False
+                    for name, value in locals().items() if name not in
+                    ('data', 'address', 'thumb', 'validated_calls', 'buffer_proof', 'resource_arguments',
+                     'ResourceArguments', 'ROOT', 'ConditionalThunkBufferProof')):
+            raise ValueError("resource arguments require their authenticated Thumb owner and conditional thunks")
     if masked_argument_proof is not None:
         if thumb is not True or any(value is not None and value is not False
                 for name, value in locals().items()
@@ -4969,6 +4979,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     if incoming_narrow_reads and thumb else None
                 if masked_argument_proof is not None:
                     incoming_read = masked_argument_proof.kind_read(instruction, len(stack))
+                if resource_arguments is not None:
+                    incoming_read = resource_arguments.read(instruction, len(stack))
                 assignment = stack_alias_assignment(instruction, aliases, len(stack), alias_constants) \
                     if thumb and incoming_read is None else None
                 deferred_derivation = False
@@ -5610,6 +5622,7 @@ def main():
                                                       "particle-projection-return-scratch-v1",
                                                       "bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1",
                                                       "named-data-buffer-finite-small-copy-binding-v1", "named-data-buffer-compiler-copy80-binding-v1", "named-data-buffer-v1", "bounded-buffer-datafree-caller-v1", "conditional-unit-entry-output-array-v1", "conditional-ability-range-local-bytes-v1",
+                                                      "conditional-incoming-resource-state-v1",
                                                       "bounded-buffer-conditional-thunks-v1",
                                                       "bounded-buffer-conditional-thunks-discarded-scratch-v1",
                                                       "bounded-buffer-conditional-thunks-selective-scratch-v1",
