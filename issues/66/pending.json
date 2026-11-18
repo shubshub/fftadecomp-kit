@@ -1786,7 +1786,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d26354ce57aa06d801548dea471f521312e8674ee5de032154b198ddc824120c",
+        "acknowledged_cursor": 6993227984,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d26354ce57aa06d801548dea471f521312e8674ee5de032154b198ddc824120c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806F994\",\"who\":\"rainbow-menu\",\"claim_id\":6992951926,\"reason\":\"Parked reconstructed source and original native tests. 292 compiled vs 296 original bytes; 2256 complete selection-caller comparisons agree.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T22:16:28Z",
+          "id": 6993223732,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:16:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9e898b6d5cf916411581671b0a1e1983527b967aed7572e2eefb1ab20492c256",
+        "result": {
+          "address": "0x0806F994",
+          "claim_id": 6992951926,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6993223732,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -1912,6 +1940,38 @@
           "request_id": 6993158153,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9fbdfe7667b3e3d2eabb81a1bf72d702317965ca84e219eb28a5db4f3b6fc3d1",
+        "acknowledged_cursor": 6993227984,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9fbdfe7667b3e3d2eabb81a1bf72d702317965ca84e219eb28a5db4f3b6fc3d1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C01D0\",\"who\":\"astra-roster\",\"note\":\"Original arena action search and bounded equipment collector.\"}",
+          "created_at": "2026-11-18T22:16:40Z",
+          "id": 6993227984,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:16:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9e898b6d5cf916411581671b0a1e1983527b967aed7572e2eefb1ab20492c256",
+        "result": {
+          "address": "0x080C01D0",
+          "claim_id": 6993227984,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6993227984,
+          "status": "accepted",
+          "who": "astra-roster"
         }
       },
       "release": null
