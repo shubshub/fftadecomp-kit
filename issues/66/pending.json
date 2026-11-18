@@ -539,6 +539,166 @@
           "who": "rainbow-m4a"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7f675557af7567ae722b28e5f0d2e8c18713bd9fe3f83c2c606336a033c9dd34",
+        "acknowledged_cursor": 6979885392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7f675557af7567ae722b28e5f0d2e8c18713bd9fe3f83c2c606336a033c9dd34",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A7B8\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T13:24:40Z",
+          "id": 6979878282,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:24:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+        "result": {
+          "address": "0x0809A7B8",
+          "claim_id": 6979878282,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979878282,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b882df87b2a0b813abe12a73cf4c069846a8bc2a546a04e6431bace97d4768af",
+        "acknowledged_cursor": 6979885392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b882df87b2a0b813abe12a73cf4c069846a8bc2a546a04e6431bace97d4768af",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A800\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T13:24:40Z",
+          "id": 6979878285,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:24:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+        "result": {
+          "address": "0x0809A800",
+          "claim_id": 6979878285,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979878285,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7d85c07aaf91cae0250250a20093ed05d538cfe5c10aaf7406fe88cec703a3c8",
+        "acknowledged_cursor": 6979885392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7d85c07aaf91cae0250250a20093ed05d538cfe5c10aaf7406fe88cec703a3c8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A848\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T13:24:41Z",
+          "id": 6979878688,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:24:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+        "result": {
+          "address": "0x0809A848",
+          "claim_id": 6979878688,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979878688,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "473a789136ec8dfbfb90b1dbda49d78a8cb06f5f01e22a6fa72576579dcba850",
+        "acknowledged_cursor": 6979885392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "473a789136ec8dfbfb90b1dbda49d78a8cb06f5f01e22a6fa72576579dcba850",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813EB64\",\"who\":\"rainbow-state\",\"note\":\"Recover complete brightness task with the shared control flags\"}",
+          "created_at": "2026-11-18T13:24:53Z",
+          "id": 6979883230,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:24:53Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+        "result": {
+          "address": "0x0813EB64",
+          "claim_id": 6979883230,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979883230,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "075e16658b7450fe28310e8effa10cfa553dbd5c10411830dc2cfaa99f27a03c",
+        "acknowledged_cursor": 6979885392,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "075e16658b7450fe28310e8effa10cfa553dbd5c10411830dc2cfaa99f27a03c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813FB7C\",\"who\":\"rainbow-state\",\"note\":\"Recover adjacent CpuSet graphics fill using the accepted BIOS fill profile\"}",
+          "created_at": "2026-11-18T13:24:58Z",
+          "id": 6979885392,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:24:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e26768748cd8c16480b76aa5ea9c5794f567f46d65abff11bb536046cddc2fef",
+        "result": {
+          "address": "0x0813FB7C",
+          "claim_id": 6979885392,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6979885392,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
