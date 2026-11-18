@@ -52,6 +52,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import data_buffer_profile as data_buffer
+import owner_switch_buffer_profile as owner_switch_buffer
 import empty_body_profile as empty_body
 import library_units
 import stack_pointer_compare_profile as sp_compare
@@ -3371,6 +3372,8 @@ class BufferCallProof:
     copy_summaries = None
     # Default-path SwitchCallees (switch_callee_profile), set per plain instance only.
     switch_callees = None
+    # Default-path OwnerSwitch (owner_switch_buffer_profile), bound per plain instance only.
+    owner_switch = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
@@ -4115,6 +4118,8 @@ class BufferCallProof:
             lines.extend(self.copy_summaries.lines())
         if self.switch_callees is not None:
             lines.extend(self.switch_callees.lines())
+        if self.owner_switch is not None:
+            lines.extend(self.owner_switch.lines())
         return lines
 
     def bios_summary_lines(self):
@@ -4157,6 +4162,10 @@ class BufferCallProof:
         if self.switch_callees is not None and self.switch_callees.records:
             # Only an inspected jump-table callee adds this; every other fingerprint is unchanged.
             digest.update(json.dumps(self.switch_callees.evidence(), sort_keys=True,
+                                     separators=(",", ":")).encode())
+        if self.owner_switch is not None:
+            # Only an owner walked over its own jump table adds this.
+            digest.update(json.dumps(self.owner_switch.evidence(), sort_keys=True,
                                      separators=(",", ":")).encode())
         return digest.hexdigest()
 
@@ -4708,7 +4717,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     root_buffer_switch = False
     if switch_relocations is not None:
         from named_data_buffer_profile import root_switch_context
-        root_buffer_switch = root_switch_context(buffer_proof, data, address,
+        from owner_switch_buffer_profile import context as owner_switch_context
+        root_buffer_switch = owner_switch_context(buffer_proof, data, address, validated_calls,
+            switch_relocations, switch_data_relocations) or root_switch_context(buffer_proof, data, address,
             validated_calls, switch_relocations, switch_data_relocations)
         if not thumb or buffer_proof is not None and not root_buffer_switch or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
@@ -6350,9 +6361,24 @@ def main():
                     verified_instructions, _ = verify_preloaded_switches(
                         got, addr, rom, mapping, data_mapping, switch_evidence)
                 else:
-                    verified_instructions, _ = verify_switches(
-                        got, addr, rom, mapping, switch_evidence,
-                        data_mapping=data_mapping if data_relocations else None)
+                    try:
+                        verified_instructions, _ = verify_switches(
+                            got, addr, rom, mapping, switch_evidence,
+                            data_mapping=data_mapping if data_relocations else None)
+                    except ValueError as switch_error:
+                        if not owner_switch_buffer.retries(switch_evidence, args, calls, data_relocations,
+                                                           function_relocations, thumb,
+                                                           rom[addr - ROM_BASE:addr - ROM_BASE + len(got)] == got):
+                            raise
+                        # The owner's own guarded table, under the typed-data version-2 buffer proof.
+                        try:
+                            verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
+                                data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
+                                                  index=inert_spin.index_snapshot(ROOT),
+                                                  switch_relocations=switch_relocations)
+                        except ValueError as owner_error:
+                            raise ValueError(f"{switch_error}; owner-switch data-buffer proof: "
+                                             f"{owner_error}") from owner_error
             elif unit_context is not None and addr == 0x08142000:
                 import flash_retry_programmer as flash_profile
                 flash_profile.check_source(ROOT)
@@ -6459,7 +6485,7 @@ def main():
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if data_buffer_evidence is not None:
         schema = data_buffer_schema
-    if switch_relocations and quotient_evidence is None:
+    if switch_relocations and quotient_evidence is None and buffer_proof.owner_switch is None:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   switch_data_thunks.SCHEMAS[thunk_switch_selector] if "thunk_policy" in switch_evidence else
                   typed_switch_frame.SCHEMA if "frame_policy" in switch_evidence else
@@ -6751,7 +6777,7 @@ def main():
                         addr, got_body, address_manifest, fingerprint, mapping,
                         buffer_proof.fingerprint())
                     f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
-            if switch_relocations and quotient_evidence is None:
+            if switch_relocations and quotient_evidence is None and buffer_proof.owner_switch is None:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
                            switch_data_thunks.SUMMARIES[thunk_switch_selector] if "thunk_policy" in switch_evidence else
                            typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else

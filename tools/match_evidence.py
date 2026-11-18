@@ -163,7 +163,7 @@ def udivsi3_report_matches(lines, root, address):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 any(line.lstrip().startswith(("* buffer calls", "* buffer proof SHA-256", "* buffer loop replay",
-                                              "* buffer BIOS", "* buffer copy summary", "* buffer switch callee",
+                                              "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* buffer owner switch",
                                               "* data symbols SHA-256", "* switches", "* switch manifest",
                                               "* switch proof SHA-256", "* function addresses",
                                               "* function address manifest", "* function address proof SHA-256"))
@@ -402,7 +402,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 not buffer_profile and any(line.lstrip().startswith(
                     ("* buffer calls:", "* buffer proof SHA-256:", "* buffer loop replay", "* buffer BIOS",
-                     "* buffer copy summary", "* buffer switch callee")) for line in lines):
+                     "* buffer copy summary", "* buffer switch callee", "* buffer owner switch")) for line in lines):
             return False
         if buffer_profile and (
                 single("* verification: ") != f"`{FUNCTION_BUFFER_SCHEMA}`" or
@@ -432,7 +432,8 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                         address, data, manifest, source_digest, functions, proof.fingerprint()) or \
                     [line for line in lines if line.lstrip().startswith("* buffer loop replay") or
                      line.lstrip().startswith("* buffer copy summary") or
-                     line.lstrip().startswith("* buffer switch callee")] != proof.loop_replay_lines() or \
+                     line.lstrip().startswith("* buffer switch callee") or
+                     line.lstrip().startswith("* buffer owner switch")] != proof.loop_replay_lines() or \
                     [line for line in lines if line.lstrip().startswith("* buffer BIOS")] != proof.bios_summary_lines():
                 return False
             control_flow = CALL_SUMMARY
@@ -561,7 +562,7 @@ def preloaded_switch_report_matches(lines, root, address):
         mapping = mapping_snapshot(root)
         objects = data_snapshot(root)
         excluded = ("* stack frame", "* buffer calls", "* buffer proof SHA-256", "* buffer loop replay",
-                    "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* function addresses",
+                    "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* buffer owner switch", "* function addresses",
                     "* function address manifest",
                     "* function address proof SHA-256", "* unsigned division")
         if mapping is None or objects is None or \
@@ -653,7 +654,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                    SWITCH_MULTIPLE_DATA_SUMMARY if multiple_data else
                    SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
         excluded = ("* stack frame:", "* buffer calls:", "* buffer proof SHA-256:",
-                    "* buffer loop replay:", "* buffer BIOS", "* buffer copy summary:", "* buffer switch callee:",
+                    "* buffer loop replay:", "* buffer BIOS", "* buffer copy summary:", "* buffer switch callee:", "* buffer owner switch:",
                     "* function addresses:",
                     "* function address manifest:",
                     "* function address proof SHA-256:")
@@ -791,7 +792,7 @@ def modsi3_report_matches(lines, root, address):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 any(line.lstrip().startswith(("* stack frame", "* buffer calls", "* buffer proof",
-                                              "* buffer loop replay", "* buffer BIOS", "* buffer copy summary", "* buffer switch callee",
+                                              "* buffer loop replay", "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* buffer owner switch",
                                               "* unsigned division", "* switches", "* switch manifest",
                                               "* switch proof", "* function addresses",
                                               "* function address manifest", "* function address proof"))
@@ -866,7 +867,7 @@ def umodsi3_report_matches(lines, root, address):
                 single("* relocations: ") != "none" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 any(line.lstrip().startswith(("* buffer calls", "* buffer proof", "* buffer loop replay",
-                                              "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* signed remainder",
+                                              "* buffer BIOS", "* buffer copy summary", "* buffer switch callee", "* buffer owner switch", "* signed remainder",
                                               "* signed quotient",
                                               "* unsigned division", "* switches", "* switch manifest",
                                               "* switch proof", "* function addresses",

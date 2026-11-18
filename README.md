@@ -1341,6 +1341,85 @@ a jump-table callee the same way; its report carries and replays the same
 lines. Its function-literal path builds a `FunctionBufferCallProof` and still
 refuses such a callee.
 
+### A jump table in the owner of the default typed-data buffer walk
+
+An owner with typed object literals that dispatched through its own agbcc jump
+table and passed a local buffer to a callee was never given the version-2 buffer
+proof. Its link has switch relocations, so `match.py` sent it to the switch
+profiles, whose walk carries no buffer proof and refused at the first stack
+alias that reaches a call, as an argument register or as an outgoing stack
+argument:
+
+```
+stack aliases cannot cross calls in caller-clobbered registers
+unsupported stack-alias use or escape
+```
+
+The switch profiles were introduced as closed evidence ("switch evidence cannot
+combine frame or buffer proof profiles"): a buffer report had no record of a
+switch and its replay no way to recover the switch edges. The walk itself was
+never the obstacle. It already treats an authenticated switch as one multi-way
+branch: every table target is followed with the same abstract state (aliases,
+stack, pointer slots, return provenance), the table and its pointer are kept
+out of the executed bytes, the guard and the dispatch must be reached only
+through the canonical sequence, and runtime call thunks beside a switch are
+refused.
+
+On the default path only, when the plain switch-data walk (one or several typed
+objects, no selector, no function literals, not the preloaded layout) refuses,
+for whatever reason it reports first, the owner is now proved by the typed-data
+proof beside the version-2 walk (`data_buffer_profile`), whose
+plain proof carries the BIOS wrapper, copy-helper and jump-table callee
+summaries. `owner_switch_buffer_profile.OwnerSwitch` binds the owner's switch to
+that proof, authenticated from the ROM bytes with the primitives
+`GuardedSwitchBufferProof.inspect` uses for a callee:
+
+1. the proof is that plain stack-argument instance, bound to one owner only;
+2. `analyze.refine_function` finds exactly one word switch with no interposed
+   scalar words;
+3. the owner graph closes with no local BL control;
+4. the linked switch relocations and direct calls are exactly those the ROM
+   bytes give;
+5. the walk re-derives the layout from those table words (`switch_layout`: the
+   canonical unsigned guard, a bound covering the table, forward in-span cases)
+   and refuses any path into the guard or dispatch that bypasses the comparison;
+6. the walk's verified instructions are exactly the owner graph's.
+
+Linked bytes that differ from the ROM keep their own refusal alone. If the
+proof refuses a matching owner too, both messages are reported:
+
+```
+stack aliases cannot cross calls in caller-clobbered registers; owner-switch data-buffer proof: ...
+```
+
+The walk runs without incoming narrow reads. The table pointer counts as the
+switch's word, not an untyped literal, when the dispatch's load is its only PC
+load. As in the switch profiles (#139), what the cases do with the table base or
+the case address left in registers after the dispatch is not checked: both are
+ROM code addresses, never stack aliases. Each report line states this.
+
+An owner without typed objects, the function-literal path, the switch-data
+selectors, and the preloaded and interposed-pool layouts keep their walk and
+message. An owner switch beside an untyped literal in the hardware window (the
+numeric hardware class) refuses with `numeric hardware words require the exact
+complete owner graph`, because that class is defined only over owners without a
+table.
+
+The record (layout, transfer, successors, table hash) is bound into the buffer
+proof fingerprint only when an owner switch exists, so every other fingerprint
+is unchanged, and is stated in one report line:
+
+```
+* buffer owner switch: `guarded-switch-owner-v1` 0x080A1600: dispatch at 0x080A161C, bound 6, 7 successors, table c7047304968e7eaa; table pointer: only PC load is the dispatch, case uses of the table registers unchecked
+```
+
+The data-buffer replay relinks the captured source with its switch relocations
+and recomputes the proof, the line and both fingerprints. As for the other
+`* buffer` lines, replay compares the line's text and order among them, not its
+position among the other fields. Besides the typed-data proof's own premise,
+the one limitation stated in each line (case uses of the table registers are
+not checked) is the only addition; no other premise is added.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the

@@ -109,7 +109,7 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
-          index=None):
+          index=None, switch_relocations=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -117,6 +117,9 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     to (name, value), all from the exact link of the original ELF.  index is the
     function index snapshot that the plain path's default-walk summaries read
     (copy_helper_summary_profile, switch_callee_profile); the function-literal path takes none.
+    switch_relocations, the owner's own jump table from the same link, is walked by
+    owner_switch_buffer_profile on the plain path only; its table pointer is that
+    proof's word, not an untyped literal.
     """
     import match
     import function_thunk_profile as thunk
@@ -160,7 +163,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                                       copy_helper_index=index, switch_callee_index=index)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
-    if schema == FUNCTION_SCHEMA:
+    if switch_relocations:
+        # The owner's own jump table; only the plain proof takes it (owner_switch_buffer_profile).
+        import owner_switch_buffer_profile as owner_switch
+        instructions = owner_switch.walk(proof, data, address, calls, switch_relocations)
+    elif schema == FUNCTION_SCHEMA:
         instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
     else:
         instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
@@ -178,6 +185,12 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     domain = {offset for offset, (value, _) in words.items()
               if ADDRESS_DOMAIN[0] <= value < ADDRESS_DOMAIN[1]}
     remaining = domain - set(literals)
+    if proof.owner_switch is not None:
+        # The owner switch's table pointer, read only by its dispatch, is that layout's word;
+        # the case words are never loaded by PC.
+        switch = proof.owner_switch.record["switch"]
+        if words.get(switch["literal"], (None, []))[1] == [address + switch["dispatch"] + 2]:
+            remaining.discard(switch["literal"])
     hardware = []
     if any(HARDWARE_WINDOW[0] <= words[offset][0] < HARDWARE_WINDOW[1] for offset in remaining):
         import owner_admission_profile as owner
@@ -236,15 +249,17 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                 candidates[0].relative_to(root).as_posix())
-                functions = {}
+                functions, switches = {}, {}
                 got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
-                                                  len(rom), rom, objects, functions)
+                                                  len(rom), rom, objects, functions, switches,
+                                                  allow_switch_data=True)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
             from inert_spin_profile import index_snapshot
             # Without a function index no default-walk summary applies, and the walk refuses as before.
             index = index_snapshot(root) if (root / "symbols/functions.txt").is_file() else None
-            result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index)
+            result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
+                           switch_relocations=switches)
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -265,7 +280,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
 # refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
-          "* mapping SHA-256", "* control flow",
+          "* buffer owner switch", "* mapping SHA-256", "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
@@ -347,7 +362,7 @@ def report_matches(report, root, address):
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
                 [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary",
-                                                         "* buffer switch callee")] ==
+                                                         "* buffer switch callee", "* buffer owner switch")] ==
                 proof.loop_replay_lines() and
                 [line for line in lines if key(line).startswith("* buffer BIOS")] == proof.bios_summary_lines() and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
