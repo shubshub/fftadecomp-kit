@@ -510,7 +510,35 @@
           "who": "rainbow-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "45b6f6b21c53af6ba02371e253e3b732b6667742381133fb84fb2c23a6a83298",
+        "acknowledged_cursor": 6979484302,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "45b6f6b21c53af6ba02371e253e3b732b6667742381133fb84fb2c23a6a83298",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142BE8\",\"who\":\"rainbow-ffta\",\"claim_id\":6978913810,\"reason\":\"Fixed old_agbcc dp-bit packer matched 332/332 bytes; canonical source and report verified.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T13:08:35Z",
+          "id": 6979484302,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:08:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "494871daa359edf59640c96b3b93a0a9e3c9c4c88a53ab07acf6083c8574e160",
+        "result": {
+          "address": "0x08142BE8",
+          "claim_id": 6978913810,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6979484302,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      }
     },
     {
       "claim": {
