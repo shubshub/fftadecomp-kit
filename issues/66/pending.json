@@ -571,6 +571,38 @@
           "who": "rainbow-m4a"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "352e520ef1c90e82062768fa25a10e6864536ebc5775cab25ca63847802b5278",
+        "acknowledged_cursor": 6980353171,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "352e520ef1c90e82062768fa25a10e6864536ebc5775cab25ca63847802b5278",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D984C\",\"who\":\"rainbow-window-range\",\"note\":\"Recover the window byte-pair layout and test the ordinary compiler and verifier against the complete 46-byte owner.\"}",
+          "created_at": "2026-11-18T13:43:31Z",
+          "id": 6980353171,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:43:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c8ad7228609f5821f631913ab8985fdfa3b8abd21fa4702fe073c127cce5875d",
+        "result": {
+          "address": "0x080D984C",
+          "claim_id": 6980353171,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980353171,
+          "status": "accepted",
+          "who": "rainbow-window-range"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
