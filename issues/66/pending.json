@@ -606,7 +606,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5665d6f59de7909e5d6b5938e1330045cb7b4101c3cfd41d693367067c194d46",
+        "acknowledged_cursor": 6988227707,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5665d6f59de7909e5d6b5938e1330045cb7b4101c3cfd41d693367067c194d46",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A95EC\",\"who\":\"astra-sound\",\"claim_id\":6988133366,\"reason\":\"Parked exact 196-byte source; original collector output contract exceeds two halfwords without additional inventory premise\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:48:00Z",
+          "id": 6988227707,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:48:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7560bc8588ee20f95f74c2f10e19438a264c5cb9c3ff1964c69c602a15a83bc3",
+        "result": {
+          "address": "0x080A95EC",
+          "claim_id": 6988133366,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6988227707,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -670,7 +698,35 @@
           "who": "astra-shift"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ec0a0cf41536a7e3308fb20c5c47472867c7ab4d718b0db43d5c4212fe58587e",
+        "acknowledged_cursor": 6988227707,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ec0a0cf41536a7e3308fb20c5c47472867c7ab4d718b0db43d5c4212fe58587e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08112AEC\",\"who\":\"astra-shift\",\"claim_id\":6988159308,\"reason\":\"MATCH 480/480 bytes, 192/192 instructions. Typed map bounds adapter also authenticated in neighboring 08113FEC; live native report replays.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:47:51Z",
+          "id": 6988224154,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:47:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7560bc8588ee20f95f74c2f10e19438a264c5cb9c3ff1964c69c602a15a83bc3",
+        "result": {
+          "address": "0x08112AEC",
+          "claim_id": 6988159308,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6988224154,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      }
     }
   ],
   "issue": 66,
