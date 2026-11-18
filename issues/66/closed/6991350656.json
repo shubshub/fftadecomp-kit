@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f7dde2fc20f42a4a5f83693362c005447d3b8ba4f292b283c5f1eaad66095937",
+    "acknowledged_cursor": 6991350656,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f7dde2fc20f42a4a5f83693362c005447d3b8ba4f292b283c5f1eaad66095937",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081428E4\",\"who\":\"astra-roster\",\"note\":\"Match the original signed 64-bit integer to software double conversion library member\"}",
+      "created_at": "2026-11-18T20:54:14Z",
+      "id": 6991350656,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:54:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4993f4165cb844ffac33637d220600e84903d59a33923bb63098c3d7198cbb89",
+    "result": {
+      "address": "0x081428E4",
+      "claim_id": 6991350656,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6991350656,
+      "status": "accepted",
+      "who": "astra-roster"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7004d3fb15e1cf800c9e91200d6ef207d4525811d7e35b3684f4a2f10c2bb615",
+    "acknowledged_cursor": 6991895325,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7004d3fb15e1cf800c9e91200d6ef207d4525811d7e35b3684f4a2f10c2bb615",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081428E4\",\"who\":\"astra-roster\",\"claim_id\":6991350656,\"reason\":\"Matched 108/108 ROM bytes and 40/40 instructions, toolkit PR 322 merged, source and replayed ELF report on the live game.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T21:16:52Z",
+      "id": 6991895325,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:16:52Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e8efd9682676fa1b2db371634fe75a2ffc1568b453bd9f83a5e7817fc04ae7cf",
+    "result": {
+      "address": "0x081428E4",
+      "claim_id": 6991350656,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6991895325,
+      "status": "accepted",
+      "who": "astra-roster"
+    }
+  }
+}
