@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "13021f81e09745cdde6210db999255c4a88e2475a8350dd297693cb83c61b477",
+    "acknowledged_cursor": 6989832949,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "13021f81e09745cdde6210db999255c4a88e2475a8350dd297693cb83c61b477",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BD68\",\"who\":\"rainbow-state\",\"note\":\"Recover the independent state-1 leaf in the original 0800BD effect task setter family\"}",
+      "created_at": "2026-11-18T19:54:22Z",
+      "id": 6989831924,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:54:22Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "39f2d9169110abb511d071c09e7deeae342b4e70506f85fbb4b874102fac5167",
+    "result": {
+      "address": "0x0800BD68",
+      "claim_id": 6989831924,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6989831924,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "2aa8555aac036145c76dc8a8ca205d7961ab661d0fd4be4b35e114728afc1c5c",
+    "acknowledged_cursor": 6989971966,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "2aa8555aac036145c76dc8a8ca205d7961ab661d0fd4be4b35e114728afc1c5c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800BD68\",\"who\":\"rainbow-state\",\"claim_id\":6989831924,\"reason\":\"Original tile animation accessor matched all 6 bytes; live canonical saved report and original game-created-node behavior replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T20:00:01Z",
+      "id": 6989971966,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T20:00:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9827c06d4035cee38cb4bcad86d94820b2e207cdba36be81585cbd5b2c8be99d",
+    "result": {
+      "address": "0x0800BD68",
+      "claim_id": 6989831924,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6989971966,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
