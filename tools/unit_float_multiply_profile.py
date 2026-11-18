@@ -1,6 +1,5 @@
 """Fresh source replay of the old-agbcc fp-bit __mulsf3 library member."""
 import re
-import struct
 import sys
 
 import unit_fpbit_source as source
@@ -33,34 +32,7 @@ def unit_owner(unit, address, orphan=None):
 
 
 def original_bindings(image):
-    """All five nonoverlapping REL sites have fixed names, types and zero addends."""
-    from addressed_signed_runtime_profile import original_function
-    if original_function(image, ADDRESS)["size"] != END - ADDRESS or len(image["text"]) != END - ADDRESS:
-        raise ValueError("fp-bit multiply requires the complete original function")
-    undefined = [symbol["name"] for symbol in image["symbols"] if symbol["name"] and not symbol["section"]]
-    if sorted(undefined) != sorted(TARGETS):
-        raise ValueError("fp-bit multiply requires its exact undefined symbol namespace")
-    seen = set()
-    for idx in image["relocations"]:
-        section = image["sections"][idx]
-        if section[1] != 9 or section[7] != image["text_index"] or section[9] != 8 or section[5] % 8:
-            raise ValueError("fp-bit multiply requires text REL relocations")
-        symbols = image["symbol_tables"].get(section[6])
-        for offset, info in struct.iter_unpack("<II", image["section_data"][idx]):
-            if symbols is None or info >> 8 >= len(symbols):
-                raise ValueError("fp-bit multiply REL has no matching symbol")
-            symbol = symbols[info >> 8]
-            name = SITES.get(offset)
-            is_data = name == OBJECT
-            if name is None or offset in seen or symbol["name"] != name or symbol["section"] or \
-                    symbol["bind"] != 1 or symbol["type"] not in (0, 1 if is_data else 2) or \
-                    symbol["value"] or symbol["size"] or info & 255 != (2 if is_data else 10) or \
-                    sum(item["name"] == name for item in image["symbols"]) != 1 or \
-                    image["text"][offset:offset+4] != (bytes(4) if is_data else bytes.fromhex("fff7feff")):
-                raise ValueError("fp-bit multiply has an incorrect original relocation, symbol or addend")
-            seen.add(offset)
-    if seen != set(SITES):
-        raise ValueError("fp-bit multiply lacks required original relocations")
+    source.fixed_bindings(image, ADDRESS, END, TARGETS, SITES, OBJECT)
 
 
 def native_proof(data, rom, mapping, index, objects):

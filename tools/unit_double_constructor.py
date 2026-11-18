@@ -13,7 +13,7 @@ NAME = 'func_08142BE8'
 LABEL = 'dp-bit constructor'
 SCHEMA = 'elf-symbol-thumb-dp-bit-make-dp-unit-v1'
 TOOLCHAIN = 'old-agbcc-O2-v1'
-UNIT_DIGEST = 'fd4260dbe23fa4058473ccd446851e3aa2a4e6a73ec65eebf4838bf401bcd7f0'
+UNIT_DIGEST = source.DP_DIGEST
 SOURCE_DIGEST = 'deebae548da5bac2789a019d221e997ec89b48e44c7abf745a2949b91e52418f'
 CONTROL = ('* control flow: scalar classification, sign and exponent in R0-R2, fraction low in R3 and high '
            'at entry SP; the private packer reads five initialized local words; the restored LR survives '
@@ -21,23 +21,12 @@ CONTROL = ('* control flow: scalar classification, sign and exponent in R0-R2, f
 
 
 def unit_owner(unit, address, orphan=None):
-    return (unit is not None and address == ADDRESS and orphan is None and unit.name == 'libgcc dp-bit' and
-            unit.toolchain == TOOLCHAIN and (unit.start, unit.end, unit.proof) == (PACK, 0x081439C8, 0x08142D34) and
-            unit.row['identity'] == [dict(address='0x08142BE8', size=3552, sha256=UNIT_DIGEST)])
+    return address == ADDRESS and orphan is None and source.dp_unit(unit)
 
 
 def check_source(capture, relative):
-    import plausible
-    from sdk_cpuset_halfword import TOKEN, base_header
-    path = capture / relative
-    text = path.read_text()
     names = ('fractype', 'halffractype', 'fp_class_type', 'fp_number_type', NAME, 'func_08143958')
-    if relative.as_posix() != 'src/08143958.c' or plausible.include_closure(capture, path) != (
-            {'src/08143958.c', 'include/ffta.h'}, []) or not base_header((capture/'include/ffta.h').read_bytes(), names):
-        raise ValueError('dp-bit constructor requires the original public types and one addressed source')
-    tokens = TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text))
-    if any(marker in text for marker in ('\\', '??', '%:', '\0')) or units.sha(' '.join(tokens).encode()) != SOURCE_DIGEST:
-        raise ValueError('dp-bit constructor requires its reviewed split-fraction signature and record assignments')
+    source.reviewed_source(capture, relative, ADDRESS, names, SOURCE_DIGEST)
 
 
 def original_bindings(image, rom, mapping, index):

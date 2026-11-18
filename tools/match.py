@@ -5776,6 +5776,9 @@ def main():
             sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if unit_context is not None:
+        import unit_double_add_parts as add_parts
+        if add_parts.unit_owner(unit_context["unit"], addr):
+            return selector_issue(add_parts.issue)
         import unit_double_constructor as constructor
         if constructor.unit_owner(unit_context["unit"], addr):
             return selector_issue(constructor.issue)
