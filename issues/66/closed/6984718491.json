@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "4aecfaf1303e221d3e5448bd7164210cd442e15d22c8203af07e78ed0ca48c36",
+    "acknowledged_cursor": 6984725840,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4aecfaf1303e221d3e5448bd7164210cd442e15d22c8203af07e78ed0ca48c36",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08122DD4\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+      "created_at": "2026-11-18T16:29:36Z",
+      "id": 6984718491,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:29:36Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fab67950a05c4a27efd55ba7f3d78ab66b8b9c2f3db3d89af764ed02199f78c2",
+    "result": {
+      "address": "0x08122DD4",
+      "claim_id": 6984718491,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6984718491,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d46cc46d9211358572497e7b06ca209b756a5c95a85e911422c62bee349f1687",
+    "acknowledged_cursor": 6984781417,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d46cc46d9211358572497e7b06ca209b756a5c95a85e911422c62bee349f1687",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08122DD4\",\"who\":\"rainbow-menu\",\"claim_id\":6984718491,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:30:53Z",
+      "id": 6984753168,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:30:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0ca046474f46a6e931e3fa5af4963f1048bd66733829c6955c0fbafa4d6b6d7c",
+    "result": {
+      "address": "0x08122DD4",
+      "claim_id": 6984718491,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6984753168,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  }
+}
