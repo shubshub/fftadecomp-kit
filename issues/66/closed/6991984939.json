@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "cd128aab262fe3539b2945ecc6207bc66c432cad8e287ec815f8219b6c7c5011",
+    "acknowledged_cursor": 6991984939,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cd128aab262fe3539b2945ecc6207bc66c432cad8e287ec815f8219b6c7c5011",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08007AC8\",\"who\":\"astra-combat\",\"note\":\"Recover second movement-state remaining count and cross-check the original constructor, advancement and completion\"}",
+      "created_at": "2026-11-18T21:20:44Z",
+      "id": 6991984939,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:20:44Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bf1881f46915dde4643073f161d1b2ac44eb5c553e541053a22729770e7b97f0",
+    "result": {
+      "address": "0x08007AC8",
+      "claim_id": 6991984939,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6991984939,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "012fb1a4cf54289661a7cf1735b322561876a3a4b43b17930b82df3e0e3351bc",
+    "acknowledged_cursor": 6992011505,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "012fb1a4cf54289661a7cf1735b322561876a3a4b43b17930b82df3e0e3351bc",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08007AC8\",\"who\":\"astra-combat\",\"claim_id\":6991984939,\"reason\":\"Matched six-byte signed halfword count reader. Canonical live report replays; original state transitions and negative signed result tested.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T21:21:52Z",
+      "id": 6992010107,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:21:52Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "372e89fb15eb56088b15a1b2f9ce8f04b87febaf4db8729f65de4332d020944d",
+    "result": {
+      "address": "0x08007AC8",
+      "claim_id": 6991984939,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6992010107,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  }
+}
