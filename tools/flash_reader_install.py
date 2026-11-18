@@ -55,7 +55,7 @@ def original_pools(image, address, end, text_sites, duplicate_names, objects, tr
             image['section_data'][rodata] == bytes(len(duplicate_names) * 4),
             'unexpected allocated section or duplicate words')
     symbol, offset = match.function_record(image, owner_name, address, True)
-    global_names = sorted({name for _, name in text_sites.values()})
+    global_names = sorted({owner_name} | {name for _, name in text_sites.values()})
     require(offset == 0 and symbol['bind'] == 1 and symbol['value'] == 1 and symbol['size'] == end-address and
             image['text'][end-address:] == trailing and
             sorted(s['name'] for s in image['symbols'] if s['bind'] != 0) == global_names,
