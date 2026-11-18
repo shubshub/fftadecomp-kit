@@ -120,6 +120,8 @@ def saved_profile_arguments(report, root, address):
         arguments += ["--switch-data-profile", SWITCH_POOL_U16_SCALAR_SELECTOR]
     elif f"* verification: `{pool_switch_frame.SCHEMA}`" in lines:
         arguments += ["--switch-data-profile", pool_switch_frame.SELECTOR]
+    elif f"* verification: `{pool_switch_frame.FIXED_SCHEMA}`" in lines:
+        arguments += ["--switch-data-profile", pool_switch_frame.FIXED_SELECTOR]
     elif f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in lines:
         arguments += ["--switch-data-profile", SWITCH_FUNCTION_U16_SCALAR_SELECTOR]
     elif f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`" in lines:

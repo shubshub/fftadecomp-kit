@@ -1,13 +1,21 @@
-"""Dispatch-identified switch pools (u16-scalars-v2) with a fixed outgoing-argument frame.
+"""Switch pools with a fixed outgoing-argument frame.
 
-The selector keeps every u16-scalars-v2 layout and literal-binding rule. It adds
-only a fixed Thumb frame whose words are write-only outgoing call arguments.
+u16-scalars-frame-v1 keeps every u16-scalars-v2 layout and literal-binding rule,
+and u16-scalars-fixed-frame-v1 every u16-scalars-v1 one. Each adds only a fixed
+Thumb frame whose words are write-only outgoing call arguments.
 """
 
 SELECTOR = 'u16-scalars-frame-v1'
 SCHEMA = 'elf-symbol-thumb-switch-data-u16-scalars-frame-v1'
 SUMMARY = ('one guarded local Thumb table found by its dispatch load, with complete mapped object '
            'and u16 scalar words and a fixed write-only outgoing-argument frame')
+# The same frame proof on the fixed pool layout (u16-scalars-v1), without
+# function literals or call thunks: the table pointer is the word after the
+# dispatch, and the manifest carries no pool_policy.
+FIXED_SELECTOR = 'u16-scalars-fixed-frame-v1'
+FIXED_SCHEMA = 'elf-symbol-thumb-switch-data-u16-scalars-fixed-frame-v1'
+FIXED_SUMMARY = ('one guarded local Thumb table with complete mapped object and u16 scalar words '
+                 'and a fixed write-only outgoing-argument frame')
 # The manifest key deliberately avoids "frame_policy", which names the
 # typed-outgoing-six-words-v1 family when status recovers saved selectors.
 STACK_POLICY = 'write-only-outgoing-argument-words-v1'
@@ -16,11 +24,20 @@ STACK_POLICY = 'write-only-outgoing-argument-words-v1'
 STATE_LIMIT = 1 << 16
 
 
+def schema(manifest):
+    """The schema of a frame manifest: its pool shape decides it."""
+    return SCHEMA if 'pool_policy' in manifest else FIXED_SCHEMA
+
+
+def summary(manifest):
+    return SUMMARY if 'pool_policy' in manifest else FIXED_SUMMARY
+
+
 def fingerprint(address, data, manifest):
     import hashlib
     from match_evidence import switch_manifest
     proof = hashlib.sha256()
-    for payload in (SCHEMA.encode('ascii'), address.to_bytes(4, 'little'),
+    for payload in (schema(manifest).encode('ascii'), address.to_bytes(4, 'little'),
                     data, switch_manifest(manifest).encode('ascii')):
         proof.update(len(payload).to_bytes(8, 'little'))
         proof.update(payload)

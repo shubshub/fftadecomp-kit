@@ -3050,12 +3050,16 @@ instructions inside the complete caller. A case may precede the dispatch (agbcc
 shares a `p += 2` block at a loop top this way) but may not land on or between
 the comparison and the table's last word; the CFG still refuses a target in a
 literal word or in the middle of an instruction, and walks the reached block like
-any other. Exactly seven schemas admit this, all through `verify_switches`:
+any other. Exactly eleven schemas admit this, all through `verify_switches`:
 `elf-symbol-thumb-switches-v1`, `elf-symbol-thumb-switch-data-v1`,
 `elf-symbol-thumb-switch-data-v2` (multiple data), `elf-symbol-thumb-switch-data-u16-scalars-v1`,
-`elf-symbol-thumb-switch-typed-outgoing-frame-v1`, and the two fixed-pool
+`elf-symbol-thumb-switch-data-u16-scalars-fixed-frame-v1`,
+`elf-symbol-thumb-switch-typed-outgoing-frame-v1`, the two fixed-pool
 function-literal schemas `elf-symbol-thumb-switch-data-u16-scalars-functions-v1`
-and `elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1`. The opt-in is
+and `elf-symbol-thumb-switch-data-u16-scalars-functions-frame-v1`, and the three
+fixed-pool thunk schemas `elf-symbol-thumb-switch-data-thunks-v1`,
+`elf-symbol-thumb-switch-data-thunks-frame-v1` and
+`elf-symbol-thumb-m4a-engine-track-thunks-v1`. The opt-in is
 `allow_backward_cases=True` in `selected_switch_layout`, `verify_switches` and
 `verify_leaf_instructions` (`backward_switch_cases=True`, passed by `verify_switches`
 and the u16-scalar replay in `match.py`). `switch_layout` defaults to the forward
@@ -3163,8 +3167,8 @@ and the fingerprint is domain-separated by the v2 schema. Replay requires
 both, and status forwards the saved selector. `u16-scalars-v1`, the other
 switch profiles and their reports are unchanged: they still accept only their
 fixed pool shapes. Frames, function literals, runtime thunks, signed or
-32-bit scalar words and owner-level selectors are not extended by this
-profile.
+32-bit scalar words (apart from the wide switch scalar words below) and
+owner-level selectors are not extended by this profile.
 
 ### Dispatch-identified switch pools with outgoing-argument frames
 
@@ -3205,6 +3209,43 @@ Replay refuses relabelling between this schema and `u16-scalars-v1`,
 `u16-scalars-v2` or `typed-outgoing-six-words-v1`, in either direction, and
 status and rebuild forward the saved selector. `u16-scalars-v2` still refuses
 every frame.
+
+`--switch-data-profile u16-scalars-fixed-frame-v1` selects the separate
+`elf-symbol-thumb-switch-data-u16-scalars-fixed-frame-v1` schema: the same
+frame proof, unchanged, on the `u16-scalars-v1` fixed pool, where the table
+pointer is the word after the dispatch. Every `u16-scalars-v1` layout and
+literal-binding rule applies, with no function literal and no call thunk
+(`_call_via_rN` stays refused as a runtime call thunk). It adds the two `#139`
+literal rules the framed function-literal selector already applies: no
+reached literal names the caller's own bytes except the table pointer, and
+the dispatch load is that pointer's only reader. The manifest carries
+`stack_policy` and no `pool_policy`; the fingerprint is domain-separated by
+the schema, which `pool_policy` selects. Replay refuses relabelling between
+this schema and `u16-scalars-v1`, `u16-scalars-frame-v1` or
+`u16-scalars-functions-frame-v1` in either direction, and status and rebuild
+forward the saved selector. `u16-scalars-v1` still refuses every frame.
+
+### Wide switch scalar words
+
+Every u16 scalar switch policy (the `u16-scalars-*` and `switch-thunks-*`
+selectors) also binds a reached literal word whose value is at least
+`0x10000000`, such as a binary32 constant (`0.5f` is `0x3F000000`) passed to
+a float routine. GBATEK's memory map lists `10000000-FFFFFFFF` as not used,
+and reads there return the prefetched opcode rather than mirroring a lower
+region, so such a word is not itself a mapped address. One residual is a
+stated premise: agbcc folds `sym + 0x80000000` (or `&arr[-0x10000000]`) into
+one such literal word, so a source that hard-codes that linked value would be
+admitted while its symbolic form is refused. The premise line says such an
+offset is assumed absent.
+Each word is recorded exactly, apart from the u16 words, as
+`"wide_scalars": [[offset, value], ...]` under
+`"wide_scalar_policy": "unmapped-bus-scalar-words-v1"`, and only when one
+exists; the u16 `scalars` list may then be empty. Replay recomputes both lists
+from the bytes. The report prints the premise as
+`* switch wide scalar premise: ...`, exactly once and only when the manifest
+carries the policy. A word above `0xFFFF` and below `0x10000000` is still
+refused, and interposed pool words must still be typed objects or u16
+scalars. Nothing is claimed about how the code uses the value.
 ### Switch function literals
 
 `--switch-data-profile u16-scalars-functions-v1` and
@@ -3240,7 +3281,8 @@ literal fails the ordinary control-flow proof. Nothing is claimed about the
 callee or about what the receiving call does with the pointer. The
 fingerprint is domain-separated by the schema, a report under a function-free
 schema cannot carry a function manifest (or the reverse), and status.py and
-rebuild.py forward the saved selector. Thunks, signed or 32-bit scalars and
+rebuild.py forward the saved selector. Thunks, signed or 32-bit scalars (apart
+from the wide switch scalar words above) and
 owner selectors are not extended.
 
 `u16-scalars-functions-frame-v1` and `u16-scalars-functions-frame-v2`
@@ -3251,8 +3293,8 @@ outgoing-argument words, consumed as a prefix by the calls that follow, with
 no stack address in a register. The manifest carries both
 `function_policy` and `"stack_policy": "write-only-outgoing-argument-words-v1"`.
 `-frame-v1` places that frame on the fixed pool layout. The frame proof does
-not depend on the pool shape, but a fixed-pool frame is reachable only
-together with bound function literals. `u16-scalars-frame-v1` itself still
+not depend on the pool shape; without function literals, the fixed-pool frame
+is `u16-scalars-fixed-frame-v1`. `u16-scalars-frame-v1` itself still
 requires the dispatch-identified pool. Unframed function-literal selectors
 still refuse a frame, and a framed report cannot be relabelled as an unframed
 or function-free one.

@@ -200,7 +200,7 @@ class VerificationTests(unittest.TestCase):
                 _, summary = verify(body, manifest, mapping)
                 self.assertEqual(summary, match.CALL_SUMMARY)
 
-    def test_frame_requires_its_policy_and_fixed_pool_frame_requires_functions(self):
+    def test_frame_requires_its_policy_and_function_words_stay_bound(self):
         body, _, manifest, mapping = fixture(frame=True)
         unframed = dict(manifest)
         unframed.pop("stack_policy")
@@ -211,8 +211,9 @@ class VerificationTests(unittest.TestCase):
         plain = copy.deepcopy(manifest)
         for field in ("function_policy", "functions"):
             plain.pop(field)
-        # Without function literals the fixed pool admits no frame (#171 stays v2-only).
-        with self.assertRaisesRegex(ValueError, "canonical stack policy marker"):
+        # Without the function policy the fixed-pool frame is u16-scalars-fixed-frame-v1,
+        # which still refuses the now unbound function word: a code address is no scalar.
+        with self.assertRaisesRegex(ValueError, "only u16"):
             verify(body, plain, mapping)
         body, _, manifest, mapping = fixture(("object", "scalar"), frame=True)
         plain = copy.deepcopy(manifest)

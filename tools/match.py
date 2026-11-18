@@ -36,6 +36,7 @@ import tempfile
 import armv4t
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
+import switch_wide_scalars as wide_scalars
 import switch_data_thunks
 import m4a_track_switch as music
 import modsi3_profile as modsi3
@@ -2537,12 +2538,23 @@ def switch_u16_scalar_records(data, address, instructions, descriptor, data_relo
     This policy admits only literal u16 numbers, not extra address bindings or
     facts about the values produced by the instructions that consume them.
     """
+    records, wide = switch_scalar_words(data, address, instructions, descriptor, data_relocations,
+                                        functions, allow_empty=allow_empty)
+    if wide:
+        raise ValueError("switch scalar policy admits only u16 literal values")
+    return records
+
+
+def switch_scalar_words(data, address, instructions, descriptor, data_relocations, functions=(),
+                        allow_empty=False):
+    """(u16 records, wide records): the u16 scalar words, and the words outside
+    the GBA bus that switch_wide_scalars binds. Any other value refuses."""
     known = {address + descriptor["literal"]} | {
         address + offset for offset in (*data_relocations, *functions)}
     reached = {((item.address + 4) & ~3) + operand.mem.disp
                for item in instructions for operand in item.operands
                if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC}
-    records = []
+    records, wide = [], []
     table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
     for literal in sorted(reached - known):
         offset = literal - address
@@ -2550,12 +2562,15 @@ def switch_u16_scalar_records(data, address, instructions, descriptor, data_relo
                 offset + 4 > len(data):
             raise ValueError("u16 scalar word must be aligned, complete and outside the switch table")
         value = struct.unpack_from("<I", data, offset)[0]
-        if value > 0xFFFF:
+        if wide_scalars.admits(value):
+            wide.append([offset, value])
+        elif value > 0xFFFF:
             raise ValueError("switch scalar policy admits only u16 literal values")
-        records.append([offset, value])
-    if not records and not allow_empty:
+        else:
+            records.append([offset, value])
+    if not records and not wide and not allow_empty:
         raise ValueError("u16 switch-data policy requires a reached scalar word")
-    return records
+    return records, wide
 
 
 def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None):
@@ -2575,9 +2590,14 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
             "frame_policy" in manifest or "scalar_policy" in manifest and not scalar_data):
         raise ValueError("switch thunks require their isolated complete switch-data marker")
     pool_frame = isinstance(manifest, dict) and "stack_policy" in manifest
-    if pool_frame and (not (pool_data or function_data or thunk_selector) or
+    if pool_frame and (not (scalar_data or thunk_selector) or
                        manifest["stack_policy"] != pool_switch_frame.STACK_POLICY):
         raise ValueError("outgoing-argument switch frame requires its canonical stack policy marker")
+    # u16-scalars-fixed-frame-v1: the frame on the fixed pool, without function literals or thunks.
+    fixed_frame = pool_frame and scalar_data and not (pool_data or function_data)
+    wide_data = scalar_data and "wide_scalar_policy" in manifest
+    if wide_data:
+        wide_scalars.check_context(manifest["wide_scalar_policy"])
     outgoing_frame = isinstance(manifest, dict) and "frame_policy" in manifest
     if outgoing_frame and (not complete_data or scalar_data or
             manifest["frame_policy"] != typed_switch_frame.SELECTOR):
@@ -2591,6 +2611,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.add("pool_policy")
     if pool_frame:
         fields.add("stack_policy")
+    if wide_data:
+        fields.update(wide_scalars.FIELDS)
     if function_data:
         fields.update(("function_policy", "functions"))
     if thunk_selector:
@@ -2644,10 +2666,26 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     if switch_layout(data, address, relocations, data_relocations,
                      allow_backward_cases=not pool_data, interposed_pool=pool_data) != descriptor:
         raise ValueError("switch descriptor does not match the guarded bytes")
-    scalars = {}
+    scalars, wide = {}, {}
+    if wide_data:
+        records = manifest["wide_scalars"]
+        if not isinstance(records, list) or not 1 <= len(records) <= len(data) // 4:
+            raise ValueError("wide switch scalars require a finite nonempty manifest")
+        previous = -1
+        for record in records:
+            if not isinstance(record, list) or len(record) != 2:
+                raise ValueError("invalid wide switch scalar record")
+            offset, value = record
+            if type(offset) is not int or offset <= previous or offset < 0 or \
+                    (address + offset) % 4 or offset + 4 > len(data) or \
+                    not wide_scalars.admits(value) or \
+                    struct.unpack_from("<I", data, offset)[0] != value:
+                raise ValueError("wide switch scalars require unique ordered exact words outside the GBA bus")
+            previous = offset
+            wide[offset] = value
     if scalar_data:
         records = manifest["scalars"]
-        if not isinstance(records, list) or not 1 <= len(records) <= len(data) // 4:
+        if not isinstance(records, list) or not (0 if wide else 1) <= len(records) <= len(data) // 4:
             raise ValueError("u16 switch-data requires a finite nonempty scalar manifest")
         previous = -1
         table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
@@ -2711,7 +2749,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                      "or indexed function spans as data")
     calls = {}
     previous = -1
-    occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars, *functions)
+    occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars, *wide, *functions)
                 for position in range(offset, offset + 4)}
     if thunk_selector:
         # Each thunk BL is bound here and only here; manifest["calls"] never names one.
@@ -2787,13 +2825,13 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         expected_literals = {address + descriptor["literal"]} | {
             address + offset for offset in (*data_relocations, *functions)}
         if scalar_data:
-            if manifest["scalars"] != switch_u16_scalar_records(
-                    data, address, instructions, descriptor, data_relocations, functions):
+            if [manifest["scalars"], manifest.get("wide_scalars", [])] != list(switch_scalar_words(
+                    data, address, instructions, descriptor, data_relocations, functions)):
                 raise ValueError("complete reachable u16 scalar literal-word coverage is required")
-            expected_literals.update(address + offset for offset in scalars)
+            expected_literals.update(address + offset for offset in (*scalars, *wide))
         if reached_literals != expected_literals:
             raise ValueError("complete switch-data literal-word coverage is required")
-    if function_data or thunk_selector:
+    if function_data or thunk_selector or fixed_frame:
         # #139's rules: no reached literal names the caller's own bytes except
         # the table pointer, and the dispatch load is that pointer's only reader.
         function_thunk.verify_own_span_literals(data, address, instructions, descriptor["literal"])
@@ -5655,7 +5693,8 @@ def switch_u16_scalar_configuration(args):
     if args.switch_data_profile is None:
         return
     if args.switch_data_profile not in (SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
-                                        pool_switch_frame.SELECTOR, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
+                                        pool_switch_frame.SELECTOR, pool_switch_frame.FIXED_SELECTOR,
+                                        SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
                                         SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
                                         SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
                                         SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR,
@@ -5694,7 +5733,8 @@ def main():
     ap.add_argument("--function-address-profile", choices=function_thunk.SELECTORS)
     ap.add_argument("--switch-profile", choices=("two-constants-v2", "two-constants-frame-v1", "one-constant-frame-v1"))
     ap.add_argument("--switch-data-profile", choices=(SWITCH_U16_SCALAR_SELECTOR, SWITCH_POOL_U16_SCALAR_SELECTOR,
-                                                      pool_switch_frame.SELECTOR, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
+                                                      pool_switch_frame.SELECTOR, pool_switch_frame.FIXED_SELECTOR,
+                                                      SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
                                                       SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
                                                       SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
                                                       SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR,
@@ -5999,7 +6039,7 @@ def main():
         SWITCH_POOL_U16_SCALAR_SELECTOR, pool_switch_frame.SELECTOR,
         SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR, SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
     pool_frame_profile = thunk_frame or args.switch_data_profile in (
-        pool_switch_frame.SELECTOR, SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+        pool_switch_frame.SELECTOR, pool_switch_frame.FIXED_SELECTOR, SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
         SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
     # the compile runs in a shell (possibly inside WSL), so give it a POSIX path
     runner = Runner(args.cc, args.wsl, args.wsl_path,
@@ -6266,12 +6306,15 @@ def main():
                         switch_thunks=thunk_switch_selector,
                         engine_track_rom=rom if thunk_switch_selector == music.SELECTOR else None)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
-                    scalar_records = switch_u16_scalar_records(
+                    scalar_records, wide_records = switch_scalar_words(
                         got, addr, scalar_instructions, switch_evidence["switch"], data_relocations,
                         function_relocations, allow_empty=bool(thunk_switch_selector))
-                    if scalar_records or not thunk_switch_selector:
+                    if scalar_records or wide_records or not thunk_switch_selector:
                         switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
                         switch_evidence["scalars"] = scalar_records
+                    if wide_records:
+                        switch_evidence["wide_scalar_policy"] = wide_scalars.POLICY
+                        switch_evidence["wide_scalars"] = wide_records
                     if thunk_switch_selector:
                         if thunk_switch_selector == music.SELECTOR:
                             switch_evidence["engine_tracks"] = music.entry_contract(rom, addr, got)
@@ -6409,7 +6452,7 @@ def main():
                   (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
                    SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA)
                   if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
-                  pool_switch_frame.SCHEMA if "stack_policy" in switch_evidence else
+                  pool_switch_frame.schema(switch_evidence) if "stack_policy" in switch_evidence else
                   (SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
                    SWITCH_FUNCTION_U16_SCALAR_SCHEMA) if "function_policy" in switch_evidence else
                   SWITCH_POOL_U16_SCALAR_SCHEMA if "pool_policy" in switch_evidence else
@@ -6701,7 +6744,7 @@ def main():
                            (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
                             SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY)
                            if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
-                           pool_switch_frame.SUMMARY if "stack_policy" in switch_evidence else
+                           pool_switch_frame.summary(switch_evidence) if "stack_policy" in switch_evidence else
                            (SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
                             SWITCH_FUNCTION_U16_SCALAR_SUMMARY) if "function_policy" in switch_evidence else
                            SWITCH_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
@@ -6710,6 +6753,8 @@ def main():
                            SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
                 f.write(f"* switches: {summary}\n")
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
+                if "wide_scalar_policy" in switch_evidence:
+                    f.write(f"{wide_scalars.report_line()}\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
                                       switch_data_thunks.fingerprint if "thunk_policy" in switch_evidence else
                                       typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else
