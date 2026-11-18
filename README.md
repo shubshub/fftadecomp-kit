@@ -2366,6 +2366,14 @@ local scan with the polling reader and programs the sector. Its O1 report
 binds both copied-code boundary symbols, five direct calls and the progress
 halfword. An invalid sector or exhausted retry loop leaves the counter intact.
 
+The 154-byte flash ID reader at `081418C0` installs a four-byte reader in its
+stack buffer. It enters ID mode with AA/55/90, reads the device byte followed
+by the maker byte, and exits with AA/55/F0/F0. Both delays count 20,000 steps
+in the same local halfword. At O1, removing the local qualifier puts the
+countdowns in a register. Removing the port qualifiers drops the two initial
+AA writes and the repeated F0. The three diagnostic builds and the original
+bus and stack access sequences are checked separately.
+
 * A row has exactly these keys. Addresses are canonical `0x%08X` text. The
   range is even, starts and ends on `config/functions.json` boundaries, holds
   at least two index functions (a unit is a library object, never one

@@ -6252,8 +6252,10 @@ def main():
                 verified_instructions, flash_evidence = flash_profile.native_proof(
                     got, rom, mapping, empty_index, data_mapping, calls, data_relocations, function_relocations,
                     unit_context, unit_orphan)
-            elif unit_context is not None and addr in (0x08141EB8, 0x08141F2C, 0x08142160):
-                if addr == 0x08141EB8:
+            elif unit_context is not None and addr in (0x081418C0, 0x08141EB8, 0x08141F2C, 0x08142160):
+                if addr == 0x081418C0:
+                    import flash_read_id as flash_profile
+                elif addr == 0x08141EB8:
                     import flash_chip_erase as flash_profile
                 elif addr == 0x08142160:
                     import flash_sector_programmer as flash_profile
@@ -6597,7 +6599,7 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
             if flash_evidence is not None:
-                label = {0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer",
+                label = {0x081418C0:"ID reader", 0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer",
                          0x08142000:"retry sector programmer"}[addr]
                 f.write(f"* flash {label}: `{library_units.canonical(flash_evidence)}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")

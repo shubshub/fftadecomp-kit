@@ -93,7 +93,11 @@ def unit_owner(unit, address, orphan):
 
 
 def reader_unit(unit, orphan):
-    return (unit is not None and orphan is not None and
+    return orphan is not None and flash_unit(unit)
+
+
+def flash_unit(unit):
+    return (unit is not None and
             (unit.name,unit.start,unit.end,unit.toolchain,unit.proof) ==
             ('agb_flash FLASH512_V130', bank.OWNER, 0x0814220C, TOOL, 0x0814195C) and
             unit.row['identity'] == [dict(address='0x0836CE28',ascii='FLASH512_V130')])

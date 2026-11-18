@@ -313,6 +313,10 @@ def schemas(unit=None, address=None, orphan=None):
         import flash_sector_programmer
         if flash_sector_programmer.unit_owner(unit, address, orphan):
             admitted.add(flash_sector_programmer.SCHEMA)
+    if address == 0x081418C0:
+        import flash_read_id
+        if flash_read_id.unit_owner(unit, address, orphan):
+            admitted.add(flash_read_id.SCHEMA)
     if address == 0x08141EB8:
         import flash_chip_erase
         if flash_chip_erase.unit_owner(unit, address, orphan):
