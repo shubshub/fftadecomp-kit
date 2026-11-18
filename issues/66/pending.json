@@ -510,7 +510,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0114ba34ef71891bd74f57c039d2bfd47cd9f97564fa2d7e41b35012cb518218",
+        "acknowledged_cursor": 6980501920,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0114ba34ef71891bd74f57c039d2bfd47cd9f97564fa2d7e41b35012cb518218",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813FB7C\",\"who\":\"rainbow-state\",\"claim_id\":6980180821,\"reason\":\"Canonical C now matches all 52 bytes and toolkit 07 replay verifies the initialized CpuSet halfword source and control 0x01000010.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T13:49:33Z",
+          "id": 6980501920,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:49:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1a8b37ee20af97545cdf7707ea0f8b901295eef81134e7636f6d21139c607fe9",
+        "result": {
+          "address": "0x0813FB7C",
+          "claim_id": 6980180821,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980501920,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -542,7 +570,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "df9ddb4542dccec2f9cf016c36bcdabb0880f4f694127a0a9d274fd95b369b2f",
+        "acknowledged_cursor": 6980501920,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "df9ddb4542dccec2f9cf016c36bcdabb0880f4f694127a0a9d274fd95b369b2f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0809E8F8\",\"who\":\"rainbow-menu\",\"claim_id\":6980388472,\"reason\":\"Exact C preserved in Parked/0809E8F8 for profile review\",\"unmatchable\":true,\"tried\":\"Exact 358/358 in native switch linker, switch-thunks-frame-v1 rejects an indirect target after constant stores to separate IWRAM blend registers. Full CFG 139, mapped 179.\"}",
+          "created_at": "2026-11-18T13:49:25Z",
+          "id": 6980498757,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:49:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1a8b37ee20af97545cdf7707ea0f8b901295eef81134e7636f6d21139c607fe9",
+        "result": {
+          "address": "0x0809E8F8",
+          "claim_id": 6980388472,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980498757,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
