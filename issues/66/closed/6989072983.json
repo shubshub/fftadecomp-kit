@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "aa903dbf7b88c763c425b8b3a92c11fefaa928d6ce7a5aa9fcd523f566e29430",
+    "acknowledged_cursor": 6989072983,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "aa903dbf7b88c763c425b8b3a92c11fefaa928d6ce7a5aa9fcd523f566e29430",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08051D50\",\"who\":\"rainbow-state\",\"note\":\"Recover original registered menu callback and verify its pointer consumer, directed branches and native ROM C\"}",
+      "created_at": "2026-11-18T19:22:10Z",
+      "id": 6989072983,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:22:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "497d0f9bb041ea05255e84f5fcf506e2a09eef2515286213d362af3f7399e7f5",
+    "result": {
+      "address": "0x08051D50",
+      "claim_id": 6989072983,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6989072983,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "c0d449a3198645ab45a2647e899e4590427cba32aacc23652a7d82288772f8ae",
+    "acknowledged_cursor": 6989183235,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c0d449a3198645ab45a2647e899e4590427cba32aacc23652a7d82288772f8ae",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08051D50\",\"who\":\"rainbow-state\",\"claim_id\":6989072983,\"reason\":\"Native 98-byte registered button callback matched, saved report replayed, and six CPU button/row cases passed through its actual consumer.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T19:26:36Z",
+      "id": 6989181281,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:26:36Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "089a2e8ecae899bced92d504d00f5308f8d127ad4c1b0f8d382217453acf79d2",
+    "result": {
+      "address": "0x08051D50",
+      "claim_id": 6989072983,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6989181281,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}

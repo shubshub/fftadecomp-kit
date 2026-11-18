@@ -666,6 +666,98 @@
           "who": "rainbow-state"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "c0d449a3198645ab45a2647e899e4590427cba32aacc23652a7d82288772f8ae",
+        "acknowledged_cursor": 6989183235,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c0d449a3198645ab45a2647e899e4590427cba32aacc23652a7d82288772f8ae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08051D50\",\"who\":\"rainbow-state\",\"claim_id\":6989072983,\"reason\":\"Native 98-byte registered button callback matched, saved report replayed, and six CPU button/row cases passed through its actual consumer.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:26:36Z",
+          "id": 6989181281,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:26:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "089a2e8ecae899bced92d504d00f5308f8d127ad4c1b0f8d382217453acf79d2",
+        "result": {
+          "address": "0x08051D50",
+          "claim_id": 6989072983,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989181281,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9164ad1ce50380f79cc0421cf9d9c3202a25ec6eaf92cd2574b754ad15c5a023",
+        "acknowledged_cursor": 6989183235,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9164ad1ce50380f79cc0421cf9d9c3202a25ec6eaf92cd2574b754ad15c5a023",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800DB0C\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T19:26:20Z",
+          "id": 6989175042,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:26:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "089a2e8ecae899bced92d504d00f5308f8d127ad4c1b0f8d382217453acf79d2",
+        "result": {
+          "address": "0x0800DB0C",
+          "claim_id": 6989175042,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989175042,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "265dfcf0047e25aae8343900b0c20e317ea9c65fd23e295110bd406bdc84a2b2",
+        "acknowledged_cursor": 6989183235,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "265dfcf0047e25aae8343900b0c20e317ea9c65fd23e295110bd406bdc84a2b2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08069574\",\"who\":\"astra-sound\",\"note\":\"Reconstruct the second menu button callback and verify its native row/flag inputs\"}",
+          "created_at": "2026-11-18T19:26:40Z",
+          "id": 6989183235,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:26:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "089a2e8ecae899bced92d504d00f5308f8d127ad4c1b0f8d382217453acf79d2",
+        "result": {
+          "address": "0x08069574",
+          "claim_id": 6989183235,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989183235,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      },
       "release": null
     }
   ],
