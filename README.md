@@ -5707,3 +5707,11 @@ base plus the appearance-field displacement. The CPU test compares stack reads,
 all clear writes, RNG effects and the returned pointer using the original callees.
 Set `FFTA_ACTIVE_SELECTION_ROOT` to the recovered game tree to run
 `tests/test_active_entry_selection.py`.
+
+For the USA effect-or-delay starter at `080DCFE4`, the opt-in
+`conditional-scheduler-descriptor-payload-calls-v1` selector keeps the
+two stack layouts distinct at their common BL. It authenticates the
+synchronous zero-phase callback for each and the installed 20-byte
+copy from the effect record. The record must be readable and separate
+from the fresh task. Allocator success, valid independent manager
+storage and the IWRAM installation remain explicit premises.

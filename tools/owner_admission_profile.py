@@ -895,6 +895,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             bindings['calls'] != sorted(proof['calls'] + proof['runtime_calls']):
         raise ValueError('owner bindings do not cover every exact reached external call')
     ordinary.update(data=bindings['data'],functions=bindings['functions'])
+    if selector == local_calls.SCHEDULER_PAYLOAD and address == 0x080DCFE4:
+        import effect_or_delay_task as choice
+        if bindings != choice.BINDINGS:
+            raise ValueError('effect or delay starter requires its exact callback and scheduler relocations')
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
