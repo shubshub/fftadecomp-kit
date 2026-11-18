@@ -5224,12 +5224,24 @@ Unique table partitioning, guard predecessors, complete acyclic CFG, byte
 partition and restoring frame checks are mandatory. Source admission and status
 replay use the same original-ELF verifier and exact manifest.
 
-Only genuine ordinary zero-addend direct calls and local switch relocations are
-admitted. Arithmetic runtimes, indirect thunks, extra named data or function
+The general admission path accepts genuine ordinary zero-addend direct calls
+and local switch relocations. Arithmetic runtimes, indirect thunks, extra named data or function
 words, local pointer materialization, local cycles and mixed runtime policies
 are rejected. Ordinary callee effects remain conditional on the returning ABI;
 this does not prove memory safety, physical separation, numeric equivalence or
 termination. A data-only owner API cannot select this source profile.
+
+The same selector covers the 306-byte menu query at `0804E224` with one
+zero-addend data relocation to the 300-entry halfword table `08529EE4`. Its
+eight outer dispatch slots and 21 inner slots account for all 31 local
+relocations, including both table pointers. The original task getter returns
+the payload at task + 24. Five known call sites pass the full word to a store,
+and the sixth sign-extends its low halfword. On dispatch state 2 the caller
+checks for a nonzero selection. The caller must supply a readable task and
+the backing entries required by its menu type. Type 1 accepts the -1 sentinel;
+types 3–6 using the word bank require a valid entry, and type 8 uses one-based
+selections 1–300. Zero reads the preceding ROM halfword on type 8; 301 reads
+the terminator. A nonzero check alone cannot establish these bounds.
 
 ### Two incoming words with canonical integer calls
 
