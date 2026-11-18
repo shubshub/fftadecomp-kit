@@ -2334,6 +2334,11 @@ Its program-and-verify caller preserves the unsigned byte count across the
 sector program operation and forwards it to the local comparator. A count
 of zero reads neither input. A difference just beyond the prefix is ignored.
 
+ReadFlash at `08141B14` copies the 34-byte cartridge reader and two padding
+bytes into a 128-byte local. The installed routine copies one byte per input
+and output access, starting at the selected sector plus the caller's byte
+offset. The game's header scan uses it to read 128 bytes into its own frame.
+
 The same library unit compiles chip erase at `08141EB8` with
 `--unit-toolchain agbcc-O1-v1`. Its six flash byte writes issue the chip-erase
 command. All four setup records install the same callback and phase-3 wait.

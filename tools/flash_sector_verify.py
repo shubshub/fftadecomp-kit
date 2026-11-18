@@ -43,9 +43,9 @@ def link_object(runner, workspace, args, original, root, relative, rom, mapping,
     return link_member(sys.modules[__name__], runner, workspace, args, original, root, relative)
 
 
-def link_member(member, runner, workspace, args, original, root, relative):
+def link_member(member, runner, workspace, args, original, root, relative, callback_type='FlashVerify'):
     capture.reviewed_source(root, relative, member.ADDRESS,
-                            (*member.TARGETS, member.NAME, 'FlashType', 'FlashSector', 'FlashVerify'), member.SOURCE_DIGEST)
+                            (*member.TARGETS, member.NAME, 'FlashType', 'FlashSector', callback_type), member.SOURCE_DIGEST)
     install.original_pools(original, member.ADDRESS, member.END, member.TEXT_SITES, member.DUPLICATES, OBJECTS)
     runner.sh(f"{args.objcopy} --remove-section=.rodata --remove-section=.rel.rodata {shlex.quote(workspace + '/f.o')}")
     stripped = match.elf_image(runner.read_binary(workspace + '/f.o'))
@@ -113,7 +113,7 @@ def frame_copy(graph, rom):
                 inter_function_padding_bytes=2, padding_ROM_credit=0, thunk=THUNK)
 
 
-def environment(rom, mapping, index, objects):
+def flash_environment(rom, mapping, index, objects):
     bank.provider(rom)
     data_symbols = match.parse_data_symbols(objects)
     require({name: data_symbols.get(name) for name in OBJECTS} == OBJECTS, 'incorrect hardware/descriptor symbols')
@@ -121,6 +121,16 @@ def environment(rom, mapping, index, objects):
     def owner(start, end, count):
         require(span_record(start, end, entries, rows, rom)['instrs'] == count, 'incorrect original extent or count')
         return erase.closure(rom[start-bank.BASE:end-bank.BASE], start, mapping, count=count)
+    require(span_record(THUNK, THUNK+2, entries, rows, rom)['instrs'] == 1 and
+            rom[THUNK-bank.BASE:THUNK+2-bank.BASE] == bytes.fromhex('1847'), 'expected bx r3 runtime veneer')
+    for setup in bank.SETUPS:
+        sector_size, shift, sectors = struct.unpack_from('<IBxH', rom, setup-bank.BASE+24)
+        require((sector_size, shift, sectors) == (4096, 12, 16), 'incorrect installed sector geometry')
+    return owner
+
+
+def environment(rom, mapping, index, objects):
+    owner = flash_environment(rom, mapping, index, objects)
     core, _, calls, _ = owner(COMPARE, COMPARE_END, 23)
     require(not calls and operations(core, COMPARE, COMPARE_END) == [
         'push {r4, r5, lr}', 'adds r5, r0, #0', 'adds r3, r1, #0', 'subs r4, r2, #1', 'cmp r2, #0',
@@ -128,11 +138,6 @@ def environment(rom, mapping, index, objects):
         'adds r5, #1', 'adds r3, #1', 'cmp r1, r0', 'beq #0x8141bd0', 'subs r0, r3, #1', 'b #0x8141bd8',
         'subs r4, #1', 'cmp r4, r2', 'bne #0x8141bc0', 'movs r0, #0', 'pop {r4, r5}', 'pop {r1}', 'bx r1'],
         'copied comparator must read byte pairs and return the first mismatch address or zero')
-    require(span_record(THUNK, THUNK+2, entries, rows, rom)['instrs'] == 1 and
-            rom[THUNK-bank.BASE:THUNK+2-bank.BASE] == bytes.fromhex('1847'), 'expected bx r3 runtime veneer')
-    for setup in bank.SETUPS:
-        sector_size, shift, sectors = struct.unpack_from('<IBxH', rom, setup-bank.BASE+24)
-        require((sector_size, shift, sectors) == (4096, 12, 16), 'incorrect installed sector geometry')
     return owner
 
 

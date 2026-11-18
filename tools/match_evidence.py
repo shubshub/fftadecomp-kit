@@ -1127,6 +1127,12 @@ def report_matches(report, root, address):
         # report must use the default toolchain, and inside a unit the unit's
         # toolchain must emit the same function
         return False
+    if address == 0x08141B14 or '* verification: `elf-symbol-thumb-flash512-read-sector-v1`' in report.splitlines():
+        import flash_read_sector
+        try:
+            return flash_read_sector.report_matches(report, root, address)
+        except (OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
+            return False
     if address == 0x08141C78 or '* verification: `elf-symbol-thumb-flash512-verify-sector-n-bytes-v1`' in report.splitlines():
         import flash_sized_verify
         try:
