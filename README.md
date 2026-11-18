@@ -5251,6 +5251,14 @@ types 3–6 using the word bank require a valid entry, and type 8 uses one-based
 selections 1–300. Zero reads the preceding ROM halfword on type 8; 301 reads
 the terminator. A nonzero check alone cannot establish these bounds.
 
+At `08034E88`, the selector verifies the 364-byte menu callback registered
+in slot 2 of the five-entry runner at `03002720`. The first guarded table has
+one interposed state-pointer word. The second has the state pointer and the
+numeric offset `0x4B9`. All 31 local table relocations, three external state
+words and 19 ordinary calls must agree with the original object and ROM.
+The callback reloads the state pointer for each of its three byte reads.
+Each pointer must still address the requested field after the preceding call.
+
 ### Two incoming words with canonical integer calls
 
 `--owner-runtime-profile canonical-integer-two-words-aligned-data-source-v1`
