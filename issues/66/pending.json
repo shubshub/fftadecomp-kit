@@ -510,7 +510,35 @@
           "who": "rainbow-m4a"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "cd5b3fbb51e8e6a0d7452bf3b396edf7ec963e9e8fe3a4f54db0c2373c32f637",
+        "acknowledged_cursor": 6980894955,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cd5b3fbb51e8e6a0d7452bf3b396edf7ec963e9e8fe3a4f54db0c2373c32f637",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081453F8\",\"who\":\"rainbow-m4a\",\"claim_id\":6980466547,\"reason\":\"MPlayExtender complete 280-byte native MATCH with historic absolute and independently proved callbacks; live source/report replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:05:29Z",
+          "id": 6980894955,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:05:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f6a17fc73dd4e4845f84f1c6e1c071e42adbc02a688201785e2985032bcad455",
+        "result": {
+          "address": "0x081453F8",
+          "claim_id": 6980466547,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980894955,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      }
     },
     {
       "claim": {
@@ -604,6 +632,38 @@
           "request_id": 6980851861,
           "status": "accepted",
           "who": "rainbow-display-impact"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "caade1157219043fb3e30bc07946f120b8da9a3f0247bd3bc50e5e2372805e66",
+        "acknowledged_cursor": 6980894955,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "caade1157219043fb3e30bc07946f120b8da9a3f0247bd3bc50e5e2372805e66",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800F770\",\"who\":\"rainbow-callback\",\"note\":\"Scanline renderer using matched line setup and advance helpers; replay linked caller declarations\"}",
+          "created_at": "2026-11-18T14:05:00Z",
+          "id": 6980882710,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:05:00Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f6a17fc73dd4e4845f84f1c6e1c071e42adbc02a688201785e2985032bcad455",
+        "result": {
+          "address": "0x0800F770",
+          "claim_id": 6980882710,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980882710,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null
