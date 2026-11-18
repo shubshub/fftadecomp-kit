@@ -1883,6 +1883,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f11f9d68b9fff5a831f31af3bdcdde50f8609af4507af4f9ed5c3ba4c358dde6",
+        "acknowledged_cursor": 6991482295,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f11f9d68b9fff5a831f31af3bdcdde50f8609af4507af4f9ed5c3ba4c358dde6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809A48C\",\"who\":\"rainbow-callback\",\"note\":\"Original 164-byte state reset/graphics scene entry, opcodes and ABI from 080231F4.\"}",
+          "created_at": "2026-11-18T20:59:24Z",
+          "id": 6991471625,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:59:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9b4c28921f6362958d80243e1aac009cb693701efe6ffb4ebe866072425167ba",
+        "result": {
+          "address": "0x0809A48C",
+          "claim_id": 6991471625,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6991471625,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3ab28c39564c8b8dc7be92a7837148538f4bdf67a119f20997a093b7bb5b3d5a",
+        "acknowledged_cursor": 6991482295,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3ab28c39564c8b8dc7be92a7837148538f4bdf67a119f20997a093b7bb5b3d5a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805451C\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T20:59:52Z",
+          "id": 6991482295,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:59:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9b4c28921f6362958d80243e1aac009cb693701efe6ffb4ebe866072425167ba",
+        "result": {
+          "address": "0x0805451C",
+          "claim_id": 6991482295,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6991482295,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
