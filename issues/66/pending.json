@@ -1883,6 +1883,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "419c591adee13f2e648a6848f3dd1f2410fea5f13f298cc6ed2c3aa675cb18ec",
+        "acknowledged_cursor": 6993132689,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "419c591adee13f2e648a6848f3dd1f2410fea5f13f298cc6ed2c3aa675cb18ec",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804C8C4\",\"who\":\"rainbow-callback\",\"note\":\"Menu initializer reached by confirmed 0804C888; full native proof.\"}",
+          "created_at": "2026-11-18T22:11:56Z",
+          "id": 6993125723,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:11:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7c6c9cbfb88381998d4a0dd62abea47ec4e1d0f91050b9277d99b3bfd09c5646",
+        "result": {
+          "address": "0x0804C8C4",
+          "claim_id": 6993125723,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6993125723,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f65227c4ab5526266b9f0ff0c90cf92ea601345b82ac63fc073696236159b9cd",
+        "acknowledged_cursor": 6993132689,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f65227c4ab5526266b9f0ff0c90cf92ea601345b82ac63fc073696236159b9cd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080016D4\",\"who\":\"astra-sound\",\"note\":\"\"}",
+          "created_at": "2026-11-18T22:12:16Z",
+          "id": 6993132689,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:12:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "7c6c9cbfb88381998d4a0dd62abea47ec4e1d0f91050b9277d99b3bfd09c5646",
+        "result": {
+          "address": "0x080016D4",
+          "claim_id": 6993132689,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6993132689,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
