@@ -153,7 +153,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             elif match.function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom)) != target:
                 raise ValueError("data-buffer call target is not its canonical function")
         thunk.verify_data_bindings(calls, literals, symbols, entries)
-        proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
+        proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
     if schema == FUNCTION_SCHEMA:
@@ -254,9 +254,10 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay
-# lines may repeat. Anything else, or any indented field, refuses.
+# and BIOS premise lines may repeat. Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* mapping SHA-256", "* control flow",
+          "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list")
@@ -337,6 +338,7 @@ def report_matches(report, root, address):
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
                 [line for line in lines if key(line) == "* buffer loop replay"] == proof.loop_replay_lines() and
+                [line for line in lines if key(line).startswith("* buffer BIOS")] == proof.bios_summary_lines() and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
                                                    functions, objects, proof.fingerprint()) and
                 source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == functions and

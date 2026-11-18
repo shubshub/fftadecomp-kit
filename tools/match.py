@@ -3230,11 +3230,20 @@ class BufferCallProof:
     # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
     # entries become proved leaf calls; None keeps every runtime refused.
     runtime_summaries = None
+    # Plain-path BIOS SWI wrapper summaries (bios_wrapper_summary_profile), set only by
+    # BufferCallProof(..., bios_wrappers=True); None keeps every wrapper walked and refused.
+    bios_summaries = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
-                 loop_replay=False):
+                 loop_replay=False, bios_wrappers=False):
+        if bios_wrappers is not False:
+            if bios_wrappers is not True or type(self) is not BufferCallProof or \
+                    discarded_exit_scratch is not None or bios_fill_proof is not None:
+                raise ValueError("BIOS wrapper summaries require the plain buffer proof")
+            from bios_wrapper_summary_profile import BiosWrapperSummaries
+            self.bios_summaries = BiosWrapperSummaries()
         # Replay is stated in the report (loop_replay_lines) and bound in the fingerprint, so
         # only producers whose reports carry and check those lines may ask for it.
         self.loop_replay = loop_replay is True
@@ -3363,9 +3372,14 @@ class BufferCallProof:
         if self.runtime_summaries is not None and self.runtime_summaries.covers(address):
             return self.runtime_summaries.call(self, address, arguments, stack, incoming,
                                                protected, **context)
+        if self.bios_summaries is not None and self.bios_summaries.covers(address) and (arguments or incoming):
+            # The calls the plain walk would otherwise inspect; the rest stay ordinary.
+            return self.bios_summaries.call(self, address, arguments, stack, incoming,
+                                            protected, **context)
         snapshot = ({callee: set(records) for callee, records in self.loop_replays.items()},
                     dict(self.dependencies), dict(self.callee_clobbers),
                     dict(self.callee_trusted))
+        bios_snapshot = self.bios_summaries.copy() if self.bios_summaries is not None else None
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
@@ -3375,6 +3389,8 @@ class BufferCallProof:
                                      snapshot):
                 ledger.clear()
                 ledger.update(saved)
+            if bios_snapshot is not None:
+                self.bios_summaries.restore(bios_snapshot)
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=True, **context)
 
@@ -3927,6 +3943,10 @@ class BufferCallProof:
                          f"pruned edges {len(pruned)}")
         return lines
 
+    def bios_summary_lines(self):
+        """The BIOS wrapper summary lines; empty unless a summary was applied."""
+        return self.bios_summaries.lines() if self.bios_summaries is not None else []
+
     def fingerprint(self):
         digest = hashlib.sha256()
         if self.bios_fill_proof is not None:
@@ -3953,6 +3973,9 @@ class BufferCallProof:
                                  key=lambda item: json.dumps(item))]
                 for address, records in self.loop_replays.items())],
                 separators=(",", ":")).encode())
+        if self.bios_summaries is not None and self.bios_summaries.observed():
+            # Reports without an applied summary keep their earlier fingerprint.
+            digest.update(self.bios_summaries.digest().encode())
         return digest.hexdigest()
 
 
@@ -5354,6 +5377,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     elif remainder_inventory_context is not None:
         remainder_inventory.finish(data, address, calls, remainder_inventory_context,
                                    instructions.values())
+    if getattr(buffer_proof, "bios_summaries", None) is not None and not buffer_proof.active:
+        buffer_proof.bios_summaries.finish(data, address, instructions, edges)
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -5829,7 +5854,8 @@ def main():
                                args.switch_data_profile or
                                any(t in RUNTIME_HELPERS.values() for t in calls.values())):
                 raise ValueError("self calls are admitted only on the plain direct-call path")
-            buffer_proof = BufferCallProof(rom, mapping if calls else None, loop_replay=True)
+            buffer_proof = BufferCallProof(rom, mapping if calls else None, loop_replay=True,
+                                           bios_wrappers=True)
             if thunk_profile:
                 if args.function_address_profile == function_thunk.UMOD_R1_SELECTOR:
                     from umod_r1_thunk_profile import prove
@@ -6055,7 +6081,8 @@ def main():
                 except ValueError:
                     if not thumb or not calls or self_sites:
                         raise
-                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
+                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
+                                                   bios_wrappers=True)
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,
                                                                       incoming_narrow_reads=True)
@@ -6356,7 +6383,7 @@ def main():
                 summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
                 f.write(f"* buffer calls: {summary}\n")
                 f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-                for line in buffer_proof.loop_replay_lines():
+                for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
                     f.write(line + "\n")
             if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")

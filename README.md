@@ -932,7 +932,8 @@ The matcher tries the existing profiles first. A successful version-2 retry
 requires an inspected buffer call and uses its own profile and summary; it does
 not broaden version-1 evidence. The complete caller and inspected ROM spans are
 bound and replayed as above. The ordinary ABI assumptions still apply, and
-block transfers, interrupts and indirect-call dependencies remain unsupported.
+block transfers, interrupts (other than the summarised BIOS wrappers below) and
+indirect-call dependencies remain unsupported.
 Named data relocations compose with this proof only under the separate schema
 described in "Typed named data beside buffer calls". A proved output-buffer call alone does not
 admit a caller whose later stale-argument or local-buffer calls cannot be proved.
@@ -1016,6 +1017,114 @@ a 44-byte frame) is admitted, and the bound write set then covers its spilled
 locals at `sp+0x18` and `sp+0x1C`. As stated above, the bounds are allocated
 stack words, not C objects.
 
+### GBA BIOS wrappers in plain buffer walks
+
+The plain register and stack buffer proofs (`elf-symbol-thumb-frame-buffer-calls-v1`
+and `-v2`, and their report checks) summarise eight exact BIOS SWI wrappers
+instead of walking them; `tools/bios_wrapper_summary_profile.py` holds the rule.
+A wrapper is reached by such a walk only when a tracked local pointer is live at
+the call, in a register or as a pointer-bearing frame word. Without the summary
+the walk reaches the `svc` and refuses (`non-leaf calls and interrupts require
+linked CFG verification`). A wrapper call with no live pointer stays an ordinary
+ABI call and is not recorded. No owner, addressed, function-literal or switch
+selector uses the summary: it is set only by `BufferCallProof(...,
+bios_wrappers=True)`, which refuses any subclass.
+
+| entry | bytes | SWI | routine | kind |
+|---|---|---|---|---|
+| `08141860` | `0adf7047` | 0x0A | ArcTan2 | scalar |
+| `08141870` | `06df7047` | 0x06 | Div | scalar |
+| `08141874` | `06df081c7047` | 0x06 | Div, remainder in R0 | scalar |
+| `0814187C` | `07df081c7047` | 0x07 | DivArm, remainder in R0 | scalar |
+| `08141898` | `08df7047` | 0x08 | Sqrt | scalar |
+| `0814186C` | `0bdf7047` | 0x0B | CpuSet | memory |
+| `08141868` | `0cdf7047` | 0x0C | CpuFastSet | memory |
+| `08141864` | `0edf7047` | 0x0E | BgAffineSet | memory |
+
+Every summarised call must meet these obligations; each refusal names the wrapper
+(`buffer callee 0x0814186C: ...`):
+
+1. The call has an actual site, and the context is the plain proof (no word
+   provenance, callee frames, single-word stores or forwarded slots): `BIOS
+   wrapper summary requires an actual direct call site`, `BIOS wrapper summaries
+   exclude word-provenance, callee-frame and forwarded-slot contexts`.
+2. The target's complete, unique, non-overlapping indexed Thumb row holds exactly
+   the bytes above: `BIOS <routine> summary requires the exact indexed wrapper
+   bytes`. An interior address, a thunk or a literal is not a wrapper entry and is
+   walked (and refused) as before.
+3. Scalar wrappers, at any walk depth: no tracked local pointer in R0-R3, R12 or LR
+   (`scalar BIOS wrapper refuses a tracked local pointer in R0-R3, R12 or LR`).
+   Pointer-bearing frame words are checked to be allocated local words and left
+   as they are.
+4. Memory wrappers, only at the owner's own call (`BIOS memory wrapper is
+   summarised only at the owner's own call`), with local pointers only in R0, the
+   source, and R1, the destination (`BIOS memory wrapper refuses a local pointer
+   outside R0 and R1`).
+5. The memory obligations are discharged when the owner's CFG is complete. R2 is
+   known only from `bios_cpuset_fill_profile.prove_bits` over the verifier's own
+   owner CFG, with the zero-extension rules of "Zero-extended CpuSet fill
+   controls". The spans follow the layout the kit states for CpuSet: count is bits
+   0-20, the unit is 4 bytes if bit 26 is set and 2 otherwise, bit 24 is a fill
+   from one source unit. CpuFastSet moves 32-bit units in blocks of eight.
+   BgAffineSet reads `count` 20-byte records and writes `count` 16-byte records.
+   * A local fill source (bit 24 set on every path) with no local destination is
+     one unit: 2 bytes when bit 26 is known clear (CpuSet), otherwise one aligned
+     word.
+   * A local destination, or a local source not proved to be a fill source, needs
+     the whole control word (`BIOS copy source or local destination requires the
+     whole control word on every path`), no reserved bit (`BIOS control word sets
+     a reserved bit`), and a count of at least 1 that, for CpuFastSet, is a
+     multiple of 8 (`BIOS control count is zero or not a multiple of eight
+     CpuFastSet words`). BgAffineSet needs an exact count in 1..255 (`BgAffineSet
+     count is not a proven constant in 1..255`) and word-aligned records.
+   * Every unit is an aligned access inside allocated local words (`buffer access
+     is unaligned or outside allocated local words`). A source span holds no
+     pointer-bearing word; a destination span holds no pointer-bearing word and no
+     word carrying the return address (`BIOS source|destination span overlaps a
+     pointer-bearing local word`, `... a return-carrying local word`). A local
+     source and a local destination are disjoint (`BIOS local source and
+     destination overlap`).
+   * Each register that carried a local pointer into the call is written before
+     any read, call, interrupt or return on every path from the call
+     (`match.stack_alias_overwritten_before_use`; `R<n> carried a local pointer
+     into BIOS <routine> and is not written before any read, call or return`).
+6. The call returns no alias; R0-R3, R12 and the flags are unknown scalars
+   afterwards. A destination span holds no word the walk keeps a fact about, so no
+   fact is invalidated.
+
+The behaviour of the routines is a premise, as in every BIOS contract of the kit
+(GBATEK, "BIOS Functions"): each routine returns to its wrapper, preserves SP, and
+reads and writes caller memory only through the spans its documented arguments
+describe. Two further premises are trusted, not proved, because GBATEK does not
+document them: no routine leaves an address of the caller frame in any register
+except, for a memory routine, R0 or R1 when that register carried one in; and
+R4-R11 are preserved (a loop replay that relies on that lists the wrapper as
+`trusted`). R2's bits are proved, as in `BiosFillProof`, with known R4-R11 bits
+surviving the owner's other calls under the conditional returning ABI. No numeric
+result, termination, source initialization, physical readability, or extent or
+nonalias of a non-local pointer is claimed: an external pointer gets no claim.
+
+Evidence: each applied summary is recorded. The report states, in this order:
+
+```
+* buffer BIOS summaries: `gba-bios-swi-wrapper-summaries-v1` <the contract>
+* buffer BIOS premise: GBATEK (BIOS Functions): each routine returns to its wrapper, preserves SP, ...
+* buffer BIOS premise: no routine leaves an address of the caller frame in any register except, ...
+* buffer BIOS premise: R4-R11 are preserved across each summarised call; nothing of the routine is inspected, so this is trusted, not proved
+* buffer BIOS manifest: `<canonical JSON>`
+```
+
+Each premise is on its own line, verbatim. The manifest holds the wrappers used
+and the sites: scalar sites with depth, untouched incoming slots and
+pointer-bearing words; memory sites with R2's known bits, the source and
+destination spans, unit, count and the killed registers, and then also the bit
+rules. The buffer proof fingerprint binds the wrapper bytes as dependencies and
+a digest of the manifest, the contract and the premises. Report replay
+recomputes the five lines and the fingerprint; a proof that applied no summary
+has none of them and keeps its earlier fingerprint, so no existing report
+changes. The report checks that refuse `* buffer loop replay` lines also refuse
+`* buffer BIOS` lines.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the
@@ -1066,8 +1175,8 @@ verified by two schemas, one for each matcher path. Neither needs a selector.
   the plain proof inspected a buffer call and the function has data relocations,
   the matcher reruns it as one composed proof: the version-2 register and stack
   buffer proof with bounded loop replay (`BufferCallProof`, exactly as
-  `elf-symbol-thumb-frame-buffer-calls-v2` runs it, incoming narrow reads
-  included), the typed object literals of `elf-symbol-thumb-data-v1`, and the
+  `elf-symbol-thumb-frame-buffer-calls-v2` runs it, incoming narrow reads and
+  the BIOS wrapper summaries included), the typed object literals of `elf-symbol-thumb-data-v1`, and the
   plain path's call rules: direct calls to indexed Thumb functions and the
   canonical `_call_via_rN` thunks, with the thunk literal and own-span checks.
 * `elf-symbol-thumb-function-data-buffer-calls-v1`, on the function-literal
@@ -1117,7 +1226,8 @@ is relaxed.
 
 The report keeps the generic buffer lines (`* buffer calls:`,
 `* buffer proof SHA-256:`, one `* buffer loop replay:` line per replayed
-callee), the mapping and data-map digests, and adds
+callee, and the five `* buffer BIOS` lines when a BIOS wrapper was summarised),
+the mapping and data-map digests, and adds
 `* data buffer calls:` (the summary and the premise),
 `* data buffer manifest:` (calls, typed object and function bindings and, when
 present, the `numeric_hardware_words` record) and
@@ -4314,10 +4424,11 @@ source and destination refusals, stale manifests and swapped wrappers.
 
 ### Zero-extended CpuSet fill controls
 
-A direct call to the CpuSet wrapper `func_0814186C` is not refused by the buffer walk as such. The default and
-dead-argument walks treat it as an ordinary callee, and the wrapper's `swi` is
+A direct call to the CpuSet wrapper `func_0814186C` is not refused by the buffer walk as such. The
+dead-argument walk treats it as an ordinary callee, and the wrapper's `swi` is
 then refused (`buffer callee 0x0814186C: non-leaf calls and interrupts require
-linked CFG verification`); the BIOS fill selectors replace that inspection with
+linked CFG verification`); the default plain path summarises it (see "GBA BIOS
+wrappers in plain buffer walks"); the BIOS fill selectors replace that inspection with
 `bios_cpuset_fill_profile.BiosFillProof`, which already checks every site: R0
 must be the only local pointer, it is read as one source unit, and bit24 of R2
 must be set on every reaching path. Bit26 chooses the unit width, and when it is
