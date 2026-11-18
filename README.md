@@ -1375,7 +1375,18 @@ Its one variable root halfword is the owner-list load `ldr r0, [r4, #imm5*4]`:
 any aligned word offset from R4 into R0 is accepted, every other code byte is
 fixed, and the report binds the offset as `owner_list_load` (0x18 for
 `0809A77C`, 0x14 for `0809A740`).
-Both retain exact ELF relocation, full-symbol ROM comparison, plausibility,
+The `conditional-flagged-local-state-iterator-v1` selector checks three 72-byte
+wrappers. Each keeps the address of the four-byte state in R4 across the
+initializer, ORs a flag into `state[1]`, passes the updated state through the
+same visitor, and returns `state[0]`. The pinned callback `08098BB0` tests bit
+0 before `080C8260` and bit 1 before `080C84C0`. The observed owner-list offset
+and mask pairs are `(0x14, 1)`, `(0x18, 1)`, and `(0x18, 2)`. The report binds
+the load, update, store, mask and register. R4 must name the very same private
+state as R0 at initialization and the descriptor's first pointer at iteration.
+The scope and nonretention premises apply to this ambient copy as well. The
+original 60-byte selector continues to require its original call interface.
+
+These profiles retain exact ELF relocation, full-symbol ROM comparison, plausibility,
 source/index binding and report replay. Default buffer rules remain unchanged.
 
 These are **conditional effect contracts**. Reports list their assumptions:

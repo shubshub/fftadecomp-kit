@@ -46,6 +46,7 @@ SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
 CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4}
 STATE = 'conditional-local-state-iterator-v1'
+FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
 OUTPUT = 'conditional-local-output-word-call-v1'
 SCHEMAS = {
     SCHEDULER_PROJECTED: 'elf-symbol-thumb-conditional-scheduler-projected-outputs-v1',
@@ -76,6 +77,7 @@ SCHEMAS = {
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
+    FLAGGED_STATE: 'elf-symbol-thumb-' + FLAGGED_STATE,
     OUTPUT: 'elf-symbol-thumb-conditional-local-output-word-call-v1',
 }
 SELECTORS = tuple(SCHEMAS)
@@ -226,6 +228,27 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                     'output-word contract requires one actual indexed output-word call')
             dependencies = (OUTPUT_CALLEE,)
             runtime_names = ()
+        elif self.policy == FLAGGED_STATE:
+            # MOV R4,SP precedes the initializer. The only post-call access
+            # through that alias is flags |= mask on state byte 1.
+            require(len(data) == 72 and calls == {address+16: 0x0814224C, address+42: 0x080C7CC0}
+                    and data[:16] == bytes.fromhex('30b583b0051c0d486c46026868460421')
+                    and data[20:22] == bytes.fromhex('6178')
+                    and data[23:38] == bytes.fromhex('200843607008486946019101aa5060')
+                    and data[40:42] == bytes.fromhex('0649')
+                    and data[46:60] == bytes.fromhex('6846007803b030bc02bc08470000')
+                    and struct.unpack_from('<III', data, 60) == (0x0836D4B8, 0x08098BB1, 0x0809ABE9),
+                    'flagged state contract requires its exact state update and visitor interface')
+            load = struct.unpack_from('<H', data, 38)[0]
+            mask = data[22]
+            require((load, mask) in ((0x6968, 1), (0x69A8, 1), (0x69A8, 2)),
+                    'flagged state contract requires a supported owner list and flag mask')
+            self.owner_list_load = dict(site=address+38, base_register=5, destination_register=0,
+                                        offset=4*((load >> 6) & 31), width=4)
+            self.state_update = dict(load=address+20, store=address+26, state_byte=1,
+                                     operation='or', mask=mask, base_register=4)
+            dependencies = (0x080C7CC0, 0x0809ABE8, 0x080C7B74, 0x08098BB0)
+            runtime_names = ('_call_via_r2', '_call_via_r6')
         else:
             # The one owner-list load at +28 is LDR R0,[R4,#imm5*4]; every other
             # code byte is fixed and the word offset is bound in the report.
@@ -274,7 +297,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_indirect_target(self, address, aliases, returns, *, site):
         if not thunk.reserved(address):
             return
-        require(self.policy == STATE and self.calls.get(site) == address == 0x0814224C,
+        require(self.policy in (STATE, FLAGGED_STATE) and self.calls.get(site) == address == 0x0814224C,
                 'local-buffer indirect call differs from authenticated root')
         require(match.ARM_REG_R0+2 not in aliases and
                 not set(returns) & (set(match.CALLER_CLOBBERED) - {match.ARM_REG_LR}),
@@ -388,12 +411,13 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                     f'scheduler payload contract requires one descriptor+{pointer_field} word addressing the payload')
         else:
             base = -4*len(stack)
+            state_alias = {r0+4: base} if self.policy == FLAGGED_STATE else {}
             if address == 0x0814224C:
-                require(aliases == {r0: base} and not slots and (constants or {}).get(r0+1) == 4,
+                require(aliases == {r0: base, **state_alias} and not slots and (constants or {}).get(r0+1) == 4,
                         'state callback requires its actual local pointer and constant four-byte size')
                 offset, width = base, 4
             else:
-                require(aliases == {r2: base+4} and slots == {base+4: base},
+                require(aliases == {r2: base+4, **state_alias} and slots == {base+4: base},
                         'visitor call requires its exact initialized state-pointer word')
                 offset, width = base, 12
         for start, size in ((offset, width),) + ((payload,) if payload else ()):
@@ -443,7 +467,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         return dict(schema=SCHEMAS[self.policy], runtime_dependencies=self.runtime_dependencies,
             environment=self.environment,
             **({'predicates': self.predicates} if self.policy == SCHEDULER_GUARDED else {}),
-            **({'owner_list_load': self.owner_list_load} if self.policy == STATE else {}),
+            **({'owner_list_load': self.owner_list_load} if self.policy in (STATE, FLAGGED_STATE) else {}),
+            **({'state_flag_update': self.state_update} if self.policy == FLAGGED_STATE else {}),
             **({'branch_calls': self.branch_calls} if self.policy in (SCHEDULER_BRANCH, SCHEDULER_FOLLOWING, SCHEDULER_WIDE, SCHEDULER_24, *LIVE_ALIAS, SCHEDULER_24_FOLLOWING, SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS, SCHEDULER_LOOP, *LOOP_LIVE_ALIAS) else {}),
             observations=[self.observations[s] for s in sorted(self.observations)],
             assumptions=[
@@ -463,6 +488,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                  'private/saved words. Constant n=4 is an interface argument, not a proof of callback behavior. '
                  'Iterator objects and scalar-query callees are valid and separate from the caller frame; '
                  'the visitor record remains unchanged and the known callback accesses only state bytes 0 and 1.')]
+                + (['R4 retains the same private state pointer from before the initializer through the iterator. '
+                    'Both calls preserve R4 and their ambient R4 alias obeys the same bounded state access '
+                    'and nonretention premises. Caller-clobbered pointer values do not survive either call.']
+                   if self.policy == FLAGGED_STATE else [])
                 + ([(f'The descriptor+{PAYLOAD_FIELDS[self.policy]} word is the only local pointer word; it addresses the payload adjacent to the '
                      'descriptor, whose extent is bounded above by the rest of the private frame, recorded as payload_frame_bytes '
                      '(an upper bound, not the payload type size). Payload initialization is not checked. The callback reads '
