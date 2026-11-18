@@ -3894,6 +3894,35 @@ symbolically along every path, and the check requires:
     the next store, a store to a pinned member at that member's width. Only
     that store's own read-modify-write load may intervene, and the value is
     used nowhere else (08122C6C);
+  - a **tested update re-read** (`tested-update-reread-v1`,
+    `tools/volatile_tested_update.py`) for `if (sym.x < 16) sym.x++;`: the
+    source reads the member twice, for the test and for the update, and only
+    the real compile performs both reads (0812BA08, 080BA8E4). The re-read
+    is an unsigned load of the member at its width, not forwarded from a
+    store. The nearest earlier memory access is a load of the same member
+    with the same value in the executor, with only register operations,
+    literal loads and branches in between. A conditional branch there reads
+    flags set by a comparison (`cmp`, `cmn`, `tst`) of that value or of an
+    unchanged copy of it, or by such a copy itself; the flags of a value
+    computed from it (`lsl r3, r0, #24; bmi`) are no test. The re-read
+    feeds, through copies only, one `add` or `sub` of an immediate that is
+    not zero at the member's width. Its result is stored back to the same
+    member, with only that store's own read-modify-write load, register
+    operations that neither read nor overwrite the value, literal loads and
+    unconditional branches in between. Neither the value nor the update's
+    flags may be used after the store. Such a load is skipped only where
+    the pairing of counterparts below fails, and only if the remaining loads
+    then pair up in order with the stripped compile's loads, each pair
+    agreeing in width, signedness, address and executor value, so that both
+    loads of a pair read the same value in ordinary memory. A source that
+    passes without the rule keeps its record, and one that no skip pairs up
+    keeps its refusal. The report lists these loads as `tested-update
+    re-reads at [...]` and prints the rule's premise: nothing writes the member between
+    the update re-read and the read of it just before, which the branch
+    tests, so in ordinary memory the stripped compile's reuse of the tested
+    value computes the same update. The overwritten-store composition, which
+    pairs traces itself, admits no such load.
+    `volatile_tested_update.POLICY.enabled = False` restores the refusal;
   - a **counterpart**: matched in order to the stripped compile's loads of
     the object, with the same address and width;
 * every access overlapping a pinned member to be exactly that member, at its
