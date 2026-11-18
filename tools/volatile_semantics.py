@@ -1922,8 +1922,10 @@ class RomInterfaces:
     Register effects are capstone's (pushes and stores count as reads).  A
     call inside the callee reads what its own callee reads, transitively, and
     writes what that callee writes on every path; recursion, more than
-    MAX_CALLEE_DEPTH levels or MAX_CALLEES callees, a CFG that does not close,
-    a word switch, an unindexed or non-Thumb target, and anything else this
+    MAX_CALLEE_DEPTH levels or MAX_CALLEES callees analysed for one called
+    name (the budget restarts per name, so the budget spent on earlier calls
+    no longer cuts later ones short), a CFG that does not close, a word
+    switch, an unindexed or non-Thumb target, and anything else this
     does not model give UNKNOWN_INTERFACE (reads r0-r3, writes none), so the
     analysis fails closed.  A register the callee never reads cannot carry
     information into it, and one it overwrites on every path carries none
@@ -1947,6 +1949,7 @@ class RomInterfaces:
             return None
         if name not in self.names:
             self.inexact = {}
+            self.budget = MAX_CALLEES
             summary = self.summary(int(found[1], 16), ())[:2]
             self.names[name] = None if summary == UNKNOWN_INTERFACE else summary
         return self.names[name]
