@@ -656,6 +656,12 @@ class ConditionalThunkScratchBufferProof(ConditionalThunkBufferProof, DiscardedR
 class ConditionalThunkRootScratchBufferProof(RootReturnScratchMixin, ConditionalThunkBufferProof):
     """Exact conditional thunk checks plus the closed root-return projection."""
 
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
+        if site == 0x0809A50A and address == 0x080C7CC0 and getattr(self, "_thunk_root", (None,))[0] == 0x0809A48C:
+            import scene_sprite_visitor
+            return scene_sprite_visitor.visit_call(self, aliases, stack, slots, words)
+        return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
+
 
 class ConditionalThunkSelectiveScratchBufferProof(ConditionalThunkScratchBufferProof):
     """Retain observed aliases for normal buffer replay; project only dead ones."""
