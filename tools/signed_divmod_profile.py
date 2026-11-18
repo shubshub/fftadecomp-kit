@@ -14,6 +14,7 @@ import modsi3_profile as remainder
 import odd_remainder_profile as odd_remainder
 import installed_shuffle_profile as shuffle
 import active_entry_shuffle_profile as active_shuffle
+import active_entry_selection_profile as active_selection
 import weighted_effect_profile as weighted_effect
 import stat_drain_profile as stat_drain
 
@@ -22,7 +23,7 @@ SCHEMA = 'elf-symbol-thumb-signed-divmod-numeric-v1'
 SHIFT_SELECTOR = 'numeric-divmod-lsr-v1'
 SHIFT_SCHEMA = 'elf-symbol-thumb-signed-divmod-lsr-v1'
 SCHEMAS = {SELECTOR: SCHEMA, SHIFT_SELECTOR: SHIFT_SCHEMA}
-ACTION_PROFILES = {module.SELECTOR: module for module in (shuffle, active_shuffle, weighted_effect, stat_drain)}
+ACTION_PROFILES = {module.SELECTOR: module for module in (shuffle, active_shuffle, active_selection, weighted_effect, stat_drain)}
 REPORT_SCHEMAS = {**SCHEMAS, odd_remainder.SELECTOR: odd_remainder.SCHEMA, **{name: module.SCHEMA for name, module in ACTION_PROFILES.items()}}
 SUMMARY = 'canonical signed quotient and remainder with existing CFG-proven numeric domains and restoring saves'
 _replay = ContextVar('signed_divmod_replay', default=False)
@@ -148,6 +149,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
         odd_remainder.check_configuration(args)
     if selector == active_shuffle.SELECTOR and args is not None:
         odd_remainder.check_configuration(args, operation='active entry shuffle')
+    if selector == active_selection.SELECTOR and args is not None:
+        odd_remainder.check_configuration(args, operation='active template selection')
     if selector == stat_drain.SELECTOR and args is not None:
         odd_remainder.check_configuration(args, operation='stat-drain divisor switch')
     if selector == odd_remainder.SELECTOR:
@@ -239,7 +242,7 @@ def render(result):
         *(['* the stat lookup may loop; returning paths preserve the native divisor']
           if selector == stat_drain.SELECTOR else []),
         *(['* native memory effects assume an accessible game table, accessible RNG seed and a private stack']
-          if selector == active_shuffle.SELECTOR else []),
+          if selector in (active_shuffle.SELECTOR, active_selection.SELECTOR) else []),
         '* relocations: none', '* source plausibility: plausible',
         f'* compiled : `{result["body"].hex()}`',
         f'* ROM bytes: `{result["body"].hex()}` ({len(result["body"])} bytes)', '',
@@ -314,6 +317,7 @@ def issue(root, address, args):
     proof = {odd_remainder.SELECTOR: 'bounded odd signed remainder',
              weighted_effect.SELECTOR: 'conditional weighted effect callback',
              stat_drain.SELECTOR: 'bounded ROM-table stat-drain division switch',
+             active_selection.SELECTOR: 'initialized template selection, clearing and text lookup',
              active_shuffle.SELECTOR: 'initialized active-entry shuffle and removal',
              shuffle.SELECTOR: 'conditional installed action shuffle'}.get(
                  args.signed_runtime_profile,'signed divmod numeric proof')
