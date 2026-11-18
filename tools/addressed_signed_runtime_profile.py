@@ -43,8 +43,11 @@ COMPILER_MMIO_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-numeric-mm
 COMPILER_MMIO_FOUR_DATA_SELECTOR = 'compiler-signed-runtime-readonly-four-words-numeric-mmio-data-v1'
 COMPILER_MMIO_FOUR_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-readonly-four-words-numeric-mmio-data-v1'
 COMPILER_MMIO_SELECTORS = (COMPILER_MMIO_DATA_SELECTOR, COMPILER_MMIO_FOUR_DATA_SELECTOR)
+# Compiler-emitted __divsi3/__modsi3 names beside canonical _call_via_rN thunks.
+COMPILER_THUNKS_DATA_SELECTOR = 'compiler-signed-runtime-thunks-data-v1'
+COMPILER_THUNKS_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-thunks-data-v1'
 COMPILER_SELECTORS = (COMPILER_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR, COMPILER_THREE_DATA_SELECTOR,
-                      *COMPILER_MMIO_SELECTORS)
+                      *COMPILER_MMIO_SELECTORS, COMPILER_THUNKS_DATA_SELECTOR)
 READONLY_TWO_DATA_SELECTOR = 'addressed-signed-runtime-readonly-two-words-data-v1'
 READONLY_TWO_DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-words-data-v1'
 READONLY_TWO_DATA_SELECTORS = (READONLY_TWO_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR)
@@ -58,7 +61,7 @@ THUNKS_SELECTOR = 'addressed-signed-runtime-thunks-v1'
 THUNKS_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-thunks-v1'
 THUNKS_DATA_SELECTOR = 'addressed-signed-runtime-thunks-data-v1'
 THUNKS_DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-thunks-data-v1'
-THUNK_SELECTORS = (THUNKS_SELECTOR, THUNKS_DATA_SELECTOR)
+THUNK_SELECTORS = (THUNKS_SELECTOR, THUNKS_DATA_SELECTOR, COMPILER_THUNKS_DATA_SELECTOR)
 UNSIGNED_SELECTOR = 'addressed-unsigned-runtime-v1'
 UNSIGNED_SCHEMA = 'elf-symbol-thumb-addressed-unsigned-runtime-v1'
 UNSIGNED_DATA_SELECTOR = 'addressed-unsigned-runtime-data-v1'
@@ -115,7 +118,7 @@ READONLY_FOUR_DATA_SELECTORS = (INTEGER_FOUR_DATA_SELECTOR, COMPILER_MMIO_FOUR_D
 INTEGER_SELECTORS = (INTEGER_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_READONLY_SELECTOR,
                      INTEGER_THREE_DATA_SELECTOR, INTEGER_FOUR_DATA_SELECTOR)
 UNSIGNED_CAPABLE_SELECTORS = (*BIOS_ORDINARY_SELECTORS, *BIOS_SELECTORS, *UNSIGNED_SELECTORS, *INTEGER_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
-                             UNSIGNED_BUFFER_DATA_SELECTOR)
+                             UNSIGNED_BUFFER_DATA_SELECTOR, COMPILER_THUNKS_DATA_SELECTOR)
 CALLBACK_SELECTORS = (CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_DATA_SELECTOR)
 DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
@@ -140,6 +143,7 @@ THUNK_TARGET_POLICY = 'all-path-memory-word-load-target-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
 SCHEMAS = {max_lines.SELECTOR: max_lines.SCHEMA, COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
+            COMPILER_THUNKS_DATA_SELECTOR: COMPILER_THUNKS_DATA_SCHEMA,
             COMPILER_TWO_DATA_SELECTOR: COMPILER_TWO_DATA_SCHEMA,
             COMPILER_THREE_DATA_SELECTOR: COMPILER_THREE_DATA_SCHEMA,
             BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1',
@@ -189,6 +193,14 @@ COMPILER_CONTRACT = ('actual compiler-emitted signed-runtime names at original T
                      'termination or arithmetic C equivalence theorem')
 UNSIGNED_OPERATIONS = {'func_08142AB0': 0x08142AB0,
                        'func_08142B28': unsigned_remainder.ADDRESS}
+# The compiler thunks route also binds the compiler's unsigned runtime names
+# beside a signed one, each to its pinned entry and identity.
+COMPILER_THUNK_ALIASES = dict(COMPILER_ALIASES, __udivsi3='func_08142AB0', __umodsi3='func_08142B28')
+COMPILER_THUNKS_CONTRACT = ('actual compiler-emitted __divsi3/__modsi3, and __udivsi3/__umodsi3 beside them, '
+                            'at original Thumb BL relocations; explicit runtime identifiers excluded from '
+                            'preprocessed C; original and linked ELF names preserved; exact canonical '
+                            'runtime identities; conditional returning ARM ABI only, no numeric result, '
+                            'definedness, termination or arithmetic C equivalence theorem')
 ABI = 'conditional returning ARM ABI; arbitrary incoming word patterns; no numeric return facts'
 _replay = ContextVar('addressed_signed_runtime_replay', default=False)
 
@@ -201,9 +213,14 @@ def text(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'))
 
 
-def compiler_namespace(source):
+def compiler_aliases(selector):
+    return COMPILER_THUNK_ALIASES if selector == COMPILER_THUNKS_DATA_SELECTOR else COMPILER_ALIASES
+
+
+def compiler_namespace(source, selector=COMPILER_DATA_SELECTOR):
     identifiers = set(re.findall(r'[A-Za-z_][A-Za-z_0-9]*', source))
-    if identifiers & (set(COMPILER_ALIASES) | set(COMPILER_ALIASES.values())):
+    aliases = compiler_aliases(selector)
+    if identifiers & (set(aliases) | set(aliases.values())):
         raise ValueError('compiler runtime identifiers cannot occur in preprocessed C')
 
 
@@ -254,7 +271,7 @@ def operations(selector):
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         from bios_cpuset_fill_profile import NAME, ADDRESS
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS, **{NAME:ADDRESS})
-    if selector in INTEGER_SELECTORS:
+    if selector in (*INTEGER_SELECTORS, COMPILER_THUNKS_DATA_SELECTOR):
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS)
     return UNSIGNED_OPERATIONS if selector in (*UNSIGNED_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                                                UNSIGNED_BUFFER_DATA_SELECTOR) else OPERATIONS
@@ -667,13 +684,15 @@ def prepare(data, address, calls, context):
             set(bindings.values()) & set(OPERATIONS) and
             set(bindings.values()) & set(UNSIGNED_OPERATIONS)):
         raise ValueError('mixed integer selector requires actual signed and unsigned calls')
+    if selector == COMPILER_THUNKS_DATA_SELECTOR and not set(bindings.values()) & set(OPERATIONS):
+        raise ValueError('compiler runtime thunks require an actual signed runtime call')
     selected = []
     identities = ((match.UDIVSI3_ADDRESS, match.verify_udivsi3_identity, match.UDIVSI3_IDENTITIES),
                   (unsigned_remainder.ADDRESS, unsigned_remainder.verify_identity,
                    unsigned_remainder.IDENTITIES)) if selector in UNSIGNED_CAPABLE_SELECTORS else tuple(
                        (module.ADDRESS, module.verify_identity, module.IDENTITIES)
                        for module in (quotient, remainder))
-    if selector in (*INTEGER_SELECTORS, *BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
+    if selector in (*INTEGER_SELECTORS, *BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS, COMPILER_THUNKS_DATA_SELECTOR):
         identities += tuple((module.ADDRESS, module.verify_identity, module.IDENTITIES)
                             for module in (quotient, remainder))
     if selector in BIOS_ORDINARY_SELECTORS:
@@ -846,8 +865,9 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
         termination='every reached region has a checked return path; universal termination unproved',
         frame=restored, partition=partition, producer_source_sha256=pins)
     if selector in COMPILER_SELECTORS:
-        aliases = {name: alias for alias, name in COMPILER_ALIASES.items()}
-        context[4]['compiler_runtime'] = dict(contract=COMPILER_CONTRACT,
+        aliases = {name: alias for alias, name in compiler_aliases(selector).items()}
+        context[4]['compiler_runtime'] = dict(
+            contract=COMPILER_THUNKS_CONTRACT if selector == COMPILER_THUNKS_DATA_SELECTOR else COMPILER_CONTRACT,
             calls=[[site-address, aliases[name], name]
                    for site, name in sorted(context[3].items())])
     if selector in BIOS_ORDINARY_SELECTORS:
@@ -1050,10 +1070,10 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                     target_symbol['type'] not in (0, 2) or \
                     sum(item['name'] == name for item in image['symbols']) != 1:
                 raise ValueError('addressed calls require unique undefined zero-valued global functions')
-            canonical = COMPILER_ALIASES.get(name) if selector in COMPILER_SELECTORS else None
+            canonical = compiler_aliases(selector).get(name) if selector in COMPILER_SELECTORS else None
             if canonical is not None and target_symbol['size'] != 0:
                 raise ValueError('compiler runtime symbols require zero original size')
-            if selector in COMPILER_SELECTORS and name in OPERATIONS:
+            if selector in COMPILER_SELECTORS and name in operations(selector):
                 raise ValueError('compiler runtime linking requires original compiler-emitted names')
             target = operations(selector).get(canonical or name)
             if target is None:
@@ -1075,6 +1095,9 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
             calls[address+offset] = target
             targets[name] = target
             occupied.update(range(offset,offset+4))
+    if selector == COMPILER_THUNKS_DATA_SELECTOR and bindings and not data_relocations:
+        # The data-free shape (a callback read from an incoming object) is not admitted here.
+        raise ValueError('compiler runtime thunks require actual typed data')
     if not bindings or with_data and not data_relocations and selector not in COMPILER_MMIO_SELECTORS or any(
                            item['name'] and not item['section'] and item['name'] not in targets
                            for item in image['symbols']):
@@ -1170,7 +1193,7 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
     if selector == max_lines.SELECTOR:
         max_lines.source_use(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     if selector in COMPILER_SELECTORS:
-        compiler_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
+        compiler_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'), selector)
     if selector in CALLBACK_SELECTORS:
         match.function_thunk.namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     if selector in THUNK_SELECTORS:
@@ -1324,6 +1347,8 @@ def render(result):
         premise.append(f'* mapped {register} callback ABI: ' + result['manifest']['callback']['contract'])
     if selector in THUNK_SELECTORS:
         premise.append('* canonical thunk callee ABI: ' + result['manifest']['thunks']['contract'])
+    if selector == COMPILER_THUNKS_DATA_SELECTOR:
+        premise.append('* compiler runtime binding: ' + result['manifest']['compiler_runtime']['contract'])
     evidence = {key:value for key,value in result.items() if key not in
                 ('body','original_elf','assembly','linked_elf')}
     for key in ('body','original_elf','assembly','linked_elf'):
@@ -1419,3 +1444,57 @@ def issue(root, address, args):
     print(f'extent    {len(result["body"])} bytes (complete ELF symbol; conditional addressed runtime ABI)')
     print('verdict MATCH - byte identical')
     return 0
+
+
+class CompilerThunksDefaultPath:
+    """kit #134: compiler __divsi3/__modsi3 beside canonical _call_via_rN thunks.
+
+    The default path's generic call binding refuses any signed runtime next to
+    a thunk, because its leaf walk proves neither a thunk target's provenance
+    nor the absence of local arguments.  This policy hands such a refused
+    function, unchanged, to COMPILER_THUNKS_DATA_SELECTOR, which proves both:
+    the compiler-runtime binding of the compiler selectors (original
+    compiler-emitted names, pinned runtime bodies) and the thunk rule of the
+    thunks selectors (every target a memory word load on every path, no SP
+    materialization, authenticated thunks), with typed named data.  Beside a
+    signed runtime it also binds the unsigned runtimes, as the explicit
+    integer selectors do.  It routes
+    only a run with no selector, the fixed toolchain and no library unit, and
+    only an original object that names both a compiler signed runtime and a
+    thunk.  Set ``enabled`` to False to keep the plain refusal.
+    """
+
+    enabled = True
+    selector = COMPILER_THUNKS_DATA_SELECTOR
+    runtimes = frozenset(COMPILER_ALIASES)
+
+    def applies(self, args, gate, original):
+        import library_units
+        import match
+        # The refusal may come before compile_object returned a parsed ELF image.
+        if not self.enabled or gate is not None or not isinstance(original, dict) or \
+                type(original.get('symbols')) is not list or \
+                args.mode != 'thumb' or args.control_flow_profile != 'ordinary' or args.label or \
+                library_units._selectors(args):
+            return False
+        names = {item['name'] for item in original['symbols'] if not item['section']}
+        return bool(names & self.runtimes) and bool(names & set(match.function_thunk.ALIASES))
+
+    def issue(self, refusal):
+        """The selector's own report writer; a refusal keeps the plain one first."""
+        def routed(root, address, args):
+            selected = argparse.Namespace(**vars(args))
+            selected.addressed_signed_runtime_profile = self.selector
+            try:
+                return issue(root, address, selected)
+            except Exception as error:  # noqa: BLE001 - fail closed to the plain refusal
+                # A deliberate refusal is a ValueError; anything else is named by
+                # its type.  KeyboardInterrupt and SystemExit pass through.
+                if os.environ.get('FFTA_TRACEBACK') not in (None, '', '0'):
+                    raise
+                reason = str(error) if isinstance(error, ValueError) else f'{type(error).__name__}: {error}'
+                sys.exit(f'compile failed:\n{refusal}; compiler signed runtime thunks: {reason}')
+        return routed
+
+
+COMPILER_THUNKS_POLICY = CompilerThunksDefaultPath()
