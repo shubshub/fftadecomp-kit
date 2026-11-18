@@ -880,6 +880,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
+    if selector == local_calls.effect_init.SELECTOR:
+        local_calls.effect_init.check_bindings(bindings)
     if selector == local_calls.SCENE_SCRIPT:
         import scene_script_position
         scene_script_position.check_bindings(address, bindings)

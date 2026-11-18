@@ -11,6 +11,7 @@ import struct
 
 import match
 import scene_scheduler_cpufill as scene_fill
+import effect_scheduler_initializer as effect_init
 import named_data_buffer_profile as named
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
@@ -47,7 +48,7 @@ SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
-CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR)
+CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
@@ -83,6 +84,7 @@ SCHEMAS = {
     SCHEDULER_MANAGER_OFFSET: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_OFFSET,
     SCHEDULER_MANAGER_PATHS: 'elf-symbol-thumb-' + SCHEDULER_MANAGER_PATHS,
     scene_fill.SELECTOR: scene_fill.SCHEMA,
+    effect_init.SELECTOR: effect_init.SCHEMA,
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
@@ -213,7 +215,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
-            self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, calls)
+            scheduler_calls = effect_init.bind(self, data, address, ins, edges, calls) if self.policy == effect_init.SELECTOR else calls
+            self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, scheduler_calls)
             if self.policy == scene_fill.SELECTOR:
                 scene_fill.bind(self, data, address, edges, calls)
             call_sites.bind_forwarding(self, edges)
@@ -325,7 +328,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_indirect_target(self, address, aliases, returns, *, site):
         if not thunk.reserved(address):
             return
-        require(self.policy in (STATE, FLAGGED_STATE, SCHEDULER_ZERO_DESCRIPTOR) and self.calls.get(site) == address == 0x0814224C,
+        require(self.policy in (STATE, FLAGGED_STATE, SCHEDULER_ZERO_DESCRIPTOR, effect_init.SELECTOR) and self.calls.get(site) == address == 0x0814224C,
                 'local-buffer indirect call differs from authenticated root')
         require(match.ARM_REG_R0+2 not in aliases and
                 not set(returns) & (set(match.CALLER_CLOBBERED) - {match.ARM_REG_LR}),
@@ -355,6 +358,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == effect_init.SELECTOR and address == effect_init.THUNK:
+                return effect_init.check_call(self, site, aliases, stack, slots, constants, words)
             if self.policy == scene_fill.SELECTOR and address == scene_fill.bios.ADDRESS:
                 return scene_fill.check_fill(self, address, aliases, stack, slots, site, words)
             if address in call_sites.ENTRIES:
@@ -486,6 +491,8 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
             scheduler = call_sites.manifest(self)
+            if self.policy == effect_init.SELECTOR:
+                return effect_init.manifest(self, scheduler)
             return scene_fill.manifest(self, scheduler) if self.policy == scene_fill.SELECTOR else scheduler
         if self.policy == SCHEDULER_ENTRY_BRANCH:
             import scheduler_entry_branch_profile as entry_branch
