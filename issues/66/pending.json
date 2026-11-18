@@ -571,6 +571,70 @@
           "who": "rainbow-callback"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0d004466e1028cadfe57d9c1431ae6aa394ac1421d7bdac923a54cf57d141afc",
+        "acknowledged_cursor": 6980183005,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0d004466e1028cadfe57d9c1431ae6aa394ac1421d7bdac923a54cf57d141afc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813FB7C\",\"who\":\"rainbow-state\",\"note\":\"Verify SDK CpuSet halfword fill source identity, one local write and the live BIOS argument with scoped native checks\"}",
+          "created_at": "2026-11-18T13:36:37Z",
+          "id": 6980180821,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:36:37Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "208bc3c3465c84ffd406029563d35a976ff140a65f108f372625b46d4f9bbc68",
+        "result": {
+          "address": "0x0813FB7C",
+          "claim_id": 6980180821,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980180821,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4e8cd15c265d9c733fb1686a3685d38a3690676a965eac7dd619c3a3ba9283d6",
+        "acknowledged_cursor": 6980183005,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4e8cd15c265d9c733fb1686a3685d38a3690676a965eac7dd619c3a3ba9283d6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0809D7E4\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T13:36:42Z",
+          "id": 6980183005,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:36:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "208bc3c3465c84ffd406029563d35a976ff140a65f108f372625b46d4f9bbc68",
+        "result": {
+          "address": "0x0809D7E4",
+          "claim_id": 6980183005,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980183005,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
