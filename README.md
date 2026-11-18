@@ -5859,3 +5859,15 @@ including `0xDB`. The caller supplies the needed readable object references.
 The other extended cases leave request halfwords at +22 and +24 uninitialized.
 Callback-specific effects and enforcement of these domains by callers remain
 premises.
+
+The USA scene renderer at `0809A48C` uses the
+`bounded-buffer-conditional-thunks-root-return-scratch-v1` owner profile.
+It renders two 16-byte sprite slots, then conditionally visits a list with
+an eight-byte local callback descriptor. The verifier checks the four frame
+records, the installer and copied IWRAM routines, the activation and expiry
+paths, the list iterator and its adapter. An empty list leaves the descriptor
+address in discarded R2 until the restored root returns. Active slots require
+live sprites and frame indices zero through three. The copied code must remain
+installed, and external objects must remain separate from the private frames.
+Set `FFTA_SCENE_SPRITE_ROOT` to the game tree for the original-code regressions
+in `tests/test_scene_sprite_visitor.py`.

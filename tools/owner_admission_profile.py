@@ -928,6 +928,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
+    if selector == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR and address == 0x0809A48C:
+        import scene_sprite_visitor
+        proof['buffers']['scene_sprite_visitor'] = scene_sprite_visitor.manifest(buffers, data, bindings)
     if selector == local_calls.menu_palette.SELECTOR:
         local_calls.menu_palette.check_bindings(bindings)
     if selector == local_calls.effect_init.SELECTOR:
