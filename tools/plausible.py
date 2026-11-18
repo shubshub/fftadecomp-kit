@@ -723,6 +723,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x0804BF78:
         import tile_cpufill32
         records.append(tile_cpufill32.record(root))
+    if address == 0x0814189C:
+        import flash_bank_command
+        records.append(flash_bank_command.record(root))
     if address == 0x0800DB0C:
         import blend_ramp
         records.append(blend_ramp.record(root))
@@ -895,6 +898,12 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         import tile_cpufill32
         try:
             hardware_qualifiers.update(tile_cpufill32.qualifier_offsets(text, tree, project, closure))
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
+    if relpath == 'src/0814189C.c' and tree is not None and project is not None:
+        import flash_bank_command
+        try:
+            hardware_qualifiers.update(flash_bank_command.qualifier_offsets(text, tree, project, closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
     if relpath == 'src/0800DB0C.c' and tree is not None and project is not None:

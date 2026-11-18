@@ -2225,6 +2225,13 @@ closed set of toolchains a row may name and all the checks:
             "proof": "0x0814195C", "evidence": "why this object was built so"}]}
 ```
 
+The FLASH512_V130 bank-switch routine at `0814189C` writes four ordered bytes
+to the cartridge command bus. Its `agbcc-O1-v1` report recompiles the
+qualifier-stripped control, which drops the first unlock write. All three
+native sector callers test for a 128-KiB device. IdentifyFlash's three ROM
+setup records and its fallback describe 64-KiB devices, so those callers
+skip the bank switch with the installed configurations.
+
 * A row has exactly these keys. Addresses are canonical `0x%08X` text. The
   range is even, starts and ends on `config/functions.json` boundaries, holds
   at least two index functions (a unit is a library object, never one
