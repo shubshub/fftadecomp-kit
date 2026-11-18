@@ -3564,6 +3564,19 @@ writes display shadow RAM at `0x0300098C/D`. Updater `0x08000718` programs DMA0
 to upload those bytes to BLDALPHA. A native execution test follows the original
 installer and scheduler on a three-keyframe input.
 
+The USA history initializer at `0x080C62CC` copies an ordinary word list
+before reading and updating the display shadow. Two script call sites pass
+exactly twelve unit records to a builder with twelve stack slots. Filtering
+can reduce the copied count to zero. Another entry at `0x080C7484` forwards
+the supplied array and signed count unchecked. Its caller must provide at
+most 24 readable, aligned words separate from the allocated state, control
+shadow, animation, palette, installed callbacks and private stack saves.
+A nonpositive count skips the copy. The native proof checks the root heap
+constructor, installed clear and copy routines, and all three compiler objects.
+The ordinary semantic comparison covers the three blend-byte reads, its write
+and the separate display halfword. It assumes successful allocation, stable
+initialized memory and the reviewed callback image resident in IWRAM.
+
 The USA BG3 scroll scene at `0x080EF484` creates a 36-byte scheduler payload
 and a 12-byte scroll child. Its graphics and scheduler heaps occupy separate
 parts of the same EWRAM scene allocation. The child provides 160 halfwords of
