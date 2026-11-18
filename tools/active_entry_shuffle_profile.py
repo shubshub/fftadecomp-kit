@@ -48,6 +48,10 @@ def check_original(image, address, bindings, targets):
         and symbol["size"] == len(image["text"]) == END - ADDRESS,
         "original ELF extent, call, table or relocation role differs",
     )
+    compiler_symbol_roles(image, targets)
+
+
+def compiler_symbol_roles(image, targets):
     for table, symbols in image["symbol_tables"].items():
         for n, row in enumerate(symbols):
             if row["name"] in targets:
@@ -125,8 +129,8 @@ def owner_shape(ins, edges, calls, partition):
     )
 
 
-def initialized_prefix():
-    # Both outcomes of each original halfword test are admitted. n is the exact
+def collection_lengths():
+    # Both outcomes of each original presence test are admitted. n is the exact
     # initialized prefix at that step, not an assumption that all 20 bytes exist.
     lengths = {0}
     for slot in range(20):
@@ -136,6 +140,11 @@ def initialized_prefix():
         )
         lengths |= {n + 1 for n in lengths}
     require(lengths == set(range(21)), "collection lengths differ")
+    return lengths
+
+
+def initialized_prefix():
+    lengths = collection_lengths()
     # At each shuffle step either R4==other and no access occurs, or the two
     # bytes are exchanged. An exchange preserves the initialized prefix and
     # its set of unique collected slot indices across the next step/pass.
@@ -173,14 +182,53 @@ def initialized_prefix():
     )
 
 
-def prove(data, address, rom, mapping, index, objects, bindings):
-    import match
+def native_spans(rom, mapping, index):
     import owner_admission_profile as owner
     import owner_graph_profile as graph
-    import local_long_branch_profile as frame
+    import software_double_profile as canonical
+
+    rows, symbols = canonical.indices(mapping, index)
+
+    def native(start, end, expected_count):
+        record = canonical.span_record(start, end, rows, symbols, rom)
+        raw = rom[start - BASE : end - BASE]
+        refined = owner.refine(raw, start, mapping)
+        ins, edges, branches, calls, table = graph.graph(raw, start, refined)
+        require(
+            not branches
+            and not table
+            and len(ins) == record["instrs"] == expected_count,
+            "callee extent, reachable count or branch role differs",
+        )
+        return raw, ins, edges, calls, graph.partition(raw, start, refined, ins, table)
+
+    return native
+
+
+def rng_and_remainder(native, data, address, calls, site, rom, mapping, index):
     import modsi3_profile as remainder
     import mod_only_structural_inventory as mod_inventory
     import software_double_profile as canonical
+
+    rng, _, _, rng_calls, _ = native(RNG, RNG + 32, 10)
+    require(not rng_calls, "RNG gained a callee")
+    seed = rng_record(rng)
+    require(
+        remainder.verify_context(
+            data, address, calls, (rom, mapping, {site: "__modsi3"})
+        ),
+        "signed remainder call differs",
+    )
+    mod_frame = mod_inventory.runtime_frames(
+        rom, mapping, canonical.prove_remainder_closure(rom, mapping, index)
+    )
+
+    return seed, mod_frame
+
+
+def prove(data, address, rom, mapping, index, objects, bindings):
+    import match
+    import local_long_branch_profile as frame
 
     require(
         address == ADDRESS and bindings == BINDINGS,
@@ -198,38 +246,14 @@ def prove(data, address, rom, mapping, index, objects, bindings):
         ),
         "state, entry table or RNG seed binding differs",
     )
-    rows, symbols = canonical.indices(mapping, index)
-
-    def native(start, end, expected_count):
-        record = canonical.span_record(start, end, rows, symbols, rom)
-        raw = rom[start - BASE : end - BASE]
-        refined = owner.refine(raw, start, mapping)
-        ins, edges, branches, calls, table = graph.graph(raw, start, refined)
-        require(
-            not branches
-            and not table
-            and len(ins) == record["instrs"] == expected_count,
-            "callee extent, reachable count or branch role differs",
-        )
-        return raw, ins, edges, calls, graph.partition(raw, start, refined, ins, table)
-
+    native = native_spans(rom, mapping, index)
     body, ins, edges, calls, partition = native(ADDRESS, END, 71)
     require(data == body, "linked output differs from the ROM owner")
     owner_shape(ins, edges, calls, partition)
     prefix = initialized_prefix()
-    rng, _, _, rng_calls, _ = native(RNG, RNG + 32, 10)
-    require(not rng_calls, "RNG gained a callee")
-    seed = rng_record(rng)
-    require(
-        remainder.verify_context(
-            data, address, calls, (rom, mapping, {address + 0x46: "__modsi3"})
-        ),
-        "signed remainder call differs",
+    seed, mod_frame = rng_and_remainder(
+        native, data, address, calls, address + 0x46, rom, mapping, index
     )
-    mod_frame = mod_inventory.runtime_frames(
-        rom, mapping, canonical.prove_remainder_closure(rom, mapping, index)
-    )
-
     clear, ci, ce, cc, cp = native(CLEAR, CLEAR + 28, 9)
     compact, mi, me, mc, mp = native(COMPACT, COMPACT + 76, 36)
     require(not cc and not mc, "table mutation helper gained a callee")

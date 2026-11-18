@@ -19,6 +19,7 @@ import tempfile
 import analyze
 import installed_shuffle_profile as installed_shuffle
 import active_entry_shuffle_profile as active_shuffle
+import active_entry_selection_profile as active_selection
 import particle_return_scratch_profile as particle
 import weighted_effect_profile as weighted_effect
 import stat_drain_profile as stat_drain
@@ -1139,7 +1140,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                 addend=struct.unpack_from('<I',image['text'],site)[0]
                 result['switches'].append([site,addend]);continue
             if target['section'] or target['value'] or target['bind']!=1 or \
-                    selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR) and target['size'] or \
+                    selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR) and target['size'] or \
                     selector == dma_fill.SELECTOR and (target['size'] or target['type']) or \
                     sum(item['name']==name for item in image['symbols'])!=1:
                 raise ValueError('owner requires unique undefined zero-valued global symbols')
@@ -1155,7 +1156,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                     copy_binding.original_target(image,address,rom,mapping,index,objects,site,target)
                     if selector == copy_binding.SELECTOR and name == 'memcpy' else
                     stat_drain.DIV if selector == stat_drain.SELECTOR and name == '__divsi3' else
-                    installed_shuffle.REMAINDER if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, weighted_effect.SELECTOR) and name == '__modsi3' else
+                    installed_shuffle.REMAINDER if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR) and name == '__modsi3' else
                     integer_native.scalar.OPERATIONS[name] if selector in (integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) and name in integer_native.scalar.OPERATIONS else
                     runtime_summary.NAMES[name] if selector in runtime_summary.SELECTORS and name in runtime_summary.NAMES else
                     thunk.ALIASES[name] if name in thunk.ALIASES else
@@ -1185,7 +1186,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
         copy_binding.check_original(result,targets,image,address,rom,mapping,index,objects)
     if selector == runtime_summary.PARTICLE_SELECTOR:
         particle.check_bindings(address, result)
-    if selector == active_shuffle.SELECTOR:
+    if selector == active_selection.SELECTOR:
+        active_selection.check_original(image,address,result,targets)
+    elif selector == active_shuffle.SELECTOR:
         active_shuffle.check_original(image,address,result,targets)
     elif selector == stat_drain.SELECTOR:
         stat_drain.check_original(image,address,result,targets)
@@ -1256,7 +1259,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     thunk.namespace(preprocessed)
     from plausible import strip_comments_and_strings
     reserved = (r'\b(?:__divsi3|__modsi3|__udivsi3|__umodsi3)\b'
-                if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
+                if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
     if re.search(reserved,strip_comments_and_strings(preprocessed)):
         raise ValueError('division identifiers are reserved for compiler emission')
     bindings,targets=original_bindings(original,address,rom,mapping,objects,selector=selector,index=index)
@@ -1308,7 +1311,7 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
         for site,addend in rodata['sites']:struct.pack_into('<I',expected,site,rodata['base']+addend)
     if bytes(expected)!=linked['text']:
         raise ValueError('linker changed bytes outside exact original relocations')
-    if selector in (small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, active_shuffle.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR):
+    if selector in (small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR):
         small_copy_binding.check_linked(linked,address,targets)
     return linked['text'][:record['size']],bindings
 

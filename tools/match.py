@@ -5683,6 +5683,7 @@ def main():
     args = ap.parse_args()
     isolated_signed = {signed_divmod.odd_remainder.SELECTOR: 'bounded odd remainder',
                        signed_divmod.shuffle.SELECTOR: 'installed action shuffle',
+                       signed_divmod.active_selection.SELECTOR: 'active template selection',
                        signed_divmod.active_shuffle.SELECTOR: 'active entry shuffle',
                        signed_divmod.stat_drain.SELECTOR: 'stat-drain divisor switch'}
     if args.signed_runtime_profile in isolated_signed:

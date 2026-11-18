@@ -5562,3 +5562,24 @@ Set `FFTA_ACTIVE_SHUFFLE_ROOT` to a recovered USA game tree to run
 `tests/test_active_entry_shuffle.py`. Its CPU test compares the original local
 accesses, table contents, RNG state and register restoration for every active
 length from zero to twenty.
+
+### Active-template selection
+
+`--signed-runtime-profile active-template-selection-v1` verifies the 228-byte
+routine at `08128EE0`. It collects physical indices of templates with a nonzero
+packed name into a 20-byte local. An empty collection returns the fixed text
+pointer from slot 744. For a nonempty collection, mode 2 uses the 15-bit RNG
+and signed remainder to select an initialized local byte. Mode 3 selects the
+last maximum appearance byte. Other modes select the last minimum at or below
+99. When every active appearance exceeds 99, the original clears physical
+slot zero, which can be inactive.
+
+The clear helper writes fifteen bytes in the selected 16-byte template and
+preserves byte 4. The original lookup then uses the selected physical slot
+to fetch the return value. All twenty reachable unit IDs have zero redirect
+bytes in the USA records. The verifier checks those rows and their text pointers,
+the complete nested lookup, and the original relocations including the state
+base plus the appearance-field displacement. The CPU test compares stack reads,
+all clear writes, RNG effects and the returned pointer using the original callees.
+Set `FFTA_ACTIVE_SELECTION_ROOT` to the recovered game tree to run
+`tests/test_active_entry_selection.py`.
