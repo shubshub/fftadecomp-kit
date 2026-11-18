@@ -1430,6 +1430,39 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     return linked["text"][:after["size"]]
 
 
+def link_typed_targets(runner, workspace, args, name, address, targets, data_names):
+    """Link an authenticated symbol plan and compare objcopy output with the executable ELF."""
+    definitions = [".syntax unified", ".thumb"]
+    for target_name, target in sorted(targets.items()):
+        if target_name in data_names:
+            definitions.extend((f".global {target_name}", f".type {target_name}, %object",
+                                f".set {target_name}, 0x{target:08X}"))
+        else:
+            definitions.extend((f".global {target_name}", f".type {target_name}, %function",
+                                f".thumb_set {target_name}, 0x{target | 1:08X}"))
+    runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
+    script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
+              ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
+              ".ARM.attributes 0 : { *(.ARM.attributes) } "
+              ".unexpected 0 : { *(.vfp11_veneer) *(.v4_bx) *(.iplt) *(.igot.plt) } "
+              ".rel.iplt 0 : { *(.rel.iplt) } "
+              "ASSERT(SIZEOF(.unexpected) == 0, \"unexpected linker stubs\") "
+              "ASSERT(SIZEOF(.rel.iplt) == 0, \"unexpected dynamic relocations\") "
+              "/DISCARD/ : { *(.comment) *(.note.GNU-stack) } }")
+    runner.write_text(f"{workspace}/f.ld", script)
+    quoted = shlex.quote(workspace)
+    runner.sh(f"export TMPDIR={quoted}; {args.assembler} -mthumb-interwork "
+              f"{quoted}/f.known.s -o {quoted}/f.known.o")
+    runner.sh(f"export TMPDIR={quoted}; {args.linker} --fatal-warnings --no-undefined "
+              f"--no-relax --orphan-handling=error -T {quoted}/f.ld -e {name} "
+              f"{quoted}/f.o {quoted}/f.known.o -o {quoted}/f.elf")
+    runner.sh(f"{args.objcopy} -O binary --only-section=.text {quoted}/f.elf {quoted}/f.linked.bin")
+    linked = elf_image(runner.read_binary(f"{workspace}/f.elf"))
+    if runner.read_binary(f"{workspace}/f.linked.bin") != linked["text"]:
+        raise ValueError("objcopy output does not equal linked ELF .text")
+    return linked
+
+
 def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                rom_image=b'', data_mapping=None, function_relocations=None, switch_relocations=None,
                allow_switch_data=False, udivsi3_bindings=None, allow_preloaded_switch=False,
@@ -1477,34 +1510,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     switch_function_literals=switch_function_literals,
                                                     switch_thunks=switch_thunks)
     data_names = {binding[0] for binding in data_relocations.values()}
-    definitions = [".syntax unified", ".thumb"]
-    for target_name, target in sorted(targets.items()):
-        if target_name in data_names:
-            definitions.extend((f".global {target_name}", f".type {target_name}, %object",
-                                f".set {target_name}, 0x{target:08X}"))
-        else:
-            definitions.extend((f".global {target_name}", f".type {target_name}, %function",
-                                f".thumb_set {target_name}, 0x{target | 1:08X}"))
-    runner.write_text(f"{workspace}/f.known.s", "\n".join(definitions) + "\n")
-    script = (f"SECTIONS {{ .text 0x{address:08X} : {{ *(.text) *(.glue_7) *(.glue_7t) }} "
-              ".data 0 : { *(.data) } .bss 0 : { *(.bss) } "
-              ".ARM.attributes 0 : { *(.ARM.attributes) } "
-              ".unexpected 0 : { *(.vfp11_veneer) *(.v4_bx) *(.iplt) *(.igot.plt) } "
-              ".rel.iplt 0 : { *(.rel.iplt) } "
-              "ASSERT(SIZEOF(.unexpected) == 0, \"unexpected linker stubs\") "
-              "ASSERT(SIZEOF(.rel.iplt) == 0, \"unexpected dynamic relocations\") "
-              "/DISCARD/ : { *(.comment) *(.note.GNU-stack) } }")
-    runner.write_text(f"{workspace}/f.ld", script)
-    quoted = shlex.quote(workspace)
-    runner.sh(f"export TMPDIR={quoted}; {args.assembler} -mthumb-interwork "
-              f"{quoted}/f.known.s -o {quoted}/f.known.o")
-    runner.sh(f"export TMPDIR={quoted}; {args.linker} --fatal-warnings --no-undefined "
-              f"--no-relax --orphan-handling=error -T {quoted}/f.ld -e {name} "
-              f"{quoted}/f.o {quoted}/f.known.o -o {quoted}/f.elf")
-    runner.sh(f"{args.objcopy} -O binary --only-section=.text {quoted}/f.elf {quoted}/f.linked.bin")
-    linked = elf_image(runner.read_binary(f"{workspace}/f.elf"))
-    if runner.read_binary(f"{workspace}/f.linked.bin") != linked["text"]:
-        raise ValueError("objcopy output does not equal linked ELF .text")
+    linked = link_typed_targets(runner, workspace, args, name, address, targets, data_names)
     return (linked_function_bytes(original, linked, name, address, calls, targets,
                                   data_relocations, function_relocations, switch_relocations,
                                   allow_switch_data, udivsi3_bindings, allow_preloaded_switch,
@@ -5692,6 +5698,10 @@ def main():
             sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
         return result
 
+    if unit_context is not None:
+        import unit_float_multiply_profile as multiply
+        if multiply.unit_owner(unit_context["unit"], addr):
+            return selector_issue(multiply.issue)
     if args.unsigned_runtime_profile is not None:
         return selector_issue(unsigned_divmod.issue)
     if args.addressed_signed_runtime_profile is not None:

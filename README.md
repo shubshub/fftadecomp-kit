@@ -2166,7 +2166,8 @@ toolchain. It is refused outside a unit, for a different unit's toolchain,
 together with `--cc`/`--flags`, other toolchain options or non-default WSL
 options. Unit toolchains support ordinary Thumb leaf, frame, direct-call, named-data
 and function-address reports. The dp-bit packer supports its unit-bound logical
-right-shift proof. The m4a memory command supports its registered-track switch proof.
+right-shift proof. The fp-bit multiply and m4a memory command have their own
+unit-bound proofs.
 Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
 nothing refers to it. Such a section is first authenticated with the
 existing compiler-orphan prerequisite, then removed; the remaining `.text`,
@@ -2244,6 +2245,14 @@ probed on the host, not through WSL.
 Other audited runtime calls inside a unit require object agreement with the default
 toolchain. The verifier checks identity bytes and boundaries. The maintainer supplies
 the evidence that a row covers a whole library object.
+
+For fp-bit `__mulsf3` at `0x08143CEC`, `--unit-toolchain old-agbcc-O2-v1`
+checks the original compiler-generated `__muldi3` call, two unpacks, one
+pack and the mapped NaN-record literal. It verifies the 171-instruction CFG,
+the frame on reached returns and the callee argument effects. Paths that
+read the fixed 16-byte NaN record assume those four words are readable.
+The report binds the compiler, unit, indexes, named data and ELF objects
+and replays the source. The proof concerns machine behavior on reached paths.
 
 For MusicPlayer2000's memory command at `0x0814636C`, combine
 `--unit-toolchain old-agbcc-O2-v1` with `--switch-data-profile m4a-engine-track-thunks-v1`.
@@ -3093,6 +3102,15 @@ or a pointer initialized to an external symbol mapped into that register
 window by `config/data_symbols.json`. Such a pointer may only be used for
 member access; retargeting, shadowing and escapes remain rejected. A comment
 alone cannot permit volatile RAM or local variables, asm or steering pragmas.
+
+For the m4a function `src/08145CAC.c` (CgbSound), the five channel-register
+pointers have a separate check in `tools/cgb_registers.py`. The channel loop
+must select all five byte addresses for each of the four channels before the
+first access. Every later use must dereference the selected pointer directly.
+The check validates the literal register matrix, the base byte type and the
+source macros. It permits the qualifiers on those five declarations and
+twenty fixed assignments. Direct wave RAM and sound-control accesses still
+need their own hardware justifications.
 
 **Allowlisted volatile RAM (kit#90):** volatile RAM is otherwise
 allowed only for an object on the maintainer's `tools/volatile_allow.json`
