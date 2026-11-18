@@ -606,7 +606,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f6fe7b019386e1a0adb44dc5203f80391119bb2d5cdb0e1eb791ba925f843733",
+        "acknowledged_cursor": 6986574319,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f6fe7b019386e1a0adb44dc5203f80391119bb2d5cdb0e1eb791ba925f843733",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DA968\",\"who\":\"rainbow-menu\",\"claim_id\":6986413896,\"reason\":\"Parked byte-exact native C (166/166), strict gate rejects the dynamic scanline buffer volatile bitfields.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:40:55Z",
+          "id": 6986574319,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:40:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "174bd5db2c9ac9fa019159992750bffa3b8a36f020e84527be43aaf9f8c70edf",
+        "result": {
+          "address": "0x080DA968",
+          "claim_id": 6986413896,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986574319,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
