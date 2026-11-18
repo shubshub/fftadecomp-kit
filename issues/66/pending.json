@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "eece10e3492dc63ee2236c784ae1264c6e0be5b8b224bb2040287128f210c2fe",
-        "acknowledged_cursor": 6978803761,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "eece10e3492dc63ee2236c784ae1264c6e0be5b8b224bb2040287128f210c2fe",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DF08\",\"who\":\"rainbow-affine\",\"note\":\"Recover 254-byte two-keyframe blend update from ROM and matched initializer 0804DDCC\"}",
-          "created_at": "2026-11-18T12:39:09Z",
-          "id": 6978803761,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:39:09Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "1f81b93e63998e70ac48e11a6d8273f4c5ea70000b0e87b28950ded37b835e0a",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6978803761,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978803761,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "f447e7a4dafb3201e7545602b9f8e7f3c741e991a294a48f86281273187e1af3",
-        "acknowledged_cursor": 6978995044,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "f447e7a4dafb3201e7545602b9f8e7f3c741e991a294a48f86281273187e1af3",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DF08\",\"who\":\"rainbow-affine\",\"claim_id\":6978803761,\"reason\":\"Recovered blend update parked with exact-size nonmatching source; loop code shape unresolved, no matched bytes claimed\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T12:47:25Z",
-          "id": 6978990840,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:47:25Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "01e099044ce1c9a2a08018920f467526056f8c699c2428c545c71bb4efa2fea4",
-        "result": {
-          "address": "0x0804DF08",
-          "claim_id": 6978803761,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6978990840,
-          "status": "accepted",
-          "who": "rainbow-affine"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "48172b9fc79ce12605bb352ef8c8beba35765995f8106d7c5f8e6db07b298f5a",
         "acknowledged_cursor": 6978849419,
         "body_provenance": "acceptance-time",
@@ -571,66 +511,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "3202526f2d19d4f8f12caf26d2d5ba3dc97356372901d8f3bb30865ebf127e8a",
-        "acknowledged_cursor": 6978880462,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "3202526f2d19d4f8f12caf26d2d5ba3dc97356372901d8f3bb30865ebf127e8a",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080701BC\",\"who\":\"rainbow-menu\",\"note\":\"Recover two-row glyph drawing with stack buffer and supported CpuSet copy proof\"}",
-          "created_at": "2026-11-18T12:42:16Z",
-          "id": 6978872663,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:42:16Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4127c681904058bfed7473448d4539f7920beeabb4b01b607c590e8af30397e3",
-        "result": {
-          "address": "0x080701BC",
-          "claim_id": 6978872663,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6978872663,
-          "status": "accepted",
-          "who": "rainbow-menu"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "b52f16ebec34cce13af2dc80664a2e4274f42828d8ab89332a7621fa49be67c1",
-        "acknowledged_cursor": 6978974556,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b52f16ebec34cce13af2dc80664a2e4274f42828d8ab89332a7621fa49be67c1",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080701BC\",\"who\":\"rainbow-menu\",\"claim_id\":6978872663,\"reason\":\"Natural C exact164/164 bytes SHA256e7612bb0d3b8a873822ded2464895ef9429c12176e6f8c2bcb4b20f52bcb8137, parked; decoder08005318 escapes local buffer via global03002BB8.\",\"unmatchable\":true,\"tried\":\"Canonical -mthumb-interwork -O2; strict typed manual linking exact; plain match rejects unsupported buffer pointer use or escape through080CB9E0->08005318; plausible strict passes.\"}",
-          "created_at": "2026-11-18T12:46:42Z",
-          "id": 6978974556,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T12:46:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bc670117249d9508ad763e1a752faf7bd7f22f9cede6b99a385d9e21914026d7",
-        "result": {
-          "address": "0x080701BC",
-          "claim_id": 6978872663,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6978974556,
-          "status": "accepted",
-          "who": "rainbow-menu"
-        }
-      }
     },
     {
       "claim": {
