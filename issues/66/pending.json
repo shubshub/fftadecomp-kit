@@ -571,6 +571,70 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b96f12b55ff40f0baab7205a89f53ef33cd3f6a05f2d8305d3fa433f62cfa32f",
+        "acknowledged_cursor": 6980533167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b96f12b55ff40f0baab7205a89f53ef33cd3f6a05f2d8305d3fa433f62cfa32f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D73AC\",\"who\":\"rainbow-affine-layer\",\"note\":\"Recover affine background setup from matched 080D72C8 and 080D74A4 neighbors. Complete extent, count, and existing callee proof confirmed.\"}",
+          "created_at": "2026-11-18T13:50:07Z",
+          "id": 6980515465,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:50:07Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fcfbd00c5bba68d11f353c5af380055db909e379fd8559a33bf79e4cdc34603a",
+        "result": {
+          "address": "0x080D73AC",
+          "claim_id": 6980515465,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980515465,
+          "status": "accepted",
+          "who": "rainbow-affine-layer"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7fe02fdcb77cc9ab8fb73138ba944313a5b03278c927e6df9d7af17724c70d7c",
+        "acknowledged_cursor": 6980533167,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7fe02fdcb77cc9ab8fb73138ba944313a5b03278c927e6df9d7af17724c70d7c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08029E48\",\"who\":\"rainbow-callback\",\"note\":\"Menu runner tile-state draw with named template and BIOS local zero fill\"}",
+          "created_at": "2026-11-18T13:50:50Z",
+          "id": 6980533167,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:50:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fcfbd00c5bba68d11f353c5af380055db909e379fd8559a33bf79e4cdc34603a",
+        "result": {
+          "address": "0x08029E48",
+          "claim_id": 6980533167,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980533167,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
