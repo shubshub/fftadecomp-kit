@@ -5776,6 +5776,9 @@ def main():
             sys.exit(f"verdict NOT VERIFIED - {error}")
 
     if unit_context is not None:
+        import unit_double_constructor as constructor
+        if constructor.unit_owner(unit_context["unit"], addr):
+            return selector_issue(constructor.issue)
         import unit_float_multiply_profile as multiply
         if multiply.unit_owner(unit_context["unit"], addr):
             return selector_issue(multiply.issue)

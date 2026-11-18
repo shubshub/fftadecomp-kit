@@ -1,0 +1,99 @@
+"""Fixed old-agbcc source capture, ELF replay and receipts for addressed fp-bit members."""
+import argparse
+import os
+from pathlib import Path
+import shutil
+import sys
+import tempfile
+
+import library_units as units
+import software_float_profile as runtime
+
+
+def build(member, root, address, args=None):
+    import match
+    from match_evidence import source_fingerprint, source_paths, mapping_snapshot, data_snapshot, report_rom_path
+    root = Path(root).resolve()
+
+    def inputs():
+        rom_path = report_rom_path(root)
+        return (source_fingerprint(root, address), mapping_snapshot(root), runtime.index_snapshot(root),
+                data_snapshot(root), units.snapshot(root), rom_path, Path(rom_path).read_bytes())
+
+    source, mapping, index, objects, table, _, rom = before = inputs()
+    unit = units.containing(units.parse(table, rom, mapping), address, address + member.END - member.ADDRESS)
+    if not member.unit_owner(unit, address):
+        raise ValueError("fp-bit source requires the pinned complete library unit")
+    tool = units.resolve(member.TOOLCHAIN)
+    config = dict(cc=tool["cc"], flags=tool["flags"], cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
+                  linker=match.DEFAULT_LD, objcopy=match.DEFAULT_OBJCOPY)
+    if args is not None and any(getattr(args, key) != value for key, value in config.items()):
+        raise ValueError("fp-bit source requires the fixed old compiler configuration")
+    args = argparse.Namespace(**config)
+
+    def executables():
+        path = os.path.expandvars(match.DEFAULT_WSL_PATH) + os.pathsep + os.environ["PATH"]
+        names = (args.cc, args.cpp, args.assembler, args.linker, args.objcopy)
+        return {name: units.sha(Path(shutil.which(os.path.expandvars(name), path=path)).read_bytes()) for name in names}
+
+    binaries = executables()
+    candidates = list((root/"src").rglob(f"{address:08X}.c"))
+    if len(candidates) != 1:
+        raise ValueError("fp-bit source requires exactly one source file")
+    relative = candidates[0].relative_to(root)
+    (root/"build").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(dir=root/"build", prefix="fpbit_source_") as directory:
+        capture = Path(directory)
+        for path in source_paths(root, address):
+            dest = capture / path.relative_to(root)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_bytes(path.read_bytes())
+        if source_fingerprint(capture, address) != source:
+            raise ValueError("fp-bit source capture differs")
+        runner = match.Runner(args.cc, "Ubuntu", match.DEFAULT_WSL_PATH, root=capture, timeout=120)
+        with runner.workspace() as workspace:
+            raw, _, original = match.compile_object(runner, workspace, args, capture, address, relative.as_posix())
+            body = member.link_object(runner, workspace, args, original, capture, relative, rom, mapping, index)
+            raw_linked = runner.read_binary(workspace + "/f.elf")
+        checker = Path(__file__).with_name("plausible.py")
+        process = match._run_replay_process([sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
+            [str(path) for path in source_paths(capture, address)], capture, 120)
+        findings, allowed = match.plausibility_result(process, address)
+        if findings or allowed or source_fingerprint(capture, address) != source:
+            raise ValueError("captured fp-bit source changed or is implausible")
+    proof = member.native_proof(body, rom, mapping, index, objects)
+    if inputs() != before or units.resolve(member.TOOLCHAIN) != tool or executables() != binaries:
+        raise ValueError("fp-bit source, ROM, indexes, unit or tool changed during replay")
+    evidence = dict(source=source, functions=units.sha(mapping), index=units.sha(index), objects=units.sha(objects),
+                    rom=units.sha(rom), unit=unit.text, compiler=tool, tool_binaries=binaries, original_elf=units.sha(raw),
+                    linked_elf=units.sha(raw_linked), cfg=proof)
+    report = "\n".join([f"# match report - 0x{address:08X}", "", f"* source: `{relative.as_posix()}`",
+        f"* verification: `{member.SCHEMA}`", f"* source SHA-256: `{source}`",
+        *units.report_lines({"unit": unit, "tool": tool}, None), f"* compiler: `{args.cc} {args.flags}`",
+        member.CONTROL,
+        "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
+        "* source plausibility: plausible", "* hand-asm allow list: not listed",
+        f"* {member.LABEL} evidence: `{units.canonical(evidence)}`",
+        f"* compiled : `{body.hex()}`", f"* ROM bytes: `{body.hex()}` ({len(body)} bytes)", "",
+        f"**MATCH - byte identical** - {len(body)}/{len(body)} bytes", ""])
+    return body, report
+
+
+def issue(member, root, address, args):
+    if args.label:
+        raise ValueError("fp-bit source requires the canonical report name")
+    body, report = build(member, root, address, args)
+    if args.emit:
+        output = (Path(root) / args.emit).resolve()
+        if (Path(root) / "build").resolve() not in output.parents:
+            raise ValueError("--emit requires a new file beneath build/")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with output.open("xb") as stream:
+            stream.write(body)
+    if not args.no_write:
+        path = Path(root) / "docs/match" / f"{address:08X}.md"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(report, encoding="utf-8")
+    print(f"extent    {len(body)} bytes (complete ELF symbol; {member.COUNT} reachable instructions; no relocations)")
+    print("verdict MATCH - byte identical")
+    return 0

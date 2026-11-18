@@ -2258,8 +2258,8 @@ toolchain. It is refused outside a unit, for a different unit's toolchain,
 together with `--cc`/`--flags`, other toolchain options or non-default WSL
 options. Unit toolchains support ordinary Thumb leaf, frame, direct-call, named-data
 and function-address reports. The dp-bit packer supports its unit-bound logical
-right-shift proof. The fp-bit multiply and m4a memory command have their own
-unit-bound proofs.
+right-shift proof. The dp-bit constructor, fp-bit multiply and m4a memory command have their
+own unit-bound proofs.
 Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
 nothing refers to it. Such a section is first authenticated with the
 existing compiler-orphan prerequisite, then removed; the remaining `.text`,
@@ -2337,6 +2337,16 @@ probed on the host, not through WSL.
 Other audited runtime calls inside a unit require object agreement with the default
 toolchain. The verifier checks identity bytes and boundaries. The maintainer supplies
 the evidence that a row covers a whole library object.
+
+For dp-bit `__make_dp` at `0x08143958`, `--unit-toolchain old-agbcc-O2-v1`
+authenticates the 3,552-byte library unit and the original 38-byte function.
+The float extension at `0x08144350` passes the fraction in R3 and the word at
+entry SP. The constructor copies these words, classification, sign and exponent
+into its private 20-byte record. The original packer reads those five words.
+The return restores LR into R3, adjusts SP and branches to R3. Replay binds the
+single Thumb call relocation and excludes the compiler's two-byte alignment NOP
+from the function extent. Native numerical tests cover signed zero, NaN payloads,
+infinities, normal rounding ties and the original packer's truncated subnormals.
 
 For fp-bit `__mulsf3` at `0x08143CEC`, `--unit-toolchain old-agbcc-O2-v1`
 checks the original compiler-generated `__muldi3` call, two unpacks, one
