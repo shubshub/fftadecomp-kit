@@ -36,6 +36,7 @@ SCHEDULER_PAYLOAD = 'conditional-scheduler-descriptor-payload-calls-v1'
 SCHEDULER_PAYLOAD8 = 'conditional-scheduler-descriptor-payload8-calls-v1'
 SCHEDULER_HALFWORD_PAYLOAD = 'conditional-scheduler-halfword-output-payload-v1'
 SCHEDULER_TWO_PAYLOAD = 'conditional-scheduler-two-payload-calls-v1'
+SCHEDULER_ZERO_DESCRIPTOR = 'conditional-scheduler-zero-descriptor-v1'
 SCHEDULER_ENTRY = 'conditional-scheduler-entry-descriptor-calls-v1'
 SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1'
 SCHEDULER_MANAGER_FIELD = 'conditional-scheduler-indirect-manager-v1'
@@ -69,6 +70,7 @@ SCHEMAS = {
     SCHEDULER_PAYLOAD8: 'elf-symbol-thumb-conditional-scheduler-descriptor-payload8-calls-v1',
     SCHEDULER_HALFWORD_PAYLOAD: 'elf-symbol-thumb-conditional-scheduler-halfword-output-payload-v1',
     SCHEDULER_TWO_PAYLOAD: 'elf-symbol-thumb-conditional-scheduler-two-payload-calls-v1',
+    SCHEDULER_ZERO_DESCRIPTOR: 'elf-symbol-thumb-' + SCHEDULER_ZERO_DESCRIPTOR,
     SCHEDULER_ENTRY: 'elf-symbol-thumb-conditional-scheduler-entry-descriptor-calls-v1',
     SCHEDULER_ENTRY_BRANCH: 'elf-symbol-thumb-' + SCHEDULER_ENTRY_BRANCH,
     SCHEDULER_MANAGER_FIELD: 'elf-symbol-thumb-conditional-scheduler-indirect-manager-v1',
@@ -201,6 +203,11 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             call_sites.bind_forwarding(self, edges)
             dependencies = tuple(self.scheduler_call_sites['dependencies'])
             runtime_names = call_sites.RUNTIME_NAMES
+        elif self.policy == SCHEDULER_ZERO_DESCRIPTOR:
+            import scheduler_zero_descriptor as descriptor
+            descriptor.bind(self, data, address, ins, edges, calls)
+            dependencies = self.scheduler_entry['dependencies']
+            runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy == SCHEDULER_ENTRY_BRANCH:
             import scheduler_entry_branch_profile as entry_branch
             self.scheduler_entry, self.scheduler_entry_branches = entry_branch.bind(data, address, ins, edges, calls)
@@ -297,7 +304,7 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_indirect_target(self, address, aliases, returns, *, site):
         if not thunk.reserved(address):
             return
-        require(self.policy in (STATE, FLAGGED_STATE) and self.calls.get(site) == address == 0x0814224C,
+        require(self.policy in (STATE, FLAGGED_STATE, SCHEDULER_ZERO_DESCRIPTOR) and self.calls.get(site) == address == 0x0814224C,
                 'local-buffer indirect call differs from authenticated root')
         require(match.ARM_REG_R0+2 not in aliases and
                 not set(returns) & (set(match.CALLER_CLOBBERED) - {match.ARM_REG_LR}),
@@ -319,6 +326,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                 self.forwarded_stack_arguments = forwarding
         require(self.calls.get(site) == address and not words,
                 'local-buffer call differs from its authenticated interface')
+        if self.policy == SCHEDULER_ZERO_DESCRIPTOR:
+            import scheduler_zero_descriptor as descriptor
+            return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
             if address in call_sites.ENTRIES:
@@ -438,6 +448,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         return {}
 
     def contract_manifest(self):
+        if self.policy == SCHEDULER_ZERO_DESCRIPTOR:
+            import scheduler_zero_descriptor as descriptor
+            return descriptor.manifest(self)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
             return call_sites.manifest(self)
