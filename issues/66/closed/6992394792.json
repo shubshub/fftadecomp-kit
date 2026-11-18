@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "34dd9f1087012bb4150c182fe702c3b4b2931bb782aa04a54dfad2c62aee2085",
+    "acknowledged_cursor": 6992394792,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "34dd9f1087012bb4150c182fe702c3b4b2931bb782aa04a54dfad2c62aee2085",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141BE0\",\"who\":\"astra-combat\",\"note\":\"Recover FLASH512 sector verification in initialized save configurations and replay original local compare routine.\"}",
+      "created_at": "2026-11-18T21:39:05Z",
+      "id": 6992394792,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:39:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "19063c26056cf41aef2965e75665277db25f62d8f9d8f583bd0f93c4ff564076",
+    "result": {
+      "address": "0x08141BE0",
+      "claim_id": 6992394792,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6992394792,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f8ef31a38a975f808d1c05a2895ad24c0db642fefee222d9e9775ca5a32e9a9b",
+    "acknowledged_cursor": 6992612035,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f8ef31a38a975f808d1c05a2895ad24c0db642fefee222d9e9775ca5a32e9a9b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141BE0\",\"who\":\"astra-combat\",\"claim_id\":6992394792,\"reason\":\"Complete 152 bytes and 60 instructions matched; live pair passed official kit PR 331 and was handed to coordinator.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T21:48:31Z",
+      "id": 6992612035,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:48:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c522532c62df423d15e13cc76a9f95749b341fd354744a4ada27c3c2cbbb4de9",
+    "result": {
+      "address": "0x08141BE0",
+      "claim_id": 6992394792,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6992612035,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  }
+}
