@@ -1133,6 +1133,9 @@ def report_matches(report, root, address):
             return flash_reader_install.report_matches(report, root, address)
         except (OSError, RuntimeError, ValueError, TypeError, KeyError, IndexError, subprocess.SubprocessError):
             return False
+    if address == 0x08142160 or '* verification: `elf-symbol-thumb-flash-sector-programmer-v1`' in report.splitlines():
+        import flash_sector_programmer
+        return flash_sector_programmer.replay(report, root, address)
     if address == 0x08141EB8 or '* verification: `elf-symbol-thumb-flash-chip-reader-v1`' in report.splitlines():
         import flash_chip_erase
         return flash_chip_erase.replay(report, root, address)

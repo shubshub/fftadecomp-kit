@@ -5790,7 +5790,7 @@ def main():
     # inside a unit the default toolchain was checked against this source only
     consistent_source = gate["source"] if isinstance(gate, dict) and "source" in gate else None
     unit_orphan = None
-    flash_erase_evidence = None
+    flash_evidence = None
     # an allowlisted volatile object is checked once, here, ahead of every
     # selector: the selectors below write their own reports
     volatile_records, volatile_finding, volatile_source = allowlisted_volatile_check(ROOT, addr, args)
@@ -6234,12 +6234,15 @@ def main():
                     verified_instructions, _ = verify_switches(
                         got, addr, rom, mapping, switch_evidence,
                         data_mapping=data_mapping if data_relocations else None)
-            elif unit_context is not None and addr in (0x08141EB8, 0x08141F2C):
+            elif unit_context is not None and addr in (0x08141EB8, 0x08141F2C, 0x08142160):
                 if addr == 0x08141EB8:
-                    import flash_chip_erase as erase_profile
+                    import flash_chip_erase as flash_profile
+                elif addr == 0x08142160:
+                    import flash_sector_programmer as flash_profile
+                    flash_profile.check_source(ROOT)
                 else:
-                    import flash_sector_erase as erase_profile
-                verified_instructions, flash_erase_evidence = erase_profile.native_proof(
+                    import flash_sector_erase as flash_profile
+                verified_instructions, flash_evidence = flash_profile.native_proof(
                     got, rom, mapping, empty_index, data_mapping, calls, data_relocations, unit_context, unit_orphan)
             elif function_relocations:
                 objects = parse_data_symbols(data_mapping) if data_relocations else {}
@@ -6369,9 +6372,9 @@ def main():
         control_flow = inert_spin.CONTROL_FLOW
     if thunk_profile:
         control_flow = function_thunk.CONTROL_FLOW
-    if flash_erase_evidence is not None:
-        schema = erase_profile.SCHEMA
-        control_flow = erase_profile.CONTROL
+    if flash_evidence is not None:
+        schema = flash_profile.SCHEMA
+        control_flow = flash_profile.CONTROL
     print(f"extent    {span} bytes (complete ELF symbol; {control_flow}; no relocations)")
     want = rom[addr - ROM_BASE: addr - ROM_BASE + span]
     got_body = got
@@ -6423,7 +6426,7 @@ def main():
         sys.exit("function mapping changed during verification; re-run match.py")
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
-    if flash_erase_evidence is not None and empty_body.index_snapshot(ROOT) != empty_index:
+    if flash_evidence is not None and empty_body.index_snapshot(ROOT) != empty_index:
         sys.exit("flash sector index changed during verification; re-run match.py")
     if unit_context is not None:
         if schema not in library_units.schemas(unit_context["unit"], addr, unit_orphan):
@@ -6575,8 +6578,9 @@ def main():
                     f"{' (' + args.label + ')' if args.label else ''}\n\n")
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
-            if flash_erase_evidence is not None:
-                f.write(f"* flash {'chip' if addr == 0x08141EB8 else 'sector'} reader: `{library_units.canonical(flash_erase_evidence)}`\n")
+            if flash_evidence is not None:
+                label = {0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer"}[addr]
+                f.write(f"* flash {label}: `{library_units.canonical(flash_evidence)}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
             if empty_profile:
                 f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")

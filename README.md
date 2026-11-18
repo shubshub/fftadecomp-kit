@@ -2318,6 +2318,15 @@ returns the wait result. The reader address remains published when the local
 buffer expires. Stripping the six port qualifiers drops four writes and the
 original wait returns `0xC003` on timeout with busy readback.
 
+The sector programmer at `08142160` uses the same O1 library unit. IdentifyFlash
+installs it for chip IDs `1B32` and `1CC2`. For sectors 0 through 15 it erases
+one sector, reinstalls the local polling reader, and programs 4,096 bytes.
+The original counter at `0200F374` decreases after each successful byte.
+On byte-program failure it includes the byte whose write was issued and whose
+poll failed. Invalid sectors and erase failures leave the incoming counter
+untouched. The report assumes stable source bytes and the original exclusively
+owned controller, timer and reader state during the synchronous operation.
+
 * A row has exactly these keys. Addresses are canonical `0x%08X` text. The
   range is even, starts and ends on `config/functions.json` boundaries, holds
   at least two index functions (a unit is a library object, never one
