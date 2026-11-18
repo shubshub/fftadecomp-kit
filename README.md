@@ -1612,6 +1612,21 @@ Valid external heap objects, entries that survive the free, and a writable menu
 destination remain runtime conditions. Set `FFTA_UNIT_OUTPUT_ROOT` to the indexed
 USA game checkout to run `tests/test_unit_entry_output.py`.
 
+The 176-byte equipment attribute routine at `0812F5E0` uses
+`--owner-runtime-profile conditional-unit-equipment-attribute-v1`. Its caller
+must supply a stable, live five-slot loadout with at most two qualifying items.
+A nonzero item qualifies when ROM field 6 is 1 or 2 and field 3 differs from 20.
+Under this condition, the original collector, sorter and consumer stay within
+the two local halfwords. Attribute 10 skips selected items and begins with a
+supplied item value or the unit default. Attribute 12 adds every equipped item.
+The unit status bit can return zero before any collection.
+
+The verifier checks the installed equipment-copy routine and the initial
+loadouts of 42 actor definitions in scene groups 1, 2, 4, 23 and 37. Runtime
+edits and the second battle caller retain the same loadout precondition.
+Set `FFTA_EQUIPMENT_ATTRIBUTE_ROOT` to an indexed USA game checkout with
+the saved report to run `tests/test_unit_equipment_attribute.py`.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
