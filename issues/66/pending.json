@@ -1794,66 +1794,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "af02a3da0772c91f831d1baaac1cf36b073399f60a71eb737279880fc0ee3459",
-        "acknowledged_cursor": 6992207751,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "af02a3da0772c91f831d1baaac1cf36b073399f60a71eb737279880fc0ee3459",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800CBFC\",\"who\":\"rainbow-state\",\"note\":\"Check provenance of affine scale destination in scanline payload versus DMA-visible staging buffers\"}",
-          "created_at": "2026-11-18T21:30:04Z",
-          "id": 6992193791,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:30:04Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6529aa807c4eb0403aa909d2c32cb74b1879c940d14bedf4802a235d90c2183a",
-        "result": {
-          "address": "0x0800CBFC",
-          "claim_id": 6992193791,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6992193791,
-          "status": "accepted",
-          "who": "rainbow-state"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "78f445209cc55abdea1dd0ffdeeb0d8ac35777c8ee759454fd91b40b3756c7ea",
-        "acknowledged_cursor": 6992207751,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "78f445209cc55abdea1dd0ffdeeb0d8ac35777c8ee759454fd91b40b3756c7ea",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800CBFC\",\"who\":\"rainbow-state\",\"claim_id\":6992193791,\"reason\":\"Cross-checked CPU-owned scale payload vs separate render banks and DMA source. Existing Parked source already records ordinary-store mismatch; no changes.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T21:30:42Z",
-          "id": 6992207751,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T21:30:42Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "6529aa807c4eb0403aa909d2c32cb74b1879c940d14bedf4802a235d90c2183a",
-        "result": {
-          "address": "0x0800CBFC",
-          "claim_id": 6992193791,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6992207751,
-          "status": "accepted",
-          "who": "rainbow-state"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "bc3101bbabe1261ad3956725cdd86ac1b306ad91f319abdf2e39f86f2c6ab42c",
         "acknowledged_cursor": 6992207751,
         "body_provenance": "acceptance-time",
