@@ -1310,7 +1310,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2d18d8c0cb0866296ae9dd1daf440b1907273a00de5d1a3e4d9310476309346c",
+        "acknowledged_cursor": 6990210119,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2d18d8c0cb0866296ae9dd1daf440b1907273a00de5d1a3e4d9310476309346c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08036034\",\"who\":\"rainbow-menu\",\"claim_id\":6990094302,\"reason\":\"Parked exact 196 bytes; original stack cursor compare and null slot ID read preceding guard tested on seven native scenarios.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:09:19Z",
+          "id": 6990210119,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:09:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6a7f2e36a58feda46474528f43b9d861c1a29aeefeb86d52514e00be191e09cc",
+        "result": {
+          "address": "0x08036034",
+          "claim_id": 6990094302,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990210119,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -1374,7 +1402,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7d26440fc992f3464cbbf989099c240477a560c3d10873e3f891f6e7f8d7ede8",
+        "acknowledged_cursor": 6990210119,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7d26440fc992f3464cbbf989099c240477a560c3d10873e3f891f6e7f8d7ede8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800BE08\",\"who\":\"rainbow-state\",\"claim_id\":6990175911,\"reason\":\"Original tile animation accessor matched all 4 bytes; live canonical saved report and original game-created-node behavior replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T20:09:14Z",
+          "id": 6990208135,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:09:14Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6a7f2e36a58feda46474528f43b9d861c1a29aeefeb86d52514e00be191e09cc",
+        "result": {
+          "address": "0x0800BE08",
+          "claim_id": 6990175911,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6990208135,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     }
   ],
   "issue": 66,
