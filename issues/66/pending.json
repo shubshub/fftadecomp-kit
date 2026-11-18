@@ -574,66 +574,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "ded24639babab13cd38f9ff7ba5e94cd6fccd400a2a0bea84e0ceaf29660d844",
-        "acknowledged_cursor": 6987279627,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "ded24639babab13cd38f9ff7ba5e94cd6fccd400a2a0bea84e0ceaf29660d844",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804BBC0\",\"who\":\"rainbow-map-route\",\"note\":\"Independently rebuild the parked graph worker, check native accesses and real caller-domain conditions without assuming the 30-node input range.\"}",
-          "created_at": "2026-11-18T18:09:55Z",
-          "id": 6987279627,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T18:09:55Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "13f400a1396909560e1823638bd4192e5f1974f37e34de6ba0509c91121b12eb",
-        "result": {
-          "address": "0x0804BBC0",
-          "claim_id": 6987279627,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6987279627,
-          "status": "accepted",
-          "who": "rainbow-map-route"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "d3b773cbc4d1a6d2f7e8288c91b39e44554a2745a7f95487a26681a20de6cdea",
-        "acknowledged_cursor": 6987346910,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "d3b773cbc4d1a6d2f7e8288c91b39e44554a2745a7f95487a26681a20de6cdea",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804BBC0\",\"who\":\"rainbow-map-route\",\"claim_id\":6987279627,\"reason\":\"396/396 linked worker, eight native full-pair path cases and independent graph diameter 8. Missing caller-domain invariant across five call sites; stays Parked.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T18:12:40Z",
-          "id": 6987346910,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T18:12:40Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "a06d645a5105b1b68a05b740094ccb84257712f6ee9582a3c82347ac6f3f9c98",
-        "result": {
-          "address": "0x0804BBC0",
-          "claim_id": 6987279627,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6987346910,
-          "status": "accepted",
-          "who": "rainbow-map-route"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "001351fca61b793fb79f513ab966266a23be5f16562e92073285dff8f619720c",
         "acknowledged_cursor": 6987326764,
         "body_provenance": "acceptance-time",
