@@ -2287,6 +2287,15 @@ native sector callers test for a 128-KiB device. IdentifyFlash's three ROM
 setup records and its fallback describe 64-KiB devices, so those callers
 skip the bank switch with the installed configurations.
 
+The same library unit compiles chip erase at `08141EB8` with
+`--unit-toolchain agbcc-O1-v1`. Its six flash byte writes issue the chip-erase
+command. All four setup records install the same callback and phase-3 wait.
+The callback copies the four-byte reader into its 64-byte local buffer, polls
+the first flash byte for `0xFF`, restores the WAITCNT low bits to three and
+returns the wait result. The reader address remains published when the local
+buffer expires. Stripping the six port qualifiers drops four writes and the
+original wait returns `0xC003` on timeout with busy readback.
+
 * A row has exactly these keys. Addresses are canonical `0x%08X` text. The
   range is even, starts and ends on `config/functions.json` boundaries, holds
   at least two index functions (a unit is a library object, never one

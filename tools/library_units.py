@@ -289,6 +289,10 @@ def schemas(unit=None, address=None, orphan=None):
     admitted = {evidence.SCHEMA, evidence.FRAMED_SCHEMA, evidence.LINKED_SCHEMA,
                 evidence.FRAMED_LINKED_SCHEMA, evidence.DATA_SCHEMA, evidence.FRAMED_DATA_SCHEMA,
                 evidence.FUNCTION_ADDRESS_SCHEMA, evidence.FRAMED_FUNCTION_ADDRESS_SCHEMA}
+    if address == 0x08141EB8:
+        import flash_chip_erase
+        if flash_chip_erase.unit_owner(unit, address, orphan):
+            admitted.add(flash_chip_erase.SCHEMA)
     if address == 0x08141F2C:
         import flash_sector_erase
         if flash_sector_erase.unit_owner(unit, address, orphan):

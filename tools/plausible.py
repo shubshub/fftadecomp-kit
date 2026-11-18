@@ -723,6 +723,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x0804BF78:
         import tile_cpufill32
         records.append(tile_cpufill32.record(root))
+    if address == 0x08141EB8:
+        import flash_chip_erase
+        records.append(flash_chip_erase.record(root))
     if address == 0x08141F2C:
         import flash_sector_erase
         records.append(flash_sector_erase.record(root))
@@ -904,6 +907,12 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         import tile_cpufill32
         try:
             hardware_qualifiers.update(tile_cpufill32.qualifier_offsets(text, tree, project, closure))
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
+    if relpath == 'src/08141EB8.c' and tree is not None and project is not None:
+        import flash_chip_erase
+        try:
+            hardware_qualifiers.update(flash_chip_erase.qualifier_offsets(text, tree, project, closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
     if relpath == 'src/08141F2C.c' and tree is not None and project is not None:

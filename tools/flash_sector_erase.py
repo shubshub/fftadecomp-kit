@@ -32,7 +32,7 @@ SPANS = {
     OWNER: (END,60), INSTALL: (0x08141AEE,24), READER: (INSTALL,2), WAIT: (0x08141EB8,55),
     0x08142000: (0x08142124,120), 0x08142160: (0x0814220C,66),
 }
-BODY = '''struct FlashSector {
+FLASH_DECLARATIONS = '''struct FlashSector {
     u32 size;
     u8 shift;
     u16 count;
@@ -54,8 +54,9 @@ struct FlashType {
 
 extern const struct FlashType *data_0200F370;
 extern u16 (*data_0200F368)(u8 phase, u8 *address, u8 lastData);
-extern void func_08141AB0(u16 *target);
+extern void func_08141AB0(u16 *target);'''
 
+BODY = FLASH_DECLARATIONS + '''
 
 u16 func_08141F2C(u16 sector)
 {
@@ -88,7 +89,11 @@ def require(ok, message):
 
 
 def unit_owner(unit, address, orphan):
-    return (address == OWNER and unit is not None and orphan is not None and
+    return address == OWNER and reader_unit(unit, orphan)
+
+
+def reader_unit(unit, orphan):
+    return (unit is not None and orphan is not None and
             (unit.name,unit.start,unit.end,unit.toolchain,unit.proof) ==
             ('agb_flash FLASH512_V130', bank.OWNER, 0x0814220C, TOOL, 0x0814195C) and
             unit.row['identity'] == [dict(address='0x0836CE28',ascii='FLASH512_V130')])
@@ -115,28 +120,32 @@ def qualifier_offsets(text, tree, project, closure):
 
 
 def stripped_build(root):
+    return stripped_reader_build(root, OWNER, SOURCE, NAME, 136, STRIPPED,
+        ((60,10,'func_08141AB0'),(74,10,program.VENEER),(104,2,'data_0200F370'),(116,2,program.WAIT)))
+
+
+def stripped_reader_build(root, address, source, name, size, digest, relocations):
     tool = units.resolve(TOOL)
     args = SimpleNamespace(cc=tool['cc'],flags=tool['flags'],cpp=match.DEFAULT_CPP,assembler=match.DEFAULT_AS,
                            linker=match.DEFAULT_LD,objcopy=match.DEFAULT_OBJCOPY)
     runner = match.Runner(args.cc,root=str(root),timeout=match.SIGNED_REPLAY_TIMEOUT)
     with runner.workspace() as workspace:
-        _,_,raw = match.compile_object(runner,workspace,args,root,OWNER,SOURCE,rewrite=lambda s: re.sub(r'\bvolatile\b','',s))
-        signature = units.signature(raw,OWNER)
+        _,_,raw = match.compile_object(runner,workspace,args,root,address,source,rewrite=lambda s: re.sub(r'\bvolatile\b','',s))
+        signature = units.signature(raw,address)
         require(raw['type'] == 1 and signature[1:] == (
-                ((60,10,'func_08141AB0'),(74,10,program.VENEER),(104,2,'data_0200F370'),(116,2,program.WAIT)),
-                0,1,136) and len(signature[0]) == 136, 'changed qualifier-stripped ET_REL')
+                relocations,0,1,size) and len(signature[0]) == size, 'changed qualifier-stripped ET_REL')
         # The diagnostic excludes unreachable duplicates using GNU section GC. The
         # positive uses the ordinary stricter library-unit orphan prerequisite.
         q = shlex.quote(workspace)
-        runner.sh(f'{args.linker} -r --gc-sections -e {NAME} {q}/f.o -o {q}/f.gc.o && mv {q}/f.gc.o {q}/f.o')
+        runner.sh(f'{args.linker} -r --gc-sections -e {name} {q}/f.o -o {q}/f.gc.o && mv {q}/f.gc.o {q}/f.o')
         retained = match.elf_image(runner.read_binary(f'{workspace}/f.o'))
         match.allocated_text_only(retained)
-        require(units.signature(retained,OWNER) == signature, 'diagnostic section GC changed the function')
-        linked = match.link_typed_targets(runner,workspace,args,NAME,OWNER,CONTROL_TARGETS,{program.WAIT,'data_0200F370'})
+        require(units.signature(retained,address) == signature, 'diagnostic section GC changed the function')
+        linked = match.link_typed_targets(runner,workspace,args,name,address,CONTROL_TARGETS,{program.WAIT,'data_0200F370'})
         match.allocated_text_only(linked)
-        symbol,offset = match.function_record(linked,NAME,OWNER,True)
-        require(offset == 0 and symbol['size'] == len(linked['text']) == 136 and not linked['relocations'] and
-                sha256(linked['text']).hexdigest() == STRIPPED, 'changed linked stripped control')
+        symbol,offset = match.function_record(linked,name,address,True)
+        require(offset == 0 and symbol['size'] == len(linked['text']) == size and not linked['relocations'] and
+                sha256(linked['text']).hexdigest() == digest, 'changed linked stripped control')
         return linked['text']
 
 
@@ -153,12 +162,12 @@ def record(root):
             'stripped control have SHA-256 '+QUALIFIED+' and '+STRIPPED+'.')
 
 
-def closure(data, address, mapping):
+def closure(data, address, mapping, *, count=None):
     from owner_admission_profile import refine
     from owner_graph_profile import graph, partition
     refined = refine(data,address,mapping)
     instructions,edges,branches,calls,words = graph(data,address,refined)
-    require(not branches and not words and len(instructions) == SPANS[address][1] and
+    require(not branches and not words and len(instructions) == (SPANS[address][1] if count is None else count) and
             refined['cfg_closed'] and not refined['partial_reasons'] and
             refined['candidate_extent'] == dict(start=f'0x{address:08X}',end=f'0x{address+len(data):08X}',bytes=len(data)), 'incomplete native CFG or unexpected computed transfer')
     return instructions,edges,calls,partition(data,address,refined,instructions,words)
@@ -178,11 +187,13 @@ def reaches(edges, start, target, excluded):
 
 
 class LocalReaderFrame(match.BufferCallProof):
+    install_site, frame_offset = 0x08141F76, -84
+
     def check_call(self,address,aliases,stack,slots=None,*,constants=None,site=None,words=None):
-        require(site == 0x08141F76 and address == INSTALL and aliases == {match.ARM_REG_R0:-84} and
-                len(stack) == 21 and all(slot[2] for slot in stack[:16]) and not any(slot[2] for slot in stack[16:]) and
+        require(site == self.install_site and address == INSTALL and aliases == {match.ARM_REG_R0:self.frame_offset} and
+                len(stack)*4 == -self.frame_offset and all(slot[2] for slot in stack[:16]) and not any(slot[2] for slot in stack[16:]) and
                 stack[-1][0] and not slots and not words, 'installer must receive only the 64-byte live local at SP')
-        self.access(-84,4,stack)
+        self.access(self.frame_offset,4,stack)
         self.installed = True
         return {}
 
@@ -295,7 +306,7 @@ def reader_installer(rom, graph):
     raise ValueError('flash reader loop failed to finish within its proved range')
 
 
-def reader_lifetime(rom,graphs,partition):
+def installed_reader_and_wait(rom,graphs):
     installed = reader_installer(rom,graphs[INSTALL])
     reader,reader_edges,reader_calls,_ = graphs[READER]
     require([(reader[pc].mnemonic,reader[pc].op_str) for pc in sorted(reader)] ==
@@ -311,6 +322,11 @@ def reader_lifetime(rom,graphs,partition):
                 'wait must obtain its reader target from the installed global')
     for pc,end in ((WAIT,0x08141eb8),(0x081419c0,0x08141a68),(0x08141a68,0x08141aac),(0x0814195c,0x08141984)):
         match.verify_leaf_instructions(rom[pc-BASE:end-BASE],pc,True,calls if pc == WAIT else None)
+    return installed
+
+
+def reader_lifetime(rom,graphs,partition):
+    installed = installed_reader_and_wait(rom,graphs)
     callers = []
     for address,program_site in ((0x08142000,0x081420f2),(0x08142160,0x081421e0)):
         _,edges,calls,_ = graphs[address]
@@ -333,13 +349,17 @@ def reader_lifetime(rom,graphs,partition):
 
 
 def replay(report, root, address):
+    return replay_member(report, root, address, OWNER, SCHEMA)
+
+
+def replay_member(report, root, address, owner, schema):
     """Reissue the genuine normal unit compilation against an immutable private snapshot."""
     import match_evidence as evidence
-    if address != OWNER or f'* verification: `{SCHEMA}`' not in report.splitlines():
+    if address != owner or f'* verification: `{schema}`' not in report.splitlines():
         return False
     root = Path(root).resolve()
     def inputs():
-        paths = set(evidence.source_paths(root,OWNER)) | set(evidence.source_paths(root,0x0814195c))
+        paths = set(evidence.source_paths(root,owner)) | set(evidence.source_paths(root,0x0814195c))
         paths.update(root/name for name in ('config/functions.json','config/data_symbols.json',
                     'config/library_units.json','symbols/functions.txt'))
         return ({p.relative_to(root):p.read_bytes() for p in paths},Path(evidence.report_rom_path(root)).read_bytes())
@@ -357,9 +377,9 @@ def replay(report, root, address):
             (capture/'build').mkdir()
             env = dict(os.environ,FFTA_ROM=str(capture/'baserom.bin'),TMPDIR=str(capture/'build'),PYTHONDONTWRITEBYTECODE='1')
             checked = subprocess.run([sys.executable,'-B',str(Path(match.__file__).resolve()),'--root',str(capture),
-                '--unit-toolchain',TOOL,f'0x{OWNER:08X}'],cwd=capture,env=env,stdin=subprocess.DEVNULL,
+                '--unit-toolchain',TOOL,f'0x{owner:08X}'],cwd=capture,env=env,stdin=subprocess.DEVNULL,
                 capture_output=True,timeout=90)
-            return (checked.returncode == 0 and (capture/'docs/match/08141F2C.md').read_text() == report and
+            return (checked.returncode == 0 and (capture/f'docs/match/{owner:08X}.md').read_text() == report and
                     inputs() == (files,rom))
     except (OSError,ValueError,RuntimeError,subprocess.SubprocessError):
         return False
