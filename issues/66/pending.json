@@ -574,7 +574,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "85d237876d520b7d97af0d322f1ddc330d09e3670c55a1f4a7f1e0b2354ef651",
+        "acknowledged_cursor": 6978781783,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "85d237876d520b7d97af0d322f1ddc330d09e3670c55a1f4a7f1e0b2354ef651",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081311DC\",\"who\":\"rainbow-state\",\"claim_id\":6978476628,\"reason\":\"Exact local two-halfword output candidate refused: callee 0812E4F4 loop can structurally reach strh outside caller local allocation; semantic bound missing\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:38:02Z",
+          "id": 6978779351,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:38:02Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8feb2219d8e60b4f103bccc7dd4b030dba4ab4a5c041df9dfa8f489736021945",
+        "result": {
+          "address": "0x081311DC",
+          "claim_id": 6978476628,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978779351,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -670,7 +698,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f5834d456e4fec0e1cdfa667e83369d23e12bbbddd7fa4ddfca50ffb5439639b",
+        "acknowledged_cursor": 6978781783,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f5834d456e4fec0e1cdfa667e83369d23e12bbbddd7fa4ddfca50ffb5439639b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813EB64\",\"who\":\"rainbow-state\",\"claim_id\":6978526908,\"reason\":\"Natural transition interpolation recovered but saved state/value allocation is reversed; precise candidate retained privately, no exact source\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:38:06Z",
+          "id": 6978780703,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:38:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8feb2219d8e60b4f103bccc7dd4b030dba4ab4a5c041df9dfa8f489736021945",
+        "result": {
+          "address": "0x0813EB64",
+          "claim_id": 6978526908,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978780703,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -702,7 +758,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f1e8a850861ad33362df4cdb7e71fa7fe02a33ea99e7093abf59de12aa464f9f",
+        "acknowledged_cursor": 6978781783,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f1e8a850861ad33362df4cdb7e71fa7fe02a33ea99e7093abf59de12aa464f9f",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08057454\",\"who\":\"rainbow-affine\",\"claim_id\":6978528130,\"reason\":\"Recovered display setup parked: current source differs by field-address code shape; no matched bytes claimed\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:38:09Z",
+          "id": 6978781783,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:38:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8feb2219d8e60b4f103bccc7dd4b030dba4ab4a5c041df9dfa8f489736021945",
+        "result": {
+          "address": "0x08057454",
+          "claim_id": 6978528130,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978781783,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
