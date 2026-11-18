@@ -543,6 +543,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ba6c9a1c0a78960be253589c00f18b6b26f5ab2a72807fc224bc652fc6f0df1c",
+        "acknowledged_cursor": 6982552828,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ba6c9a1c0a78960be253589c00f18b6b26f5ab2a72807fc224bc652fc6f0df1c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08027528\",\"who\":\"rainbow-callback\",\"note\":\"Verify the 20-entry unit menu array and native advancing producer bounds\"}",
+          "created_at": "2026-11-18T15:09:17Z",
+          "id": 6982552828,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:09:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8e993a9187c8f5240d931c65ddc590978c8f1fdaa335b98ccb6fade9658a08f2",
+        "result": {
+          "address": "0x08027528",
+          "claim_id": 6982552828,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982552828,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
