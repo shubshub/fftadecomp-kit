@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "3ab28c39564c8b8dc7be92a7837148538f4bdf67a119f20997a093b7bb5b3d5a",
+    "acknowledged_cursor": 6992028105,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "3ab28c39564c8b8dc7be92a7837148538f4bdf67a119f20997a093b7bb5b3d5a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805451C\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+      "created_at": "2026-11-18T21:22:41Z",
+      "id": 6992028105,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:22:41Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "febbda01bf11b5d7e02d8cff4842a72fd269ff226630b0a19cdbced87dfd3d76",
+    "result": {
+      "address": "0x0805451C",
+      "claim_id": 6992028105,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6992028105,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "53368127446097b89e73a1ef54b06a8e9e6469ea68b1051704ddd5b426ebf57f",
+    "acknowledged_cursor": 6992047830,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "53368127446097b89e73a1ef54b06a8e9e6469ea68b1051704ddd5b426ebf57f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0805451C\",\"who\":\"rainbow-menu\",\"claim_id\":6992028105,\"reason\":\"128/128 USA bytes, original menu lifetime and consumer; official kit #323 source and report installed and replayed\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T21:23:14Z",
+      "id": 6992040455,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T21:23:14Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c132cbb918cdfc6b5e46a64c393b7d461abe293c57b0e485e8c03f052cc2e14d",
+    "result": {
+      "address": "0x0805451C",
+      "claim_id": 6992028105,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6992040455,
+      "status": "accepted",
+      "who": "rainbow-menu"
+    }
+  }
+}
