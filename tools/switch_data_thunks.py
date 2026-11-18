@@ -14,12 +14,15 @@ A thunk call is bound exactly once, in the ``thunks`` list; the ordinary
 import hashlib
 import json
 
+import m4a_track_switch as music
+
 from armv4t import ARMV4T, CONDITIONS, encoding as armv4t_encoding  # noqa: F401 (kit #180 shared checker)
 
 POLICY = 'canonical-call-thunks-v1'
 # selector -> (schema, outgoing frame). Only the fixed-gap pool layout is admitted.
 SELECTORS = {
     'switch-thunks-v1': ('elf-symbol-thumb-switch-data-thunks-v1', False),
+    music.SELECTOR: (music.SCHEMA, False),
     'switch-thunks-frame-v1': ('elf-symbol-thumb-switch-data-thunks-frame-v1', True),
 }
 SCHEMAS = {selector: value[0] for selector, value in SELECTORS.items()}
@@ -29,6 +32,7 @@ SUMMARIES = {
                'where present, and canonical call thunks'
                + (' and a fixed write-only outgoing-argument frame' if frame else ''))
     for selector, (_, frame) in SELECTORS.items()}
+SUMMARIES[music.SELECTOR] = music.SUMMARY
 FIELDS = frozenset(('thunk_policy', 'thunks', 'dependencies'))
 
 
@@ -49,6 +53,10 @@ def selector_for_manifest(manifest):
         return None
     if manifest['thunk_policy'] != POLICY or 'pool_policy' in manifest:
         raise ValueError('switch thunks require their canonical policy marker and fixed pool layout')
+    if 'engine_tracks' in manifest:
+        if 'stack_policy' in manifest or 'scalar_policy' in manifest:
+            raise ValueError('m4a engine tracks exclude scalar pools and outgoing frames')
+        return music.SELECTOR
     return 'switch-thunks-frame-v1' if 'stack_policy' in manifest else 'switch-thunks-v1'
 
 
@@ -127,7 +135,7 @@ def combine(mnemonic, left, right):
     return (low, high) if 0 <= low <= high <= 0xFFFFFFFF else None
 
 
-def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None):
+def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None, *, engine_rom=None, objects=None):
     """Refuse a thunk call whose target register may hold a local code address.
 
     Local provenance enters through every load of the switch table pointer
@@ -166,6 +174,9 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     registers = {*range(ARM_REG_R0, ARM_REG_R12 + 1), ARM_REG_LR}
     thunks = {site: ARM_REG_R0 + (target - function_thunk.START) // 4
               for site, target in calls.items() if target in function_thunk.ALIASES.values()}
+    engine_call = None
+    if engine_rom is not None:
+        engine_call = music.verified_callback(instructions, edges, address, calls, data, engine_rom, objects)
     states, revisits = {}, {}
     pending = [(address, frozenset((ARM_REG_LR,)), (), False)]
     while pending:
@@ -201,7 +212,7 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
             target = thunks.get(site)
             if target in tainted:
                 raise ValueError('thunk target register can hold a local code address')
-            if target in constants:
+            if target in constants and site != engine_call:
                 raise ValueError('thunk target register holds a constant-derived value')
             clobbered = (set(CALLER_CLOBBERED) if site in calls else set()) | {ARM_REG_LR}
             tainted = (tainted - clobbered) | {ARM_REG_LR}

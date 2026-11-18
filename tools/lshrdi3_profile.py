@@ -10,8 +10,14 @@ import subprocess
 import sys
 import tempfile
 
+import library_units
+
 NAME = "lshrdi3"
 SCHEMA = "elf-symbol-thumb-lshrdi3-target-v1"
+UNIT_SCHEMA = "elf-symbol-thumb-dp-bit-pack-d-lshrdi3-v1"
+UNIT_TOOLCHAIN = "old-agbcc-O2-v1"
+PACK_D, PACK_D_END, DP_BIT_END = 0x08142BE8, 0x08142D34, 0x081439C8
+DP_BIT_DIGEST = "fd4260dbe23fa4058473ccd446851e3aa2a4e6a73ec65eebf4838bf401bcd7f0"
 RUNTIME = "agbcc-thumb-lshrdi3-v1"
 ABI = "agbcc-thumb-di-r0-r1-shift-r2-v1"
 SEMANTICS = "unsigned64-right-shift-count0-63-v1"
@@ -33,10 +39,26 @@ def index_snapshot(root):
     return (Path(root) / "symbols/functions.txt").read_bytes()
 
 
-def fixed_configuration(args):
+def unit_owner(unit, address, orphan):
+    """Only __pack_d in the ROM-authenticated dp-bit object, without section exclusion."""
+    return (unit is not None and address == PACK_D and orphan is None and
+            unit.name == "libgcc dp-bit" and unit.toolchain == UNIT_TOOLCHAIN and
+            (unit.start, unit.end, unit.proof) == (PACK_D, DP_BIT_END, PACK_D_END) and
+            unit.row["identity"] == [{"address": f"0x{PACK_D:08X}", "size": DP_BIT_END - PACK_D,
+                                      "sha256": DP_BIT_DIGEST}])
+
+
+def configuration(unit_context):
     from match import DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS
-    if (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) != \
-            (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS):
+    cc, flags = DEFAULT_CC, DEFAULT_FLAGS
+    if unit_context is not None:
+        spec = library_units.TOOLCHAINS[UNIT_TOOLCHAIN]
+        cc, flags = spec["cc"], spec["flags"]
+    return cc, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, flags
+
+
+def fixed_configuration(args, unit_context=None):
+    if (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags) != configuration(unit_context):
         raise ValueError("lshrdi3 requires the fixed approved toolchain configuration")
 
 
@@ -44,13 +66,15 @@ def manifest_text(manifest):
     return json.dumps(manifest, sort_keys=True, separators=(",", ":"))
 
 
-def fingerprint(address, data, manifest, source_digest, mapping, index, data_mapping, rom):
-    from match import DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS
+def fingerprint(address, data, manifest, source_digest, mapping, index, data_mapping, rom, unit_context=None):
     digest = hashlib.sha256()
-    configuration = repr((DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS))
-    for payload in (SCHEMA.encode(), address.to_bytes(4, "little"), data,
-                    manifest_text(manifest).encode(), source_digest.encode(), mapping, index,
-                    data_mapping or b"", hashlib.sha256(rom).digest(), configuration.encode()):
+    schema = SCHEMA if unit_context is None else UNIT_SCHEMA
+    payloads = [schema.encode(), address.to_bytes(4, "little"), data, manifest_text(manifest).encode(),
+                source_digest.encode(), mapping, index, data_mapping or b"", hashlib.sha256(rom).digest(),
+                repr(configuration(unit_context)).encode()]
+    if unit_context is not None:
+        payloads.extend(line.encode() for line in library_units.report_lines(unit_context, None))
+    for payload in payloads:
         digest.update(len(payload).to_bytes(8, "little"))
         digest.update(payload)
     return digest.hexdigest()
@@ -59,10 +83,10 @@ def fingerprint(address, data, manifest, source_digest, mapping, index, data_map
 def selected(report):
     from software_double_profile import marker_text
     lines = report.splitlines()
-    if not any(SCHEMA in line or marker_text(line).startswith("* lshrdi3") for line in lines):
+    if not any(SCHEMA in line or UNIT_SCHEMA in line or marker_text(line).startswith("* lshrdi3") for line in lines):
         return False
     profiles = [line for line in lines if marker_text(line).startswith("* verification")]
-    if profiles != [f"* verification: `{SCHEMA}`"] or \
+    if profiles not in ([f"* verification: `{SCHEMA}`"], [f"* verification: `{UNIT_SCHEMA}`"]) or \
             any(marker_text(line).startswith(FORBIDDEN) for line in lines):
         raise ValueError("mixed or malformed lshrdi3 profile selection")
     return True
@@ -190,9 +214,8 @@ def verify(data, address, rom, mapping, index, data_mapping, manifest):
     return instructions
 
 
-def verify_source(root, address, data, rom, mapping, index, data_mapping, source_digest, manifest):
-    from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD,
-                       DEFAULT_FLAGS, DEFAULT_WSL_PATH, Runner, compile_object, link_calls,
+def verify_source(root, address, data, rom, mapping, index, data_mapping, source_digest, manifest, unit_context=None):
+    from match import (DEFAULT_WSL_PATH, Runner, compile_object, link_calls,
                        _run_replay_process, plausibility_result)
     from match_evidence import source_paths, source_fingerprint, mapping_snapshot, data_snapshot, report_rom_path
     if _replay_active.get():
@@ -208,8 +231,12 @@ def verify_source(root, address, data, rom, mapping, index, data_mapping, source
         selected_rom = report_rom_path(root)
         if Path(selected_rom).read_bytes() != rom:
             raise ValueError("lshrdi3 replay ROM differs")
-        args = argparse.Namespace(cc=DEFAULT_CC, cpp=DEFAULT_CPP, assembler=DEFAULT_AS,
-                                  objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS)
+        if unit_context is not None:
+            if not unit_owner(unit_context["unit"], address, None) or address + len(data) != PACK_D_END:
+                raise ValueError("unit lshrdi3 requires the complete dp-bit pack_d caller")
+            library_units.recheck(root, unit_context)
+        cc, cpp, assembler, objcopy, linker, flags = configuration(unit_context)
+        args = argparse.Namespace(cc=cc, cpp=cpp, assembler=assembler, objcopy=objcopy, linker=linker, flags=flags)
         (root / "build").mkdir(exist_ok=True)
         with tempfile.TemporaryDirectory(prefix="ffta_lshrdi3_replay_", dir=root / "build") as directory:
             captured = Path(directory)
@@ -219,7 +246,7 @@ def verify_source(root, address, data, rom, mapping, index, data_mapping, source
                 destination.write_bytes(path.read_bytes())
             if source_fingerprint(captured, address) != source_digest:
                 raise ValueError("lshrdi3 source capture differs")
-            runner = Runner(DEFAULT_CC, "Ubuntu", DEFAULT_WSL_PATH, root=captured, timeout=120)
+            runner = Runner(cc, "Ubuntu", DEFAULT_WSL_PATH, root=captured, timeout=120)
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                  candidates[0].relative_to(root).as_posix())
@@ -246,6 +273,8 @@ def verify_source(root, address, data, rom, mapping, index, data_mapping, source
                 index_snapshot(root) != index or data_snapshot(root) != data_mapping or \
                 report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
             raise ValueError("lshrdi3 replay inputs changed")
+        if unit_context is not None:
+            library_units.recheck(root, unit_context)
         return instructions
     finally:
         _replay_active.reset(token)
@@ -253,7 +282,6 @@ def verify_source(root, address, data, rom, mapping, index, data_mapping, source
 
 def report_matches(report, root, address):
     from software_double_profile import marker_text, unique_members
-    from match import DEFAULT_CC, DEFAULT_FLAGS
     from match_evidence import (CALL_SUMMARY, STACK_SUMMARY, source_fingerprint,
                                 mapping_snapshot, data_snapshot, report_rom_path)
     try:
@@ -280,11 +308,24 @@ def report_matches(report, root, address):
 
         mapping, index, objects = mapping_snapshot(root), index_snapshot(root), data_snapshot(root)
         source_digest = source_fingerprint(root, address)
+        binding = library_units.binding(report)
+        unit_context = None
+        if unquote("* verification: ") == UNIT_SCHEMA:
+            unit = library_units.containing(library_units.load(root), address)
+            if binding is None or not unit_owner(unit, address, binding[3]):
+                return False
+            tool = library_units.resolve(UNIT_TOOLCHAIN)
+            if binding != (unit.text, tool["id"], tool["sha256"], None):
+                return False
+            unit_context = {"unit": unit, "tool": tool}
+        elif binding is not None:
+            return False
+        cc, _, _, _, _, flags = configuration(unit_context)
         if mapping is None or unquote("* source SHA-256: ") != source_digest or \
                 unquote("* mapping SHA-256: ") != hashlib.sha256(mapping).hexdigest() or \
                 unquote("* function index SHA-256: ") != hashlib.sha256(index).hexdigest() or \
                 single("* control flow: ") != CALL_SUMMARY or single("* lshrdi3: ") != SUMMARY or \
-                unquote("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
+                unquote("* compiler: ") != f"{cc} {flags}" or \
                 single("* verified extent: ") != "complete ELF function symbol, including literal pools" or \
                 single("* relocations: ") != "none" or single("* source plausibility: ") != "plausible" or \
                 single("* hand-asm allow list: ") != "not listed":
@@ -314,9 +355,9 @@ def report_matches(report, root, address):
                 [line for line in lines if marker_text(line).startswith("**MATCH")] != \
                 [f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"] or \
                 unquote("* lshrdi3 proof SHA-256: ") != \
-                fingerprint(address, data, manifest, source_digest, mapping, index, objects, rom):
+                fingerprint(address, data, manifest, source_digest, mapping, index, objects, rom, unit_context):
             return False
-        verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest)
+        verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest, unit_context)
         return True
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):

@@ -38,6 +38,7 @@ import struct
 import subprocess
 import tempfile
 
+import m4a_track_switch as music
 from refusal import Refusal
 
 TABLE = Path("config") / "library_units.json"
@@ -280,12 +281,18 @@ def _rejects_new_option(path):
     return result.returncode != 0 and "prologue-bugfix" in result.stderr
 
 
-def schemas():
-    """The ordinary byte-level schemas a unit toolchain may produce."""
+def schemas(unit=None, address=None, orphan=None):
+    """Byte-level schemas admitted for this library unit and caller."""
     import match_evidence as evidence
-    return frozenset((evidence.SCHEMA, evidence.FRAMED_SCHEMA, evidence.LINKED_SCHEMA,
-                      evidence.FRAMED_LINKED_SCHEMA, evidence.DATA_SCHEMA, evidence.FRAMED_DATA_SCHEMA,
-                      evidence.FUNCTION_ADDRESS_SCHEMA, evidence.FRAMED_FUNCTION_ADDRESS_SCHEMA))
+    import lshrdi3_profile
+    admitted = {evidence.SCHEMA, evidence.FRAMED_SCHEMA, evidence.LINKED_SCHEMA,
+                evidence.FRAMED_LINKED_SCHEMA, evidence.DATA_SCHEMA, evidence.FRAMED_DATA_SCHEMA,
+                evidence.FUNCTION_ADDRESS_SCHEMA, evidence.FRAMED_FUNCTION_ADDRESS_SCHEMA}
+    if lshrdi3_profile.unit_owner(unit, address, orphan):
+        admitted.add(lshrdi3_profile.UNIT_SCHEMA)
+    if music.unit_owner(unit, address, orphan):
+        admitted.add(music.SCHEMA)
+    return frozenset(admitted)
 
 
 def _selectors(args):
@@ -320,10 +327,15 @@ def gate(root, address, args):
             span = None
         unit = containing(units, address, address + span if span and span > 0 else None)
     requested = getattr(args, "unit_toolchain", None)
+    selectors = _selectors(args)
+    engine_tracks = getattr(args, "switch_data_profile", None) == music.SELECTOR
+    if engine_tracks and (requested != music.TOOLCHAIN or not music.unit_owner(unit, address) or
+                          selectors != ["switch_data_profile"]):
+        raise Refusal("m4a engine tracks require the isolated fixed old-agbcc unit and indexed owner")
     if requested:
         if chosen != defaults:
             raise Refusal("--unit-toolchain fixes the compiler and flags; do not combine it with toolchain options")
-        if _selectors(args) or args.mode != "thumb" or args.control_flow_profile != "ordinary" or \
+        if (selectors and not engine_tracks) or args.mode != "thumb" or args.control_flow_profile != "ordinary" or \
                 getattr(args, "wsl", "Ubuntu") != "Ubuntu" or \
                 getattr(args, "wsl_path", match.DEFAULT_WSL_PATH) != match.DEFAULT_WSL_PATH:
             raise Refusal("library unit toolchains are admitted on the ordinary Thumb path only, "
@@ -541,7 +553,9 @@ def report_admitted(report, root, address):
             return (unit is not None and row == unit.text and toolchain == unit.toolchain and
                     digest == tool["sha256"] and compilers == [f"* compiler: `{tool['cc']} {tool['flags']}`"] and
                     len(verifications) == 1 and
-                    verifications[0] in [f"* verification: `{schema}`" for schema in schemas()])
+                    verifications[0] in [f"* verification: `{schema}`" for schema in schemas(unit, address, orphan)])
+        if verifications == [f"* verification: `{music.SCHEMA}`"]:
+            return False
         if verifications == [f"* verification: `{O0_SCHEMA}`"]:
             return unit is None or unit.toolchain == O0_TOOLCHAIN
         if compilers not in ([], [f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`"]):

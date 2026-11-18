@@ -12,6 +12,7 @@ import io
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -22,6 +23,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import lshrdi3_profile as profile
+import library_units
 import match
 import match_evidence as evidence
 import status
@@ -64,6 +66,9 @@ class LogicalRightShiftTests(unittest.TestCase):
         self.root = Path(directory.name)
         for name in ("src", "include", "config", "symbols"):
             (self.root / name).mkdir()
+        temporary_root = patch.object(tempfile, "tempdir", str(self.root))
+        temporary_root.start()
+        self.addCleanup(temporary_root.stop)
         environment = patch.dict(os.environ, {"TMPDIR": str(self.root),
                                                "PYTHONDONTWRITEBYTECODE": "1"})
         environment.start()
@@ -295,6 +300,79 @@ class LogicalRightShiftTests(unittest.TestCase):
                                     self.mapping, self.index, self.objects, self.rom))
             self.assertFalse(evidence.report_matches(forged, self.root, BASE))
             self.assertTrue(status.collect(str(self.root), verify=False, quiet=True)[4])
+
+    def test_pack_d_unit_replay_uses_old_compiler_and_binds_unit(self):
+        game = Path(os.environ.get("FFTA_ROOT", ROOT.parent / "fftadecomp")).resolve()
+        address = profile.PACK_D
+        source = Path(f"src/{address:08X}.c")
+        old_cc = library_units.TOOLCHAINS[profile.UNIT_TOOLCHAIN]["cc"]
+        if not (game / source).is_file() or not Path(os.path.expandvars(old_cc)).is_file():
+            self.skipTest("requires the pack_d source in FFTA_ROOT and old_agbcc")
+        for path in (*evidence.source_paths(game, address), game / library_units.TABLE,
+                     game / "config/functions.json", game / "config/data_symbols.json",
+                     game / "symbols/functions.txt"):
+            dest = self.root / path.relative_to(game)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, dest)
+
+        argv = ["match.py", "--root", str(self.root), hex(address), "--unit-toolchain", profile.UNIT_TOOLCHAIN]
+        with patch.object(sys, "argv", argv), patch.object(match, "ROOT", match.ROOT), redirect_stdout(io.StringIO()):
+            self.assertEqual(match.main(), 0)
+        report = (self.root / f"docs/match/{address:08X}.md").read_text()
+        self.assertIn(f"* verification: `{profile.UNIT_SCHEMA}`", report)
+        self.assertIn('**MATCH - byte identical** - 332/332 bytes', report)
+        self.assertIn('"calls":[[124,"__lshrdi3"]],"data":[],"frame":true', report)
+        with patch.object(match, "compile_object", wraps=match.compile_object) as compile_object:
+            self.assertTrue(evidence.report_matches(report, self.root, address))
+            self.assertEqual([call.args[2].cc for call in compile_object.call_args_list], [old_cc])
+        row, _, digest, _ = library_units.binding(report)
+        for label, forged in {
+            "legacy schema": report.replace(profile.UNIT_SCHEMA, profile.SCHEMA),
+            "default compiler": report.replace(old_cc, match.DEFAULT_CC),
+            "compiler digest": report.replace(digest, "0" * 64),
+            "orphan": report + "\n* unit orphan constants: `{}`",
+            "call site": report.replace("[124,", "[126,"),
+            "missing unit": "\n".join(line for line in report.splitlines() if not line.startswith(library_units.MARKERS)),
+        }.items():
+            with self.subTest(label=label):
+                self.assertFalse(evidence.report_matches(forged, self.root, address))
+
+        # Even a canonically updated table and report row require a new proof fingerprint.
+        table = self.root / library_units.TABLE
+        document = json.loads(table.read_bytes())
+        owner = next(unit for unit in document["units"] if unit["name"] == "libgcc dp-bit")
+        owner["evidence"] += " Updated evidence."
+        table.write_text(json.dumps(document))
+        changed = report.replace(row, library_units.canonical(owner))
+        self.assertTrue(library_units.report_admitted(changed, self.root, address))
+        self.assertFalse(evidence.report_matches(changed, self.root, address))
+
+
+class PackDUnitAdmissionTests(unittest.TestCase):
+    def test_existing_default_proof_fingerprint_is_stable(self):
+        manifest = {"calls": [[4, "__lshrdi3"]], "frame": True}
+        digest = profile.fingerprint(BASE, b"caller", manifest, "source", b"mapping", b"index", None, b"ROM")
+        self.assertEqual(digest, "7fe559e5a8aa341df0212a9345599ead9add88917f59eed853c8c60028d94bb7")
+
+    def test_only_pack_d_in_the_pinned_full_unit_is_admitted(self):
+        row = {"name": "libgcc dp-bit", "start": "0x08142BE8", "end": "0x081439C8",
+               "proof": "0x08142D34", "toolchain": "old-agbcc-O2-v1",
+               "identity": [{"address": "0x08142BE8", "size": 3552,
+                             "sha256": "fd4260dbe23fa4058473ccd446851e3aa2a4e6a73ec65eebf4838bf401bcd7f0"}]}
+
+        def admitted(owner, address=0x08142BE8, orphan=None):
+            unit = library_units.Unit(owner, library_units.canonical(owner))
+            return profile.UNIT_SCHEMA in library_units.schemas(unit, address, orphan)
+
+        self.assertTrue(admitted(row))
+        self.assertFalse(admitted(row, address=0x08142D34))
+        self.assertFalse(admitted(row, orphan={}))
+        self.assertNotIn(profile.UNIT_SCHEMA, library_units.schemas())
+        for key, value in (("start", "0x08142BEA"), ("end", "0x081439CA"), ("proof", "0x08142BE8"),
+                           ("identity", [dict(row["identity"][0], sha256="0" * 64)]),
+                           ("toolchain", "agbcc-O1-v1"), ("name", "other unit")):
+            with self.subTest(key=key):
+                self.assertFalse(admitted(dict(row, **{key: value})))
 
 
 class CountDomainTests(unittest.TestCase):

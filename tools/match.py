@@ -37,6 +37,7 @@ import armv4t
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 import switch_data_thunks
+import m4a_track_switch as music
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import signed_divmod_profile as signed_divmod
@@ -2512,6 +2513,11 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.update(("function_policy", "functions"))
     if thunk_selector:
         fields.update(switch_data_thunks.FIELDS)
+        if thunk_selector == music.SELECTOR:
+            fields.add("engine_tracks")
+            if not switch_data_thunks.exact(manifest["engine_tracks"], music.entry_contract(rom, address, data)) or \
+                    not switch_data_thunks.exact(manifest["data"], [[0x148, "data_02008E60", 4]]):
+                raise ValueError("m4a entry contract or callback object binding differs")
     if outgoing_frame:
         fields.add("frame_policy")
     if mapping is None or not isinstance(manifest, dict) or set(manifest) != fields or \
@@ -2673,7 +2679,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             switch_outgoing_stack=pool_switch_frame.STACK_POLICY
                                             if pool_frame else None,
                                             switch_outgoing_stack_fixed_pool=pool_frame and not pool_data,
-                                            switch_thunks=thunk_selector)
+                                            switch_thunks=thunk_selector,
+                                            engine_track_rom=rom if thunk_selector == music.SELECTOR else None)
     if thunk_selector:
         # The thunk binding's own literal rules: no object or literal may name a
         # code entry or a reserved thunk, so no data word can become a call target.
@@ -2730,6 +2737,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
             ((item.address + 4) & ~3) + operand.mem.disp == address + descriptor["literal"]}
         if pointer_loads != {address + descriptor["dispatch"] + 2}:
             raise ValueError("switch table pointer must be read only by its dispatch load")
+    if thunk_selector == music.SELECTOR:
+        return instructions, music.CONTROL_FLOW
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
@@ -4062,7 +4071,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
-                             incoming_narrow_reads=False):
+                             incoming_narrow_reads=False, engine_track_rom=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4122,6 +4131,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         pool_switch_frame.check_context(switch_outgoing_stack)
         if not switch_interposed_pool and not switch_outgoing_stack_fixed_pool:
             raise ValueError("outgoing-argument switch frame requires the interposed switch pool")
+    if (engine_track_rom is not None) != (switch_thunks == music.SELECTOR):
+        raise ValueError("engine track ROM requires its exclusive switch selector")
     if switch_thunks is not None:
         framed = switch_data_thunks.framed(switch_thunks)
         if not thumb or not backward_switch_cases or not validated_calls or \
@@ -5269,7 +5280,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if switch is None or calls != validated_calls:
             raise ValueError("switch thunks require their verified local switch and exact calls")
         switch_data_thunks.verify_thunk_targets(instructions, edges, address, calls,
-                                                address + switch["literal"], data)
+                                                address + switch["literal"], data, engine_rom=engine_track_rom,
+                                                objects=switch_data_relocations)
     reaching_return = set(returns)
     pending = list(returns)
     while pending:
@@ -5811,6 +5823,7 @@ def main():
             float_evidence = None
             shift_evidence = None
             shift_profile = ashldi3
+            shift_options = {}
             quotient_evidence = None
             remainder_evidence = None
             division_evidence = None
@@ -5939,7 +5952,11 @@ def main():
                     got, addr, rom, mapping, empty_index, data_mapping, float_evidence)
             elif ashldi3_bindings:
                 shift_profile = ashldi3.for_bindings(ashldi3_bindings)
-                shift_profile.fixed_configuration(args)
+                if unit_context is not None and shift_profile.NAME == "lshrdi3":
+                    if not shift_profile.unit_owner(unit_context["unit"], addr, unit_orphan):
+                        raise ValueError("unit lshrdi3 requires the approved dp-bit pack_d caller")
+                    shift_options["unit_context"] = unit_context
+                shift_profile.fixed_configuration(args, **shift_options)
                 verified_instructions = verify_leaf_instructions(
                     got, addr, True, calls, ashldi3_context=(rom, mapping, empty_index, ashldi3_bindings))
                 shift_evidence = shift_profile.make_manifest(calls, addr, ashldi3_bindings,
@@ -6041,7 +6058,8 @@ def main():
                         switch_interposed_pool=pool_switch_profile,
                         switch_outgoing_stack=pool_switch_frame.STACK_POLICY if pool_frame_profile else None,
                         switch_outgoing_stack_fixed_pool=pool_frame_profile and not pool_switch_profile,
-                        switch_thunks=thunk_switch_selector)
+                        switch_thunks=thunk_switch_selector,
+                        engine_track_rom=rom if thunk_switch_selector == music.SELECTOR else None)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                     scalar_records = switch_u16_scalar_records(
                         got, addr, scalar_instructions, switch_evidence["switch"], data_relocations,
@@ -6050,6 +6068,8 @@ def main():
                         switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
                         switch_evidence["scalars"] = scalar_records
                     if thunk_switch_selector:
+                        if thunk_switch_selector == music.SELECTOR:
+                            switch_evidence["engine_tracks"] = music.entry_contract(rom, addr, got)
                         switch_evidence["thunk_policy"] = switch_data_thunks.POLICY
                         switch_evidence["thunks"] = [[site - addr, thunk_names[target]]
                                                      for site, target in sorted(calls.items())
@@ -6178,7 +6198,7 @@ def main():
     if float_evidence is not None:
         schema = software_float.SCHEMA
     if shift_evidence is not None:
-        schema = shift_profile.SCHEMA
+        schema = shift_profile.UNIT_SCHEMA if shift_options else shift_profile.SCHEMA
     if unsigned_remainder_evidence is not None:
         schema = umodsi3.SCHEMA
     if spin_profile:
@@ -6188,6 +6208,8 @@ def main():
     if thunk_profile:
         schema = function_thunk.schema_for(args.function_address_profile)
     control_flow = CALL_SUMMARY if linked_profile else "closed leaf CFG"
+    if thunk_switch_selector == music.SELECTOR:
+        control_flow = music.CONTROL_FLOW
     if preloaded_profile:
         control_flow = PRELOADED_SWITCH_CONTROL_FLOW
     if spin_profile:
@@ -6248,9 +6270,8 @@ def main():
     if data_profile and data_snapshot(ROOT) != data_mapping:
         sys.exit("data symbol mapping changed during verification; re-run match.py")
     if unit_context is not None:
-        if schema not in library_units.schemas():
-            sys.exit(f"refused: library unit toolchains admit the leaf, frame, direct-call, named-data and "
-                     f"function-address schemas only, not {schema}")
+        if schema not in library_units.schemas(unit_context["unit"], addr, unit_orphan):
+            sys.exit(f"refused: library unit {unit_context['unit'].name} does not admit {schema} at 0x{addr:08X}")
         try:
             library_units.recheck(ROOT, unit_context)
         except ValueError as error:
@@ -6288,12 +6309,12 @@ def main():
             sys.exit(f"software-float source replay failed: {error}")
     if shift_evidence is not None:
         if shift_profile.index_snapshot(ROOT) != empty_index or report_rom_path(ROOT) != rom_file or hand_asm_allowed:
-            sys.exit("ashldi3 index/ROM selection changed or hand-ASM exception requested")
+            sys.exit(f"{shift_profile.NAME} index/ROM selection changed or hand-ASM exception requested")
         try:
             shift_profile.verify_source(ROOT, addr, got_body, rom, mapping, empty_index,
-                                  data_mapping, fingerprint, shift_evidence)
+                                        data_mapping, fingerprint, shift_evidence, **shift_options)
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
-            sys.exit(f"ashldi3 source replay failed: {error}")
+            sys.exit(f"{shift_profile.NAME} source replay failed: {error}")
     if args.signed_quotient_profile is not None:
         if hand_asm_allowed or report_rom_path(ROOT) != rom_file:
             sys.exit("framed signed quotient excludes hand-ASM exceptions and ROM selection changes")
@@ -6478,7 +6499,7 @@ def main():
                 f.write(f"* {shift_profile.NAME}: {shift_profile.SUMMARY}\n")
                 f.write(f"* {shift_profile.NAME} manifest: `{shift_profile.manifest_text(shift_evidence)}`\n")
                 proof_digest = shift_profile.fingerprint(addr, got_body, shift_evidence, fingerprint,
-                                                   mapping, empty_index, data_mapping, rom)
+                                                         mapping, empty_index, data_mapping, rom, **shift_options)
                 f.write(f"* {shift_profile.NAME} proof SHA-256: `{proof_digest}`\n")
             if unsigned_remainder_evidence is not None:
                 f.write(f"* unsigned remainder: {umodsi3.SUMMARY}\n")

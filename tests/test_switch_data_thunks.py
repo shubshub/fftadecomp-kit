@@ -667,7 +667,10 @@ class EndToEndTests(unittest.TestCase):
                     result, output = run('--switch-data-profile', selector)
                     with self.subTest(selector=selector, message=message):
                         self.assertNotIn(verdict, output.splitlines())
-                        self.assertIn(message, str(result))
+                        if selector == thunks.music.SELECTOR:
+                            self.assertIn('isolated fixed old-agbcc unit', str(result))
+                        else:
+                            self.assertIn(message, str(result))
             source.write_text(SOURCE)
             # The saved report replays and selects exactly one selector.
             result, output = run('--switch-data-profile', PLAIN)

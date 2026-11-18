@@ -16,6 +16,7 @@ import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 import switch_data_thunks
+import m4a_track_switch as music
 import subprocess
 from rompath import rom_path
 from pathlib import Path
@@ -724,6 +725,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                        switch_u16_scalar_fingerprint if scalar_data else
                        switch_multiple_data_fingerprint if multiple_data else
                        switch_data_fingerprint if data_profile else switch_fingerprint)
+        if thunk_selector == music.SELECTOR and not music.replay(root, "\n".join(lines), data):
+            return False
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
