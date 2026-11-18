@@ -3550,6 +3550,20 @@ hardware or external observers. It establishes no MMIO equivalence, physical
 readability, callee behavior or termination. The ordinary default policy remains
 unchanged. Native reports bind the selected policy, producer/runtime pins and
 fresh semantic evidence; inventory-only manifests cannot establish admission.
+The USA blend-alpha keyframe callback at `0x08006720` uses
+`--addressed-signed-runtime-profile compiler-signed-runtime-data-v1`. Its
+three native compiles each have a read-only search through four-byte records.
+The checker verifies the zero starting index, signed interval boundaries and
+one-record increment. A fixed-point analysis over the original CFG proves
+that the index is the only loop-modified value live at the next iteration.
+The volatile comparison uses a symbolic index and checks every outcome of a
+single arbitrary iteration in all three compiles, including both paths that
+write the named BLDALPHA bytes. The proof assumes stable ordinary
+records and mutually disjoint valid records, event, payload and shadow storage. The callback
+writes display shadow RAM at `0x0300098C/D`. Updater `0x08000718` programs DMA0
+to upload those bytes to BLDALPHA. A native execution test follows the original
+installer and scheduler on a three-keyframe input.
+
 A passing semantic check still requires plausible source and complete ELF bytes
 identical to the ROM before a function earns match credit.
 
