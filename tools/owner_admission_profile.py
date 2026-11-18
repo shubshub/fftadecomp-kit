@@ -844,6 +844,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
+    if selector == local_calls.SCENE_SCRIPT:
+        import scene_script_position
+        scene_script_position.check_bindings(address, bindings)
     if selector == local_calls.SCHEDULER_ZERO_DESCRIPTOR:
         import scheduler_zero_descriptor
         scheduler_zero_descriptor.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
