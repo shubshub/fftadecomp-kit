@@ -510,7 +510,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "84ac60195255dc6604a0c05de376deda29159078399180d82d25d746a0b8bdd0",
+        "acknowledged_cursor": 6987525877,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "84ac60195255dc6604a0c05de376deda29159078399180d82d25d746a0b8bdd0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08128C3C\",\"who\":\"astra-sound\",\"claim_id\":6987135534,\"reason\":\"514/514 bytes, 226 instructions, final canonical game report replayed with merged toolkit PR 284.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:19:39Z",
+          "id": 6987524561,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:19:39Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "534c0a248d4144983b9efdb3adbacd4c6d693a78d07b717274d4f362f9c27b60",
+        "result": {
+          "address": "0x08128C3C",
+          "claim_id": 6987135534,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987524561,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -698,7 +726,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "fca53b48c062a084aa12c710c3351eee4076455cdfaae672de3e10c625ef8230",
+        "acknowledged_cursor": 6987525877,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "fca53b48c062a084aa12c710c3351eee4076455cdfaae672de3e10c625ef8230",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DA598\",\"who\":\"rainbow-menu\",\"claim_id\":6987487535,\"reason\":\"Private natural C matches 484/484 original bytes and all 238 instructions; exact qualifier/provider review pending.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:19:42Z",
+          "id": 6987525877,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:19:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "534c0a248d4144983b9efdb3adbacd4c6d693a78d07b717274d4f362f9c27b60",
+        "result": {
+          "address": "0x080DA598",
+          "claim_id": 6987487535,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987525877,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     }
   ],
   "issue": 66,
