@@ -574,7 +574,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6e259c703fe327625a4c9e9091aff82b8b38a48a9509f6378b034165a26b8a94",
+        "acknowledged_cursor": 6985674948,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6e259c703fe327625a4c9e9091aff82b8b38a48a9509f6378b034165a26b8a94",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081333DC\",\"who\":\"rainbow-menu\",\"claim_id\":6985617279,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:04:56Z",
+          "id": 6985662341,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:04:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8e7f19e60d1481b40a4a00ac9d5d36b2dbda564844c4b0b8bb3ad4d6eafa25b2",
+        "result": {
+          "address": "0x081333DC",
+          "claim_id": 6985617279,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6985662341,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c8bd6d487dbc568573a7dbe01c3d0ceffceee9b2559f93258214b4bd29ad65d9",
+        "acknowledged_cursor": 6985674948,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c8bd6d487dbc568573a7dbe01c3d0ceffceee9b2559f93258214b4bd29ad65d9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081324CC\",\"who\":\"astra-sound\",\"claim_id\":6985629976,\"reason\":\"Complete effect handler source compiled and canonical report replayed in the live USA game tree.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:05:25Z",
+          "id": 6985674948,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:05:25Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8e7f19e60d1481b40a4a00ac9d5d36b2dbda564844c4b0b8bb3ad4d6eafa25b2",
+        "result": {
+          "address": "0x081324CC",
+          "claim_id": 6985629976,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6985674948,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
