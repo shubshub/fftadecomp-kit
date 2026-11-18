@@ -75,12 +75,13 @@ STATE_ROOTS = {  # genuine 60-byte roots; only the owner-list load at +28 differ
 STATE_DEPENDENCIES = (0x080C7CC0, 0x0809ABE8, 0x080C7B74, 0x08098BB0)
 
 
-def bound_state(address, data):
+def bound_state(address, data, policy=local.STATE):
     """Run the real state-iterator bind_root with only ROM/index access stubbed."""
     bodies = {target: bytes([n])*8 for n, target in enumerate(STATE_DEPENDENCIES)}
-    calls = {address+14: 0x0814224C, address+32: 0x080C7CC0}
+    initial, iterate = (16, 42) if policy == local.FLAGGED_STATE else (14, 32)
+    calls = {address+initial: 0x0814224C, address+iterate: 0x080C7CC0}
     result = object.__new__(local.ConditionalLocalBufferProof)
-    result.policy, result.rom, result.entries = local.STATE, b'', []
+    result.policy, result.rom, result.entries = policy, b'', []
     result.mapping = result.index = b''
     result.dependencies, result.records, result.identities = {}, {}, {}
     result.calls, result.observations, result.environment = {}, {}, {}
@@ -227,6 +228,50 @@ class ConditionalLocalBufferTests(unittest.TestCase):
                                  destination_register=0, offset=offset, width=4))
                 p.observations = {site: {} for site in p.calls}
                 self.assertEqual(p.contract_manifest()['owner_list_load']['offset'], offset)
+
+    def test_flagged_state_binds_update_and_list(self):
+        # The two call fields are supplied through the decoded call map in this
+        # bounded test. Native matching independently checks both displacements.
+        body = bytes.fromhex('30b583b0051c0d486c46026868460421a7f040fd6178012008436070'
+                             '08486946019101aa5060686906492df06dfa6846007803b030bc02bc'
+                             '08470000b8d43608b18b0908e9ab0908')
+        for address, list_load, flag, offset in ((0x0809A7B8, 0x68, 1, 20),
+                                                  (0x0809A800, 0xA8, 1, 24),
+                                                  (0x0809A848, 0xA8, 2, 24)):
+            image = bytearray(body)
+            image[22], image[38] = flag, list_load
+            p = bound_state(address, bytes(image), local.FLAGGED_STATE)
+            self.assertEqual(p.state_update, dict(load=address+20, store=address+26,
+                             state_byte=1, operation='or', mask=flag, base_register=4))
+            self.assertEqual(p.owner_list_load['offset'], offset)
+        for offset, value in ((8, 0x68), (20, 0x21), (22, 4), (22, 2), (24, 0x48),
+                              (26, 0x20), (32, 0x02), (38, 0x60), (58, 1), (64, 0xB3)):
+            image = bytearray(body)
+            image[offset] = value
+            with self.subTest(offset=offset, value=value), self.assertRaisesRegex(ValueError, 'flagged state contract'):
+                bound_state(0x0809A7B8, bytes(image), local.FLAGGED_STATE)
+        with self.assertRaisesRegex(ValueError, 'state contract'):
+            bound_state(0x0809A7B8, body)
+
+    def test_flagged_state_requires_only_the_exact_live_state_alias(self):
+        stack = [LOCAL]*3 + [SAVED]*3
+        base = -24
+        clear, walk = 0x0814224C, 0x080C7CC0
+        p = proof(local.FLAGGED_STATE, {100: clear, 126: walk})
+        args = {R0: base, R0+4: base}
+        self.assertEqual(p.check_call(clear, args, stack, constants={R0+1: 4}, site=100), {})
+        visitor = {R0+2: base+4, R0+4: base}
+        slot = {base+4: base}
+        self.assertEqual(p.check_call(walk, visitor, stack, slot, site=126), {})
+        for aliases in ({R0: base}, {**args, R0+4: base+4}, {**args, R0+1: base}, {**args, R0+6: base}):
+            with self.subTest(aliases=aliases), self.assertRaisesRegex(ValueError, 'actual local pointer'):
+                p.check_call(clear, aliases, stack, constants={R0+1: 4}, site=100)
+        for aliases, slots in (({R0+2: base+4}, slot), (visitor, {base+4: base+4}),
+                               ({**visitor, R0: base}, slot)):
+            with self.subTest(aliases=aliases, slots=slots), self.assertRaisesRegex(ValueError, 'initialized state-pointer'):
+                p.check_call(walk, aliases, stack, slots, site=126)
+        with self.assertRaisesRegex(ValueError, 'pointer or return provenance'):
+            p.check_indirect_target(clear, {R0+2: base}, {match.ARM_REG_LR}, site=100)
 
     def test_state_owner_list_load_refuses_other_registers_and_forms(self):
         # LDR R0,[R5,#0x18]; LDR R1,[R4,#0x18]; LDRH R0,[R4,#0x18]; LDR R0,[R4,R0].
