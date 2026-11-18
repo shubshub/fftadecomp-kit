@@ -1243,6 +1243,134 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "98caf2547394e0e37481cb38d5d15d3e04adbadb6ecad9be71c8e343242c2ac1",
+        "acknowledged_cursor": 6990012926,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "98caf2547394e0e37481cb38d5d15d3e04adbadb6ecad9be71c8e343242c2ac1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08113220\",\"who\":\"claude-ffta2\",\"note\":\"hand match (never attempted, 2026-11-19)\"}",
+          "created_at": "2026-11-18T20:01:39Z",
+          "id": 6990010880,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:01:39Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f58528271a79a3f09d1c028433d0ce143a2463c7a77dbad5f4fbe090408a879",
+        "result": {
+          "address": "0x08113220",
+          "claim_id": 6990010880,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6990010880,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "273b551537b4bf4c6f6b2526bbca8cc8b50103d8caa6019c74c31fc391daf2f3",
+        "acknowledged_cursor": 6990012926,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "273b551537b4bf4c6f6b2526bbca8cc8b50103d8caa6019c74c31fc391daf2f3",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080FCF68\",\"who\":\"claude-ffta2\",\"note\":\"hand match (never attempted, 2026-11-19)\"}",
+          "created_at": "2026-11-18T20:01:41Z",
+          "id": 6990011710,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:01:41Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f58528271a79a3f09d1c028433d0ce143a2463c7a77dbad5f4fbe090408a879",
+        "result": {
+          "address": "0x080FCF68",
+          "claim_id": 6990011710,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 6990011710,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "35dcf68a3f0cff2f83c108e8c8204ad7d34d4cc2a89328fe54eca303c4afa0a2",
+        "acknowledged_cursor": 6990012926,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "35dcf68a3f0cff2f83c108e8c8204ad7d34d4cc2a89328fe54eca303c4afa0a2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BDCC\",\"who\":\"rainbow-state\",\"note\":\"Recover independent original tile-animation accessor and check it against the same game-created node\"}",
+          "created_at": "2026-11-18T20:01:42Z",
+          "id": 6990012102,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:01:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f58528271a79a3f09d1c028433d0ce143a2463c7a77dbad5f4fbe090408a879",
+        "result": {
+          "address": "0x0800BDCC",
+          "claim_id": 6990012102,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990012102,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dd19821ba6bcbe9e4cc24e67eddd10600567665456fa364716122a226d2b1935",
+        "acknowledged_cursor": 6990012926,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dd19821ba6bcbe9e4cc24e67eddd10600567665456fa364716122a226d2b1935",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141FC8\",\"who\":\"astra-shift\",\"note\":\"Recover FLASH512_V130 ProgramByte ordered flash commands and wait callback under native O1.\"}",
+          "created_at": "2026-11-18T20:01:44Z",
+          "id": 6990012926,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:01:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "6f58528271a79a3f09d1c028433d0ce143a2463c7a77dbad5f4fbe090408a879",
+        "result": {
+          "address": "0x08141FC8",
+          "claim_id": 6990012926,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990012926,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
