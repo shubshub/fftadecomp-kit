@@ -514,66 +514,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "9aa552de33d01d914d37200a2deb51da959076d397a8c9b40e519f23ad17475b",
-        "acknowledged_cursor": 6982371895,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "9aa552de33d01d914d37200a2deb51da959076d397a8c9b40e519f23ad17475b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08118AC0\",\"who\":\"rainbow-scene\",\"note\":\"Recover 210-byte overlay scene callback using the checked mode-six script entry\"}",
-          "created_at": "2026-11-18T15:02:28Z",
-          "id": 6982371895,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T15:02:28Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "af76f01b56f2e515bdb0c9821cd8b56cf9d5a8f04d9cbc34cd733cd3e444607b",
-        "result": {
-          "address": "0x08118AC0",
-          "claim_id": 6982371895,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6982371895,
-          "status": "accepted",
-          "who": "rainbow-scene"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "1d1346cb8de5739a66fc0ac3ecc2b5f891dd5321084efab50834b57bea8743ea",
-        "acknowledged_cursor": 6982442101,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "1d1346cb8de5739a66fc0ac3ecc2b5f891dd5321084efab50834b57bea8743ea",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08118AC0\",\"who\":\"rainbow-scene\",\"claim_id\":6982371895,\"reason\":\"Overlay scene callback matched 210 ROM bytes and 84 instructions, and live saved report replay passed\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T15:05:07Z",
-          "id": 6982442101,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T15:05:07Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "3da7eba5e7754d1c1f358c3afc49f1943918c068a13885fda2e6283fd6a56910",
-        "result": {
-          "address": "0x08118AC0",
-          "claim_id": 6982371895,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6982442101,
-          "status": "accepted",
-          "who": "rainbow-scene"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "11da42001085d3b8bc885abbac13d7b2ff7a1d49a92d5aa52a9a84edfecce4d9",
         "acknowledged_cursor": 6982442101,
         "body_provenance": "acceptance-time",
