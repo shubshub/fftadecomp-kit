@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
+    "acknowledged_cursor": 6989250923,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08034E88\",\"who\":\"astra-shift\",\"note\":\"Original switch-list callback registered at 08031FE6, two real jump tables and complete outgoing extent. Primary owns maps.\"}",
+      "created_at": "2026-11-18T19:28:33Z",
+      "id": 6989231717,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:28:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
+    "result": {
+      "address": "0x08034E88",
+      "claim_id": 6989231717,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6989231717,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ccc99230ad54ab6ce72e2d0fd4b9bf8892a80ea9eb6fca1bc24627fd022df8dc",
+    "acknowledged_cursor": 6989630519,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ccc99230ad54ab6ce72e2d0fd4b9bf8892a80ea9eb6fca1bc24627fd022df8dc",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08034E88\",\"who\":\"astra-shift\",\"claim_id\":6989231717,\"reason\":\"Recovered five-slot menu runner callback; native 364/364 bytes, 89/89 instructions and source-bound replay under merged toolkit PR 300.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T19:45:23Z",
+      "id": 6989615181,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:45:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "59646c9b109a25aa59d8e94d07adeb61e7ec89ac0f5342711129018c604848a3",
+    "result": {
+      "address": "0x08034E88",
+      "claim_id": 6989231717,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6989615181,
+      "status": "accepted",
+      "who": "astra-shift"
+    }
+  }
+}
