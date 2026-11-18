@@ -1726,7 +1726,35 @@
           "who": "astra-roster"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5c84f45acb5a9aaf6727ba8d73629f9d0d77dc2d7ba6655a78087b27efc945ce",
+        "acknowledged_cursor": 6993207874,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5c84f45acb5a9aaf6727ba8d73629f9d0d77dc2d7ba6655a78087b27efc945ce",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C48A4\",\"who\":\"astra-roster\",\"claim_id\":6992910898,\"reason\":\"Matched all 192 bytes, 83 instructions and the original byte return at checkpoint 87 PR 342. Live source and report replayed with all three caller paths.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T22:15:45Z",
+          "id": 6993207874,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:15:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "95d6776f620c2a3af2d29df61025ec01f41c01baf3b04d972e494fd5f91f79c4",
+        "result": {
+          "address": "0x080C48A4",
+          "claim_id": 6992910898,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6993207874,
+          "status": "accepted",
+          "who": "astra-roster"
+        }
+      }
     },
     {
       "claim": {
