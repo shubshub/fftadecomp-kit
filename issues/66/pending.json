@@ -1758,7 +1758,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6afd54273159ef411223f292dae79356e90e74fa3654dcb1bb1988229d367543",
+        "acknowledged_cursor": 6992111114,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6afd54273159ef411223f292dae79356e90e74fa3654dcb1bb1988229d367543",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800C9E4\",\"who\":\"rainbow-state\",\"claim_id\":6991961608,\"reason\":\"Parked natural affine-circle C. Six in-range native renderings agree across complete 696-byte payloads. Source emits 258 of 268 target bytes; no known external gameplay bound for the caller.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T21:26:21Z",
+          "id": 6992111114,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:26:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ccd692a0e560de1444af5cb1b2e015ce652429977b043e6c3823ec6a4df96ddd",
+        "result": {
+          "address": "0x0800C9E4",
+          "claim_id": 6991961608,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6992111114,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -1880,6 +1908,38 @@
           "request_id": 6992067103,
           "status": "accepted",
           "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "739afddaa90073d2de07a076909621416e01e733dafa54a29fe6dd25af0c9196",
+        "acknowledged_cursor": 6992111114,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "739afddaa90073d2de07a076909621416e01e733dafa54a29fe6dd25af0c9196",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141AB0\",\"who\":\"astra-combat\",\"note\":\"Recover authentic FLASH512_V130 SetReadFlash1 installation from its ROM byte reader and verify normal caller storage, local lifetime and byte-read behavior\"}",
+          "created_at": "2026-11-18T21:26:15Z",
+          "id": 6992108610,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:26:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "ccd692a0e560de1444af5cb1b2e015ce652429977b043e6c3823ec6a4df96ddd",
+        "result": {
+          "address": "0x08141AB0",
+          "claim_id": 6992108610,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992108610,
+          "status": "accepted",
+          "who": "astra-combat"
         }
       },
       "release": null
