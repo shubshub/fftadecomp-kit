@@ -20,6 +20,7 @@ import sys
 import tempfile
 
 import divsi3_profile as quotient
+import m4a_max_lines as max_lines
 import modsi3_profile as remainder
 import umodsi3_profile as unsigned_remainder
 
@@ -87,11 +88,11 @@ BIOS_READONLY_FOUR_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-four-wor
 BIOS_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-function-literals-data-v1'
 BIOS_SCALAR_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-function-literals-data-v1'
 BIOS_ORDINARY_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-ordinary-function-literals-data-v1'
-SCALAR_CONTROL_SELECTORS = (BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
+SCALAR_CONTROL_SELECTORS = (max_lines.SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                             BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS)
-FUNCTION_DATA_SELECTORS = (BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
+FUNCTION_DATA_SELECTORS = (max_lines.SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                            BIOS_ORDINARY_FUNCTION_DATA_SELECTOR)
-BIOS_SELECTORS = (BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
+BIOS_SELECTORS = (max_lines.SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
 BIOS_ORDINARY_SELECTOR = 'addressed-native-bios-ordinary-v1'
 BIOS_ORDINARY_DATA_SELECTOR = 'addressed-native-bios-ordinary-data-v1'
 BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR = 'addressed-native-bios-ordinary-readonly-two-words-data-v1'
@@ -138,7 +139,7 @@ THUNK_CONTRACT = ('conditional returning opaque callee via canonical _call_via_r
 THUNK_TARGET_POLICY = 'all-path-memory-word-load-target-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
-SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
+SCHEMAS = {max_lines.SELECTOR: max_lines.SCHEMA, COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
             COMPILER_TWO_DATA_SELECTOR: COMPILER_TWO_DATA_SCHEMA,
             COMPILER_THREE_DATA_SELECTOR: COMPILER_THREE_DATA_SCHEMA,
             BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1',
@@ -308,6 +309,8 @@ def data_literals(data, address, rom, mapping, objects, records, *, selector=DAT
         return {}  # This distinct selector still requires actual reached MMIO in finish.
     # Calls are authenticated separately by prepare; do not send reserved runtime
     # names through the ordinary function-address validator.
+    if selector == max_lines.SELECTOR:
+        records = max_lines.split_records(records, rom, address, data, match.parse_data_symbols(objects))
     functions, data_records = [], []
     for row in records:
         if not isinstance(row, (list, tuple)) or len(row) != 3:
@@ -349,6 +352,8 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
                  ('match_evidence', 'inert_spin_profile', 'analyze', 'plausible'))
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         paths.add(Path(importlib.import_module('bios_cpuset_fill_profile').__file__))
+    if selector == max_lines.SELECTOR:
+        paths.add(Path(max_lines.__file__))
     if selector in CODE_IMAGE_SELECTORS:
         paths.update(Path(importlib.import_module(name).__file__) for name in
                      ('cpuset_code_image_profile', 'iwram_installation_prerequisite'))
@@ -913,6 +918,10 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
             data_contract='Separate typed ABS32 named objects and exact unique indexed Thumb function entries; '
                 'function literals are not objects or proof of a callback signature, invocation, return, '
                 'memory effects, physical readability, allocation or C semantic equivalence.')
+    if selector == max_lines.SELECTOR:
+        context[4]['data_bindings'] = [list(row) for row in context[7] if row[1] != max_lines.SYMBOL]
+        context[4]['linker_absolute'] = max_lines.verify_use(data, instructions, edges, partition, calls, literals)
+        context[4]['m4a_callback_rows'] = max_lines.callbacks(context[0], context[1], literals)
     if selector in CALLBACK_SELECTORS:
         context[4]['callback'] = dict(
             contract=R3_CALLBACK_CONTRACT if selector == R3_CALLBACK_SELECTOR else CALLBACK_CONTRACT,
@@ -1021,7 +1030,11 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                         sum(item['name'] == name for item in image['symbols']) != 1:
                     raise ValueError('addressed ABS32 requires an aligned unique undefined global with its exact type')
                 addend = struct.unpack_from('<i', image['text'], offset)[0]
-                if callable_literal:
+                if selector == max_lines.SELECTOR and name == max_lines.SYMBOL:
+                    if target_symbol['type'] != 0 or symbol['size'] != max_lines.SIZE:
+                        raise ValueError('m4a original linker absolute must be NOTYPE in its complete owner')
+                    target = max_lines.symbol_value(rom, address, offset, addend, objects)
+                elif callable_literal:
                     if addend != 0 or name in objects:
                         raise ValueError('function literal cannot have an addend or an object identity')
                     target = match.function_address_target(name, entries, address, symbol['size'], len(rom))
@@ -1073,7 +1086,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
     return calls, bindings, targets
 
 
-def linked_bytes(original, linked, address, calls, targets, *, data_relocations=None, function_literals=()):
+def linked_bytes(original, linked, address, calls, targets, *, data_relocations=None, function_literals=(),
+                 selector=SELECTOR):
     import match
     if linked['type'] != 2 or linked['relocations']:
         raise ValueError('addressed runtime link requires executable ELF without relocations')
@@ -1095,9 +1109,17 @@ def linked_bytes(original, linked, address, calls, targets, *, data_relocations=
             for name in function_literals):
         raise ValueError('linked function literals require their original canonical bindings')
     data_names = {record[0] for record in data_relocations.values()} - function_literals
+    scalar_names = set()
+    if selector == max_lines.SELECTOR:
+        if (address != max_lines.ADDRESS or before['size'] != max_lines.SIZE or
+                data_relocations.get(max_lines.OFFSET) != (max_lines.SYMBOL, 0) or
+                targets.get(max_lines.SYMBOL) != 80):
+            raise ValueError('m4a linked absolute requires its original owner and relocation')
+        scalar_names.add(max_lines.SYMBOL)
+        data_names -= scalar_names
     functions = [item['name'] for item in linked['symbols'] if item['type'] == 2]
     objects = [item['name'] for item in linked['symbols'] if item['type'] == 1]
-    expected_functions = {name} | (set(targets) - data_names)
+    expected_functions = {name} | (set(targets) - data_names - scalar_names)
     if len(functions) != len(expected_functions) or set(functions) != expected_functions or \
             len(objects) != len(data_names) or set(objects) != data_names or any(
             item['name'] and not item['section'] or
@@ -1106,9 +1128,12 @@ def linked_bytes(original, linked, address, calls, targets, *, data_relocations=
     for target_name, target in targets.items():
         symbols = [item for item in linked['symbols'] if item['name'] == target_name]
         kind = 1 if target_name in data_names else 2
-        value = target if kind == 1 else target | 1
+        if target_name in scalar_names:
+            kind = 0
+        value = target | 1 if kind == 2 else target
         if len(symbols) != 1 or symbols[0]['type'] != kind or symbols[0]['bind'] != 1 or \
-                symbols[0]['section'] != 0xFFF1 or symbols[0]['value'] != value:
+                symbols[0]['section'] != 0xFFF1 or symbols[0]['value'] != value or \
+                target_name in scalar_names and symbols[0]['size'] != 0:
             raise ValueError('addressed runtime linked target lost its absolute Thumb identity')
     occupied = set()
     for site, target in calls.items():
@@ -1142,6 +1167,8 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
     from inert_spin_profile import fixed_configuration
     fixed_configuration(args)
     data = {} if selector in DATA_SELECTORS else None
+    if selector == max_lines.SELECTOR:
+        max_lines.source_use(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     if selector in COMPILER_SELECTORS:
         compiler_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'))
     if selector in CALLBACK_SELECTORS:
@@ -1156,7 +1183,9 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
     data_names = {record[0] for record in (data or {}).values()} - function_literals
     definitions = ['.syntax unified','.thumb']
     for name,target in sorted(targets.items()):
-        if name in data_names:
+        if selector == max_lines.SELECTOR and name == max_lines.SYMBOL:
+            definitions += [f'.global {name}', f'.set {name}, {target}']
+        elif name in data_names:
             definitions += [f'.global {name}',f'.type {name}, %object',f'.set {name}, 0x{target:08X}']
         else:
             definitions += [f'.global {name}',f'.type {name}, %function',f'.thumb_set {name}, 0x{target|1:08X}']
@@ -1180,7 +1209,7 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
     if runner.read_binary(f'{workspace}/f.linked.bin') != linked['text']:
         raise ValueError('addressed runtime objcopy differs from linked ELF text')
     result = linked_bytes(original,linked,address,calls,targets,data_relocations=(None if selector in COMPILER_MMIO_SELECTORS and not data else data),
-                          function_literals=function_literals),calls,bindings
+                          function_literals=function_literals, selector=selector),calls,bindings
     if data is not None:
         result += ([[offset,name,addend] for offset,(name,addend) in sorted(data.items())],)
     return result
