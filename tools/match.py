@@ -366,7 +366,12 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
                            rewrite=lambda text: volatile_semantics.perturb_pinned(text, declaration))
             perturbed = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
             from named_data_buffer_profile import BIOS_OVERWRITE_SELECTOR
-            if address == 0x08006720:
+            if address == 0x080EF484:
+                import scroll_prefix_scene
+                objects = parse_data_symbols(data_snapshot(root))
+                records.append(scroll_prefix_scene.record((real, stripped, perturbed),
+                    (real_image, stripped_image, perturbed_image), preprocessed, entry, interfaces, rom, objects))
+            elif address == 0x08006720:
                 import blend_keyframe_loop
                 location = parse_data_symbols(data_snapshot(root)).get(entry["symbol"])
                 records.append(blend_keyframe_loop.record((real, stripped, perturbed),

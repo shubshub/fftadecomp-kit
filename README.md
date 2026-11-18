@@ -3564,6 +3564,19 @@ writes display shadow RAM at `0x0300098C/D`. Updater `0x08000718` programs DMA0
 to upload those bytes to BLDALPHA. A native execution test follows the original
 installer and scheduler on a three-keyframe input.
 
+The USA BG3 scroll scene at `0x080EF484` creates a 36-byte scheduler payload
+and a 12-byte scroll child. Its graphics and scheduler heaps occupy separate
+parts of the same EWRAM scene allocation. The child provides 160 halfwords of
+scroll data followed by two separate DMA banks. The ordinary verifier checks
+the whole callback after a native proof bounds the variable loop. The first
+fill writes all 160 rows. The subsequent calls update even prefix lengths
+from 0 through 72 and enter phase `0x103` when the counter reaches 74.
+The proof requires normal scheduler entry, live successful allocations, an
+available graphics slot, private descriptor frames and stable task ownership.
+The original, stripped and layout-perturbed objects have the same 23 typed
+relocations. A native test follows the original initializer, allocator and
+scheduler and reproduces bank and shadow writes when these premises fail.
+
 A passing semantic check still requires plausible source and complete ELF bytes
 identical to the ROM before a function earns match credit.
 
