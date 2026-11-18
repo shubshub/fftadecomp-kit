@@ -1173,6 +1173,10 @@ def report_matches(report, root, address):
             import affine_oam_slot
             if not affine_oam_slot.report_body(report, root):
                 return False
+        if address == 0x0804BF78:
+            import tile_cpufill32
+            if not tile_cpufill32.report_body(report, root):
+                return False
         if address == 0x0800DB0C:
             import blend_ramp
             if not blend_ramp.report_body(report, root):
