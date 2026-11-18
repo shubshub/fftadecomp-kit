@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "87b3cd1777ee54fca85bd2d120e8f86e7053df8bee76edc2da287b335686eddb",
+    "acknowledged_cursor": 6978535132,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "87b3cd1777ee54fca85bd2d120e8f86e7053df8bee76edc2da287b335686eddb",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081379F0\",\"who\":\"rainbow-state\",\"note\":\"Recover interpolation routine using merged control-flags fields and matched siblings\"}",
+      "created_at": "2026-11-18T12:26:19Z",
+      "id": 6978520073,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:26:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9456cf38ec44c313cf6226421704becba5c0df9401cbd49d1a1575390a6306f8",
+    "result": {
+      "address": "0x081379F0",
+      "claim_id": 6978520073,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978520073,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "59564a1a4306c53c415299600122a585151df94109e2ecef763b04611feef031",
+    "acknowledged_cursor": 6978829143,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "59564a1a4306c53c415299600122a585151df94109e2ecef763b04611feef031",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081379F0\",\"who\":\"rainbow-state\",\"claim_id\":6978520073,\"reason\":\"Native MATCH 140/140 bytes after compiler signed runtime two-readonly-word data composition; parent integrating report\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T12:39:50Z",
+      "id": 6978818477,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:39:50Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e9c78cbd1ca90e3c81de6ca6a431bef30bc8e0f58f5c1046f4172f33a2c56108",
+    "result": {
+      "address": "0x081379F0",
+      "claim_id": 6978520073,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978818477,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
