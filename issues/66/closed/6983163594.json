@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "f7e905b488974d4453958fcd5d29a379807c978cf656c8039b48efc202856bc1",
+    "acknowledged_cursor": 6983163594,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f7e905b488974d4453958fcd5d29a379807c978cf656c8039b48efc202856bc1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811D4A0\",\"who\":\"rainbow-state\",\"note\":\"Recover scene actor scheduler/CpuSet callback and prove stack effects under native toolkit\"}",
+      "created_at": "2026-11-18T15:31:49Z",
+      "id": 6983163594,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:31:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "3f58eb415e5893620c8affd0ce5bf82f0e5cb8b3bb1b937b80d9126a6bf9f472",
+    "result": {
+      "address": "0x0811D4A0",
+      "claim_id": 6983163594,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6983163594,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "cc289f008033106aa4207e87f2c10a449d7ce06970b3c2694d31dc3c68e2249b",
+    "acknowledged_cursor": 6983738780,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "cc289f008033106aa4207e87f2c10a449d7ce06970b3c2694d31dc3c68e2249b",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811D4A0\",\"who\":\"rainbow-state\",\"claim_id\":6983163594,\"reason\":\"Merged official kit16 reproduces 348/348 native bytes, 146 instructions. Live source-bound replay passed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:52:49Z",
+      "id": 6983729988,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:52:49Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "49ae6fb8b194e6888934ecbf3e583ce6c006ce904c49ac779486ae7649e3da20",
+    "result": {
+      "address": "0x0811D4A0",
+      "claim_id": 6983163594,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6983729988,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "36160c0cd11791ebb9e4a0a96f7888aa3b58e038d13c51b1c2fbf01331efce66",
+    "acknowledged_cursor": 6983719912,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "36160c0cd11791ebb9e4a0a96f7888aa3b58e038d13c51b1c2fbf01331efce66",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081314D0\",\"who\":\"rainbow-action-evaluators\",\"note\":\"Slot 2 of dispatcher table 083A86F8, 44-byte target flag and record kind evaluator.\"}",
+      "created_at": "2026-11-18T15:51:53Z",
+      "id": 6983705372,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:51:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9822e4389e98e93fde6aa5f54b86e2f20d30ec0e0893a6266318d7f5c8948785",
+    "result": {
+      "address": "0x081314D0",
+      "claim_id": 6983705372,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6983705372,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d1d165d12946f30b3764660c0123de51bfa967264afc17ce2c1c094aa855b893",
+    "acknowledged_cursor": 6983738780,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d1d165d12946f30b3764660c0123de51bfa967264afc17ce2c1c094aa855b893",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081314D0\",\"who\":\"rainbow-action-evaluators\",\"claim_id\":6983705372,\"reason\":\"Slot 2 matched 44/44 bytes and 21 instructions; target predicate and record kinds 0x15/8/0x0F. Saved report replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T15:53:01Z",
+      "id": 6983735261,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T15:53:01Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "49ae6fb8b194e6888934ecbf3e583ce6c006ce904c49ac779486ae7649e3da20",
+    "result": {
+      "address": "0x081314D0",
+      "claim_id": 6983705372,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6983735261,
+      "status": "accepted",
+      "who": "rainbow-action-evaluators"
+    }
+  }
+}
