@@ -1223,6 +1223,61 @@ summarised the same way; its report carries and replays the same lines. Its
 function-literal path builds a `FunctionBufferCallProof` and still refuses
 the call.
 
+### Jump-table callees in the default stack buffer walk
+
+A local pointer that reaches a callee dispatching through an agbcc jump table
+used to stop the version-2 walk at the dispatch, which it could not resolve:
+
+```
+buffer callee 0x080C9208: unresolved program-counter write
+```
+
+The layout is already proved by the `bounded-buffer-guarded-switch-v1` family's
+`GuardedSwitchBufferProof.inspect`. The version-2 proof that `match.py` builds on
+its default path, and that report replay rebuilds, now uses that same proof for
+such a callee. Only that plain proof does: the constructor keyword
+`switch_callee_index` is refused for any subclass and for version 1, and no
+selector or profile proof changes. The rule is the existing one, reused
+unchanged: when `analyze.refine_function` finds a word switch in an inspected
+callee, inspection is delegated to a `GuardedSwitchBufferProof` built on the same
+ROM, mapping and index, as `NamedDataBufferProof.inspect` builds its delegate,
+but without that path's refusal of calls: direct calls and two-constant tables
+are admitted, as under `bounded-buffer-guarded-switch-v1`. Its `inspect`
+requires one table with zero or two interposed
+scalar words; the canonical unsigned-guarded dispatch, a bound covering the
+table and every case a forward offset inside the callee; no local BL control and
+every direct call a canonical indexed function; and the callee CFG verified with
+the table words as switch relocations and equal to the complete owner graph. It
+supplies the verified instructions and the dispatch's finite successors, and the
+plain proof's own alias walk then follows every case under its unchanged access,
+escape, join and return rules. The selectors' span checks (owner size,
+dependency budget, index-row agreement) are not applied; the plain walk's own
+span rules apply, as for every other callee. A callee with no word switch is
+walked as before;
+every other layout, including the preloaded one, is refused as before.
+
+The rule fires only where the walk refused, so no admitted walk changes. Each
+delegated callee's `complete-guarded-buffer-switch-v1` record (table hash,
+successors, partition) is bound into the buffer proof fingerprint only when one
+exists, so every other fingerprint is unchanged, and is stated in one report
+line:
+
+```
+* buffer switch callee: `guarded-switch-callee-v1` 0x080C9208: dispatch at 0x080C9226, 9 successors, 0 scalar words, table a07a394809bf6eed
+```
+
+Report replay recomputes the proof, the lines and the fingerprint, and reads
+`symbols/functions.txt` for the delegate's identities. No premise is added
+beyond the plain walk's own: direct calls inside the callee use the ordinary
+returning ABI summaries, as in any inspected callee.
+
+The typed-data proof beside the version-2 walk (`data_buffer_profile`) builds
+the same plain proof for its plain path, and takes the same index from
+`match.py` and from its own replay, so a caller with typed object words reaches
+a jump-table callee the same way; its report carries and replays the same
+lines. Its function-literal path builds a `FunctionBufferCallProof` and still
+refuses such a callee.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the

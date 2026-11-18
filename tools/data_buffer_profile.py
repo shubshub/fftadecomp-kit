@@ -116,7 +116,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     offset to (name, value) and function_relocations each function word offset
     to (name, value), all from the exact link of the original ELF.  index is the
     function index snapshot that the plain path's default-walk summaries read
-    (copy_helper_summary_profile); the function-literal path takes none.
+    (copy_helper_summary_profile, switch_callee_profile); the function-literal path takes none.
     """
     import match
     import function_thunk_profile as thunk
@@ -157,7 +157,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                 raise ValueError("data-buffer call target is not its canonical function")
         thunk.verify_data_bindings(calls, literals, symbols, entries)
         proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
-                                      copy_helper_index=index)
+                                      copy_helper_index=index, switch_callee_index=index)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
     if schema == FUNCTION_SCHEMA:
@@ -261,9 +261,10 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary and BIOS premise lines may repeat. Anything else, or any indented field, refuses.
+# copy-summary, switch-callee and BIOS premise lines may repeat. Anything else, or any indented field,
+# refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
-          "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary",
+          "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
           "* mapping SHA-256", "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
@@ -345,7 +346,8 @@ def report_matches(report, root, address):
         return (proved_schema == schema and proved == manifest and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
-                [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary")] ==
+                [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary",
+                                                         "* buffer switch callee")] ==
                 proof.loop_replay_lines() and
                 [line for line in lines if key(line).startswith("* buffer BIOS")] == proof.bios_summary_lines() and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
