@@ -639,6 +639,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c2f8a1b82fdc90d161713a1ecb6a546529686142d9db167c2d0dc467bae2c656",
+        "acknowledged_cursor": 6982112056,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c2f8a1b82fdc90d161713a1ecb6a546529686142d9db167c2d0dc467bae2c656",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0805F69C\",\"who\":\"rainbow-affine\",\"note\":\"Recheck payload store, phase 0x102 sender and callback closure in current official kit\"}",
+          "created_at": "2026-11-18T14:52:38Z",
+          "id": 6982112056,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:52:38Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d9c8efc6ceac28f47da6528227f50d4a2d91b364fb919a5a0837fbb750f1b595",
+        "result": {
+          "address": "0x0805F69C",
+          "claim_id": 6982112056,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982112056,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
