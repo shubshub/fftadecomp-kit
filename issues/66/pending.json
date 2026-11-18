@@ -634,7 +634,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ef4b8050cbc001350f3adeb33f1fb054214f05146247967b8e70d8dde94c4b5d",
+        "acknowledged_cursor": 6987043551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef4b8050cbc001350f3adeb33f1fb054214f05146247967b8e70d8dde94c4b5d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08031658\",\"who\":\"astra-sound\",\"claim_id\":6987012129,\"reason\":\"All 28 bytes, 11 instructions and both BLDCNT shadow volatile read/write witnesses reconstructed and replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:00:05Z",
+          "id": 6987038359,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:00:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "46e0e877a7a0f61b09abd4d8f78ff11e58ecc02a740f1c48274fb1e7d5e2fa64",
+        "result": {
+          "address": "0x08031658",
+          "claim_id": 6987012129,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987038359,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -666,7 +694,35 @@
           "who": "rainbow-gap-leaves"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f9e1aabc3f9f6f99c30aea5a3f8c77eeff69d6c758ce3e8aadc629c60ed5d7be",
+        "acknowledged_cursor": 6987043551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f9e1aabc3f9f6f99c30aea5a3f8c77eeff69d6c758ce3e8aadc629c60ed5d7be",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D2E6C\",\"who\":\"rainbow-gap-leaves\",\"claim_id\":6987016357,\"reason\":\"12-byte leaf with six native instructions replays. Clears primary bit 5 of byte 2 in the six-byte action descriptor.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:00:15Z",
+          "id": 6987042201,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:00:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "46e0e877a7a0f61b09abd4d8f78ff11e58ecc02a740f1c48274fb1e7d5e2fa64",
+        "result": {
+          "address": "0x080D2E6C",
+          "claim_id": 6987016357,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987042201,
+          "status": "accepted",
+          "who": "rainbow-gap-leaves"
+        }
+      }
     },
     {
       "claim": {
@@ -696,6 +752,38 @@
           "request_id": 6987019888,
           "status": "accepted",
           "who": "rainbow-menu"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3e5c50ae47c9760f47ce9aaa44d1d99c6f2399ec1a3b7448a10fa28cb3e16da6",
+        "acknowledged_cursor": 6987043551,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3e5c50ae47c9760f47ce9aaa44d1d99c6f2399ec1a3b7448a10fa28cb3e16da6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D2F08\",\"who\":\"rainbow-callback\",\"note\":\"\"}",
+          "created_at": "2026-11-18T18:00:18Z",
+          "id": 6987043551,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:00:18Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "46e0e877a7a0f61b09abd4d8f78ff11e58ecc02a740f1c48274fb1e7d5e2fa64",
+        "result": {
+          "address": "0x080D2F08",
+          "claim_id": 6987043551,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987043551,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null

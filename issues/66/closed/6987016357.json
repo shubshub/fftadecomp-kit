@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dc91aea595c9dbb9eaf7485a661b39114fdeb6754d7d109fd26d7594d1ddc2c7",
+    "acknowledged_cursor": 6987023231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dc91aea595c9dbb9eaf7485a661b39114fdeb6754d7d109fd26d7594d1ddc2c7",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D2E6C\",\"who\":\"rainbow-gap-leaves\",\"note\":\"Recover and replay the native six-instruction helper entered from the 08032E4C dispatcher call.\"}",
+      "created_at": "2026-11-18T17:59:08Z",
+      "id": 6987016357,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:59:08Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+    "result": {
+      "address": "0x080D2E6C",
+      "claim_id": 6987016357,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6987016357,
+      "status": "accepted",
+      "who": "rainbow-gap-leaves"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "f9e1aabc3f9f6f99c30aea5a3f8c77eeff69d6c758ce3e8aadc629c60ed5d7be",
+    "acknowledged_cursor": 6987043551,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "f9e1aabc3f9f6f99c30aea5a3f8c77eeff69d6c758ce3e8aadc629c60ed5d7be",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D2E6C\",\"who\":\"rainbow-gap-leaves\",\"claim_id\":6987016357,\"reason\":\"12-byte leaf with six native instructions replays. Clears primary bit 5 of byte 2 in the six-byte action descriptor.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T18:00:15Z",
+      "id": 6987042201,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:00:15Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "46e0e877a7a0f61b09abd4d8f78ff11e58ecc02a740f1c48274fb1e7d5e2fa64",
+    "result": {
+      "address": "0x080D2E6C",
+      "claim_id": 6987016357,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6987042201,
+      "status": "accepted",
+      "who": "rainbow-gap-leaves"
+    }
+  }
+}
