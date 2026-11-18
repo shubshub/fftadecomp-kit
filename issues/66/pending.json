@@ -639,6 +639,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "af7c3a4a464d01b9924765982353da6d353c7175503820e107d3a05b435f09e2",
+        "acknowledged_cursor": 6978913891,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "af7c3a4a464d01b9924765982353da6d353c7175503820e107d3a05b435f09e2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08125DE8\",\"who\":\"rainbow-state\",\"note\":\"Recover parked display save/restore using shared control_flags declaration\"}",
+          "created_at": "2026-11-18T12:43:51Z",
+          "id": 6978909031,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:43:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fe6ec77edabe4f3a28997e3b6b960db6af56f4f2c7b54da05820c5f2cef1da25",
+        "result": {
+          "address": "0x08125DE8",
+          "claim_id": 6978909031,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978909031,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5bf73c6d93cae482e386d1f77d8c20cb4a417bb3b45aab9d3c8daadc1818be2b",
+        "acknowledged_cursor": 6978913891,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5bf73c6d93cae482e386d1f77d8c20cb4a417bb3b45aab9d3c8daadc1818be2b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08142BE8\",\"who\":\"rainbow-ffta\",\"note\":\"NTFS native matching and full ROM replay\"}",
+          "created_at": "2026-11-18T12:44:03Z",
+          "id": 6978913810,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:44:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fe6ec77edabe4f3a28997e3b6b960db6af56f4f2c7b54da05820c5f2cef1da25",
+        "result": {
+          "address": "0x08142BE8",
+          "claim_id": 6978913810,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978913810,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5e4a14883f5e162449c3e4faf8ced59b8ab07f6e01d2b55f68035bb39aba99d4",
+        "acknowledged_cursor": 6978913891,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5e4a14883f5e162449c3e4faf8ced59b8ab07f6e01d2b55f68035bb39aba99d4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081311DC\",\"who\":\"rainbow-ffta\",\"note\":\"NTFS native matching and full ROM replay\"}",
+          "created_at": "2026-11-18T12:44:03Z",
+          "id": 6978913891,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:44:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fe6ec77edabe4f3a28997e3b6b960db6af56f4f2c7b54da05820c5f2cef1da25",
+        "result": {
+          "address": "0x081311DC",
+          "claim_id": 6978913891,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978913891,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
