@@ -3272,11 +3272,14 @@ class BufferCallProof:
     bios_summaries = None
     # Default-path CopySummaries (copy_helper_summary_profile), set per plain instance only.
     copy_summaries = None
+    # Default-path SwitchCallees (switch_callee_profile), set per plain instance only.
+    switch_callees = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
-                 loop_replay=False, bios_wrappers=False, copy_helper_index=None):
+                 loop_replay=False, bios_wrappers=False, copy_helper_index=None,
+                 switch_callee_index=None):
         if bios_wrappers is not False:
             if bios_wrappers is not True or type(self) is not BufferCallProof or \
                     discarded_exit_scratch is not None or bios_fill_proof is not None:
@@ -3306,6 +3309,12 @@ class BufferCallProof:
             if type(self) is not BufferCallProof or stack_arguments is not True:
                 raise ValueError("copy summaries require the plain stack-argument buffer proof")
             self.copy_summaries = CopySummaries(rom, mapping, copy_helper_index)
+        if switch_callee_index is not None:
+            from switch_callee_profile import SwitchCallees
+            # Scratch and BIOS-fill policies already refuse stack arguments above.
+            if type(self) is not BufferCallProof or stack_arguments is not True:
+                raise ValueError("switch callees require the plain stack-argument buffer proof")
+            self.switch_callees = SwitchCallees(rom, mapping, switch_callee_index)
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
@@ -3404,6 +3413,9 @@ class BufferCallProof:
         return self.target(address)
 
     def inspect(self, address, data):
+        if self.switch_callees is not None and \
+                (delegated := self.switch_callees.inspect(self, address, data)) is not None:
+            return delegated
         instructions = verify_leaf_instructions(data, address, True,
                                                 buffer_proof=self if self.stack_arguments else None,
                                                 call_resolver=self.resolve_call,
@@ -3430,6 +3442,7 @@ class BufferCallProof:
         bios_snapshot = self.bios_summaries.copy() if self.bios_summaries is not None else None
         copy_snapshot = None if self.copy_summaries is None else \
             (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations))
+        switch_snapshot = dict(self.switch_callees.records) if self.switch_callees is not None else None
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
@@ -3446,6 +3459,9 @@ class BufferCallProof:
                                          copy_snapshot):
                     ledger.clear()
                     ledger.update(saved)
+            if switch_snapshot is not None:
+                self.switch_callees.records.clear()
+                self.switch_callees.records.update(switch_snapshot)
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=True, **context)
 
@@ -3974,7 +3990,8 @@ class BufferCallProof:
 
     def loop_replay_lines(self):
         """Report lines stating every replayed callee and the premises it relied on, then every
-        summarised copy-helper call (copy_helper_summary_profile)."""
+        summarised copy-helper call (copy_helper_summary_profile) and every inspected jump-table
+        callee (switch_callee_profile)."""
         from callee_preservation_profile import preserves_r7_r8
         lines = []
         for callee, records in sorted(self.loop_replays.items()):
@@ -3999,6 +4016,8 @@ class BufferCallProof:
                          f"pruned edges {len(pruned)}")
         if self.copy_summaries is not None:
             lines.extend(self.copy_summaries.lines())
+        if self.switch_callees is not None:
+            lines.extend(self.switch_callees.lines())
         return lines
 
     def bios_summary_lines(self):
@@ -4037,6 +4056,10 @@ class BufferCallProof:
         if self.copy_summaries is not None and self.copy_summaries.observations:
             # Only a summarised copy adds this; every other fingerprint is unchanged.
             digest.update(json.dumps(self.copy_summaries.evidence(), sort_keys=True,
+                                     separators=(",", ":")).encode())
+        if self.switch_callees is not None and self.switch_callees.records:
+            # Only an inspected jump-table callee adds this; every other fingerprint is unchanged.
+            digest.update(json.dumps(self.switch_callees.evidence(), sort_keys=True,
                                      separators=(",", ":")).encode())
         return digest.hexdigest()
 
@@ -6221,7 +6244,8 @@ def main():
                         raise
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
                                                    bios_wrappers=True,
-                                                   copy_helper_index=inert_spin.index_snapshot(ROOT))
+                                                   copy_helper_index=inert_spin.index_snapshot(ROOT),
+                                                   switch_callee_index=inert_spin.index_snapshot(ROOT))
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,
                                                                       incoming_narrow_reads=True)

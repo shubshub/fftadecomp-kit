@@ -490,7 +490,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                     if buffer_stack_arguments is not None or any(reserved(target) for target in calls.values()):
                         proof = BufferCallProof(rom, mapping, stack_arguments=buffer_stack_arguments,
                                                 loop_replay=True, bios_wrappers=True,
-                                                copy_helper_index=index if buffer_stack_arguments else None) \
+                                                copy_helper_index=index if buffer_stack_arguments else None,
+                                                switch_callee_index=index if buffer_stack_arguments else None) \
                             if buffer_stack_arguments is not None else None
                         instructions = verify_leaf_instructions(got, address, True, calls, buffer_proof=proof,
                                                                 incoming_narrow_reads=True)
