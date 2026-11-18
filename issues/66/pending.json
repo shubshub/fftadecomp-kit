@@ -602,7 +602,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f237c8075cb2c6a94f9be762fb63bce3c3cccce85c4a78cc1c6106f5d2d11df7",
+        "acknowledged_cursor": 6980678216,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f237c8075cb2c6a94f9be762fb63bce3c3cccce85c4a78cc1c6106f5d2d11df7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08029E48\",\"who\":\"rainbow-callback\",\"claim_id\":6980533167,\"reason\":\"Parked menu-panel draw and clear: complete 208-byte function, natural C reproduces 171 bytes and the four call sites, register allocations differ.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T13:56:46Z",
+          "id": 6980678216,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:56:46Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2aadc6bf1451911ff76c2f89760ab670488f16099fc2f2d82af34f23d05cac4c",
+        "result": {
+          "address": "0x08029E48",
+          "claim_id": 6980533167,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980678216,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -632,6 +660,38 @@
           "request_id": 6980611672,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2b0433c4465df7a1430b4c15bfdf3b0fe8507081c0828055ab9a056b9361b40b",
+        "acknowledged_cursor": 6980678216,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2b0433c4465df7a1430b4c15bfdf3b0fe8507081c0828055ab9a056b9361b40b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800DE70\",\"who\":\"rainbow-callback\",\"note\":\"Scanline callback from the existing ROM handler table; two 160-halfword planes into the four-byte row record\"}",
+          "created_at": "2026-11-18T13:56:29Z",
+          "id": 6980670854,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:56:29Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2aadc6bf1451911ff76c2f89760ab670488f16099fc2f2d82af34f23d05cac4c",
+        "result": {
+          "address": "0x0800DE70",
+          "claim_id": 6980670854,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980670854,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null
