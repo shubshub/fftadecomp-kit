@@ -83,6 +83,21 @@ def caller_shape(data, address, instructions, edges, calls):
         raise ValueError('action shuffle literal words do not bind its pointer slot and table')
 
 
+def rng_record(rng):
+    """Authenticate the exact original seed update and its nonnegative 15-bit projection."""
+    import match
+    if len(rng) != 32:
+        raise ValueError('action shuffle RNG extent differs')
+    # Written seed is (old*A+B) modulo 2**32, then LSL 1 / LSR 17 leaves only bits 16..30.
+    decoded = {
+        item.address: item for item in match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB).disasm(rng[:20], RNG)
+    }
+    words(decoded, RNG, (0x4A04, 0x6811, 0x4804, 0x4348, 0x4904, 0x1840, 0x6010, 0x0040, 0x0C40, 0x4770))
+    if struct.unpack_from('<III', rng, 20) != (0x030034B0, 0x41C64E6D, 0x3039):
+        raise ValueError('action shuffle RNG state or recurrence literals differ')
+    return dict(address=RNG, sha256=sha(rng), seed=0x030034B0, range=[0, 32767])
+
+
 def prove(data, address, rom, mapping, index, objects, bindings):
     import installed_copy_effects as copy
     import iwram_installation_prerequisite as install
@@ -131,14 +146,7 @@ def prove(data, address, rom, mapping, index, objects, bindings):
         or body(0x08142248, 0x0814224A, 1) != bytes.fromhex('0847')
     ):
         raise ValueError('action shuffle requires the original dispatcher, descriptor and BX R1')
-    # Written seed is (old*A+B) modulo 2**32, then LSL 1 / LSR 17 leaves only bits 16..30.
-    rng = body(RNG, RNG + 32, 10)
-    decoded = {
-        item.address: item for item in match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB).disasm(rng[:20], RNG)
-    }
-    words(decoded, RNG, (0x4A04, 0x6811, 0x4804, 0x4348, 0x4904, 0x1840, 0x6010, 0x0040, 0x0C40, 0x4770))
-    if struct.unpack_from('<III', rng, 20) != (0x030034B0, 0x41C64E6D, 0x3039):
-        raise ValueError('action shuffle RNG state or recurrence literals differ')
+    rng = rng_record(body(RNG, RNG + 32, 10))
     if body(THUNK, THUNK + 2, 1) != bytes.fromhex('1847'):
         raise ValueError('action shuffle requires complete BX R3')
     if not remainder.verify_context(data, address, calls, (rom, mapping, {address + 0x32: '__modsi3'})):
@@ -199,7 +207,7 @@ def prove(data, address, rom, mapping, index, objects, bindings):
         bindings=bindings,
         partition=partition,
         dispatcher=[0x081338BA, 0x08142248, slot],
-        rng=dict(address=RNG, sha256=sha(rng), seed=0x030034B0, range=[0, 32767]),
+        rng=rng,
         runtime=dict(
             identities=[list(row) for row in remainder.IDENTITIES],
             dividends=[0, 32767],
