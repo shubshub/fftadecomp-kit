@@ -289,6 +289,10 @@ def schemas(unit=None, address=None, orphan=None):
     admitted = {evidence.SCHEMA, evidence.FRAMED_SCHEMA, evidence.LINKED_SCHEMA,
                 evidence.FRAMED_LINKED_SCHEMA, evidence.DATA_SCHEMA, evidence.FRAMED_DATA_SCHEMA,
                 evidence.FUNCTION_ADDRESS_SCHEMA, evidence.FRAMED_FUNCTION_ADDRESS_SCHEMA}
+    if address == 0x08141B14:
+        import flash_read_sector
+        if flash_read_sector.unit_owner(unit, address, orphan):
+            admitted.add(flash_read_sector.SCHEMA)
     if address == 0x08141C78:
         import flash_sized_verify
         if flash_sized_verify.unit_owner(unit, address, orphan):
