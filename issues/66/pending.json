@@ -1343,6 +1343,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "498d995fb1c80e83e23a85e86da6d3b6ac01e107ace292e39d9e181fcd64b9e6",
+        "acknowledged_cursor": 6990120683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "498d995fb1c80e83e23a85e86da6d3b6ac01e107ace292e39d9e181fcd64b9e6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800BE00\",\"who\":\"rainbow-state\",\"note\":\"Recover independent original tile-animation accessor and check it against the same game-created node\"}",
+          "created_at": "2026-11-18T20:05:52Z",
+          "id": 6990120683,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:05:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "1667b5f9be987bec9a954861b42393fcac45e252bf07befcd4ca768b40202e5b",
+        "result": {
+          "address": "0x0800BE00",
+          "claim_id": 6990120683,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990120683,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
