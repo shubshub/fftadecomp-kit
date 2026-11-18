@@ -37,6 +37,7 @@ SCHEDULER_PAYLOAD = 'conditional-scheduler-descriptor-payload-calls-v1'
 SCHEDULER_PAYLOAD8 = 'conditional-scheduler-descriptor-payload8-calls-v1'
 SCHEDULER_HALFWORD_PAYLOAD = 'conditional-scheduler-halfword-output-payload-v1'
 SCHEDULER_TWO_PAYLOAD = 'conditional-scheduler-two-payload-calls-v1'
+SCENE_SCRIPT = 'conditional-scene-mode6-position-v1'
 SCHEDULER_ZERO_DESCRIPTOR = 'conditional-scheduler-zero-descriptor-v1'
 SCHEDULER_ENTRY = 'conditional-scheduler-entry-descriptor-calls-v1'
 SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1'
@@ -72,6 +73,7 @@ SCHEMAS = {
     SCHEDULER_PAYLOAD8: 'elf-symbol-thumb-conditional-scheduler-descriptor-payload8-calls-v1',
     SCHEDULER_HALFWORD_PAYLOAD: 'elf-symbol-thumb-conditional-scheduler-halfword-output-payload-v1',
     SCHEDULER_TWO_PAYLOAD: 'elf-symbol-thumb-conditional-scheduler-two-payload-calls-v1',
+    SCENE_SCRIPT: 'elf-symbol-thumb-' + SCENE_SCRIPT,
     SCHEDULER_ZERO_DESCRIPTOR: 'elf-symbol-thumb-' + SCHEDULER_ZERO_DESCRIPTOR,
     SCHEDULER_ENTRY: 'elf-symbol-thumb-conditional-scheduler-entry-descriptor-calls-v1',
     SCHEDULER_ENTRY_BRANCH: 'elf-symbol-thumb-' + SCHEDULER_ENTRY_BRANCH,
@@ -112,6 +114,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         super().__init__(rom, mapping, index, objects)
         self.policy = policy
         self.observations = {}
+        if policy == SCENE_SCRIPT:
+            # Mode-six helper, predicate, geometry, callback, three inputs of
+            # the shared helper interpreter, direct scheduler and two thunks.
+            self.dependency_budget = 10
         if policy in (SCHEDULER_SEQUENTIAL, SCHEDULER_LEAF_OUTPUT, SCHEDULER_KILLED_ALIAS):
             # Thirty-two ordinary bodies, two scheduler bodies and two thunks.
             self.dependency_budget = 36
@@ -208,6 +214,11 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             call_sites.bind_forwarding(self, edges)
             dependencies = tuple(self.scheduler_call_sites['dependencies'])
             runtime_names = call_sites.RUNTIME_NAMES
+        elif self.policy == SCENE_SCRIPT:
+            import scene_script_position as scene
+            scene.bind(self, data, address, calls)
+            dependencies = (0x08005954,)
+            runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy == SCHEDULER_ZERO_DESCRIPTOR:
             import scheduler_zero_descriptor as descriptor
             descriptor.bind(self, data, address, ins, edges, calls)
@@ -331,6 +342,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                 self.forwarded_stack_arguments = forwarding
         require(self.calls.get(site) == address and not words,
                 'local-buffer call differs from its authenticated interface')
+        if self.policy == SCENE_SCRIPT:
+            import scene_script_position as scene
+            return scene.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy == SCHEDULER_ZERO_DESCRIPTOR:
             import scheduler_zero_descriptor as descriptor
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
@@ -456,6 +470,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
         return {}
 
     def contract_manifest(self):
+        if self.policy == SCENE_SCRIPT:
+            import scene_script_position as scene
+            return scene.manifest(self)
         if self.policy == SCHEDULER_ZERO_DESCRIPTOR:
             import scheduler_zero_descriptor as descriptor
             return descriptor.manifest(self)

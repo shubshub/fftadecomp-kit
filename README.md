@@ -1514,6 +1514,20 @@ scheduler's ordinary premises. Run `tests/test_scheduler_event_definition.py`
 with `FFTA_EVENT_DEFINITION_ROOT` set to the indexed checkout for native
 replay and mutation tests.
 
+The scene callbacks at `08118A08`, `08118AC0` and `08118B94` use
+`--owner-runtime-profile conditional-scene-mode6-position-v1`. Each fills
+two RAM ranges with BIOS CpuSet and passes a four-byte position to the script
+helper at `080E03F8` through its fifth argument. The verifier checks both
+halfword fill sources. Its helper interpreter follows switch case 6 and
+reads two signed halfwords from the position. The geometry predicate consumes
+the resulting coordinates. Either predicate outcome reaches the direct scheduler,
+with delay 0 or 20, a separate 28-byte descriptor and callback `080DFF04`.
+Its phase-zero path copies a delay halfword, count byte and script data pointer
+to the payload. The report records the selected instructions, real ELF bindings,
+and the physical-isolation, allocator, BIOS and ordinary-return premises.
+Run `tests/test_scene_script_position.py` with `FFTA_SCENE_SCRIPT_ROOT` set to
+an indexed game checkout containing the saved `08118A08` report.
+
 Issue #81's single local result word passed to an indexed callee has its own
 opt-in profile:
 
