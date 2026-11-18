@@ -831,6 +831,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "05900ed56919cc6eeec6a13f3e68ee92ff6f41ce6b9842c2e82d8958316285b1",
+        "acknowledged_cursor": 6978340540,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "05900ed56919cc6eeec6a13f3e68ee92ff6f41ce6b9842c2e82d8958316285b1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F7160\",\"who\":\"rainbow-ffta\",\"note\":\"Verify parked source under merged BIOS/data/scheduler proof\"}",
+          "created_at": "2026-11-18T12:17:56Z",
+          "id": 6978333471,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:17:56Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4ed66e843eef72bf0c93d1b964aa3aacf467d0361c17e28da882d7d618725468",
+        "result": {
+          "address": "0x080F7160",
+          "claim_id": 6978333471,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978333471,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "9c5e6728f214d023ae7a61f4e4a3f6ffa7c7f82429e9a3fb71f73066cd5bc79e",
+        "acknowledged_cursor": 6978340540,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9c5e6728f214d023ae7a61f4e4a3f6ffa7c7f82429e9a3fb71f73066cd5bc79e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08101410\",\"who\":\"rainbow-ffta\",\"note\":\"Verify parked source under merged BIOS/data/scheduler proof\"}",
+          "created_at": "2026-11-18T12:18:06Z",
+          "id": 6978337005,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:18:06Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4ed66e843eef72bf0c93d1b964aa3aacf467d0361c17e28da882d7d618725468",
+        "result": {
+          "address": "0x08101410",
+          "claim_id": 6978337005,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978337005,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a7167f8a768cdeb8668972bb174cf833fe23eef254a6b64b0244f342ec054759",
+        "acknowledged_cursor": 6978340540,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a7167f8a768cdeb8668972bb174cf833fe23eef254a6b64b0244f342ec054759",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08117884\",\"who\":\"rainbow-ffta\",\"note\":\"Verify parked source under merged BIOS/data/scheduler proof\"}",
+          "created_at": "2026-11-18T12:18:15Z",
+          "id": 6978340540,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:18:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "4ed66e843eef72bf0c93d1b964aa3aacf467d0361c17e28da882d7d618725468",
+        "result": {
+          "address": "0x08117884",
+          "claim_id": 6978340540,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978340540,
+          "status": "accepted",
+          "who": "rainbow-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
