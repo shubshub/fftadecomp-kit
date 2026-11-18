@@ -147,8 +147,37 @@ class CompilerSignedRuntimeDataTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'manifest differs'):
             profile.verify(**f, selector=SELECTOR, manifest=forged)
 
-    def build_boundary(self):
-        f = self.fixture()
+    def test_compiler_two_words_combines_frame_alias_and_data_proofs(self):
+        selector = profile.COMPILER_TWO_DATA_SELECTOR
+        f = self.base.fixture()
+        manifest, _ = profile.verify(**f, selector=selector)
+        self.assertEqual(manifest['schema'], profile.COMPILER_TWO_DATA_SCHEMA)
+        self.assertEqual(manifest['frame']['entry_stack']['words'], [0, 1])
+        self.assertEqual(manifest['data_bindings'], f['data_bindings'])
+        self.assertEqual({call[1] for call in manifest['compiler_runtime']['calls']}, {'__divsi3'})
+        self.assertIn('readonly_entry_stack_words_profile.py', manifest['producer_source_sha256'])
+        with self.assertRaises(ValueError):
+            profile.verify(**f, selector=SELECTOR)
+        with self.assertRaises(ValueError):
+            self.bindings(f, self.base.fixtures.data_image(f), selector)
+        for reads, extra in (((), ()), ((0x9802,), ()), ((0x9802, 0x9903, 0x9A04), ()),
+                             ((0x9802, 0x9903), (0x9002,)), ((0x9802, 0x9903), (0xA802,))):
+            with self.subTest(reads=reads, extra=extra), self.assertRaises(ValueError):
+                profile.verify(**self.base.fixture(reads, extra), selector=selector)
+        with self.assertRaises(ValueError):
+            profile.verify(**dict(f, data_bindings=[]), selector=selector)
+        with self.build_boundary(f) as (root, _, _):
+            with patch.object(sys, 'argv', ['match.py', '--root', str(root),
+                    '--addressed-runtime-profile', selector, f'{A:08X}']), redirect_stdout(io.StringIO()):
+                self.assertEqual(match.main(), 0)
+            report = (root / 'docs/match/08010000.md').read_text()
+            self.assertIn('incoming stack ABI', report)
+            self.assertTrue(fixtures.evidence.report_matches(report, root, A))
+            self.assertFalse(fixtures.evidence.report_matches(
+                report.replace('incoming stack ABI', 'unchecked stack'), root, A))
+
+    def build_boundary(self, f=None):
+        f = self.fixture() if f is None else f
         original_builder = self.base.fixtures.data_image
         linked_builder = self.base.fixtures.linked_data_image
 

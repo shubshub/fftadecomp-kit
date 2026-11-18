@@ -33,14 +33,17 @@ DATA_SELECTOR = 'addressed-signed-runtime-data-v1'
 DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-data-v1'
 COMPILER_DATA_SELECTOR = 'compiler-signed-runtime-data-v1'
 COMPILER_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-data-v1'
+COMPILER_TWO_DATA_SELECTOR = 'compiler-signed-runtime-readonly-two-words-data-v1'
+COMPILER_TWO_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-readonly-two-words-data-v1'
 COMPILER_MMIO_DATA_SELECTOR = 'compiler-signed-runtime-numeric-mmio-data-v1'
 COMPILER_MMIO_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-numeric-mmio-data-v1'
 COMPILER_MMIO_FOUR_DATA_SELECTOR = 'compiler-signed-runtime-readonly-four-words-numeric-mmio-data-v1'
 COMPILER_MMIO_FOUR_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-readonly-four-words-numeric-mmio-data-v1'
 COMPILER_MMIO_SELECTORS = (COMPILER_MMIO_DATA_SELECTOR, COMPILER_MMIO_FOUR_DATA_SELECTOR)
-COMPILER_SELECTORS = (COMPILER_DATA_SELECTOR, *COMPILER_MMIO_SELECTORS)
+COMPILER_SELECTORS = (COMPILER_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR, *COMPILER_MMIO_SELECTORS)
 READONLY_TWO_DATA_SELECTOR = 'addressed-signed-runtime-readonly-two-words-data-v1'
 READONLY_TWO_DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-words-data-v1'
+READONLY_TWO_DATA_SELECTORS = (READONLY_TWO_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR)
 CALLBACK_SELECTOR = 'addressed-signed-runtime-r2-callback-data-v1'
 CALLBACK_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-r2-callback-data-v1'
 R3_CALLBACK_SELECTOR = 'addressed-signed-runtime-r3-callback-data-v1'
@@ -132,6 +135,7 @@ THUNK_TARGET_POLICY = 'all-path-memory-word-load-target-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
 SCHEMAS = {COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
+            COMPILER_TWO_DATA_SELECTOR: COMPILER_TWO_DATA_SCHEMA,
             BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-numeric-mmio-code-image-data-v1',
             BIOS_SCALAR_CODE_IMAGE_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-code-image-data-v1',
             BIOS_READONLY_TWO_SELECTOR: 'elf-symbol-thumb-addressed-native-bios-fill-readonly-two-words-v1',
@@ -347,7 +351,7 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
         paths.add(Path(importlib.import_module('readonly_entry_stack_profile').__file__))
     if selector in THUNK_SELECTORS:
         paths.add(Path(importlib.import_module('unsigned_thunk_profile').__file__))
-    if selector in (READONLY_TWO_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
+    if selector in (*READONLY_TWO_DATA_SELECTORS, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
         paths.add(Path(importlib.import_module('readonly_entry_stack_words_profile').__file__))
     return {path.name: sha(path.read_bytes()) for path in sorted(paths)}
 
@@ -742,8 +746,8 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
                                             address, data, context[0], context[1])
     elif any(remainder.address_literal(row['value']) for row in partition['words']):
         raise ValueError('addressed signed runtimes exclude address literals and data bindings')
-    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
-        if selector in (READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
+    if selector in (READONLY_SELECTOR, READONLY_TWO_SELECTOR, *READONLY_TWO_DATA_SELECTORS, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
+        if selector in (READONLY_TWO_SELECTOR, *READONLY_TWO_DATA_SELECTORS, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR):
             import readonly_entry_stack_words_profile as incoming
             policy = {'schema': incoming.SCHEMA, 'words': ([0, 1, 2, 3] if selector in READONLY_FOUR_DATA_SELECTORS else
                                                            [0, 1, 2] if selector == INTEGER_THREE_DATA_SELECTOR else [0, 1])}
@@ -1260,7 +1264,7 @@ def render(result):
     selector = next((key for key,value in SCHEMAS.items() if value == result['manifest']['schema']),None)
     if selector is None:
         raise ValueError('unknown addressed signed runtime manifest schema')
-    premise = [] if selector not in (BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, READONLY_SELECTOR, READONLY_TWO_SELECTOR, READONLY_TWO_DATA_SELECTOR, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR) else [
+    premise = [] if selector not in (BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, READONLY_SELECTOR, READONLY_TWO_SELECTOR, *READONLY_TWO_DATA_SELECTORS, INTEGER_READONLY_SELECTOR, UNSIGNED_READONLY_SELECTOR, INTEGER_THREE_DATA_SELECTOR, *READONLY_FOUR_DATA_SELECTORS, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR) else [
         '* incoming stack ABI: ' + result['manifest']['frame']['entry_stack']['contract']]
     if selector in DATA_SELECTORS:
         premise.append('* named data binding: ' + result['manifest']['data_contract'])
