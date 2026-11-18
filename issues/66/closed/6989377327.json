@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9e909fa4cc19248747c8b123637c53dd1345e818198dbf207608053365396536",
+    "acknowledged_cursor": 6989433369,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9e909fa4cc19248747c8b123637c53dd1345e818198dbf207608053365396536",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804BF78\",\"who\":\"rainbow-state\",\"note\":\"Reconstruct the original clipped two-by-two per-nibble tile pixel clear using the two reached BIOS word operations\"}",
+      "created_at": "2026-11-18T19:34:40Z",
+      "id": 6989377327,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:34:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "66fad3f74c240067ebccb0ea11cbf2966bbe5cc46eecea992ef534b2f7931420",
+    "result": {
+      "address": "0x0804BF78",
+      "claim_id": 6989377327,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6989377327,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "bb3b8ab387bd616749cc3c62bb2b9ae22fc9bbf8ca05dbe42cdba1c17ce625b2",
+    "acknowledged_cursor": 6989787934,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "bb3b8ab387bd616749cc3c62bb2b9ae22fc9bbf8ca05dbe42cdba1c17ce625b2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804BF78\",\"who\":\"rainbow-state\",\"claim_id\":6989377327,\"reason\":\"Live source and canonical report match 204/204 bytes, 95/95 instructions, on merged SDK CpuFill32 toolkit 3cd3e6d; saved report successfully replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T19:52:17Z",
+      "id": 6989778397,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T19:52:17Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "507d9669182b92bdd872604015a280cbc067a1c0e41fcd234a541c1cd5f801ad",
+    "result": {
+      "address": "0x0804BF78",
+      "claim_id": 6989377327,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6989778397,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
