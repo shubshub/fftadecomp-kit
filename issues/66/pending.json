@@ -602,7 +602,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ef6732b9f93b2d21ab8d83ab34be3062420adcc14db7a3fe687f072860dbe9dd",
+        "acknowledged_cursor": 6980166865,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef6732b9f93b2d21ab8d83ab34be3062420adcc14db7a3fe687f072860dbe9dd",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08029DD4\",\"who\":\"rainbow-callback\",\"claim_id\":6980071931,\"reason\":\"Verified complete 116-byte decimal tile formatter via the published native BIOS-fill and runtime profile\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T13:36:05Z",
+          "id": 6980166865,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:36:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "96b32d38e4cf40b76f1440ef5ff3ad0aef9449846e69a810fc99c9530081ce32",
+        "result": {
+          "address": "0x08029DD4",
+          "claim_id": 6980071931,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980166865,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     }
   ],
   "issue": 66,
