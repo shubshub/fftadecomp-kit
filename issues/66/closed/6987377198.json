@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "de621a6a77c8910fb347e3a0de86fef57fedbd40ed5c56193957cdc148d4fe38",
+    "acknowledged_cursor": 6987377198,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "de621a6a77c8910fb347e3a0de86fef57fedbd40ed5c56193957cdc148d4fe38",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C13C8\",\"who\":\"rainbow-callback\",\"note\":\"\"}",
+      "created_at": "2026-11-18T18:13:56Z",
+      "id": 6987377198,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:13:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "05fcfb371853e8c2975b1b4ab0074742ac5c24a8c36c33265c0bca96a95254f4",
+    "result": {
+      "address": "0x080C13C8",
+      "claim_id": 6987377198,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6987377198,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "58da92ede76e731db361b0e3e6cf36643163b9cd5e410efd2ea0afa9bc3205c2",
+    "acknowledged_cursor": 6987476882,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "58da92ede76e731db361b0e3e6cf36643163b9cd5e410efd2ea0afa9bc3205c2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C13C8\",\"who\":\"rainbow-callback\",\"claim_id\":6987377198,\"reason\":\"Parked. Original 4-byte equipment output can receive five halfwords through 0812F0CC. Fully sized C gives 110 original-extent bytes, 99 identical; two halfwords gives 101 but lacks an input invariant.\",\"unmatchable\":true,\"tried\":\"ordinary agbcc -O2; linked signed modulus native profile; two and five halfword buffers\"}",
+      "created_at": "2026-11-18T18:16:51Z",
+      "id": 6987450547,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T18:16:51Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2af5ade6c3d1414524dc1100a196e4e6ae7999061d1204a59af86b070054895a",
+    "result": {
+      "address": "0x080C13C8",
+      "claim_id": 6987377198,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6987450547,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
