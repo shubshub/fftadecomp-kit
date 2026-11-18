@@ -603,6 +603,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "5081249e7277e3ef690b1c58e056ebf395bc4dcefd9a5736f58cbd390daa30af",
+        "acknowledged_cursor": 6980466547,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5081249e7277e3ef690b1c58e056ebf395bc4dcefd9a5736f58cbd390daa30af",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081453F8\",\"who\":\"rainbow-m4a\",\"note\":\"USA MPlayExtender callback boundaries and complete native proof with isolated indexes, supported by historical source and code witnesses.\"}",
+          "created_at": "2026-11-18T13:48:05Z",
+          "id": 6980466547,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:48:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5df21e87801d4960de3ee121a65abc22f0b32f86066a8e7be98105e09709f60e",
+        "result": {
+          "address": "0x081453F8",
+          "claim_id": 6980466547,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980466547,
+          "status": "accepted",
+          "who": "rainbow-m4a"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
