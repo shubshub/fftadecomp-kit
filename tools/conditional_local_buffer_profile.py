@@ -53,6 +53,7 @@ STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
 OUTPUT = 'conditional-local-output-word-call-v1'
 SCHEMAS = {
+    'conditional-cone-tile-stack-footprint-v1': 'elf-symbol-thumb-conditional-cone-tile-stack-footprint-v1',
     SCHEDULER_PROJECTED: 'elf-symbol-thumb-conditional-scheduler-projected-outputs-v1',
     SCHEDULER: 'elf-symbol-thumb-conditional-scheduler-descriptor-calls-v1',
     SCHEDULER_BRANCH: 'elf-symbol-thumb-conditional-scheduler-branch-descriptor-calls-v1',
