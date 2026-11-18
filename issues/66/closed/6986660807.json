@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ae335f2285b53e1afbb3d6df0e8666bf0a86df1851a3f921d672b26c6414f053",
+    "acknowledged_cursor": 6986665871,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ae335f2285b53e1afbb3d6df0e8666bf0a86df1851a3f921d672b26c6414f053",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080570D8\",\"who\":\"rainbow-callback\",\"note\":\"Roster list twin source recovery with authenticated BIOS fill and two callback bindings\"}",
+      "created_at": "2026-11-18T17:44:25Z",
+      "id": 6986660807,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:44:25Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "92057a8e88c60b0bffe95f87f859bb7b8a750d0d14f701047bc7f731bd3e2156",
+    "result": {
+      "address": "0x080570D8",
+      "claim_id": 6986660807,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6986660807,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "837217a0e11568fbff0573ea82daa221eef68e583653392acf6e3f448b9234a4",
+    "acknowledged_cursor": 6987023231,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "837217a0e11568fbff0573ea82daa221eef68e583653392acf6e3f448b9234a4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080570D8\",\"who\":\"rainbow-callback\",\"claim_id\":6986660807,\"reason\":\"Parked plausible 403/408 same-offset native bytes. Five encodings swap r8 and r9 for incoming position and count offset. All original calls, branches, extents and literals match.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2, original sibling profile and mapped relocations\"}",
+      "created_at": "2026-11-18T17:59:26Z",
+      "id": 6987023231,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:59:26Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+    "result": {
+      "address": "0x080570D8",
+      "claim_id": 6986660807,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6987023231,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}

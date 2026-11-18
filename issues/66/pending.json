@@ -510,7 +510,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "837217a0e11568fbff0573ea82daa221eef68e583653392acf6e3f448b9234a4",
+        "acknowledged_cursor": 6987023231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "837217a0e11568fbff0573ea82daa221eef68e583653392acf6e3f448b9234a4",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080570D8\",\"who\":\"rainbow-callback\",\"claim_id\":6986660807,\"reason\":\"Parked plausible 403/408 same-offset native bytes. Five encodings swap r8 and r9 for incoming position and count offset. All original calls, branches, extents and literals match.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2, original sibling profile and mapped relocations\"}",
+          "created_at": "2026-11-18T17:59:26Z",
+          "id": 6987023231,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:59:26Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+        "result": {
+          "address": "0x080570D8",
+          "claim_id": 6986660807,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987023231,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -635,6 +663,102 @@
           "who": "astra-sound"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "2bcd7548cedba460304fea599f2c36dd393923390c6548a3e2a9ee41f37cb32b",
+        "acknowledged_cursor": 6987023231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2bcd7548cedba460304fea599f2c36dd393923390c6548a3e2a9ee41f37cb32b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08031658\",\"who\":\"astra-sound\",\"note\":\"Recover original BLDCNT shadow register assignments referenced by four direct game calls.\"}",
+          "created_at": "2026-11-18T17:58:57Z",
+          "id": 6987012129,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:58:57Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+        "result": {
+          "address": "0x08031658",
+          "claim_id": 6987012129,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987012129,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "dc91aea595c9dbb9eaf7485a661b39114fdeb6754d7d109fd26d7594d1ddc2c7",
+        "acknowledged_cursor": 6987023231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dc91aea595c9dbb9eaf7485a661b39114fdeb6754d7d109fd26d7594d1ddc2c7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D2E6C\",\"who\":\"rainbow-gap-leaves\",\"note\":\"Recover and replay the native six-instruction helper entered from the 08032E4C dispatcher call.\"}",
+          "created_at": "2026-11-18T17:59:08Z",
+          "id": 6987016357,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:59:08Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+        "result": {
+          "address": "0x080D2E6C",
+          "claim_id": 6987016357,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987016357,
+          "status": "accepted",
+          "who": "rainbow-gap-leaves"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c754d51849c739b0874e2df410535135941bd996747fd2ef3153c82a5ccaacec",
+        "acknowledged_cursor": 6987023231,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c754d51849c739b0874e2df410535135941bd996747fd2ef3153c82a5ccaacec",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DA968\",\"who\":\"rainbow-menu\",\"note\":\"\"}",
+          "created_at": "2026-11-18T17:59:17Z",
+          "id": 6987019888,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:59:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "93e35c71efa86f6da7ee69e3a5ab651b758886d3d649b469cd10ed65c3007948",
+        "result": {
+          "address": "0x080DA968",
+          "claim_id": 6987019888,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6987019888,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
