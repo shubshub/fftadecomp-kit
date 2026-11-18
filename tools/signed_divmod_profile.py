@@ -13,13 +13,15 @@ import divsi3_profile as quotient
 import modsi3_profile as remainder
 import odd_remainder_profile as odd_remainder
 import installed_shuffle_profile as shuffle
+import weighted_effect_profile as weighted_effect
 
 SELECTOR = 'numeric-divmod-v1'
 SCHEMA = 'elf-symbol-thumb-signed-divmod-numeric-v1'
 SHIFT_SELECTOR = 'numeric-divmod-lsr-v1'
 SHIFT_SCHEMA = 'elf-symbol-thumb-signed-divmod-lsr-v1'
 SCHEMAS = {SELECTOR: SCHEMA, SHIFT_SELECTOR: SHIFT_SCHEMA}
-REPORT_SCHEMAS = {**SCHEMAS, odd_remainder.SELECTOR: odd_remainder.SCHEMA, shuffle.SELECTOR: shuffle.SCHEMA}
+REPORT_SCHEMAS = {**SCHEMAS, odd_remainder.SELECTOR: odd_remainder.SCHEMA, shuffle.SELECTOR: shuffle.SCHEMA,
+                  weighted_effect.SELECTOR: weighted_effect.SCHEMA}
 SUMMARY = 'canonical signed quotient and remainder with existing CFG-proven numeric domains and restoring saves'
 _replay = ContextVar('signed_divmod_replay', default=False)
 
@@ -140,6 +142,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
     from match_evidence import (source_fingerprint, source_paths, mapping_snapshot,
                                 data_snapshot, report_rom_path)
     from inert_spin_profile import index_snapshot
+    if selector == weighted_effect.SELECTOR and args is not None:
+        odd_remainder.check_configuration(args)
     if selector == odd_remainder.SELECTOR:
         return odd_remainder.build(root, address, args, expected)
     root = Path(root)
@@ -149,7 +153,7 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
             match.DEFAULT_CC, match.DEFAULT_CPP, match.DEFAULT_AS, match.DEFAULT_OBJCOPY,
             match.DEFAULT_LD, match.DEFAULT_FLAGS):
         raise ValueError('signed divmod requires the fixed approved toolchain')
-    if selector == shuffle.SELECTOR:
+    if selector in (shuffle.SELECTOR, weighted_effect.SELECTOR):
         from known_query_native_closure_profile import environment_fingerprint
         environment = environment_fingerprint()
     source, mapping, index = source_fingerprint(root, address), mapping_snapshot(root), index_snapshot(root)
@@ -172,15 +176,16 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
             raw, _, original = match.compile_object(runner, workspace, args, captured, address,
                 candidates[0].relative_to(root).as_posix())
             assembly = runner.read_binary(f'{workspace}/f.s')
-            if selector == shuffle.SELECTOR:
+            if selector in (shuffle.SELECTOR, weighted_effect.SELECTOR):
                 import owner_admission_profile as owner
                 body, bindings = owner.object_bytes(runner, workspace, args, original, address, rom, mapping,
                                                    objects, selector=selector, index=index)
-                manifest, instructions = shuffle.prove(body, address, rom, mapping, index, objects, bindings)
+                profile = weighted_effect if selector == weighted_effect.SELECTOR else shuffle
+                manifest, instructions = profile.prove(body, address, rom, mapping, index, objects, bindings)
                 manifest['environment_sha256'] = sha(text(environment).encode())
                 manifest = json.loads(text(manifest))
                 if expected is not None and manifest != expected:
-                    raise ValueError('action shuffle evidence differs from fresh native proof')
+                    raise ValueError('action effect evidence differs from fresh native proof')
             else:
                 body, calls, bindings = object_bytes(runner, workspace, args, original, address, rom, mapping,
                                                     selector=selector)
@@ -197,8 +202,8 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
             index_snapshot(root) != index or data_snapshot(root) != objects or \
             report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
         raise ValueError('signed divmod source, maps, headers or ROM changed during replay')
-    if selector == shuffle.SELECTOR and environment_fingerprint() != environment:
-        raise ValueError('action shuffle verification environment changed during replay')
+    if selector in (shuffle.SELECTOR, weighted_effect.SELECTOR) and environment_fingerprint() != environment:
+        raise ValueError('action effect verification environment changed during replay')
     return {'address': address, 'body': body, 'manifest': manifest, 'source_sha256': source,
             'mapping_sha256': sha(mapping), 'index_sha256': sha(index),
             'objects_sha256': None if objects is None else sha(objects), 'rom_sha256': sha(rom),
@@ -223,6 +228,8 @@ def render(result):
         '* verified extent: complete ELF function symbol, including literal pools',
         *(['* machine effects are conditional on installation, accessible memory and protected saves']
           if selector == shuffle.SELECTOR else []),
+        *(['* machine effects are conditional on accessible ordinary game objects, a private stack and returning ordinary scorer calls']
+          if selector == weighted_effect.SELECTOR else []),
         '* relocations: none', '* source plausibility: plausible',
         f'* compiled : `{result["body"].hex()}`',
         f'* ROM bytes: `{result["body"].hex()}` ({len(result["body"])} bytes)', '',
@@ -295,6 +302,7 @@ def issue(root, address, args):
         report.parent.mkdir(parents=True, exist_ok=True)
         report.write_text(render(result))
     proof = {odd_remainder.SELECTOR: 'bounded odd signed remainder',
+             weighted_effect.SELECTOR: 'conditional weighted effect callback',
              shuffle.SELECTOR: 'conditional installed action shuffle'}.get(
                  args.signed_runtime_profile,'signed divmod numeric proof')
     print(f'extent    {len(result["body"])} bytes (complete ELF symbol; {proof}; no relocations)')
