@@ -1484,6 +1484,19 @@ it), and, for direct calls, the scheduler reading the parent only through the
 outgoing word. Existing scheduler selectors retain their
 `func_08005B6C`-only guards.
 
+The menu constructor at `080253B0` uses
+`--owner-runtime-profile conditional-menu-palette-scheduler-v1`. For mode 17
+it passes a 28-byte descriptor to the scheduler without initializing any field.
+For other modes it stores `mode - 1` at descriptor offset 20 and copies two
+palette bytes into `030039F8`. The verifier checks both indexed ROM palettes,
+the CpuSet installer and the exact accesses of its installed copy entry.
+In both cases the scheduler copies seven words and overwrites the phase halfword
+with zero. Callback `08028FF4` reads that phase and initializes six ordering
+bytes. Callback `08028DE0` also reads the argument halfword and writes its low
+byte, the task and its parent into the fresh payload. The remaining descriptor
+bytes stay opaque. This result covers synchronous creation under the installed
+image, valid manager, parent, allocation and separate-storage premises.
+
 The constructor at `080D376C` first clears a 28-byte descriptor and passes
 it to the same direct scheduler entry. Use
 `--owner-runtime-profile conditional-scheduler-zero-descriptor-v1` for
