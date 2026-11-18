@@ -510,7 +510,35 @@
           "who": "rainbow-late-object-swap"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "9e1757803c29cf96ad7ca645b8a285c403b04963a2266a3bcb448228e1b4bcc7",
+        "acknowledged_cursor": 6982606806,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "9e1757803c29cf96ad7ca645b8a285c403b04963a2266a3bcb448228e1b4bcc7",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A39720\",\"who\":\"rainbow-late-object-swap\",\"claim_id\":6982539835,\"reason\":\"Authentic 20/20 byte and 10/10 instruction late-ROM MATCH; strict ELF symbol, no relocations, saved report replay true. Slot 08394038=03006B6D names installed callback.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:11:12Z",
+          "id": 6982603510,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:11:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "266902435c401498f1f6029aacde6c9ca7ea457fb543d4a99df15a8f454e30d8",
+        "result": {
+          "address": "0x08A39720",
+          "claim_id": 6982539835,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982603510,
+          "status": "accepted",
+          "who": "rainbow-late-object-swap"
+        }
+      }
     },
     {
       "claim": {
@@ -542,7 +570,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0a1a3727ef66597c504f8a9f711c4f137da10773ed6d8ebd1d34afc33f54259d",
+        "acknowledged_cursor": 6982606806,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0a1a3727ef66597c504f8a9f711c4f137da10773ed6d8ebd1d34afc33f54259d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08A39770\",\"who\":\"rainbow-affine\",\"claim_id\":6982542083,\"reason\":\"Sole installed Thumb callback slot 08394040; default leaf native 4/4 2/2; stored live source/report replay true; targeted strict status (1,4)\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:11:19Z",
+          "id": 6982606806,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:11:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "266902435c401498f1f6029aacde6c9ca7ea457fb543d4a99df15a8f454e30d8",
+        "result": {
+          "address": "0x08A39770",
+          "claim_id": 6982542083,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6982606806,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
