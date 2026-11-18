@@ -858,7 +858,35 @@
           "who": "rainbow-tile"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8f535598fbf42bed4eec719ab06dc9e7c62e2b2dc9d6ebaf4da3d7a2c2686525",
+        "acknowledged_cursor": 6978719342,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8f535598fbf42bed4eec719ab06dc9e7c62e2b2dc9d6ebaf4da3d7a2c2686525",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C6858\",\"who\":\"rainbow-tile\",\"claim_id\":6978631583,\"reason\":\"Recovered exact148byte source, retained scratch/tile/080C6858.c and receipts. Default alias join refuses moving array cursor; finite-loop selector excludes callback clear thunk. No admitted match.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:35:17Z",
+          "id": 6978719342,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:35:17Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cb74578fd06970a07b40c35869c62bcc5f6b5069fcb58200f9b06584167c5c77",
+        "result": {
+          "address": "0x080C6858",
+          "claim_id": 6978631583,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978719342,
+          "status": "accepted",
+          "who": "rainbow-tile"
+        }
+      }
     },
     {
       "claim": {
@@ -888,6 +916,66 @@
           "request_id": 6978649549,
           "status": "accepted",
           "who": "rainbow-callback"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "6a25b7ed659319d46c4e27a47765daf6bdc9396acc3319a434c3d8af1dd8eb53",
+        "acknowledged_cursor": 6978719342,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6a25b7ed659319d46c4e27a47765daf6bdc9396acc3319a434c3d8af1dd8eb53",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800F93C\",\"who\":\"rainbow-callback\",\"claim_id\":6978649549,\"reason\":\"Parked byte-identical 132-byte window callback; requires unallowlisted volatile output bitfields, policy issue168\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T12:34:22Z",
+          "id": 6978698639,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:34:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cb74578fd06970a07b40c35869c62bcc5f6b5069fcb58200f9b06584167c5c77",
+        "result": {
+          "address": "0x0800F93C",
+          "claim_id": 6978649549,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6978698639,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bbf7dd09a6196290a239cdcd581d42f823248ad57fcaeef5433b379f2807e639",
+        "acknowledged_cursor": 6978719342,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bbf7dd09a6196290a239cdcd581d42f823248ad57fcaeef5433b379f2807e639",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D9C58\",\"who\":\"rainbow-tile\",\"note\":\"Recover scanline task callback from the matched creator and neighboring scanline source\"}",
+          "created_at": "2026-11-18T12:33:54Z",
+          "id": 6978688124,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T12:33:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "cb74578fd06970a07b40c35869c62bcc5f6b5069fcb58200f9b06584167c5c77",
+        "result": {
+          "address": "0x080D9C58",
+          "claim_id": 6978688124,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6978688124,
+          "status": "accepted",
+          "who": "rainbow-tile"
         }
       },
       "release": null
