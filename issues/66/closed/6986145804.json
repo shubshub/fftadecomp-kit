@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "7422852a693f8c1cc8bd92a72c7b4ee93054c5e0c2121fd177e5509a6d8cf50c",
+    "acknowledged_cursor": 6986146744,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7422852a693f8c1cc8bd92a72c7b4ee93054c5e0c2121fd177e5509a6d8cf50c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081332F8\",\"who\":\"rainbow-state\",\"note\":\"Check original effect slot 67 equipment removal and output bounds\"}",
+      "created_at": "2026-11-18T17:23:39Z",
+      "id": 6986145804,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:23:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "878f1788c3f33d71481f61f1889e52046b16a0780a9db64698abe04857af5f85",
+    "result": {
+      "address": "0x081332F8",
+      "claim_id": 6986145804,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6986145804,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "aba13c6076b62dcc5b6e85ffdc867fa76c6278999eb61820f13e55cc3a65c91e",
+    "acknowledged_cursor": 6986185381,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "aba13c6076b62dcc5b6e85ffdc867fa76c6278999eb61820f13e55cc3a65c91e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081332F8\",\"who\":\"rainbow-state\",\"claim_id\":6986145804,\"reason\":\"Parked native 142/142; verifier cannot establish output contract for two local halfwords.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T17:24:51Z",
+      "id": 6986175877,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T17:24:51Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "545f392bda233a4a6001100feb99f3a65fdeec91ebb5980aa629f9ef6d65c868",
+    "result": {
+      "address": "0x081332F8",
+      "claim_id": 6986145804,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6986175877,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}

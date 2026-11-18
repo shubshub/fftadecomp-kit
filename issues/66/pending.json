@@ -606,7 +606,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4e73317905e020ed9fece013d3a0c6c66e4ce9e40885a4b07d91a81bc57646fc",
+        "acknowledged_cursor": 6986185381,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4e73317905e020ed9fece013d3a0c6c66e4ce9e40885a4b07d91a81bc57646fc",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081335C0\",\"who\":\"rainbow-menu\",\"claim_id\":6986145641,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:25:13Z",
+          "id": 6986185381,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:25:13Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "545f392bda233a4a6001100feb99f3a65fdeec91ebb5980aa629f9ef6d65c868",
+        "result": {
+          "address": "0x081335C0",
+          "claim_id": 6986145641,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986185381,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -638,7 +666,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "aba13c6076b62dcc5b6e85ffdc867fa76c6278999eb61820f13e55cc3a65c91e",
+        "acknowledged_cursor": 6986185381,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aba13c6076b62dcc5b6e85ffdc867fa76c6278999eb61820f13e55cc3a65c91e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081332F8\",\"who\":\"rainbow-state\",\"claim_id\":6986145804,\"reason\":\"Parked native 142/142; verifier cannot establish output contract for two local halfwords.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:24:51Z",
+          "id": 6986175877,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:24:51Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "545f392bda233a4a6001100feb99f3a65fdeec91ebb5980aa629f9ef6d65c868",
+        "result": {
+          "address": "0x081332F8",
+          "claim_id": 6986145804,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986175877,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
