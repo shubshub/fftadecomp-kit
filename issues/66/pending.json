@@ -634,7 +634,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "cdbfd1bf43019e95797fbb6e2e66d15f4392c796821795c911c42b0edd8e7d25",
+        "acknowledged_cursor": 6984354633,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cdbfd1bf43019e95797fbb6e2e66d15f4392c796821795c911c42b0edd8e7d25",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080195F4\",\"who\":\"rainbow-menu\",\"claim_id\":6984312223,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T16:15:55Z",
+          "id": 6984345050,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:15:55Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a6edbf47965005d7fe0ff3ee90440489e0ba86c7d41de73d8e669ac5df372faa",
+        "result": {
+          "address": "0x080195F4",
+          "claim_id": 6984312223,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6984345050,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -696,6 +724,66 @@
           "request_id": 6984313738,
           "status": "accepted",
           "who": "rainbow-callback"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "8626de21f3b962ccabe1b2108c88cf5f1a79c25a02039fca36e2ebdc2fe015c1",
+        "acknowledged_cursor": 6984354633,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8626de21f3b962ccabe1b2108c88cf5f1a79c25a02039fca36e2ebdc2fe015c1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131A50\",\"who\":\"rainbow-callback\",\"claim_id\":6984313738,\"reason\":\"Native evaluator slot 40 matched and replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T16:16:16Z",
+          "id": 6984354633,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:16:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a6edbf47965005d7fe0ff3ee90440489e0ba86c7d41de73d8e669ac5df372faa",
+        "result": {
+          "address": "0x08131A50",
+          "claim_id": 6984313738,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6984354633,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "97ba9ae38f971eb8d94014deef13082fe05200b4b4cfa431719bc1c110232a0d",
+        "acknowledged_cursor": 6984354633,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "97ba9ae38f971eb8d94014deef13082fe05200b4b4cfa431719bc1c110232a0d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080641A8\",\"who\":\"rainbow-state\",\"note\":\"Menu state table command queue initialization\"}",
+          "created_at": "2026-11-18T16:15:45Z",
+          "id": 6984340857,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T16:15:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a6edbf47965005d7fe0ff3ee90440489e0ba86c7d41de73d8e669ac5df372faa",
+        "result": {
+          "address": "0x080641A8",
+          "claim_id": 6984340857,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6984340857,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
