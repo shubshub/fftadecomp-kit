@@ -41,6 +41,9 @@ HEAP = {0x080227E8, 0x08022840, 0x080070C8, 0x08006C88, 0x08006D38, 0x08006DA0,
 
 def check_source(root, address):
     import plausible
+    import menu_roster_pointer_list as pointer_list
+    if address == pointer_list.OWNER:
+        return pointer_list.check_source(root)
     require(address in FILTERS, 'unexpected menu roster filter')
     source = (Path(root) / f'src/{address:08X}.c').read_text()
     header = (Path(root) / 'include/ffta.h').read_bytes()
@@ -87,12 +90,16 @@ def index_domain():
                 reverse_default_witness=dict(count=2, enabled=[0, 4], output=[1, 253]))
 
 
-def lifetime(rom, mapping, index, consumer):
-    entries, rows = indices(mapping, index)
+def heap_providers():
     heap = {row[0]: row for row in (*scroll_prefix_scene.PROVIDER, *packed_transfer_task.PROVIDERS)
             if row[0] in HEAP}
     require(heap.keys() == HEAP, 'incomplete root heap inventory')
-    for address, end, digest in (*PROVIDERS, CONSUMERS[consumer], *heap.values()):
+    return tuple(heap.values())
+
+
+def lifetime(rom, mapping, index, consumer):
+    entries, rows = indices(mapping, index)
+    for address, end, digest in (*PROVIDERS, CONSUMERS[consumer], *heap_providers()):
         span_record(address, end, entries, rows, rom)
         require(sha256(rom[address-match.ROM_BASE:end-match.ROM_BASE]).hexdigest() == digest,
                 f'changed scene allocation or consumer at {address:08X}')
@@ -146,6 +153,9 @@ def predicate(ins, address):
 
 
 def prove(data, address, rom, mapping, index, objects, original, ins, calls, refinement, words):
+    import menu_roster_pointer_list as pointer_list
+    if address == pointer_list.OWNER:
+        return pointer_list.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     require(address in FILTERS, 'unknown menu roster filter')
     end, count, digest, _ = FILTERS[address]
     literal = end - address - 16
