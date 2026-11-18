@@ -713,7 +713,7 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x081457FC:
         import m4a_dma_counter
         records.append(m4a_dma_counter.record(root))
-    if address in (0x080D9F60, 0x080DA968, 0x080DA1C4, 0x080DA3B8, 0x080DA598):
+    if address in (0x080D9F60, 0x080DA074, 0x080DA968, 0x080DA1C4, 0x080DA3B8, 0x080DA598):
         import window_scanline
         if window_scanline.uses_element(root, address):
             records.append(window_scanline.record(root, address))
@@ -862,7 +862,7 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
                 hardware_qualifiers.add(offset)
         except (OSError, ValueError, ImportError, SystemExit):
             pass
-    if relpath in ('src/080D9F60.c', 'src/080DA968.c', 'src/080DA1C4.c',
+    if relpath in ('src/080D9F60.c', 'src/080DA074.c', 'src/080DA968.c', 'src/080DA1C4.c',
                    'src/080DA3B8.c', 'src/080DA598.c') and tree is not None and project is not None:
         import window_scanline
         try:
