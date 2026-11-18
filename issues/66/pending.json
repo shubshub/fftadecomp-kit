@@ -667,6 +667,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b2b809841017015d8fb793827055fe61e92666ff70a9f29000ccf8d506131268",
+        "acknowledged_cursor": 6982230453,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b2b809841017015d8fb793827055fe61e92666ff70a9f29000ccf8d506131268",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08A38A60\",\"who\":\"rainbow-affine\",\"note\":\"Recover word/byte repeating fill in installed IWRAM primitive table, natural C and strict late extent\"}",
+          "created_at": "2026-11-18T14:57:05Z",
+          "id": 6982230453,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:57:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "01761f2884eae7be40629f0a6b20c3ce35db582218d644e2c9362545df5a6856",
+        "result": {
+          "address": "0x08A38A60",
+          "claim_id": 6982230453,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982230453,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
