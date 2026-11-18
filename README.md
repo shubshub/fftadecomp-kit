@@ -5450,3 +5450,19 @@ readability, initialization or termination. The distinct source-replayed report
 requires actual transparent-call observations and binds caller/callee bytes,
 partitions, exact call sites, input snapshots, all producers, runtime and selected
 toolchain binaries. Earlier selectors retain their existing refusal boundaries.
+
+### Bounded odd signed remainder
+
+`--signed-runtime-profile signed-remainder-u16-quarter-odd-v1` accepts one compiler-emitted
+`__modsi3` in a complete scalar Thumb caller. It replays the canonical integer source
+verifier, including typed original ELF relocations, both runtime bodies, caller frame and
+ordinary returning-call ABI premises. The dividend must come from `ASR #16`. The divisor
+must come from a zero-extending halfword load, `LSR #2`, `LSL #1` and `ADD #1` on a
+single reaching-definition path. The doubled value crosses one ordinary BL in an
+ABI-preserved register. Merges in those paths, clobbers, cycles and alternative compiler
+or addressed runtime identities fail.
+
+For all 65,536 halfword inputs, the divisor is odd and lies in 1 through 32,767.
+The signed dividend lies in −32,768 through 32,767. This rules out division by zero
+and signed division overflow. The report records the defining instructions, preserved
+register and intervening call. Its acceptance reruns the fixed compiler and both proofs.

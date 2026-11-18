@@ -5550,7 +5550,7 @@ def main():
     ap.add_argument("--control-flow-profile", default="ordinary", choices=("ordinary", inert_spin.SELECTOR))
     ap.add_argument("--signed-quotient-profile", choices=(divsi3.FRAMED_SELECTOR,))
     ap.add_argument("--unsigned-quotient-profile", choices=(UDIVSI3_FRAMED_SELECTOR,))
-    ap.add_argument("--signed-runtime-profile", choices=tuple(signed_divmod.SCHEMAS))
+    ap.add_argument("--signed-runtime-profile", choices=tuple(signed_divmod.REPORT_SCHEMAS))
     ap.add_argument("--unsigned-runtime-profile", choices=(unsigned_divmod.SELECTOR,))
     ap.add_argument("--addressed-signed-runtime-profile", "--addressed-runtime-profile",
                     dest="addressed_signed_runtime_profile", choices=tuple(addressed_signed_runtime.SCHEMAS))
@@ -5655,6 +5655,11 @@ def main():
                                                       "descriptor-cursor-value-v1",
                                                       "private-float-unpack-pack-v1", "private-float-extension-v1", "private-float-comparison-v1", "private-double-comparison-v1", "private-float-scalar-conversion-v1", "private-double-scalar-conversion-v1", "private-double-unpack-pack-v1", "private-double-truncation-v1", "private-double-scalar-pack-v1", "private-scalar-division-byte-locals-v1", "private-float-selected-record-v1", "private-double-inline-division-v1", "private-double-selected-record-v1", "private-float-inline-division-v1", "private-float-unsigned-conversion-v1"))
     args = ap.parse_args()
+    if args.signed_runtime_profile == signed_divmod.odd_remainder.SELECTOR:
+        try:
+            signed_divmod.odd_remainder.check_configuration(args)
+        except ValueError as error:
+            sys.exit(str(error))
     if args.owner_runtime_profile == "conditional-palette-source-compilation-v1":
         from palette_source_admission_profile import configuration
         configuration(args)
