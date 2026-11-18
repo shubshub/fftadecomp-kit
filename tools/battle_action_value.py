@@ -61,24 +61,31 @@ def selection_cases():
     return cases
 
 
-def prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words):
-    from software_float_profile import ROM_SHA256
-    require(sha256(rom).hexdigest() == ROM_SHA256 and len(ins) == 99 and not words and
-            data == rom[OWNER-equipment.BASE:END-equipment.BASE] and original == equipment.bindings(CALLS)
-            and calls == {OWNER+s: t for s, t in CALLS.items()}, 'battle evaluator body or four calls differ')
+def check_dependencies(rom, mapping, index, objects, pins, owner, count):
     entries, rows = equipment.indices(mapping, index)
     shared = (equipment.WRAPPER, equipment.SORT, equipment.COLLECT, equipment.SLOT, equipment.ITEM,
               equipment.FLAG, equipment.DEFAULT, 0x081256D4, 0x080C9644, 0x080CA268, 0x08142250)
-    spans = dict(PINS)
+    spans = dict(pins)
     for address in shared:
         end, _, digest = equipment.PINS[address]
         spans[address] = (end, digest)
     for address, (end, digest) in spans.items():
         row = equipment.span_record(address, end, entries, rows, rom)
         require(sha256(rom[address-equipment.BASE:end-equipment.BASE]).hexdigest() == digest and
-                (address != OWNER or row['instrs'] == 99), 'battle evaluator dependency differs')
+                (address != owner or row['instrs'] == count), 'battle evaluator dependency differs')
     equipment.equipment_access(rom)
     equipment.producer(rom)
+    names = equipment.match.parse_data_symbols(objects)
+    require(names.get('g_table_0851D180') == equipment.ITEMS and names.get('g_table_0854CD54') == equipment.SCENES
+            and names.get('data_0836D4BC') == equipment.COPY_POINTER, 'battle equipment data roles differ')
+
+
+def prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words):
+    from software_float_profile import ROM_SHA256
+    require(sha256(rom).hexdigest() == ROM_SHA256 and len(ins) == 99 and not words and
+            data == rom[OWNER-equipment.BASE:END-equipment.BASE] and original == equipment.bindings(CALLS)
+            and calls == {OWNER+s: t for s, t in CALLS.items()}, 'battle evaluator body or four calls differ')
+    check_dependencies(rom, mapping, index, objects, PINS, OWNER, 99)
     local_accesses(ins)
     # The guard collects on its own frame before inspecting the first halfword.
     equipment.ops(rom, GUARD, 'push {r4, r5, r6, r7, lr}', 'mov r7, r8', 'push {r7}', 'sub sp, #4',
@@ -88,9 +95,6 @@ def prove(data, rom, mapping, index, objects, original, ins, calls, refinement, 
                   'ldrh r0, [r0]', 'mov r8, r0')
     for site in (0x080BE566, 0x080BE73C):
         equipment.ops(rom, site, 'bl #0x80bdecc', 'lsls r0, r0, #0x10')
-    names = equipment.match.parse_data_symbols(objects)
-    require(names.get('g_table_0851D180') == equipment.ITEMS and names.get('g_table_0854CD54') == equipment.SCENES
-            and names.get('data_0836D4BC') == equipment.COPY_POINTER, 'battle equipment data roles differ')
     return dict(schema=equipment.named.EQUIPMENT_SCHEMA, instructions=99, calls=original['calls'], runtime_calls=[],
                 partition=equipment.graph.partition(data, OWNER, refinement, ins, words),
                 outgoing=[-44,-36], local=[-36,-32], saved=[-32,0], guard_local=[-72,-68],
