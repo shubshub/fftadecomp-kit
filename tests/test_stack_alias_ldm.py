@@ -63,7 +63,8 @@ class StackAliasLdmTests(unittest.TestCase):
         self.verify(self.frame([0x2007, 0x9000, 0x4669, 0x4668, 0xC901, 0x6010]))
         with self.assertRaisesRegex(ValueError, 'verified return|indirect control flow'):
             self.verify(self.frame([0x2007, 0x9000, 0x4670, 0x4669, 0xC901], result=0x4700))
-        with self.assertRaisesRegex(ValueError, 'verified return|indirect control flow'):
+        # str r0, [sp, #12] writes the pushed LR word itself and is refused there.
+        with self.assertRaisesRegex(ValueError, 'stack-frame store overlaps a saved register or return-address word'):
             self.verify(self.frame([0x9003, 0xA903, 0xC901], words=1, result=0x4700))
 
     def test_misalignment_and_post_writeback_bounds_stay_rejected(self):

@@ -169,7 +169,9 @@ class ScalarFrameTests(unittest.TestCase):
             for operation in ("sub sp, #4", "str r3, [sp, #8]"):
                 with self.subTest(case=case, operation=operation), self.assertRaises(ValueError) as error:
                     self.verify(self.structural(initial.replace(case, case + operation + "\n")))
-                self.assertRegex(str(error.exception), "depth|balance|control flow")
+                # str r3, [sp, #8] writes the pushed LR word, refused by the frame walk.
+                self.assertRegex(str(error.exception), "depth|balance|control flow|"
+                                 "stack-frame store overlaps a saved register or return-address word")
                 record("graph_rejections", {"case": case.strip(), "operation": operation, "reason": str(error.exception)})
         growing = initial.replace(".Ldone:\n", ".Ldone:\n.Lloop:\nsub sp, #4\ncmp r3, #0\nbne .Lloop\nadd sp, #4\n")
         with self.assertRaisesRegex(ValueError, "depth"):

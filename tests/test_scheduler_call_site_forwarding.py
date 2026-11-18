@@ -167,7 +167,9 @@ class ForwardedCallSiteTests(unittest.TestCase):
 
     def test_slot_in_a_saved_register_word_refuses(self):
         # push {r4,lr}; str r1,[sp,#4] after sub sp,#4: the pushed R4 word; pop {r4} restores it.
-        with self.assertRaisesRegex(ValueError, 'restored into a register'):
+        # The forwarder's own frame walk now refuses the store into its saved R4 word first.
+        with self.assertRaisesRegex(ValueError, 'restored into a register|'
+                                    'stack-frame store overlaps a saved register or return-address word'):
             verified(owner_program(), bodies(forwarder(0x9101, push=0xB510, pop=(0xBC10, 0xBC01, 0x4700))))
 
     def test_forwarder_may_not_materialize_sp(self):

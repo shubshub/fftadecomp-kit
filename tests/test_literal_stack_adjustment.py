@@ -70,7 +70,8 @@ class LiteralStackAdjustmentTests(unittest.TestCase):
     def test_stack_alias_bounds_and_return_provenance_still_refused(self):
         with self.assertRaisesRegex(ValueError, "outside the tracked frame"):
             self.verify(self.frame("mov r0, sp\nldr r1, [r0, #8]", allocate=-4, release=4))
-        with self.assertRaisesRegex(ValueError, "verified return|non-leaf"):
+        # sp+4 is the pushed LR word: a direct store there is refused before the return.
+        with self.assertRaisesRegex(ValueError, "stack-frame store overlaps a saved register or return-address word"):
             self.verify(self.frame("str r0, [sp, #4]", allocate=-4, release=4))
 
     def test_literal_outside_or_overlapping_code_is_refused(self):

@@ -195,7 +195,8 @@ class OrdinaryRemainderTests(unittest.TestCase):
         mapping,index = self.indexes(rows)
         with self.assertRaises(ValueError):self.native(mapping=mapping,index=index)
         for sequence,message in (
-                ([0xB510,0x9000,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
+                # ldr r0, [sp]: a frame access that writes no pushed word
+                ([0xB510,0x9800,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC10,0xBC02,0x4708],
                  'numeric proof requires a frameless caller'),
                 ([0xB510,'ordinary',0x237F,0x1C10,0x4018,'mod',0xBC02,0x4708],
                  'non-leaf indirect control flow requires linked CFG verification'),

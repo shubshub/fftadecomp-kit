@@ -78,8 +78,10 @@ class ForwardedStackArgumentTests(unittest.TestCase):
 
     def test_slot_in_a_saved_register_word_refuses(self):
         # push {r4,lr}; str r1,[sp]; bl; pop {r4}; pop {r0}; bx r0: R4 would receive the pointer.
+        # The callee's own frame walk now refuses the store into its saved R4 word first.
         code = (0xb510, 0x9100, LEAF, 0xbc10, 0xbc01, 0x4700)
-        with self.assertRaisesRegex(ValueError, 'restored into a register'):
+        with self.assertRaisesRegex(ValueError, 'restored into a register|'
+                                    'stack-frame store overlaps a saved register or return-address word'):
             admit(**forwarding(forwarder=code))
 
     def test_forwarder_may_not_materialize_sp(self):

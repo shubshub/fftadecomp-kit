@@ -49,8 +49,9 @@ class StackAliasStmTests(unittest.TestCase):
 
     def test_writeback_is_observed_by_next_access(self):
         # The first word is at entry-SP-4; its writeback is the forbidden entry SP.
+        # A frame of local words only, so the store itself is allowed.
         with self.assertRaisesRegex(ValueError, 'outside the tracked frame'):
-            self.verify(self.frame('add r5, sp, #24\nstm r5!, {r0}\nldr r2, [r5]'))
+            self.verify('sub sp, #16\nadd r5, sp, #12\nstm r5!, {r0}\nldr r2, [r5]\nadd sp, #16\nbx lr')
         # After one local store, this offset changes from entry-SP-4 to entry SP.
         with self.assertRaisesRegex(ValueError, 'outside the tracked frame'):
             self.verify(self.frame('mov r5, sp\nstm r5!, {r0}\nldr r2, [r5, #24]'))
@@ -64,19 +65,30 @@ class StackAliasStmTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'escape'):
             self.verify(self.frame('mov r0, sp\nstm r5!, {r0}'))
 
-    def test_saved_return_corruption_is_not_a_verified_return(self):
-        with self.assertRaisesRegex(ValueError, 'verified return|indirect control flow'):
-            self.verify(self.frame('add r5, sp, #24\nstm r5!, {r0}'))
-        self.verify(self.frame('mov r0, lr\nadd r5, sp, #24\nstm r5!, {r0}'))
-        with self.assertRaisesRegex(ValueError, 'verified return|indirect control flow'):
-            self.verify(self.frame('mov r0, lr\nadd r5, sp, #20\nstm r5!, {r0, r1}'))
-        self.verify(self.frame('mov r1, lr\nadd r5, sp, #20\nstm r5!, {r0, r1}'))
+    def test_saved_words_refuse_stores_even_of_the_entry_return(self):
+        # sp+16 and sp+20 hold the pushed R4 and R5, sp+24 the pushed LR.
+        for middle in ('add r5, sp, #24\nstm r5!, {r0}',
+                       'mov r0, lr\nadd r5, sp, #24\nstm r5!, {r0}',
+                       'mov r0, lr\nadd r5, sp, #20\nstm r5!, {r0, r1}',
+                       'mov r1, lr\nadd r5, sp, #20\nstm r5!, {r0, r1}',
+                       'add r5, sp, #12\nstm r5!, {r0, r1}'):
+            with self.subTest(middle=middle), self.assertRaisesRegex(
+                    ValueError, 'stack-alias store overlaps a saved register or return-address word'):
+                self.verify(self.frame(middle))
+        # The entry return in a local word keeps its provenance through the frame.
+        self.verify(self.frame('mov r0, lr\nmov r5, sp\nstm r5!, {r0}'))
 
     def test_store_effects_preserve_return_and_pointer_word_rules(self):
+        # A pushed word (saved, not local) refuses the store and keeps its facts.
         stack = [(True, True, False), (False, False, True)]
+        with self.assertRaisesRegex(ValueError, 'saved register or return-address word'):
+            match.stack_alias_store(stack, {}, {}, set(), -8, 4, match.ARM_REG_R0)
+        self.assertEqual(stack, [(True, True, False), (False, False, True)])
+        # A local word carrying the entry return loses it to a scalar store.
+        stack = [(True, False, True), (False, False, True)]
         slots = {-8: -4}
         match.stack_alias_store(stack, slots, {}, set(), -8, 4, match.ARM_REG_R0)
-        self.assertEqual(stack, [(False, True, False), (False, False, True)])
+        self.assertEqual(stack, [(False, False, True), (False, False, True)])
         self.assertEqual(slots, {})
         match.stack_alias_store(stack, slots, {}, {match.ARM_REG_R1}, -4, 4, match.ARM_REG_R1)
         self.assertEqual(stack[1], (True, False, True))
