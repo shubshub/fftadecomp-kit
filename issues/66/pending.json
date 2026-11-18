@@ -542,7 +542,35 @@
           "who": "astra-shift"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "03a1c15c84b6e69eea317119b68c454fbf5a9491d8e2ef2961076da9d8d3fb08",
+        "acknowledged_cursor": 6987591895,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "03a1c15c84b6e69eea317119b68c454fbf5a9491d8e2ef2961076da9d8d3fb08",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080FE594\",\"who\":\"astra-shift\",\"claim_id\":6987467877,\"reason\":\"MATCH 552/552 bytes, 229/229 instructions. Five registered effect variants use a 0x44-byte task payload. Native canonical-thunks-v1 report issued and independently replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T18:22:11Z",
+          "id": 6987591895,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T18:22:11Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f3c1999a6be86d54c111cfd86b6e17551fba0d47ac02ec31b9ec3c02b6460596",
+        "result": {
+          "address": "0x080FE594",
+          "claim_id": 6987467877,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6987591895,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      }
     },
     {
       "claim": {
