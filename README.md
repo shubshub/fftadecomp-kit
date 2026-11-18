@@ -4521,6 +4521,15 @@ The halfword fill initializes and transfers only the low halfword of the
 four-byte slot. The verifier follows all four known caller continuations to
 where they overwrite the returned channel.
 
+The same selector checks the two fixed DMA3 transfers at `08003410`. The
+original C initializes a halfword on the stack before each transfer. DMA3
+programming covers 96 KiB of VRAM and 1 KiB of palette RAM. The intervening
+call writes all 128 OAM entries and preserves the initializer's stack and
+saved registers. Removing the hardware object's qualifier removes exactly
+the two control readbacks. Transfer completion, exclusive use of idle DMA3,
+hardware-visible stack memory and a writable video access interval are
+explicit hardware premises. The single control reads do not poll completion.
+
 `--owner-runtime-profile transfer-masked-stack-argument-v1` verifies the 364-byte transfer setup at 0x08037C84. Its one-bit resource update compiles to a word load, mask and store into the eighth incoming argument, followed by a reload of the same word. The selector authenticates all ten raw Thumb calls in eight indexed caller graphs. Each call allocates four writable argument words and initializes the eighth argument with zero or one. Two phase-byte cases require their taken zero edge to dominate the call. The store therefore preserves the caller's bits, including when another function subsequently uses the outgoing area. The ordinary frame checker still rejects incoming writes. Any additional computed or external caller must supply a writable Boolean word, and non-stack objects must be distinct from active frames.
 
 The cone writer advances its output cursor in incoming stack word 3. Its identified caller `080B4A1C` provides this word inside a 32-byte outgoing area, copies the entry output argument through two exact Thumb MOV instructions, and discards the slot without reading it after return. The initialization dominates the call. A scan of the hash-verified 16 MiB USA ROM finds exactly one encoded Thumb BL targeting the writer and zero literal Thumb pointers to it. Computed indirect targets remain outside this inventory. The report assumes sufficient writable output records, writable outgoing arguments, and ordinary separation between external memory and active private frames. The profile covers only this owner and its specified calls.
