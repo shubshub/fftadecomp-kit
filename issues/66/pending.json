@@ -1726,7 +1726,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "243d98ef36137e8af6ada699e4b60f0d8e4aa93729eadc2c8127b69905b24f03",
+        "acknowledged_cursor": 6992132708,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "243d98ef36137e8af6ada699e4b60f0d8e4aa93729eadc2c8127b69905b24f03",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141EB8\",\"who\":\"astra-sound\",\"claim_id\":6991815548,\"reason\":\"O1 source and canonical report match the original 116 bytes, 43 instructions and all four native flash setups.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T21:27:20Z",
+          "id": 6992132708,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:27:20Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fec5916ad86947319cf881667c3030694013a4bc7150f9857d1947ca1f00310d",
+        "result": {
+          "address": "0x08141EB8",
+          "claim_id": 6991815548,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6992132708,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -1880,6 +1908,38 @@
           "request_id": 6992108610,
           "status": "accepted",
           "who": "astra-combat"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "943ebdb6ad20f07b5588dae28092b5d0e7bbc86e138bf32bf973fb47f640655a",
+        "acknowledged_cursor": 6992132708,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "943ebdb6ad20f07b5588dae28092b5d0e7bbc86e138bf32bf973fb47f640655a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800CAF0\",\"who\":\"rainbow-state\",\"note\":\"Assess affine ellipse scanline sibling and original callers under rendering-domain bounds.\"}",
+          "created_at": "2026-11-18T21:26:45Z",
+          "id": 6992119887,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:26:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fec5916ad86947319cf881667c3030694013a4bc7150f9857d1947ca1f00310d",
+        "result": {
+          "address": "0x0800CAF0",
+          "claim_id": 6992119887,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6992119887,
+          "status": "accepted",
+          "who": "rainbow-state"
         }
       },
       "release": null
