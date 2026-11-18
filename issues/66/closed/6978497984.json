@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "ea40cb582772dab63516e8c518a831b3f78d17f3c347bd5fc3419f7ca01affba",
+    "acknowledged_cursor": 6978497984,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ea40cb582772dab63516e8c518a831b3f78d17f3c347bd5fc3419f7ca01affba",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C13C8\",\"who\":\"rainbow-tile\",\"note\":\"Recover unit-value computation from matched callers and the paired item helper\"}",
+      "created_at": "2026-11-18T12:25:19Z",
+      "id": 6978497984,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:25:19Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "99d379f45d0ff3dfd21a04f63eeb4fcbce30c97de0279fd4686f847539b268fa",
+    "result": {
+      "address": "0x080C13C8",
+      "claim_id": 6978497984,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978497984,
+      "status": "accepted",
+      "who": "rainbow-tile"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "071af70d2d2cd74eefc58d7cb38c840667252dadd231613aa3bf69a720f982b6",
+    "acknowledged_cursor": 6978631583,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "071af70d2d2cd74eefc58d7cb38c840667252dadd231613aa3bf69a720f982b6",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C13C8\",\"who\":\"rainbow-tile\",\"claim_id\":6978497984,\"reason\":\"Complete natural unit-value candidate retained in scratch/tile/080C13C8.c; direct/nested conditions align full control flow and pool positions but assign unit/count to r5/r4 instead of target r4/r5. No match admitted.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T12:31:12Z",
+      "id": 6978627985,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:31:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "b0c3901589d4d7883818b0843d9e37d31ba9601444f12e4f462d24ba3389aef5",
+    "result": {
+      "address": "0x080C13C8",
+      "claim_id": 6978497984,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978627985,
+      "status": "accepted",
+      "who": "rainbow-tile"
+    }
+  }
+}
