@@ -104,7 +104,8 @@ class LiteralStackAliasTests(unittest.TestCase):
     def test_balanced_return_and_saved_return_provenance_still_required(self):
         with self.assertRaises(ValueError):
             self.verify(self.sequence().replace("release:\n.word 1564", "release:\n.word 1560"))
-        with self.assertRaisesRegex(ValueError, "verified return|non-leaf"):
+        # sp+1564 is the pushed LR word: a store there is refused before the return.
+        with self.assertRaisesRegex(ValueError, "stack-alias store overlaps a saved register or return-address word"):
             self.verify(self.sequence(offset=1564, after="str r1, [r0]\nmovs r0, #0"))
 
     def test_natural_fixed_O2_source_and_unmodified_complete_original_elf(self):

@@ -191,8 +191,9 @@ class ZeroAwareRemainderTests(unittest.TestCase):
         with self.assertRaises(ValueError): self.native(selector='default')
         with self.assertRaisesRegex(ValueError, 'non-leaf indirect control flow requires linked CFG verification'):
             self.machine([0xB510, 0x237F, 0x1C10, 0x4018, 'mod', 0xBC02, 0x4708])
+        # ldr r0, [sp]: a frame access that writes no pushed word
         with self.assertRaisesRegex(ValueError, 'numeric proof requires a frameless caller'):
-            self.machine([0xB510, 0x9000, 0x237F, 0x1C10, 0x4018, 'mod', 0xBC10, 0xBC02, 0x4708])
+            self.machine([0xB510, 0x9800, 0x237F, 0x1C10, 0x4018, 'mod', 0xBC10, 0xBC02, 0x4708])
 
     def test_inventory_selector_has_no_C_match_report_or_status_admission(self):
         with self.assertRaisesRegex(ValueError, 'signed16 r0 and nonzero r1'):

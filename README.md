@@ -690,13 +690,21 @@ tracked alongside pushed registers. Deallocation cannot cross entry SP, all
 returns must restore entry depth, and control-flow joins require equal depths.
 Stores update the affected word's return-address provenance; loading an incoming
 argument never establishes a return address. Stores outside the tracked frame
-are rejected. Calls invalidate return-address facts in allocated local/outgoing
-words, retaining pushed-save facts only under the existing ABI call assumption.
+are rejected, and so are stores into pushed words: a direct `str` must land in a
+word allocated by `sub sp` on every incoming path, never in a saved register or
+the saved return address (`stack-frame store overlaps a saved register or
+return-address word`). The walk does not otherwise prove that R4-R11 are
+restored: popped registers are not compared with pushed ones. Calls invalidate
+return-address facts in allocated local/outgoing words, retaining pushed-save
+facts only under the existing ABI call assumption.
 
 Local-array addresses formed by 16-bit register moves and constant additions
 or subtractions are tracked relative to entry SP. Aligned byte, halfword and
-word accesses through these aliases must stay inside the allocated/pushed
-frame. Partial stores invalidate the affected word's return-address fact.
+word loads through these aliases must stay inside the allocated/pushed frame;
+stores must stay inside allocated local words, whether the alias was formed in
+the owner or returned by an inspected callee (`stack-alias store overlaps a
+saved register or return-address word`). Partial stores invalidate the affected
+word's return-address fact.
 Register-indexed accesses, including signed byte/halfword loads, additionally
 require an exact constant established by a 16-bit immediate move or register
 copy. Writes and restoring pops discard constant facts; calls discard them for
@@ -731,7 +739,7 @@ their registers are restored by a pop.
 
 An exact 16-bit Thumb STMIA may store scalar low registers through a known,
 word-aligned stack alias. Its nonempty register list must exclude the base;
-each word must fit the tracked frame. Each store applies the scalar store's
+each word must be an allocated local word. Each store applies the scalar store's
 saved-return and pointer-word effects, and the base retains its exact incremented
 offset after writeback. Stored stack pointers, other modes and encodings, and
 out-of-frame or misaligned spans remain rejected. Writeback does not relax

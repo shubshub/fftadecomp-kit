@@ -395,7 +395,9 @@ class CallLoopTests(unittest.TestCase):
             "strb in the loop": ([0xB500, 0x7008] + call + close, "excludes stores"),
             "strh in the loop": ([0xB500, 0x8008] + call + close, "excludes stores"),
             "stmia in the loop": ([0xB500, 0xC101] + call + close, "excludes stores"),
-            "stack store in the loop": ([0xB500, 0x9000] + call + close, "excludes stores"),
+            # push {lr} leaves only the LR word, so the frame walk refuses this store first.
+            "stack store in the loop": ([0xB500, 0x9000] + call + close,
+                                        "excludes stores|stack-frame store overlaps a saved register"),
             "balanced sp change in the loop": ([0xB500, 0xB081, 0xB001] + bl(A + 6, B) +
                                                [branch(A + 10, A + 2)], "stack-pointer changes"),
             "push and pop in the loop": ([0xB500, 0xB401, 0xBC01] + bl(A + 6, B) + [branch(A + 10, A + 2)],

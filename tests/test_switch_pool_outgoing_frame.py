@@ -287,11 +287,13 @@ class AttackTests(unittest.TestCase):
                 self.refused(arguments=(escape, *ARGUMENTS))
 
     def test_out_of_frame_access(self):
-        # [sp,#8] is the saved r4 slot above the eight-byte frame.
-        self.refused("must store", arguments=("str0", "str1", "str2", "call"),
+        # [sp,#8] is the saved r4 slot above the eight-byte frame. The frame walk now
+        # refuses a store into a saved word before the outgoing-frame rule sees it.
+        saved = "must store|stack-frame store overlaps a saved register or return-address word"
+        self.refused(saved, arguments=("str0", "str1", "str2", "call"),
                      push=0xB510, epilogue=(0xBC10, POP_R1, BX_R1))  # push {r4,lr}; pop {r4}
         # Before the allocation, [sp] is the saved r4 slot.
-        self.refused("must store", prologue=("str0",),
+        self.refused(saved, prologue=("str0",),
                      push=0xB510, epilogue=(0xBC10, POP_R1, BX_R1))
 
     def test_runtime_call_thunk(self):
@@ -319,7 +321,9 @@ class AttackTests(unittest.TestCase):
 
     def test_frame_lifetime(self):
         self.refused("lifetime", prologue=("call",))
-        self.refused("move inside", arguments=(0xB410, *ARGUMENTS, 0xBC10))  # push/pop {r4}
+        # push/pop {r4}: the stores then hit the pushed R4 word, which the frame walk refuses first.
+        self.refused("move inside|stack-frame store overlaps a saved register or return-address word",
+                     arguments=(0xB410, *ARGUMENTS, 0xBC10))
 
     def test_stack_block_transfer(self):
         # stm.w sp,{r0,r1}: Thumb has no SP block store on ARMv4T, so the encoding is refused.

@@ -2926,6 +2926,8 @@ def stack_alias_store(stack, pointer_slots, aliases, return_registers,
         stack[slot] = (False, stack[slot][1], stack[slot][2])
         pointer_slots[offset] = value
         return True
+    if not stack[slot][2]:
+        raise ValueError("stack-alias store overlaps a saved register or return-address word")
     stack[slot] = (width == 4 and register in return_registers,
                    stack[slot][1], stack[slot][2])
     pointer_slots.pop(pointer_word, None)
@@ -5018,6 +5020,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                     pointer_slots[offset] = aliases[registers[0]]
                                     allowed_aliases.add(registers[0])
                                 else:
+                                    if not stack[slot][2]:
+                                        raise ValueError("stack-frame store overlaps a saved register or return-address word")
                                     pointer_slots.pop(offset, None)
                                 stack[slot] = (registers[0] in return_registers,
                                                stack[slot][1], stack[slot][2])
