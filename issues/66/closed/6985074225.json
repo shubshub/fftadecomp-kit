@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "57b08570c1de741f1e008e08ec22d42725f26e05090ef88df4bad035d438766c",
+    "acknowledged_cursor": 6985133556,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "57b08570c1de741f1e008e08ec22d42725f26e05090ef88df4bad035d438766c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08131EC0\",\"who\":\"rainbow-action-apply\",\"note\":\"Recovered from action descriptor table 083A87B0 slot 8 via 081338BA and BX r1; physical callback takes ActionState in r0.\"}",
+      "created_at": "2026-11-18T16:42:59Z",
+      "id": 6985074225,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:42:59Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "bda117cde10c76b6d4828635909fdd7e4942798f9fc81e661779dade43001a25",
+    "result": {
+      "address": "0x08131EC0",
+      "claim_id": 6985074225,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6985074225,
+      "status": "accepted",
+      "who": "rainbow-action-apply"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "d48eef58f0a8049dc242286cf0066c04c29a21da7ca147a08cf131791b6391f8",
+    "acknowledged_cursor": 6985157194,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "d48eef58f0a8049dc242286cf0066c04c29a21da7ca147a08cf131791b6391f8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08131EC0\",\"who\":\"rainbow-action-apply\",\"claim_id\":6985074225,\"reason\":\"Genuine action descriptor callback; native 2-byte 1-instruction match and independent saved report replay\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:46:04Z",
+      "id": 6985157194,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:46:04Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e93bfb60262a6e8f1fa2c6d2366e6cc712036711c63ece15ce108c56051ebec5",
+    "result": {
+      "address": "0x08131EC0",
+      "claim_id": 6985074225,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6985157194,
+      "status": "accepted",
+      "who": "rainbow-action-apply"
+    }
+  }
+}
