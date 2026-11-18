@@ -638,7 +638,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "3926980e8cc60cade86eda605fed394bbec69cc786f28d97ac06e216e0e37bbb",
+        "acknowledged_cursor": 6980084946,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3926980e8cc60cade86eda605fed394bbec69cc786f28d97ac06e216e0e37bbb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08057500\",\"who\":\"rainbow-callback\",\"claim_id\":6979904462,\"reason\":\"Retained nearest plausible parked source at 117 of 120 bytes. Unit lookup and cached-pointer variants did not resolve register choice\",\"unmatchable\":true,\"tried\":\"fixed -O2 with direct unit lookup, pointer and helper forms\"}",
+          "created_at": "2026-11-18T13:32:44Z",
+          "id": 6980081266,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:32:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2c99fe4230d9761649f361c3a40a6dc1242392eaa61acb9c38848c3591cd8653",
+        "result": {
+          "address": "0x08057500",
+          "claim_id": 6979904462,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980081266,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -792,6 +820,98 @@
           "request_id": 6979990618,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "a198ba53764ed8f0d3ffecbe39f3888c53dcae54b7da017e12512a4072e1f131",
+        "acknowledged_cursor": 6980084946,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a198ba53764ed8f0d3ffecbe39f3888c53dcae54b7da017e12512a4072e1f131",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812C8DC\",\"who\":\"rainbow-state\",\"claim_id\":6979990618,\"reason\":\"Parked 130/130 exact bytes. Native buffer replay reaches third halfword at caller sp+28, outside the four-byte equipment output; no independent two-entry premise.\",\"unmatchable\":true,\"tried\":\"agbcc -mthumb-interwork -O2; ordinary native, matched func_0812EF94 inlined\"}",
+          "created_at": "2026-11-18T13:32:52Z",
+          "id": 6980084946,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:32:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2c99fe4230d9761649f361c3a40a6dc1242392eaa61acb9c38848c3591cd8653",
+        "result": {
+          "address": "0x0812C8DC",
+          "claim_id": 6979990618,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6980084946,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "16fda27bb40533a680da14a1d7f211d648adb4d0f475f78113631c84b1f94b48",
+        "acknowledged_cursor": 6980084946,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "16fda27bb40533a680da14a1d7f211d648adb4d0f475f78113631c84b1f94b48",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08035AD8\",\"who\":\"rainbow-callback\",\"note\":\"Match decimal tile renderer with existing BIOS-fill and unsigned division proofs\"}",
+          "created_at": "2026-11-18T13:32:22Z",
+          "id": 6980071723,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:32:22Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2c99fe4230d9761649f361c3a40a6dc1242392eaa61acb9c38848c3591cd8653",
+        "result": {
+          "address": "0x08035AD8",
+          "claim_id": 6980071723,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980071723,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0210faadf705420b3c3de8d358322178b02573efad08bbf7a9895aba37688916",
+        "acknowledged_cursor": 6980084946,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0210faadf705420b3c3de8d358322178b02573efad08bbf7a9895aba37688916",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08029DD4\",\"who\":\"rainbow-callback\",\"note\":\"Match decimal tile renderer with existing BIOS-fill and unsigned division proofs\"}",
+          "created_at": "2026-11-18T13:32:23Z",
+          "id": 6980071931,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T13:32:23Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2c99fe4230d9761649f361c3a40a6dc1242392eaa61acb9c38848c3591cd8653",
+        "result": {
+          "address": "0x08029DD4",
+          "claim_id": 6980071931,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6980071931,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null
