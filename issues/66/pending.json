@@ -574,7 +574,35 @@
           "who": "rainbow-menu"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7de95d50d03432fa674eb9119f31f2b654b7cd171589660f99ed4f20e6ecaf53",
+        "acknowledged_cursor": 6981245212,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7de95d50d03432fa674eb9119f31f2b654b7cd171589660f99ed4f20e6ecaf53",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08034FFC\",\"who\":\"rainbow-menu\",\"claim_id\":6981129721,\"reason\":\"376/376 MATCH and saved report replay True on public kit 8e69508, src/08034FFC.c and docs/match/08034FFC.md.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:19:05Z",
+          "id": 6981239376,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:19:05Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "991dfdf2865a78ba4cb65ee56534ff99874ea07ea7a93a319771a718062560f0",
+        "result": {
+          "address": "0x08034FFC",
+          "claim_id": 6981129721,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981239376,
+          "status": "accepted",
+          "who": "rainbow-menu"
+        }
+      }
     },
     {
       "claim": {
@@ -606,7 +634,35 @@
           "who": "rainbow-display-transition"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "97af6a5091be6743d02de6e1eb71129fb23e0005f0d1a49c9d80f91ed92e4a1b",
+        "acknowledged_cursor": 6981245212,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "97af6a5091be6743d02de6e1eb71129fb23e0005f0d1a49c9d80f91ed92e4a1b",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D3BD0\",\"who\":\"rainbow-display-transition\",\"claim_id\":6981160432,\"reason\":\"228/228 bytes and 105/105 instructions exact with project control header and typed helper; Parked for unbounded common loop in volatile three-compile proof\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:19:19Z",
+          "id": 6981245212,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:19:19Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "991dfdf2865a78ba4cb65ee56534ff99874ea07ea7a93a319771a718062560f0",
+        "result": {
+          "address": "0x080D3BD0",
+          "claim_id": 6981160432,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981245212,
+          "status": "accepted",
+          "who": "rainbow-display-transition"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +692,38 @@
           "request_id": 6981176884,
           "status": "accepted",
           "who": "rainbow-callback"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b62dda4ad373120737bea0bdf0b1d4d1f45cba30b4962acd4e5556de7c85855e",
+        "acknowledged_cursor": 6981245212,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b62dda4ad373120737bea0bdf0b1d4d1f45cba30b4962acd4e5556de7c85855e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C286C\",\"who\":\"rainbow-group-selection\",\"note\":\"Reconstruct two-phase group selection against its real group and entry helper interfaces\"}",
+          "created_at": "2026-11-18T14:19:16Z",
+          "id": 6981243996,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:19:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "991dfdf2865a78ba4cb65ee56534ff99874ea07ea7a93a319771a718062560f0",
+        "result": {
+          "address": "0x080C286C",
+          "claim_id": 6981243996,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981243996,
+          "status": "accepted",
+          "who": "rainbow-group-selection"
         }
       },
       "release": null
