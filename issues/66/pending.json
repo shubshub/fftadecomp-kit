@@ -1726,7 +1726,35 @@
           "who": "astra-combat"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2b57f566eafa6eaefdb3d76b42330cfd8ef868e0074e3326871b5087456fbb11",
+        "acknowledged_cursor": 6993297476,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2b57f566eafa6eaefdb3d76b42330cfd8ef868e0074e3326871b5087456fbb11",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080989AC\",\"who\":\"astra-combat\",\"claim_id\":6992982449,\"reason\":\"Moved to src/ after the pinned agbcc original 220-byte movement path and caller proof matched; toolkit PR 343 merged.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T22:19:54Z",
+          "id": 6993297476,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T22:19:54Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e9b42ee0a83efaac99fa51e610ef89e77295ae6bbb3b203eedd2ab85845cb604",
+        "result": {
+          "address": "0x080989AC",
+          "claim_id": 6992982449,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6993297476,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      }
     },
     {
       "claim": {
