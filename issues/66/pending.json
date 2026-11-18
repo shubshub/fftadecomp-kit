@@ -543,6 +543,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f131dabfdb116694cffd1e773e3fbc5f30e615cfcf6a26a3dbd1409b2d9cec03",
+        "acknowledged_cursor": 6982685508,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f131dabfdb116694cffd1e773e3fbc5f30e615cfcf6a26a3dbd1409b2d9cec03",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811D8A4\",\"who\":\"rainbow-event-third-child\",\"note\":\"Matched 0811DA64 explicitly registers this callback with 76-byte payload. Investigate complete CFG, interior provisional ARM row, and recover C; coordinate corrections.\"}",
+          "created_at": "2026-11-18T15:14:04Z",
+          "id": 6982685508,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:14:04Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "849e6b63d68a45fe02ddb933fb135c3bcd32805670520999650845d176499478",
+        "result": {
+          "address": "0x0811D8A4",
+          "claim_id": 6982685508,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6982685508,
+          "status": "accepted",
+          "who": "rainbow-event-third-child"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
