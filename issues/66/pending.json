@@ -1403,6 +1403,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "cbb659050c45fa84d96407cfd34639c1881d903d12280bfdf42a60f5658b26cf",
+        "acknowledged_cursor": 6990456341,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "cbb659050c45fa84d96407cfd34639c1881d903d12280bfdf42a60f5658b26cf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08141F2C\",\"who\":\"astra-shift\",\"note\":\"Native FLASH512_V130 sector erase, actual ordered hardware command and lifetime of installed RAM reader.\"}",
+          "created_at": "2026-11-18T20:19:10Z",
+          "id": 6990456341,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:19:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "380ff6439a9bbb51120808ce0e7d53e85ad95b216aaa221c21737d47d62473c9",
+        "result": {
+          "address": "0x08141F2C",
+          "claim_id": 6990456341,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6990456341,
+          "status": "accepted",
+          "who": "astra-shift"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
