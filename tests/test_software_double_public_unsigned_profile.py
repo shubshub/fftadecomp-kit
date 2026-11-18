@@ -1,10 +1,14 @@
 """Canonical public wide conversion and the exact authored runtime owner."""
 
 import copy
+from contextlib import redirect_stdout
 import hashlib
+import io
 import json
 import struct
+import sys
 import unittest
+from unittest.mock import patch
 
 import test_software_double_profile as fixture
 
@@ -67,11 +71,71 @@ class PublicUnsignedConversionTests(unittest.TestCase):
         manifest = profile.make_manifest(calls, start, bindings, instructions)
         self.assertEqual(len(profile.verify(body, start, self.rom, self.mapping, self.index, manifest)), count)
 
+    def test_word_owner_native_report_and_source_replay(self):
+        start, end, _, digest = profile.UNSIGNED_WORD_OWNER
+        self.indexes(2, 1)
+        (self.root / "config/functions.json").write_bytes(self.mapping)
+        (self.root / "symbols/functions.txt").write_bytes(self.index)
+        source = self.root / "src/08142864.c"
+        natural = """unsigned func_08142864(double value)
+{
+    if (value >= 2147483648.0)
+        return (unsigned)(int)(value + -2147483648.0) + 0x80000000u;
+    return (int)value;
+}
+"""
+        source.write_text(natural)
+        self.assertEqual(hashlib.sha256(self.runtime_rom[start-BASE:end-BASE]).hexdigest(), digest)
+        argv = ["match.py", "--root", str(self.root), "--software-double-profile", profile.SELECTOR,
+                f"0x{start:08X}"]
+        with patch.object(sys, "argv", argv), patch.object(match, "ROOT", match.ROOT), redirect_stdout(io.StringIO()):
+            self.assertEqual(match.main(), 0)
+        report = (self.root / "docs/match/08142864.md").read_text()
+        self.assertTrue(profile.report_matches(report, self.root, start))
+        self.assertIn(f"{end-start}/{end-start} bytes", report)
+        self.assertFalse(profile.report_matches(report.replace("__gedf2", "__ltdf2"), self.root, start))
+        runner = match.Runner(match.DEFAULT_CC, root=self.root, timeout=120)
+        with runner.workspace() as workspace:
+            _, _, original = match.compile_object(runner, workspace, self.args, self.root, start, "src/08142864.c")
+            for key, value in (("section", 1), ("bind", 2), ("type", 1), ("value", 2),
+                               ("name", "func_0814374C"), ("name", "__gedf2_alias")):
+                changed = copy.deepcopy(original)
+                next(symbol for symbol in changed["symbols"] if symbol["name"] == "__gedf2")[key] = value
+                with self.subTest(symbol=(key, value)), self.assertRaises(ValueError):
+                    match.call_bindings(changed, "func_08142864", start, self.mapping, len(self.runtime_rom),
+                                        self.runtime_rom, double_bindings={}, double_index=self.index)
+        # An unused, macro-pasted explicit runtime name leaves the ELF unchanged.
+        source.write_text("#define CAT(a,b) a ## b\nextern int CAT(__ge,df2)(double,double);\n" + natural)
+        self.assertFalse(profile.report_matches(report, self.root, start))
+        with runner.workspace() as workspace:
+            _, _, original = match.compile_object(runner, workspace, self.args, self.root, start, "src/08142864.c")
+            with self.assertRaisesRegex(ValueError, "compiler-generated"):
+                profile.object_bytes(runner, workspace, self.args, original, start, self.mapping,
+                                     self.runtime_rom, self.index)
+
+    def test_word_owner_private_alias_and_whole_extent_are_pinned(self):
+        self.indexes(2, 1)
+        start, end, _, _ = profile.UNSIGNED_WORD_OWNER
+        body = self.runtime_rom[start-BASE:end-BASE]
+        self.assertNotIn("__gedf2", profile.OPERATIONS)
+        for owner, site in ((start, start+12), (start+2, start+10), (BASE, BASE+10)):
+            with self.subTest(owner=owner, site=site):
+                self.assertIsNone(profile.call_target("__gedf2", owner, site))
+        calls = {site: target for site, target in profile.EDGES if start <= site < end}
+        for changed in ({start+10: "__ltdf2"}, {start+22: "__gedf2"}, {start+10: "func_0814374C"}):
+            bindings = dict(profile.UNSIGNED_WORD_BINDINGS)
+            bindings.update(changed)
+            with self.subTest(bindings=changed), self.assertRaisesRegex(ValueError, "original runtime relocations"):
+                profile.verify_context(body, start, calls, (self.runtime_rom, self.mapping, self.index, bindings))
+        for lo, hi in ((start+2, end), (start, end-2)):
+            with self.subTest(span=(lo, hi)), self.assertRaises(ValueError):
+                profile.validate_span(self.runtime_rom[lo-BASE:hi-BASE], lo, self.runtime_rom, self.mapping, self.index)
+
     def test_other_runtime_owners_and_interior_or_short_owners_stay_refused(self):
         self.fixture(SOURCE)
         start, end, _, _ = profile.UNSIGNED_WIDE_OWNER
         for a, b, _, _ in profile.IDENTITIES:
-            if a == start:
+            if a in (start, profile.UNSIGNED_WORD_OWNER[0]):
                 continue
             with self.subTest(owner=a), self.assertRaises(ValueError):
                 profile.validate_span(self.rom[a-BASE:b-BASE], a, self.rom, self.mapping, self.index)
