@@ -869,6 +869,12 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
                 text, tree, project, int(relpath[4:-2], 16), closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
+    if relpath == "src/08000DBC.c" and project is not None:
+        import immediate_dma_fill as dma_fill
+        try:
+            hardware_qualifiers.add(dma_fill.qualifier(text, tree, project, closure, 0x08000DBC, data_symbols or {}))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     counter_qualifiers = set()
     if relpath == "src/081457FC.c" and tree is not None and project is not None and closure == (
             {relpath, "include/ffta.h"}, []):
