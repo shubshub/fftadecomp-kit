@@ -492,7 +492,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         one_object_word_switch=selector == bios_switch.SELECTOR)
     if selector == named_buffer.ABILITY_RANGE_SELECTOR:
         import ability_range_local_bytes as ability
-        proof = ability.prove(data, address, rom, mapping, index, objects, bindings, ins, edges, calls, refinement)
+        if address == 0x0807B928:
+            import ability_list_pane as pane
+            proof = pane.prove(data, rom, mapping, index, objects, bindings, ins, calls, refinement, words)
+        else:
+            proof = ability.prove(data, address, rom, mapping, index, objects, bindings, ins, edges, calls, refinement)
     elif selector == named_buffer.EQUIPMENT_SELECTOR:
         import unit_equipment_attribute as equipment
         proof = equipment.prove(data, address, rom, mapping, index, objects, bindings, ins, calls, refinement, words)
@@ -1463,6 +1467,9 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         if selector == named_buffer.EQUIPMENT_SELECTOR:
             import unit_equipment_attribute as equipment
             equipment.check_source(capture, address)
+        if selector == named_buffer.ABILITY_RANGE_SELECTOR and address == 0x0807B928:
+            import ability_list_pane as pane
+            pane.check_source(capture)
         if selector == named_buffer.ROSTER_FILTER_SELECTOR:
             import menu_roster_filter as roster_filter
             roster_filter.check_source(capture, address)
