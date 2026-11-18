@@ -4477,6 +4477,12 @@ classes, short and long unsigned guards, and ordinary typed calls. Late status
 and rebuild fixtures verify function-only output while preserving nonzero
 external prefix bytes. These are finite verifier tests, not game-match credit.
 
+### Cone-shaped tile range at `080B48CC`
+
+`--owner-runtime-profile conditional-cone-tile-stack-footprint-v1` verifies the 336-byte cone writer. At its eligibility and height calls, the compiler keeps a local byte pointer at call-site SP+52. The verifier requires empty register aliases at both calls, traces the incoming and outgoing stack offsets across the 29 complete Thumb owners, and replays their native frame checks. Only the map query at `0801CC7C` materializes a stack address. Its private byte pointer can survive in R2 on a false return. The checker follows the known return values through each consumer until the cone loop overwrites R2.
+
+The cone writer advances its output cursor in incoming stack word 3. Its identified caller `080B4A1C` provides this word inside a 32-byte outgoing area, copies the entry output argument through two exact Thumb MOV instructions, and discards the slot without reading it after return. The initialization dominates the call. A scan of the hash-verified 16 MiB USA ROM finds exactly one encoded Thumb BL targeting the writer and zero literal Thumb pointers to it. Computed indirect targets remain outside this inventory. The report assumes sufficient writable output records, writable outgoing arguments, and ordinary separation between external memory and active private frames. The profile covers only this owner and its specified calls.
+
 ### Explicit named-data buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile named-data-buffer-v1 <address>`
