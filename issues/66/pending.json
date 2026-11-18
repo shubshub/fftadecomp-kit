@@ -30,7 +30,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0e294e0448e965742b69cf0296ea11b351e9763256ffe44a9eed173b1f08e244",
+        "acknowledged_cursor": 6989250923,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0e294e0448e965742b69cf0296ea11b351e9763256ffe44a9eed173b1f08e244",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814189C\",\"who\":\"claude-ffta2\",\"claim_id\":6926164820,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:28:30Z",
+          "id": 6989230661,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:28:30Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
+        "result": {
+          "address": "0x0814189C",
+          "claim_id": 6926164820,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989230661,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "48e32d27ed3f3899e14e7473e837f8560c1a078a976b749805c6d0e6b82cbdc2",
+        "acknowledged_cursor": 6989250923,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "48e32d27ed3f3899e14e7473e837f8560c1a078a976b749805c6d0e6b82cbdc2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081418C0\",\"who\":\"claude-ffta2\",\"claim_id\":6926167919,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:29:15Z",
+          "id": 6989250923,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:29:15Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
+        "result": {
+          "address": "0x081418C0",
+          "claim_id": 6926167919,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989250923,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +692,66 @@
           "request_id": 6989206558,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "8e379b9c68fa9d10eb3f7016a411a00da4fe7c1d9e8fb536baf9f3026f60b1de",
+        "acknowledged_cursor": 6989250923,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8e379b9c68fa9d10eb3f7016a411a00da4fe7c1d9e8fb536baf9f3026f60b1de",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08054DA8\",\"who\":\"rainbow-state\",\"claim_id\":6989206558,\"reason\":\"Native 108-byte registered button callback matched and saved report replayed. Six original menu dispatch traces verified the actual receiver, key mask and row-dependent writes.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:29:03Z",
+          "id": 6989245885,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:29:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
+        "result": {
+          "address": "0x08054DA8",
+          "claim_id": 6989206558,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989245885,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
+        "acknowledged_cursor": 6989250923,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "00059c929262acdf8183027a849f581af983884fb21a505d0093e587db4b91ff",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08034E88\",\"who\":\"astra-shift\",\"note\":\"Original switch-list callback registered at 08031FE6, two real jump tables and complete outgoing extent. Primary owns maps.\"}",
+          "created_at": "2026-11-18T19:28:33Z",
+          "id": 6989231717,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:28:33Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b73d6113f69aca7a6f53d68b39f4d79774dd662befb28cd3deccc9d1cc8a9437",
+        "result": {
+          "address": "0x08034E88",
+          "claim_id": 6989231717,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989231717,
+          "status": "accepted",
+          "who": "astra-shift"
         }
       },
       "release": null
