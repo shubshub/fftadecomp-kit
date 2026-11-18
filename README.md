@@ -4721,6 +4721,25 @@ is refused). It does not widen function literals or ordinary objects.
 `test_cpuset_code_image.py` covers admitted and refused shapes, overrun, gaps,
 forged manifests, relabelling and report replay.
 
+### The m4a scanline limit linker symbol
+
+The USA `MPlayExtender` at `0x081453F8` uses the GBA library's `extern char
+gMaxLines[]` and `MAX_LINES ((u32)gMaxLines)`. The selector
+`--addressed-signed-runtime-profile addressed-m4a-extender-bios-fill-max-lines-v1`
+checks the original undefined global NOTYPE symbol, its single zero-addend
+`R_ARM_ABS32` at offset `0x110`, and the linked size-zero NOTYPE absolute with
+value 80. The load at `0x08145478` supplies the byte stored at mixer offset 12
+at `0x0814547C`; the next assignment to its register ends that value's lifetime.
+The ROM supplies the numeric value. The historical library source supplies the
+symbol name and its scalar interpretation. A data-map entry for the symbol is
+rejected. The report records the linker absolute separately from objects and
+callback functions.
+
+The BIOS fill and typed callback checks also run. The owner ELF relocations for
+slots 17, 19 and 29 must agree with the independent ROM table at `0x0836D098`
+and the callback entry extents in the function index. Saved reports recompile
+and relink the original source to replay this evidence.
+
 ### Fixed hardware addresses as numbers in BIOS fill owners
 
 A source may name a VRAM, palette, OAM or I/O address as a plain number, such as
