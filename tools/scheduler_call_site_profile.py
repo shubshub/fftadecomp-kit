@@ -47,9 +47,40 @@ Obligations at each site, all checked against the walk's state there:
 
 The scheduler bodies, the allocator and the callbacks are never walked. Their
 effects are the descriptor selectors' premises, stated per invocation.
+
+conditional-scheduler-call-site-summaries-v2 (issue #238) is the same contract
+with the forwarded callee stack arguments of issue #183, the rule
+named-data-buffer-stack-index-v2 already applies (match.BufferCallProof,
+forwarded_slot_step and forwarded_frame_change, unchanged), so that v1 reports
+keep their meaning:
+
+8. an inspected buffer callee may store a tracked owner-frame pointer into an
+   aligned word of its own frame as its own callee's outgoing stack argument,
+   only if its every SP use is PUSH, POP, ADD/SUB SP,#imm or an immediate
+   [sp,#imm] access; the next callee is walked with that word as an incoming
+   stack argument, so every access through it is still bounded against the
+   owner's frame. A call an inspected callee makes with its own frame keeps
+   v1's buffer rules, with no forwarding, since a slot there would not be in
+   owner terms;
+9. a slot released by ADD SP still holds the pointer: it is tracked until
+   written, walked code that reads it refuses, walked callees inherit it, and
+   calls trusted while it lies below SP are recorded;
+10. at the owner, the words a walked root call's callee released are recorded
+    and removed from its result. On every owner CFG path after such a call the
+    owner may not move SP down (SUB SP,#imm; the core walk already refuses
+    ADD/MOV SP,Rm), nor make any call the walk inspects: one that receives a
+    stack pointer in R0-R3, R12 or LR or while a frame word holds one, and
+    every scheduler site, none of which is told about the word. Every later
+    call is trusted under the recorded FORWARD_PREMISE of
+    stack_index_precondition_profile;
+11. at least one forwarded slot is recorded, so v1 and v2 admit disjoint sets.
+
+This proof never replays loops (a callee that needs replay refuses as under
+v1), so forwarding never meets replay.
 """
 import hashlib
 from pathlib import Path
+import struct
 
 import match
 import function_thunk_profile as thunk
@@ -57,6 +88,9 @@ from scheduler_loop_composition_profile import components
 
 SELECTOR = 'conditional-scheduler-call-site-summaries-v1'
 SCHEMA = 'elf-symbol-thumb-' + SELECTOR
+SELECTOR_V2 = 'conditional-scheduler-call-site-summaries-v2'
+SCHEMA_V2 = 'elf-symbol-thumb-' + SELECTOR_V2
+SCHEMAS = {SELECTOR: SCHEMA, SELECTOR_V2: SCHEMA_V2}
 SCHEDULER, POOL, DIRECT = 0x08005B6C, 0x08121B8C, 0x08005954
 # Closed entry table; every listed body is pinned by size and SHA-256 in
 # conditional_local_buffer_profile.DEPENDENCIES.
@@ -252,6 +286,70 @@ def bind(data, address, ins, edges, calls):
                 source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
 
 
+def bind_forwarding(proof, edges):
+    """v2: turn on issue #183's forwarded slots for every callee the walk inspects."""
+    if proof.policy != SELECTOR_V2:
+        return
+    proof.forwarded_stack_arguments = True
+    proof.forward_slot_records = set()   # (callee, store site, callee entry-SP offset, owner offset)
+    proof.forward_trusted_calls = set()  # (caller, site, target) trusted inside a walked callee
+    proof.forward_releases = {}          # owner call site -> owner entry-SP offsets released
+    proof.walked_sites = set()           # owner call sites checked by the buffer rules
+    proof.owner_edges = dict(edges)
+
+
+def walked_call(proof, result, stack, *, site):
+    """An owner call checked by the buffer rules: under v2, record the site and remove the
+    released words its callee hands back (they lie below the owner's SP; see forwarding)."""
+    if proof.policy != SELECTOR_V2:
+        return result
+    proof.walked_sites.add(site)
+    stale = match.stale_words(result)
+    if not stale:
+        return result
+    proof.forward_releases.setdefault(site, set()).update(position - 4 * len(stack) for position in stale)
+    return type(result)({key: value for key, value in result.items() if key not in stale.values()})
+
+
+SP_DOWN_REFUSAL = 'the owner moves SP down after a callee released a forwarded pointer word'
+STACK_POINTER_REFUSAL = ('the owner passes stack pointers to a callee after a callee released a '
+                         'forwarded pointer word')
+
+
+def forwarding(proof):
+    """The v2 record: every forwarded slot and released word, and the owner rules after a release.
+
+    A released word still holds a pointer into the owner's frame, below the owner's SP. The
+    owner reaches memory below SP only by moving SP down, and a callee reaches it below its
+    entry SP; a walked callee or a scheduler site would not be told about the word. So on
+    every owner path after the release both are refused, and every other call is trusted
+    under FORWARD_PREMISE, as named-data-buffer-stack-index-v2 does.
+    """
+    from stack_index_precondition_profile import FORWARD_PREMISE, moves_sp_down
+    require(proof.forward_slot_records,
+            'forwarded call-site summaries require a forwarded callee stack argument')
+    address, data = proof.root
+    edges = proof.owner_edges
+    releases = [[site, sorted(positions)] for site, positions in sorted(proof.forward_releases.items())]
+    after, pending = set(), [successor for site, _ in releases for successor in edges[site]]
+    while pending:
+        site = pending.pop()
+        if site not in after:
+            after.add(site)
+            pending.extend(edges[site])
+    handed = proof.walked_sites | set(proof.observations)
+    trusted = []
+    for site in sorted(after):
+        require(not moves_sp_down(struct.unpack_from('<H', data, site - address)[0]), SP_DOWN_REFUSAL)
+        require(site not in handed, STACK_POINTER_REFUSAL)
+        if site in proof.calls:
+            trusted.append([site, proof.calls[site]])
+    return dict(slots=sorted(list(record) for record in proof.forward_slot_records),
+                released=releases, trusted_calls=trusted,
+                trusted_callee_calls=sorted(list(record) for record in proof.forward_trusted_calls),
+                premise=FORWARD_PREMISE if releases else None, premise_proved=False)
+
+
 def payload_extent(value, stack, descriptor):
     """End (entry-SP-relative) of a payload at `value`: the end of the run of
     allocated local words holding it, or the descriptor if that comes first."""
@@ -386,16 +484,29 @@ PREMISES = [
     'pointer uses the returning ARM ABI summary, and a call that receives one is inspected as a bounded '
     'buffer callee.',
 ]
+PREMISES_V2 = PREMISES + [
+    'An inspected buffer callee may forward a caller-frame pointer as its own callee\'s outgoing stack '
+    'argument (issue #183): each recorded slot is a word of that callee\'s own frame, written by an '
+    'immediate SP store in a callee whose every SP use is immediate, and the next callee is walked with '
+    'it as an incoming stack argument. A released slot still holds the pointer and is tracked until '
+    'written. After an owner call whose callee released one, no owner path moves SP down or hands a '
+    'callee a stack pointer, and every later call is trusted under the recorded forwarded stack argument '
+    'premise.',
+]
 
 
 def manifest(proof):
     sites = proof.scheduler_call_sites
     require(set(proof.observations) == {record['site'] for record in sites['sites']},
             'every scheduler call site must be observed')
-    return dict(schema=SCHEMA, runtime_dependencies=proof.runtime_dependencies,
+    v2 = proof.policy == SELECTOR_V2
+    record = dict(schema=SCHEMAS[proof.policy], runtime_dependencies=proof.runtime_dependencies,
         environment=proof.environment, call_sites=sites,
         observations=[proof.observations[site] for site in sorted(proof.observations)],
-        assumptions=list(PREMISES),
+        assumptions=list(PREMISES_V2 if v2 else PREMISES),
         actual_callback_effects_proved=False, nonescape_proved=False, termination_proved=False,
         manager_memory_access_proved=False, caller_shape_bounds=False,
         source_sha256=hashlib.sha256(Path(__file__).read_bytes()).hexdigest())
+    if v2:
+        record['forwarded_stack_arguments'] = forwarding(proof)
+    return record
