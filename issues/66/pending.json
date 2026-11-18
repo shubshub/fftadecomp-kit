@@ -30,7 +30,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "610d2a460e6969aee2f7d185cc5d000adf86967bf613c4f887c63187e0be50d9",
+        "acknowledged_cursor": 6989359627,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "610d2a460e6969aee2f7d185cc5d000adf86967bf613c4f887c63187e0be50d9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141EB8\",\"who\":\"claude-ffta2\",\"claim_id\":6926194990,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:32:58Z",
+          "id": 6989340331,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:32:58Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1d0edee2a4123f49e343a93282780616b0d3f55e7d7b0ebb3d94c6960da8437",
+        "result": {
+          "address": "0x08141EB8",
+          "claim_id": 6926194990,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989340331,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -62,7 +90,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "dd7acd9a0ae33d827db7254f5c75b8e279b123e1ca744fda835feb5c581c8034",
+        "acknowledged_cursor": 6989359627,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "dd7acd9a0ae33d827db7254f5c75b8e279b123e1ca744fda835feb5c581c8034",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08141F2C\",\"who\":\"claude-ffta2\",\"claim_id\":6926198018,\"reason\":\"stale lease: library-unit hand match paused pending kit #214; not worked since 2026-11-16\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:33:50Z",
+          "id": 6989359627,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:33:50Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1d0edee2a4123f49e343a93282780616b0d3f55e7d7b0ebb3d94c6960da8437",
+        "result": {
+          "address": "0x08141F2C",
+          "claim_id": 6926198018,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 6989359627,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
@@ -442,7 +498,35 @@
           "who": "rainbow-affine"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a604419180b8a2bbe7efb94b8e94e39f001b21ea307cf3c9afb8b69de14f1b61",
+        "acknowledged_cursor": 6989359627,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a604419180b8a2bbe7efb94b8e94e39f001b21ea307cf3c9afb8b69de14f1b61",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080318DC\",\"who\":\"rainbow-affine\",\"claim_id\":6989292256,\"reason\":\"12/12, original callback registration/indirect dispatch and seven USA CPU cases, live native and saved report verified\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T19:33:12Z",
+          "id": 6989345628,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:33:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1d0edee2a4123f49e343a93282780616b0d3f55e7d7b0ebb3d94c6960da8437",
+        "result": {
+          "address": "0x080318DC",
+          "claim_id": 6989292256,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6989345628,
+          "status": "accepted",
+          "who": "rainbow-affine"
+        }
+      }
     },
     {
       "claim": {
@@ -472,6 +556,38 @@
           "request_id": 6989308346,
           "status": "accepted",
           "who": "astra-sound"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "01f1df7cdbee997b0696e4f651d2e55fa57fafebc8dd248629dd3c821bc81e50",
+        "acknowledged_cursor": 6989359627,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "01f1df7cdbee997b0696e4f651d2e55fa57fafebc8dd248629dd3c821bc81e50",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DD09C\",\"who\":\"rainbow-callback\",\"note\":\"Recover two-branch scheduler construction using matched 080DCF64 and 080DD1E0 callback layouts and genuine source prototypes.\"}",
+          "created_at": "2026-11-18T19:33:10Z",
+          "id": 6989344711,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T19:33:10Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1d0edee2a4123f49e343a93282780616b0d3f55e7d7b0ebb3d94c6960da8437",
+        "result": {
+          "address": "0x080DD09C",
+          "claim_id": 6989344711,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6989344711,
+          "status": "accepted",
+          "who": "rainbow-callback"
         }
       },
       "release": null
