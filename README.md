@@ -2339,6 +2339,15 @@ poll failed. Invalid sectors and erase failures leave the incoming counter
 untouched. The report assumes stable source bytes and the original exclusively
 owned controller, timer and reader state during the synchronous operation.
 
+The D4BF and fallback programmer at `08142000` copies the complete 36-byte
+erase scanner into a 96-byte word-aligned stack buffer. It retries failed
+erases or nonempty scans up to 81 times. A successful first attempt triggers
+one additional erase, and a successful retry triggers six. The code discards
+these additional erase results. It then replaces the first four bytes of the
+local scan with the polling reader and programs the sector. Its O1 report
+binds both copied-code boundary symbols, five direct calls and the progress
+halfword. An invalid sector or exhausted retry loop leaves the counter intact.
+
 * A row has exactly these keys. Addresses are canonical `0x%08X` text. The
   range is even, starts and ends on `config/functions.json` boundaries, holds
   at least two index functions (a unit is a library object, never one

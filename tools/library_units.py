@@ -301,6 +301,10 @@ def schemas(unit=None, address=None, orphan=None):
         import flash_reader_install
         if flash_reader_install.unit_owner(unit, address, orphan):
             admitted.add(flash_reader_install.SCHEMA)
+    if address == 0x08142000:
+        import flash_retry_programmer
+        if flash_retry_programmer.unit_owner(unit, address, orphan):
+            admitted.add(flash_retry_programmer.SCHEMA)
     if address == 0x08142160:
         import flash_sector_programmer
         if flash_sector_programmer.unit_owner(unit, address, orphan):

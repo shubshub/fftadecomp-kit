@@ -6242,6 +6242,12 @@ def main():
                     verified_instructions, _ = verify_switches(
                         got, addr, rom, mapping, switch_evidence,
                         data_mapping=data_mapping if data_relocations else None)
+            elif unit_context is not None and addr == 0x08142000:
+                import flash_retry_programmer as flash_profile
+                flash_profile.check_source(ROOT)
+                verified_instructions, flash_evidence = flash_profile.native_proof(
+                    got, rom, mapping, empty_index, data_mapping, calls, data_relocations, function_relocations,
+                    unit_context, unit_orphan)
             elif unit_context is not None and addr in (0x08141EB8, 0x08141F2C, 0x08142160):
                 if addr == 0x08141EB8:
                     import flash_chip_erase as flash_profile
@@ -6587,7 +6593,8 @@ def main():
             f.write(f"* source: `{src_rel}`\n")
             f.write(f"* verification: `{schema}`\n")
             if flash_evidence is not None:
-                label = {0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer"}[addr]
+                label = {0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer",
+                         0x08142000:"retry sector programmer"}[addr]
                 f.write(f"* flash {label}: `{library_units.canonical(flash_evidence)}`\n")
             f.write(f"* source SHA-256: `{fingerprint}`\n")
             if empty_profile:
