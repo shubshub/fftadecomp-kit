@@ -645,7 +645,11 @@ refuses a report in which:
    other `* buffer ` lines (loop replay, and the BIOS, copy-helper and
    switch-callee summary lines) are exempt: they may repeat, because the
    buffer proof requires them to equal its recomputed lines exactly and in
-   order. The two self-call lines appear together or not at all.
+   order. On `elf-symbol-thumb-frame-v1`, `-frame-calls-v1` and
+   `-frame-data-v1`, the `* DMA fill` lines are exempt in the same way:
+   replay requires them to equal the recomputed block exactly, right after
+   the stack-frame line (see "Immediate DMA fills from a local unit"). The
+   two self-call lines appear together or not at all.
    `* compiler:` is required, even though `library_units` alone admits a
    report without it;
 3. `* source:` does not name the file `match.py` compiles for this address
@@ -912,6 +916,113 @@ site offsets as canonical JSON). Replay accepts a self call only when both
 lines are present and the offsets equal the `bl` sites the bytes reproduce, so a
 report that drops or edits them is rejected, and a report without them is
 rejected if the bytes contain a self call.
+
+#### Immediate DMA fills from a local unit
+
+`DmaFill16(3, 0, dst, n)` keeps the fill value in a local halfword and writes
+the local's address to a DMA source register. The walk refuses that store as
+`unsupported stack-alias use or escape`. On this plain direct-call path only
+(`tools/dma_fill_profile.py`), one form of it is admitted: a 16-bit
+`str rS, [rB]` with no offset, where the alias in rS is the only offending
+register, rB is not an alias, and the next instructions in the bytes have the
+shape of items 2 and 3 below. Any other store keeps its refusal at that
+instruction. The site, the alias offset and the frame state are recorded, and
+nothing else about the alias changes. After the walk, over the walk's own CFG
+and exact constants (PC literals, immediate moves, register moves in R0-R12,
+shifts, add/sub, and/or/eor/bic; a join keeps only equal values; a call keeps
+only R4-R11, the ordinary ABI premise), every recorded store must satisfy all
+of:
+
+1. rB is exactly `0x040000B0`, `0x040000BC`, `0x040000C8` or `0x040000D4` on
+   every reaching path (`DMA source store base is not exactly one DMA source
+   register on every path`).
+2. The next instructions form one straight window, each reached only from the
+   one before it, of at most 16 instructions: register-only arithmetic, moves
+   and PC literal loads that do not write rB, then exactly one destination
+   store `str rD, [rB, #4]`, more of the same, and the control store
+   `str rC, [rB, #8]`. A call, branch, return, other memory access or second
+   store through rB is not the shape, so the store stays an escape; a
+   control-flow edge into the window refuses after the walk (`DMA fill
+   requires one straight destination and control store after the source
+   store`).
+3. The instruction after the control store, again reached only from it, reads
+   the control back with `ldr rX, [rB, #8]` (without it the store stays an
+   escape; with another path into it, `DMA fill requires the control read-back
+   immediately after the enable`).
+4. rC is an exact constant with the enable bit set, immediate start timing,
+   fixed source, incrementing destination, no repeat, no Game Pak DRQ and the
+   unused bits clear (16-20, and 14-15 on DMA0-2) (`DMA fill control is not
+   an exact immediate fixed-source enable`). Bit 26 gives the unit, 4 or 2
+   bytes; the count is the low 16 bits on DMA3 and the low 14 on DMA0-2, and 0
+   means 0x10000 or 0x4000. The interrupt bit is free and recorded with the
+   control.
+5. The source unit lies in allocated local words for every frame state the walk
+   reached the store with, at one source offset (`BufferCallProof.access`;
+   `DMA fill source differs between paths`), and on no path does a word it
+   touches hold a stack address (a pointer slot of the version-2 walk, which
+   main's retry and the data-buffer proof take; `DMA fill source unit is a
+   pointer-bearing local word`): the transfer copies the unit out.
+6. rD is an exact constant aligned to the unit (`DMA fill destination is not
+   an exact unit-aligned address`), and the whole span from it lies inside
+   palette RAM `[0x05000000, 0x05000400)`, VRAM `[0x06000000, 0x06018000)`, OAM
+   `[0x07000000, 0x07000400)` or EWRAM `[0x02000000, 0x02040000)`, or inside
+   IWRAM below the stack floor, `[0x03000000, 0x03003EC0)` (`DMA fill
+   destination span is not wholly in a stackless region or in IWRAM below the
+   stack floor`). The floor comes from the ROM: the boot code must be exactly
+   `b 0x080000C0` at 0x08000000, then `mov r0, #0x12; msr cpsr_fc, r0;
+   ldr sp, [pc, #0x28]` (IRQ SP 0x03007FA0, literal at 0x080000F8) and
+   `mov r0, #0x1f; msr cpsr_fc, r0; ldr sp, [pc, #0x18]` (System SP
+   0x03007EC0, literal at 0x080000F4), and the stated stack premise allows at
+   most 16 KiB below the System SP. A ROM whose boot code differs admits no
+   IWRAM span.
+
+With immediate timing and a fixed source the transfer reads exactly the
+recorded unit, the CPU is held until it ends, and the read-back cannot
+complete before it does; the control and the window rule out every mode that
+reads the source later or waits on the cartridge. The local's address goes
+only to a write-only register, and the unit it addresses holds no stack
+address, so the copies carry none. The stack premise: every live stack word
+(System/User, IRQ or BIOS supervisor) lies in IWRAM at or above 0x03003EC0,
+since the System stack grows at most 16 KiB below its boot SP and the IRQ and
+supervisor stacks lie above it. So no span in the admitted regions holds one. 16 KiB is a
+stated bound, not a measured one. It is weaker than the named-data premise:
+named objects sit up to 0x0300616C, which a stack deeper than about 7.5 KiB
+would overwrite.
+
+A report that uses the rule keeps its schema, which can only be
+`elf-symbol-thumb-frame-v1`, `-frame-calls-v1`, `-frame-data-v1` or, beside a
+buffer call with typed data, `elf-symbol-thumb-data-buffer-calls-v1`, and adds
+these lines right after the stack-frame line, as one block:
+
+* `* DMA fills:` the contract `gba-dma-immediate-local-fill-v1` and a fixed
+  summary of the checks;
+* one `* DMA fill premise:` line per premise, verbatim and in this order:
+  GBATEK DMA semantics (DMAxSAD and DMAxDAD are write-only; the immediate
+  transfer and its span); the channel is idle when the control word is written;
+  no interrupt reprograms the channel between the source store and the
+  enable; no later transfer starts from the stale source address without
+  rewriting it; the one-sided stack bound above; R4-R11 preserved across
+  calls (the ordinary ABI summary);
+* `* DMA fill manifest:` canonical JSON `{"sites": [...]}`, one record per
+  store: site, channel, source offset and frame size, unit, destination,
+  control and read-back sites, control word, destination, span bytes and
+  region.
+
+Replay walks the ROM bytes with the same rule, the boot code included, and
+requires exactly these lines, as one block right after the one stack-frame
+line; the data-buffer validator passes a fresh policy
+object to its composed proof and compares the same lines. The lines on any
+other schema refuse, and so does a report without them whose bytes need the
+rule. Records with buffer-call dependencies but no data-buffer evidence refuse
+(`DMA fill records require the plain frame, call, data or data-buffer
+schemas`). Self calls and the switch, runtime, function-literal and owner paths
+never pass the rule, so the store stays refused there, as do the store inside
+a walked callee (`0801AF08`) and DMA copies from a local. The rule is one
+policy object that `match.py` builds for the plain path (each later walk,
+including the data-buffer proof, takes a fresh one only when it exists), so
+gating it behind a selector is a one-line change. `tests/test_dma_fill.py` covers each obligation
+with assembled bodies, the replay with synthetic reports, and the path end to
+end with natural C compiled by the fixed agbcc.
 
 Selector refusals (a `ValueError`; `refusal.Refusal` is the subclass used for
 the clean ones) are reported by `match.py` on the command line as
@@ -1529,11 +1640,14 @@ the mapping and data-map digests, and adds
 present, the `numeric_hardware_words` record) and
 `* data buffer proof SHA-256:` (a domain-separated digest of the schema, the
 version-2 buffer schema, the address, the bytes, the manifest, the source
-digest, both maps and the buffer proof fingerprint). Report replay requires exactly these fields and no
+digest, both maps and the buffer proof fingerprint). On the plain path the
+composed walk also applies the immediate DMA fill rule ("Immediate DMA fills
+from a local unit"), and its `* DMA fill` lines join the report. Report replay
+requires exactly these fields and no
 other `* ` field, recompiles and relinks the captured source, reruns the
 composed proof against the selected ROM, and requires the recomputed manifest,
-fingerprints, replay lines and stack-frame line, a plausible source and
-unchanged inputs. Library-unit toolchains do not admit these schemas.
+fingerprints, replay lines, DMA fill lines and stack-frame line, a plausible
+source and unchanged inputs. Library-unit toolchains do not admit these schemas.
 `tests/test_data_buffer_calls.py` covers both paths.
 
 ### Engine cutpoint diagnostics

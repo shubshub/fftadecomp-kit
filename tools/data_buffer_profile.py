@@ -112,7 +112,7 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
-          index=None, switch_relocations=None):
+          index=None, switch_relocations=None, dma_fills=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -123,6 +123,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     switch_relocations, the owner's own jump table from the same link, is walked by
     owner_switch_buffer_profile on the plain path only; its table pointer is that
     proof's word, not an untyped literal.
+    dma_fills, a fresh dma_fill_profile.Fills, goes to the plain path's walk; the
+    function-literal path has no DMA fill rule, so a DMA source store there stays refused.
     """
     import match
     import function_thunk_profile as thunk
@@ -174,7 +176,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
     else:
         instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
-                                                      incoming_narrow_reads=True)
+                                                      incoming_narrow_reads=True, dma_fills=dma_fills)
     if not proof.dependencies:
         raise ValueError("data-buffer evidence requires an inspected buffer call")
     match.verify_data_literals(instructions, address, literals)
@@ -217,7 +219,7 @@ def selected(report):
         f"* verification: `{schema}`" in (line.strip() for line in lines) for schema in SCHEMAS)
 
 
-def verify_source(root, address, data, rom, mapping, objects, source_digest):
+def verify_source(root, address, data, rom, mapping, objects, source_digest, dma_fills=None):
     """Recompile and relink the captured source, then rerun the composed proof."""
     from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD, DEFAULT_FLAGS,
                        DEFAULT_WSL_PATH, Runner, compile_object, link_calls, _run_replay_process,
@@ -262,7 +264,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
             # Without a function index no default-walk summary applies, and the walk refuses as before.
             index = index_snapshot(root) if (root / "symbols/functions.txt").is_file() else None
             result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
-                           switch_relocations=switches)
+                           switch_relocations=switches, dma_fills=dma_fills)
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -279,21 +281,23 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest):
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee and BIOS premise lines may repeat. Anything else, or any indented field,
-# refuses.
+# copy-summary, switch-callee, BIOS premise and DMA fill premise lines may repeat. Anything else, or any
+# indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
           "* buffer owner switch", "* mapping SHA-256", "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
-          "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list")
+          "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
+          "* DMA fills", "* DMA fill premise", "* DMA fill manifest")
 
 
 def report_matches(report, root, address):
     from match import DEFAULT_CC, DEFAULT_FLAGS, uses_stack_frame
     from match_evidence import (CALL_SUMMARY, STACK_BUFFER_SUMMARY, STACK_SUMMARY, data_snapshot,
                                 mapping_fingerprint, mapping_snapshot, report_rom_path, source_fingerprint)
+    import dma_fill_profile as dma_fill
     lines = report.splitlines()
 
     def key(line):
@@ -357,8 +361,13 @@ def report_matches(report, root, address):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
+        # DMA fill lines (kit #239) replay with the same rule and must equal the recomputed lines.
+        dma_lines = dma_fill.report_fields(lines)
+        fills = dma_fill.Fills(rom) if dma_lines else None
         instructions, proof, proved_schema, proved = verify_source(
-            root, address, data, rom, functions, objects, source_digest)
+            root, address, data, rom, functions, objects, source_digest, fills)
+        if fills is not None:
+            dma_fill.check_report(fills, lines)
         framed = uses_stack_frame(instructions)
         stack_lines = [line for line in lines if key(line) == "* stack frame"]
         if not (proved_schema == schema and proved == manifest and
@@ -377,7 +386,8 @@ def report_matches(report, root, address):
         from match_evidence import closed_report
         return closed_report(report, root, address, dict(
             schema=schema, data=data, instructions=instructions, buffer_proof=proof, mapped=True,
-            control_flow=CALL_SUMMARY, data_profile=True, data_mapping=objects, data_buffer_evidence=manifest))
+            control_flow=CALL_SUMMARY, data_profile=True, data_mapping=objects, data_buffer_evidence=manifest,
+            dma_lines=fills.report_lines() if fills is not None else ()))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, json.JSONDecodeError):
         return False

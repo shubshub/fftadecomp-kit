@@ -53,6 +53,7 @@ import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
+import dma_fill_profile as dma_fill
 import empty_body_profile as empty_body
 import library_units
 import rom_mirror
@@ -4228,7 +4229,7 @@ def _ordinary_call_replay(proof, address=None):
 # the only verify_leaf_instructions parameters a self-calling function may set
 SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")
 INCOMING_NARROW_READ_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver",
-                                   "buffer_proof", "incoming_narrow_reads")
+                                   "buffer_proof", "incoming_narrow_reads", "dma_fills")
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
@@ -4257,7 +4258,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
                              incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
-                             switch_thunk_premises=None):
+                             switch_thunk_premises=None, dma_fills=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4267,7 +4268,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
 
     incoming_narrow_reads admits thumb_incoming_narrow_read pairs. It is accepted
     only on the plain direct-call path, optionally with a plain BufferCallProof.
+
+    dma_fills (a dma_fill_profile.Fills) admits the stack-alias store to a DMA source
+    register of an immediate fixed-source fill; it requires incoming_narrow_reads.
     """
+    if dma_fills is not None and (type(dma_fills) is not dma_fill.Fills or incoming_narrow_reads is not True):
+        raise ValueError("DMA fills require the plain Thumb direct-call path")
     if incoming_narrow_reads is not False and (
             incoming_narrow_reads is not True or thumb is not True or
             buffer_proof is not None and type(buffer_proof) is not BufferCallProof or any(
@@ -5327,7 +5333,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         elif not instruction.mnemonic.startswith("ldr"):
                             raise ValueError("unsupported stack-frame write")
                 if (set(read) & aliases.keys()) - allowed_aliases and not deferred_derivation and not (
-                        bounded_index is not None and bounded_index.defer_derivation(instruction, aliases)):
+                        bounded_index is not None and bounded_index.defer_derivation(instruction, aliases)) and not (
+                        dma_fills is not None and dma_fills.admit(data, address, instruction, current, aliases, stack,
+                                                                  (set(read) & aliases.keys()) - allowed_aliases,
+                                                                  pointers=pointer_slots.keys() | words.keys())):
                     raise ValueError("unsupported stack-alias use or escape")
                 constant = None
                 if thumb and unconditional and instruction.size == 2 and \
@@ -5654,6 +5663,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                    instructions.values())
     if getattr(buffer_proof, "bios_summaries", None) is not None and not buffer_proof.active:
         buffer_proof.bios_summaries.finish(data, address, instructions, edges)
+    if dma_fills is not None:
+        dma_fills.finish(data, address, instructions, edges, predecessors)
     return [instructions[current] for current in sorted(instructions)]
 
 
@@ -5818,7 +5829,7 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                   remainder_evidence=None, quotient_evidence=None, signed_quotient_profile=None,
                   spin_profile=False, spin_evidence=None, function_index=None, double_profile=False,
                   double_evidence=None, thunk_profile=False, function_address_profile=None,
-                  thunk_evidence=None, unit_context=None, unit_orphan=None):
+                  thunk_evidence=None, unit_context=None, unit_orphan=None, dma_lines=()):
     """The complete text of a match report.
 
     match.py writes exactly this (or, with --check-report, compares it with
@@ -5827,7 +5838,8 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
     whole text (match_evidence.closed_report says which two compile-derived
     choices a replay that does not compile takes from the report).  The
     keyword names are main()'s; `mapped` and `switches` are the conditions
-    main() tests for the mapping and switch blocks.
+    main() tests for the mapping and switch blocks.  dma_lines are the
+    dma_fill_profile block, written right after the stack-frame line.
     """
     out = []
     out.append(f"# match report - 0x{addr:08X}"
@@ -5846,6 +5858,10 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
         out.append(f"* empty body: {empty_body.SUMMARY}\n")
     if framed_profile:
         out.append(f"* stack frame: {STACK_SUMMARY}\n")
+    elif dma_lines:
+        raise ValueError("DMA fill lines require the stack-frame line")
+    for line in dma_lines:
+        out.append(line + "\n")
     if buffer_proof is not None and buffer_proof.dependencies:
         summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
         out.append(f"* buffer calls: {summary}\n")
@@ -6374,6 +6390,7 @@ def main():
             double_evidence = None
             double_switch_relocations = {}
             thunk_evidence = None
+            dma_fills = None
             self_sites = frozenset()
             if thunk_profile:
                 got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
@@ -6704,11 +6721,14 @@ def main():
                                          f"{'function-data-buffer' if data_relocations else 'function-buffer'} "
                                          f"proof: {buffer_error}") from buffer_error
             else:
+                # The one policy object for immediate DMA fills (kit #239); each later walk takes a
+                # fresh one only when this one exists.
+                dma_fills = dma_fill.Fills(rom) if thumb else None
                 try:
                     verified_instructions = (
                         verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites) if self_sites else
                         verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof,
-                                                 incoming_narrow_reads=thumb))
+                                                 incoming_narrow_reads=thumb, dma_fills=dma_fills))
                 except ValueError:
                     if not thumb or not calls or self_sites:
                         raise
@@ -6716,14 +6736,17 @@ def main():
                                                    bios_wrappers=True,
                                                    copy_helper_index=inert_spin.index_snapshot(ROOT),
                                                    switch_callee_index=inert_spin.index_snapshot(ROOT))
+                    dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,
-                                                                      incoming_narrow_reads=True)
+                                                                      incoming_narrow_reads=True,
+                                                                      dma_fills=dma_fills)
                 if thumb and data_relocations and buffer_proof.dependencies:
                     # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
+                    dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
                     verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                         data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
-                                          index=inert_spin.index_snapshot(ROOT))
+                                          index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills)
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:
@@ -6742,6 +6765,12 @@ def main():
                 raise ValueError("buffer-call evidence does not support data relocations")
             if buffer_proof.dependencies and len(buffer_proof.span(addr)) != len(got):
                 raise ValueError("buffer caller requires an exact complete mapped span")
+            if dma_fills is not None and dma_fills.records and buffer_proof.dependencies and \
+                    data_buffer_evidence is None:
+                raise ValueError("DMA fill records require the plain frame, call, data or data-buffer schemas")
+            if dma_fills is not None and dma_fills.records and not uses_stack_frame(verified_instructions):
+                # render_report writes the block after the stack-frame line; refuse here, before writing
+                raise ValueError("DMA fill records require the stack-frame line")
     except Exception as e:                       # noqa: BLE001
         routed = addressed_signed_runtime.COMPILER_THUNKS_POLICY
         if routed.applies(args, gate, original):
@@ -7005,7 +7034,8 @@ def main():
             spin_profile=spin_profile, spin_evidence=spin_evidence, function_index=function_index,
             double_profile=double_profile, double_evidence=double_evidence, thunk_profile=thunk_profile,
             function_address_profile=args.function_address_profile, thunk_evidence=thunk_evidence,
-            unit_context=unit_context, unit_orphan=unit_orphan)
+            unit_context=unit_context, unit_orphan=unit_orphan,
+            dma_lines=dma_fills.report_lines() if dma_fills is not None else ())
         if args.check_report:
             # what status.py --verify requires of a MATCH: the saved report is exactly the one this run
             # would write (a source that does not match keeps its verdict and compares nothing)
