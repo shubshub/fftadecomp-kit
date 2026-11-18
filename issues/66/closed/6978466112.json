@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "092dc565f7b779ecae0f3d12f4b58c39b08872cfdc238602600b7e6271dbf539",
+    "acknowledged_cursor": 6978474726,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "092dc565f7b779ecae0f3d12f4b58c39b08872cfdc238602600b7e6271dbf539",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D376C\",\"who\":\"rainbow-tile\",\"note\":\"Recover the descriptor initialization wrapper using matched callers and scheduler siblings\"}",
+      "created_at": "2026-11-18T12:23:54Z",
+      "id": 6978466112,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:23:54Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "7cb719067ea9ecdc1049529af74137e2132f5874c81bf4a1335c3fa7c834ee23",
+    "result": {
+      "address": "0x080D376C",
+      "claim_id": 6978466112,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978466112,
+      "status": "accepted",
+      "who": "rainbow-tile"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "9e6ca782edb1a3888ee2a15866af9374f7c2fd7d4654349fce5c078f18812870",
+    "acknowledged_cursor": 6978497984,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9e6ca782edb1a3888ee2a15866af9374f7c2fd7d4654349fce5c078f18812870",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D376C\",\"who\":\"rainbow-tile\",\"claim_id\":6978466112,\"reason\":\"Natural descriptor-clear/create-task source retained in scratch/tile/080D376C.c; scheduler summary rejects root clear callback thunk, default rejects function-literal/thunk composition. No match admitted.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T12:25:10Z",
+      "id": 6978494484,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:25:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "99d379f45d0ff3dfd21a04f63eeb4fcbce30c97de0279fd4686f847539b268fa",
+    "result": {
+      "address": "0x080D376C",
+      "claim_id": 6978466112,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978494484,
+      "status": "accepted",
+      "who": "rainbow-tile"
+    }
+  }
+}

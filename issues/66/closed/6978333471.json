@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "05900ed56919cc6eeec6a13f3e68ee92ff6f41ce6b9842c2e82d8958316285b1",
+    "acknowledged_cursor": 6978340540,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "05900ed56919cc6eeec6a13f3e68ee92ff6f41ce6b9842c2e82d8958316285b1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F7160\",\"who\":\"rainbow-ffta\",\"note\":\"Verify parked source under merged BIOS/data/scheduler proof\"}",
+      "created_at": "2026-11-18T12:17:56Z",
+      "id": 6978333471,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:17:56Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "4ed66e843eef72bf0c93d1b964aa3aacf467d0361c17e28da882d7d618725468",
+    "result": {
+      "address": "0x080F7160",
+      "claim_id": 6978333471,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6978333471,
+      "status": "accepted",
+      "who": "rainbow-ffta"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "204ef8a7e6bc9164128260e770a405dfb584f48ed1991bf61678b81f8088fd48",
+    "acknowledged_cursor": 6978497984,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "204ef8a7e6bc9164128260e770a405dfb584f48ed1991bf61678b81f8088fd48",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080F7160\",\"who\":\"rainbow-ffta\",\"claim_id\":6978333471,\"reason\":\"Byte-identical source and replayed report in local matching branch\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T12:24:21Z",
+      "id": 6978475970,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T12:24:21Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "99d379f45d0ff3dfd21a04f63eeb4fcbce30c97de0279fd4686f847539b268fa",
+    "result": {
+      "address": "0x080F7160",
+      "claim_id": 6978333471,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6978475970,
+      "status": "accepted",
+      "who": "rainbow-ffta"
+    }
+  }
+}
