@@ -905,6 +905,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         import effect_or_delay_task as choice
         if bindings != choice.BINDINGS:
             raise ValueError('effect or delay starter requires its exact callback and scheduler relocations')
+    if selector == local_calls.effect_registry.SELECTOR and bindings != local_calls.effect_registry.BINDINGS:
+        raise ValueError('registry task starter requires its exact callback, named tables and scheduler relocations')
     if selector == local_calls.SCHEDULER_EVENT:
         import scheduler_event_definition as event
         event.check_bindings(bindings)
