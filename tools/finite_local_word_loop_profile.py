@@ -246,6 +246,10 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     require(row['instrs'] == len(instructions) and len(text_rows) == 1 and
             int(text_rows[0][3]) == len(instructions), 'finite loop exact instruction counts differ')
     operations.verify_operations(instructions, edges, address, local_calls, calls, refinement)
+    if address == 0x080C6858:
+        import history_unit_list as history
+        return history.prove(data,address,rom,mapping,index,objects,bindings,
+                             instructions,edges,calls,refinement)
     runtime_names = []
     for site, target in calls.items():
         if target == thunk.ALIASES['_call_via_r3']:
