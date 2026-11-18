@@ -482,66 +482,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "11f15d743dbc943a7549b0d39b7404426d12861dc6e3d089c0e9d2a7c37bbf3c",
-        "acknowledged_cursor": 6986232721,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "11f15d743dbc943a7549b0d39b7404426d12861dc6e3d089c0e9d2a7c37bbf3c",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A97EC\",\"who\":\"rainbow-particle-initializer\",\"note\":\"Recover already indexed 340-byte particle initializer with genuine canonical runtime and returned scratch R3 overwrite verification\"}",
-          "created_at": "2026-11-18T17:27:06Z",
-          "id": 6986232721,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:27:06Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "aac33edc97f7c4b501caf9d2a48a5859f3665d518400ddb6d0213a185bc7c693",
-        "result": {
-          "address": "0x080A97EC",
-          "claim_id": 6986232721,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6986232721,
-          "status": "accepted",
-          "who": "rainbow-particle-initializer"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "df3fe37ec7d00be109f67d76d64ea719e44e8a5bb2f7c6fbe5480ce571d613e9",
-        "acknowledged_cursor": 6986785621,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "df3fe37ec7d00be109f67d76d64ea719e44e8a5bb2f7c6fbe5480ce571d613e9",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A97EC\",\"who\":\"rainbow-particle-initializer\",\"claim_id\":6986232721,\"reason\":\"340-byte native particle initializer, 152 instructions; original ELF and complete signed-remainder/R3-caller proof replayed with merged toolkit #276.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T17:49:34Z",
-          "id": 6986785621,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T17:49:34Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "15b4543dfb1f69375a5babef22ba7fbfebd748c5e4281c7a7a3755e1683bfa74",
-        "result": {
-          "address": "0x080A97EC",
-          "claim_id": 6986232721,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6986785621,
-          "status": "accepted",
-          "who": "rainbow-particle-initializer"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "a9f9d4c1f79a84d6eeb6d304707e50eff31bd636c6b5cc7f9fa1e1e5b2c513ee",
         "acknowledged_cursor": 6986415826,
         "body_provenance": "acceptance-time",
