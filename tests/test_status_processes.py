@@ -197,7 +197,7 @@ class ProcessVerificationTests(unittest.TestCase):
             history.assert_called_once_with(str(self.root), 'origin', 'main', force=False)
             no_rom.assert_called_once_with(str(self.root), commit='a'*40)
             matches.assert_called_once_with(str(archive), 'fixture-badges', jobs=1, worker_processes=8)
-            plausible.assert_called_once_with(str(archive))
+            plausible.assert_called_once_with(str(archive), worker_processes=8)
             reports.assert_called_once_with(str(archive))
             self.assertEqual(publish.call_count, int(match_ok))
             self.assertFalse(archive.exists())
