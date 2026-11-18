@@ -3689,6 +3689,20 @@ order. The other branch clears the records and selects all of them. The list
 is read by the history initializer before its caller releases the stack
 frame. Only the pointers to units survive in the allocated state.
 
+At `080C68EC` the same finite-local selector uses the existing conditional list
+query contract. The installed clearer zeros the entire 196-byte state. The
+query writes a pointer for each node before selection begins. The owner reads
+the first word of each returned object and keeps the first two pointers that
+equal one of the 24 primary scene record addresses. The four history values
+are 18, 5, 8 and 2. The final current state is zero.
+
+The existing query contract assumes a finite, acyclic list of at most 13 nodes.
+The test executes the original menu call site and all of its callees with a
+placed queue for each length from zero through thirteen. It checks the complete
+state against the expected record selection, including repeated entries and
+early exit. The original boot installer supplies the clear routine; the CPU
+test models its three BIOS CpuSet operations.
+
 The USA history initializer at `0x080C62CC` copies an ordinary word list
 before reading and updating the display shadow. Two script call sites pass
 exactly twelve unit records to a builder with twelve stack slots. Filtering
