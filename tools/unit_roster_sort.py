@@ -34,13 +34,25 @@ RECURSION = (0x0808A138, 0x0808A146)
 def check_source(root, address):
     import plausible
 
-    require(address == OWNER, 'unexpected roster source')
-    source = (Path(root) / 'src/08071DC8.c').read_text()
+    require(address in (OWNER, SORT), 'unexpected roster source')
+    source = (Path(root) / f'src/{address:08X}.c').read_text()
     header = (Path(root) / 'include/ffta.h').read_bytes()
-    require(base_header(header, ('func_08071DC8', 'func_08087D98', 'g_state_02000000'))
+    reserved = ('func_08087D98', 'func_0808A0B4', 'SortEntry', 'partition') if address == SORT else (
+        'func_08071DC8', 'func_08087D98', 'g_state_02000000')
+    require(base_header(header, reserved)
             and not any(marker in source for marker in (chr(92), '??', '%:', chr(0))),
             'unexpected source preprocessing or header')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(source)))
+    if address == SORT:
+        arguments = 'SortEntry * entries , s32 left , s32 right'
+        declarations = ('# include " ffta . h " typedef struct { s32 key ; s32 value ; } SortEntry ; '
+                        f'extern void func_0808A0B4 ( {arguments} ) ; '
+                        f'static inline void partition ( {arguments} ) {{ ')
+        signature = (f'void func_08087D98 ( {arguments} , s32 descending ) {{ if ( descending ) {{ '
+                     'SortEntry copy [ 24 ] ;')
+        require(tokens.startswith(declarations) and tokens.count('#') == 1 and tokens.count(signature) == 1,
+                'unexpected sort pair declarations, local capacity or ABI')
+        return
     end = 'SortEntry08071DC8 list [ 24 ] ;'
     prefix, separator, body = tokens.partition(end)
     # Bind physical addresses to the declared 24 objects, their field widths,
@@ -204,7 +216,52 @@ def menu_mode(rom):
                 toggle=0x08073BAC, consumers=[0x08061220, 0x080B8182], heap_request=24)
 
 
+def prove_sort_wrapper(data, rom, mapping, index, original, ins, calls, refinement, words):
+    import owner_admission_profile as owner
+
+    expected = dict(calls=[[site - SORT, 'func_0808A0B4'] for site in SORT_CALLS],
+                    data=[], functions=[], switches=[])
+    require(data == extent(rom, mapping, index, SORT) and original == expected and not words
+            and calls == dict.fromkeys(SORT_CALLS, PARTITION), 'unexpected sort wrapper roles')
+    block(ins, SORT, 'push {r4, r5, r6, r7, lr}', 'mov r7, sl', 'mov r6, sb', 'mov r5, r8',
+          'push {r5, r6, r7}', 'sub sp, #0xc8', 'mov sb, r0', 'str r1, [sp, #0xc0]', 'mov r8, r2',
+          'cmp r3, #0', 'beq #0x8087e72', 'adds r7, r1, #0', 'add r7, r8', 'mov r0, r8',
+          'adds r0, #1', 'str r0, [sp, #0xc4]', 'mov r4, sb')
+    block(ins, 0x08087E50, 'ldr r1, [sp, #0xc4]', 'cmp r1, #0', 'ble #0x8087efa',
+          'mov r2, r8', 'lsls r0, r2, #3', 'mov r3, sp', 'adds r2, r0, r3', 'mov r4, sb',
+          'adds r3, r1, #0')
+    block(ins, 0x08087EFA, 'add sp, #0xc8', 'pop {r3, r4, r5}', 'mov r8, r3', 'mov sb, r4',
+          'mov sl, r5', 'pop {r4, r5, r6, r7}', 'pop {r0}', 'bx r0')
+
+    caller = extent(rom, mapping, index, OWNER)
+    caller_ref = owner.refine(caller, OWNER, mapping)
+    caller_ins, _, _, caller_calls, _ = graph.graph(caller, OWNER, caller_ref)
+    require(caller_ref['cfg_closed'] and caller_calls == {OWNER + case[3]: SORT for case in CASES},
+            'changed roster caller')
+    frame = collection(caller_ins)
+    return dict(schema=named.ROSTER_SORT_SCHEMA, instructions=len(ins), calls=original['calls'],
+                runtime_calls=[], partition=graph.partition(data, SORT, refinement, ins, words),
+                sort=partitions(rom, mapping, index),
+                roster_caller=dict(address=OWNER, calls=sorted(caller_calls), frame=frame,
+                                   left=0, right='enabled count - 1'),
+                conditions=[
+                    '0 <= left <= right < 24. The records are word aligned and live in ordinary RAM, '
+                    'disjoint from the wrapper and recursive frames. The stack has sufficient live space. '
+                    'Keys and payloads used in the partition are initialized and remain paired.',
+                    'With a zero direction the signed-key partition reads and writes only [left,right]. '
+                    'Equal keys need not keep their order.',
+                    'With a nonzero direction the wrapper first reads 24 complete records into its frame. '
+                    'It sorts [left,right] in that copy, then reverses the entire prefix [0,right] back '
+                    'into writable input records. For left > 0 this moves records from below left. '
+                    'The suffix above right must be readable machine storage but cannot affect the result.',
+                    'The roster caller supplies a 24-record stack array and passes left = 0 on all six '
+                    'calls. It must have at least one enabled unit for those calls.'],
+                environment=environment_fingerprint())
+
+
 def prove(data, address, rom, mapping, index, objects, original, ins, calls, refinement, words):
+    if address == SORT:
+        return prove_sort_wrapper(data, rom, mapping, index, original, ins, calls, refinement, words)
     require(address == OWNER and extent(rom, mapping, index, OWNER) == data and len(ins) == 392
             and original == bindings() and calls == {OWNER + c[3]: SORT for c in CASES}
             and sorted(words.items()) == [tuple(row) for row in original['switches']]
