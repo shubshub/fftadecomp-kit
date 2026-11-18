@@ -888,6 +888,12 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             hardware_qualifiers.update(scanline_wave.qualifier_offsets(text, tree, project, closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
+    if relpath == "src/08003410.c" and tree is not None and project is not None:
+        import boot_dma3_fill
+        try:
+            hardware_qualifiers.add(boot_dma3_fill.qualifier(text, tree, project, closure, data_symbols or {}))
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
     if relpath in ("src/08000DBC.c", "src/08000E40.c") and project is not None:
         import immediate_dma_fill as dma_fill
         try:
