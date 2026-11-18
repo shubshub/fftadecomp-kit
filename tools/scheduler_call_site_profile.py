@@ -91,6 +91,7 @@ SCHEMA = 'elf-symbol-thumb-' + SELECTOR
 SELECTOR_V2 = 'conditional-scheduler-call-site-summaries-v2'
 SCHEMA_V2 = 'elf-symbol-thumb-' + SELECTOR_V2
 SCHEMAS = {SELECTOR: SCHEMA, SELECTOR_V2: SCHEMA_V2,
+           'conditional-effect-initialized-scheduler-v1': 'elf-symbol-thumb-conditional-effect-initialized-scheduler-v1',
            'conditional-scheduler-sdk-halfword-fill-v1': 'elf-symbol-thumb-conditional-scheduler-sdk-halfword-fill-v1'}
 SCHEDULER, POOL, DIRECT = 0x08005B6C, 0x08121B8C, 0x08005954
 # Closed entry table; every listed body is pinned by size and SHA-256 in
