@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "c8005d72ba685ecb999a73cad0278741b361f685dd41c6d0379fb7f8123555d8",
+    "acknowledged_cursor": 6981359046,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "c8005d72ba685ecb999a73cad0278741b361f685dd41c6d0379fb7f8123555d8",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080DFF8C\",\"who\":\"rainbow-curve-knots\",\"note\":\"Recover four remaining register allocation bytes in the curve midpoint expression; compatible typed helpers and native gate.\"}",
+      "created_at": "2026-11-18T14:23:34Z",
+      "id": 6981353676,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:23:34Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "250d84f82ecc1a4a8681b3040ba5e896b9899378ecde5dcd97302240e18356d2",
+    "result": {
+      "address": "0x080DFF8C",
+      "claim_id": 6981353676,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6981353676,
+      "status": "accepted",
+      "who": "rainbow-curve-knots"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "594b6882f3cd3b695af40227f9c693f1ef7980dc8a6bf519466e5531125e4cf0",
+    "acknowledged_cursor": 6981533552,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "594b6882f3cd3b695af40227f9c693f1ef7980dc8a6bf519466e5531125e4cf0",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFF8C\",\"who\":\"rainbow-curve-knots\",\"claim_id\":6981353676,\"reason\":\"Canonical producer-compatible callback and four helper declarations confirmed; 686/690 and 333/337 official. Tuned midpoint expressions still use r1 rather than r2.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T14:30:09Z",
+      "id": 6981523589,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:30:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8306ff91ace771dc92acf9a5064e8e410b60b82727fa884d1ec798792b9ef1c9",
+    "result": {
+      "address": "0x080DFF8C",
+      "claim_id": 6981353676,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6981523589,
+      "status": "accepted",
+      "who": "rainbow-curve-knots"
+    }
+  }
+}

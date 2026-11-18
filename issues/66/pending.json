@@ -574,7 +574,35 @@
           "who": "rainbow-curve-knots"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "594b6882f3cd3b695af40227f9c693f1ef7980dc8a6bf519466e5531125e4cf0",
+        "acknowledged_cursor": 6981533552,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "594b6882f3cd3b695af40227f9c693f1ef7980dc8a6bf519466e5531125e4cf0",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFF8C\",\"who\":\"rainbow-curve-knots\",\"claim_id\":6981353676,\"reason\":\"Canonical producer-compatible callback and four helper declarations confirmed; 686/690 and 333/337 official. Tuned midpoint expressions still use r1 rather than r2.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:30:09Z",
+          "id": 6981523589,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:30:09Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8306ff91ace771dc92acf9a5064e8e410b60b82727fa884d1ec798792b9ef1c9",
+        "result": {
+          "address": "0x080DFF8C",
+          "claim_id": 6981353676,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981523589,
+          "status": "accepted",
+          "who": "rainbow-curve-knots"
+        }
+      }
     },
     {
       "claim": {
@@ -666,7 +694,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0b6cfe475e3c4921634a0d9f60b1a0d21aa8f783f937990e9dc69b772513e2ca",
+        "acknowledged_cursor": 6981533552,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0b6cfe475e3c4921634a0d9f60b1a0d21aa8f783f937990e9dc69b772513e2ca",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A97EC\",\"who\":\"rainbow-state\",\"claim_id\":6981458576,\"reason\":\"Parked byte-exact 340/340; runtime summary and root R3 return-scratch contract need composition\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:30:32Z",
+          "id": 6981533552,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:30:32Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8306ff91ace771dc92acf9a5064e8e410b60b82727fa884d1ec798792b9ef1c9",
+        "result": {
+          "address": "0x080A97EC",
+          "claim_id": 6981458576,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981533552,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     }
   ],
   "issue": 66,
