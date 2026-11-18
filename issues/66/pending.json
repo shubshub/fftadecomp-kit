@@ -510,7 +510,35 @@
           "who": "rainbow-callback"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d786b8f1e681ec19bae662790370eb7a598b2006b8d6cc7ae7aaa89b932747af",
+        "acknowledged_cursor": 6981585452,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d786b8f1e681ec19bae662790370eb7a598b2006b8d6cc7ae7aaa89b932747af",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08000718\",\"who\":\"rainbow-callback\",\"claim_id\":6981176884,\"reason\":\"Promoted C with native 112/112 and 43/43 agbcc-O0 unit MATCH, boot DMA0 hardware validation in merged toolkit PR 261\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T14:32:31Z",
+          "id": 6981585452,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:32:31Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f8233d3809184ccb4d204018c53b19cd9dfba41e6d855a572e25e55eaeed28bb",
+        "result": {
+          "address": "0x08000718",
+          "claim_id": 6981176884,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6981585452,
+          "status": "accepted",
+          "who": "rainbow-callback"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,38 @@
           "request_id": 6981556280,
           "status": "accepted",
           "who": "rainbow-state"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "3cce8899a27967858b624aa86a004f262926b9c1cae3289dcfab53e35eba7213",
+        "acknowledged_cursor": 6981585452,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "3cce8899a27967858b624aa86a004f262926b9c1cae3289dcfab53e35eba7213",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D3BD0\",\"who\":\"rainbow-transition-proof\",\"note\":\"Prove the identical pre-control loop and synchronized volatile tails in isolated toolkit; reproduce compiled and mutated evidence.\"}",
+          "created_at": "2026-11-18T14:32:24Z",
+          "id": 6981582266,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T14:32:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f8233d3809184ccb4d204018c53b19cd9dfba41e6d855a572e25e55eaeed28bb",
+        "result": {
+          "address": "0x080D3BD0",
+          "claim_id": 6981582266,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6981582266,
+          "status": "accepted",
+          "who": "rainbow-transition-proof"
         }
       },
       "release": null
