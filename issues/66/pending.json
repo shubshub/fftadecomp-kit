@@ -510,7 +510,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e1c5ee078b0fc950aefb878d4b3434c375496e25d3702be11742bf45a3192591",
+        "acknowledged_cursor": 6986961699,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e1c5ee078b0fc950aefb878d4b3434c375496e25d3702be11742bf45a3192591",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CD2C4\",\"who\":\"rainbow-state\",\"claim_id\":6986415826,\"reason\":\"All 158 original bytes match via merged toolkit PR 278; live saved native report independently replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:56:42Z",
+          "id": 6986957782,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:56:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e195053b8334d27f4204e9b019d9b930a1363c7d07e6b96f6869efb5ecc5dfad",
+        "result": {
+          "address": "0x080CD2C4",
+          "claim_id": 6986415826,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986957782,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
@@ -636,6 +664,66 @@
           "request_id": 6986935299,
           "status": "accepted",
           "who": "astra-sound"
+        }
+      },
+      "release": {
+        "acceptance_body_sha256": "e2f3d9b83afba117f7f04ae23198d03ffc3464daf3a97f16307c66f61625a60d",
+        "acknowledged_cursor": 6986961699,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e2f3d9b83afba117f7f04ae23198d03ffc3464daf3a97f16307c66f61625a60d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A827C\",\"who\":\"astra-sound\",\"claim_id\":6986935299,\"reason\":\"12-byte original active field setter compiled and live report replay passed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T17:56:52Z",
+          "id": 6986961699,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:56:52Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e195053b8334d27f4204e9b019d9b930a1363c7d07e6b96f6869efb5ecc5dfad",
+        "result": {
+          "address": "0x080A827C",
+          "claim_id": 6986935299,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6986961699,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "156796edb9c2ffb34d325d0703b702c5e7e6a180e48ac98fe9ca61282ca335b1",
+        "acknowledged_cursor": 6986961699,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "156796edb9c2ffb34d325d0703b702c5e7e6a180e48ac98fe9ca61282ca335b1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804413C\",\"who\":\"rainbow-gap-leaves\",\"note\":\"Recover the 28-byte 0804413C callable helper in the original dispatcher, check real register ABI, reference and native replay.\"}",
+          "created_at": "2026-11-18T17:56:24Z",
+          "id": 6986950404,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T17:56:24Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e195053b8334d27f4204e9b019d9b930a1363c7d07e6b96f6869efb5ecc5dfad",
+        "result": {
+          "address": "0x0804413C",
+          "claim_id": 6986950404,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6986950404,
+          "status": "accepted",
+          "who": "rainbow-gap-leaves"
         }
       },
       "release": null
