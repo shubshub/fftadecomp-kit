@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "5dc1d9cafcfa35943b868ad294b3b1737c8ce6623ab5fff53fe3c2bbdb16c967",
+    "acknowledged_cursor": 6992877213,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "5dc1d9cafcfa35943b868ad294b3b1737c8ce6623ab5fff53fe3c2bbdb16c967",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081418C0\",\"who\":\"astra-sound\",\"note\":\"\"}",
+      "created_at": "2026-11-18T22:00:37Z",
+      "id": 6992877213,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T22:00:37Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0d1fd056e82e2025642057d49540c4b69c4ad86260a4593742d36ee1f8c52b05",
+    "result": {
+      "address": "0x081418C0",
+      "claim_id": 6992877213,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6992877213,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "6eb9459dae192ad5544614640bec01cbcea0200796abaf62270ec74c9bed7c47",
+    "acknowledged_cursor": 6993109466,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "6eb9459dae192ad5544614640bec01cbcea0200796abaf62270ec74c9bed7c47",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081418C0\",\"who\":\"astra-sound\",\"claim_id\":6992877213,\"reason\":\"\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T22:11:12Z",
+      "id": 6993109466,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T22:11:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "6c9cbf7481af7acfbeb896a658d6c64df7ec126f5d06b907a514657a1ceaebc2",
+    "result": {
+      "address": "0x081418C0",
+      "claim_id": 6992877213,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6993109466,
+      "status": "accepted",
+      "who": "astra-sound"
+    }
+  }
+}
