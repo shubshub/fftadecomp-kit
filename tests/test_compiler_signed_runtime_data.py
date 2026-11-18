@@ -176,6 +176,39 @@ class CompilerSignedRuntimeDataTests(unittest.TestCase):
             self.assertFalse(fixtures.evidence.report_matches(
                 report.replace('incoming stack ABI', 'unchecked stack'), root, A))
 
+    def test_compiler_three_words_binds_all_three_reads_without_widening_two_words(self):
+        selector = profile.COMPILER_THREE_DATA_SELECTOR
+        reads = (0x9802, 0x9903, 0x9A04)
+        f = self.base.fixture(reads)
+        manifest, _ = profile.verify(**f, selector=selector)
+        self.assertEqual(manifest['schema'], profile.COMPILER_THREE_DATA_SCHEMA)
+        stack = manifest['frame']['entry_stack']
+        self.assertEqual(stack['words'], [0, 1, 2])
+        self.assertEqual({row[1] for row in stack['reads']}, {0, 4, 8})
+        self.assertEqual(manifest['data_bindings'], f['data_bindings'])
+        self.assertEqual({row[1] for row in manifest['compiler_runtime']['calls']}, {'__divsi3'})
+        self.assertIn('readonly_entry_stack_words_profile.py', manifest['producer_source_sha256'])
+        with self.assertRaises(ValueError):
+            profile.verify(**f, selector=profile.COMPILER_TWO_DATA_SELECTOR)
+        with self.assertRaises(ValueError):
+            self.bindings(f, self.base.fixtures.data_image(f), selector)
+        with self.assertRaises(ValueError):
+            profile.verify(**dict(f, data_bindings=[]), selector=selector)
+        for invalid_reads, extra in ((reads[:2], ()), (reads + (0x9B05,), ()),
+                                     (reads, (0x9004,)), (reads, (0xA804,))):
+            with self.subTest(reads=invalid_reads, extra=extra), self.assertRaises(ValueError):
+                profile.verify(**self.base.fixture(invalid_reads, extra), selector=selector)
+        with self.build_boundary(f) as (root, _, _):
+            with patch.object(sys, 'argv', ['match.py', '--root', str(root),
+                    '--addressed-runtime-profile', selector, f'{A:08X}']), redirect_stdout(io.StringIO()):
+                self.assertEqual(match.main(), 0)
+            report = (root / 'docs/match/08010000.md').read_text()
+            self.assertIn('incoming stack ABI', report)
+            self.assertTrue(fixtures.evidence.report_matches(report, root, A))
+            self.assertFalse(fixtures.evidence.report_matches(
+                report.replace(profile.COMPILER_THREE_DATA_SCHEMA, profile.COMPILER_TWO_DATA_SCHEMA),
+                root, A))
+
     def build_boundary(self, f=None):
         f = self.fixture() if f is None else f
         original_builder = self.base.fixtures.data_image

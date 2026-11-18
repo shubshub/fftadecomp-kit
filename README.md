@@ -2164,9 +2164,9 @@ closed set of toolchains a row may name and all the checks:
 `match.py --unit-toolchain <id>` verifies an address with its unit's
 toolchain. It is refused outside a unit, for a different unit's toolchain,
 together with `--cc`/`--flags`, other toolchain options or non-default WSL
-options, and with any profile selector: unit toolchains use the ordinary Thumb path, and the
-report must be one of the leaf, frame, direct-call, named-data and
-function-address schemas.
+options. Unit toolchains support ordinary Thumb leaf, frame, direct-call, named-data
+and function-address reports. The dp-bit packer supports its unit-bound logical
+right-shift proof. The m4a memory command supports its registered-track switch proof.
 Below `-O2` agbcc also copies every literal-pool word into `.rodata`, where
 nothing refers to it. Such a section is first authenticated with the
 existing compiler-orphan prerequisite, then removed; the remaining `.text`,
@@ -2241,11 +2241,19 @@ compiler binary's hash, so they validate offline only where that binary is
 installed. Library units need a POSIX host: the compiler is hashed and
 probed on the host, not through WSL.
 
-Limits: runtime-helper calls (`__lshrdi3` and the other audited runtimes)
-and every specialised profile still require the default toolchain; such a
-function inside a unit verifies only when the two toolchains agree. The
-tool checks identity bytes and boundaries; that a row covers one whole
-library object is the maintainer's evidence.
+Other audited runtime calls inside a unit require object agreement with the default
+toolchain. The verifier checks identity bytes and boundaries. The maintainer supplies
+the evidence that a row covers a whole library object.
+
+For MusicPlayer2000's memory command at `0x0814636C`, combine
+`--unit-toolchain old-agbcc-O2-v1` with `--switch-data-profile m4a-engine-track-thunks-v1`.
+The original ELF supplies the 18-case table, mapped callback slot and canonical
+r2 thunk. On engine entry, r1 names one of the 25 tracks registered by the
+three ROM player descriptors, and the active stack is disjoint from the callback
+word. The proof checks all stores on paths to the callback against those premises.
+The indirect target must return under the ordinary ARM ABI. The saved report
+binds the unit, compiler, registrations and engine code and recompiles the source.
+The engine entry premise does not cover arbitrary external calls.
 
 ### Named Thumb function addresses
 
@@ -3630,6 +3638,14 @@ as for left shift. Explicit runtime identifiers in preprocessed source, addresse
 aliases, mixed operations/profiles and forged or stale evidence are rejected.
 Mapped data and fixed scalar frames remain supported. Existing left-shift
 reports and count semantics are unchanged.
+
+For `__pack_d` at `0x08142BE8`, `--unit-toolchain old-agbcc-O2-v1`
+selects `elf-symbol-thumb-dp-bit-pack-d-lshrdi3-v1`. The caller covers
+332 bytes in the ROM-authenticated 3552-byte dp-bit unit. Its call at
+`0x08142C64` passes the same CFG count and frame checks. The report binds
+the canonical unit row and compiler binary digest, then replays the
+complete source with `old_agbcc -mthumb-interwork -O2`. This schema
+requires the original relocatable object with no orphan sections excluded.
 
 ## Canonical float multiply, unsigned conversion and double comparison
 
