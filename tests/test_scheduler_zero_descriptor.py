@@ -3,6 +3,7 @@ import copy
 import json
 import os
 from pathlib import Path
+import subprocess
 import sys
 import unittest
 
@@ -14,6 +15,11 @@ import scheduler_zero_descriptor as descriptor
 
 
 class DescriptorBoundsTests(unittest.TestCase):
+    def test_scheduler_provider_loads_in_a_fresh_interpreter(self):
+        tools = Path(descriptor.__file__).resolve().parent
+        subprocess.run([sys.executable, '-B', '-c', 'import scheduler_zero_descriptor'],
+                       cwd=tools, check=True)
+
     def test_requires_same_offset_28_bytes_and_no_other_alias(self):
         from types import SimpleNamespace
         proof = SimpleNamespace(access=lambda *args: None, observations={})

@@ -11,7 +11,6 @@ from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_CALL
 from capstone.arm import ARM_OP_REG, ARM_REG_R0, ARM_REG_PC
 
 import bios_cpuset_fill_profile as bios
-import owner_admission_profile as owner
 import owner_graph_profile as graph
 import owner_runtime_profile as operations
 import software_double_profile as indexed
@@ -145,6 +144,9 @@ def verify(data, address, rom, mapping, index, *, selector, call_site, pointer_a
             type(address) is not int or type(call_site) is not int or type(pointer_address) is not int \
             or not 2 <= len(data) <= MAX_OWNER:
         raise ValueError('installation image requires bounded immutable complete inputs')
+    # Scheduler providers also use this installer while the owner profiles load.
+    import owner_admission_profile as owner
+
     owner.validate_span(data, address, rom, mapping, index)
     refined = owner.refine(data, address, mapping)
     instructions, edges, branches, calls, words = graph.graph(data, address, refined)
