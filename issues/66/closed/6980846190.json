@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "66fa3f82d3969c09690dff5331a934faef0f80d8595a6a8b2d20369c6872a9c2",
+    "acknowledged_cursor": 6980851861,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "66fa3f82d3969c09690dff5331a934faef0f80d8595a6a8b2d20369c6872a9c2",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0812260C\",\"who\":\"rainbow-state\",\"note\":\"Recover script unit selection and roster flag update with current mapped rosters and known 13-entry list query.\"}",
+      "created_at": "2026-11-18T14:03:33Z",
+      "id": 6980846190,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:03:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a67a9cb0cff3dd4d03f52b3e52ca008c0e6010b6d13980134dc6151275c66ca1",
+    "result": {
+      "address": "0x0812260C",
+      "claim_id": 6980846190,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6980846190,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a9c32be71430170079299c73892e831c3cdce6afdef97f6c2f4fa342c017954f",
+    "acknowledged_cursor": 6980998757,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a9c32be71430170079299c73892e831c3cdce6afdef97f6c2f4fa342c017954f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0812260C\",\"who\":\"rainbow-state\",\"claim_id\":6980846190,\"reason\":\"Recovered natural 332 of expected 354-byte script handler, exact 186-byte prefix; guest selection addressing near miss preserved in Parked.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T14:09:33Z",
+      "id": 6980998757,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T14:09:33Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a2c86b8698e74fec289ca8f76cb9c0f475ba74409069959b6c719e38c4db85f8",
+    "result": {
+      "address": "0x0812260C",
+      "claim_id": 6980846190,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6980998757,
+      "status": "accepted",
+      "who": "rainbow-state"
+    }
+  }
+}
