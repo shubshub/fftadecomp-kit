@@ -1726,7 +1726,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b9f008bb2a0a248d74d7b59ee1da813211d3d6081c838812c8ed6bc51d91e13d",
+        "acknowledged_cursor": 6992754537,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b9f008bb2a0a248d74d7b59ee1da813211d3d6081c838812c8ed6bc51d91e13d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080058A4\",\"who\":\"rainbow-state\",\"claim_id\":6992366851,\"reason\":\"Native 176/176 scheduler subtree destructor matched and saved game report replayed with merged toolkit 78.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T21:54:58Z",
+          "id": 6992754537,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T21:54:58Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d29d42bef1efa4130a9608910392427b85ff58c341458213beca931c86970bf7",
+        "result": {
+          "address": "0x080058A4",
+          "claim_id": 6992366851,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6992754537,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     },
     {
       "claim": {
