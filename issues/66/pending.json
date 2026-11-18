@@ -1883,6 +1883,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "0cd358b7cf8e6f0b11a39c0e0948e1f75cdff63b87774c56ec6a5c495ea44621",
+        "acknowledged_cursor": 6991430110,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0cd358b7cf8e6f0b11a39c0e0948e1f75cdff63b87774c56ec6a5c495ea44621",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08130454\",\"who\":\"astra-combat\",\"note\":\"Recover indexed combat unit calculation and verify integer result ABI against its matched caller\"}",
+          "created_at": "2026-11-18T20:57:36Z",
+          "id": 6991430110,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T20:57:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d5ecedab2f5f0d5b7f814da330876d2f52a894e8a8d9ad2d26a5a2e1405e7bb0",
+        "result": {
+          "address": "0x08130454",
+          "claim_id": 6991430110,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 6991430110,
+          "status": "accepted",
+          "who": "astra-combat"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
