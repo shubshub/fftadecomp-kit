@@ -53,6 +53,13 @@ def bind_calls(calls, mapping, address, size, rom_size):
 
 
 def prove_divisor_choices(instructions, edges, address, calls):
+    """The existing inventory retains its exact {4,8} domain."""
+    sites = {site for site, target in calls.items() if target == quotient.UDIV}
+    return prove_finite_divisor_choices(instructions, edges, address, calls, sites,
+                                       permitted=frozenset((4, 8)))
+
+
+def prove_finite_divisor_choices(instructions, edges, address, calls, sites, *, permitted=None):
     """Forward must-definition proof with finite unions, never assumed inputs.
 
     An absent fact is unknown, including any uninitialized incoming path. Only
@@ -63,9 +70,8 @@ def prove_divisor_choices(instructions, edges, address, calls):
     """
     from capstone.arm import (ARM_CC_AL, ARM_CC_INVALID, ARM_REG_R0,
                               ARM_REG_R1, ARM_REG_R3, ARM_REG_R12, ARM_REG_LR)
-    sites = {site for site, target in calls.items() if target == quotient.UDIV}
     if address not in instructions or set(edges) != set(instructions) or not sites or \
-            set(calls) - set(instructions):
+            set(calls) - set(instructions) or set(sites) - set(calls):
         raise ValueError('UDIV choices require exact complete reached instruction and call sites')
     states, pending = {address: {}}, [address]
     while pending:
@@ -109,8 +115,11 @@ def prove_divisor_choices(instructions, edges, address, calls):
     proven = {}
     for site in sorted(sites):
         values = states[site].get(ARM_REG_R1)
-        if not values or not values <= frozenset((4, 8)):
-            raise ValueError(f'UDIV requires all-path defined r1 choices within {{4,8}} at {site:08X}')
+        if not values or any(type(value) is not int or not 1 <= value <= 0xFFFFFFFF for value in values) or \
+                permitted is not None and not values <= permitted:
+            if permitted == frozenset((4, 8)):
+                raise ValueError(f'UDIV requires all-path defined r1 choices within {{4,8}} at {site:08X}')
+            raise ValueError(f'unsigned runtime requires all-path defined r1 choices of at most two nonzero unsigned32 constants at {site:08X}')
         proven[site] = sorted(values)
     return proven
 

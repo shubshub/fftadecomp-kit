@@ -11,6 +11,10 @@ framed selector admits a fixed Thumb frame through the unchanged
 ``prove_frame`` policy: direct aligned SP-relative words inside the allocated
 frame, and incoming words only under the existing read-only entry-word
 contracts.  No SP materialization, alias or dynamic adjustment is admitted.
+
+The separate finite-choice selector keeps the original saved-only frame and
+requires one or two known nonzero unsigned32 divisor choices, defined on every
+reaching path. It shares the existing finite-choice must-definition producer.
 """
 import argparse
 import hashlib
@@ -23,7 +27,9 @@ SELECTOR = 'unsigned-divmod-thunk-ordinary-structural-inventory-v1'
 SCHEMA = 'thumb-unsigned-divmod-thunk-ordinary-structural-inventory-v1'
 FRAME_SELECTOR = 'unsigned-divmod-thunk-ordinary-framed-structural-inventory-v1'
 FRAME_SCHEMA = 'thumb-unsigned-divmod-thunk-ordinary-framed-structural-inventory-v1'
-SELECTORS = (SELECTOR, FRAME_SELECTOR)
+CHOICES_SELECTOR = 'unsigned-divmod-thunk-divisor-choices-structural-inventory-v1'
+CHOICES_SCHEMA = 'thumb-unsigned-divmod-thunk-divisor-choices-structural-inventory-v1'
+SELECTORS = (SELECTOR, FRAME_SELECTOR, CHOICES_SELECTOR)
 OPERATIONS = dict(divmod.OPERATIONS)
 
 
@@ -195,7 +201,11 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
             raise ValueError('unsigned DIV/MOD thunk saved-only frame excludes locals, entry words and SP exports')
     runtime_sites = {site: name for site, name in bindings.items() if name in OPERATIONS}
     thunk_sites = {site: name for site, name in bindings.items() if name in thunks.ALIASES}
-    divisors = remainder.prove_divisors(instructions, edges, address, runtime_sites)
+    if selector == CHOICES_SELECTOR:
+        import udiv_constant_choices_inventory as choices
+        divisors = choices.prove_finite_divisor_choices(instructions, edges, address, calls, runtime_sites)
+    else:
+        divisors = remainder.prove_divisors(instructions, edges, address, runtime_sites)
     if set(divisors) != set(runtime_sites):
         raise ValueError('unsigned DIV/MOD thunks require a CFG-proven divisor at every runtime call')
     dependencies = thunks.dependencies(thunk_sites.values(), rom)
@@ -221,13 +231,15 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
                 if name not in OPERATIONS and name not in thunks.ALIASES]
     modules = (match, match.armv4t, thunks, owner, graph, operations, frame, complete, remainder, divmod,
         divmod.quotient, divmod.remainder, match.software_double, match.software_float)
+    if selector == CHOICES_SELECTOR:
+        modules += (choices,)
     if framed:
         import readonly_entry_stack_profile as word0
         import readonly_entry_stack_words_profile as words
         modules += (word0, words)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
-    observed = {'schema': FRAME_SCHEMA if framed else SCHEMA, 'selector': selector, 'inventory_only': True, 'source_or_ELF_admission': False,
+    observed = {'schema': CHOICES_SCHEMA if selector == CHOICES_SELECTOR else FRAME_SCHEMA if framed else SCHEMA, 'selector': selector, 'inventory_only': True, 'source_or_ELF_admission': False,
         'claim': 'acyclic local structural CFG/frame and restoration at every reached return',
         'arithmetic_C_equivalence': False, 'memory_safety_claim': False, 'termination_claim': False,
         'physical_memory_nonalias_claim': False, 'runtime_numeric_return_facts': [],
@@ -238,7 +250,9 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         'calls': [[site-address, name] for site, name in sorted(bindings.items())],
         'runtime_calls': [[site-address, name] for site, name in sorted(runtime_sites.items())],
         'caller_divisors': [[site-address, divisors[site]] for site in sorted(divisors)],
-        'divisor_policy': 'unchanged all-path unsigned32 nonzero constant proof in r1 at every runtime call; calls kill caller-saved facts',
+        'divisor_policy': ('all-path defined r1 finite choices: one or two known nonzero unsigned32 constants; calls kill caller-saved facts'
+            if selector == CHOICES_SELECTOR else
+            'unchanged all-path unsigned32 nonzero constant proof in r1 at every runtime call; calls kill caller-saved facts'),
         'canonical_thunk_calls': [[site-address, name] for site, name in sorted(thunk_sites.items())],
         'canonical_thunk_runtime': thunks.RUNTIME, 'canonical_thunk_ABI': thunks.ABI,
         'canonical_thunk_dependencies': dependencies,
