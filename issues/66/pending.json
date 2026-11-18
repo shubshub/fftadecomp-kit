@@ -542,7 +542,35 @@
           "who": "rainbow-event-third-child"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ed50126248fd0ff45fd6c2acae82f9a2c9ea602300cc994214fbaabaa1ceea5e",
+        "acknowledged_cursor": 6983055600,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ed50126248fd0ff45fd6c2acae82f9a2c9ea602300cc994214fbaabaa1ceea5e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811D8A4\",\"who\":\"rainbow-event-third-child\",\"claim_id\":6982685508,\"reason\":\"Complete accepted native recovery 448/448 bytes, 187/187 reachable Thumb instructions, 19 typed calls, source plausible and saved frame-data replay passed. Proven signed coordinates in two native helpers also reverified.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:27:49Z",
+          "id": 6983055091,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:27:49Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "df5b6dc4639aea0208e36b4dea138f8deb30df5520639930e08c43e3458962b7",
+        "result": {
+          "address": "0x0811D8A4",
+          "claim_id": 6982685508,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6983055091,
+          "status": "accepted",
+          "who": "rainbow-event-third-child"
+        }
+      }
     },
     {
       "claim": {
@@ -634,7 +662,35 @@
           "who": "rainbow-state"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "951cd9c31ad6cdf8314ca6e19695fb1fb7e371bb485bedbdb92ee83cf009c560",
+        "acknowledged_cursor": 6983055600,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "951cd9c31ad6cdf8314ca6e19695fb1fb7e371bb485bedbdb92ee83cf009c560",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080DFAEC\",\"who\":\"rainbow-state\",\"claim_id\":6982998388,\"reason\":\"Recovered task payload flag clears using verified caller/helper ABI. Kit11 live MATCH 32/32, 10/10 instructions, source-bound replay passed.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-18T15:27:50Z",
+          "id": 6983055600,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-18T15:27:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "df5b6dc4639aea0208e36b4dea138f8deb30df5520639930e08c43e3458962b7",
+        "result": {
+          "address": "0x080DFAEC",
+          "claim_id": 6982998388,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 6983055600,
+          "status": "accepted",
+          "who": "rainbow-state"
+        }
+      }
     }
   ],
   "issue": 66,
