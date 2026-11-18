@@ -1164,6 +1164,10 @@ def report_matches(report, root, address):
         if address == 0x08006720 and records:
             import blend_keyframe_loop
             blend_keyframe_loop.report_scope(report)
+        if address == 0x0800C4B4:
+            import scanline_dispatch
+            if not records or not scanline_dispatch.report_body(report, root):
+                return False
         if address == 0x080C62CC:
             import history_word_copy
             if not records or not history_word_copy.report_body(report, root):
