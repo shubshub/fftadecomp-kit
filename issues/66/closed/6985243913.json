@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dc1885eebf10185d13b9548ef2f61456c9cfffc1b9fa15bfa403751162a2860e",
+    "acknowledged_cursor": 6985249813,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dc1885eebf10185d13b9548ef2f61456c9cfffc1b9fa15bfa403751162a2860e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A8498\",\"who\":\"rainbow-callback\",\"note\":\"Recheck motion builder native bounded-buffer and transitive arithmetic admission.\"}",
+      "created_at": "2026-11-18T16:49:20Z",
+      "id": 6985243913,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:49:20Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9985b67bb219d98262277f2264570e25fc983df2dd50937ebe6aadb7d9d28ba9",
+    "result": {
+      "address": "0x080A8498",
+      "claim_id": 6985243913,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6985243913,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b3698660d6e6d11331d19b5611ee138cec83db503a2c687f9e96f776e909201c",
+    "acknowledged_cursor": 6985324798,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b3698660d6e6d11331d19b5611ee138cec83db503a2c687f9e96f776e909201c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A8498\",\"who\":\"rainbow-callback\",\"claim_id\":6985243913,\"reason\":\"80 byte native reproduction confirmed. Bounded buffer walk needs nested 64-bit integer helper proof at 08008534 to __muldi3; current guard rejects.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-18T16:52:17Z",
+      "id": 6985324798,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T16:52:17Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c2d1cef56f2373c5c6bc514491c6d5cf83ab37776e6e720525e88776870a00ae",
+    "result": {
+      "address": "0x080A8498",
+      "claim_id": 6985243913,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 6985324798,
+      "status": "accepted",
+      "who": "rainbow-callback"
+    }
+  }
+}
