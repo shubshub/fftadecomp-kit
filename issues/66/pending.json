@@ -514,66 +514,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "b96f12b55ff40f0baab7205a89f53ef33cd3f6a05f2d8305d3fa433f62cfa32f",
-        "acknowledged_cursor": 6980533167,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "b96f12b55ff40f0baab7205a89f53ef33cd3f6a05f2d8305d3fa433f62cfa32f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080D73AC\",\"who\":\"rainbow-affine-layer\",\"note\":\"Recover affine background setup from matched 080D72C8 and 080D74A4 neighbors. Complete extent, count, and existing callee proof confirmed.\"}",
-          "created_at": "2026-11-18T13:50:07Z",
-          "id": 6980515465,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:50:07Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "fcfbd00c5bba68d11f353c5af380055db909e379fd8559a33bf79e4cdc34603a",
-        "result": {
-          "address": "0x080D73AC",
-          "claim_id": 6980515465,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 6980515465,
-          "status": "accepted",
-          "who": "rainbow-affine-layer"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "73034e5911cc1a223c9c17d230ccb77b33c97f643a263e7bcdcb2a061b35cb96",
-        "acknowledged_cursor": 6980613337,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "73034e5911cc1a223c9c17d230ccb77b33c97f643a263e7bcdcb2a061b35cb96",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D73AC\",\"who\":\"rainbow-affine-layer\",\"claim_id\":6980515465,\"reason\":\"Recovered ordinary affine BG setup from matched neighbors. Native full 188/188 bytes, 82/82 instructions, elf-symbol-thumb-data-buffer-calls-v1 independently replayed.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-18T13:54:08Z",
-          "id": 6980613337,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-18T13:54:08Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "4301478a379c7818a0b04aee42c54d48dcf8331cdca0acc72cdc7d488c75f6a4",
-        "result": {
-          "address": "0x080D73AC",
-          "claim_id": 6980515465,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 6980613337,
-          "status": "accepted",
-          "who": "rainbow-affine-layer"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "7fe02fdcb77cc9ab8fb73138ba944313a5b03278c927e6df9d7af17724c70d7c",
         "acknowledged_cursor": 6980533167,
         "body_provenance": "acceptance-time",
