@@ -2317,11 +2317,26 @@ obligations, each with its refusal:
    same address value (one identity per defining instruction) was stored
    through at the same displacement with at least the same width on every path
    since; byte-level initialisation covers everything else.
+10. **Scalar words.** A whole scalar word stored at a fixed offset keeps its
+    value range but not its derivation. A register loaded from or stored to the
+    word mirrors it until either is written, and `cmp` plus branch refinement of
+    the register refines the word; a refinement never rewrites a pointer word.
+    Every write that may reach a word ends its mirrors, whether the word is
+    tracked or not, and forgets the scalar words it may overwrite: a variable
+    store those in its value hull, a store through a possible stack address its
+    candidates, a callee those inside its reach, or every one when it may read a
+    register holding a stack address. A call walks the callee while a word is
+    mirrored too, since a mirror held in R4-R11 survives the call. Joins keep a
+    scalar word only where both paths track it.
+11. **No premise on a constant.** No premise is stated on an index with no
+    variable in it ("index is the constant N"): it is the same on every run, so
+    the premise would be always true or always false. A reloaded constant word
+    makes such an index common.
 
-The report adds one line, bound in the fingerprint and re-derived on replay:
+The report adds one line, bound in the fingerprint and re-derived on replay (080E4EB0's):
 
 ```
-* stack index frame words: pointer-bearing local words entry_SP-<n>, ...; deferred exact spills <site>, ...; <M> identity-initialised loads; <N> calls with ROM-walked callee stack reach (at most <B> bytes above the callee's entry SP), none reaching a pointer-bearing word; stack addresses left in argument registers the callee never reads: R<n> at <call site>, ...[; calls this analysis did not walk (<site>, ...): their results are trusted, as the core trusts every callee it does not walk, to hold no address into this frame][; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP]
+* stack index frame words: pointer-bearing local words entry_SP-0x68, ...; deferred exact spills 0x080E504C, 0x080E5052, 0x080E5058; 14 identity-initialised loads; 33 calls with ROM-walked callee stack reach (at most 0 bytes above the callee's entry SP), none reaching a pointer-bearing word; stack addresses left in argument registers the callee never reads: R3 at 0x080E50F6, ...; calls this analysis did not walk (0x080E4F58, ...): their results are trusted, as the core trusts every callee it does not walk, to hold no address into this frame; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP
 ```
 
 `stack_index_frame_words_profile.POLICY` is the one switch: disabled, the core

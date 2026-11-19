@@ -20,6 +20,7 @@ RANGED = (0x1c04, 0x2103, 0x400c)        # r4 = entry_R0 & 3
 MASKED = (0x1c04, 0x0624, 0x0e24)        # r4 = entry_R0 & 255
 ACCESS = (0x4669, 0x5D08)                # mov r1,sp; ldrb r0,[r1,r4]
 FORCE = (0x4668, 0x9003, 0x9B03)         # mov r0,sp; str r0,[sp,#12]; ldr r3,[sp,#12]: frame words
+RELOAD = (0x9801, 0x4669, 0x5C0A)        # ldr r0,[sp,#4]; mov r1,sp; ldrb r2,[r1,r0]
 CALLEE = 0x08014000
 INNER = CALLEE + 0x100
 
@@ -179,6 +180,14 @@ class FrameWordTests(unittest.TestCase):
         with self.assertRaisesRegex(sip.Refusal, 'mixed provenance used as a base'):
             admit(code)
 
+    def test_a_join_keeps_a_mirror_only_from_both_paths(self):
+        # FORCE; movs r0,#200; str r0,[sp,#8]; cmp r4,#0; beq T; movs r1,#0; b J; T: ldr r1,[sp,#8];
+        # J: cmp r1,#2; bls .+2; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0].  A kept mirror would
+        # refine the word to [0,2], a proved access; the word holds 200, outside the frame.
+        body = (0x20C8, 0x9002, 0x2C00, 0xD001, 0x2100, 0xE000, 0x9902, 0x2902, 0xD9FF, 0x9802, 0x4669, 0x5C0A)
+        with self.assertRaisesRegex(sip.Refusal, 'index is the constant 200'):
+            admit(frame_owner(FORCE + body))
+
     def test_a_release_on_one_path_is_a_release(self):
         # cmp r4,#0; beq T; add sp,#4; b J; T: mov r0,sp; str r0,[sp,#0]; movs r0,#0; add sp,#4;
         # J: bl callee
@@ -234,6 +243,23 @@ class FrameWordTests(unittest.TestCase):
         code = frame_owner(self.RETURNED + (0x1C05, 0x4668, 0x9003, 0x1C28, INNER, 0x9903, 0x5D08))
         with self.assertRaisesRegex(sip.Refusal, 'receives a stack address in R0 while a local word holds one'):
             admit(code, **two_callees((0x4770,), (0x2109, 0x60C1, 0x4770)))
+
+    def test_store_through_a_possible_address_forgets_its_candidate_words(self):
+        # FORCE; add r0,sp,#4; bl callee (R0 = sp+4, returned); <r5 = r0 moved>; movs r0,#1;
+        # str r0,[sp,#8]; str r6,[r5,#4]; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]
+        def owner(adjust):
+            return frame_owner(FORCE + (0xA801, CALLEE, adjust, 0x2001, 0x9002, 0x606E, 0x9802, 0x4669, 0x5C0A),
+                               index=())
+        # adds r5,r0,#0: the store may overwrite the counter word at sp+8, so no source is left.
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(owner(0x1C05), **callee(0x4770))
+        # adds r5,r0,#4: it may reach sp+12 only, the pointer word.
+        with self.assertRaisesRegex(sip.Refusal, 'store through a possible stack address may reach '
+                                    'the pointer-bearing local word at entry-SP-24'):
+            admit(owner(0x1D05), **callee(0x4770))
+        # subs r5,r0,#4: it reaches sp+4 only, so the counter word keeps its value.
+        _, (manifest, _) = admit(owner(0x1F05), **callee(0x4770))
+        self.assertEqual([row[1:] for row in evidence(manifest)['accesses']], [['load', 1, -35, -35, 32]])
 
     def test_a_possible_address_from_a_join_reaches_its_candidates(self):
         # movs r0,#1; str r0,[sp,#8]; cmp r4,#0; beq T; mov r5,sp; b J; T: movs r5,#0;
@@ -310,6 +336,21 @@ class FrameWordTests(unittest.TestCase):
         policy.note_returned(0x100, Result({match.ARM_REG_R1: -16}))
         policy.note_returned(0x104, Result({match.ARM_REG_LR: -20}))
         self.assertEqual(policy.returned, {0x100: {0: {-8, -4}, 12: {-12}, 1: {-16}}, 0x104: {None: {-20}}})
+
+    def test_a_premise_may_name_loads_and_call_results(self):
+        # Under frame words, an index read from memory or returned by a call is a variable:
+        # FORCE; movs r2,#128; lsls r2,r2,#18; ldrb r4,[r2] (u8 at 0x02000000); mov r1,sp;
+        # movs r5,#7; strb r5,[r1,r4]
+        code = frame_owner(FORCE + (0x2280, 0x0492, 0x7814, 0x4669, 0x2507, 0x550D), index=())
+        _, (manifest, _) = admit(code)
+        self.assertEqual(evidence(manifest)['preconditions'][0]['expression'],
+                         f'u8[0x02000000]@0x{site(code, code.index(0x7814)):08X}')
+        # ... movs r0,#0; bl callee; lsls r4,r0,#24; lsrs r4,r4,#24; mov r1,sp; movs r5,#7;
+        # strb r5,[r1,r4]
+        code = frame_owner(FORCE + (0x2000, CALLEE, 0x0604, 0x0E24, 0x4669, 0x2507, 0x550D), index=())
+        _, (manifest, _) = admit(code, **callee(0x4770))
+        self.assertEqual(evidence(manifest)['preconditions'][0]['expression'],
+                         f'(ret(0x{site(code, code.index(CALLEE)):08X}) & 255)')
 
     # ---- F5: variable accesses avoid pointer-bearing words ------------------------------
     def test_variable_store_may_not_overlap_a_pointer_word(self):
@@ -388,11 +429,116 @@ class FrameWordTests(unittest.TestCase):
             admit(frame_owner(spill + (0xAA01, 0x7011) + ACCESS))         # add r2,sp,#4; strb r1,[r2]
 
     # ---- F10/F11: scalar words and compare refinement -----------------------------------
+    def test_an_overwritten_word_drops_its_mirrors(self):
+        # FORCE; movs r0,#0; str r0,[sp,#8]; ldr r1,[sp,#8]; movs r2,#200; str r2,[sp,#8];
+        # cmp r1,#2; bls .+2; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]: refining R1 says
+        # nothing about the word any more, which holds 200, outside the frame.  No premise is
+        # stated on a constant index.
+        body = (0x2000, 0x9002, 0x9902, 0x22C8, 0x9202, 0x2902, 0xD9FF, 0x9802, 0x4669, 0x5C0A)
+        with self.assertRaisesRegex(sip.Refusal, r'outside \[-36, 0\)\); index is the constant 200 '
+                                    r'\(no premise can be stated\)'):
+            admit(frame_owner(FORCE + body, index=()))
+        # The same mirror on a word nothing tracked (only half-initialised by strh) ends too:
+        # FORCE; mov r3,sp; movs r2,#0; strh r2,[r3,#8]; strh r2,[r3,#10]; ldr r0,[sp,#8];
+        # movs r1,#200; str r1,[sp,#8]; cmp r0,#2; bhi .+4; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]
+        body = (0x466B, 0x2200, 0x811A, 0x815A, 0x9802, 0x21C8, 0x9102, 0x2802, 0xD802, 0x9802, 0x4669, 0x5C0A)
+        with self.assertRaisesRegex(sip.Refusal, 'index is the constant 200'):
+            admit(frame_owner(FORCE + body, index=()))
+
+    def test_a_stored_register_mirrors_its_word(self):
+        # The loop compares the stored register itself: ... str r0,[sp,#8]; cmp r0,#2; bls loop
+        loop = (0x2000, 0x9002, 0x9802, 0x4669, 0x5C0A, 0x3001, 0x9002, 0x2802, 0xD9F8)
+        _, (manifest, _) = admit(frame_owner(loop, index=()))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+
+    def test_a_narrow_fixed_load_is_its_full_unsigned_range(self):
+        # 40-word frame; add r1,sp,#8; ldrb r4,[r1]; mov r1,sp; movs r5,#7; strb r5,[r1,r4]
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner((0xA902, 0x780C, 0x4669, 0x2507, 0x550D), words=40, index=()))
+
     def test_a_fixed_store_initialises_its_bytes(self):
         # Four copied bytes and movs r0,#5; str r0,[sp,#4]: sp+0..7 is initialised for r4 < 8.
         body = FORCE + (0x2005, 0x9001, 0x4669, 0x5D08)
         _, (manifest, _) = admit(frame_owner(body, count=4, index=(0x1c04, 0x2107, 0x400c)))
         self.assertEqual(evidence(manifest)['preconditions'], [])
+
+    def test_words_a_store_may_reach_are_forgotten(self):
+        # movs r0,#0; str r0,[sp,#4]; <write>; ldr r0,[sp,#4]; mov r1,sp; ldrb r2,[r1,r0]
+        cases = {
+            # mov r1,sp; str r5,[r1,r4] with r4 in {0, 4}: the last element is the word
+            'variable store': ((0x4669, 0x510D), dict(index=(0x1c04, 0x2101, 0x400c, 0x00A4))),
+            # add r1,sp,#4; movs r2,#200; stmia r1!,{r2}
+            'block store': ((0xA901, 0x22C8, 0xC104), {}),
+            # a callee that writes [sp,#4]: movs r1,#9; str r1,[sp,#4]; bx lr
+            'callee reach': ((CALLEE,), callee(0x2109, 0x9101, 0x4770)),
+            # a callee handed mov r0,sp that writes [r0,#4]: movs r1,#9; str r1,[r0,#4]; bx lr
+            'callee handed the frame': ((0x4668, CALLEE), callee(0x2109, 0x6041, 0x4770)),
+        }
+        for name, (write, kwargs) in cases.items():
+            with self.subTest(write=name):
+                index = kwargs.pop('index', MASKED)
+                with self.assertRaisesRegex(ValueError, 'no defined source'):
+                    admit(frame_owner((0x2000, 0x9001) + write + RELOAD, index=index), **kwargs)
+        # add sp,#4; sub sp,#4 releases sp+0 and allocates it again: movs r0,#0; str r0,[sp,#0];
+        # ...; ldr r0,[sp,#0]; mov r1,sp; strb r5,[r1,r0]
+        with self.assertRaisesRegex(ValueError, 'no defined source'):
+            admit(frame_owner((0x2000, 0x9000, 0xB001, 0xB081, 0x9800, 0x4669, 0x540D)))
+        # A callee that leaves the word alone keeps it.
+        _, (manifest, _) = admit(frame_owner((0x2000, 0x9001, CALLEE) + RELOAD), **callee(0x4770))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+
+    def test_a_call_ends_the_mirrors_of_the_registers_it_clobbers(self):
+        # FORCE; movs r0,#200; str r0,[sp,#8]; ldr r0,[sp,#8]; bl callee; cmp r0,#2; bls .+2;
+        # ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]: the compare is of the callee's R0.
+        body = (0x20C8, 0x9002, 0x9802, CALLEE, 0x2802, 0xD9FF, 0x9802, 0x4669, 0x5C0A)
+        with self.assertRaisesRegex(sip.Refusal, 'index is the constant 200'):
+            admit(frame_owner(FORCE + body, index=()), **callee(0x2000, 0x4770))
+
+    def test_a_callee_ends_the_mirrors_of_the_words_it_reaches(self):
+        # mov r3,sp; movs r2,#0; strh r2,[r3,#8]; strh r2,[r3,#10] (sp+8 initialised, untracked);
+        # movs r0,#0; movs r3,#0; ldr r4,[sp,#8] (R4 mirrors it and survives calls); bl callee;
+        # cmp r4,#2; bhi .+4;
+        # ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0].  The callee writes [sp,#8] (movs r1,#200;
+        # str r1,[sp,#8]; bx lr), so the compare of R4 says nothing about the word.
+        # movs r0,#0; movs r3,#0 first: the core walks a callee handed a stack alias itself.
+        body = (0x466B, 0x2200, 0x811A, 0x815A, 0x2000, 0x2300, 0x9C02, CALLEE, 0x2C02, 0xD802,
+                0x9802, 0x4669, 0x5C0A)
+        writes = callee(0x21C8, 0x9102, 0x4770)
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner(FORCE + body, index=()), **writes)
+        # A callee that leaves the word alone keeps the mirror: the access is proved.
+        _, (manifest, _) = admit(frame_owner(FORCE + body, index=()), **callee(0x4770))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+        # With no word tracked at all, the mirror alone needs the walk.
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner(body, index=()), **writes)
+        code = frame_owner(body, index=())
+        _, (manifest, _) = admit(code, **callee(0x4770))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+        self.assertEqual(words(manifest)['calls'], [[site(code, code.index(CALLEE)), CALLEE, 0, [], []]])
+
+    def test_spilled_loop_counter_is_bounded_by_its_compare(self):
+        _, (manifest, _) = admit(frame_owner(LOOP, index=()))
+        found = evidence(manifest)
+        self.assertEqual(found['preconditions'], [])
+        self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
+        self.assertEqual(words(manifest)['pointer_words'], [])
+
+    def test_a_rewritten_register_no_longer_refines_the_word(self):
+        # adds r1,#0 after the reload: the compare refines a register that no longer mirrors it.
+        broken = LOOP[:8] + (0x3100,) + LOOP[8:9] + (0xD9F6,)
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner(broken, index=()))
+
+    def test_a_variable_store_forgets_the_scalar_words_it_may_overwrite(self):
+        # movs r0,#0; str r0,[sp,#8]; [add r1,sp,#8; movs r2,#9; strb r2,[r1,r4]];
+        # ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]
+        store = (0xA902, 0x2209, 0x550A)
+        body = lambda middle: (0x2000, 0x9002, *middle, 0x9802, 0x4669, 0x5C0A)
+        _, (manifest, _) = admit(frame_owner(body(()), index=RANGED))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner(body(store), index=RANGED))
 
     # ---- F2/F6: calls ---------------------------------------------------------------------
     def test_pointer_word_inside_a_callee_stack_reach_refuses(self):
@@ -525,6 +671,16 @@ class ReviewReproducerTests(unittest.TestCase):
         with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
             admit(frame_owner((0x4668, CALLEE, 0x1C05, 0x2001, 0x9002, 0x60AE, 0x9802, 0x4669, 0x5C0A),
                               index=()), **callee(0x4770))
+
+    def test_stale_mirrors(self):
+        # B: a mirror on an untracked word survived a store to it
+        with self.assertRaises(sip.Refusal):
+            admit(frame_owner((0x466B, 0x2200, 0x811A, 0x815A, 0x9802, 0x21C8, 0x9102, 0x2802, 0xD802,
+                               0x9802, 0x4669, 0x5C0A), index=()))
+        # B2: the stale mirror turned a pointer word into the scalar [0,2]
+        with self.assertRaisesRegex(sip.Refusal, 'saved register word'):
+            admit(frame_owner((0x466B, 0x2200, 0x819A, 0x81DA, 0x9803, 0x4669, 0x9103, 0x2802, 0xD801,
+                               0x9A03, 0x6216) + ACCESS))
 
     def test_a_premise_store_keeps_the_pointer_word_above_its_array(self):
         # C: mov r0,sp; str r0,[sp,#12]; mov r1,sp; movs r5,#7; strb r5,[r1,r4] (premise

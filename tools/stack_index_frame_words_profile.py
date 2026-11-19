@@ -58,6 +58,18 @@ F9. A load through an address this analysis owns is initialised when the same ad
     at least the same width on every path since; byte-level initialisation still covers the
     rest.  Joins keep an identity or a fact only when both paths hold it, so none reaches its
     own defining instruction again.
+F10. A whole scalar word stored at a fixed offset keeps its value range but not its derivation;
+    a register loaded from it, or stored to it, mirrors it until either is written, and a
+    compare-and-branch refinement of the register refines the word.  Every write that may reach
+    a word ends its mirrors, whether the word is tracked or not, and forgets the scalar words it
+    may overwrite: a variable store those its value hull overlaps, a store through a possible
+    stack address its candidates, a callee those inside its reach, or all of them when it may
+    read a register holding a stack address.  A call walks the callee while a word is mirrored
+    too, since a mirror held in R4-R11 survives the call.  Joins keep a scalar word only when
+    both paths track it.
+F11. A premise is never stated on an index with no variable in it: it is the same on every run,
+    so the premise would be always true or always false (a reloaded constant word makes such
+    an index common).
 
 The core reaches this module through ``Policy.defer_spill`` and ``Policy.note_returned``;
 ``POLICY`` is the one switch, and disabling it restores the plain analysis and the core's
@@ -121,6 +133,13 @@ def drop_zero(expr):
     if expr is not None and expr[0] == "bin" and expr[1] == "add" and expr[2] == ZERO:
         return expr[3]
     return expr
+
+
+def variable(expr):
+    """Whether a derivation reads anything that is not a constant (an entry register, a call
+    result or a load)."""
+    return expr[0] in ("entry", "ret", "ld") or any(variable(part) for part in expr[1:]
+                                                    if type(part) is tuple)
 
 
 def possible(offsets):
@@ -341,23 +360,23 @@ class CalleeReach:
 
 # ---- the analysis ---------------------------------------------------------------------
 class WordState(sip.State):
-    __slots__ = ("words", "ids", "facts", "released")
+    __slots__ = ("words", "mirrors", "ids", "facts", "released")
 
-    def __init__(self, kinds, init, regs, exprs, flags, words=(), ids=(None,) * 16,
+    def __init__(self, kinds, init, regs, exprs, flags, words=(), mirrors=(), ids=(None,) * 16,
                  facts=frozenset(), released=False):
         super().__init__(kinds, init, regs, exprs, flags)
-        self.words, self.ids = words, ids
+        self.words, self.mirrors, self.ids = words, mirrors, ids
         self.facts, self.released = facts, released
 
     def key(self):
-        return super().key() + (self.words, tuple(self.ids), self.facts, self.released)
+        return super().key() + (self.words, self.mirrors, tuple(self.ids), self.facts, self.released)
 
     def __eq__(self, other):
         return type(other) is WordState and self.key() == other.key()
 
     def copy(self):
         return WordState(self.kinds, self.init, list(self.regs), list(self.exprs), self.flags,
-                         self.words, list(self.ids), self.facts, self.released)
+                         self.words, self.mirrors, list(self.ids), self.facts, self.released)
 
     def freeze(self):
         super().freeze()
@@ -383,11 +402,15 @@ class FrameWordsAnalysis(sip.Analysis):
         state.words = tuple(sorted([entry for entry in state.words if entry[0] != offset] +
                                    [(offset, value, ident)]))
 
-    def forget(self, state, low, high):
-        """Drop the tracked words overlapping [low, high)."""
-        gone = {word for word, _, _ in state.words if word < high and low < word + 4}
+    def forget(self, state, low, high, *, scalars_only=False):
+        """Drop the tracked words overlapping [low, high) (only the scalar ones if asked) and the
+        mirror of every word there, tracked or not: whatever [low, high) now holds, no register
+        is known to equal it."""
+        gone = {word for word, value, _ in state.words if word < high and low < word + 4 and
+                not (scalars_only and is_pointer(value))}
         if gone:
             state.words = tuple(entry for entry in state.words if entry[0] not in gone)
+        state.mirrors = tuple(pair for pair in state.mirrors if not (pair[1] < high and low < pair[1] + 4))
 
     def pointer_overlap(self, state, low, high):
         return next((word for word, value, _ in state.words
@@ -407,15 +430,24 @@ class FrameWordsAnalysis(sip.Analysis):
             if word is not None:
                 self.fail(f"{'load' if load else 'store'} through a possible stack address may "
                           f"reach the pointer-bearing local word at entry-SP{word:+d}")
-        if not load and any(is_pointer(value) for value in stored):
-            self.fail("stack address stored through a possible stack address")
+        if not load:
+            if any(is_pointer(value) for value in stored):
+                self.fail("stack address stored through a possible stack address")
+            for low, high in spans:
+                self.forget(state, low, high)
 
     def write(self, state, register, value, expr=None):
         super().write(state, register, value, expr)
         state.ids[register] = None
+        state.mirrors = tuple(pair for pair in state.mirrors if pair[0] != register)
 
     def premise(self, state, site, width, load, c, texpr, tlo, tmod, disp):
-        return super().premise(state, site, width, load, c, drop_zero(texpr), tlo, tmod, disp)
+        texpr = drop_zero(texpr)
+        if c is not None and texpr is not None and not variable(texpr):
+            # The same index on every run: a premise on it is always true or always false, and
+            # neither is a premise to review (a reloaded constant word makes this common).
+            return f"index is the constant {sip.render(texpr)} (no premise can be stated)"
+        return super().premise(state, site, width, load, c, texpr, tlo, tmod, disp)
 
     def frame_check(self, state, lo, hi, width, *, load):
         problem = super().frame_check(state, lo, hi, width, load=load and not self.initialised)
@@ -427,7 +459,7 @@ class FrameWordsAnalysis(sip.Analysis):
 
     # ---- accesses -----------------------------------------------------------------
     def fixed(self, state, site, offset, width, load, register):
-        """A fixed-offset access to the frame (F3, F4)."""
+        """A fixed-offset access to the frame (F3, F4, F10)."""
         word = offset - offset % 4
         entry = word_entry(state, word)
         floor = -4 * sip.depth(state)
@@ -442,11 +474,15 @@ class FrameWordsAnalysis(sip.Analysis):
                 state.ids[register] = entry[1] if whole else None
                 return
             result = sip.TOP
-            if width == 1:
+            if whole and entry is not None:
+                result = entry[0]
+            elif width == 1:
                 result = ("S", 0, 255, 0)
             elif width == 2:
                 result = ("S", 0, 0xFFFF, 0)
             self.write(state, register, result)
+            if whole:
+                state.mirrors = state.mirrors + ((register, word),)
             return
         value = self.read(state, register)
         if is_pointer(value):
@@ -454,6 +490,7 @@ class FrameWordsAnalysis(sip.Analysis):
                 self.fail("stack address stored outside a whole allocated local word")
             elif not sip.is_ranged(value) and value[0] == "A" and site not in self.spills:
                 self.fail("exact stack address stored to a local word the core did not defer")
+            self.forget(state, word, word + 4)
             if whole:
                 self.put(state, word, value, state.ids[register])
                 if self.check:
@@ -464,6 +501,10 @@ class FrameWordsAnalysis(sip.Analysis):
             if entry is not None and is_pointer(entry[0]) and not whole:
                 self.fail("partial store over a pointer-bearing local word")
             self.forget(state, offset, offset + width)
+            if whole:
+                self.put(state, word, value, None)
+                state.mirrors = tuple(pair for pair in state.mirrors if pair[0] != register) + \
+                    ((register, word),)
         self.mark(state, offset, width)
 
     def access(self, state, site, base_register, displacement, index_register, width, load,
@@ -490,13 +531,21 @@ class FrameWordsAnalysis(sip.Analysis):
                 self.identity_loads.add(site)
         finally:
             self.initialised = False
-        if not load and ident is not None and disp is not None:
-            state.facts = state.facts | {(ident, disp, width)}
+        if (deferred or sip.is_ranged(base)) and base[0] == "A" and (index is None or index[0] == "S"):
+            hull = base if index is None else sip.add_values(base, index)
+            if not load:
+                # The access is proved or premised clear of pointer-bearing words (F5); only the
+                # hull, which may be far wider under a premise, reaches them.
+                self.forget(state, hull[1] + displacement, hull[2] + displacement + width,
+                            scalars_only=True)
+                if ident is not None and disp is not None:
+                    state.facts = state.facts | {(ident, disp, width)}
 
     def copy_site(self, state, site):
         destination, count = self.copies[site]
         if self.pointer_overlap(state, destination, destination + count) is not None:
             self.fail("ROM copy destination overlaps a pointer-bearing local word")
+        self.forget(state, destination, destination + count)
         return super().copy_site(state, site)
 
     # ---- identities (F9) ----------------------------------------------------------
@@ -522,13 +571,14 @@ class FrameWordsAnalysis(sip.Analysis):
         else:
             self.identify(state, self.current, destination)
 
-    # ---- calls (F2, F6) -----------------------------------------------------------
+    # ---- calls (F2, F6, F10) -----------------------------------------------------
     def callee(self, state, site, target):
-        """F2 and F6: words a callee may reach, and argument registers it never reads."""
+        """F2, F6 and F10: words a callee may reach, and argument registers it never reads."""
         if self.check and site not in self.copies:
             self.call_sites.add(site)       # a ROM table copy's helper is authenticated, not trusted
         carried = [register for register in range(4) if sip.is_ranged(state.regs[register])]
-        if not state.words and not state.released and not carried:
+        # A mirror held in R4-R11 survives the call, so the words it mirrors need the walk too.
+        if not state.words and not state.mirrors and not state.released and not carried:
             return []
         if state.released:
             self.fail("call after a pointer-bearing local word was released")
@@ -547,6 +597,7 @@ class FrameWordsAnalysis(sip.Analysis):
             if is_pointer(value) and (reach is None or word < floor + reach):
                 self.fail(f"callee 0x{target:08X} may reach the pointer-bearing local word at "
                           f"entry-SP{word:+d}" + ("" if reach is not None else f" ({reason})"))
+        self.forget(state, floor, 0 if reach is None or receives else floor + reach)
         dead = [register for register in carried if register not in reads]
         for register in dead:
             # Never read by the callee: not an escape.  Hidden from the call's own checks here;
@@ -588,6 +639,7 @@ class FrameWordsAnalysis(sip.Analysis):
                             after.exprs[register] = None
                 for register in CLOBBERED:
                     after.ids[register] = None
+                after.mirrors = tuple(pair for pair in after.mirrors if pair[0] not in CLOBBERED)
             return outgoing
         moved = None
         if raw & 0xF000 == 0xC000:
@@ -597,7 +649,11 @@ class FrameWordsAnalysis(sip.Analysis):
                 low, high = pointer[1], pointer[1] + 4 * count
                 if self.pointer_overlap(state, low, high) is not None:
                     self.fail("block transfer over a pointer-bearing local word")
+                if not raw & 0x800:
+                    state = state.copy()
+                    self.forget(state, low, high)
             elif pointer[0] == "O":
+                state = state.copy()
                 self.through_possible(state, self.spans(state, pointer, 0, 4 * count), bool(raw & 0x800),
                                       [state.regs[n] for n in range(8) if raw & (1 << n)])
                 if len(pointer) > 1 and not (raw & 0x800 and raw & (1 << base)):
@@ -626,6 +682,16 @@ class FrameWordsAnalysis(sip.Analysis):
                     after.released = True
                 self.forget(after, -4 * before, floor)
                 after.facts = frozenset()
+        if raw & 0xF000 == 0xD000 and state.flags is not None:
+            register = state.flags[0]
+            for _, after in outgoing:
+                if after is not None and after.regs[register][0] == "S":
+                    for held, word in after.mirrors:
+                        entry = word_entry(after, word)
+                        # A mirror holds only while neither side is written, so the word holds
+                        # the register's value; never let a refinement rewrite a pointer entry.
+                        if held == register and (entry is None or entry[0][0] == "S"):
+                            self.put(after, word, after.regs[register], None)
         return outgoing
 
     # ---- driver -------------------------------------------------------------------
@@ -639,15 +705,21 @@ class FrameWordsAnalysis(sip.Analysis):
         for word in sorted(set(left) | set(right)):
             a, b = left.get(word), right.get(word)
             if a is not None and b is not None:
-                value = sip.widen(a[0], sip.join_values(a[0], b[0]), self.thresholds, visits)
+                if a[0][0] == "S" and b[0][0] == "S":
+                    value = sip.widen(a[0], sip.join_values(a[0], b[0]), self.thresholds, visits)
+                elif is_pointer(a[0]) and is_pointer(b[0]):
+                    value = sip.widen(a[0], sip.join_values(a[0], b[0]), self.thresholds, visits)
+                else:
+                    value = sip.POISON
                 words.append((word, value, a[1] if a[1] == b[1] else None))
-            else:
-                words.append((word, sip.POISON, None))      # pointer-bearing on one path only
+            elif is_pointer((a or b)[0]):
+                words.append((word, sip.POISON, None))
         # A join the plain domain makes OPAQUE keeps the exact offsets it may hold (F8).
         regs = tuple(possible_join(a, b) if value == sip.OPAQUE else value
                      for value, a, b in zip(joined.regs, old.regs, new.regs))
         return WordState(joined.kinds, joined.init, regs, joined.exprs, joined.flags,
-                         tuple(words), tuple(x if x == y else None for x, y in zip(old.ids, new.ids)),
+                         tuple(words), tuple(sorted(set(old.mirrors) & set(new.mirrors))),
+                         tuple(x if x == y else None for x, y in zip(old.ids, new.ids)),
                          old.facts & new.facts, old.released or new.released)
 
     def run(self):
