@@ -2074,8 +2074,15 @@ address initialises nothing, and it may not store a return-carrying value.
 
 A variable stack address may be copied, moved by an immediate, combined with
 further scalar indices or used as the base of one load or store. It may not be
-stored, pushed, compared, passed in R0-R3 or be live in a return-visible
-register at a return. Escapes of an array's exact address are still the buffer
+stored, pushed, compared, held in R0-R3 or R12 at a call, or be live in a
+return-visible register at a return. R12 is call-clobbered, so the analysis
+cannot know its value after the call, yet a callee need not write it: an
+address held there could survive the call untracked. As for R0-R3, it is
+refused at the call. R4-R11 are carried across a call; that the callee does not
+read them as data is the same unproved ABI premise the core's callee walk
+makes. R12 is not return-visible, so a ranged address left in it at the
+owner's return is admitted, as the core treats IP as ABI scratch at a return.
+Escapes of an array's exact address are still the buffer
 proof's business and refuse unless a callee is proved to bound them. Functions
 with pointer-bearing, word-provenance or return-carrying local words are
 outside the policy. The policy applies only to the owner itself, never to
