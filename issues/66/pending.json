@@ -990,7 +990,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "71ce3dc4c5f4c7500d074b707fee5c75d62075c490eddc6f70680c168239b781",
+        "acknowledged_cursor": 7016934481,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "71ce3dc4c5f4c7500d074b707fee5c75d62075c490eddc6f70680c168239b781",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080BEAC8\",\"who\":\"claude-ffta2\",\"claim_id\":6990718046,\"reason\":\"parked for now: bytes identical (1120/1120), refused: a spilled local-address slot pulls 080CA7A4's jump table into the buffer walk\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-19T17:35:14Z",
+          "id": 7016934481,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T17:35:14Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2af3ca6ffa33cfac7f6a060042573ffda2acd8f5ca89b10d7242d00e8da12431",
+        "result": {
+          "address": "0x080BEAC8",
+          "claim_id": 6990718046,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7016934481,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
