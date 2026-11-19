@@ -43,10 +43,17 @@ register, an incoming argument or below SP), and for loads initialised.  Reads
 and writes are both allowed under the premise; a write through a variable
 address initialises nothing.  A variable stack address may be copied, moved by
 an immediate, combined with further scalar indices, or used as the base of one
-load or store.  It may not be stored, pushed, compared, passed in R0-R3, or be
-live in a return-visible register at a return.  Escapes of the array's exact
-address are the buffer proof's business and still refuse unless a callee is
-proved to bound them.
+load or store.  It may not be stored, pushed, compared, held in R0-R3 or R12 at
+a call, or be live in a return-visible register at a return.  R12 is
+call-clobbered, so the analysis forgets it at a call, yet a callee need not
+write it: an address held there could survive the call untracked, so it is
+refused at the call as in R0-R3.  R4-R11 are carried across a call; that the
+callee does not read them as data is the same unproved ABI premise the core's
+callee walk makes.  R12 is not return-visible: a ranged address left in it at
+the owner's return is admitted, as the core treats IP as ABI scratch at a
+return (agbcc leaves one there, for example in 0x08098C20).  Escapes of the
+array's exact address are the buffer proof's business and still refuse unless
+a callee is proved to bound them.
 
 The values the core cannot represent are owned completely by this module: it
 re-decodes the verified body as raw Thumb-1 and runs one abstract interpretation
@@ -811,7 +818,10 @@ class Analysis:
             target = site + 4 + offset
             if self.address <= target < self.end:
                 refuse("same-owner long branches are outside this policy")
-            self.no_escape(state, range(4), "a call argument register")
+            # R12 is call-clobbered, so the analysis cannot know its value after the call,
+            # yet a callee need not write it: an address held there could survive the call
+            # untracked.  As for R0-R3, it is refused at the call.
+            self.no_escape(state, (0, 1, 2, 3, 12), "a call argument register")
             self.writers.add(site)
             result = None
             if site in self.copies:

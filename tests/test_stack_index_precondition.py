@@ -345,6 +345,117 @@ class StackIndexPreconditionTests(unittest.TestCase):
         self.assertNotIn('stack_index_preconditions', manifest['proof']['buffers'])
 
 
+CALLEE = 0x08014000
+TAIL = (0x2000, 0x2100, 0x2200, 0x2300)     # movs r0,#0 .. movs r3,#0
+# mov r3,sp; adds r3,r3,r5; mov ip,r3; movs r3,#0: ip = sp + entry_R5, a ranged stack address.
+RANGED_IP = (0x466B, 0x195B, 0x469C, 0x2300)
+REFUSED_AT_CALL = 'ranged stack address escapes through a call argument register'
+# Issue #348: bl to `bx lr` leaves ip untouched; mov r3,ip; str r6,[r3] then stores at sp + entry_R5.
+# Any analysis that handles BL (or replaces this one) must refuse verify_call(R12_REPRODUCER).
+R12_REPRODUCER = RANGED_IP + (CALLEE, 0x4663, 0x601E)
+
+
+def call_owner_code(middle, tail=TAIL):
+    """push {r4-r7,lr}; sub sp,#16; r4 = entry_R0 & 3; copy four table bytes to sp; <middle>;
+    mov r1,sp; ldrb r0,[r1,r4] (proved in bounds); <tail>; add sp,#16; pop {r4-r7}; pop {r1}; bx r1."""
+    code = [0xB5F0, 0xB084, 0x1C04, 0x2103, 0x400C, 0x4668, 0, 0x2204, HELPER, *middle,
+            0x4669, 0x5D08, *tail, 0xB004, 0xBCF0, 0xBC02, 0x4708]
+    raw = len(assemble(OWNER, code))
+    literal = raw + (-raw % 4)
+    code[6] = 0x4900 | ((literal - ((2 * 6 + 4) & ~3)) // 4)       # ldr r1,=data_table
+    return code
+
+
+def verify_call(middle, tail=TAIL, callee=(0x4770,), selector=SELECTOR):
+    """Verify ``call_owner_code`` with ``CALLEE`` holding ``callee`` (by default `bx lr`)."""
+    raw = struct.pack(f'<{len(callee)}H', *callee)
+    arguments, _ = fixture(call_owner_code(middle, tail), selector=selector,
+                           extra_functions=[(CALLEE, len(raw), len(callee))],
+                           patch_rom={CALLEE + n: byte for n, byte in enumerate(raw)})
+    return owner.verify(**arguments)
+
+
+class R12AcrossCallTests(unittest.TestCase):
+    """The analysis forgets R12 at a call, yet a callee need not write it: a ranged address there is
+    refused at the call, as in R0-R3."""
+
+    def test_ranged_address_in_r12_at_a_call_refuses(self):
+        for selector in sip.SELECTORS:
+            with self.subTest(selector=selector), self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+                verify_call(R12_REPRODUCER, selector=selector)
+
+    def test_refused_at_the_call_whatever_follows(self):
+        # Every case is refused at the bl, before any later code is analysed: what the owner does
+        # with ip afterwards (a use, nothing, or an overwrite) changes nothing.
+        uses = {
+            'load base': (0x4663, 0x681A),                      # mov r3,ip; ldr r2,[r3]
+            'index': (0x4663, 0x466A, 0x5CD2),                  # mov r3,ip; mov r2,sp; ldrb r2,[r2,r3]
+            'spill': (0x4663, 0x9301),                          # mov r3,ip; str r3,[sp,#4]
+            'next call argument': (0x4660, CALLEE),             # mov r0,ip; bl
+            'comparison': (0x4663, 0x2B00),                     # mov r3,ip; cmp r3,#0
+            'high comparison': (0x45A4,),                       # cmp ip,r4
+            'no use': (),
+            'overwritten after the call': (0x46A4,),            # mov ip,r4: the callee already had it
+        }
+        for name, use in uses.items():
+            with self.subTest(name), self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+                verify_call(RANGED_IP + (CALLEE, *use))
+        with self.subTest('return value'), self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+            verify_call(RANGED_IP + (CALLEE,), tail=(0x4660, *TAIL[1:]))     # mov r0,ip
+
+    def test_ranged_r12_on_one_path_refuses_at_the_join(self):
+        # cmp r4,#0; beq over mov ip,r3: ip is ranged on one path only, POISON after the join.
+        with self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+            verify_call((0x466B, 0x195B, 0x2C00, 0xD000, 0x469C, 0x2300, CALLEE))
+
+    def test_ranged_address_in_r12_at_the_return_is_admitted(self):
+        # R12 is not return-visible, as in the core (IP is ABI scratch at a return): the address
+        # parked in ip with no call before the return is admitted.
+        manifest, _ = verify_call(RANGED_IP)
+        self.assertEqual(manifest['profile'], sip.SCHEMA)
+
+    def test_callee_reading_r12_refuses(self):
+        # mov r3,ip; str r1,[r3,#0x40]; bx lr: the callee itself writes through the address.
+        with self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+            verify_call(RANGED_IP + (CALLEE,), callee=(0x4663, 0x6419, 0x4770))
+
+    def test_every_call_argument_register_is_checked(self):
+        # mov r3,sp; adds r3,r3,r5; adds rN,r3,#0; bl, with the address left in R0-R3 or R12,
+        # to a callee that reads it (cmp rN,#0, or mov r3,ip; cmp r3,#0; then bx lr).
+        moves = {0: (0x1C18, (0x2800,)), 1: (0x1C19, (0x2900,)), 2: (0x1C1A, (0x2A00,)),
+                 3: (0x1C1B, (0x2B00,)), 12: (0x469C, (0x4663, 0x2B00))}
+        for register, (move, read) in moves.items():
+            middle = (0x466B, 0x195B, move) + (() if register == 3 else (0x2300,)) + (CALLEE,)
+            with self.subTest(register=register), self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+                verify_call(middle, callee=(*read, 0x4770))
+
+    def test_r12_overwritten_before_the_call_is_admitted(self):
+        # The same address parked in ip, then mov ip,r3 (r3 == 0) before the call.
+        manifest, _ = verify_call(RANGED_IP + (0x469C, CALLEE, 0x4663, 0x601E))
+        self.assertEqual(manifest['profile'], sip.SCHEMA)
+
+    def test_exact_stack_alias_in_r12_is_left_to_the_core(self):
+        # mov r3,sp; mov ip,r3; movs r3,#0: the core passes an exact alias in ip to the callee walk.
+        exact = (0x466B, 0x469C, 0x2300, CALLEE)
+        manifest, _ = verify_call(exact)
+        self.assertEqual(manifest['profile'], sip.SCHEMA)
+        with self.assertRaisesRegex(ValueError, f'buffer callee 0x{CALLEE:08X}: buffer access'):
+            verify_call(exact, callee=(0x4663, 0x6419, 0x4770))
+
+    def test_ranged_address_in_r12_without_a_call_is_still_bounded(self):
+        # mov r3,sp; adds r3,r3,r4 (r4 in [0,3]); mov ip,r3; movs r3,#0; mov r3,ip; strb r6,[r3]:
+        # with no call in between, the store through the copy is proved in bounds.
+        bounded = (0x466B, 0x191B, 0x469C, 0x2300)
+        manifest, _ = verify_call(bounded + (0x4663, 0x701E))
+        store = [record for record in evidence(manifest)['accesses'] if record[1] == 'store']
+        self.assertEqual(store, [[store[0][0], 'store', 1, -36, -33, 0]])
+        with self.assertRaisesRegex(sip.Refusal, REFUSED_AT_CALL):
+            verify_call(bounded + (CALLEE, 0x4663, 0x701E))
+        # The unbounded sp + entry_R5 is refused at the store itself.
+        with self.assertRaisesRegex(sip.Refusal, 'not 4-byte aligned'):
+            verify_call(RANGED_IP + (0x4663, 0x601E))
+
+
 class ValueDomainTests(unittest.TestCase):
     def test_expression_rendering_and_narrowing(self):
         entry = ('entry', 1)
