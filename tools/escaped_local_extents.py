@@ -32,16 +32,20 @@ and main's message):
    blocks give their code range by labels the function defines.  Inlined
    subroutines and other location forms fail.
    "unsupported debug information: ..."
-3. agbcc's frame shape (frame_shape).  Pushes and high-register moves, then
-   at most one sp decrement, open the function; sp changes nowhere else
-   but in epilogues: the matching increment, then only pops, r8-r11
-   restores and the return, entered from no label.  An adjustment is an
-   immediate, a literal-pool word, or agbcc's `mov`/`lsl` pair.  So sp is the body sp
-   (the DWARF frame base) at every call, escape and internal access, and no
-   callee's frame overlaps this one.  No named local lies below the body sp
-   or overlaps the saved registers.
+3. agbcc's frame shape (frame_shape).  Pushes of callee-saved registers
+   and lr and high-register moves, then at most one sp decrement, open the
+   function; sp changes nowhere else but in epilogues: the matching
+   increment, then only pops, r8-r11 restores and the return, entered from
+   no label.  An adjustment is an immediate, a literal-pool word, or agbcc's
+   `mov`/`lsl` pair.  So sp is the body sp (the DWARF frame base) at every
+   call, escape and internal access, and no callee's frame overlaps this
+   one.  No named local lies below the body sp or overlaps the saved
+   registers.  A pushed argument register (agbcc's varargs prologue pushes
+   r0-r3, which the body addresses as data) is no saved register, as in
+   volatile_semantics' push area.
    "the stack pointer moves outside the prologue and epilogue" /
-   "a named local lies below sp or overlaps the saved registers"
+   "a named local lies below sp or overlaps the saved registers" /
+   "the prologue pushes an argument register"
 4. Exact owner.  Every escaping frame address (a call argument, an unnamed
    argument register the callee may read, a stored value) is the body sp
    plus a constant strictly inside exactly one named local whose scope
@@ -64,13 +68,23 @@ and main's message):
    not forwarded (it stopped at a call, or found no store) refuses if an
    untraced store outside the escaped locals - to an internal slot, or to
    the frame before an escape - may overlap it; so no internal value, and
-   no frame address kept in one, comes back as an unknown.  Every other
-   stored frame address has escaped its locals (rules 4 and 5).  A
-   variable frame offset overlaps every frame slot but the saved
-   registers (C bounds, premise 2; main, before an escape, takes it as
-   disjoint from every constant slot).  When a store at a variable frame
-   offset precedes an escape, the escape event also binds, in program
-   order, every such store and every constant store into an escaped local.
+   no frame address kept in one, comes back as an unknown.  A frame read
+   before any escape (volatile_semantics' frame_read, kit#346) is no such
+   load: its event binds every store it could see.  Every other stored
+   frame address has escaped its locals (rules 4 and 5).  A variable frame
+   offset overlaps every frame slot but the saved registers (C bounds,
+   premise 2): before an escape exactly main's push area (a load of the
+   exact word its push still holds), after one every byte a push still
+   holds (saved_area), where main keeps only the exact pushed word.
+   Known conservative refusal: an untraced store that a later store has
+   overwritten still refuses a load it may overlap (a saved slot
+   overwritten after an escape, then reloaded past a store at a variable
+   offset; agbcc never stores into the push area).
+   When a store at a variable frame offset precedes an escape, the escape
+   event also binds, in program order, every such store and every constant
+   store into an escaped local (in place of main's binding of every local
+   byte, since the other slots stay internal), and the record names
+   main's frame-read premises.
    "partially overlapping stack access"
 8. Consumers.  Every consumer of an escaping frame address is recorded: a
    callee and the register (or stack-argument word) it receives the
@@ -143,8 +157,8 @@ class Policy:
         "a pointer this function does not compute from sp (an argument, a literal, a value loaded "
         "from memory or returned by a call) addresses no frame byte outside the escaped locals, as "
         "main assumes for the whole frame before an escape; and a variable frame offset reaches "
-        "no saved-register slot (C bounds; main assumes more, that before an escape it reaches "
-        "no constant frame slot at all)",
+        "no saved-register slot (C bounds; main assumes the same of the pushed callee-saved "
+        "registers and lr)",
         "a callee reads or writes no stack word beyond the stack arguments its prototype names "
         "and takes no input in r4-r11 (the ARM calling convention), as main already assumes "
         "before an escape",
@@ -465,16 +479,22 @@ def writes_sp(mnemonic, operands):
 
 
 def frame_shape(function):
-    """(saved bytes, frame bytes) of agbcc's frame: pushes and high-register moves, then at most
-    one sp decrement, open the function; sp changes nowhere else but in epilogues (the matching
-    increment, then only pops, register moves and the return, entered from no label)"""
+    """(saved bytes, frame bytes) of agbcc's frame: pushes (of no argument register) and
+    high-register moves, then at most one sp decrement, open the function; sp changes nowhere
+    else but in epilogues (the matching increment, then only pops, register moves and the
+    return, entered from no label)"""
     instructions, labels, pools = function
     targets = set(labels.values())
     at, saved = 0, 0
     while at < len(instructions):
         mnemonic, operands, _ = instructions[at]
         if mnemonic == "push":
-            saved += 4 * len(semantics.register_list(operands[0]))
+            names = semantics.register_list(operands[0])
+            if set(names) & set(semantics.ARGUMENT_REGISTERS):
+                # their slots are data a variable offset may reach, not saved registers
+                # (volatile_semantics keeps no argument register private either)
+                raise SemanticError("the prologue pushes an argument register")
+            saved += 4 * len(names)
         elif not (mnemonic == "mov" and len(operands) == 2 and
                   semantics.register(operands[1]) in ("r8", "r9", "r10", "r11")):
             break
@@ -736,12 +756,13 @@ class FrameState:
         """the escape snapshot applies constant stores in order but sees no store at a variable
         frame offset, which may land on an escaped local before or after them: when there is
         one, the escape also binds every such store and every constant store into an escaped
-        local, in program order"""
+        local, in program order (as volatile_semantics.show_stores prints them)"""
         stores = [entry for entry in executor.memory if entry[0] == "store" and not entry[5] and
                   carries(entry[2], SP)]
         if not any(not is_stack(entry[2]) for entry in stores):
             return ()
-        return (tuple((executor.observed(entry[2]) if is_stack(entry[2]) else entry[2], entry[1], entry[3])
+        return (tuple(("store", executor.observed(entry[2]) if is_stack(entry[2]) else entry[2], entry[1],
+                       entry[3])
                       for entry in stores if not is_stack(entry[2]) or
                       any(self.escaped_byte(signed32(linear(entry[2])[0]) + byte) for byte in range(entry[1]))),)
 
@@ -757,12 +778,31 @@ class FrameState:
         return any(self.base + local.offset <= offset < self.base + local.offset + local.size
                    for local in self.escaped)
 
-    def saved_area(self, address, width):
-        """inside the saved-register slots [top, entry sp)"""
+    def saved_area(self, executor, address, width):
+        """inside the saved-register slots [top, entry sp), every byte still holding its push: a
+        byte that any other fixed-slot store has overwritten, or that a pop has released, is
+        local, as in volatile_semantics' push area (kit#346).  That area (load's saved) also
+        requires the exact pushed word; relation uses it alone before an escape, and this test
+        only after one.  Under frame_shape the release test and the fail-closed end are defence
+        in depth: pushes fill [top, 0) before any access, and the only loads after a pop are
+        the pops' own exact reads"""
         if not is_stack(address):
             return False
         start = signed32(linear(address)[0])
-        return self.top <= start and start + width <= 0
+        if not (self.top <= start and start + width <= 0):
+            return False
+        for byte in range(start, start + width):
+            for entry in reversed(executor.memory):
+                if entry[0] == "release" and byte < entry[1]:
+                    return False
+                if entry[0] == "store" and is_stack(entry[2]) and \
+                        signed32(linear(entry[2])[0]) <= byte < signed32(linear(entry[2])[0]) + entry[1]:
+                    if not entry[5]:
+                        return False
+                    break
+            else:
+                return False                # not pushed yet: fail closed
+        return True
 
     def private(self, executor, address, width):
         if not is_stack(address):

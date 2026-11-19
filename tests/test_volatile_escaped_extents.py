@@ -507,6 +507,81 @@ class ExecutorTests(unittest.TestCase):
         self.refused(frame().replace("\tpop\t{r4}\n", "\tmov\tsp, r3\n\tpop\t{r4}\n"),
                      frame(), "does more than restore")
 
+    def test_frame_reads_before_an_escape_are_bound_not_refused(self):
+        # kit#346 composed: before any escape a read the byte map cannot place (a[i & 1]) is a
+        # frame-read event carrying the stores it could see, in this rule as in main; after
+        # &x escapes, a spill at sp+12 that no local holds stays internal
+        def program(first, spill):
+            return body("push\t{r4, lr}", "add\tsp, sp, #-16", f"mov\tr1, #{first}", "str\tr1, [sp, #4]",
+                        "mov\tr1, #0", "str\tr1, [sp, #8]", "mov\tr1, #1", "and\tr1, r0", "lsl\tr1, r1, #2",
+                        "add\tr1, sp", "ldr\tr4, [r1, #4]", "mov\tr1, #0", "mov\tr0, sp", "bl\tfunc_0802A2C0",
+                        f"mov\tr1, #{spill}", "str\tr1, [sp, #12]", "mov\tr0, r4", "bl\tfunc_0802A2C0",
+                        "add\tsp, sp, #16", "pop\t{r4}", "pop\t{r0}", "bx\tr0")
+        locals_ = [Local("x", 0, 4, ()), Local("a", 4, 8, ())]
+        with self.assertRaises(semantics.SemanticError) as caught:
+            fixtures.compare(program(1, 5), program(1, 6))     # main: the spill is observable
+        self.assertIn("differ in observable behaviour", str(caught.exception))
+        results, _ = check(program(1, 5), program(1, 6), real_locals=locals_)
+        self.assertEqual(results[0][1], 1)
+        self.assertEqual(results[0][-1], list(semantics.FRAME_READ_PREMISES))
+        self.refused(program(1, 5), program(2, 5), "real frame read32", real_locals=locals_)
+
+    def test_an_escape_carrying_the_stores_names_the_premises(self):
+        # kit#346 composed: a leaf (no pushes, so no saved slot passes the store) whose a[i] = v
+        # precedes the escape of &a to RAM: ordering() binds the store, and the record names the
+        # frame-read premises that binding relies on
+        def program(value):
+            return body("add\tsp, sp, #-8", "lsl\tr3, r0, #2", "add\tr3, sp", f"mov\tr1, #{value}",
+                        "str\tr1, [r3]", "ldr\tr2, .L3", "mov\tr1, sp", "str\tr1, [r2]", "add\tsp, sp, #8",
+                        "bx\tlr").replace(".word\tg_control_flags_03000940\n", ".word\tdata_02000000\n")
+        options = dict(real_locals=[Local("a", 0, 8, ())], objects={"data_02000000": 0x02000000})
+        results, models = check(program(1), program(1), **options)
+        self.assertEqual(results[0][-1], list(semantics.FRAME_READ_PREMISES))
+        self.assertIn("premised consumers: stored to", extents.record(models))
+        self.refused(program(1), program(2), "differ in observable behaviour", **options)
+
+    def test_an_internal_slot_read_past_a_variable_offset_store_is_refused(self):
+        # after &x escapes, a[i] = v into the internal array a, then a[1], never stored, is read:
+        # an internal load must find an exact earlier store, never an overlapping traced one
+        indexed = frame("lsl\tr2, r4, #2", "mov\tr3, sp", "add\tr3, r3, r2", "mov\tr1, #0", "str\tr1, [r3, #4]",
+                        "ldr\tr0, [sp, #8]", "mov\tr3, #0", "bl\tfunc_0802A2C0", size=16)
+        self.refused(indexed, indexed, "partially overlapping stack access",
+                     real_locals=[Local("x", 0, 4, ()), Local("a", 4, 8, ())])
+
+    def test_a_saved_slot_overwritten_by_a_plain_store_is_local(self):
+        # kit#346's push area: once a store other than its push overwrites the saved r4 slot it is
+        # local, so a[i] = v may reach it; the two orders of that store and a[i] = v, then a read of
+        # the slot, differ (main refuses them through a frame read, and so must the frame model)
+        def program(order):
+            overwrite, indexed = ("mov\tr2, #1", "str\tr2, [sp, #8]"), ("lsl\tr3, r0, #2", "add\tr3, sp",
+                                                                        "str\tr1, [r3]")
+            return body("push\t{r4, lr}", "add\tsp, sp, #-8",
+                        *(overwrite + indexed if order == "oi" else indexed + overwrite),
+                        "ldr\tr0, [sp, #8]", "add\tsp, sp, #8", "pop\t{r4}", "pop\t{r1}", "bx\tr1")
+        with self.assertRaises(semantics.SemanticError):
+            fixtures.compare(program("oi"), program("io"))
+        self.refused(program("oi"), program("io"), "differ in observable behaviour",
+                     real_locals=[Local("a", 0, 8, ())])
+        self.assertEqual(check(program("oi"), program("oi"), real_locals=[Local("a", 0, 8, ())])[0][0][1], 1)
+
+    def test_a_pushed_argument_register_is_no_saved_slot(self):
+        # kit#346 (F2) makes a pushed r0-r3 data that a variable offset may reach, so the saved
+        # area (saved_area, out of reach of a variable offset) may not hold one: `push {r1, r4,
+        # lr}`, a[i] = v, then the r1 slot read back in either order is refused by main, and the
+        # frame model must not admit it
+        def body_(hoisted):
+            store = ["lsl\tr3, r0, #2", "add\tr3, sp", "str\tr1, [r3]"]
+            read = ["ldr\tr0, [sp, #8]"]
+            return body("push\t{r1, r4, lr}", "add\tsp, sp, #-8", *(read + store if hoisted else store + read),
+                        "add\tsp, sp, #8", "pop\t{r1, r4}", "pop\t{r2}", "bx\tr2")
+        with self.assertRaises(semantics.SemanticError):
+            fixtures.compare(body_(False), body_(True))
+        self.refused(body_(False), body_(True), "the prologue pushes an argument register", real_locals=[])
+        for registers in ("r0, r1, r2, r3", "r3", "r2, lr"):
+            with self.subTest(registers=registers), self.assertRaises(semantics.SemanticError) as caught:
+                extents.frame_shape(semantics.parse_assembly(body(f"push\t{{{registers}}}", "bx\tlr"))[0][NAME])
+            self.assertIn("the prologue pushes an argument register", str(caught.exception))
+
     def test_frame_state_checks_the_body_sp_itself(self):
         # frame_shape already keeps sp at the body sp between prologue and epilogue; the state
         # checks it again at every call, escape and internal access (defence in depth)

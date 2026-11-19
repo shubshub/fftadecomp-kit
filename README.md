@@ -4159,9 +4159,27 @@ symbolically along every path, and the check requires:
   memory), every local frame byte at that moment, with the stores applied in
   program order, is part of the behaviour too, relative to the first
   escaping pointer and re-snapshotted at each escape. That includes slots
-  in the incoming-argument area. Every callee needs a file-scope prototype
-  with a fixed argument list. A callee with no prototype, `()` or `...`
-  fails closed. An indirect call (`bl _call_via_rN`) is compared like a
+  in the incoming-argument area. Before the first escape, a frame read that
+  this byte map cannot place (at a variable offset from `sp`, such as
+  `a[i]` on a local array, or at a fixed slot after a store at one) is part
+  of the behaviour with the local frame stores so far: each store at a
+  variable offset in program order and, between two of them, the bytes the
+  fixed-slot stores leave. A fixed-slot read takes only the bytes it reads,
+  pushed ones included. A read at a variable offset takes every byte but the
+  slots of pushed callee-saved registers and `lr`, which no C pointer
+  reaches; registers `r0`-`r3` pushed by agbcc's varargs prologue are data
+  like any local. So is the first escape when a store at a variable offset
+  precedes it. Such a read is refused when a byte it binds holds a frame
+  address, since it could return that address. A slot stops being saved
+  once a store other than its push overwrites it, or once `sp` rises above
+  it (a pop or an add to `sp`); a function that sets `sp` to anything but a
+  fixed offset from the entry `sp` is refused. The record of a verdict that
+  relies on such a read or escape, or that reads a saved slot past a store
+  at a variable offset, names its premises: no callee holds a frame address
+  before the frame escapes, and a variable offset from `sp` reaches no
+  pushed callee-saved register or `lr`. Every callee needs a file-scope
+  prototype with a fixed argument list. A callee with no prototype, `()` or
+  `...` fails closed. An indirect call (`bl _call_via_rN`) is compared like a
   named one only when rN holds a word loaded from an element of a file-scope
   function-pointer object or array whose declared type (a unique direct
   typedef or a direct `R (*name[N])(params)` declarator) is such a
@@ -4604,7 +4622,9 @@ repeated with `-g`; its `.text` and parsed instruction stream must equal the
 checked compile's, and its DWARF 2 information gives every named local's frame
 slot, size and scope. In that run:
 
-* the function must have agbcc's frame shape: pushes, then at most one `sp`
+* the function must have agbcc's frame shape: pushes of callee-saved
+  registers and `lr` (a prologue that pushes `r0`-`r3`, agbcc's varargs save
+  area, is refused: those slots are data, as above), then at most one `sp`
   decrement, and `sp` changes nowhere else but in epilogues that only pop,
   restore r8-r11 and return;
 * every escaping frame address (a call argument, an argument register the
@@ -4637,10 +4657,15 @@ slot, size and scope. In that run:
 * a frame load that is not forwarded (it stopped at a call) is refused when an
   untraced store outside the escaped locals may overlap it, so no internal
   value, and no frame address kept in one, comes back as an unknown value. A
-  variable frame offset may reach every slot but the saved registers (main,
-  before an escape, treats it as disjoint from every constant slot), and an
-  escape after such a store also compares the order of the stores that can
-  reach the escaped locals.
+  frame read before any escape is bound as above and is no such load. A
+  variable frame offset may reach every slot but the saved registers (before
+  an escape exactly the push area above; after one, every byte a push still
+  holds), and an escape after such a store compares the order of the stores
+  that can reach the escaped locals (in place of every local byte, since the
+  other slots stay internal); the record then names the frame-read premises.
+  An untraced store that a later store has overwritten still refuses a load
+  it may overlap, a conservative refusal that only hand-written code (a
+  saved slot overwritten by a plain store) reaches.
 
 The report then carries `* allowlisted volatile escaped-local extents
 (escaped-local-extents-v1): ...` with, per compile, the escaped locals, the

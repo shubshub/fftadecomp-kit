@@ -24,7 +24,21 @@ symbolically along every path, and the check requires
    for both compiles, so this says the qualifier changed nothing that the
    program computes.  When a stack address escapes (a call argument or a
    stored value), every local frame byte, with the stores applied in order,
-   joins the behaviour (incoming-argument slots included).  Every callee
+   joins the behaviour (incoming-argument slots included).  Before that, a
+   frame read that this byte map cannot place (at a variable offset from
+   sp, or at a fixed slot across a store at one) joins the behaviour with
+   the local frame stores so far: each store at a variable offset in
+   program order and, between two of them, the bytes the fixed-slot stores
+   leave.  A fixed-slot read takes only the bytes it reads, pushed ones
+   included; a read at a variable offset takes every byte but the push
+   area, the slots of pushed callee-saved registers and lr, which no C
+   pointer reaches (agbcc's varargs prologue pushes r0-r3, which are data).
+   So does the first escape when a store at a variable offset precedes it
+   (Executor.frame_read, Executor.local_stores); under escaped-local
+   extents every escape after such a store carries its ordering() of the
+   stores that reach the escaped locals instead.  The record of such a
+   verdict, or of one that reads a saved slot past a store at a variable
+   offset, names its premises (FRAME_READ_PREMISES).  Every callee
    needs a file-scope prototype with a fixed list of one-word arguments;
    no prototype, `()`, `...` and wider arguments fail closed.  A
    `bl _call_via_rN` is an opaque call like a named one when rN holds a
@@ -150,7 +164,9 @@ which the stripped compile narrows to an
 (`(s16)sym.h`), whose `lsl`/`asr` the normaliser does not equate with the
 other compile's sign extension; and the mixed chain `sym.h = (sym.b = a)`,
 whose zero-extended byte the normaliser does not equate with the stripped
-compile's `lsl #24; lsr #24` (`sym.b = (sym.h = a)` passes).
+compile's `lsl #24; lsr #24` (`sym.b = (sym.h = a)` passes).  A frame
+read that cannot be placed is refused while a frame address is stored in
+the frame (`a[0] = &x; p = a[i]`), since the read could return it.
 
 Without the permuted compile, an alias store paired with a planted read
 (`(void)sym.h; p[1] = 0x100;` with `p` derived from another member) has the
@@ -178,6 +194,12 @@ MAX_STEPS = 20000
 MAX_DECISIONS = 32
 RUNTIME_ARITY = {"__divsi3": 2, "__udivsi3": 2, "__modsi3": 2, "__umodsi3": 2}
 ARGUMENT_REGISTERS = ("r0", "r1", "r2", "r3")
+# kit#346: what a verdict relies on when a frame read (or a first escape
+# carrying the local stores, Executor.local_stores) joins its behaviour, or a
+# saved slot is read past a store at a variable offset; the record of such a
+# verdict prints them
+FRAME_READ_PREMISES = ("no callee holds a frame address before the frame escapes",
+                       "a variable offset from sp reaches no pushed callee-saved register or lr")
 PINNED_WIDTHS = (1, 2)      # volatile members the rules model: bytes and halfwords
 TYPE_SIZES = {"u8": 1, "s8": 1, "char": 1, "vu8": 1, "vs8": 1,
               "u16": 2, "s16": 2, "short": 2, "vu16": 2, "vs16": 2,
@@ -966,6 +988,15 @@ def truncate(value, bits):
     return ("trunc", bits, value)
 
 
+def stored_bytes(width, value):
+    """the bytes a store of width bytes writes, lowest address first (as escape() splits them)"""
+    if width == 1:
+        return (value,)
+    if isinstance(value, int):
+        return tuple((value >> (8 * byte)) & 0xFF for byte in range(width))
+    return tuple(("byte", byte, value) for byte in range(width))
+
+
 def sign_extend(value, bits):
     if isinstance(value, int):
         value &= (1 << bits) - 1
@@ -1318,6 +1349,8 @@ class Executor:
         self.escaped, self.known, self.conditions = False, {}, []
         self.frame_base = None
         self.frame = self.frame_model.state() if self.frame_model is not None else None
+        # the path relied on FRAME_READ_PREMISES (frame_read, escape, load)
+        self.premised = False
         # registers and flags holding a value read back from memory: any load
         # but a literal word or a word reload of a clean word store (see
         # check_address and decide)
@@ -1335,8 +1368,14 @@ class Executor:
                 raise SemanticError(f"{self.label} compile of {self.name}: execution runs off the end")
             self.pc = pc
             result = self.step(pc, *self.instructions[pc])
+            if not is_stack(self.regs["sp"]):
+                # agbcc keeps sp a fixed offset from the entry sp; anything else
+                # would hide where the frame (and its saved slots) lies
+                self.fail(self.instructions[pc][2], "sp is set to a value that is not a fixed offset "
+                          "from the entry sp")
             if result == "return":
                 path = Path(list(decisions), self.conditions, self.trace, self.records)
+                path.premised = self.premised
                 if self.load_captures is not None:
                     path._load_provenance = LoadProvenance(path, self.load_captures, _producer=_EXECUTOR_LOAD_KEY)
                 return path
@@ -1390,37 +1429,68 @@ class Executor:
             return "overlap"
         if is_stack(a) != is_stack(b) and self.frame is not None:
             # escaped_local_extents: a variable frame offset may land anywhere in the frame but
-            # the saved registers (C bounds, as before an escape); a pointer not computed from
-            # sp reaches no internal slot
+            # the saved registers (C bounds); a pointer not computed from sp reaches no internal
+            # slot.  Before an escape the saved registers are main's push area exactly (private:
+            # the exact pushed word, still its push's); after one, where main keeps only that
+            # exact word, every byte its push still holds (saved_area)
             stack, width, other = (a, width_a, b) if is_stack(a) else (b, width_b, a)
             if carries(other, SP):
-                return "disjoint" if private or self.frame.saved_area(stack, width) else "overlap"
+                return "disjoint" if private or (self.escaped and self.frame.saved_area(self, stack, width)) \
+                    else "overlap"
             if not self.escaped or private or self.frame_private(stack, width):
                 return "disjoint"
-        elif is_stack(a) != is_stack(b) and (not self.escaped or private):
+        # An address at a variable offset from sp may still be in the frame:
+        # only the push area (private) stays out of its reach, as in escape().
+        elif is_stack(a) != is_stack(b) and (not self.escaped or private) and \
+                (private or not (carries(a, SP) and carries(b, SP))):
             return "disjoint"
         ga, gb = global_symbol(a), global_symbol(b)
         if ga and gb and ga != gb:
             return "disjoint"
         return "overlap"
 
-    def load(self, width, signed, address, text, peek=False):
+    def load(self, width, signed, address, text, probe=False):
         # Saved-register slots stay private even after the frame escapes:
-        # the escaping pointer addresses locals, not the push area.
-        saved = is_stack(address) and any(entry[0] == "store" and entry[5] and entry[2] == address
-                                          for entry in self.memory)
+        # the escaping pointer addresses locals, not the push area.  A slot
+        # is saved while the last fixed-slot store to touch it is the push of
+        # a callee-saved register or lr there and sp has not risen above it
+        # since (a pop or an add to sp leaves a "release", sp_moved); once
+        # released or overwritten, it is local.
+        saved = False
+        if is_stack(address):
+            start = signed32(linear(address)[0])
+            for entry in reversed(self.memory):
+                if entry[0] == "release" and start < entry[1]:
+                    break
+                if entry[0] == "store" and is_stack(entry[2]) and \
+                        start - entry[1] < signed32(linear(entry[2])[0]) < start + width:
+                    saved = entry[5] and entry[2] == address
+                    break
+        # escaped_local_extents: after an escape an internal slot keeps the
+        # pre-escape model (frame_private); there is none before an escape.
         internal = self.frame_private(address, width)
         stack = is_stack(address) and (not self.escaped or saved or internal)
+        # Before an escape no trace event holds a fixed-slot local store, so a
+        # frame read that this scan cannot place (at a variable offset from
+        # sp, or at a fixed slot across a store at one) is an event of its
+        # own (frame_read).  The scan keeps saved slots apart (relation).
+        local = carries(address, SP) and not self.escaped
+        placed = not local or is_stack(address)
         version, forwarded = "entry", None
         self.load_clean = False
-        for entry in reversed(self.memory):
+        for entry in reversed(self.memory) if placed else ():
             if entry[0] == "call":
                 if not stack:
                     version = ("call", entry[1])
                     break
                 continue
+            if entry[0] == "release":
+                continue
             _, stored_width, stored_address, stored, event, _, derived = entry
             relation = self.relation(address, width, stored_address, stored_width, saved)
+            if saved and relation == "disjoint" and not probe and not is_stack(stored_address) and \
+                    carries(stored_address, SP):
+                self.premised = True     # a saved slot passes a store at a variable offset
             if relation == "same":
                 forwarded = stored
                 # Only a store wider than every pinned member can be reloaded
@@ -1430,14 +1500,22 @@ class Executor:
                 self.load_clean = width == 4 and width > max(PINNED_WIDTHS) and not derived
                 break
             if relation == "overlap":
+                if local and not is_stack(stored_address):
+                    placed = False
+                    break
                 if event is None or internal:
                     self.fail(text, "partially overlapping stack access")
                 version = ("store", event)
                 break
+        if not placed:
+            version = self.frame_read(width, address, text, probe)
         if forwarded is not None:
             value = forwarded
         else:
-            if self.frame is not None and carries(address, SP) and not peek:
+            # escaped_local_extents, rule 7: a load that stopped at a call or found no
+            # store hides no untraced store.  A frame read (before any escape, when no
+            # call can change the frame) binds every store it could see in its event.
+            if self.frame is not None and carries(address, SP) and placed and not probe:
                 self.frame.reload(self, address, width, text)
             value = ("load", width, self.observed(address), version)
             if self.load_captures is not None:
@@ -1447,13 +1525,81 @@ class Executor:
         return value, forwarded is not None
 
     def current(self, width, address):
-        return self.load(width, False, address, "", peek=True)[0]
+        return self.load(width, False, address, "", probe=True)[0]
+
+    def local_stores(self, window=None, base=0):
+        """the stores so far to the frame, as the frame holds them: each store
+        at a variable offset from sp in program order, and between two of
+        them ("bytes") the bytes that the fixed-slot stores there leave, at
+        their sp offset less base.  Fixed-slot stores between two variable
+        ones commute up to those bytes, and a fixed byte outside window (sp
+        offsets [start, end)) cannot reach a read of window, so neither
+        changes what a read sees.  Without a window (a read at a variable
+        offset, an escape) the push area is left out, as escape() leaves it
+        out: no C pointer reaches a pushed callee-saved register or lr."""
+        items, run = [], {}
+        for entry in self.memory:
+            # A fixed-slot read is placed by its address, so the push area is
+            # no premise for it: saved bytes in its window are bound too.
+            if entry[0] != "store" or (entry[5] and window is None) or not carries(entry[2], SP):
+                continue
+            if not is_stack(entry[2]):
+                if run:
+                    items.append(("bytes", tuple(sorted(run.items()))))
+                    run = {}
+                items.append(("store", self.observed(entry[2]), entry[1], entry[3]))
+                continue
+            offset = signed32(linear(entry[2])[0])
+            for byte, part in enumerate(stored_bytes(entry[1], entry[3])):
+                if window is None or window[0] <= offset + byte < window[1]:
+                    run[offset + byte - base] = part
+        if run:
+            items.append(("bytes", tuple(sorted(run.items()))))
+        return tuple(items)
+
+    def frame_read(self, width, address, text, probe):
+        """the version of a read of the unescaped frame that the byte-wise
+        scan cannot place: a trace event carrying local_stores, of the whole
+        frame for a variable offset and of the bytes read for a fixed slot.
+
+        Invariants: before an escape no callee holds a frame address, so a
+        call cannot change the frame; every store outside the frame and every
+        call is traced; the push area (the slots of pushed callee-saved
+        registers and lr, not pushed argument registers) is out of reach of a
+        variable offset, as in escape(), and a fixed-slot read binds the
+        pushed bytes it reads.  So two compiles whose traces agree up to the
+        event read the same value, and ("frame-read", index) names it.  Every
+        value that may be a frame address carries sp (relation's premise), so
+        a read that could return one is refused.  A probe (current) records
+        nothing and equals no recorded read."""
+        if probe:
+            return ("frame-read", None)
+        self.premised = True
+        window = None
+        if is_stack(address):
+            start = signed32(linear(address)[0])
+            window = (start, start + width)
+        stores = self.local_stores(window)
+        if any(carries(part, SP) for item in stores if item[0] == "bytes" for _, part in item[1]):
+            # The read could return that frame address as a plain value, and
+            # an address that does not carry sp is disjoint from the frame.
+            # (A frame address stored at a variable offset escapes the frame.)
+            self.fail(text, "a frame address stored in the frame may be read back here, "
+                      "where the stored slot cannot be placed")
+        self.trace.append(("frame-read", address, width, stores))
+        return ("frame-read", len(self.trace) - 1)
 
     def observed(self, address):
         """an address as the trace records it: escaped stack slots relative to the escape"""
         if is_stack(address) and self.frame_base is not None:
             return ("frame", signed32(linear(address)[0]) - self.frame_base)
         return address
+
+    def sp_moved(self, old, new):
+        """sp rose: the slots below its new value are released (see load).
+        run() refuses an sp that is not a fixed offset, so both are."""
+        if is_stack(old) and is_stack(new) and signed32(linear(new)[0]) > signed32(linear(old)[0]):
+            self.memory.append(("release", signed32(linear(new)[0])))
 
     def escape(self, values, text):
         """the frame becomes visible to other code through a pointer in values.
@@ -1463,7 +1609,14 @@ class Executor:
         stores applied byte by byte in program order; each escape takes a
         new snapshot.  So two compiles cannot hand over different stack data,
         on either side of the pointer.  From then on stack stores are
-        observable and calls may change the frame.
+        observable and calls may change the frame.  A store at a variable
+        offset from sp has no place in the byte map, and before the first
+        escape no event orders it among the fixed-slot stores, so if one
+        precedes the first escape, that escape also carries local_stores.
+        Under escaped-local extents (a frame model) every escape after such a
+        store carries the model's ordering() instead: the stores at a variable
+        offset among the stores to the escaped locals, the only bytes the
+        snapshot holds.
         """
         pointers = [value for value in values if carries(value, SP)]
         if not pointers:
@@ -1473,7 +1626,7 @@ class Executor:
                 self.fail(text, f"a stack address escapes as {show(pointer)}")
         if self.frame_base is None:
             self.frame_base = min(signed32(linear(pointer)[0]) for pointer in pointers)
-        self.escaped = True
+        first, self.escaped = not self.escaped, True
         if self.frame is not None:
             self.frame.escape(self, pointers, text)
         frame = {}
@@ -1491,8 +1644,19 @@ class Executor:
                 else:
                     part = ("byte", byte, value)
                 frame[offset + byte - self.frame_base] = part
-        self.trace.append(("escape", tuple(sorted(frame.items()))) +
-                          (self.frame.ordering(self) if self.frame is not None else ()))
+        event = ("escape", tuple(sorted(frame.items())))
+        if self.frame is not None:
+            # escaped_local_extents: the snapshot holds the escaped locals only, and
+            # ordering() binds every store at a variable offset among the constant
+            # stores into them, at every escape (local_stores would bind internal
+            # slots too, which stay internal)
+            event += self.frame.ordering(self)
+            self.premised = self.premised or len(event) > 2
+        elif first and any(entry[0] == "store" and carries(entry[2], SP) and not is_stack(entry[2])
+                           for entry in self.memory):
+            event += (self.local_stores(base=self.frame_base),)
+            self.premised = True
+        self.trace.append(event)
 
     def store(self, width, address, value, saved=False, text="", derived=False):
         value = truncate(value, width * 8)
@@ -1762,6 +1926,8 @@ class Executor:
                             if not isinstance(value, int)]
                 if len(symbolic) == 1:
                     record.affine_source = register(symbolic[0])
+            if destination == "sp":
+                self.sp_moved(regs["sp"], result)
             regs[destination] = result
             derived = bool(record.reads & self.derived)
             self.derived = (self.derived | {destination}) if derived else (self.derived - {destination})
@@ -1841,12 +2007,18 @@ class Executor:
                 address = add(start, 4 * n)
                 self.check_address(address, 4, text, multiple=True)
                 if storing:
-                    self.store(4, address, regs[name], saved=mnemonic == "push", text=text,
+                    # Only a callee-saved register or lr makes a saved slot: an
+                    # argument register pushed (agbcc's varargs prologue pushes
+                    # r0-r3) is data that the body may address.
+                    saved = mnemonic == "push" and name not in ARGUMENT_REGISTERS
+                    self.store(4, address, regs[name], saved=saved, text=text,
                                derived=derived or name in self.derived)
                 else:
                     loaded[name] = self.load(4, False, address, text)[0]
                     clean[name] = self.load_clean and not derived
             if writeback:
+                if mnemonic == "pop":
+                    self.sp_moved(regs[base], add(regs[base], 4 * len(names)))
                 regs[base] = start if mnemonic == "push" else add(regs[base], 4 * len(names))
             for name, value in loaded.items():
                 if name != "pc":
@@ -2720,6 +2892,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional, indirect = \
         (set() for _ in range(8))
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
+    premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
         records = path.records
         for call in records:
@@ -2827,6 +3000,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 1. the stripped compile behaves the same on this path
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
                        interfaces, _capture_load_provenance=_capture_load_provenance)
+        premised = premised or getattr(path, "premised", False) or getattr(other, "premised", False)
         if forwarded_updates:
             # Ordinary reads crossed by the distinct forwarding proof are not
             # discarded: require their complete ordered provenance in both
@@ -2923,6 +3097,11 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    if premised:
+        result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
+                   list(FRAME_READ_PREMISES))
+        # the tested-update re-reads stay tagged after the positional parts, so record() finds them
+        return result + (tested_update.Rereads(sorted(tested)),) if tested else result
     if tested:
         # tagged, so record() finds it after whatever optional parts precede it
         return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
@@ -2949,11 +3128,21 @@ def show_event(event):
                           for register, value in part[1:])
         return f"call {target}({', '.join(show(a) for a in event[2])})" + \
             (f" with {unnamed[2:]}" if unnamed else "")
+    if event[0] == "frame-read":
+        return f"frame read{event[2] * 8} {show(event[1])} after {show_stores(event[3])}"
     if event[0] == "escape":
-        return "frame escape {" + ", ".join(f"{offset:+#x}: {show(value)}" for offset, value in event[1]) + "}"
+        return "frame escape {" + ", ".join(f"{offset:+#x}: {show(value)}" for offset, value in event[1]) + "}" + \
+            (f" after {show_stores(event[2])}" if len(event) > 2 else "")
     if event[0] in ("loop", "back-edge", "saved"):
         return f"{event[0]} {event[1:]}"        # volatile_loop_induction
     return "return" + (f" {show(event[1])}" if len(event) > 1 else "")
+
+
+def show_stores(stores):
+    return "[" + ", ".join(
+        f"store{item[2] * 8} {show(item[1])} <- {show(item[3])}" if item[0] == "store" else
+        "{" + ", ".join(f"{offset:+#x}: {show(part)}" for offset, part in item[1]) + "}"
+        for item in stores) + "]"
 
 
 def normalised(lines):
@@ -3131,7 +3320,7 @@ def record(symbol, results, perturbed=False):
         extra = [part for part in extra if not getattr(part, "loop_induction", False)]
         tested = next((part for part in extra if isinstance(part, tested_update.Rereads)), [])
         extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
-        unloaded, relied, updates, ordinary, conditional, indirect = (extra + [[], [], [], [], [], []])[:6]
+        unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
                      f"chained re-reads at {list(n + 1 for n in chained)}" +
@@ -3145,6 +3334,7 @@ def record(symbol, results, perturbed=False):
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
                      (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
+                     (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
                      (f", {loops.describe()}" if loops else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +

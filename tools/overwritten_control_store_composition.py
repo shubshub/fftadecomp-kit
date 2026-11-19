@@ -274,9 +274,14 @@ def unchanged_fill_prefix(real, stripped, interfaces):
 
 
 def record(symbol, results):
-    """Fresh canonical composition evidence carried by normal volatile replay."""
+    """Fresh canonical composition evidence carried by normal volatile replay.  A verdict that
+    relied on volatile_semantics' frame-read premises (kit#346) names them, as the plain record
+    does: the SHA-256 binds them, but a premise is stated, not only hashed."""
     import json
     fingerprint = hashlib.sha256(json.dumps(results,sort_keys=True,separators=(',',':')).encode()).hexdigest()
+    premises = list(semantics.FRAME_READ_PREMISES)
+    premised = any(part == premises for _, proof in results for part in proof["result"])
     return (f"* allowlisted volatile semantics: `{symbol}` conditional ordinary overwritten control stores; "
             f"{PREMISE}; independent member permutation and original volatile classifiers preserved; "
-            f"composition SHA-256 {fingerprint}")
+            f"composition SHA-256 {fingerprint}" +
+            (f"; frame reads under premises: {'; '.join(premises)}" if premised else ""))
