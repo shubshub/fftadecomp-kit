@@ -3353,11 +3353,12 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   reaches the ROM range, or any other operation on a constant, becomes tainted,
   and a loop that keeps changing a constant is tainted after sixteen revisits.
   Only the registers a revisit changes are tainted: an entry whose joined state
-  is unchanged keeps it, except that an exact value arriving at a constant-derived
-  (MIXED) entry counts as a change, since MIXED would drop that value's ROM check.
-  A constant combined with a loaded value stays constant-derived.
-  `adds/subs rd, rs, #0` (and `movs rd, rs`) are register copies and carry the
-  source's state over unchanged. Once a
+  is unchanged keeps it.
+  A constant combined with a loaded value stays constant-derived. At a join the
+  interval covers the exact values of every incoming path that has one; a path
+  where the constant met a loaded value adds none, so it cannot hide the others
+  from the ROM check. `adds/subs rd, rs, #0` (and `movs rd, rs`) are register
+  copies and carry the source's state over unchanged. Once a
   constant-derived value has been stored on a path (other than through SP, the
   verified write-only outgoing frame), every later non-literal load on that path
   is constant-derived too, whatever register or address it uses; the flag is

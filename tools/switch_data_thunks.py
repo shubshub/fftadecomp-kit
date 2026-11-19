@@ -106,7 +106,25 @@ ROM_LOW, ROM_HIGH = 0x08000000, 0x0E000000
 BINARY = frozenset(('add', 'adds', 'sub', 'subs', 'lsls', 'lsrs', 'orrs', 'ands', 'eors', 'bics'))
 OTHER = frozenset(('asrs', 'rors', 'muls', 'adcs', 'sbcs', 'mvns', 'negs', 'rsbs'))
 CONSTANT_BUDGET = 16
-MIXED = (-1, -1)  # constant-derived, value unknown (a constant combined with a loaded value)
+# A register in the constant map may be constant-derived. Its value is the interval of the
+# exact values it holds on the paths where it was built only from immediates and literal
+# words; MIXED holds none (on every such path a constant met a loaded value).
+MIXED = (-1, -1)
+
+
+def join(old, new):
+    """The constant state of a register that reaches a join with ``old`` and ``new``.
+
+    A MIXED path adds no exact value, so it cannot hide the other paths' interval from
+    the ROM check (kit #367); the register stays constant-derived by staying in the map.
+    An interval is the hull of the exact paths only: even a one-value interval does not
+    mean the register holds that value on every path (it may be MIXED or loaded on others).
+    """
+    if old == MIXED:
+        return new
+    if new == MIXED:
+        return old
+    return min(old[0], new[0]), max(old[1], new[1])
 
 
 def constant_value(operand, constants):
@@ -153,8 +171,12 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     immediate, then add, sub, shifts and logical operations over constants).
     An interval that reaches the ROM range, or any other operation on a
     constant, makes the register tainted; a loop that keeps changing a constant
-    taints it after a fixed number of revisits. A thunk register that holds any
-    constant-derived value is refused, so a callback must be loaded from memory.
+    taints it after a fixed number of revisits. A constant combined with a
+    loaded value is constant-derived with no exact value (MIXED). At a join the
+    interval covers the exact values of every path that has one, and a MIXED or
+    non-constant path adds none, so it cannot hide them from the ROM check. A
+    thunk register that holds any constant-derived value is refused, so a
+    callback must be loaded from memory.
 
     Premises: callee results are untainted under the ordinary call ABI; a code
     address passed to a callee as an argument (r0-r3 or stack) and kept in
@@ -185,26 +207,17 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
         merged = dict(old_known)
         for register, low, high in known:
             old = merged.get(register)
-            if old is None:
-                merged[register] = (low, high)
-            elif MIXED in (old, (low, high)):
-                merged[register] = MIXED
-            else:
-                merged[register] = (min(low, old[0]), max(high, old[1]))
+            merged[register] = (low, high) if old is None else join(old, (low, high))
         if site in states and incoming <= old_tainted and merged == old_known and (not dirty_in or old_stored):
             continue
         tainted, stored = old_tainted | incoming, old_stored or dirty_in
         revisits[site] = revisits.get(site, 0) + 1
         if revisits[site] > CONSTANT_BUDGET:
             # Widen only what this visit changed: an unchanged entry is already the
-            # join of every path seen here. MIXED tops the constant lattice but does
-            # not cover an exact interval for taint (the interval's ROM check would be
-            # lost), so an exact incoming value absorbed into MIXED is also a change.
-            # The kept map only shrinks from here on.
-            exact_in = {register for register, low, high in known if (low, high) != MIXED}
+            # join of every path seen here (an exact value arriving at a MIXED entry
+            # changes it, see join). The kept map only shrinks from here on.
             changing = frozenset(register for register, value in merged.items()
-                                 if old_known.get(register) != value or
-                                 value == MIXED and register in exact_in)
+                                 if old_known.get(register) != value)
             tainted |= changing
             merged = {register: value for register, value in merged.items() if register not in changing}
         states[site] = (tainted, merged, stored)
@@ -285,6 +298,8 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
                     if item.mnemonic in BINARY and (None in values or MIXED in values):
                         mixed = True  # a constant combined with another value stays constant-derived
                     elif item.mnemonic in BINARY:
+                        # The paths where every operand is exact. On an operand's MIXED paths the result
+                        # is MIXED, which its map entry (or its taint) already covers.
                         result = combine(item.mnemonic, *values)
                         escapes = result is None
                     else:
