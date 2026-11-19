@@ -346,7 +346,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f469755ec5fac3f44aae737fb3ae3dce6478b81d58ffb26d2cfd8135855abf27",
+        "acknowledged_cursor": 7017022405,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f469755ec5fac3f44aae737fb3ae3dce6478b81d58ffb26d2cfd8135855abf27",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080E13A8\",\"who\":\"claude-ffta2\",\"claim_id\":6989631601,\"reason\":\"parked for now: bytes identical (932/932), refused: volatile SDK fill temporaries (kit #164) + no profile for initialised arrays with BIOS fills\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-19T17:38:44Z",
+          "id": 7017022405,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T17:38:44Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "b6f4b7300a6d5504f8d27deea56fb2bcfc625b9c58458861ca3a6b85a2ea9671",
+        "result": {
+          "address": "0x080E13A8",
+          "claim_id": 6989631601,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7017022405,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
