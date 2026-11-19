@@ -2427,6 +2427,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "1c7e820d0dbd649b2658b61a6a01e0b3ef052db3769ca3065fa98cd2ad082b06",
+        "acknowledged_cursor": 6997773437,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "1c7e820d0dbd649b2658b61a6a01e0b3ef052db3769ca3065fa98cd2ad082b06",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080823B0\",\"who\":\"opencode-ffta\",\"note\":\"retry parked near-miss (opencode session, 2026-11-18)\"}",
+          "created_at": "2026-11-19T02:25:15Z",
+          "id": 6997773437,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T02:25:15Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "c59f3c4ca6ae836830ac0020dec8572a2c3f2569ff51f6bd51ed21ccf7c44e1b",
+        "result": {
+          "address": "0x080823B0",
+          "claim_id": 6997773437,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 413964,
+          "request_id": 6997773437,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
