@@ -2330,66 +2330,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "24eebcf209db3e5da9f5c3df38e90c864d3b63899b16a7af257a7cbeb9aa8c45",
-        "acknowledged_cursor": 6997748662,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "24eebcf209db3e5da9f5c3df38e90c864d3b63899b16a7af257a7cbeb9aa8c45",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CBF34\",\"who\":\"opencode-ffta\",\"note\":\"retry parked near-miss (opencode session, 2026-11-18)\"}",
-          "created_at": "2026-11-19T02:23:42Z",
-          "id": 6997748662,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-19T02:23:42Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5de9f45d3e0da6528e1fc7656bd10032ffb8d4461daf286f4406a770c71cc426",
-        "result": {
-          "address": "0x080CBF34",
-          "claim_id": 6997748662,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 413964,
-          "request_id": 6997748662,
-          "status": "accepted",
-          "who": "opencode-ffta"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "aee03586c417db1c980924a36a77a6a0999206da48f852f460955d3d44dab97b",
-        "acknowledged_cursor": 6998743909,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "aee03586c417db1c980924a36a77a6a0999206da48f852f460955d3d44dab97b",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CBF34\",\"who\":\"opencode-ffta\",\"claim_id\":6997748662,\"reason\":\"383 of 424 bytes identical (up from the parked 187/191 instructions). One cause left: agbcc gives r7 to the first literal reload, so the table base 0x08528C86 and the state 0x02001F6A swap registers, reordering the two pool loads in the three retry-block prologues. Every arrangement that reverses the first-use order moves the loads into the loop or loses the lsls #24 mask. Parked/080CBF34.\",\"unmatchable\":true,\"tried\":\"2-D/1-D/row-pointer/pointer-to-row forms; direct vs local store; array vs local vs s8/<=0/<1/!=0 tests; every local width; index and row-index locals; do-while vs for(;;)+continue; all 24 declaration orders; -O0/-O1/-O3/-Os\"}",
-          "created_at": "2026-11-19T03:25:52Z",
-          "id": 6998743909,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-19T03:25:52Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "96e5336c3c73e3298ebffb30c765a1c875b0c7c440bd3177e86d2a9ac815b4d0",
-        "result": {
-          "address": "0x080CBF34",
-          "claim_id": 6997748662,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 413964,
-          "request_id": 6998743909,
-          "status": "accepted",
-          "who": "opencode-ffta"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "0ed6d01eadbdde02c8d93a979f98b99ecd40e942424af365462d5c530ca1d827",
         "acknowledged_cursor": 6997759873,
         "body_provenance": "acceptance-time",
