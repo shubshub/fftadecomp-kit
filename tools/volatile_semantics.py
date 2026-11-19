@@ -429,10 +429,18 @@ def declared_before(names, index):
 def parameter_parts(text):
     """Split only outer commas; malformed or unbounded declarators fail closed.
 
-    Parentheses, brackets and braces all nest. An outer `?` refuses, since
-    `a ? b, c : d` holds a comma that separates nothing.
+    Parentheses, brackets and braces all nest. An outer conditional operator
+    nests too, from its `?` to its `:`: the middle operand is an expression,
+    so `a ? b, c : d` is one argument whose comma separates nothing, while
+    the last operand ends at the next outer comma.  A character or string
+    literal could hide a `?`, `:` or comma, so in raw text an outer `?`
+    beside a quote refuses.  The check itself reads translation_unit's
+    output, where every literal is already blanked, so there a conditional
+    with literal operands is read like any other; the quote refusal is
+    defence in depth for raw text.
     """
-    parts, start, nesting = [], 0, []
+    parts, start, nesting, pending = [], 0, [], 0
+    quoted = "'" in text or '"' in text
     for position, character in enumerate(text):
         if character in "([{":
             nesting.append({"(": ")", "[": "]", "{": "}"}[character])
@@ -442,12 +450,19 @@ def parameter_parts(text):
             if not nesting or nesting.pop() != character:
                 raise SemanticError("unbalanced parameter declaration")
         elif character == "?" and not nesting:
-            raise SemanticError("an outer conditional operator in a parameter or argument list")
-        elif character == "," and not nesting:
+            if quoted:
+                raise SemanticError("an outer conditional operator beside a literal in a parameter or "
+                                    "argument list")
+            pending += 1
+        elif character == ":" and not nesting:
+            if not pending:
+                raise SemanticError("an outer `:` without its `?` in a parameter or argument list")
+            pending -= 1
+        elif character == "," and not nesting and not pending:
             parts.append(text[start:position].strip())
             start = position + 1
     parts.append(text[start:].strip())
-    if nesting or any(not part for part in parts):
+    if nesting or pending or any(not part or part[0] in "?:" or part[-1] in "?:" for part in parts):
         raise SemanticError("malformed parameter declaration")
     return parts
 
