@@ -1498,7 +1498,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "d3d069aeaba82f1b7955964b9494ac0bb4a0d0b7d25d9f7ae285c8870d38d2f5",
+        "acknowledged_cursor": 7019436424,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d3d069aeaba82f1b7955964b9494ac0bb4a0d0b7d25d9f7ae285c8870d38d2f5",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08083FB0\",\"who\":\"claude-ffta2\",\"claim_id\":7019041441,\"reason\":\"parked for now: bytes identical, refused because the owner guarded-switch selectors do not accept a two-word interposed pool\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-19T19:12:13Z",
+          "id": 7019436424,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T19:12:13Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f0e91a3391f5072c6dd5eba7cdd152c341d2d376ec638065b3c1e2e94efc5026",
+        "result": {
+          "address": "0x08083FB0",
+          "claim_id": 7019041441,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7019436424,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
