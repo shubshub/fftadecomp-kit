@@ -2621,8 +2621,13 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.update(("scalar_policy", "scalars"))
     if pool_data:
         fields.add("pool_policy")
+    # Same-owner long BL edges exist only beside the outgoing-argument frame,
+    # and the key appears only when there is at least one.
+    long_branches = pool_frame and "local_long_branches" in manifest
     if pool_frame:
         fields.add("stack_policy")
+    if long_branches:
+        fields.add("local_long_branches")
     if wide_data:
         fields.update(wide_scalars.FIELDS)
     if function_data:
@@ -2818,6 +2823,13 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             switch_thunk_premises=switch_data_thunks.StorePremises(
                                                 switch_data_thunks.premise_records(manifest))
                                             if thunk_selector else None)
+    if pool_frame:
+        import local_long_branch_profile as local_long_branch
+        recorded = manifest["local_long_branches"] if long_branches else None
+        if recorded is not None:
+            local_long_branch.validate_record(recorded)
+        if local_long_branch.record(instructions, address) != recorded:
+            raise ValueError("switch local long branches must be recorded exactly")
     if thunk_selector:
         # The thunk binding's own literal rules: no object or literal may name a
         # code entry or a reserved thunk, so no data word can become a call target.
@@ -4875,7 +4887,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if not stack_operation and adjustment is None and ARM_REG_SP in registers:
                 raise ValueError("scalar switch frames exclude stack-address materialization")
         calling = CS_GRP_CALL in instruction.groups
-        local_branch = (calling and (double_context is not None or
+        # The outgoing-argument switch frame proof carries its pending words
+        # across these edges and refuses an LR read after one; the restoring
+        # frame proof below re-proves every edge.
+        local_branch = (calling and (double_context is not None or switch_outgoing_stack is not None or
                                      addressed_signed_runtime.local_branches(addressed_signed_runtime_context)) and
                         len(operands) == 1 and operands[0].type == ARM_OP_IMM and
                         address <= operands[0].imm < end)
@@ -5497,13 +5512,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if typed_switch_outgoing_frame is not None:
         typed_switch_frame.verify_frame(instructions, edges, address, calls)
     if switch_outgoing_stack is not None:
-        pool_switch_frame.verify_frame(instructions, edges, address, calls)
+        pool_switch_frame.verify_frame(instructions, edges, address, calls, local_branches)
     if switch_thunks is not None:
         if switch is None or calls != validated_calls:
             raise ValueError("switch thunks require their verified local switch and exact calls")
         switch_data_thunks.verify_thunk_targets(instructions, edges, address, calls,
                                                 address + switch["literal"], data, engine_rom=engine_track_rom,
-                                                objects=switch_data_relocations, premises=switch_thunk_premises)
+                                                objects=switch_data_relocations, premises=switch_thunk_premises,
+                                                branches=local_branches)
     reaching_return = set(returns)
     pending = list(returns)
     while pending:
@@ -6613,6 +6629,10 @@ def main():
                         switch_evidence["pool_policy"] = SWITCH_POOL_POLICY
                     if pool_frame_profile:
                         switch_evidence["stack_policy"] = pool_switch_frame.STACK_POLICY
+                        import local_long_branch_profile as local_long_branch
+                        long_branches = local_long_branch.record(scalar_instructions, addr)
+                        if long_branches is not None:
+                            switch_evidence["local_long_branches"] = long_branches
                     if function_switch_profile:
                         switch_evidence["function_policy"] = SWITCH_FUNCTION_POLICY
                         switch_evidence["functions"] = [[offset, name] for offset, (name, _)

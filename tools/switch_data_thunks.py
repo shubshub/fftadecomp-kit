@@ -328,7 +328,7 @@ def premise_lines(address, manifest):
 
 
 def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None, *, engine_rom=None, objects=None,
-                         premises=None):
+                         premises=None, branches=None):
     """Refuse a thunk call whose target register may hold a local code address.
 
     Local provenance enters through every load of the switch table pointer
@@ -400,12 +400,17 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     16-bit ARMv4T mnemonics in ``ARMV4T`` (hi-register and bx forms checked by
     encoding) plus the bound BL pairs, and refuses ``svc``, ``bkpt`` and
     ``udf`` (kit #180): the model must agree with the ARM7TDMI on every byte.
+    ``branches`` names the same-owner long BL jumps that the framed selector's
+    verifier admitted and re-proves. Such a BL is no call: it clobbers no
+    argument register, and the continuation it leaves in LR is a local code
+    address, so LR is tainted after it.
     """
     engine_call = None if engine_rom is None else \
         music.verified_callback(instructions, edges, address, calls, data, engine_rom, objects)
 
     def walk(relaxed):
-        return walk_thunk_targets(instructions, edges, address, calls, pointer, data, engine_call, relaxed)
+        return walk_thunk_targets(instructions, edges, address, calls, pointer, data, engine_call, relaxed,
+                                  branches or {})
 
     try:
         walk(frozenset())
@@ -435,11 +440,13 @@ def verify_thunk_targets(instructions, edges, address, calls, pointer, data=None
     return derived
 
 
-def walk_thunk_targets(instructions, edges, address, calls, pointer, data, engine_call, relaxed):
+def walk_thunk_targets(instructions, edges, address, calls, pointer, data, engine_call, relaxed, branches=None):
     """One walk of ``verify_thunk_targets``: {relaxed load: the constant stores it may read}.
 
     ``relaxed`` is the set of non-exact loads the premise covers, or None for all of them.
+    ``branches`` holds the sites of same-owner long BL jumps, which clobber only LR.
     """
+    branches = {} if branches is None else branches
     import function_thunk_profile as function_thunk
     from capstone import CS_GRP_INT
     from capstone.arm import (ARM_INS_BL, ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_REG_LR, ARM_REG_PC,
@@ -514,9 +521,11 @@ def walk_thunk_targets(instructions, edges, address, calls, pointer, data, engin
             if result != MIXED and base in definite:
                 exact.add(base)
         item = instructions[site]
-        if item.size != 2 and not (item.id == ARM_INS_BL and item.size == 4 and site in calls) or \
+        if item.size != 2 and not (item.id == ARM_INS_BL and item.size == 4 and
+                                   (site in calls or site in branches)) or \
                 CS_GRP_INT in item.groups or item.size == 2 and not armv4t_encoding(item):
-            raise ValueError('switch thunks admit only 16-bit ARMv4T encodings and bound BL pairs')
+            raise ValueError('switch thunks admit only 16-bit ARMv4T encodings, bound BL pairs '
+                             'and local long branches')
         read, written = item.regs_access()
         read, written = set(read), set(written) & registers
         mems = [operand.mem for operand in item.operands if operand.type == ARM_OP_MEM]

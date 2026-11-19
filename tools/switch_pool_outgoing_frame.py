@@ -49,18 +49,26 @@ def check_context(policy):
         raise ValueError('outgoing-argument switch frame requires its canonical stack policy')
 
 
-def verify_frame(instructions, edges, address, calls):
+def verify_frame(instructions, edges, address, calls, branches=None):
     """Prove one fixed frame of write-only outgoing words on every reached path.
 
     The ordinary verifier already supplies the complete CFG, balanced saved
     registers, entry-LR return, typed literal ownership and the ordinary
-    direct-call ABI boundary. This adds:
+    direct-call ABI boundary. ``branches`` maps each same-owner long BL (an
+    agbcc far jump) to its target; the caller has recognised each one with
+    local_long_branch_profile.target and re-proves them all with its
+    restoring-frame proof. This adds:
 
     * one constant `sub sp,#n` reached before any call or frame access, and
       every return reached only after an `add sp,#n` of the same size;
     * no other SP arithmetic and no SP register operand, so no stack address
       reaches a register and no block transfer is based on SP; 32-bit
-      encodings other than the bound calls are refused;
+      encodings other than the bound calls and the long-BL edges are refused;
+    * a long-BL edge is a jump, not a call: its only successor is its target,
+      it consumes no outgoing words, and the walk carries the phase and the
+      pending words to the target, where every rule below applies as on any
+      other edge. It leaves a local continuation address in LR, so a read of
+      LR on any path before LR is written again refuses;
     * frame accesses are only `str rX,[sp,#k]` with k a word offset below n;
       the caller never reads the frame;
     * each call consumes the words written since the previous call (or the
@@ -73,16 +81,28 @@ def verify_frame(instructions, edges, address, calls):
 
     No fact about a callee's arity or memory effects follows.
     """
-    from capstone.arm import ARM_OP_MEM, ARM_OP_REG, ARM_REG_SP
+    from capstone.arm import ARM_OP_MEM, ARM_OP_REG, ARM_REG_LR, ARM_REG_SP
     from match import thumb_stack_adjustment
+    branches = {} if branches is None else branches
+    for site, destination in branches.items():
+        if site in calls or site not in instructions or instructions[site].size != 4 or \
+                tuple(edges[site]) != (destination,):
+            raise ValueError('outgoing-argument frame long branches must be exact non-call edges')
     allocations, releases = {}, {}
+    reads_lr, writes_lr = set(), set()
     for site, item in instructions.items():
+        read, written = item.regs_access()
+        if ARM_REG_LR in read:
+            reads_lr.add(site)
+        if ARM_REG_LR in written:
+            writes_lr.add(site)
         adjustment = thumb_stack_adjustment(item)
         if adjustment:
             (allocations if adjustment < 0 else releases)[site] = abs(adjustment)
             continue
-        if item.size != 2 and site not in calls:
-            raise ValueError('outgoing-argument switch frame admits only 16-bit Thumb instructions and calls')
+        if item.size != 2 and site not in calls and site not in branches:
+            raise ValueError('outgoing-argument switch frame admits only 16-bit Thumb instructions, '
+                             'calls and local long branches')
         if item.mnemonic in ('push', 'pop'):
             continue
         # Capstone names an ldm/stm base as a register operand, so this also
@@ -97,7 +117,8 @@ def verify_frame(instructions, edges, address, calls):
     allocation, words = next(iter(allocations.items()))
     full = (1 << words) - 1
     consumed = {}
-    pending = [(address, 0, 0)]
+    # continuation: on this path LR may hold a long-BL continuation address.
+    pending = [(address, 0, 0, False)]
     seen = set()
     while pending:
         state = pending.pop()
@@ -106,8 +127,14 @@ def verify_frame(instructions, edges, address, calls):
         seen.add(state)
         if len(seen) > STATE_LIMIT:
             raise ValueError('outgoing-argument frame proof exceeds its state limit')
-        site, phase, written = state
+        site, phase, written, continuation = state
         item = instructions[site]
+        if continuation and site in reads_lr:
+            raise ValueError('a local long branch leaves a continuation in LR that nothing may read')
+        if site in branches:
+            continuation = True
+        elif site in writes_lr:
+            continuation = False
         if site == allocation:
             if phase != 0:
                 raise ValueError('outgoing-argument frame allocation is repeated or out of lifetime')
@@ -139,6 +166,6 @@ def verify_frame(instructions, edges, address, calls):
         successors = edges[site]
         if not successors and phase != 2:
             raise ValueError('outgoing-argument frame return must follow its release')
-        pending.extend((target, phase, written) for target in successors)
+        pending.extend((target, phase, written, continuation) for target in successors)
     if not consumed or max(consumed.values()) != full:
         raise ValueError('every outgoing-argument frame word must be consumed by a call')

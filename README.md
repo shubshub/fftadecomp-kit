@@ -3466,7 +3466,8 @@ arguments 5 and up:
   live;
 * no stack address in a register: any SP register operand (`add rX,sp,#k`,
   `mov rX,sp`, `add rX,sp`, an SP-based `ldm`/`stm`) rejects, as does any
-  32-bit encoding other than a bound call;
+  32-bit encoding other than a bound call or a same-owner long `bl` jump
+  (below);
 * the caller only writes the frame, with `str rX,[sp,#k]` for word-aligned
   `0 <= k < n`. A read of the frame, before or after a write, rejects;
 * each call consumes the words written since the previous call (or the
@@ -3476,8 +3477,39 @@ arguments 5 and up:
   rejects, and some call must consume the whole frame. Later calls are not
   shown to ignore stale frame words: only the frame stores since the previous
   call are attributed to a call, and no proof relies on frame contents;
-* the per-path walk is bounded at 65536 `(site, phase, written-words)`
-  states, and a function that needs more rejects.
+* the per-path walk is bounded at 65536 `(site, phase, written-words,
+  LR-continuation)` states, and a function that needs more rejects.
+
+A function longer than the narrow Thumb branch range reaches its shared exits
+with agbcc's same-owner long `bl` jumps (`@ far jump`); a far conditional
+branch, such as a switch guard's default, becomes an inverted branch over such
+a `bl`, and `far_jump_used_p` makes the prologue save LR. The frame proof
+admits them as plain edges:
+
+* the `bl` is an unconditional Thumb BL pair to a non-entry instruction
+  boundary inside the function, with no relocation and no call binding. A
+  call binding at that site, a target at the entry, inside an instruction,
+  in the table, its pointer or a literal word, or on the guard and dispatch
+  sequence rejects; a `bl` past the end of the function is an unbound call;
+* the edge is a jump: its only successor is the target, it clobbers no
+  argument register and consumes no outgoing words. The pending words and
+  the frame phase carry to the target, where every rule above applies;
+* the `bl` leaves a local code address in LR. A read of LR on any path from
+  it before LR is written again rejects, and so does a return through LR;
+* the existing `thumb-same-owner-long-bl-restoring-frame-v1` proof re-proves
+  every edge: each return restores SP, r4-r11 and the entry LR from the
+  saved frame.
+
+The manifest records the edges as `local_long_branches`,
+`{"schema": "thumb-same-owner-long-bl-restoring-frame-v1", "edges": [[site,
+target], ...]}` in function offsets, only when there is at least one, so
+reports without far jumps are unchanged. Replay re-derives the record and
+rejects a missing, extra or altered one. The admission is keyed on this frame
+proof, so every selector that carries it takes the edges:
+`u16-scalars-frame-v1`, `u16-scalars-fixed-frame-v1` (below),
+`u16-scalars-functions-frame-v1` and `-v2`, and `switch-thunks-frame-v1`,
+whose thunk-target walk also treats LR as a local code address after the
+jump. Frameless switch-data selectors still reject every same-owner `bl`.
 
 Non-SP block copies keep their ordinary meaning, because no register can hold
 a stack address. The ordinary direct-call ABI boundary is unchanged: nothing
