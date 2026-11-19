@@ -1,10 +1,13 @@
 """Stack-index owners whose locals hold spilled stack addresses and counters (frame words)."""
+import copy
 from pathlib import Path
 import struct
 import sys
 import unittest
+from unittest import mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+import match
 import owner_admission_profile as owner
 import stack_index_frame_words_profile as fw
 import stack_index_precondition_profile as sip
@@ -16,6 +19,7 @@ SELECTOR = sip.SELECTOR
 RANGED = (0x1c04, 0x2103, 0x400c)        # r4 = entry_R0 & 3
 MASKED = (0x1c04, 0x0624, 0x0e24)        # r4 = entry_R0 & 255
 ACCESS = (0x4669, 0x5D08)                # mov r1,sp; ldrb r0,[r1,r4]
+FORCE = (0x4668, 0x9003, 0x9B03)         # mov r0,sp; str r0,[sp,#12]; ldr r3,[sp,#12]: frame words
 CALLEE = 0x08014000
 INNER = CALLEE + 0x100
 
@@ -66,7 +70,305 @@ def words(manifest):
 
 
 class FrameWordTests(unittest.TestCase):
-    # ---- F2: calls ------------------------------------------------------------------------
+    # ---- F3/F4: exact and ranged spills ------------------------------------------------
+    def test_exact_spill_reloads_as_an_index_zero_base_under_the_same_premise(self):
+        # mov r0,sp; str r0,[sp,#12]; ldr r1,[sp,#12]; ldrb r0,[r1,r4]
+        code = frame_owner((0x4668, 0x9003, 0x9903, 0x5D08))
+        _, (manifest, _) = admit(code)
+        found = evidence(manifest)
+        row, = found['preconditions']
+        self.assertEqual((row['expression'], row['bound'], row['array_sp']), ('(entry_R0 & 255)', 3, [0, 3]))
+        self.assertEqual(words(manifest)['pointer_words'], [12 - 36])
+        self.assertEqual(words(manifest)['spills'], [site(code, code.index(0x9003))])
+        line = sip.precondition_lines(found)[-1]
+        self.assertTrue(line.startswith('* stack index frame words: pointer-bearing local words entry_SP-0x18;'))
+        self.assertIn(f'deferred exact spills 0x{site(code, code.index(0x9003)):08X}', line)
+
+    def test_version_two_takes_the_same_rule(self):
+        code = frame_owner((0x4668, 0x9003, 0x9903, 0x5D08))
+        _, (manifest, _) = admit(code, selector=sip.SELECTOR_V2)
+        self.assertEqual(manifest['profile'], sip.SCHEMA_V2)
+        self.assertEqual(evidence(manifest)['preconditions'][0]['expression'], '(u32)(entry_R0 & 255)')
+        self.assertEqual(words(manifest)['pointer_words'], [-24])
+
+    def test_a_plain_admission_carries_no_frame_words(self):
+        _, (manifest, _) = admit(frame_owner(ACCESS))
+        self.assertNotIn('frame_words', evidence(manifest))
+        self.assertEqual(len(sip.precondition_lines(evidence(manifest))), 1)
+
+    def test_disabled_policy_restores_the_core_refusal(self):
+        code = frame_owner((0x4668, 0x9003, 0x9903, 0x5D08))
+        with mock.patch.object(fw.POLICY, 'enabled', False):
+            with self.assertRaisesRegex(ValueError, '^variable stack indices exclude pointer-bearing'):
+                admit(code)
+            # A plain refusal stays the plain one: the reloaded counter has no defined source.
+            with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+                admit(frame_owner(LOOP, index=()))
+
+    def test_a_word_scalar_on_one_path_and_pointer_on_the_other_is_poison(self):
+        # cmp r4,#0; beq T; mov r0,sp; b J; T: movs r0,#0; J: str r0,[sp,#12] is the register join;
+        # here the word itself joins: beq T; mov r0,sp; str r0,[sp,#12]; b J; T: movs r0,#0;
+        # str r0,[sp,#12]; J: ldr r1,[sp,#12]; ldrb r0,[r1]
+        code = frame_owner((0x2C00, 0xD002, 0x4668, 0x9003, 0xE001, 0x2000, 0x9003, 0x9903, 0x7808) + ACCESS)
+        with self.assertRaisesRegex(sip.Refusal, 'mixed provenance used as a base'):
+            admit(code)
+
+    def test_a_release_on_one_path_is_a_release(self):
+        # cmp r4,#0; beq T; add sp,#4; b J; T: mov r0,sp; str r0,[sp,#0]; movs r0,#0; add sp,#4;
+        # J: bl callee
+        body = ACCESS + (0x2100, 0x2C00, 0xD001, 0xB001, 0xE003, 0x4668, 0x9000, 0x2000, 0xB001, CALLEE)
+        with self.assertRaisesRegex(sip.Refusal, 'call after a pointer-bearing local word was released'):
+            admit(frame_owner(body, tail=(0xb003, 0xbcf0, 0xbc02, 0x4708)), **callee(0x4770))
+
+    def test_a_spilled_returned_alias_is_a_pointer_word(self):
+        # mov r0,sp; bl callee; str r0,[sp,#12]: the core keeps the callee's returned alias in R0,
+        # a possible stack address here, so the deferred spill makes a pointer word.
+        code = frame_owner((0x4668, CALLEE, 0x9003) + ACCESS)
+        _, (manifest, _) = admit(code, **callee(0x4770))
+        self.assertEqual(words(manifest)['pointer_words'], [-24])
+        self.assertEqual(words(manifest)['spills'], [site(code, code.index(0x9003))])
+        # Reloaded, a possible address is no base: ldr r1,[sp,#12]; ldrb r0,[r1]
+        with self.assertRaisesRegex(sip.Refusal, 'mixed provenance used as a base'):
+            admit(frame_owner((0x4668, CALLEE, 0x9003, 0x9903, 0x7808) + ACCESS), **callee(0x4770))
+
+    def test_a_spill_the_analysis_does_not_see_as_an_address_refuses(self):
+        # The same owner, with the core's returned aliases withheld from the analysis: R0 is an
+        # unknown scalar to it, so the deferred spill is not tracked, and that refuses.
+        with mock.patch.object(sip.Policy, 'note_returned', lambda *arguments: None):
+            with self.assertRaisesRegex(sip.Refusal, 'is not a tracked local word'):
+                admit(frame_owner((0x4668, CALLEE, 0x9003) + ACCESS), **callee(0x4770))
+
+    # ---- F8: possible stack addresses ----------------------------------------------------
+    # mov r0,sp; bl callee (bx lr): the core keeps R0 = sp+0 as the callee's returned alias.
+    RETURNED = (0x4668, CALLEE)
+
+    def test_store_through_a_returned_alias_over_a_pointer_word_refuses(self):
+        # adds r5,r0,#0; mov r0,sp; str r0,[sp,#12] (pointer word); str r6,[r5,#12] overwrites it;
+        # ldr r1,[sp,#12]; movs r5,#7; strb r5,[r1,r4]
+        code = frame_owner(self.RETURNED + (0x1C05, 0x4668, 0x9003, 0x60EE, 0x9903, 0x2507, 0x550D))
+        with self.assertRaisesRegex(sip.Refusal, 'store through a possible stack address may reach '
+                                    'the pointer-bearing local word at entry-SP-24'):
+            admit(code, **callee(0x4770))
+
+    def test_load_through_a_returned_alias_of_a_pointer_word_refuses(self):
+        # ... str r0,[sp,#12]; ldr r2,[r5,#12] reads the pointer word; str r6,[r2,#32]
+        code = frame_owner(self.RETURNED + (0x1C05, 0x4668, 0x9003, 0x68EA, 0x6216) + ACCESS)
+        with self.assertRaisesRegex(sip.Refusal, 'load through a possible stack address may reach '
+                                    'the pointer-bearing local word at entry-SP-24'):
+            admit(code, **callee(0x4770))
+
+    def test_a_returned_alias_handed_to_a_callee_beside_a_pointer_word_refuses(self):
+        # adds r5,r0,#0; mov r0,sp; str r0,[sp,#12]; adds r0,r5,#0; bl inner (movs r1,#9;
+        # str r1,[r0,#12]; bx lr); ldr r1,[sp,#12]; ldrb r0,[r1,r4]
+        code = frame_owner(self.RETURNED + (0x1C05, 0x4668, 0x9003, 0x1C28, INNER, 0x9903, 0x5D08))
+        with self.assertRaisesRegex(sip.Refusal, 'receives a stack address in R0 while a local word holds one'):
+            admit(code, **two_callees((0x4770,), (0x2109, 0x60C1, 0x4770)))
+
+    def test_a_possible_address_from_a_join_reaches_its_candidates(self):
+        # movs r0,#1; str r0,[sp,#8]; cmp r4,#0; beq T; mov r5,sp; b J; T: movs r5,#0;
+        # J: str r6,[r5,#8] (the core: r5 may be sp+0); ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]
+        body = (0x2001, 0x9002, 0x2C00, 0xD001, 0x466D, 0xE000, 0x2500, 0x60AE, 0x9802, 0x4669, 0x5C0A)
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner(FORCE + body))
+        # The join keeps its offset: str r6,[r5,#4] reaches sp+4 only, clear of the pointer word.
+        body = (0x2C00, 0xD001, 0x466D, 0xE000, 0x2500, 0x606E)
+        _, (manifest, _) = admit(frame_owner(FORCE + body + ACCESS))
+        self.assertEqual(words(manifest)['pointer_words'], [-24])
+        # stmia r5!,{r6} writes back past the word: a later store through r5 reaches sp+12.
+        body = (0x2C00, 0xD001, 0x466D, 0xE000, 0x2500, 0xC540, 0x60AE)
+        with self.assertRaisesRegex(sip.Refusal, 'store through a possible stack address may reach '
+                                    'the pointer-bearing local word at entry-SP-24'):
+            admit(frame_owner(FORCE + body + ACCESS))
+        # A block store or load through r5 = sp+12 or a scalar covers the pointer word itself:
+        # beq T; add r5,sp,#12; b J; T: movs r5,#0; J: stmia r5!,{r6} or ldmia r5!,{r6}
+        for transfer, kind in ((0xC540, 'store'), (0xCD40, 'load')):
+            with self.subTest(transfer=kind):
+                body = (0x2C00, 0xD001, 0xAD03, 0xE000, 0x2500, transfer)
+                with self.assertRaisesRegex(sip.Refusal, f'{kind} through a possible stack address may '
+                                            'reach the pointer-bearing local word at entry-SP-24'):
+                    admit(frame_owner(FORCE + body + ACCESS))
+
+    def test_block_write_back_moves_a_possible_address(self):
+        # FORCE; mov r0,sp; bl callee; adds r5,r0,#0 (r5 = sp+0, returned); <transfer>; <store>
+        def owner(*body):
+            return frame_owner(FORCE + self.RETURNED + (0x1C05,) + body + ACCESS)
+        # stmia r5!,{r6} or ldmia r5!,{r6} leaves r5 = sp+4: str r6,[r5,#8] reaches the pointer word.
+        for transfer in (0xC540, 0xCD40):
+            with self.subTest(transfer=hex(transfer)):
+                with self.assertRaisesRegex(sip.Refusal, 'store through a possible stack address may reach '
+                                            'the pointer-bearing local word at entry-SP-24'):
+                    admit(owner(transfer, 0x60AE), **callee(0x4770))
+        # str r6,[r5,#4] reaches sp+8 only.
+        admit(owner(0xC540, 0x606E), **callee(0x4770))
+
+    def test_possible_addresses_keep_their_offsets_up_to_a_bound(self):
+        self.assertEqual(fw.possible({-8, -4}), ('O', frozenset({-8, -4})))
+        self.assertEqual(fw.possible(range(-4 * (fw.MAX_POSSIBLE + 1), 0, 4)), sip.OPAQUE)
+        self.assertEqual(fw.possible_join(sip.exact_alias(-8), sip.TOP), ('O', frozenset({-8})))
+        self.assertEqual(fw.possible_join(fw.possible({-8}), sip.exact_alias(-4)), ('O', frozenset({-8, -4})))
+        self.assertEqual(fw.possible_join(sip.OPAQUE, sip.exact_alias(-4)), sip.OPAQUE)
+        self.assertIsNone(fw.candidates(sip.OPAQUE))
+        # OPAQUE may be any local word.
+        analysis = fw.FrameWordsAnalysis(b'\x70\x47', OWNER, frozenset(), frozenset(), {})
+        state = fw.WordState(('L',) * 3, frozenset(), (sip.TOP,) * 16, (None,) * 16, None)
+        self.assertEqual(analysis.spans(state, sip.OPAQUE, 0, 4), [(-12, 0)])
+        self.assertEqual(analysis.spans(state, fw.possible({-8}), 2, 2), [(-6, -4)])
+        self.assertEqual(analysis.spans(state, fw.possible({-8}), None, 2), [(-12, 0)])
+
+    def test_a_returned_alias_outside_r0_r12_refuses(self):
+        # bl callee; bx lr, with the core reporting a returned alias under a key that is no register.
+        data = assemble(OWNER, (CALLEE, 0x4770))
+        for returned, refused in (({None: frozenset({-4})}, True), ({1: frozenset({-4})}, False)):
+            with self.subTest(returned=returned):
+                analysis = fw.FrameWordsAnalysis(data, OWNER, frozenset(), frozenset(), {},
+                                                 returned={OWNER: returned})
+                if refused:
+                    with self.assertRaisesRegex(sip.Refusal, 'returns a stack alias outside R0-R12'):
+                        analysis.run()
+                else:
+                    states = analysis.run()
+                    self.assertEqual(states[OWNER + 4].regs[1], fw.possible({-4}))
+
+    def test_the_policy_records_every_returned_alternative(self):
+        class Result(dict):
+            pass
+        policy = sip.Policy(OWNER, 2)
+        result = Result({match.ARM_REG_R0: -8})
+        result.alternatives = (Result({match.ARM_REG_R0: -4, match.ARM_REG_R12: -12}),)
+        policy.note_returned(0x100, result, result.alternatives)
+        policy.note_returned(0x100, Result({match.ARM_REG_R1: -16}))
+        policy.note_returned(0x104, Result({match.ARM_REG_LR: -20}))
+        self.assertEqual(policy.returned, {0x100: {0: {-8, -4}, 12: {-12}, 1: {-16}}, 0x104: {None: {-20}}})
+
+    # ---- F5: variable accesses avoid pointer-bearing words ------------------------------
+    def test_variable_store_may_not_overlap_a_pointer_word(self):
+        # The spill at sp+12 is never reloaded, so the store's array runs to the frame top.
+        code = frame_owner((0x4668, 0x9003, 0x4669, 0x2507, 0x550D))
+        with self.assertRaisesRegex(sip.Refusal, 'overlaps a pointer-bearing local word at entry-SP-24'):
+            admit(code)
+        # Reloading the word makes it an object of its own: the array stops before it.
+        _, (manifest, _) = admit(frame_owner((0x4668, 0x9003, 0x4669, 0x2507, 0x550D, 0x9A03)))
+        self.assertEqual(evidence(manifest)['preconditions'][0]['bound'], 12)
+
+    def test_proved_range_may_not_overlap_a_pointer_word(self):
+        # r4 = entry_R0 & 15: the proved range sp+0..sp+15 covers the pointer word at sp+12, so
+        # the store needs the premise, whose array stops before it.
+        code = frame_owner((0x4668, 0x9003, 0x4669, 0x2507, 0x550D, 0x9A03), index=(0x1c04, 0x210f, 0x400c))
+        _, (manifest, _) = admit(code)
+        self.assertEqual(evidence(manifest)['accesses'], [])
+        self.assertEqual(evidence(manifest)['preconditions'][0]['bound'], 12)
+        # Without the spill the same proved range needs no premise.
+        _, (manifest, _) = admit(frame_owner((0x4669, 0x2507, 0x550D, 0x9A03), index=(0x1c04, 0x210f, 0x400c)))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+
+    def test_a_wide_access_overlaps_by_its_last_byte(self):
+        # r4 = (entry_R0 & 3) << 2; mov r1,sp; str r5,[r1,r4]: index 3 writes sp+12..15,
+        # the pointer word, so the store needs the premise that stops the array before it.
+        code = frame_owner((0x4668, 0x9003, 0x4669, 0x510D, 0x9A03), index=RANGED + (0x00A4,))
+        _, (manifest, _) = admit(code)
+        row, = evidence(manifest)['preconditions']
+        self.assertEqual((row['kind'], row['bound'], row['scale']), ('store', 3, 4))
+
+    def test_partial_access_to_a_pointer_word_refuses(self):
+        spill = (0x4668, 0x9003, 0xA903)          # ..., add r1,sp,#12
+        with self.assertRaisesRegex(sip.Refusal, 'partial read of a pointer-bearing local word'):
+            admit(frame_owner(spill + (0x7808,) + ACCESS))
+        with self.assertRaisesRegex(sip.Refusal, 'partial store over a pointer-bearing local word'):
+            admit(frame_owner(spill + (0x2000, 0x7008) + ACCESS))
+        # A whole-word store of a scalar ends the pointer: the reload is a plain value again.
+        _, (manifest, _) = admit(frame_owner(spill + (0x2000, 0x6008, 0x9A03, 0x7810) + ACCESS))
+        self.assertEqual(words(manifest)['pointer_words'], [-24])
+
+    def test_block_transfer_over_a_pointer_word_refuses(self):
+        # add r1,sp,#12; ldmia r1!,{r2} reads the pointer word at sp+12.
+        with self.assertRaisesRegex(sip.Refusal, 'block transfer over a pointer-bearing local word'):
+            admit(frame_owner((0x4668, 0x9003, 0xA903, 0xC904) + ACCESS))
+        # The same block reload of the word below it is a plain reload.
+        admit(frame_owner((0x4668, 0x9003, 0xA902, 0xC904) + ACCESS))
+
+    def test_maybe_pointer_word_refuses_as_a_base(self):
+        # cmp r4,#0; beq; mov r0,sp; str r0,[sp,#12]; ldr r1,[sp,#12]; ldrb r0,[r1]
+        code = frame_owner((0x2C00, 0xD001, 0x4668, 0x9003, 0x9903, 0x7808) + ACCESS)
+        with self.assertRaisesRegex(sip.Refusal, 'mixed provenance used as a base'):
+            admit(code)
+        # A register that is a stack address on one path and a scalar on the other, spilled.
+        code = frame_owner((0x2C00, 0xD001, 0x4668, 0xE000, 0x2000, 0x9003, 0x9903, 0x7808) + ACCESS)
+        with self.assertRaisesRegex(sip.Refusal, 'mixed provenance used as a base'):
+            admit(code)
+        # Spilled and never reloaded, it is still a pointer word that accesses must avoid.
+        code = frame_owner((0x2C00, 0xD001, 0x4668, 0xE000, 0x2000, 0x9003) + ACCESS)
+        _, (manifest, _) = admit(code)
+        self.assertEqual(words(manifest)['pointer_words'], [-24])
+        self.assertEqual(words(manifest)['spills'], [site(code, code.index(0x9003))])
+
+    def test_variable_access_may_not_overlap_a_maybe_pointer_word(self):
+        # cmp r4,#0; beq; mov r0,sp; str r0,[sp,#12]; then strb r5,[r1,r4] over the frame.
+        code = frame_owner((0x2C00, 0xD001, 0x4668, 0x9003, 0x4669, 0x2507, 0x550D))
+        with self.assertRaisesRegex(sip.Refusal, 'overlaps a pointer-bearing local word at entry-SP-24'):
+            admit(code)
+
+    def test_reloaded_address_may_not_escape(self):
+        spill = (0x4668, 0x9003, 0x9903)
+        with self.assertRaisesRegex(sip.Refusal, 'escapes to memory'):
+            admit(frame_owner(spill + (0x2200, 0x6011) + ACCESS))         # str r1,[r2]
+        with self.assertRaisesRegex(sip.Refusal, 'comparison'):
+            admit(frame_owner(spill + (0x2900,) + ACCESS))                 # cmp r1,#0
+        with self.assertRaisesRegex(sip.Refusal, 'stored outside a whole allocated local word'):
+            admit(frame_owner(spill + (0xAA01, 0x7011) + ACCESS))         # add r2,sp,#4; strb r1,[r2]
+
+    # ---- F10/F11: scalar words and compare refinement -----------------------------------
+    def test_a_fixed_store_initialises_its_bytes(self):
+        # Four copied bytes and movs r0,#5; str r0,[sp,#4]: sp+0..7 is initialised for r4 < 8.
+        body = FORCE + (0x2005, 0x9001, 0x4669, 0x5D08)
+        _, (manifest, _) = admit(frame_owner(body, count=4, index=(0x1c04, 0x2107, 0x400c)))
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+
+    # ---- F2/F6: calls ---------------------------------------------------------------------
+    def test_pointer_word_inside_a_callee_stack_reach_refuses(self):
+        # add r0,sp,#4; str r0,[sp,#12]; movs r0,#0; bl callee
+        code = frame_owner((0xA801, 0x9003, 0x2000, CALLEE) + ACCESS)
+        with self.assertRaisesRegex(sip.Refusal, 'may reach the pointer-bearing local word at entry-SP-24'):
+            admit(code, **callee(0x9803, 0x4770))                             # ldr r0,[sp,#12]; bx lr
+        admit(code, **callee(0x9802, 0x4770))                                 # ldr r0,[sp,#8]
+        _, (manifest, _) = admit(code, **callee(0x4770))
+        self.assertEqual(words(manifest)['calls'], [[site(code, code.index(CALLEE)), CALLEE, 0, [], []]])
+        self.assertEqual(words(manifest)['unwalked'], [])
+        with self.assertRaisesRegex(sip.Refusal, 'uses SP or PC'):
+            admit(code, **callee(0x4668, 0x4770))                             # mov r0,sp
+
+    def test_a_callee_handed_a_stack_address_may_not_run_beside_pointer_words(self):
+        # movs r1,#0; strb r1,[r0]; bx lr is a bounded buffer callee of the array.
+        body = (0x4668, 0x9003, 0x4668, CALLEE, 0x9903, 0x7808) + ACCESS
+        admit(frame_owner((0x4668, CALLEE) + ACCESS), **callee(0x2100, 0x7001, 0x4770))
+        with self.assertRaisesRegex(sip.Refusal, 'receives a stack address in R0'):
+            admit(frame_owner(body), **callee(0x2100, 0x7001, 0x4770))
+
+    def test_a_callee_reading_r12_receives_the_stack_address_in_it(self):
+        # FORCE (pointer word at sp+12); add r0,sp,#4; mov r12,r0; movs r0,#0; movs r3,#0;
+        # bl callee (mov r0,r12; movs r1,#9; str r1,[r0,#8]: the pointer word; bx lr);
+        # ldr r1,[sp,#12]; ldrb r0,[r1,r4]
+        code = frame_owner(FORCE + (0xA801, 0x4684, 0x2000, 0x2300, CALLEE, 0x9903, 0x5D08))
+        with self.assertRaisesRegex(sip.Refusal, 'receives a stack address in R12 while a local word holds one'):
+            admit(code, **callee(0x4660, 0x2109, 0x6081, 0x4770))
+
+    def test_a_call_this_analysis_does_not_walk_is_a_listed_premise(self):
+        # movs r0,#0; bl callee (add r0,sp,#0; bx lr: the address of its first stack argument,
+        # which is the owner's sp+0); adds r5,r0,#0; mov r0,sp; str r0,[sp,#12] (a pointer word);
+        # str r6,[r5,#12] (overwrites it); ldr r1,[sp,#12]; movs r5,#7; strb r5,[r1,r4].
+        # No word exists at the call, so nothing walks the callee and its result is a scalar to
+        # the core and to this analysis: the core's own trust, which the report names.
+        body = (0x4668, 0x9003, 0x60EE, 0x9903, 0x2507, 0x550D)
+        code = frame_owner((0x2000, CALLEE, 0x1C05) + body)
+        _, (manifest, _) = admit(code, **callee(0xA800, 0x4770))
+        call = site(code, code.index(CALLEE))
+        self.assertEqual(words(manifest)['unwalked'], [call])
+        self.assertIn(f'calls this analysis did not walk (0x{call:08X}): their results are trusted',
+                      sip.precondition_lines(evidence(manifest))[-1])
+        # With the pointer word spilled before the call, the walk runs and refuses `add r0,sp`.
+        code = frame_owner((0x4668, 0x9003, 0x2000, CALLEE, 0x1C05) + body[2:])
+        with self.assertRaisesRegex(sip.Refusal, 'may reach the pointer-bearing local word'):
+            admit(code, **callee(0xA800, 0x4770))
+
     def test_ranged_address_in_an_unread_argument_register_is_not_an_escape(self):
         # mov r3,sp; adds r3,r3,r4; bl callee; mov r1,sp; ldrb r0,[r1,r4]
         code = frame_owner((0x466B, 0x191B, 0x2000, CALLEE) + ACCESS, index=RANGED)
@@ -97,9 +399,70 @@ class FrameWordTests(unittest.TestCase):
         # A callee that writes R3 on every path replaces it: the load is an ordinary one.
         admit(code, **callee(0x0040, 0x2300, 0x4770))
 
+    def test_released_pointer_word_ends_calls_and_stack_growth(self):
+        spill = (0x4668, 0x9003) + ACCESS
+        with self.assertRaisesRegex(sip.Refusal, 'call after a pointer-bearing local word was released'):
+            admit(frame_owner(spill, tail=(0xb004, CALLEE, 0xbcf0, 0xbc02, 0x4708)), **callee(0x4770))
+        with self.assertRaisesRegex(ValueError, 'moves SP down after releasing|stack'):
+            admit(frame_owner(spill, tail=(0xb004, 0xb084, 0xb004, 0xbcf0, 0xbc02, 0x4708)))
+
+    def test_tampered_frame_words_make_the_manifest_stale(self):
+        arguments, (manifest, _) = admit(frame_owner((0x4668, 0x9003, 0x9903, 0x5D08)))
+        edits = {
+            'pointer word': lambda found: found['pointer_words'].append(-28),
+            'spill': lambda found: found['spills'].clear(),
+            'premise': lambda found: found.__setitem__('premise', fw.SWI_PREMISE),
+            'removed': None,
+        }
+        for name, edit in edits.items():
+            with self.subTest(edit=name):
+                changed = copy.deepcopy(manifest)
+                if edit is None:
+                    del evidence(changed)['frame_words']
+                else:
+                    edit(words(changed))
+                with self.assertRaisesRegex(ValueError, 'differs from complete fresh native replay'):
+                    owner.verify(**arguments, manifest=changed)
+        owner.verify(**arguments, manifest=copy.deepcopy(manifest))
+
+
+# movs r0,#0; str r0,[sp,#8]; loop: ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]; adds r0,#1;
+# str r0,[sp,#8]; ldr r1,[sp,#8]; cmp r1,#2; bls loop
+LOOP = (0x2000, 0x9002, 0x9802, 0x4669, 0x5C0A, 0x3001, 0x9002, 0x9902, 0x2902, 0xD9F7)
+
 
 class ReviewReproducerTests(unittest.TestCase):
     """Owners an adversarial review built against the first version; each must refuse."""
+
+    def test_returned_aliases(self):
+        cases = {
+            # store through the returned alias over a pointer word, then a premise-bounded store
+            # through the reloaded word
+            'A': (0x4668, CALLEE, 0x1C05, 0x4668, 0x9003, 0x60EE, 0x9903, 0x2507, 0x550D),
+            # load of the pointer word through the returned alias, then a store over saved LR
+            'A2': (0x4668, CALLEE, 0x1C05, 0x4668, 0x9003, 0x68EA, 0x6216) + ACCESS,
+        }
+        for name, code in cases.items():
+            with self.subTest(case=name):
+                with self.assertRaisesRegex(sip.Refusal, 'through a possible stack address'):
+                    admit(frame_owner(code), **callee(0x4770))
+        # A3: the returned alias handed to a callee that writes the pointer word
+        with self.assertRaisesRegex(sip.Refusal, 'receives a stack address in R0'):
+            admit(frame_owner((0x4668, CALLEE, 0x1C05, 0x4668, 0x9003, 0x1C28, INNER, 0x9903, 0x5D08)),
+                  **two_callees((0x4770,), (0x2109, 0x60C1, 0x4770)))
+        # A4: the returned alias overwrites a scalar counter word; no spill, no pointer word
+        with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+            admit(frame_owner((0x4668, CALLEE, 0x1C05, 0x2001, 0x9002, 0x60AE, 0x9802, 0x4669, 0x5C0A),
+                              index=()), **callee(0x4770))
+
+    def test_a_premise_store_keeps_the_pointer_word_above_its_array(self):
+        # C: mov r0,sp; str r0,[sp,#12]; mov r1,sp; movs r5,#7; strb r5,[r1,r4] (premise
+        # (entry_R0 & 255) < 12); ldr r2,[sp,#12] is still the pointer; str r6,[r2,#32]
+        with self.assertRaisesRegex(sip.Refusal, 'saved register word'):
+            admit(frame_owner((0x4668, 0x9003, 0x4669, 0x2507, 0x550D, 0x9A03, 0x6216)))
+        # Used inside the frame, the reload is the index-zero base of the array it addresses.
+        _, (manifest, _) = admit(frame_owner((0x4668, 0x9003, 0x4669, 0x2507, 0x550D, 0x9A03, 0x5D16)))
+        self.assertEqual([row['bound'] for row in evidence(manifest)['preconditions']], [12, 3])
 
     def test_a_nested_call_writes_only_what_every_return_writes(self):
         # D: mov r3,sp; adds r3,r3,r5; movs r0,#0; bl outer (push {lr}; bl inner; pop {pc}),
