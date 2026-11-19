@@ -8,13 +8,9 @@ status.py - how much of the ROM is actually decompiled.
     python tools/status.py --check         # exit 1 if the README is stale
     python tools/status.py --badges badges # shields.io endpoint JSON
 
-Retains two legacy provisional metrics:
-
-    functions matched / total
-    bytes matched / total        (main indexed spans / legacy layout code sizes)
-
-plus a bytes row over the union of main index spans, and matched bytes per
-64 KiB region of that union.  The badges read only the two legacy rows.
+The main metrics count matched functions and the union of their indexed bytes.
+Both totals use the same main function index. Overlapping bytes count once.
+Regional coverage and library units are available in the expandable breakdown.
 
 Additional verified late-ROM functions and complete-body bytes are reported
 separately, without a guessed denominator or whole-ROM completion percentage.
@@ -238,20 +234,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
 
     code = [f for f in fns if int(f["rom"], 16) < CODE_END]
     total_fns = len(code)
-    total_bytes = 0
-    layout_path = os.path.join(root, "config", "rom_layout.json")
-    if os.path.exists(layout_path):
-        layout = json.load(open(layout_path, encoding="utf-8"))
-        total_bytes = sum(seg["size"] for seg in layout.get("segments", [])
-                          if seg.get("name", "").startswith("code"))
-    if not total_bytes:
-        covered = set()
-        for f in code:
-            covered.update(range(int(f["rom"], 16), int(f["end"], 16)))
-        total_bytes = len(covered)
-
     src_dir = os.path.join(root, "src")
-    matched_f, matched_b, problems = 0, 0, []
+    problems = []
     paths = sorted(Path(src_dir).rglob("*.c")) if os.path.isdir(src_dir) else []
     source_counts = {}
     for path in paths:
@@ -486,16 +470,14 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         results = (prior.get(str(path.relative_to(root)), fresh.get(str(path.relative_to(root))))
                    for path in paths)
         # map yields source order even when subprocesses finish out of order.
-        for source_f, source_b, source_problems, source_bodies in results:
-            matched_f += source_f
-            matched_b += source_b
+        for _, _, source_problems, source_bodies in results:
             problems.extend(source_problems)
             verified_bodies.extend(source_bodies)
+    matched_main = {address for address, _, late in verified_bodies if not late}
+    spans = index_progress(fns, matched_main)
     if progress is not None:
-        progress.update(index_progress(
-            fns, [address for address, _, late in verified_bodies if not late]))
-    unit_problems, unit_summary = library_units.status_summary(
-        root, fns, {address for address, _, late in verified_bodies if not late}, CODE_END)
+        progress.update(spans)
+    unit_problems, unit_summary = library_units.status_summary(root, fns, matched_main, CODE_END)
     problems.extend(unit_problems)
     if progress is not None and unit_summary is not None:
         progress["library_units"] = unit_summary
@@ -515,7 +497,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             continue
         late_f += 1
         late_b += size
-    return total_fns, matched_f, total_bytes, matched_b, problems, late_f, late_b
+    return total_fns, len(matched_main), spans["total"], spans["matched"], problems, late_f, late_b
 
 
 REGION = 0x10000
@@ -556,17 +538,7 @@ def index_progress(fns, matched):
             "regions": regions, "late_entries": len(entries) - len(code)}
 
 
-def render_progress(progress):
-    """the index-span row (with its footnote) and the per-region section"""
-    total, done = progress["total"], progress["matched"]
-    frac = done / total if total else 0.0
-    row = (f"| Bytes matched (index span) | {done:,} / {total:,} | "
-           f"**{frac * 100:.2f}%** | `{bar(frac)}` |")
-    note = ("Both byte denominators are provisional. Layout labels undercount\n"
-            "code; index spans can run long or cover code-like data. Neither\n"
-            "denominator is established. The index-span row divides the union\n"
-            "of matched entries' spans by the union, overlaps merged, of every\n"
-            f"entry span starting below `0x{CODE_END:08X}`.")
+def render_regions(progress):
     rows = []
     for base, region_total, region_done, count, count_done in progress["regions"]:
         part = region_done / region_total if region_total else 0.0
@@ -574,8 +546,7 @@ def render_progress(progress):
                     f"{f'{count_done}/{count}':>9} fns")
     rows.append(f"0x{CODE_END:08X}+ assets and data; "
                 f"{progress['late_entries']:,} index entries")
-    section = ["Matched bytes per 64 KiB region (of indexed span)", "", "```"] + rows + ["```"]
-    return row, note, section
+    return ["Matched bytes by 64 KiB ROM region", "", "```"] + rows + ["```"]
 
 
 def badge_url(label, percent, badge_base):
@@ -589,66 +560,37 @@ def badge_url(label, percent, badge_base):
 
 def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_base=None,
            *, late_f=0, late_b=0, progress=None):
-    """progress, from index_progress(), adds the index-span row and region bars"""
+    """Render the checked status block and the fractions used by the badge endpoints."""
     pf = matched_f / total_f if total_f else 0.0
     pb = matched_b / total_b if total_b else 0.0
-    label = f"{prefix} " if prefix else ""
     lines = [
-        START,
-        "",
-        "### Decompilation status",
-        "",
-        "Legacy provisional metrics (including the two percentage badges):",
-        "",
-        f"![{label}functions]({badge_url(f'{label}functions', pf * 100, badge_base)}) "
-        f"![{label}bytes]({badge_url(f'{label}bytes', pb * 100, badge_base)})",
-        "",
-        "| Metric | Count | Percent | |",
-        "|---|---|---|---|",
-        f"| Functions matched | {matched_f:,} / {total_f:,} | **{pf * 100:.2f}%** | "
-        f"`{bar(pf)}` |",
-        f"| Bytes matched | {matched_b:,} / {total_b:,} | **{pb * 100:.2f}%** | "
-        f"`{bar(pb)}` |",
+        START, "", "## Decompilation progress", "",
+        "| Metric | Matched / indexed | Complete | Progress |",
+        "| :--- | ---: | ---: | :--- |",
     ]
-    if progress is not None:
-        span_row, span_note, regions = render_progress(progress)
-        lines += [span_row]
+    for name, done, total, fraction in (("functions", matched_f, total_f, pf),
+                                        ("bytes", matched_b, total_b, pb)):
+        lines.append(f"| {name.capitalize()} matched | {done:,} / {total:,} | "
+                     f"**{fraction * 100:.2f}%** | ![](/docs/badges/{name}.svg) |")
     lines += [
-        "",
-        f"The function denominator counts {total_f:,} provisional index entries\n"
-        f"starting below `0x{CODE_END:08X}`; matched main bytes count indexed spans.\n"
-        f"The byte denominator sums all legacy layout segments named `code*`,\n"
-        f"including late-ROM labels, or falls back to the union of main indexed\n"
-        f"spans when that sum is zero or the layout is absent. Labels do not\n"
-        f"prove code ownership; index spans can be truncated or overlapping.\n"
-        f"Generated by `tools/status.py` from `config/functions.json` and the\n"
-        f"match reports in `docs/match/`.",
-    ]
-    if progress is not None:
-        lines += ["", span_note, ""] + regions
-    lines += [
-        "",
-        f"**Legacy credit: {matched_f:,} matched functions and {matched_b:,} indexed bytes.**\n"
-        f"Only exact matches are committed - see the rule in *Matching*.",
-        "",
+        "", "Each match reproduces the original ROM bytes. Byte coverage counts overlapping "
+        "function spans once.", "",
+        "<details>", "<summary>ROM regions and library units</summary>", "",
+        f"The main index covers functions starting below `0x{CODE_END:08X}`. "
+        "Its totals can change as function boundaries are recovered.", "",
         f"**Additional verified late-ROM spans: {late_f:,} functions; "
-        f"{late_b:,} complete-body bytes.**\n"
-        f"These separately indexed and verified ROM bodies include their internal\n"
-        f"literal pools, exclude external alignment and RAM aliases, and do not\n"
-        f"alter the legacy metrics. No late-ROM denominator is established;\n"
-        f"neither summary certifies exhaustive whole-game coverage.",
+        f"{late_b:,} complete-body bytes.** These are counted separately.",
     ]
+    label = f"{prefix} " if prefix else ""
+    links = [f"[{name.capitalize()} badge]({badge_url(label + name, fraction * 100, badge_base)})"
+             for name, fraction in (("functions", pf), ("bytes", pb))]
+    lines += ["", " · ".join(links)]
+    if progress is not None:
+        lines += [""] + render_regions(progress)
     units = (progress or {}).get("library_units")
     if units:
         lines += [
-            "",
-            f"**Library units: {len(units['units']):,} recorded in `config/library_units.json`.**\n"
-            f"Prebuilt library objects that the original build compiled with another\n"
-            f"toolchain. Each function inside one is verified with its unit's\n"
-            f"toolchain, or with the default one where both emit the same function.\n"
-            f"They are part of the legacy metrics above and are listed here apart\n"
-            f"from the rest of the code.",
-            "",
+            "", "Library functions are included in the totals above.", "",
             "| Unit | Range | Toolchain | Functions matched | Bytes matched |",
             "|---|---|---|---|---|",
         ] + [f"| {unit['name']} | `0x{unit['start']:08X}`-`0x{unit['end']:08X}` | `{unit['toolchain']}` | "
@@ -656,10 +598,40 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
              for unit in units["units"]] + [
             f"| Everything outside library units | | default | "
             f"{units['outside_matched']:,} / {units['outside_functions']:,} | |"]
+    lines += ["", "</details>"]
     if problems:
         lines += ["", "```", "needs attention:"] + [f"  {p}" for p in problems] + ["```"]
     lines += ["", END]
     return "\n".join(lines), pf, pb
+
+
+def meter_svg(name, fraction):
+    """A segmented meter whose fill is proportional to the unrounded count."""
+    start, end = (("#efc775", "#bf8950") if name == "functions" else ("#8ae6d6", "#409eaa"))
+    return f'''<svg xmlns="http://www.w3.org/2000/svg" width="128" height="12" viewBox="0 0 128 12">
+  <title>{name.capitalize()} matched: {fraction:.2%}</title>
+  <defs>
+    <linearGradient id="ink"><stop stop-color="{start}"/><stop offset="1" stop-color="{end}"/></linearGradient>
+    <pattern id="ticks" width="12.4" height="8" patternUnits="userSpaceOnUse" x="2">
+      <path d="M0 0v8" stroke="#192535" stroke-width="1.5"/>
+    </pattern>
+    <clipPath id="filled"><rect x="2" y="2" width="{124 * fraction:.4f}" height="8"/></clipPath>
+  </defs>
+  <rect x=".5" y=".5" width="127" height="11" rx="3" fill="#192535" stroke="#63747e"/>
+  <rect x="2" y="2" width="124" height="8" rx="1" fill="url(#ink)" clip-path="url(#filled)"/>
+  <rect x="2" y="2" width="124" height="8" fill="url(#ticks)"/>
+</svg>
+'''
+
+
+def progress_assets(root, pf, pb, prefix=""):
+    directory = Path(root) / "docs" / "badges"
+    assets = {}
+    for name, fraction in (("functions", pf), ("bytes", pb)):
+        label = f"{prefix} {name}" if prefix else name
+        assets[directory / f"{name}.svg"] = meter_svg(name, fraction)
+        assets[directory / f"{name}.json"] = json.dumps(badge(label, fraction * 100)) + "\n"
+    return assets
 
 
 def main():
@@ -698,6 +670,7 @@ def main():
     block, pf, pb = render(tf, mf, tb, mb, problems, args.label_prefix, badge_base,
                            late_f=late_f, late_b=late_b, progress=progress or None)
 
+    assets = progress_assets(root, pf, pb, args.label_prefix)
     if args.badges:
         out = os.path.abspath(args.badges)
         os.makedirs(out, exist_ok=True)
@@ -730,6 +703,8 @@ def main():
         if os.path.exists(status_path):
             if open(status_path, encoding="utf-8").read().strip() != block.strip():
                 sys.exit("docs/status.md is stale - run: python tools/status.py --write")
+        if any(not path.is_file() or path.read_text() != content for path, content in assets.items()):
+            sys.exit("progress assets are stale - run: python tools/status.py --write")
         print("README status is up to date")
         return 1 if problems else 0
 
@@ -742,6 +717,9 @@ def main():
         # without needing this tool
         status_path = os.path.join(root, "docs", "status.md")
         os.makedirs(os.path.dirname(status_path), exist_ok=True)
+        for path, content in assets.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content, encoding="utf-8")
         with open(status_path, "w", encoding="utf-8", newline="\n") as f:
             f.write(block + "\n")
         if new != current:

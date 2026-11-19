@@ -1,6 +1,10 @@
 """Index-span bytes row and per-region bars in the status block."""
 
+import json
 import re
+import tempfile
+from unittest.mock import patch
+from xml.etree import ElementTree
 import sys
 from pathlib import Path
 import unittest
@@ -66,10 +70,10 @@ class Render(unittest.TestCase):
            entry(0x08060000, 0x08060040), entry(0x08200000, 0x08200004)]
 
     def render(self, progress):
-        return status.render(3, 1, 1000, 0x100, [], badge_base="https://x/badges",
+        return status.render(3, 1, 448, 0x100, [], badge_base="https://x/badges",
                              progress=progress)[0]
 
-    def test_without_progress_the_block_is_unchanged(self):
+    def test_without_regions_the_summary_still_renders(self):
         block = self.render(None)
         self.assertNotIn("(index span)", block)
         self.assertNotIn("```", block)
@@ -77,9 +81,8 @@ class Render(unittest.TestCase):
     def test_rows_and_regions(self):
         progress = status.index_progress(self.fns, [0x08000000])
         block = self.render(progress)
-        self.assertIn("| Bytes matched (index span) | 256 / 448 | **57.14%** | "
-                      f"`{status.bar(256 / 448)}` |", block)
-        self.assertIn("Both byte denominators are provisional.", block)
+        self.assertIn("| Bytes matched | 256 / 448 | **57.14%** | ![](/docs/badges/bytes.svg) |", block)
+        self.assertLess(block.index("| Bytes matched |"), block.index("<details>"))
         fence = block.split("```")[1].strip("\n").splitlines()
         self.assertEqual(len(fence), 0x15 + 1)
         self.assertEqual(fence[0], f"0x08000000  {status.bar(256 / 384, 20)}   66.7%        1/2 fns")
@@ -87,10 +90,34 @@ class Render(unittest.TestCase):
         self.assertEqual(fence[1], f"0x08010000  {'░' * 20}    0.0%        0/0 fns")
         self.assertEqual(len({len(row) for row in fence[:-1]}), 1)
 
-    def test_badge_regex_reads_the_legacy_rows(self):
+    def test_legacy_layout_and_overlapping_matches_do_not_inflate_coverage(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            (root / "config").mkdir()
+            (root / "src").mkdir()
+            (root / "docs/match").mkdir(parents=True)
+            entries = self.fns[:3]
+            (root / "config/functions.json").write_text(json.dumps(entries))
+            (root / "config/rom_layout.json").write_text(json.dumps(
+                {"segments": [{"name": "code", "size": 100}]}))
+            for entry in entries[:2]:
+                key = entry["rom"][2:]
+                (root / "src" / (key + ".c")).touch()
+                (root / "docs/match" / (key + ".md")).write_text("* compiled : `00`")
+            with patch.object(status, "report_matches", return_value=True):
+                counts = status.collect(str(root), verify=False)
+            self.assertEqual(counts[:5], (3, 2, 448, 384, []))
+            _, pf, pb = status.render(*counts[:5])
+            assets = status.progress_assets(root, pf, pb)
+            self.assertEqual(json.loads(assets[root/"docs/badges/bytes.json"])["message"], "85.71%")
+            meter = ElementTree.fromstring(assets[root/"docs/badges/bytes.svg"])
+            fill = meter.find(".//{*}clipPath/{*}rect")
+            self.assertAlmostEqual(float(fill.get("width")), 124 * 384 / 448, places=3)
+
+    def test_badge_percentages_match_the_table(self):
         progress = status.index_progress(self.fns, [0x08000000])
         block = self.render(progress)
-        self.assertEqual(badge_percentages(block), {"functions": 33.33, "bytes": 25.6})
+        self.assertEqual(badge_percentages(block), {"functions": 33.33, "bytes": 57.14})
         self.assertEqual(badge_percentages(self.render(None)), badge_percentages(block))
 
 
