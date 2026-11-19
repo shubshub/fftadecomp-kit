@@ -117,15 +117,18 @@ branch to the table's distinct case labels (Executor.jump_table), each
 explored like a conditional branch under the same path bound.  Anything
 else the symbolic executor does not model - ARM code, any other computed
 jump, symbolic loops beyond the path bound, unknown instructions - fails
-closed with a reason.
+closed with a reason.  A function refused by a bound (BoundExceeded) is
+checked once more by relational loop induction (volatile_loop_induction),
+which can admit it only by a proof over every iteration of its loops.
 
 Known limits (false refusals, never false acceptance of a qualifier
 effect): reading a pinned member twice where an ordinary declaration would
 reuse the first value (`if (x) ...; if (x) ...`) is refused, as are loops
-whose exit depends on unknown values, stripped compiles that legally reorder
-accesses around a pinned one, and equivalent code that the expression
-normaliser cannot prove equal.  For halfword members that includes a narrow
-read (`(u8)sym.h`, `sym.h & 0xFF`), which the stripped compile narrows to an
+whose exit depends on unknown values that the induction cannot prove,
+stripped compiles that legally reorder accesses around a pinned one, and
+equivalent code that the expression normaliser cannot prove equal.  For
+halfword members that includes a narrow read (`(u8)sym.h`, `sym.h &
+0xFF`), which the stripped compile narrows to an
 `ldrb` of the low byte that the overlap rule refuses; a signed read
 (`(s16)sym.h`), whose `lsl`/`asr` the normaliser does not equate with the
 other compile's sign extension; and the mixed chain `sym.h = (sym.b = a)`,
@@ -139,6 +142,7 @@ permutation is its only guard (the lexical provenance rules are defence in
 depth).
 """
 
+import contextvars
 import re
 
 from plausible import declaration_tokens
@@ -170,6 +174,19 @@ INVERSE = {"eq": "ne", "ne": "eq", "cs": "cc", "cc": "cs", "hs": "lo", "lo": "hs
 
 class SemanticError(ValueError):
     """the real and stripped compiles differ in a way the rules do not permit"""
+
+
+class BoundExceeded(SemanticError):
+    """a cost bound stopped the exploration of function: the check is undecided there"""
+
+    def __init__(self, message, function=None):
+        super().__init__(message)
+        self.function = function
+
+
+# {function name: executor factory} while volatile_loop_induction re-runs a
+# function the bounds refused; unset, every compile runs on Executor.
+LOOP_INDUCTION = contextvars.ContextVar("volatile_loop_induction", default=None)
 
 
 # ---------------------------------------------------------------- declaration
@@ -424,6 +441,10 @@ def verified_scalars(scope):
 def declared_before(names, index):
     """the names of {name: index} declared before the declaration at index"""
     return {name for name, at in names.items() if at < index}
+
+
+# the counterpart-list marker of a loop cut (volatile_loop_induction)
+LOOP_CUT = (None, None, "loop cut")
 
 
 def parameter_parts(text):
@@ -1259,8 +1280,9 @@ class Executor:
         while True:
             steps += 1
             if steps > MAX_STEPS:
-                raise SemanticError(f"{self.label} compile of {self.name}: path exceeds {MAX_STEPS} "
-                                    "instructions (loops with unknown exit conditions are not modelled)")
+                raise BoundExceeded(f"{self.label} compile of {self.name}: path exceeds {MAX_STEPS} "
+                                    "instructions (loops with unknown exit conditions are not modelled)",
+                                    self.name)
             if pc >= len(self.instructions):
                 raise SemanticError(f"{self.label} compile of {self.name}: execution runs off the end")
             result = self.step(pc, *self.instructions[pc])
@@ -1293,9 +1315,9 @@ class Executor:
             return self.known[condition] != flipped
         if len(self.conditions) >= len(self.decisions):
             if len(self.decisions) >= MAX_DECISIONS:
-                raise SemanticError(f"{self.label} compile of {self.name}: more than {MAX_DECISIONS} "
+                raise BoundExceeded(f"{self.label} compile of {self.name}: more than {MAX_DECISIONS} "
                                     "unknown branch conditions on one path (loops with unknown exit "
-                                    "conditions are not modelled)")
+                                    "conditions are not modelled)", self.name)
             raise NeedDecision()
         taken = self.decisions[len(self.conditions)]
         if type(taken) is not bool:
@@ -1864,9 +1886,10 @@ class Executor:
             else:
                 if len(self.conditions) >= len(self.decisions):
                     if len(self.decisions) >= MAX_DECISIONS:
-                        raise SemanticError(f"{self.label} compile of {self.name}: more than "
+                        raise BoundExceeded(f"{self.label} compile of {self.name}: more than "
                                             f"{MAX_DECISIONS} unknown branch conditions on one path "
-                                            "(loops with unknown exit conditions are not modelled)")
+                                            "(loops with unknown exit conditions are not modelled)",
+                                            self.name)
                     raise NeedDecision(sorted(set(partition)))
                 case = self.decisions[len(self.conditions)]
                 if type(case) is not int or case not in partition:
@@ -2053,24 +2076,26 @@ class RomInterfaces:
 def explore(name, function, signatures, label, layout, interfaces=None, *,
             _capture_load_provenance=False):
     paths, pending = [], [[]]
+    executor = (LOOP_INDUCTION.get() or {}).get(name, Executor)
     while pending:
         decisions = pending.pop()
         try:
-            path = Executor(name, function, signatures, label, layout, interfaces).run(
+            path = executor(name, function, signatures, label, layout, interfaces).run(
                 decisions, _capture_load_provenance=_capture_load_provenance)
         except NeedDecision as error:
             pending += [decisions + [option] for option in error.options]
             continue
         paths.append(path)
         if len(paths) > MAX_PATHS:
-            raise SemanticError(f"{name} has more than {MAX_PATHS} paths; the semantic check is bounded")
+            raise BoundExceeded(f"{name} has more than {MAX_PATHS} paths; the semantic check is bounded", name)
     return paths
 
 
 def replay(name, function, signatures, label, decisions, layout, interfaces=None, *,
            _capture_load_provenance=False):
+    executor = (LOOP_INDUCTION.get() or {}).get(name, Executor)
     try:
-        return Executor(name, function, signatures, label, layout, interfaces).run(
+        return executor(name, function, signatures, label, layout, interfaces).run(
                 decisions, _capture_load_provenance=_capture_load_provenance)
     except NeedDecision:
         raise SemanticError(f"{name}: the stripped compile branches where the real one does not")
@@ -2559,6 +2584,11 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         counterparts, explained_stores = [], set()
         classified_dead_reads = set()
         for position, record in enumerate(records):
+            if record.kind == "loop":
+                # volatile_loop_induction (kit#137): the code after a loop cut runs once per
+                # iteration, so the loads are compared segment by segment
+                counterparts.append(LOOP_CUT + (record,))
+                continue
             if record.kind != "load" or object_offset(record.address, symbol, size) is None:
                 continue
             destination = next(iter(record.writes))
@@ -2662,12 +2692,18 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the real and stripped compiles differ in observable "
                                 f"behaviour (path {number}, event {index + 1}: real "
                                 f"{show_event(mine)}, stripped {show_event(theirs)})")
-        theirs = [(r.width, r.signed, where(r.address)) for r in other.records
-                  if r.kind == "load" and object_offset(r.address, symbol, size) is not None]
+        theirs = [LOOP_CUT if r.kind == "loop" else (r.width, r.signed, where(r.address))
+                  for r in other.records
+                  if r.kind == "loop" or r.kind == "load" and object_offset(r.address, symbol, size) is not None]
         mine = [entry[:3] for entry in counterparts]
         if mine != theirs:
             index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b), min(len(mine), len(theirs)))
-            if index < len(mine):
+            if index < len(mine) and mine[index] == LOOP_CUT and \
+                    not (index < len(theirs) and theirs[index] != LOOP_CUT):
+                # a loop cut where the stripped compile has none: never two equal traces
+                raise SemanticError(f"{name}: the real and stripped compiles reach a loop cut after different "
+                                    f"loads (path {number})")
+            if index < len(mine) and mine[index] != LOOP_CUT:
                 raise SemanticError(f"{name}: {describe(counterparts[index][3])} loads "
                                     f"{counterparts[index][2]}, which the stripped compile does not "
                                     "load there; the qualifier added a read")
@@ -2691,9 +2727,15 @@ def show_event(event):
     if event[0] == "call":
         target = event[1] if isinstance(event[1], str) else show(event[1][1]) if event[1][0] == "via" \
             else str(event[1])
-        return f"call {target}({', '.join(show(a) for a in event[2])})"
+        # volatile_loop_induction adds the registers the callee may read beyond its prototype
+        unnamed = "".join(f", {register} {show(value)}" for part in event[3:] if part[:1] == ("unnamed",)
+                          for register, value in part[1:])
+        return f"call {target}({', '.join(show(a) for a in event[2])})" + \
+            (f" with {unnamed[2:]}" if unnamed else "")
     if event[0] == "escape":
         return "frame escape {" + ", ".join(f"{offset:+#x}: {show(value)}" for offset, value in event[1]) + "}"
+    if event[0] in ("loop", "back-edge", "saved"):
+        return f"{event[0]} {event[1:]}"        # volatile_loop_induction
     return "return" + (f" {show(event[1])}" if len(event) > 1 else "")
 
 
@@ -2724,8 +2766,9 @@ def remap(expression, atom, mapping):
 
 
 def object_accesses(records, atom):
+    # a loop cut (volatile_loop_induction) separates the accesses of each iteration
     return [(record.kind, record.width, record.address) for record in records
-            if record.address is not None and contains(record.address, atom)]
+            if record.kind == "loop" or record.address is not None and contains(record.address, atom)]
 
 
 def perturbation_check(name, real_function, perturbed_function, signatures, symbol, size, pinned,
@@ -2753,9 +2796,13 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
             index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b),
                          min(len(mine), len(theirs)))
             real_access = object_accesses(path.records, atom)[index] if index < len(mine) else None
+            if (real_access or ("",))[0] == "loop" or index < len(theirs) and theirs[index][0] == "loop":
+                raise SemanticError(f"{name}: the layout-perturbed compile accesses {symbol} a different number "
+                                    f"of times between loop cuts (path {number})")
+            access = sum(1 for entry in mine[:index + 1] if entry[0] != "loop")
             raise SemanticError(
                 f"{name}: an access to {symbol} does not follow its member when the pinned members "
-                f"move (path {number}, access {index + 1}: real "
+                f"move (path {number}, access {access}: real "
                 f"{show(real_access[2]) if real_access else 'none'}, perturbed "
                 f"{show(theirs[index][2]) if index < len(theirs) else 'none'}); a pinned member may "
                 "only be reached through its own name")
@@ -2778,8 +2825,16 @@ def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
     through its name.  interfaces, if given, is a RomInterfaces: the callees'
     argument registers derived from their ROM code.
     """
-    return _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
-                            perturbed_assembly, interfaces)
+    try:
+        return _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
+                                perturbed_assembly, interfaces)
+    except BoundExceeded as bound:
+        # kit#137: only a bound refusal, and only by a proof over every iteration
+        from volatile_loop_induction import POLICY
+        if POLICY is None:
+            raise
+        return POLICY.compare(bound, real_assembly, stripped_assembly, preprocessed, symbol, declaration,
+                              perturbed_assembly, interfaces)
 
 
 def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
@@ -2854,6 +2909,8 @@ def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
     for name, paths, read_modify_write, chained, *extra in results:
+        loops = next((part for part in extra if getattr(part, "loop_induction", False)), None)
+        extra = [part for part in extra if not getattr(part, "loop_induction", False)]
         unloaded, relied, updates, ordinary, conditional, indirect = (extra + [[], [], [], [], [], []])[:6]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -2865,7 +2922,8 @@ def record(symbol, results, perturbed=False):
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
-                     (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else ""))
+                     (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
+                     (f", {loops.describe()}" if loops else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
             "; ".join(parts))

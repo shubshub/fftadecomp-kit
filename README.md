@@ -3728,9 +3728,68 @@ checked in full and a function they cut short is refused, never accepted on
 the paths seen. The path bound was 256; holding 1024 paths, measured on
 0800C4B4, costs about 300 MB and 5 s (the true ceiling is 1024 paths of
 up to 20000 records each). Loops whose exit depends on unknown values stay
-refused at any decision bound. Because the
+refused at any decision bound, unless the relational loop induction below
+proves them. Because the
 check sees every spelling, the earlier syntactic rule against statements
 that only read `symbol.member` is gone.
+
+**Relational loop induction (kit#137).** Only a refusal by one of those
+bounds can become an admission, and only for a function with a loop
+(`tools/volatile_loop_induction.py`, one policy object). That function is
+checked again with each loop cut at the target of a depth-first back edge
+(control flow that enters a loop in more than one place refuses): a path
+cuts a loop when it first reaches the cut point and ends when it
+reaches it again, so each path covers one iteration, and the induction
+covers them all. At a cut, a location the loop's strongly connected region
+writes (r0-r12, lr, the flags, frame slots it stores at `[sp, #imm]`) that
+no path from the cut may read is poisoned; a live one that holds sp, the
+object's address or a value loaded from the object keeps its exact value;
+every other live one gets a fresh value, the same in the real and the
+stripped (or permuted) compile when both held the same value at the cut, and
+marked as read back from memory. Memory outside the frame gets a barrier;
+when a store it hides may hold a value read from the object, every load it
+stops carries the object, so such a value is never laundered into an
+ordinary pointer, and a store it hides may not hold a pinned member's
+content, nor may a register or frame slot live across the cut (rule 5 would
+lose the member's value). The existing comparison then runs on these paths,
+with the cut and the back edge as events, and with the cut as a marker in
+the lists of object loads (and of permuted object accesses) it compares, so
+a load cannot move across a cut: equal lists mean equal counts per
+iteration. At every back edge each compile must restore what it kept,
+leave unwritten locations alone, hold no address in a fresh location, keep
+sp, the escape state and its frame stores inside the region's slots, and
+give each shared location its counterpart's value again. The flags must be
+dead at the cut, and the region may not push, pop or write sp.
+
+That second run decides functions the bound left undecided, so it does not
+inherit the executor's call model, whose gaps (kit#215 and those found
+while summarising loops) would otherwise become admissions. In it every
+register a callee may read beyond its prototype is compared; afterwards r12,
+lr and the flags differ between the compiles; the register a callee's ROM
+return sites jump through holds a value named by the call's byte offset in
+its compile, and also its earlier value when another return site may
+leave it alone (for a callee whose return form the ROM does not show,
+every r0-r3 depends on that offset); a register the callee may leave alone keeps
+its earlier value; outgoing stack-argument words belong to the callee; and
+an access through any of those refuses. Pushes are allowed only in the
+prologue, before sp moves; frame accesses below sp, not aligned to their
+width or (before an escape) at a variable offset refuse, which also keeps
+the shape of kit main's variable-offset frame read out of every loop; every
+call and cut sees one word-aligned sp with no frame store below it, and sp
+never drops below it; the saved slots join each escape snapshot; and r4-r11
+must hold their entry values at every return. Untyped calls stay refused.
+The invariants the proof rests on are listed in the module's docstring.
+
+A report that relies on it says so in the semantic record:
+`loops by relational induction at instructions [N, ...]
+(relational-loop-induction-v1, premise: callees preserve r4-r11 and sp, and
+leave their return address only in the register their ROM return sites jump
+through)`. A function it cannot prove keeps the bound's message, followed by
+`; relational loop induction (kit#137): ` and the reason. The rule is on the
+default path because it only turns that refusal into an admission and prints
+its premise in each report that uses it; no saved report reaches a bound, so
+none changes. The opt-in BIOS fill rules, by contrast, change walks that
+already admit.
 
 The match report records `* allowlisted volatile: ...` for each such object,
 with the header's SHA-256, and `* allowlisted volatile semantics: ...`, which
