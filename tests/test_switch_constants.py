@@ -5,12 +5,13 @@ import hashlib
 import io
 import json
 import os
+import select
 import shutil
+import signal
 import struct
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
@@ -425,26 +426,74 @@ class RealSourceTests(unittest.TestCase):
                     match.main()
             self.assertFalse((self.root / "docs/match/08000000.md").exists())
 
+    @unittest.skipUnless(hasattr(os, "pidfd_open"), "observing the grandchild's exit needs pidfd_open")
     def test_timeout_kills_the_owned_child_group(self):
-        child_pid_file = self.root / "child.pid"
-        script = ("import pathlib,subprocess,sys,time; "
-                  "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(60)']); "
-                  f"pathlib.Path({str(child_pid_file)!r}).write_text(str(child.pid)); time.sleep(60)")
-        with self.assertRaises(subprocess.TimeoutExpired):
-            match._run_replay_process([sys.executable, "-c", script], self.root, 0.3)
-        child_pid = int(child_pid_file.read_text())
-        for _attempt in range(50):
-            state = Path(f"/proc/{child_pid}/stat")
-            try:
-                running = state.read_text().split()[2] != "Z"
-            except (FileNotFoundError, ProcessLookupError):
-                # The child can be reaped between open() and read(); the read
-                # then fails with ESRCH instead of the file being missing.
-                running = False
-            if not running:
-                break
-            time.sleep(0.01)
-        else:
+        # Every step waits on an event, never on the host's speed: the timeout
+        # is raised only once the grandchild exists, and its exit is read from
+        # a pidfd. CEILING bounds a hang; reaching it fails the test.
+        CEILING = 60
+        REPLAY_TIMEOUT = 7.25  # arbitrary; it must reach communicate() unchanged
+        channel = self.root / "grandchild.pid"
+        os.mkfifo(channel)
+        reader = os.open(channel, os.O_RDONLY | os.O_NONBLOCK)
+        self.addCleanup(os.close, reader)
+        script = ("import subprocess,sys,time; "
+                  "child=subprocess.Popen([sys.executable,'-c','import time;time.sleep(3600)']); "
+                  f"channel=open({str(channel)!r},'w'); channel.write(str(child.pid)); channel.close(); "
+                  "time.sleep(3600)")
+
+        def wait_readable(fd, event):
+            waiter = select.poll()
+            waiter.register(fd, select.POLLIN)
+            if not waiter.poll(CEILING * 1000):
+                self.fail(f"{event} did not happen within {CEILING} s")
+
+        real_communicate = subprocess.Popen.communicate
+        grandchild, forwarded = [], []
+
+        def communicate(process, *args, **kwargs):
+            if grandchild:
+                # The handler's own call after the kill: real, with a hang guard.
+                try:
+                    return real_communicate(process, timeout=CEILING)
+                except subprocess.TimeoutExpired:
+                    # Kill both directly, not by group, so Popen's exit wait cannot hang too.
+                    process.kill()
+                    if grandchild[0] is not None:
+                        reap(grandchild[0])
+                    self.fail("the killed group kept the child's pipes open")
+            forwarded.append(kwargs.get("timeout", args[1] if len(args) > 1 else None))
+            grandchild.append(None)
+            data = b""
+            while True:
+                wait_readable(reader, "the child reporting its grandchild's pid")
+                chunk = os.read(reader, 64)
+                if not chunk:
+                    break
+                data += chunk
+            if not data:
+                self.fail("the child closed the channel without reporting a pid")
+            pidfd = os.pidfd_open(int(data))
+            grandchild[0] = pidfd
+            self.addCleanup(os.close, pidfd)
+            self.addCleanup(reap, pidfd)  # runs first: never leave a surviving grandchild
+            if select.select([pidfd], [], [], 0)[0]:
+                self.fail("the grandchild had already exited before the timeout")
+            raise subprocess.TimeoutExpired(process.args, forwarded[0])
+
+        def reap(pidfd):
+            if not select.select([pidfd], [], [], 0)[0]:
+                with contextlib.suppress(ProcessLookupError):
+                    signal.pidfd_send_signal(pidfd, signal.SIGKILL)
+
+        with patch.object(subprocess.Popen, "communicate", communicate), \
+                self.assertRaises(subprocess.TimeoutExpired):
+            match._run_replay_process([sys.executable, "-c", script], self.root, REPLAY_TIMEOUT)
+        self.assertEqual(len(grandchild), 1)
+        self.assertEqual(forwarded, [REPLAY_TIMEOUT], "the replay timeout must reach communicate()")
+        try:
+            wait_readable(grandchild[0], "the grandchild's exit after the group kill")
+        except AssertionError:
             self.fail("owned timeout child is still executing")
 
     def test_cleanup_failure_never_produces_a_match(self):

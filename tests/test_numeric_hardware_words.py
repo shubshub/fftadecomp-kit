@@ -9,6 +9,7 @@ import unittest
 from unittest.mock import patch
 
 import bios_fast_fill_source_profile as fast
+import m4a_max_lines as max_lines
 import named_data_buffer_profile as buffers
 import owner_admission_profile as owner
 import test_bios_cpuset_fill_profile as fill
@@ -284,7 +285,10 @@ class AddressedNumericHardwareWordTests(unittest.TestCase):
         return numeric_destination(f, value)
 
     def test_selector_set_is_exactly_the_bios_fill_data_selectors(self):
-        self.assertEqual(set(profile.NUMERIC_HARDWARE_SELECTORS), set(ADDRESSED_SELECTORS))
+        # The MPlayExtender selector is a BIOS fill data selector under its own
+        # name: its saved report records three numeric hardware words.
+        self.assertEqual(set(profile.NUMERIC_HARDWARE_SELECTORS),
+                         set(ADDRESSED_SELECTORS) | {max_lines.SELECTOR})
         self.assertEqual({selector for selector in profile.SCHEMAS
                           if selector.startswith('addressed-native-bios-fill-') and selector.endswith('-data-v1')},
                          set(ADDRESSED_SELECTORS))

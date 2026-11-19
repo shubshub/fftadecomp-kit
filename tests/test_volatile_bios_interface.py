@@ -94,7 +94,7 @@ class BiosVolatileInterfaceTests(unittest.TestCase):
             entry = dict(symbol=fixtures.SYMBOL, declaration=fixtures.DECLARATION)
             with patch.dict(os.environ, FFTA_ROM=str(root / 'baserom.bin')), \
                     patch.object(match.plausibility, 'allowlisted_volatile_used', return_value=[entry]), \
-                    patch.object(match, 'compile_object'), \
+                    patch.object(match, 'compile_object', return_value=(b'', b'', None)), \
                     patch.object(semantics, 'compare', return_value=[]) as compare:
                 for selector in (None, native.buffers.SELECTOR, native.buffers.BIOS_FILL_SELECTOR):
                     match.allowlisted_volatile_semantics(root, f['address'], runner=Runner(),
