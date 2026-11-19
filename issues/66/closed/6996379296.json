@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "364f6c6f96653df7c495502ee09bc3e4f5fd54839d559a64777b7a1835f10290",
+    "acknowledged_cursor": 6996379296,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "364f6c6f96653df7c495502ee09bc3e4f5fd54839d559a64777b7a1835f10290",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0814496C\",\"who\":\"opencode-ffta\",\"note\":\"hand match (opencode session, 2026-11-18)\"}",
+      "created_at": "2026-11-19T01:01:07Z",
+      "id": 6996379296,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T01:01:07Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "c0e3bb3b9b7ee6d27c1053f6c329bc2d6c67e33c877bc831097df83c062c006c",
+    "result": {
+      "address": "0x0814496C",
+      "claim_id": 6996379296,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 413964,
+      "request_id": 6996379296,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "e87cffdef1e5fd93b647f773236d1602a5fbe2b00993b3b2fb67cab7a56e222e",
+    "acknowledged_cursor": 6997727010,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e87cffdef1e5fd93b647f773236d1602a5fbe2b00993b3b2fb67cab7a56e222e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814496C\",\"who\":\"opencode-ffta\",\"claim_id\":6996379296,\"reason\":\"bytes identical (32B, sha256 b4c137a9). The module at 0x08144944 does not use the agbcc Thumb ABI - the result comes back in R3 and R1 survives the call - so no plausible C expresses it; the only spelling needs register-pinned globals (inline asm). match.py: HAND-ASM REQUIRED BUT NOT ALLOWED; only the maintainer can whitelist it. Parked/0814496C.\",\"unmatchable\":true,\"tried\":\"natural C with the callee returning in R0; static callee in the same TU; u64 and every struct return shape; -fcall-saved-r1; -fcall-saved-r3; old_agbcc\"}",
+      "created_at": "2026-11-19T02:22:20Z",
+      "id": 6997727010,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T02:22:20Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d3cbf49f477d48ad64b303f4dc96925330b40152aac2e935007b588f686e38ce",
+    "result": {
+      "address": "0x0814496C",
+      "claim_id": 6996379296,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 413964,
+      "request_id": 6997727010,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  }
+}
