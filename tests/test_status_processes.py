@@ -16,6 +16,7 @@ sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import push
+import match_evidence as evidence
 import status
 import test_status_parallel as fixtures
 
@@ -97,14 +98,15 @@ class ProcessVerificationTests(unittest.TestCase):
                 stream.write(report + '\n')
             return report != 'stale'
         def invoke(command, **kwargs):
-            self.assertEqual(command[-5:], ['--owner-runtime-profile', 'fixture-owner',
-                                          '--flags', '-O2', '--no-write'])
+            self.assertEqual(command[-6:], ['--owner-runtime-profile', 'fixture-owner',
+                                          '--flags', '-O2', '--check-report', '--no-write'])
             if command[4] == '08000020':
                 (self.root / 'docs/match/08000020.md').write_text('stale')
-            return subprocess.CompletedProcess(command, 0, fixtures.matched_output(), '')
+            # an owner writes its own report, so match.py compares nothing and the replay holds it
+            return subprocess.CompletedProcess(command, 0, fixtures.matched_output(compared=False), '')
         with patch.object(owner, 'selected', return_value=True), \
                 patch.object(owner, 'selector_for_report', return_value='fixture-owner'), \
-                patch.object(status, 'compiler_flags', return_value='-O2'), \
+                patch.object(evidence, 'compiler_flags', return_value='-O2'), \
                 patch.object(status, 'report_matches', side_effect=replay), \
                 patch.object(status.subprocess, 'run', side_effect=invoke):
             self.assertEqual(self.collect(), (3, 1, 24, 8, [
@@ -119,7 +121,8 @@ class ProcessVerificationTests(unittest.TestCase):
         responses = {'0814FFF0': fixtures.matched_output(24),
                      '08150000': fixtures.matched_output(),
                      '08150010': fixtures.matched_output(10),
-                     '08150020': 'verdict MATCH - byte identical\n'}
+                     '08150020': 'verdict MATCH - byte identical\n'
+                                 'report  identical to the saved docs/match/08150020.md\n'}
         with patch.object(status.subprocess, 'run', side_effect=lambda command, **kwargs:
                           subprocess.CompletedProcess(command, 0, responses[command[4]], '')):
             self.assertEqual(self.collect(), (1, 1, 8, 8, [

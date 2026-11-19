@@ -15,6 +15,7 @@ TASK = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(TASK / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 
 BASE = 0x08000000
 OBJECT = 0x02001000
@@ -312,8 +313,15 @@ class ReportTests(unittest.TestCase):
         self.assertTrue(evidence.switch_report_matches(report.splitlines(), TASK, BASE, data_profile=True))
         bad = report.replace(evidence.SWITCH_MULTIPLE_DATA_SCHEMA, evidence.SWITCH_DATA_SCHEMA)
         self.assertFalse(evidence.switch_report_matches(bad.splitlines(), TASK, BASE, data_profile=True))
+        instructions, control_flow = match.verify_switches(self.body, BASE, self.body, self.functions, self.manifest,
+                                                          data_mapping=self.objects)
+        report_fixtures.source_at(self, "src/08000000.c")
+        complete = report_fixtures.complete(
+            TASK, BASE, self.body, evidence.SWITCH_MULTIPLE_DATA_SCHEMA, instructions, mapped=True,
+            control_flow=control_flow, data_profile=True, switches=True, switch_evidence=self.manifest)
         with mock.patch.object(evidence.empty_body, "has_empty_body", return_value=False):
-            self.assertTrue(evidence.report_matches(report, TASK, BASE))
+            self.assertTrue(evidence.report_matches(complete, TASK, BASE))
+            self.assertFalse(evidence.report_matches(report, TASK, BASE))
 
     def test_legacy_single_word_report_remains_valid(self):
         self.body, _, self.manifest, mapping = fixture(1)

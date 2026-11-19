@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 
 BASE = match.ROM_BASE
 NAME = "func_08000000"
@@ -108,25 +109,10 @@ class FunctionAddressFrameTests(unittest.TestCase):
         (self.root / "baserom.bin").write_bytes(self.rom)
         framed = match.uses_stack_frame(instructions)
         schema = evidence.FRAMED_FUNCTION_ADDRESS_SCHEMA if framed else evidence.FUNCTION_ADDRESS_SCHEMA
-        fields = [
-            f"* verification: `{schema}`",
-            f"* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`",
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.mapping)}`",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            "* control flow: " + (evidence.CALL_SUMMARY if self.manifest["calls"] else "closed leaf CFG"),
-            "* verified extent: complete ELF function symbol, including literal pools",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"* compiled : `{self.body.hex()}`",
-            "* source plausibility: plausible", "* relocations: none",
-            f"* function addresses: {evidence.FUNCTION_ADDRESS_SUMMARY}",
-            f"* function address manifest: `{evidence.function_address_manifest(self.manifest)}`",
-            "* function address proof SHA-256: `" + evidence.function_address_fingerprint(
-                BASE, self.body, self.manifest, framed=framed) + "`",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
-        ]
-        if framed:
-            fields.append(f"* stack frame: {evidence.STACK_SUMMARY}")
-        return "\n".join(fields)
+        return report_fixtures.complete(
+            self.root, BASE, self.body, schema, instructions, mapped=True,
+            control_flow=evidence.CALL_SUMMARY if self.manifest["calls"] else "closed leaf CFG",
+            data_profile=bool(self.manifest["data"]), address_manifest=self.manifest)
 
     def test_fixed_frame_typed_literals_and_cached_report(self):
         for framed, call in ((True, True), (True, False), (False, True)):

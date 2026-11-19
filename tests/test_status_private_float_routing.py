@@ -51,7 +51,7 @@ class StatusPrivateFloatRoutingTests(unittest.TestCase):
         def invoke(command, **options):
             self.assertEqual(command, [sys.executable, str(STAGED / 'tools/match.py'),
                 '--root', str(self.root), f'{ADDRESS:08X}', '--owner-runtime-profile',
-                private_float.SELECTOR, '--no-write'])
+                private_float.SELECTOR, '--check-report', '--no-write'])
             self.assertEqual(options, {'capture_output': True, 'text': True})
             return subprocess.CompletedProcess(command, 0, OUTPUT, '')
         with patch.object(status.subprocess, 'run', side_effect=invoke) as native, \

@@ -27,6 +27,7 @@ sys.path.insert(0, str(TASK / "tools"))
 sys.path.insert(0, str(TASK / "tests"))
 import match
 import match_evidence as evidence
+import report_fixtures
 import switch_pool_outgoing_frame as frame
 import switch_wide_scalars as wide_scalars
 import test_switch_pool_outgoing_frame as pool_tests
@@ -391,28 +392,17 @@ class ReportTests(unittest.TestCase):
     def report(self, manifest=None, fingerprint=None, *, schema=frame.FIXED_SCHEMA, summary=None,
                stack=True, premise=None):
         manifest = self.manifest if manifest is None else manifest
-        summary = frame.FIXED_SUMMARY if summary is None else summary
-        fingerprint = fingerprint or frame.fingerprint(BASE, self.body, manifest)
-        if premise is None:
-            premise = [wide_scalars.report_line()] if "wide_scalar_policy" in manifest else []
-        lines = [f"* verification: `{schema}`", f"* source SHA-256: `{self.source}`"]
-        if stack:
-            lines.append(f"* stack frame: {evidence.STACK_SUMMARY}")
-        lines += [
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.functions)}`",
-            f"* control flow: {match.CALL_SUMMARY}",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            f"* switches: {summary}",
-            f"* switch manifest: `{evidence.switch_manifest(manifest)}`",
-            *premise,
-            f"* switch proof SHA-256: `{fingerprint}`",
-            "* verified extent: complete ELF function symbol, including literal pools",
-            "* relocations: none",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"* compiled : `{self.body.hex()}`",
-            "* source plausibility: plausible",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes"]
-        return "\n".join(lines)
+        report = report_fixtures.switch_report(
+            self.root, BASE, self.body, schema, manifest, summary=summary,
+            fingerprint=fingerprint or frame.fingerprint(BASE, self.body, manifest), control_flow=match.CALL_SUMMARY)
+        if not stack:
+            report = report.replace(f"* stack frame: {evidence.STACK_SUMMARY}\n", "")
+        if premise is not None:
+            # replace the premise line the writer derives from the manifest with the given lines
+            lines = [line for line in report.split("\n") if line != wide_scalars.report_line()]
+            at = next(index for index, line in enumerate(lines) if line.startswith("* switch manifest: ")) + 1
+            report = "\n".join(lines[:at] + list(premise) + lines[at:])
+        return report
 
     def valid(self, report):
         return evidence.report_matches(report, self.root, BASE)

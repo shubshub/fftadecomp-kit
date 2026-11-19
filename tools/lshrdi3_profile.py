@@ -358,8 +358,14 @@ def report_matches(report, root, address):
                 unquote("* lshrdi3 proof SHA-256: ") != \
                 fingerprint(address, data, manifest, source_digest, mapping, index, objects, rom, unit_context):
             return False
-        verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest, unit_context)
-        return True
+        instructions = verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest,
+                                     unit_context)
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=UNIT_SCHEMA if unit_context is not None else SCHEMA, data=data, instructions=instructions,
+            mapped=True, control_flow=CALL_SUMMARY, data_profile=bool(manifest.get("data")), data_mapping=objects,
+            empty_index=index, rom=rom, shift_evidence=manifest, shift_profile=sys.modules[__name__],
+            shift_options={} if unit_context is None else {"unit_context": unit_context}))
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False

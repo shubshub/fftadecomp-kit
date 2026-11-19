@@ -23,9 +23,11 @@ import push
 import status
 
 
-def matched_output(size=8):
+def matched_output(size=8, compared=True):
+    """match.py's output for a MATCH; `compared`: its own writer's report equals the saved one (--check-report)."""
     return (f"extent    {size} bytes (complete ELF symbol; closed CFG; no relocations)\n"
-            "verdict MATCH - byte identical\n")
+            "verdict MATCH - byte identical\n" +
+            ("\nreport  identical to the saved docs/match/fixture.md\n" if compared else ""))
 
 
 class StatusParallelTests(unittest.TestCase):
@@ -141,7 +143,8 @@ class StatusParallelTests(unittest.TestCase):
         self.fixture([0x0814FFF0, 0x08150000, 0x08150010, 0x08150020, 0x08150030])
         responses = {"0814FFF0": matched_output(24), "08150000": matched_output(),
                      "08150010": matched_output(10),
-                     "08150020": "verdict MATCH - byte identical\n",
+                     "08150020": "verdict MATCH - byte identical\n"
+                                 "report  identical to the saved docs/match/08150020.md\n",
                      "08150030": matched_output() + matched_output().splitlines()[0] + "\n"}
         expected = (1, 1, 8, 8, [
             "08150010: complete verified body disagrees with the late indexed extent",

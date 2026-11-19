@@ -598,7 +598,7 @@ def report_matches(report, root, address):
             return False
         if selector_from_manifest(manifest) != selector:
             return False
-        verify(data, address, rom, mapping, index, objects, manifest)
+        instructions = verify(data, address, rom, mapping, index, objects, manifest)
         expected_objects = [f"* data symbols SHA-256: `{hashlib.sha256(objects).hexdigest()}`"] if manifest["data"] else []
         if [line for line in lines if marker_text(line).startswith("* data symbols")] != expected_objects or \
                 [line for line in lines if marker_text(line).startswith("* stack frame")] != \
@@ -611,7 +611,14 @@ def report_matches(report, root, address):
                 fingerprint(address, data, manifest, source_digest, mapping, index, objects, rom):
             return False
         verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest)
-        return report_rom_path(root) == rom_path and Path(rom_path).read_bytes() == rom
+        if report_rom_path(root) != rom_path or Path(rom_path).read_bytes() != rom:
+            return False
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=schema_for(selector), data=data, instructions=instructions, mapped=True,
+            control_flow=CONTROL_FLOW, data_profile=bool(manifest["data"]), data_mapping=objects,
+            function_index=index, rom=rom, thunk_profile=True, function_address_profile=selector,
+            thunk_evidence=manifest))
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False

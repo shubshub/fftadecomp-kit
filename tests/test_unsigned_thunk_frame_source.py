@@ -22,6 +22,7 @@ HERE = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(HERE/'tools'))
 import match
 import match_evidence as evidence
+import report_fixtures
 import function_thunk_profile as thunks
 import owner_admission_profile as owner
 import owner_graph_profile as graph
@@ -351,19 +352,8 @@ class UnsignedThunkFrameSourceTests(unittest.TestCase):
 
     def report(self, root, manifest=None, schema=profile.FRAME_SCHEMA, selector=profile.FRAME_SELECTOR):
         manifest = self.manifest if manifest is None else manifest
-        source = evidence.source_fingerprint(root, A)
-        proof = thunks.fingerprint(A, self.body, manifest, source, self.mapping, self.index, self.objects, self.rom)
-        return '\n'.join([f'* verification: `{schema}`', f'* function-address thunks: {selector}',
-            f'* control flow: {thunks.CONTROL_FLOW}', f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
-            *([f'* stack frame: {evidence.STACK_SUMMARY}'] if manifest.get('frame') else []),
-            f'* source SHA-256: `{source}`', f'* mapping SHA-256: `{sha(self.mapping)}`',
-            f'* function index SHA-256: `{sha(self.index)}`', f'* data symbols SHA-256: `{sha(self.objects)}`',
-            f'* ROM SHA-256: `{sha(self.rom)}`', '* verified extent: complete ELF function symbol, including literal pools',
-            '* relocations: none', '* source plausibility: plausible', '* hand-asm allow list: not listed',
-            f'* source: `src/{A:08X}.c`', f'* compiled : `{self.body.hex()}`',
-            f'* function-address-thunk manifest: `{thunks.manifest_text(manifest)}`',
-            f'* function-address-thunk sha256: `{proof}`', f'* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)',
-            f'**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes'])+'\n'
+        return report_fixtures.thunk_report(root, A, self.body, manifest, selector, rom=self.rom, index=self.index,
+                                            objects=self.objects, schema=schema)
 
     def test_report_replays_frame_evidence_and_rejects_tampering(self):
         root, rom_path = self.report_root()

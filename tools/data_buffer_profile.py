@@ -361,7 +361,7 @@ def report_matches(report, root, address):
             root, address, data, rom, functions, objects, source_digest)
         framed = uses_stack_frame(instructions)
         stack_lines = [line for line in lines if key(line) == "* stack frame"]
-        return (proved_schema == schema and proved == manifest and
+        if not (proved_schema == schema and proved == manifest and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
                 [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary",
@@ -372,7 +372,12 @@ def report_matches(report, root, address):
                                                    functions, objects, proof.fingerprint()) and
                 source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == functions and
                 data_snapshot(root) == objects and report_rom_path(root) == selected_rom and
-                Path(selected_rom).read_bytes() == rom)
+                Path(selected_rom).read_bytes() == rom):
+            return False
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=schema, data=data, instructions=instructions, buffer_proof=proof, mapped=True,
+            control_flow=CALL_SUMMARY, data_profile=True, data_mapping=objects, data_buffer_evidence=manifest))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, json.JSONDecodeError):
         return False

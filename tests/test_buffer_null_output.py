@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 import match
 import match_evidence as evidence
+import report_fixtures
 import test_buffer_index as fixtures
 
 BASE = match.ROM_BASE
@@ -121,7 +122,7 @@ class BufferNullOutputTests(unittest.TestCase):
         rom = body.ljust(0x100, b'\0') + child.ljust(0x100, b'\0') + scalar_body
         mapping = json.dumps(entries).encode()
         proof = match.BufferCallProof(rom, mapping, stack_arguments=True)
-        match.verify_leaf_instructions(body, BASE, True, calls, buffer_proof=proof)
+        instructions = match.verify_leaf_instructions(body, BASE, True, calls, buffer_proof=proof)
         self.assertEqual(proof.dependencies, {BASE + 0x100: child, BASE + 0x200: scalar_body})
         self.assertTrue(any(i.mnemonic == 'cmp' and i.operands[1].type == match.ARM_OP_IMM
                             and i.operands[1].imm == 0
@@ -135,19 +136,8 @@ class BufferNullOutputTests(unittest.TestCase):
             f'{int(row["rom"], 16):08X} {int(row["end"], 16):08X} '
             f'{int(row["end"], 16) - int(row["rom"], 16)} '
             f'{(int(row["end"], 16) - int(row["rom"], 16)) // 2} return\n' for row in entries))
-        report = '\n'.join((
-            f'* source: `src/{BASE:08X}.c`', f'* verification: `{evidence.STACK_BUFFER_SCHEMA}`',
-            f'* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`',
-            f'* stack frame: {evidence.STACK_SUMMARY}',
-            f'* buffer calls: {evidence.STACK_BUFFER_SUMMARY}',
-            f'* buffer proof SHA-256: `{proof.fingerprint()}`',
-            f'* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`',
-            f'* control flow: {evidence.CALL_SUMMARY}',
-            f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
-            '* verified extent: complete ELF function symbol, including literal pools', '* relocations: none',
-            f'* ROM bytes: `{body.hex()}` ({len(body)} bytes)',
-            f'* compiled : `{body.hex()}`', '* source plausibility: plausible',
-            '* hand-asm allow list: not listed', f'**MATCH - byte identical** - {len(body)}/{len(body)} bytes'))
+        report = report_fixtures.complete(self.root, BASE, body, evidence.STACK_BUFFER_SCHEMA, instructions,
+                                          buffer_proof=proof, mapped=True, control_flow=evidence.CALL_SUMMARY)
         self.assertTrue(evidence.report_matches(report, self.root, BASE))
         legacy = report.replace(evidence.STACK_BUFFER_SCHEMA, evidence.BUFFER_SCHEMA).replace(
             evidence.STACK_BUFFER_SUMMARY, evidence.BUFFER_SUMMARY)

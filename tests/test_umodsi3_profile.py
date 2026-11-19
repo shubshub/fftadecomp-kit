@@ -24,6 +24,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 import umodsi3_profile as profile
 
 BASE = 0x08000000
@@ -256,7 +257,12 @@ class UnsignedRemainderTests(unittest.TestCase):
         def read(path):
             return self.rom if path.resolve() == self.rom_path else original_read(path)
         with patch.object(Path, "read_bytes", read):
-            report = "\n".join(lines)
+            instructions = profile.verify(self.body, BASE, self.rom, self.mapping, self.objects, manifest)
+            self.assertFalse(evidence.report_matches("\n".join(lines), self.root, BASE))
+            report = report_fixtures.complete(
+                self.root, BASE, self.body, profile.SCHEMA, instructions, mapping=self.mapping,
+                data_mapping=self.objects, mapped=True, control_flow=evidence.CALL_SUMMARY,
+                data_profile=bool(manifest["data"]), unsigned_remainder_evidence=manifest)
             self.assertTrue(evidence.report_matches(report, self.root, BASE))
             for changed in (report + "\n" + lines[0],
                             report.replace("-O2", "-O1"),

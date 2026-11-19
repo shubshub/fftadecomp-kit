@@ -24,7 +24,8 @@ import subprocess
 import sys
 import tempfile
 
-from match_evidence import (data_snapshot, mapping_snapshot, report_matches, source_fingerprint,
+from match_evidence import (data_snapshot, mapping_snapshot, report_matches, saved_selectors,
+                            source_fingerprint,
                             SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
                             SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR,
                             SWITCH_FUNCTION_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
@@ -101,49 +102,8 @@ def output_path(root, requested):
 
 
 def saved_profile_arguments(report, root, address):
-    arguments = []
-    import owner_admission_profile
-    if owner_admission_profile.selected(report):
-        arguments += ["--owner-runtime-profile", owner_admission_profile.selector_for_report(report)]
-    constants_policy = switch_constants.selected_policy(report)
-    if constants_policy is not None:
-        arguments += ["--switch-profile", constants_policy.selector]
-    # The switch-data selectors are recovered from the report as status.py
-    # recovers them; status.py forwards other selectors this does not.
-    typed_outgoing_profile = typed_switch_frame.selector_for_report(report)
-    if typed_outgoing_profile:
-        arguments += ["--switch-data-profile", typed_outgoing_profile]
-    lines = report.splitlines()
-    if f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_U16_SCALAR_SELECTOR]
-    elif f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_POOL_U16_SCALAR_SELECTOR]
-    elif f"* verification: `{pool_switch_frame.SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", pool_switch_frame.SELECTOR]
-    elif f"* verification: `{pool_switch_frame.FIXED_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", pool_switch_frame.FIXED_SELECTOR]
-    elif f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_FUNCTION_U16_SCALAR_SELECTOR]
-    elif f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR]
-    elif f"* verification: `{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR]
-    elif f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`" in lines:
-        arguments += ["--switch-data-profile", SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR]
-    thunk_switch = switch_data_thunks.selector_for_report(report)
-    if thunk_switch is not None:
-        arguments += ["--switch-data-profile", thunk_switch]
-    if function_thunk.selected(report):
-        arguments += ["--function-address-profile", function_thunk.selector_for_report(report)]
-    if software_double.selected(report):
-        arguments += ["--software-double-profile", software_double.SELECTOR]
-        if software_double.target_remainder_selected(report):
-            arguments += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
-    if inert_spin.selected(report):
-        arguments += ["--control-flow-profile", inert_spin.SELECTOR]
-    unit_toolchain = library_units.report_toolchain(report)
-    if unit_toolchain is not None:
-        arguments += ["--unit-toolchain", unit_toolchain]
+    # status.py recovers the selectors with the same function
+    arguments = saved_selectors(report).arguments
     if arguments and not report_matches(report, root, address):
         raise ValueError(f"0x{address:08X}: invalid saved profile report")
     return arguments

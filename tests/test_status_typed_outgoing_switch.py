@@ -16,6 +16,7 @@ if os.environ.get('FFTA_TEST_TOOLS_FALLBACK'):
     sys.path.append(os.environ['FFTA_TEST_TOOLS_FALLBACK'])
 import status
 import match_evidence as evidence
+import report_fixtures
 import typed_switch_outgoing_frame as frame
 from test_typed_switch_outgoing_frame import combined, BASE, OBJECTS
 
@@ -48,22 +49,7 @@ class StatusTypedOutgoingSwitchTests(unittest.TestCase):
                        'verdict MATCH - byte identical\n')
 
     def render(self):
-        manifest = self.fixture[4]
-        return '\n'.join([
-            '# synthetic typed outgoing switch', f'* verification: `{frame.SCHEMA}`',
-            f'* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`',
-            f'* mapping SHA-256: `{evidence.mapping_fingerprint(self.mapping.read_bytes())}`',
-            f'* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects.read_bytes())}`',
-            f'* switches: {frame.SUMMARY}', '* source plausibility: plausible',
-            '* relocations: none',
-            '* verified extent: complete ELF function symbol, including literal pools',
-            f'* stack frame: {evidence.STACK_SUMMARY}',
-            f'* compiled : `{self.body.hex()}`',
-            f'* switch manifest: `{evidence.switch_manifest(manifest)}`',
-            f'* switch proof SHA-256: `{frame.fingerprint(BASE, self.body, manifest)}`',
-            f'* control flow: {evidence.CALL_SUMMARY}',
-            f'* ROM bytes: `{self.body.hex()}` ({self.size} bytes)',
-            f'**MATCH - byte identical** - {self.size}/{self.size} bytes', ''])
+        return report_fixtures.switch_report(self.root, BASE, self.body, frame.SCHEMA, self.fixture[4])
 
     def collect(self, verify=True, write=False):
         return status.collect(str(self.root), verify, write_reports=write)
@@ -77,7 +63,7 @@ class StatusTypedOutgoingSwitchTests(unittest.TestCase):
     def test_real_fresh_report_routes_exact_selector_and_replays_no_write(self):
         def invoke(command, **kwargs):
             self.assertEqual(command, [sys.executable, str(ROOT / 'tools/match.py'), '--root',
-                str(self.root), '08000000', '--switch-data-profile', frame.SELECTOR, '--no-write'])
+                str(self.root), '08000000', '--switch-data-profile', frame.SELECTOR, '--check-report', '--no-write'])
             self.assertEqual(kwargs, {'capture_output': True, 'text': True})
             return subprocess.CompletedProcess(command, 0, self.output, '')
         with patch.object(status.subprocess, 'run', side_effect=invoke) as native, \

@@ -26,6 +26,7 @@ PRODUCTION = Path(os.environ.get('FFTA_UMOD_SOURCE_DEPENDENCIES', HERE))
 sys.path[:0] = [str(HERE/'tools'), str(PRODUCTION/'tools')]
 import match
 import match_evidence as evidence
+import report_fixtures
 import function_thunk_profile as thunks
 import umod_r1_thunk_profile as profile
 import umod_r1_thunk_inventory as inventory
@@ -256,12 +257,15 @@ class UmodR1SourceTests(unittest.TestCase):
         self.assertEqual(result.exception.code,0)
         self.assertIn(profile.SELECTOR,output.getvalue())
         self.assertIn('--function-address-profile',output.getvalue())
-        # Current status forwards the authenticated extracted thunk selector,
-        # and match_evidence routes the same selected report validator.
-        status=ast.parse((PRODUCTION/'tools/status.py').read_text())
+        # Current status (and rebuild) forward the authenticated extracted thunk selector that
+        # match_evidence.saved_selectors recovers, and match_evidence routes the same selected
+        # report validator.
+        recovery=next(n for n in ast.walk(ast.parse((PRODUCTION/'tools/match_evidence.py').read_text()))
+                      if isinstance(n,ast.FunctionDef) and n.name=='saved_selectors')
         self.assertTrue(any(isinstance(n,ast.Call) and isinstance(n.func,ast.Attribute) and n.func.attr=='selector_for_report'
-                            and isinstance(n.func.value,ast.Name) and n.func.value.id=='function_thunk' for n in ast.walk(status)))
-        self.assertIn('"--function-address-profile", thunk_profile',(PRODUCTION/'tools/status.py').read_text())
+                            and isinstance(n.func.value,ast.Name) and n.func.value.id=='function_thunk' for n in ast.walk(recovery)))
+        self.assertIn('"--function-address-profile", found.thunk',(PRODUCTION/'tools/match_evidence.py').read_text())
+        self.assertIn('saved_selectors(saved_report)',(PRODUCTION/'tools/status.py').read_text())
         self.assertIn('return function_thunk.report_matches(report, root, address)',(PRODUCTION/'tools/match_evidence.py').read_text())
 
     def test_report_fingerprint_binds_all_current_context_and_source(self):
@@ -292,18 +296,8 @@ class UmodR1SourceTests(unittest.TestCase):
         return root,rom_path
 
     def report(self,root):
-        source=evidence.source_fingerprint(root,A)
-        proof=thunks.fingerprint(A,self.body,self.manifest,source,self.mapping,self.index,self.objects,self.rom)
-        return '\n'.join([f'* verification: `{profile.SCHEMA}`',f'* function-address thunks: {profile.SELECTOR}',
-            f'* control flow: {thunks.CONTROL_FLOW}',f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
-            f'* source SHA-256: `{source}`',f'* mapping SHA-256: `{sha(self.mapping)}`',
-            f'* function index SHA-256: `{sha(self.index)}`',f'* data symbols SHA-256: `{sha(self.objects)}`',
-            f'* ROM SHA-256: `{sha(self.rom)}`','* verified extent: complete ELF function symbol, including literal pools',
-            '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
-            f'* source: `src/{A:08X}.c`',f'* compiled : `{self.body.hex()}`',
-            f'* function-address-thunk manifest: `{thunks.manifest_text(self.manifest)}`',
-            f'* function-address-thunk sha256: `{proof}`',f'* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)',
-            f'**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes'])+'\n'
+        return report_fixtures.thunk_report(root,A,self.body,self.manifest,profile.SELECTOR,rom=self.rom,
+                                            index=self.index,objects=self.objects)
 
     def test_report_acceptance_requires_fresh_source_maps_and_runtime_producer(self):
         root,rom_path=self.report_root();report=self.report(root)

@@ -19,6 +19,7 @@ if os.environ.get("FFTA_TEST_SUPPORT_TOOLS"):
 sys.path.insert(0, str(TASK / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 
 assert Path(match.__file__).resolve() == TASK / "tools/match.py"
 assert Path(evidence.__file__).resolve() == TASK / "tools/match_evidence.py"
@@ -331,22 +332,9 @@ class ReportTests(unittest.TestCase):
 
     def report(self, manifest=None, fingerprint=None):
         manifest = self.manifest if manifest is None else manifest
-        fingerprint = fingerprint or evidence.switch_pool_u16_scalar_fingerprint(
-            BASE, self.body, manifest)
-        return "\n".join([
-            f"* verification: `{SCHEMA}`",
-            f"* source SHA-256: `{self.source}`",
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.functions)}`",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            f"* switches: {evidence.SWITCH_POOL_U16_SCALAR_SUMMARY}",
-            "* source plausibility: plausible", "* relocations: none",
-            "* verified extent: complete ELF function symbol, including literal pools",
-            f"* compiled : `{self.body.hex()}`",
-            f"* switch manifest: `{evidence.switch_manifest(manifest)}`",
-            "* control flow: closed leaf CFG",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
-            f"* switch proof SHA-256: `{fingerprint}`"])
+        return report_fixtures.switch_report(
+            self.root, BASE, self.body, SCHEMA, manifest, summary=evidence.SWITCH_POOL_U16_SCALAR_SUMMARY,
+            fingerprint=fingerprint or evidence.switch_pool_u16_scalar_fingerprint(BASE, self.body, manifest))
 
     def valid(self, report):
         return evidence.switch_report_matches(report.splitlines(), self.root, BASE, data_profile=True)

@@ -78,9 +78,11 @@ class PublicationSessionTests(unittest.TestCase):
 
     def compile(self, command, **kwargs):
         self.calls.append(command[4])
+        # match.py --check-report: its own writer's report equals the saved one
         return subprocess.CompletedProcess(command, 0,
             "extent    4 bytes (complete ELF symbol; closed CFG; no relocations)\n"
-            "verdict MATCH - byte identical\n", "")
+            "verdict MATCH - byte identical\n"
+            f"\nreport  identical to the saved docs/match/{command[4]}.md\n", "")
 
     def verify(self):
         return self.session.verify(self.head)
@@ -196,7 +198,8 @@ class PublicationSessionTests(unittest.TestCase):
 
     def test_missing_complete_extent_refuses(self):
         self.compiler.side_effect = lambda command, **kwargs: subprocess.CompletedProcess(command, 0,
-                                                        "verdict MATCH - byte identical\n", "")
+            "verdict MATCH - byte identical\n"
+            f"report  identical to the saved docs/match/{command[4]}.md\n", "")
         with self.assertRaisesRegex(ValueError, "missing complete verified"):
             self.verify()
 

@@ -19,6 +19,7 @@ if os.environ.get("FFTA_TEST_SUPPORT_TOOLS"):
 sys.path.insert(0, str(TASK / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 
 assert Path(match.__file__).resolve() == TASK / "tools/match.py"
 assert Path(evidence.__file__).resolve() == TASK / "tools/match_evidence.py"
@@ -450,22 +451,10 @@ class ReportTests(unittest.TestCase):
 
     def report(self, manifest=None, fingerprint=None):
         manifest = self.manifest if manifest is None else manifest
-        fingerprint = fingerprint or evidence.switch_function_u16_scalar_fingerprint(BASE, self.body, manifest)
-        return "\n".join([
-            f"* verification: `{self.schema}`",
-            f"* source SHA-256: `{self.source}`",
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.functions)}`",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            f"* switches: {self.summary}"] + (
-            [f"* stack frame: {evidence.STACK_SUMMARY}"] if self.frame else []) + [
-            "* source plausibility: plausible", "* relocations: none",
-            "* verified extent: complete ELF function symbol, including literal pools",
-            f"* compiled : `{self.body.hex()}`",
-            f"* switch manifest: `{evidence.switch_manifest(manifest)}`",
-            f"* control flow: {match.CALL_SUMMARY if self.frame else 'closed leaf CFG'}",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
-            f"* switch proof SHA-256: `{fingerprint}`"])
+        return report_fixtures.switch_report(
+            self.root, BASE, self.body, self.schema, manifest, summary=self.summary,
+            fingerprint=fingerprint or evidence.switch_function_u16_scalar_fingerprint(BASE, self.body, manifest),
+            control_flow=match.CALL_SUMMARY if self.frame else "closed leaf CFG")
 
     def valid(self, report):
         return evidence.switch_report_matches(report.splitlines(), self.root, BASE, data_profile=True)
