@@ -2238,6 +2238,40 @@ object is not detected), the physical stack, source readability or
 termination. The premise lines are the reviewable list of what must hold
 whenever each site runs.
 
+#### Frame words
+
+`tools/stack_index_frame_words_profile.py` extends the analysis. It runs on
+the default path of both selectors, and only where the plain analysis refuses.
+A report the plain analysis admits keeps its evidence, and a function both
+refuse keeps the plain refusal. Its obligations, each with its refusal:
+
+1. **Callee stack reach.** A callee's mapped ROM bytes are walked, with
+   everything it calls: every instruction is ARMv4T Thumb (or SWI), SP is used
+   only by `push`, `pop`, `add/sub sp,#imm` and `ldr/str Rd,[sp,#imm]`, and
+   every return is proved to use the saved LR (a nested callee that may write
+   the saved LR word unsaves it). The walk yields the bytes above the entry SP
+   the callee may touch, the registers of R0-R3 and R12 it may read before
+   writing, and those it writes on every path (a nested call surely writes only
+   what every return of the inner callee writes). The only BIOS call the walk
+   admits is SWI 6 (`Div`), under a GBATEK premise printed in the report; its
+   handler stores R2 below SP, so R2 counts as read.
+2. **Unread argument registers.** A variable stack address left in R0-R3 at a
+   call is not an escape when the walk proves the callee never reads that
+   register before writing it (080E4EB0 leaves `&x[j]` in R3 across the
+   division wrapper `0x08141870`). After the call it is unusable unless the
+   callee writes it on every path. The rule covers R0-R3 only, never R12.
+
+The report adds one line, bound in the fingerprint and re-derived on replay:
+
+```
+* stack index frame words: <N> calls with ROM-walked callee stack reach (at most <B> bytes above the callee's entry SP); stack addresses left in argument registers the callee never reads: R<n> at <call site>, ...[; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP]
+```
+
+`stack_index_frame_words_profile.POLICY` is the one switch: disabled, the plain
+analysis refuses exactly as before. The walk trusts what every call in the kit
+already trusts: callees preserve R4-R11 and SP, and neither they nor interrupt
+handlers read a stack word below their entry SP before writing it.
+
 #### Version 2: forwarded callee stack arguments and sign-extended indices
 
 `--owner-runtime-profile named-data-buffer-stack-index-v2` is v1 with two
