@@ -565,13 +565,13 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
     pb = matched_b / total_b if total_b else 0.0
     lines = [
         START, "", "## Decompilation progress", "",
-        "| Metric | Matched / indexed | Complete | Progress |",
-        "| :--- | ---: | ---: | :--- |",
+        "| Metric | Matched / indexed | Progress |",
+        "| :--- | ---: | :---: |",
     ]
     for name, done, total, fraction in (("functions", matched_f, total_f, pf),
                                         ("bytes", matched_b, total_b, pb)):
         lines.append(f"| {name.capitalize()} matched | {done:,} / {total:,} | "
-                     f"**{fraction * 100:.2f}%** | ![](/docs/badges/{name}.svg) |")
+                     f'**{fraction * 100:.2f}%**<br><img src="/docs/badges/{name}.svg" width="82" alt=""> |')
     lines += [
         "", "Each match reproduces the original ROM bytes. Byte coverage counts overlapping "
         "function spans once.", "",

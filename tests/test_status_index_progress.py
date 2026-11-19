@@ -81,7 +81,7 @@ class Render(unittest.TestCase):
     def test_rows_and_regions(self):
         progress = status.index_progress(self.fns, [0x08000000])
         block = self.render(progress)
-        self.assertIn("| Bytes matched | 256 / 448 | **57.14%** | ![](/docs/badges/bytes.svg) |", block)
+        self.assertIn('| Bytes matched | 256 / 448 | **57.14%**<br><img src="/docs/badges/bytes.svg" width="82" alt=""> |', block)
         self.assertLess(block.index("| Bytes matched |"), block.index("<details>"))
         fence = block.split("```")[1].strip("\n").splitlines()
         self.assertEqual(len(fence), 0x15 + 1)
