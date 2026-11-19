@@ -3563,8 +3563,10 @@ symbolically along every path, and the check requires:
   path reads before writing (pushes and stores count as reads) and those
   every path overwrites before returning. A call inside the callee reads and
   writes what its own callee does, transitively, up to 8 levels and 64
-  callees. Recursion, a CFG that does not close, a word switch, an unindexed
-  or ARM target and anything unmodelled leave the strict rule in place. A
+  callees for each called name (the budget restarts per name, so the budget
+  spent on earlier calls no longer cuts later ones short). Recursion,
+  a CFG that does not close, a word switch, an unindexed or ARM target and
+  anything unmodelled leave the strict rule in place. A
   register the callee never reads carries nothing into it, and one it
   overwrites on every path carries nothing out, so a dead load there is
   dead across the call. A register it leaves alone stays live past the call,
