@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 
 import match
-import owner_admission_profile as owner
 import owner_graph_profile as graph
 import callback_local_two_output_frame as local
 import descriptor_output_alias_profile as frame
@@ -67,6 +66,9 @@ class ConsumerBoundary:
         self.seal = sha(canonical(self.receipt).encode())
 
     def _derive(self):
+        # owner_admission_profile imports this module through the word-result
+        # callback profile; importing it here keeps this module importable first.
+        import owner_admission_profile as owner
         policy = json.loads(self.policy)
         rom, mapping, index, objects, source = self.inputs
         spans = frame.DescriptorOutputAliasProof(rom, mapping, index, objects)
