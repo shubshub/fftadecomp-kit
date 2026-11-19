@@ -2326,7 +2326,35 @@
           "who": "opencode-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2e3ddd0854920db74f9951cd315f65aafaf9070051130b4f69d0bb26df2d0594",
+        "acknowledged_cursor": 6998292448,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2e3ddd0854920db74f9951cd315f65aafaf9070051130b4f69d0bb26df2d0594",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813B2A8\",\"who\":\"opencode-ffta\",\"claim_id\":6997325404,\"reason\":\"two blockers: the stack-buffer proof walks callee 0x0813AF98 and refuses (unsupported buffer pointer use or escape); and a real register-allocation difference remains - the ROM keeps a copy of the record pointer in sl, agbcc spills it to the frame, so 58 of 205 instructions differ (468 vs 470 bytes). Parked/0813B2A8.\",\"unmatchable\":true,\"tried\":\"the status variable frame residency; the size selection form; the header copy form; the kind as a separate variable; the list type; direct-vs-thunk call spelling; every spelling of the record-pointer copy; declaration order (200 permutations)\"}",
+          "created_at": "2026-11-19T02:57:40Z",
+          "id": 6998292448,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T02:57:40Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "163b5b8cb302f3b14a9bf17a4a35880274d5f5c8f22fe5646812915a523fc606",
+        "result": {
+          "address": "0x0813B2A8",
+          "claim_id": 6997325404,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 6998292448,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      }
     },
     {
       "claim": {
