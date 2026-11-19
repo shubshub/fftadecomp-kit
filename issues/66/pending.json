@@ -2390,7 +2390,35 @@
           "who": "opencode-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "796bc2232da496d5ea8fb92f0b2957cffda208c2207cfd89ffc9ef3f3449a4d9",
+        "acknowledged_cursor": 6997298709,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "796bc2232da496d5ea8fb92f0b2957cffda208c2207cfd89ffc9ef3f3449a4d9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081306E0\",\"who\":\"opencode-ffta\",\"claim_id\":6996879902,\"reason\":\"released before starting: indirect 'mov pc, r0' jump table makes the branch proof the hard part; re-planned onto a direct-call target\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-19T01:55:49Z",
+          "id": 6997298709,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T01:55:49Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d83b01154a88d5f090ae5641908f5d9aa6ec3f3e3fc6305bc81083c46865a9d9",
+        "result": {
+          "address": "0x081306E0",
+          "claim_id": 6996879902,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 6997298709,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      }
     },
     {
       "claim": {
