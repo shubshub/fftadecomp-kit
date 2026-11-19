@@ -5988,6 +5988,7 @@ def main():
     # the compile runs in a shell (possibly inside WSL), so give it a POSIX path
     runner = Runner(args.cc, args.wsl, args.wsl_path,
                     timeout=software_double.REPLAY_TIMEOUT if double_profile or thunk_profile else None)
+    original = None
     try:
         with runner.workspace() as workspace:
             object_data, text_data, original = compile_object(
@@ -6360,6 +6361,9 @@ def main():
             if buffer_proof.dependencies and len(buffer_proof.span(addr)) != len(got):
                 raise ValueError("buffer caller requires an exact complete mapped span")
     except Exception as e:                       # noqa: BLE001
+        routed = addressed_signed_runtime.COMPILER_THUNKS_POLICY
+        if routed.applies(args, gate, original):
+            return selector_issue(routed.issue(e))
         sys.exit(f"compile failed:\n{e}")
 
     if len(got) < span:

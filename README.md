@@ -2986,6 +2986,34 @@ its caller. Still excluded: local buffers passed to callbacks, compiler-emitted
 incoming stack words. The r2 and r3 callback selectors keep their fixed producer
 shapes.
 
+The default path admits compiler-emitted `__divsi3`/`__modsi3` beside canonical
+thunks. Its generic call binding still refuses a signed runtime next to a
+`_call_via_rN` call, because that walk proves neither where a thunk's target
+came from nor that no local address reaches it. On that refusal, a run with no
+selector, the fixed toolchain and no library unit, whose original object names
+both a compiler signed runtime and a thunk, is re-verified under
+`compiler-signed-runtime-thunks-data-v1` (schema
+`elf-symbol-thumb-compiler-signed-runtime-thunks-data-v1`). That proof
+composes three existing ones: the compiler-runtime binding of
+`compiler-signed-runtime-data-v1` (original compiler-emitted names, explicit
+runtime identifiers refused in the preprocessed C, pinned runtime bodies);
+everything `addressed-signed-runtime-thunks-data-v1` checks (target loads, no
+SP materialization, authenticated thunks, local long branches, source
+namespace), with actual typed data; and the unsigned runtime binding of the
+explicit integer selectors, which neither of the other two has. Beside at least
+one signed runtime, the compiler's `__udivsi3`/`__umodsi3` bind to
+`0x08142AB0`/`0x08142B28` with their pinned identities. Unsigned runtimes
+alone are neither routed nor admitted, and the other compiler selectors keep
+their signed-only names. The data-free shape (a callback read from an incoming
+object, as in `080178A4`) stays excluded: it is routed, then refused with
+`compiler runtime thunks require actual typed data`. The report prints the
+compiler runtime, thunk callee and named data premises. A refused route keeps
+the plain refusal first: `<plain refusal>; compiler signed runtime thunks:
+<reason>`. Status
+replays the report by naming that selector, which also works by hand.
+`addressed_signed_runtime_profile.COMPILER_THUNKS_POLICY.enabled = False`
+restores the plain refusal.
+
 ### Guarded local Thumb switches
 
 The separate `elf-symbol-thumb-switches-v1` profile admits one compiler-emitted
