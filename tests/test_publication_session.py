@@ -85,10 +85,16 @@ class PublicationSessionTests(unittest.TestCase):
     def verify(self):
         return self.session.verify(self.head)
 
-    def accept_progress(self):
-        event = self.verify()
+    def write_progress(self, event):
         (self.repo / "README.md").write_text(event["status_block"])
         (self.repo / "docs/status.md").write_text(event["status_block"])
+        for name, content in event["status_assets"].items():
+            path = self.repo / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(content)
+
+    def accept_progress(self):
+        self.write_progress(self.verify())
         return self.verify()
 
     def test_fresh_baseline_unchanged_reuse_and_new_source_verification(self):
@@ -107,6 +113,14 @@ class PublicationSessionTests(unittest.TestCase):
             self.session.publish(self.head)
             publish.assert_called_once_with(str(self.repo), "fork", "topic", force=True,
                 lease=("destination", "b"*40), commit=self.head)
+
+    def test_changed_meter_reuses_receipts_but_requires_current_progress(self):
+        self.accept_progress()
+        (self.repo / "docs/badges/bytes.svg").write_text("stale")
+        event = self.verify()
+        self.assertEqual((event["event"], event["fresh"]), ("progress-stale", 0))
+        self.write_progress(event)
+        self.assertEqual(self.verify()["event"], "verified")
 
     def test_modified_source_or_report_invalidates_all_and_recompiles(self):
         self.add_source("08000010")
@@ -360,8 +374,7 @@ class PublicationSessionTests(unittest.TestCase):
             yield f"verify {second}\n"
             event = events[-1]
             self.assertEqual((event["fresh"], event["reused"]), (1, 1))
-            (self.repo / "README.md").write_text(event["status_block"])
-            (self.repo / "docs/status.md").write_text(event["status_block"])
+            self.write_progress(event)
             yield f"verify {second}\n"
             yield f"push {second}\n"
             yield "quit\n"

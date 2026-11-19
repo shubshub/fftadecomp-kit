@@ -283,7 +283,7 @@ class OfflineProcessReplayTests(unittest.TestCase):
             return True
         with patch.object(status, 'report_matches', side_effect=replay):
             result = status.collect(str(self.root), False, worker_processes=2)
-        self.assertEqual(result[1], 3)
+        self.assertEqual(result[1], 2)  # Count each verified address once.
         pids = (self.root / '08000000.pid').read_text().splitlines()
         self.assertEqual(len(pids), 2)
         self.assertEqual(len(set(pids)), 1)

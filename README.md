@@ -313,10 +313,10 @@ python tools/push.py --repo ../fftadecomp --remote fork --branch contribution \
 
 Startup verifies the captured HEAD, then reads `verify FULL_COMMIT`,
 `push FULL_COMMIT`, or `quit` from stdin. JSON event lines accompany ordinary
-gate diagnostics. `verified` and `progress-stale` events include `status_block`,
+gate diagnostics. `verified` and `progress-stale` events include `status_block`, `status_assets`,
 `fresh`, `reused`, and snapshot/runtime/ROM digests. After `progress-stale`, the
-operator may write that exact block to README and `docs/status.md`, commit it,
-and submit the new HEAD. Only `verified` authorizes the session's `push` command.
+operator may write that block to the README and `docs/status.md`, write the
+generated files at the paths in `status_assets`, commit them and submit the new HEAD. Only `verified` authorizes the session's `push` command.
 The session does not rebase, edit game files, commit, or load saved success JSON.
 After a successful real push, the session remains available for subsequent
 additive candidates and advances its destination lease only to the exact pushed
@@ -4434,28 +4434,17 @@ capability grants zero game C credit and does not admit the complete caller.
 
 ## Status accounting
 
-The two existing percentage badges and table rows retain their legacy
-provisional bases. The function denominator counts entries starting below
-`0x08150000`; matched main bytes count indexed spans. The byte denominator sums
-all legacy layout segments named `code*`, including late-ROM labels, falling
-back to the union of main indexed spans when that sum is zero or the layout is
-absent. Layout labels do not prove executable ownership, and historical index
-spans may be truncated or overlapping. These numbers are not whole-game
-completion percentages.
+Function progress counts verified entries in the main function index, starting below
+`0x08150000`. Byte progress divides the union of matched index spans by the
+union of all main index spans. Overlapping bytes count once. The README meters,
+regional breakdown and badge endpoints use these counts. Index boundaries can
+change as more code is recovered.
 
-Additional verified late-ROM spans are reported separately as absolute
-function and complete-body byte counts, without a guessed denominator. Their
-complete ELF/report extent must equal the unique indexed extent. Internal
-literal pools count; external alignment and installation-time RAM aliases do
-not. No late count changes a legacy numerator, denominator or percentage.
-This is recovered-code evidence, not an exhaustive late-ROM inventory.
-
-A decomp with `config/library_units.json` also gets one row per library
-unit (functions and indexed bytes matched inside it) and a row for every
-function outside units. Unit functions stay in the legacy metrics; the rows
-only separate them. A row whose proving function is unverified, verified with
-the default toolchain, or no longer needs the unit's toolchain is listed
-under "needs attention".
+Late-ROM functions have a separate absolute count. Their complete ELF and
+report extent must equal the unique indexed extent. Internal literal pools count.
+External alignment and installation-time RAM aliases are excluded. The regional
+and library breakdown also lists each recorded library unit and the functions
+outside those units.
 
 `--verify` performs fresh official matching without rewriting reports;
 `--write --verify` also regenerates and replays them. Fresh no-write verification

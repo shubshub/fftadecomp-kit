@@ -213,7 +213,8 @@ def snapshot_parts(root):
     shared = {name: value for name, value in manifest.items()
               if name not in sources.values() and
               not re.fullmatch(r"docs/match/[0-9A-F]{8}\.md", name) and
-              name not in ("README.md", "docs/status.md")}
+              name not in ("README.md", "docs/status.md", "docs/badges/functions.svg",
+                           "docs/badges/bytes.svg", "docs/badges/functions.json", "docs/badges/bytes.json")}
     # Unused reports are also immutable shared dependencies. Newly added reports
     # may only accompany a new addressed source.
     reports = {name: value for name, value in manifest.items()
@@ -330,7 +331,7 @@ class VerificationSession:
             if not push.check_plausible(tree, worker_processes=self.worker_processes) or not push.check_reports(tree):
                 raise ValueError("native plausibility/report gate failed")
             badge = push.badge_base(self.repo) or os.environ.get("FFTA_BADGE_BASE") or ""
-            block, _, _ = status.render(tf, mf, tb, mb, problems, badge_base=badge,
+            block, pf, pb = status.render(tf, mf, tb, mb, problems, badge_base=badge,
                                         late_f=lf, late_b=lb, progress=progress or None)
             readme = (Path(tree) / "README.md").read_text()
             start, end = readme.find(status.START), readme.find(status.END)
@@ -338,6 +339,11 @@ class VerificationSession:
             status_file = Path(tree) / "docs/status.md"
             progress_ok = current.strip() == block.strip() and (
                 not status_file.exists() or status_file.read_text().strip() == block.strip())
+            assets = {path.relative_to(tree).as_posix(): content
+                      for path, content in status.progress_assets(tree, pf, pb).items()}
+            progress_ok = progress_ok and all((Path(tree) / name).is_file() and
+                                              (Path(tree) / name).read_text() == content
+                                              for name, content in assets.items())
             if tree_pin(tree, snapshot=True) != manifest:
                 raise ValueError("committed snapshot mutated during verification")
         finally:
@@ -356,7 +362,7 @@ class VerificationSession:
                 "commit": expected, "reused": reused, "fresh": len(results) - reused,
                 "snapshot_sha256": object_pin(manifest),
                 "runtime_sha256": object_pin(self.runtime), "rom_sha256": self.rom[1],
-                "status_block": block}
+                "status_block": block, "status_assets": assets}
 
     def publish(self, expected):
         self.authenticate()
