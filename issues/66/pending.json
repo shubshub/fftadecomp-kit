@@ -2270,66 +2270,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "64872d1f730ac43348311aadc887106e57fd64d46817f6fb14fabf1f1d52e22f",
-        "acknowledged_cursor": 6996394563,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "64872d1f730ac43348311aadc887106e57fd64d46817f6fb14fabf1f1d52e22f",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800A0B8\",\"who\":\"opencode-ffta\",\"note\":\"hand match (opencode session, 2026-11-18)\"}",
-          "created_at": "2026-11-19T01:01:58Z",
-          "id": 6996394563,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-19T01:01:58Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0c30ce07e5bebc4ba1b648865ebb8d4ee76c2ea8e3538f918cec98eff0ccde40",
-        "result": {
-          "address": "0x0800A0B8",
-          "claim_id": 6996394563,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 413964,
-          "request_id": 6996394563,
-          "status": "accepted",
-          "who": "opencode-ffta"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "7be22654c3538679824b2d9e11601a3c96b50f5a30aaa34bf3cb9cc96cfe5705",
-        "acknowledged_cursor": 6996761428,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7be22654c3538679824b2d9e11601a3c96b50f5a30aaa34bf3cb9cc96cfe5705",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800A0B8\",\"who\":\"opencode-ffta\",\"claim_id\":6996394563,\"reason\":\"bytes are identical (84B, sha256 bbdb53ca...); match.py refuses on a proof limit: the stack-buffer walk reaches the _call_via_r2 thunk at 0x0814224C with the context pointer live in r0 (same class as Parked/0801174C, Parked/08025FDC). Parked/0800A0B8 with the full diagnosis.\",\"unmatchable\":true,\"tried\":\"match.py --root . 0x0800A0B8; all 170 --owner-runtime-profile selectors; --function-address-profile thunks; static-callback-buffer-v1\"}",
-          "created_at": "2026-11-19T01:23:30Z",
-          "id": 6996761428,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-19T01:23:30Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "37d5b9a781f2c224995f8855e01e7010ddeb5972d60e24e68a0447145e4567d5",
-        "result": {
-          "address": "0x0800A0B8",
-          "claim_id": 6996394563,
-          "code": 0,
-          "message": "release accepted; unmatchable evidence requires maintainer review",
-          "operation": "release",
-          "owner_id": 413964,
-          "request_id": 6996761428,
-          "status": "accepted",
-          "who": "opencode-ffta"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "0516c7f0e1ba1c9116506f1998b33db024d05276df16bf48594d36e8c427eefd",
         "acknowledged_cursor": 6996409799,
         "body_provenance": "acceptance-time",
