@@ -37,6 +37,16 @@ maps the symbol to the listed address.  Source files never qualify.  match.py
 then compiles each user a second time with the qualifier stripped from that
 declaration and refuses any difference beyond the documented dead load before
 each member store (tools/volatile_semantics.py).
+
+agbcc reads `volatile`, `__volatile__` and `__volatile` as the same qualifier
+(kit#93).  The `volatile` rule refuses all three, and every exception above
+accepts only the plain spelling; in a file with a line splice, an exception
+holds only where it also holds with the splices joined.  Every asm keyword
+spelling, a NUL byte and a preprocessor query (`__has_include`, `#embed`, ...)
+are refused outright.  With --addr the addressed source's translation unit is
+also checked after cpp (volatile_census): each qualifier the compiler will see
+must be one this run read as a qualifier, in code, in a file it linted, and
+the unit may hold no asm keyword.
 """
 
 import argparse
@@ -44,15 +54,31 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import platform
 import re
+import shlex
+import subprocess
 import sys
+import tempfile
 
 JUSTIFY = "plausible:"
+
+# Every spelling agbcc reads as the volatile qualifier: gcc/c-parse.gperf maps
+# `volatile`, `__volatile__` and `__volatile` to TYPE_QUAL RID_VOLATILE.  Each
+# check that looks for the qualifier uses VOLATILE (kit#93).
+VOLATILE_SPELLINGS = ("volatile", "__volatile__", "__volatile")
+VOLATILE = r"\b(?:__volatile__|__volatile|volatile)\b"
+VOLATILE_QUALIFIER = re.compile(VOLATILE)
+GNU_VOLATILE = ("`{}` is GNU C's spelling of volatile: the same qualifier, refused everywhere "
+                "(every exception accepts only the plain spelling `volatile`)")
 
 # id, severity, pattern, message
 RULES = [
     # --- constructs that are a codegen hack by definition
-    ("inline-asm", "error", r"__asm__|\basm\s*(?:__volatile__|volatile|goto|inline)?\s*\(",
+    # `asm`, `__asm` and `__asm__` are all ASM_KEYWORD in agbcc's c-parse.gperf,
+    # and its grammar takes any type qualifier before the `(`: the token itself
+    # is refused (`__asm("")`, `asm const ("")`, `int r __asm("r4");`).
+    ("inline-asm", "error", r"\b(?:__asm__|__asm|asm)\b",
      "inline assembly: the point of a matching decomp is C that compiles to the "
      "original code, not asm pasted into a C file"),
     ("asm-include", "error", r'#\s*include\s+"[^"]*\.(s|S)"',
@@ -74,7 +100,7 @@ RULES = [
      "empty function body"),
     ("placeholder", "error", r"\?\?\?|\bTODO\b|\bFIXME\b|\bUNIMPLEMENTED\b|not implemented",
      "placeholder body"),
-    ("volatile", "error", r"\bvolatile\b",
+    ("volatile", "error", VOLATILE,
      "volatile: it suppresses reordering, which is the classic way to force a "
      "byte match (real I/O code is the only legitimate use - justify it)"),
     ("attribute-steering", "error",
@@ -105,7 +131,8 @@ RULES = [
 
 # A backslash, optional horizontal whitespace and a newline: GCC's cpp splices
 # the lines even with the whitespace (it only warns), so every scan must too.
-SPLICE = r"\\[ \t\f\v]*\r?\n"
+# cpp counts a NUL byte as that whitespace as well.
+SPLICE = r"\\[ \t\f\v\0]*\r?\n"
 
 
 def join_splices(text):
@@ -317,7 +344,7 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
     `u16 : 16`; BIT_FIELD_WIDTHS), the members the semantic check models.
 
     While the entry is active, every linted file is scanned with line splices
-    joined as cpp joins them, and refuses: form feed, vertical tab and lone
+    joined as cpp joins them, and refuses: form feed, vertical tab, NUL and lone
     carriage return; #include
     outside include/ and src/*.h (from the closure); token pasting, digraph and trigraph spellings (they
     can build a directive or name the scan cannot see); typeof (it would copy
@@ -364,9 +391,9 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
             for hash_token in re.finditer(r"#", line[0]):
                 finding(line.start() + hash_token.start(), f"`#` outside a directive line is "
                         f"refused while {symbol} is allowlisted: it could forge a directive")
-        for control in re.finditer(r"[\f\v]|\r(?!\n)", untranslated if untranslated is not None
+        for control in re.finditer(r"[\f\v\0]|\r(?!\n)", untranslated if untranslated is not None
                                    else text if text is not None else code):
-            finding(control.start(), f"form feed, vertical tab and lone carriage return are "
+            finding(control.start(), f"form feed, vertical tab, NUL and lone carriage return are "
                     f"refused while {symbol} is allowlisted: cpp treats them as whitespace "
                     "where the directive scans do not")
         for typeof in re.finditer(r"\b(?:typeof|__typeof|__typeof__)\b", joined):
@@ -580,7 +607,9 @@ def member_provenance(code, entry):
             close += 1
         if any(t == symbol for t, _ in tokens[index + 2:close]):
             findings.append((offset, f"`&(...)` around {symbol} may not take a member's address"))
-    qualifiers = {"const", "volatile", "__extension__", "signed", "unsigned"}
+    # every qualifier and signedness spelling gcc/c-parse.gperf reserves
+    qualifiers = {"const", "__const", "__const__", *VOLATILE_SPELLINGS, "restrict", "__restrict",
+                  "__restrict__", "__extension__", "signed", "__signed", "__signed__", "unsigned"}
     for index, (token, offset) in enumerate(tokens):
         if token != "(":
             continue
@@ -588,12 +617,19 @@ def member_provenance(code, entry):
         while after < len(tokens) and tokens[after][0] in qualifiers:
             after += 1
         rest = [t for t, _ in tokens[after:after + 3]]
-        if rest[:1] in (["struct"], ["union"]) and ("{" in rest[1:3]):
-            findings.append((offset, f"a type name with a struct or union body may not appear in a "
-                             f"{symbol} user: it can reinterpret the object"))
+        if rest[:1] in (["struct"], ["union"]):
+            # a body anywhere before the type name's `)`: after a tag or
+            # attributes (`struct __attribute__((packed)) { ... }`) too
+            depth, probe = 0, after + 1
+            while probe < len(tokens) and depth >= 0 and tokens[probe][0] != "{":
+                depth += {"(": 1, ")": -1}.get(tokens[probe][0], 0)
+                probe += 1
+            if depth >= 0 and probe < len(tokens) and tokens[probe][0] == "{":
+                findings.append((offset, f"a type name with a struct or union body may not appear in a "
+                                 f"{symbol} user: it can reinterpret the object"))
         if rest[:1] == ["*"]:
             close = after + 1
-            while close < len(tokens) and tokens[close][0] in qualifiers:
+            while close < len(tokens) and (tokens[close][0] in qualifiers or tokens[close][0] == "*"):
                 close += 1
             if close < len(tokens) and tokens[close][0] == ")":
                 findings.append((offset, f"an abstract `(*)` declarator may not appear in a {symbol} "
@@ -773,14 +809,15 @@ def inert_control_flow(text):
     return hits
 
 
-def hardware_polling_bodies(code, hardware_qualifiers):
+def hardware_polling_bodies(code, hardware_qualifiers, text=None):
     """Empty while bodies may poll a documented, fixed volatile MMIO macro.
 
     Only one object-like direct-access definition and a nonzero constant mask
     qualify. Function bodies, RAM reads, calls and mutable aliases still fail.
+    A file with a line splice anywhere in text, comments included, never does.
     """
     bodies = set()
-    if re.search(SPLICE, code):
+    if re.search(SPLICE, text if text is not None else code):
         return bodies
     definitions = list(re.finditer(
         r"(?m)^[ \t]*#[ \t]*define[ \t]+(?P<name>[A-Za-z_]\w*)[ \t]+"
@@ -857,6 +894,24 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     code = strip_comments_and_strings(text)
     macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
+    splices = [match.span() for match in re.finditer(SPLICE, text)]
+    if splices:
+        # cpp joins line splices before it reads a token, so an exemption holds
+        # only where it also holds in the joined text: a splice can hide a
+        # retarget from these scans (`d\<newline>ma = &ram;`), or open a comment
+        # only cpp sees (`/\<newline>*`) that turns a statement into a macro tail.
+        def physical(offset):
+            """the offset in text of the joined text's character at offset"""
+            for start, end in splices:
+                if start > offset:
+                    break
+                offset += end - start
+            return offset
+        joined_text = join_splices(text)
+        joined = strip_comments_and_strings(joined_text)
+        macro_tails &= {physical(offset) for offset in statement_macro_tails(joined)}
+        hardware_qualifiers &= {physical(offset) for offset in
+                                hardware_volatile_offsets(joined_text, joined, data_symbols or {})}
     if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
             {relpath, "include/ffta.h"}, []):
         import boot_dma0_shadow as dma
@@ -990,7 +1045,15 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         code, relpath, data_symbols or {},
         volatile_allow_entries() if volatile_allow is None else volatile_allow, text, closure,
         untranslated, tree)
-    polling_bodies = hardware_polling_bodies(code, hardware_qualifiers)
+    polling_bodies = hardware_polling_bodies(code, hardware_qualifiers, text)
+    for nul in re.finditer("\0", text):
+        findings.append((code.count("\n", 0, nul.start()) + 1, "nul-byte", "error",
+                         "a NUL byte: cpp reads it as whitespace, even inside a line splice, where "
+                         "these scans read a character, and no real source holds one"))
+    for offset, name in preprocessor_probes(text):
+        findings.append((code.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
+                         f"`{name}` asks the preprocessor about the files or the build: no gcc 2.95-era "
+                         "source does, and it can tell the volatile census's copy from the tree"))
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, code):
             if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
@@ -1003,7 +1066,8 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             if sev == "suspect" and justified(text, line):
                 continue
             # an inline-asm-looking thing inside a comment is not code
-            findings.append((line, rid, sev, msg))
+            findings.append((line, rid, sev, GNU_VOLATILE.format(m[0]) if rid == "volatile" and
+                             m[0] != "volatile" else msg))
     findings += inert_control_flow(code)
     # comments are where hackiness gets admitted, so scan them raw too
     for i, raw in enumerate(text.split("\n"), 1):
@@ -1052,6 +1116,257 @@ def check_file(path):
                       untranslated=untranslated, tree=tree, project=parent if tree is not None else None)
 
 
+def squeezed(text):
+    """(text without backslashes, whitespace and control characters, the offset in text of each kept one)"""
+    kept = [(index, char) for index, char in enumerate(text)
+            if not (char <= "\x20" or char in "\x7f\\")]
+    return "".join(char for _, char in kept), [index for index, _ in kept]
+
+
+# Queries cpp answers about the files and the build: every `__has_` operator
+# (`__has_include`, `__has_include_next`, `__has_embed`, ...), `#embed` and
+# `__TIMESTAMP__`.  They are looked for with backslashes and whitespace
+# deleted, so neither a line splice nor a desynchronised comment or literal
+# hides one, and `#embed` may have comments between `#` (or `%:`) and `embed`.
+# This is defence in depth only: token pasting builds a query no scan of the
+# text can see, and the volatile census's random markers are what keep a
+# source from telling the census's copy from the tree.
+PROBE = re.compile(r"__has_\w*|__TIMESTAMP__|(?:#|%:|\?\?=)(?:/\*.*?\*/)*embed", re.S)
+
+
+def preprocessor_probes(text):
+    """[(offset in text, spelling)] of every preprocessor query (PROBE)"""
+    flat, offsets = squeezed(text)
+    return [(offsets[match.start()], match[0] if match[0].startswith("__") else "#embed")
+            for match in PROBE.finditer(flat)]
+
+
+# ------------------------------------------------------------------ the volatile census
+# The rules read source text, but agbcc reads what cpp makes of it.  Token
+# pasting, a line splice, or text the lint reads as a comment or a literal
+# (kit#129) can give that translation unit a qualifier no rule saw, and typeof
+# copies a qualifier onto an object the source never qualifies.  The census
+# checks where each qualifier came from; where an exempt one ends up is the
+# exceptions' business (kit#357).
+TYPEOF_SPELLINGS = ("typeof", "__typeof__", "__typeof")
+CENSUS_WORD = re.compile(r"[A-Za-z0-9_$]+")
+# bytes that can join two pieces of one token (backslash splices) or that only
+# separate tokens; with them deleted, any qualifier cpp could lex from a file,
+# and any paste operator, is a plain substring of it
+CENSUS_SQUEEZE = re.compile(rb"[\x00-\x20\x7f\\]")
+CENSUS_HINTS = (b"volatile", b"asm", b"##", b"%:", b"??=", b"??/")
+ASM_SPELLINGS = ("asm", "__asm", "__asm__")
+# cpp output's string and character literals (to the end of the line when
+# unterminated, as cpp reads them) and its identifier-like words
+CENSUS_TOKEN = re.compile(r'"(?:\\.|[^"\\\n])*"?' r"|'(?:\\.|[^'\\\n])*'?|[A-Za-z0-9_$]+")
+# a literal that cpp closes on its own line; cpp only warns about one that it
+# does not, and agbcc's cc1 reads that one on across the newline
+CENSUS_LITERAL = re.compile(r'"(?:\\.|[^"\\\n])*"' r"|'(?:\\.|[^'\\\n])*'")
+MARKER_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+# match.py's preprocessor (match.DEFAULT_CPP), pinned here so that the lint
+# need not import match.py, and with it every profile module, except on
+# Windows; a test keeps the two equal.
+CENSUS_CPP = "cpp"
+
+
+def census_markers(forbidden, choice=None):
+    """a fresh marker per spelling: a reserved identifier as long as the spelling, `__` and letters or digits.
+
+    Drawn at random on every run, so no source can spell one, and redrawn until
+    none occurs in any of the forbidden texts (every input, raw and squeezed,
+    and the real unit) or in another marker.
+    """
+    import secrets
+    choice = choice or secrets.choice
+    while True:
+        markers = {spelling: "__" + "".join(choice(MARKER_LETTERS) for _ in range(len(spelling) - 2))
+                   for spelling in VOLATILE_SPELLINGS}
+        values = list(markers.values())
+        if all(a == b or a not in b for a in values for b in values) and \
+                not any(value in text for value in values for text in forbidden):
+            return markers
+
+
+def census_marked(text, markers):
+    """text with every qualifier of the lint's code view replaced by its marker"""
+    code = strip_comments_and_strings(text)
+    pieces, last = [], 0
+    for match in VOLATILE_QUALIFIER.finditer(code):
+        pieces += [text[last:match.start()], markers[match[0]]]
+        last = match.end()
+    return "".join(pieces) + text[last:]
+
+
+def census_findings(real, marked, markers):
+    """why the qualifiers of `real` are not the lint's, given cpp's output for the marked copy.
+
+    Empty when the real unit holds no qualifier, or when (1) the marked unit
+    holds none either, (2) no marker was pasted into a longer token, (3) the
+    marked unit with each marker mapped back is the real unit, byte for byte,
+    and (4) the unit holds no typeof.
+    """
+    words = CENSUS_WORD.findall(real)
+    if not any(word in VOLATILE_SPELLINGS for word in words):
+        return []
+    findings = []
+    marked_words = CENSUS_WORD.findall(marked)
+    values = set(markers.values())
+    unread = sorted({word for word in marked_words if word in VOLATILE_SPELLINGS})
+    if unread:
+        findings.append(f"the translation unit holds `{unread[0]}` where no linted file spells the "
+                        "qualifier in code: token pasting, a line splice or text the lint reads as a "
+                        "comment or literal made it")
+    pasted = sorted({word for word in marked_words
+                     if word not in values and any(marker in word for marker in values)})
+    if pasted:
+        findings.append("a qualifier is pasted into a longer token in the translation unit")
+    restored = marked
+    for spelling, marker in markers.items():
+        restored = restored.replace(marker, spelling)
+    if restored != real:
+        findings.append("the translation unit changes when only its linted qualifiers are renamed: "
+                        "it depends on more than the text of its linted files")
+    if any(word in TYPEOF_SPELLINGS for word in words):
+        findings.append("typeof in a translation unit that holds a volatile qualifier: it can copy "
+                        "the qualifier onto an object the source never qualifies")
+    return findings
+
+
+def census_unit(source):
+    """(tree, path of the source in it) for a source under a `src` directory, else None"""
+    for parent in source.parents:
+        if parent.name == "src":
+            return parent.parent, source.relative_to(parent.parent).as_posix()
+    return None
+
+
+def census_inputs(tree, name):
+    """every file the compile may read: the addressed source, src/**/*.h, include/**.
+
+    A superset of match_evidence.source_paths, whose resolved files are the
+    only dependencies match.py's verify_dependencies admits.
+    """
+    paths = set()
+    for top in ("src", "include"):
+        for directory, _, files in os.walk(tree / top):
+            paths.update(Path(directory) / file for file in files
+                         if top == "include" or file.lower().endswith(".h") or file.lower() == name)
+    return paths
+
+
+def lint_text(data):
+    """a file's bytes as check_file reads them"""
+    return data.decode("utf-8", errors="replace").replace("\r\n", "\n").replace("\r", "\n")
+
+
+def census_run(command, root):
+    """run a shell command from root as match.Runner runs it (through WSL on Windows)"""
+    if platform.system() == "Windows":
+        import match
+        return match.Runner(match.DEFAULT_CC, root=str(root)).sh(command)
+    # no timeout, as for the compile itself (a bounded run needs POSIX process groups)
+    result = subprocess.run(command, shell=True, capture_output=True, text=True, cwd=root)
+    if result.returncode != 0:
+        raise RuntimeError((result.stderr or result.stdout or "command failed").strip())
+    return result.stdout
+
+
+def volatile_census(address, linted):
+    """[(path, rule, message)] for the addressed source's translation unit.
+
+    Runs cpp as match.py does on the addressed source and again on a copy of
+    the files it reads, each rewritten by census_marked with fresh markers, and
+    applies census_findings.  Every file the unit reads must be one this run
+    lints, read under one name.  No candidate input may hold a preprocessor
+    query (preprocessor_probes), as defence in depth: the markers are drawn
+    at random, so a query that tells the copy from the tree cannot make the
+    copy spell one.  An asm keyword anywhere in the unit's code (outside
+    literals) is inline asm, however cpp made it; a literal that runs past
+    the end of its line, which cc1 and cpp read differently, is refused.  Skipped when no candidate
+    input could produce a qualifier or an asm keyword (no `volatile`, `asm` or
+    paste operator in any of them, with splices and whitespace deleted); a
+    census that cannot run is a finding.
+    """
+    name = f"{address:08X}.c".lower()
+    linted = [Path(path).resolve() for path in linted]
+    sources = sorted({path for path in linted if path.name.lower() == name})
+    if not sources:
+        return []
+    if len(sources) != 1:
+        return [(sources[0], "volatile-census", "the volatile census needs exactly one addressed source")]
+    source = sources[0]
+    unit = census_unit(source)
+    if unit is None:
+        return []
+    tree, relative = unit
+    forbidden, hinted, failed = [], False, None
+    for path in sorted(census_inputs(tree, name) | set(linted)):
+        try:
+            data = path.read_bytes()
+        except OSError as error:
+            failed = failed or error
+            continue
+        text = data.decode("utf-8", errors="replace")
+        forbidden += [text, squeezed(text)[0]]
+        hinted = hinted or any(hint in CENSUS_SQUEEZE.sub(b"", data) for hint in CENSUS_HINTS)
+        probes = preprocessor_probes(text)
+        if probes:
+            return [(source, "volatile-census", f"{path.name} holds `{probes[0][1]}`: a preprocessor "
+                     "query could tell the volatile census's copy from the tree")]
+    if failed is not None:
+        return [(source, "volatile-census", f"the volatile census could not read an input: {failed}")]
+    if not hinted:
+        return []
+    try:
+        command = f"{CENSUS_CPP} -nostdinc -undef -I include {shlex.quote(relative)}"
+        base = tree.resolve()
+        (base / "build").mkdir(exist_ok=True)
+        # inside the tree, like match.py's own workspaces, so a WSL runner reaches it too
+        with tempfile.TemporaryDirectory(prefix="ffta_census_", dir=base / "build") as work:
+            work = Path(work)
+            census_run(f"{command} -o {shlex.quote(work.relative_to(base).as_posix() + '/real.i')}", base)
+            real = (work / "real.i").read_bytes().decode("utf-8")
+            tokens = CENSUS_TOKEN.findall(real)
+            if any(token[0] in "\"'" and not CENSUS_LITERAL.fullmatch(token) for token in tokens):
+                return [(source, "multiline-literal", "a string or character literal in the translation "
+                         "unit runs past the end of its line: cpp ends it there, but agbcc reads on "
+                         "into the next line, so the census cannot read the unit as agbcc does")]
+            asm = sorted({token for token in tokens if token in ASM_SPELLINGS})
+            if asm:
+                return [(source, "inline-asm", f"the translation unit holds `{asm[0]}`: inline asm, "
+                         "even where a line splice or token pasting hides it from the rules")]
+            if not any(word in VOLATILE_SPELLINGS for word in CENSUS_WORD.findall(real)):
+                return []
+            names = set()
+            for marker in re.finditer(r'(?m)^#[ \t]+[0-9]+[ \t]+"((?:\\.|[^"\\\n])*)"', real):
+                if not (marker[1].startswith("<") and marker[1].endswith(">")):
+                    names.add(os.path.normpath(re.sub(r"\\(.)", r"\1", marker[1])))
+            if any(os.path.isabs(name) or name.split(os.sep)[0] == os.pardir for name in names):
+                return [(source, "volatile-census", "the translation unit reads a file outside its tree")]
+            reads = {name: (base / name).resolve() for name in names}
+            unlinted = sorted(set(reads.values()) - set(linted))
+            if unlinted:
+                return [(source, "volatile-census", f"the translation unit reads {unlinted[0].name}, "
+                         "which this run does not lint")]
+            identities = {(path.stat().st_dev, path.stat().st_ino) for path in reads.values()}
+            if len(identities) != len(reads):
+                return [(source, "volatile-census", "the translation unit reads one file under two names")]
+            markers = census_markers(forbidden + [real])
+            copy = work / "copy"
+            for top in ("src", "include"):
+                for directory, _, _ in os.walk(base / top):
+                    (copy / Path(directory).relative_to(base)).mkdir(parents=True, exist_ok=True)
+            for name, path in reads.items():
+                target = copy / name
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(census_marked(lint_text(path.read_bytes()), markers).encode("utf-8"))
+            census_run(f"{command} -o ../marked.i", copy)
+            marked = (work / "marked.i").read_bytes().decode("utf-8")
+    except (OSError, ValueError, RuntimeError, ImportError, subprocess.SubprocessError) as error:
+        return [(source, "volatile-census", f"the volatile census could not preprocess the source: {error}")]
+    return [(source, "volatile-census", message) for message in census_findings(real, marked, markers)]
+
+
 def asm_allow_path():
     return os.environ.get("FFTA_ASM_ALLOW") or os.path.join(
         os.path.dirname(os.path.abspath(__file__)), "asm_allow.json")
@@ -1093,11 +1408,13 @@ def main():
 
     total = 0
     all_findings = []
+    linted = []
     for p in args.paths:
         files = sorted(
             str(q) for q in Path(p).rglob("*")
             if q.is_file() and q.suffix in (".c", ".h")) \
             if os.path.isdir(p) else [p]
+        linted += files
         for f in files:
             findings = check_file(f)
             if not findings:
@@ -1111,6 +1428,19 @@ def main():
                 for line, rid, sev, msg in findings:
                     print(f"  {os.path.basename(f)}:{line}: {sev.upper()}: {rid}")
                     print(f"      {msg}")
+    if args.addr:
+        try:
+            address = int(args.addr, 16)
+        except ValueError:
+            census = [(Path(args.addr), "volatile-census", "the volatile census needs a hexadecimal --addr")]
+        else:
+            census = volatile_census(address, linted)
+        for path, rule, message in census:
+            total += 1
+            all_findings.append({"file": str(path), "line": 0, "rule": rule,
+                                 "severity": "error", "message": message})
+            if not args.json:
+                print(f"{path}:\n  {path.name}:0: ERROR: {rule}\n      {message}")
 
     allowed = asm_allowed(args.addr) if total else None
     if args.json:

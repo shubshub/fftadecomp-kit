@@ -3812,6 +3812,83 @@ window by `config/data_symbols.json`. Such a pointer may only be used for
 member access; retargeting, shadowing and escapes remain rejected. A comment
 alone cannot permit volatile RAM or local variables, asm or steering pragmas.
 
+**Every spelling of the qualifier (kit#93).** agbcc reads `volatile`,
+`__volatile__` and `__volatile` as the same qualifier (`gcc/c-parse.gperf`).
+The `volatile` rule refuses all three. Every exception (the hardware forms
+above, the allow list below and the per-file modules) accepts only the plain
+spelling, so a compile that strips `volatile` strips the qualifier entirely.
+`plausible.VOLATILE` is the one pattern every check uses. Alongside it:
+
+* the `inline-asm` rule refuses each of agbcc's asm keywords (`asm`, `__asm`,
+  `__asm__`) as a token, wherever it appears in code: `__asm("")`,
+  `asm const ("")` and `register int r __asm("r4");` included;
+* a NUL byte is refused anywhere (`nul-byte`): cpp reads it as whitespace, even
+  inside a line splice;
+* in a file with a line splice, the hardware exception and the statement-macro
+  exemption hold only where they also hold with the splices joined, as cpp
+  reads the file, and the polling exemption needs no splice anywhere in it;
+* `preprocessor-probe` refuses every `__has_` operator (`__has_include`,
+  `__has_include_next`, `__has_embed`, ...), `#embed` (also as `%:embed`, or
+  with comments before `embed`) and `__TIMESTAMP__`, looked for with
+  backslashes and whitespace deleted. No gcc 2.95-era source uses them. This
+  is defence in depth, not what makes the census below sound: token pasting
+  builds a query that no scan of the text can see (`CAT(__ha, s_include)`).
+
+The rules read source text, but agbcc reads what cpp makes of it. So when the
+lint runs with `--addr`, `plausible.py` also takes a **volatile census** of the
+addressed source's translation unit. It preprocesses the source as match.py
+does. If the unit holds a qualifier, it preprocesses it again from a copy of
+the files the unit reads, where every qualifier in the lint's code view is
+renamed to a marker of the same length. The markers are drawn at random on
+every run, and are redrawn until none occurs in any input (as written, or with
+backslashes and whitespace deleted) or in the real unit, so no source can
+spell one. That is the census's guarantee. A source that can tell the copy
+from the tree, by a pasted query or any other means, can make the copy take
+another branch. But it cannot make the copy produce a marker where the real
+unit holds a qualifier that the lint did not read, so the comparison below
+refuses it. The one exception is a macro that carries an exempt qualifier
+somewhere else (kit#357), and that needs no detection at all. The source is
+refused (`volatile-census`) when:
+
+* the copy still holds a qualifier: token pasting, a line splice, or text the
+  lint reads as a comment or literal (kit#129) made it;
+* a marker was pasted into a longer token;
+* the copy, with each marker mapped back, differs from the real unit in any
+  byte;
+* the unit reads a file this run does not lint, or one file under two names;
+* a candidate input holds a preprocessor query (defence in depth, as above);
+* the unit also uses `typeof`, which can copy the qualifier onto an object the
+  source never qualifies;
+* the census cannot run.
+
+The census also refuses an asm keyword (`asm`, `__asm`, `__asm__`) anywhere
+in the unit outside a literal, as `inline-asm`, so a line splice or token
+pasting cannot hide one from that rule. Before that scan it refuses a string
+or character literal that runs past the end of its line, as
+`multiline-literal`: cpp ends one there, with only a warning, but agbcc reads
+on into the next line. It is skipped when no file the compile
+may read (the source, `src/**/*.h`, `include/**`) holds `volatile`, `asm`,
+`##`, `%:`, `??=` or `??/` once backslashes and whitespace are deleted. Its
+scratch files live under the tree's `build/`, like match.py's workspaces. It
+runs `plausible.CENSUS_CPP`, which a test keeps equal to `match.DEFAULT_CPP`,
+from the tree's root. It imports match.py only on Windows, to run through
+`match.Runner` without `wsl_path`, so on WSL `cpp` must be on the login
+`PATH`. Elsewhere the lint never loads match.py's profile modules.
+
+What the census proves is where each qualifier came from: every qualifier agbcc
+compiles is one the lint read, in code, in a file this run lints, and so was
+refused or exempted by an exception above. It does not check where an exempt
+qualifier ends up: a macro can carry a justified hardware qualifier onto other
+memory, which is the hardware exception's business (kit#357). The census runs
+wherever the lint runs with `--addr`: match.py's ordinary path (and so
+`status.py --verify`) and every profile that lints a captured copy. It does not
+run for 0x08001244 (`oam_list_context`, whose `-include` prefix units it does
+not model) or for the reviewed-source selectors (`flash_*`, `unit_double_*`).
+Those pin their sources' tokens or digests instead. A word `volatile` in a
+string literal or in an input's path counts as a qualifier the copy keeps, so it
+is refused. So is a unit that uses `__DATE__` or `__TIME__` if the two runs
+straddle a second.
+
 For the m4a function `src/08145CAC.c` (CgbSound), the five channel-register
 pointers have a separate check in `tools/cgb_registers.py`. The channel loop
 must select all five byte addresses for each of the four channels before the
