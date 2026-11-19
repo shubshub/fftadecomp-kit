@@ -413,13 +413,19 @@ def struct_size(code, ctype, unit=False):
 DIGRAPHS = {"<:": "[ ", ":>": " ]", "<%": "{ ", "%>": " }", "%:%:": "##  ", "%:": "# "}
 
 
-def spell_digraphs(code):
+def spell_digraphs(code, view=None):
     """code (comments and literals already blanked) with each digraph spelt as its bracket or `#`.
 
-    agbcc reads `<%` as `{` and `<:` as `[`.  Outside a literal no valid C has
-    these pairs otherwise, and the offsets are kept.
+    cpp and agbcc read `%:` as `#`, `<%` as `{` and `<:` as `[` (kit#408).
+    Outside a literal no valid C has these pairs otherwise, and the offsets
+    are kept.  Given view, another view of the same text (one that keeps its
+    literals, say), the digraphs code holds are spelt in view instead, so a
+    literal's text is left as it is.
     """
-    return re.sub(r"%:%:|<:|:>|<%|%>|%:", lambda digraph: DIGRAPHS[digraph[0]], code)
+    out = list(code if view is None else view)
+    for digraph in re.finditer(r"%:%:|<:|:>|<%|%>|%:", code):
+        out[digraph.start():digraph.end()] = DIGRAPHS[digraph[0]]
+    return "".join(out)
 
 
 def operand_view(text):
@@ -1431,8 +1437,13 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
 
 def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
                closure=None, untranslated=None, tree=None, project=None):
-    """check_text's findings for one view of a file: the text as given, splices and all"""
-    code = strip_comments_and_strings(text)
+    """check_text's findings for one view of a file: the text as given, splices and all.
+
+    Every rule reads the code with its digraphs spelt as cpp reads them, so
+    `%:if 0` meets the rule `#if 0` does (kit#408).
+    """
+    unspelt = strip_comments_and_strings(text)
+    code = spell_digraphs(unspelt)
     macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
     if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
@@ -1577,7 +1588,7 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         findings.append((code.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
                          f"`{name}` asks the preprocessor about the files or the build: no gcc 2.95-era "
                          "source does, and it can tell the volatile census's copy from the tree"))
-    literals = strip_comments_and_strings_keep_strings(text)
+    literals = spell_digraphs(unspelt, strip_comments_and_strings_keep_strings(text))
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, literals if rid == "asm-include" else code):
             if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
