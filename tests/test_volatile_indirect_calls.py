@@ -117,7 +117,10 @@ class SignatureTests(unittest.TestCase):
         self.assertEqual(self.signature(source(call='g_cb[0](t[0, 1], 5);')), (False, 2, 0))
         self.assertEqual(self.signature(source(call='g_cb[0]((T){0, 1}, 5);')), (False, 2, 0))
         self.assertEqual(self.signature(source(call='g_cb[0]((c ? 1, 2 : 3), 5);')), (False, 2, 0))
-        self.assertIn('cannot be read', self.signature(source(call='g_cb[0](c ? 0, 5 : 6);')))
+        # the middle operand of an outer conditional is an expression: one argument, not two
+        self.assertIn('passes 1 arguments to its 2-argument prototype',
+                      self.signature(source(call='g_cb[0](c ? 0, 5 : 6);')))
+        self.assertEqual(self.signature(source(call='g_cb[0](c ? 0 : 6, 5);')), (False, 2, 0))
         self.assertIn('cannot be read', self.signature(source(call='g_cb[0](t[0, 5);')))
         disagree = TYPEDEF + 'extern void (*g_cb[])(void *, u32, u32);\n'
         self.assertIn('disagree', self.signature(source(disagree)))
