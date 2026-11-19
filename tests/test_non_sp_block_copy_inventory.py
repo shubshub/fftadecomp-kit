@@ -176,6 +176,17 @@ class NonSPBlockCopyInventoryTests(unittest.TestCase):
         data[offset:offset+len(raw)] = raw
         return self.changed(data, **changes)
 
+    def test_a_rom_mirror_of_a_function_entry_is_a_function_address(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377): the interposed
+        # constant at 0x20 may not name func_08020000 through either mirror.
+        for value in (B | 1, (B | 1) + 0x02000000, (B | 1) + 0x04000000):
+            with self.subTest(value=hex(value)), \
+                    self.assertRaisesRegex(ValueError, 'cannot materialize runtime/thunk/function addresses'):
+                self.mutate(0x20, struct.pack('<I', value))
+        # The SRAM/flash bus is not ROM: such a constant stays a number.
+        manifest, _ = self.mutate(0x20, struct.pack('<I', (B | 1) + 0x06000000))
+        self.assertIn((B | 1) + 0x06000000, [row['value'] for row in manifest['constants']])
+
     def test_old_defaults_and_false_keyword_boundaries(self):
         import analyze
         old = owner.refine(self.body, A, self.mapping)

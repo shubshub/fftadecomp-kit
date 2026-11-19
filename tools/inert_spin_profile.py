@@ -15,6 +15,8 @@ import subprocess
 import sys
 import tempfile
 
+import rom_mirror
+
 
 SCHEMA = "elf-symbol-thumb-mixed-return-inert-spin-v1"
 SELECTOR = "mixed-return-inert-spin-v1"
@@ -283,7 +285,7 @@ def verify(data, address, rom, mapping, index, manifest, *, data_mapping=None):
                     occupied & set(range(offset, offset + 4)):
                 raise ValueError("inert-spin data bindings require ordered aligned mapped words")
             value = objects[name] + addend
-            if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data) or \
+            if not 0 <= value <= 0xFFFFFFFF or address <= rom_mirror.canonical(value) < address + len(data) or \
                     is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or \
                     umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value) or \
                     software_float.reserved(value) or struct.unpack_from("<I", data, offset)[0] != value:

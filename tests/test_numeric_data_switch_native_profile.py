@@ -89,6 +89,18 @@ class NumericSwitchSourceTests(unittest.TestCase):
         return native.verify_original(*(fixture() if values is None else values),
             objects=kwargs.pop('objects', OBJECTS), **kwargs)
 
+    def test_a_rom_mirror_of_a_function_entry_is_a_function_address(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377).
+        from test_rom_mirror_literals import extra_reached_word
+        for value in ((CALLEE | 1) + 0x02000000, CALLEE + 0x04000000):
+            with self.subTest(value=hex(value)), extra_reached_word(value), \
+                    self.assertRaisesRegex(ValueError, 'cannot materialize runtime or function addresses'):
+                self.verify()
+        # An SRAM word is a number, and so needs the u16 scalar category.
+        with extra_reached_word((CALLEE | 1) + 0x06000000), \
+                self.assertRaisesRegex(ValueError, 'bounded u16 category'):
+            self.verify()
+
     def test_loop_and_saved_register_only_frame(self):
         result, count = self.verify(); self.assertEqual(count, 22)
         proof = result['prerequisite']; self.assertEqual(proof['stack_adjustments'], [])

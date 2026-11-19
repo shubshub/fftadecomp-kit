@@ -28,6 +28,8 @@ A = match.ROM_BASE + 0x10000
 THUNK = profile.ALIASES["_call_via_r3"]
 OUTSIDE = 0x02001000
 OWN = (A + 8, A + 9)
+# The same bytes through the ROM wait-state mirrors at 0x0A000000 and 0x0C000000 (#377).
+MIRRORED = tuple(value + mirror for value in OWN for mirror in (0x02000000, 0x04000000))
 
 
 def bl(site, target):
@@ -110,7 +112,7 @@ class LegacyBufferReplay(unittest.TestCase):
         self.assertTrue(self.replay(OUTSIDE))
 
     def test_literal_naming_the_callers_own_bytes_is_refused(self):
-        for value in OWN:
+        for value in OWN + MIRRORED:
             with self.subTest(value=value), self.assertRaisesRegex(ValueError, "caller's own bytes"):
                 self.replay(value)
 
@@ -134,7 +136,7 @@ class OrdinaryMatchPath(unittest.TestCase):
         self.assertIn("16/16 bytes", output)
 
     def test_literal_naming_the_callers_own_bytes_is_refused(self):
-        for value in OWN:
+        for value in OWN + MIRRORED:
             with self.subTest(value=value):
                 code, _ = self.run_main(caller(value), {A + 4: THUNK})
                 self.assertIn("caller's own bytes", str(code))

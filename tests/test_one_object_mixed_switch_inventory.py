@@ -149,6 +149,16 @@ class OneObjectMixedSwitchInventoryTests(unittest.TestCase):
             (cls.retained/'body.bin').write_bytes(cls.body)
             (cls.retained/'native-inventory.json').write_text(json.dumps(cls.manifest,indent=2)+'\n')
 
+    def test_a_rom_mirror_of_a_function_entry_is_a_function_address(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377).
+        from test_rom_mirror_literals import extra_reached_word
+        for value in ((B | 1) + 0x02000000, B + 0x04000000):
+            with self.subTest(value=hex(value)), extra_reached_word(value), \
+                    self.assertRaisesRegex(ValueError, 'cannot materialize a runtime/thunk/function address'):
+                self.native()
+        with extra_reached_word((B | 1) + 0x06000000):
+            self.native()
+
     def native(self, **changes):
         values = dict(data=self.body,address=A,rom=self.rom,mapping=self.mapping,index=self.index,
             calls=self.calls,bindings=self.bindings,selector=profile.SELECTOR)

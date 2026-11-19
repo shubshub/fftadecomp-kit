@@ -4,6 +4,7 @@ import hashlib
 import json
 
 import division_switch_profile as switches
+import rom_mirror
 
 SCHEMA = "elf-symbol-thumb-divsi3-positive-constant-v1"
 SUMMARY = "pinned Thumb signed quotient with CFG-proven positive signed32 constant divisors"
@@ -25,7 +26,7 @@ IDENTITIES = (
 
 
 def reserved(address):
-    return any(start <= address & ~1 < end for start, end, _ in IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _ in IDENTITIES)
 
 
 def manifest_text(manifest):

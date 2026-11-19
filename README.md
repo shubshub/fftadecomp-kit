@@ -1493,9 +1493,10 @@ entry. All linked bytes are compared with the ROM.
 
 Both also require typed provenance for every reached address-domain literal,
 as the complete-owner selectors do: each reached PC-loaded word whose value is
-in `[0x02000000,0x09000000)` (RAM, I/O to OAM, ROM) must be a typed object or
-function literal, and every typed literal must be such a word, with one
-exception. An untyped word in `[0x04000000,0x08000000)` that the owner rule
+in `[0x02000000,0x09000000)` (RAM, I/O to OAM, ROM), a ROM wait-state mirror
+word folded first (see "ROM wait-state mirrors"), must be a typed object or
+function literal, and every typed literal must be such a word, spelled at its
+canonical address, with one exception. An untyped word in `[0x04000000,0x08000000)` that the owner rule
 classes as a numeric hardware word (`reached-numeric-hardware-literals-v1`,
 see "Fixed hardware addresses as numbers in BIOS fill owners") is a number;
 it is computed over the exact complete owner graph, which must agree with the
@@ -2570,6 +2571,40 @@ A caller whose stack buffer also reaches a callee uses the typed-data buffer
 schemas instead (see "Typed named data beside buffer calls").
 These checks establish relocation fidelity, not the safety of dereferencing a
 mapped address. No game data should be copied into the symbol map.
+
+### ROM wait-state mirrors
+
+The GBA maps the Game Pak ROM three times: at `0x08000000-0x09FFFFFF` and at
+its wait-state mirrors `0x0A000000-0x0BFFFFFF` and `0x0C000000-0x0DFFFFFF`.
+Only the access timing differs, so a mirror word names the same code or data as
+the wait-state-0 address it folds to (`value & ~0x06000000`). Every rule that
+classes a literal word as ROM, as code or as an address needing typed
+provenance folds it first (`tools/rom_mirror.py`):
+
+- the typed address domain `[0x02000000,0x09000000)` of the complete-owner,
+  data-buffer, scratch-overwrite and private-frame callee rules;
+- indexed code entries and function spans in the thunk literal rules
+  (`verify_literal_bindings`, `verify_data_bindings`, the own-span rule and the
+  switch span checks) and in the function-address check of the switch and
+  block-copy inventories;
+- the reserved runtime identities (the `_call_via_rN` table, `__udivsi3` and the
+  other pinned runtimes) and every own-function check on a bound object value.
+
+A mirror word is therefore refused wherever its wait-state-0 word is. An untyped
+mirror word needs typed provenance, and a mirror of a function entry needs
+canonical function provenance, which is only ever the exact Thumb entry.
+`config/data_symbols.json` refuses a mirror address, so a typed object's base
+is canonical. An addend can still carry the bound value into a mirror. The
+complete-owner, data-buffer, scratch-overwrite and private-frame callee rules
+refuse such a literal as outside their typed domain. The addressed
+signed-runtime data rule and the plain `elf-symbol-thumb-data-v1` and
+`frame-data-v1` relocations keep it as a typed binding, with its name and addend
+recorded; the folded span checks still refuse a mirror of indexed code or of the
+caller's own bytes. Rules that admit only RAM or the loaded ROM image already
+refuse mirror words. A mirror of `0x09000000-0x09FFFFFF`, beyond the 16 MiB
+image, folds outside the typed domain, as that range itself does.
+`0x0E000000-0x0FFFFFFF` is the SRAM/flash bus, not ROM, and is never folded:
+words there, and masks such as `0x0FFFFFFF`, stay numbers.
 
 ### Library units
 
@@ -5064,9 +5099,9 @@ For every thunk caller, mapped data relocation bases and signed-addend results
 must not alias indexed function entries (even or Thumb-tagged) or the reserved
 thunk table. Such ambiguous code-as-object bindings require canonical function
 provenance; renaming a callback as mapped data cannot bypass the selector.
-Reachable PC-relative pool words matching indexed code entries require the
-canonical function relocation at that offset; reserved thunk-table literals
-are rejected. This is a conservative provenance boundary for ambiguous
+Reachable PC-relative pool words matching indexed code entries, directly or
+through a ROM wait-state mirror, require the canonical function relocation at
+that offset; reserved thunk-table literals, mirrors included, are rejected. This is a conservative provenance boundary for ambiguous
 code-valued literals, not proof that a numeric value denotes a function. It
 does not scan instruction bytes, unreachable pool words or unrelated integers.
 

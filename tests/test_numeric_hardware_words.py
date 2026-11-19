@@ -127,6 +127,41 @@ class OwnerNumericHardwareWordTests(unittest.TestCase):
                         self.assertRaisesRegex(ValueError, 'exact typed object/function coverage'):
                     owner.verify(**self.fixture(selector, value)[0])
 
+    def test_rom_wait_state_mirror_words_need_typed_provenance_as_rom_words(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000-0x09FFFFFF (#377).
+        for selector in OWNER_SELECTORS[:-1]:
+            for value in (0x0A000000, 0x0A010000, 0x0C010000, 0x0AFFFFFC):
+                with self.subTest(selector=selector, value=hex(value)):
+                    f = self.fixture(selector, value)[0]
+                    with self.assertRaisesRegex(ValueError, 'exact typed object/function coverage'):
+                        owner.verify(**f)
+                    with self.assertRaisesRegex(ValueError, f'genuine named object proof at {value:08X}'):
+                        owner.preflight(*(f[k] for k in ('data', 'address', 'rom', 'mapping', 'index', 'objects')),
+                                        selector=selector)
+            # SRAM/flash words, and mirrors of the space past the 16 MiB image, stay numbers.
+            for value in (0x0E000000, 0x0FFFFFFF, 0x0BFFFFFC):
+                with self.subTest(selector=selector, value=hex(value)):
+                    f = self.fixture(selector, value)[0]
+                    manifest, _ = owner.verify(**f)
+                    self.assertNotIn('numeric_hardware_words', manifest['proof'])
+                    owner.preflight(*(f[k] for k in ('data', 'address', 'rom', 'mapping', 'index', 'objects')),
+                                    selector=selector)
+
+    def test_a_typed_object_spelled_through_a_rom_mirror_is_refused(self):
+        for selector in (buffers.BIOS_FILL_SELECTOR, buffers.MIXED_FAST_FILL_SELECTOR):
+            for value in (0x08100000, 0x0A100000, 0x0C100000):
+                with self.subTest(selector=selector, value=hex(value)):
+                    f, word, _ = self.fixture(selector, value)
+                    objects = dict(json.loads(f['objects']), data_06000000='0x06000000')
+                    typed = copy.deepcopy(dict(f, objects=json.dumps(objects).encode()))
+                    typed['bindings']['data'] = sorted(typed['bindings']['data'] +
+                                                       [[word, 'data_06000000', value - 0x06000000]])
+                    if value < 0x09000000:
+                        owner.verify(**typed)
+                        continue
+                    with self.assertRaisesRegex(ValueError, 'exact typed object/function coverage'):
+                        owner.verify(**typed)
+
     def test_typed_hardware_words_stay_typed_and_old_manifests_keep_their_form(self):
         f, word, _ = self.fixture(buffers.BIOS_FILL_SELECTOR)
         objects = dict(json.loads(f['objects']), data_0600B1E0=f'0x{VRAM:08X}')

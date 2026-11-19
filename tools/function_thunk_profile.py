@@ -12,6 +12,7 @@ import sys
 import tempfile
 
 from inert_spin_profile import fixed_configuration, index_snapshot, marker_text, validate_span
+import rom_mirror
 
 
 SCHEMA = "elf-symbol-thumb-function-address-thunks-v1"
@@ -103,7 +104,7 @@ _replay_active = ContextVar("function_thunk_replay_active", default=False)
 
 
 def reserved(value):
-    return START <= value & ~1 < END
+    return START <= rom_mirror.canonical(value) & ~1 < END
 
 
 def verify_data_bindings(calls, literals, objects, entries):
@@ -111,7 +112,7 @@ def verify_data_bindings(calls, literals, objects, entries):
         return
     code_entries = {int(entry["rom"], 16) & ~1 for entry in entries}
     for name, value in literals.values():
-        if any(reserved(target) or target & ~1 in code_entries for target in (objects[name], value)):
+        if any(reserved(target) or rom_mirror.canonical(target) & ~1 in code_entries for target in (objects[name], value)):
             raise ValueError("thunk callers cannot bind indexed function entries as data")
 
 
@@ -128,7 +129,7 @@ def verify_literal_bindings(data, address, instructions, calls, mapping, functio
         if offset < 0 or offset + 4 > len(data) or (address + offset) % 4:
             raise ValueError("thunk literal is not a complete aligned caller word")
         value = struct.unpack_from("<I", data, offset)[0]
-        if reserved(value) or value & ~1 in code_entries and (
+        if reserved(value) or rom_mirror.canonical(value) & ~1 in code_entries and (
                 offset not in functions or functions[offset][1] != value):
             raise ValueError("code-entry thunk literals require canonical function provenance")
 
@@ -148,7 +149,7 @@ def verify_own_span_literals(data, address, instructions, table_pointer=None):
             if offset < 0 or offset + 4 > len(data) or (address + offset) % 4:
                 raise ValueError("thunk literal is not a complete aligned caller word")
             value = struct.unpack_from("<I", data, offset)[0]
-            if offset != table_pointer and address <= value & ~1 < address + len(data):
+            if offset != table_pointer and address <= rom_mirror.canonical(value) & ~1 < address + len(data):
                 raise ValueError("thunk literals cannot name the caller's own bytes")
 
 

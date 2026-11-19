@@ -11,6 +11,8 @@ import subprocess
 import sys
 import tempfile
 
+import rom_mirror
+
 
 SCHEMA = "elf-symbol-thumb-df-convert-sub-div-target-v1"
 SELECTOR = "convert-sub-div-target-v1"
@@ -246,7 +248,7 @@ _replay_active = ContextVar("software_double_replay_active", default=False)
 
 
 def reserved(address):
-    return any(start <= address & ~1 < end for start, end, _, _ in IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _, _ in IDENTITIES)
 
 
 def shared_float_call(name, target):

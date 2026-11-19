@@ -8,6 +8,8 @@ import hashlib
 import json
 import struct
 
+import rom_mirror
+
 SELECTOR = 'incoming-scratch-overwrite-ordinary-v1'
 SCHEMA = 'thumb-incoming-scratch-overwrite-ordinary-v1'
 MAX_BYTES = 512
@@ -84,7 +86,7 @@ def authenticate_ordinary(rom, mapping, index, objects, caller, size, target):
     address_words = set()
     for word in partition['words']:
         value, offset = word['value'], word['address'] - target
-        if not word['load_sites'] or not 0x02000000 <= value < 0x09000000:
+        if not word['load_sites'] or not rom_mirror.typed_domain(value):
             continue
         names = sorted(name for name, address in object_names.items() if address == value)
         if not names:

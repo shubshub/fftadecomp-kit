@@ -447,6 +447,22 @@ class InterposedPoolManifest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 profile.verify(f["data"], A, f["rom"], f["mapping"], f["index"], f["objects"], manifest_for(f))
 
+    def test_rom_mirror_pool_words_are_the_rom_words_they_name(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377).
+        for mirror in (0x02000000, 0x04000000):
+            for value, message in ((A | 1, "canonical function provenance|caller's own bytes"),
+                                   (profile.ALIASES["_call_via_r2"], "canonical function provenance"),
+                                   (A + 2, "caller's own bytes")):
+                f = fixture(interposed=2, values=[0x1424, value + mirror])
+                with self.subTest(value=hex(value + mirror)), self.assertRaisesRegex(ValueError, message):
+                    profile.verify(f["data"], A, f["rom"], f["mapping"], f["index"], f["objects"], manifest_for(f))
+        # The SRAM/flash bus is not ROM: such words are numbers.
+        for value in ((A | 1) + 0x06000000, profile.ALIASES["_call_via_r2"] + 0x06000000, 0x0FFFFFFF):
+            f = fixture(interposed=2, values=[0x1424, value])
+            with self.subTest(value=hex(value)):
+                self.assertTrue(profile.verify(f["data"], A, f["rom"], f["mapping"], f["index"], f["objects"],
+                                               manifest_for(f)))
+
     def test_numeric_word_naming_the_callers_own_bytes_is_refused(self):
         f = fixture(interposed=3)
         size = len(f["data"])

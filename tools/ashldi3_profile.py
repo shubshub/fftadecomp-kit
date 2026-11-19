@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 
+import rom_mirror
+
 NAME = "ashldi3"
 SCHEMA = "elf-symbol-thumb-ashldi3-target-v1"
 RUNTIME = "agbcc-thumb-ashldi3-v1"
@@ -26,7 +28,7 @@ _replay_active = ContextVar("ashldi3_replay_active", default=False)
 
 
 def reserved(address):
-    return ADDRESS <= address & ~1 < END
+    return ADDRESS <= rom_mirror.canonical(address) & ~1 < END
 
 
 def index_snapshot(root):

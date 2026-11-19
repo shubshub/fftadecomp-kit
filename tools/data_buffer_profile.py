@@ -27,6 +27,8 @@ import struct
 import sys
 import tempfile
 
+import rom_mirror
+
 SCHEMA = "elf-symbol-thumb-data-buffer-calls-v1"
 FUNCTION_SCHEMA = "elf-symbol-thumb-function-data-buffer-calls-v1"
 SCHEMAS = (SCHEMA, FUNCTION_SCHEMA)
@@ -42,8 +44,9 @@ CALLS_FIELD = "* data buffer calls: "
 MANIFEST_FIELD = "* data buffer manifest: "
 PROOF_FIELD = "* data buffer proof SHA-256: "
 # Reached PC-loaded words in this window need typed provenance (the owner rule's
-# RAM, I/O-to-OAM and ROM domains), apart from the numeric hardware class.
-ADDRESS_DOMAIN = (0x02000000, 0x09000000)
+# RAM, I/O-to-OAM and ROM domains), apart from the numeric hardware class. A ROM
+# wait-state mirror word is folded onto the ROM it names before the test.
+ADDRESS_DOMAIN = rom_mirror.TYPED_DOMAIN
 # owner_admission_profile.NUMERIC_HARDWARE: the I/O, palette, VRAM and OAM window.
 HARDWARE_WINDOW = (0x04000000, 0x08000000)
 REPLAY_TIMEOUT = 120
@@ -178,12 +181,12 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     thunk.verify_literal_bindings(data, address, instructions, calls, mapping, function_relocations)
     if any(thunk.reserved(target) for target in calls.values()):
         thunk.verify_own_span_literals(data, address, instructions)
-    # Every reached RAM/ROM address-domain word is a typed object or function
-    # literal, and every typed literal is one; hardware-window words that are
-    # neither are numbers (the owner rule's numeric hardware class).
+    # Every reached RAM/ROM address-domain word, a ROM mirror word included, is a
+    # typed object or function literal, and every typed literal is a domain word
+    # spelled at its canonical address; hardware-window words that are neither
+    # are numbers (the owner rule's numeric hardware class).
     words = reached_words(data, address, instructions)
-    domain = {offset for offset, (value, _) in words.items()
-              if ADDRESS_DOMAIN[0] <= value < ADDRESS_DOMAIN[1]}
+    domain = {offset for offset, (value, _) in words.items() if rom_mirror.typed_domain(value)}
     remaining = domain - set(literals)
     if proof.owner_switch is not None:
         # The owner switch's table pointer, read only by its dispatch, is that layout's word;
@@ -198,7 +201,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         if hardware:
             manifest["numeric_hardware_words"] = owner.numeric_hardware_record(hardware)
     untyped = sorted(remaining - {row[0] for row in hardware})
-    outside = sorted(set(literals) - domain)
+    outside = sorted(set(literals) - {offset for offset in domain if not rom_mirror.mirror(words[offset][0])})
     if untyped or outside:
         raise ValueError("data-buffer address literals require exact typed object/function coverage: " +
                          ", ".join([f"untyped word 0x{address + offset:08X} = 0x{words[offset][0]:08X}"

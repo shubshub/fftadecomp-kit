@@ -11,6 +11,7 @@ import sys
 import tempfile
 
 import library_units
+import rom_mirror
 
 NAME = "lshrdi3"
 SCHEMA = "elf-symbol-thumb-lshrdi3-target-v1"
@@ -32,7 +33,7 @@ _replay_active = ContextVar("lshrdi3_replay_active", default=False)
 
 
 def reserved(address):
-    return ADDRESS <= address & ~1 < END
+    return ADDRESS <= rom_mirror.canonical(address) & ~1 < END
 
 
 def index_snapshot(root):

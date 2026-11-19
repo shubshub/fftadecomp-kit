@@ -476,6 +476,30 @@ class ProofTests(unittest.TestCase):
                 match.verify_switches(bytes(moved), BASE, rom_image(bytes(moved)), wide, manifest,
                                       data_mapping=json.dumps({'g_right': f'0x{address:08X}'}).encode())
 
+    def test_objects_cannot_name_a_rom_mirror_of_code(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377); an addend that
+        # carries the object word into a mirror names the code there.
+        body, labels, manifest = build()
+        wide = json.dumps([{'rom': f'0x{BASE:08X}', 'end': f'0x{BASE + len(body):08X}', 'mode': 'thumb'},
+                           {'rom': f'0x{CALLEE:08X}', 'end': f'0x{CALLEE + 0x40:08X}', 'mode': 'thumb'}]).encode()
+        cases = {'entry': ((CALLEE | 1) + 0x02000000, 'cannot bind indexed function entries as data'),
+                 'thunk': (THUNK_R2 + 0x04000000, 'cannot bind indexed function entries as data'),
+                 'callee span': (CALLEE + 9 + 0x04000000, 'code entries or indexed function spans'),
+                 'own span': (BASE + 8 + 0x02000000, 'code entries or indexed function spans')}
+        for label, (value, message) in cases.items():
+            moved, bound = bytearray(body), copy.deepcopy(manifest)
+            struct.pack_into('<I', moved, labels['object'], value)
+            bound['data'] = [[labels['object'], 'g_right', value - 0x02002000]]
+            with self.subTest(label), self.assertRaisesRegex(ValueError, message):
+                match.verify_switches(bytes(moved), BASE, rom_image(bytes(moved)), wide, bound,
+                                      data_mapping=json.dumps(OBJECTS).encode())
+        # The SRAM/flash bus is not ROM.
+        moved, bound = bytearray(body), copy.deepcopy(manifest)
+        struct.pack_into('<I', moved, labels['object'], CALLEE + 9 + 0x06000000)
+        bound['data'] = [[labels['object'], 'g_right', CALLEE + 9 + 0x06000000 - 0x02002000]]
+        match.verify_switches(bytes(moved), BASE, rom_image(bytes(moved)), wide, bound,
+                              data_mapping=json.dumps(OBJECTS).encode())
+
     def test_constants_built_from_immediates_cannot_be_thunk_targets(self):
         obj = (('ldr', 3, 'object'),)
         rom_address = (('h', 0x2280), ('h', 0x0512), ('h', 0x3231))  # movs #0x80; lsls #20; adds #0x31
