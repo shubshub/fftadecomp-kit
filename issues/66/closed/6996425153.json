@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "a43bff2e9da01a25d713d0f7ea622891a9b60f264c6a700b7fa6651f89b09587",
+    "acknowledged_cursor": 6996425153,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a43bff2e9da01a25d713d0f7ea622891a9b60f264c6a700b7fa6651f89b09587",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08142950\",\"who\":\"opencode-ffta\",\"note\":\"hand match (opencode session, 2026-11-18)\"}",
+      "created_at": "2026-11-19T01:03:37Z",
+      "id": 6996425153,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T01:03:37Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "0fff8beedb988098717a358447eaf4766bba2ed20d705290546b9cafb213a613",
+    "result": {
+      "address": "0x08142950",
+      "claim_id": 6996425153,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 413964,
+      "request_id": 6996425153,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ee01d3e149af9d6443bc62cff0ecdb1a8625aded5a88347f28ead620dd04d87e",
+    "acknowledged_cursor": 6997362712,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ee01d3e149af9d6443bc62cff0ecdb1a8625aded5a88347f28ead620dd04d87e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142950\",\"who\":\"opencode-ffta\",\"claim_id\":6996425153,\"reason\":\"ROM bytes are GCC's hand-written Thumb assembly __modsi3 (config/arm/lib1thumb_981111.asm); agbcc -mthumb-interwork cannot emit the non-interworking 'mov pc, lr' return and match.py refuses any source calling the reserved __div0 hook at 0x0814274C\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2 (agbcc gcc 2.9-arm-000512)\"}",
+      "created_at": "2026-11-19T01:59:55Z",
+      "id": 6997362712,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T01:59:55Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5400be9f4a8b094197c833e59ce2a631efed485d8ad37c958271466c717bb316",
+    "result": {
+      "address": "0x08142950",
+      "claim_id": 6996425153,
+      "code": 0,
+      "message": "release accepted; unmatchable evidence requires maintainer review",
+      "operation": "release",
+      "owner_id": 413964,
+      "request_id": 6997362712,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  }
+}

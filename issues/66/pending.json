@@ -2298,7 +2298,35 @@
           "who": "opencode-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ee01d3e149af9d6443bc62cff0ecdb1a8625aded5a88347f28ead620dd04d87e",
+        "acknowledged_cursor": 6997362712,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ee01d3e149af9d6443bc62cff0ecdb1a8625aded5a88347f28ead620dd04d87e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08142950\",\"who\":\"opencode-ffta\",\"claim_id\":6996425153,\"reason\":\"ROM bytes are GCC's hand-written Thumb assembly __modsi3 (config/arm/lib1thumb_981111.asm); agbcc -mthumb-interwork cannot emit the non-interworking 'mov pc, lr' return and match.py refuses any source calling the reserved __div0 hook at 0x0814274C\",\"unmatchable\":true,\"tried\":\"-mthumb-interwork -O2 (agbcc gcc 2.9-arm-000512)\"}",
+          "created_at": "2026-11-19T01:59:55Z",
+          "id": 6997362712,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T01:59:55Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5400be9f4a8b094197c833e59ce2a631efed485d8ad37c958271466c717bb316",
+        "result": {
+          "address": "0x08142950",
+          "claim_id": 6996425153,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 6997362712,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      }
     },
     {
       "claim": {
@@ -2394,7 +2422,35 @@
           "who": "opencode-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a4201f0263877ffd48ddf10b30305e97ababa249a239af0dab61fc74543a5f65",
+        "acknowledged_cursor": 6997362712,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a4201f0263877ffd48ddf10b30305e97ababa249a239af0dab61fc74543a5f65",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801F438\",\"who\":\"opencode-ffta\",\"claim_id\":6997337828,\"reason\":\"released before starting: the function contains an ambiguous local BL (self/intra-function call at 0x0801F48C), which the direct-call profile rejects by contract\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-19T01:59:47Z",
+          "id": 6997360654,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T01:59:47Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "5400be9f4a8b094197c833e59ce2a631efed485d8ad37c958271466c717bb316",
+        "result": {
+          "address": "0x0801F438",
+          "claim_id": 6997337828,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 6997360654,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      }
     }
   ],
   "issue": 66,

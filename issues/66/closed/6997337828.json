@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "acd180d29e8f0367022a37cbe76485546402d745bdcdd1ba2a6cd11573cb04c9",
+    "acknowledged_cursor": 6997337828,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "acd180d29e8f0367022a37cbe76485546402d745bdcdd1ba2a6cd11573cb04c9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801F438\",\"who\":\"opencode-ffta\",\"note\":\"hand match (opencode session, 2026-11-18, batch 2)\"}",
+      "created_at": "2026-11-19T01:58:18Z",
+      "id": 6997337828,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T01:58:18Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "371da4bc5daf75258c5aa3addb74ad62c65d65a63be410471c0f6be5d6daae67",
+    "result": {
+      "address": "0x0801F438",
+      "claim_id": 6997337828,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 413964,
+      "request_id": 6997337828,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "a4201f0263877ffd48ddf10b30305e97ababa249a239af0dab61fc74543a5f65",
+    "acknowledged_cursor": 6997362712,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "a4201f0263877ffd48ddf10b30305e97ababa249a239af0dab61fc74543a5f65",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0801F438\",\"who\":\"opencode-ffta\",\"claim_id\":6997337828,\"reason\":\"released before starting: the function contains an ambiguous local BL (self/intra-function call at 0x0801F48C), which the direct-call profile rejects by contract\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-19T01:59:47Z",
+      "id": 6997360654,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-19T01:59:47Z",
+      "user": {
+        "id": 413964,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5400be9f4a8b094197c833e59ce2a631efed485d8ad37c958271466c717bb316",
+    "result": {
+      "address": "0x0801F438",
+      "claim_id": 6997337828,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 413964,
+      "request_id": 6997360654,
+      "status": "accepted",
+      "who": "opencode-ffta"
+    }
+  }
+}
