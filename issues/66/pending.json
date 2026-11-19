@@ -2358,7 +2358,35 @@
           "who": "opencode-ffta"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "a98e6395a1f47f57ae1420d6916d7d123a0ec395bba99de807ef2b9a6e06d97e",
+        "acknowledged_cursor": 6996844800,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a98e6395a1f47f57ae1420d6916d7d123a0ec395bba99de807ef2b9a6e06d97e",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A8498\",\"who\":\"opencode-ffta\",\"claim_id\":6996409799,\"reason\":\"bytes are identical (80B, sha256 a6b3965c...); match.py refuses before its byte comparison: the bounded buffer-call walk enters callee 0x080A12FC, whose divisor is not a constant (signed quotient needs its canonical positive-constant proof) and whose deeper chain reaches a software-float identity range. Parked/080A8498 with the full diagnosis.\",\"unmatchable\":true,\"tried\":\"match.py --root . 0x080A8498; every documented selector value (258 over 14 options); --control-flow-profile mixed-return-inert-spin-v1; --owner-runtime-profile bounded-buffer-runtime-summaries-v1\"}",
+          "created_at": "2026-11-19T01:28:36Z",
+          "id": 6996844800,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-19T01:28:36Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2e06a91a3d9a5af462f112a9ccca3199bd682ddc213c55e3514024a163858acc",
+        "result": {
+          "address": "0x080A8498",
+          "claim_id": 6996409799,
+          "code": 0,
+          "message": "release accepted; unmatchable evidence requires maintainer review",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 6996844800,
+          "status": "accepted",
+          "who": "opencode-ffta"
+        }
+      }
     },
     {
       "claim": {
