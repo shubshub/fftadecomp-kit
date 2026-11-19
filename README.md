@@ -3362,7 +3362,47 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   constant-derived value has been stored on a path (other than through SP, the
   verified write-only outgoing frame), every later non-literal load on that path
   is constant-derived too, whatever register or address it uses; the flag is
-  not cleared by a call and a join is dirty if any incoming path is. A thunk
+  not cleared by a call and a join is dirty if any incoming path is. Memory
+  keeps the exact bytes those stores can leave (kit `#393`). An address is
+  exact when its base (and index) hold one value on every path; it is taken
+  mod 2^32 and the ARM7TDMI mirrors are folded (EWRAM, IWRAM, palette, VRAM,
+  OAM, the I/O mirror and the ROM windows; SRAM, the cartridge GPIO port, the
+  0x0D window and unused regions are no fixed byte; on this cartridge, with a
+  FLASH512 save and a 16 MiB ROM, the 0x0D window is a plain ROM mirror, as
+  kit `#406` folds it, so treating its bytes as unfixed is conservative). The
+  cartridge ROM ignores writes, so no store leaves a byte there. A store at an
+  exact address, forcibly aligned, replaces its bytes, and a store anywhere
+  else may land on any byte, so its bytes and their count are kept apart. A
+  load takes the exact values its bytes can hold in every layout the ARM7TDMI
+  can produce: a misaligned LDR or LDRH is rotated, LDRSH at an odd
+  address is LDRSB, a halfword or word read from SRAM repeats its one byte
+  (with the same rotation on top, so LDRH at an odd SRAM address of byte b is
+  b, 0, 0, b), and a load through a non-exact address may be at any alignment.
+  An 8-bit store to palette RAM or BG VRAM fills both halves of its halfword,
+  and one to OAM or OBJ VRAM is ignored (in the mode-dependent part of VRAM,
+  either). So a constant stored, loaded back and shifted into the ROM meets
+  the ROM check; a byte no constant store can have written makes the load
+  constant-derived with no exact value. LDM and STM write their base back, with
+  the ROM check on the new base. Interval addition and subtraction that wraps
+  whole is taken modulo 2^32.
+  **Thunk store premise.** Only where this sound walk refuses, a load through
+  an address that is not exact on every path may be assumed to read back no
+  byte this function stored as a constant; never a load at an exact address,
+  nor one that may overlap a constant store through the same unchanged
+  register or a copy of it (registers are matched by name and copy, not by
+  value: after `adds r6, r5, #28`, a load through `r6` is not tied to a store
+  through `r5`). The smallest set of such loads that admits the function is
+  derived in address order, recorded in the manifest as `store_premises`
+  (`[[load, [store, ...]], ...]`, offsets from the function) and stated once
+  per load:
+  `* thunk store premise: the load at 0x... through a non-exact address reads
+  back no byte this function stored as a constant (stores at 0x..., ...)`.
+  A report whose walk needs no premise has neither; replay re-derives the set
+  and refuses a missing, extra or different record or line. When no premise
+  helps, the sound walk's reason is reported. Not followed: a constant a DMA
+  transfer copies elsewhere, and a constant combined with a loaded value
+  (including a word only partly assembled from stored bytes), which is not
+  checked against the ROM range. A thunk
   register holding any constant-derived value, including a literal word itself,
   is refused, so a callback must be a plain load from memory and cannot be
   loaded after a constant store on its path. Not followed: a callee copying
