@@ -989,6 +989,12 @@ def split_operands(text):
     return parts
 
 
+# A pc-relative literal operand `.Lp` or `.Lp+k`.  k is decimal without a
+# leading zero: GAS reads `.Lp+020` as octal 16, so a decimal reading of it
+# would load a different word than the assembled `ldr` does.
+POOL_OPERAND = re.compile(r"(\.L\w+)(?:\s*\+\s*(0|[1-9][0-9]*))?")
+
+
 def parse_word(text):
     text = text.strip()
     if re.fullmatch(r"-?(?:0[xX][0-9A-Fa-f]+|[0-9]+)", text):
@@ -1761,7 +1767,7 @@ class Executor:
                 self.fail(text, "unsupported instruction form")
             subject = register(operands[0])
             width = 1 if mnemonic.endswith("b") else 2 if mnemonic.endswith("h") else 4
-            pool = re.fullmatch(r"(\.L\w+)(?:\s*\+\s*([0-9]+))?", operands[1])
+            pool = POOL_OPERAND.fullmatch(operands[1])
             if pool and mnemonic == "ldr":
                 words = self.pools.get(pool[1])
                 offset = int(pool[2] or 0)
@@ -1873,9 +1879,12 @@ class Executor:
         """(index register, destination, table register, pointer pool) when the
         five instructions at pc are agbcc's jump-table dispatch, else None:
 
-            lsl rD, rI, #2; ldr rT, .Lpool; add rD, rD, rT; ldr rD, [rD]; mov pc, rD
+            lsl rD, rI, #2; ldr rT, .Lpool[+4k]; add rD, rD, rT; ldr rD, [rD]; mov pc, rD
 
-        Only the shape is read here; jump_table proves the rest or fails."""
+        The pointer pool is (label, byte offset): agbcc dumps the literals that
+        are still pending at the jump into one pool there, so the table pointer
+        may share it with them (`.L42+40`).  Only the shape is read here;
+        jump_table proves the rest or fails."""
         low = [f"r{n}" for n in range(8)]
         forms = [(mnemonic[:-1] if mnemonic in ("lsls", "adds") else mnemonic, operands)
                  for mnemonic, operands, _ in self.instructions[pc:pc + 5]]
@@ -1886,23 +1895,26 @@ class Executor:
                 len(load_ops) != 2 or len(jump_ops) != 2:
             return None
         destination, index = register(shift_ops[0]), register(shift_ops[1])
-        table, pool = register(pointer_ops[0]), pointer_ops[1].strip()
+        table = register(pointer_ops[0])
+        pool = POOL_OPERAND.fullmatch(pointer_ops[1].strip())
         if destination not in low or index not in low or table not in low or table == destination or \
-                immediate(shift_ops[2]) != 2 or not re.fullmatch(r"\.L\w+", pool) or \
+                immediate(shift_ops[2]) != 2 or pool is None or \
                 [register(o) for o in add_ops] != [destination, destination, table] or \
                 register(load_ops[0]) != destination or \
                 not re.fullmatch(r"\[\s*" + destination + r"\s*\]", load_ops[1].strip()) or \
                 register(jump_ops[0]) != "pc" or register(jump_ops[1]) != destination:
             return None
-        return index, destination, table, pool
+        return index, destination, table, (pool[1], int(pool[2] or 0))
 
     def jump_table(self, pc, index, destination, table, pool):
         """agbcc's guarded jump-table dispatch, as a multiway branch.
 
         The table must be the function's own: the pointer pool and the table
         both start right after `mov pc` (nothing but labels, alignment and
-        the pointer word between), the pointer is exactly the table's label,
-        and every entry is exactly a local code label.  The index must be
+        literal words between), the pointer is a word-aligned word of that
+        pool, possibly shared with the function's other literals, that is
+        exactly the table's label, and every entry is exactly a local code
+        label.  The index must be
         bounded by the table: with N+1 entries, either a known constant at
         most N or a `cmp index, #N` whose `hi` branch was not taken on this
         path, so the loaded word is one of the entries.  Each distinct label
@@ -1914,11 +1926,14 @@ class Executor:
         label.  Anything else fails closed."""
         text = self.instructions[pc + 4][2]
         after = pc + 5
+        pool, offset = pool
         words = self.pools.get(pool)
-        if words is None or self.labels.get(pool) != after or len(words) != 1 or \
-                not (isinstance(words[0], tuple) and len(words[0]) == 2 and words[0][0] == "code"):
+        word = words[offset // 4] if words is not None and offset % 4 == 0 and offset // 4 < len(words) \
+            else None
+        if self.labels.get(pool) != after or \
+                not (isinstance(word, tuple) and len(word) == 2 and word[0] == "code"):
             self.fail(text, "the jump-table pointer is not a local label word right after the jump")
-        label = words[0][1]
+        label = word[1]
         entries = self.pools.get(label)
         if entries is None or self.labels.get(label) != after:
             self.fail(text, "the jump table does not immediately follow the jump")

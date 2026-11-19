@@ -3781,9 +3781,14 @@ loops whose exit depends on unknown values, more than 1024 paths, and
 prototypes that are missing, `()`, variadic, inconsistent, not one word per
 parameter, or too complex to read at file scope. The one computed jump it
 models is agbcc's switch dispatch (kit#170): `lsl rD, rI, #2; ldr rT, .Lp;
-add rD, rD, rT; ldr rD, [rD]; mov pc, rD`, where `.Lp` holds exactly the
-label of a table that starts right after the `mov pc`, every entry is
-exactly a local code label of the function, and on the path the index is
+add rD, rD, rT; ldr rD, [rD]; mov pc, rD`, where the pointer word `.Lp` or
+`.Lp+4k` (a decimal offset without a leading zero, which GAS would read as
+octal; literal loads take the same form) lies in the pool that starts right
+after the `mov pc` (agbcc dumps
+the literals still pending at the jump there, so it may share that pool
+with them) and holds exactly the label of a table that also starts right
+after the jump (only labels, alignment and literal words between), every
+entry is exactly a local code label of the function, and on the path the index is
 either a known constant inside the table or was compared with
 `cmp rI, #N` and the `hi` branch not taken, for a table of exactly N+1
 entries. Each distinct case label is then a successor, explored like a
@@ -3791,8 +3796,9 @@ conditional branch and counted against the same 1024-path bound; the
 decision records the index, N and which entries share a label, so the
 stripped and permuted compiles must dispatch on the same value through the
 same partition. Any other `mov pc` or `bx` source, an unguarded or
-differently guarded index, a table that is not adjacent, not local or of
-another size, and entering the dispatch past its shift still fail closed.
+differently guarded index, a pointer word outside that pool or misaligned
+in it, a table that is not adjacent, not local or of another size, and
+entering the dispatch past its shift still fail closed.
 The path and decision bounds are cost bounds (kit#137): every path is
 checked in full and a function they cut short is refused, never accepted on
 the paths seen. The path bound was 256; holding 1024 paths, measured on
