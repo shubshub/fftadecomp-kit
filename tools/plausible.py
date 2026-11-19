@@ -89,7 +89,9 @@ RULES = [
     ("inline-asm", "error", r"\b(?:__asm__|__asm|asm)\b",
      "inline assembly: the point of a matching decomp is C that compiles to the "
      "original code, not asm pasted into a C file"),
-    ("asm-include", "error", r'#\s*include\s+"[^"]*\.(s|S)"',
+    # matched against the view that keeps string literals (check_view): the
+    # code view blanks the quoted file name
+    ("asm-include", "error", r'(?m)^[ \t]*#[ \t]*include[ \t]*["<][^">\n]*\.[sS][">]',
      "including an assembly file"),
     ("optimize-pragma", "error",
      r"#\s*pragma\s+(?:GCC\s+)?optimize\b|__attribute__\s*\(\(?[^)]*optimize",
@@ -1575,8 +1577,9 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         findings.append((code.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
                          f"`{name}` asks the preprocessor about the files or the build: no gcc 2.95-era "
                          "source does, and it can tell the volatile census's copy from the tree"))
+    literals = strip_comments_and_strings_keep_strings(text)
     for rid, sev, pat, msg in RULES:
-        for m in re.finditer(pat, code):
+        for m in re.finditer(pat, literals if rid == "asm-include" else code):
             if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
                 continue
             if rid == "dead-code" and m.start() in macro_tails:
