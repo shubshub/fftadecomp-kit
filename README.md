@@ -2313,11 +2313,15 @@ obligations, each with its refusal:
    through a possible stack address may reach the pointer-bearing local word at
    entry-SP-n", and the same for a load). Spilled, one is a pointer word whose
    reload is unusable as a base.
+9. **Element identity.** A load through an owned address is initialised when the
+   same address value (one identity per defining instruction) was stored
+   through at the same displacement with at least the same width on every path
+   since; byte-level initialisation covers everything else.
 
 The report adds one line, bound in the fingerprint and re-derived on replay:
 
 ```
-* stack index frame words: pointer-bearing local words entry_SP-<n>, ...; deferred exact spills <site>, ...; <N> calls with ROM-walked callee stack reach (at most <B> bytes above the callee's entry SP), none reaching a pointer-bearing word; stack addresses left in argument registers the callee never reads: R<n> at <call site>, ...[; calls this analysis did not walk (<site>, ...): their results are trusted, as the core trusts every callee it does not walk, to hold no address into this frame][; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP]
+* stack index frame words: pointer-bearing local words entry_SP-<n>, ...; deferred exact spills <site>, ...; <M> identity-initialised loads; <N> calls with ROM-walked callee stack reach (at most <B> bytes above the callee's entry SP), none reaching a pointer-bearing word; stack addresses left in argument registers the callee never reads: R<n> at <call site>, ...[; calls this analysis did not walk (<site>, ...): their results are trusted, as the core trusts every callee it does not walk, to hold no address into this frame][; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP]
 ```
 
 `stack_index_frame_words_profile.POLICY` is the one switch: disabled, the core

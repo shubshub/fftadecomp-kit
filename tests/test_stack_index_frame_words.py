@@ -105,6 +105,72 @@ class FrameWordTests(unittest.TestCase):
             with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
                 admit(frame_owner(LOOP, index=()))
 
+    def test_ranged_spill_reload_reads_the_element_it_stored(self):
+        # mov r1,sp; adds r1,r1,r4; str r1,[sp,#12]; movs r0,#7; strb r0,[r1];
+        # ldr r2,[sp,#12]; ldrb r0,[r2]: byte 3 is not copied, but it is the byte just stored.
+        # The element is stored twice; only the load is an identity-initialised access.
+        code = frame_owner((0x4669, 0x1909, 0x9103, 0x2007, 0x7008, 0x7008, 0x9A03, 0x7810), index=RANGED)
+        _, (manifest, _) = admit(code)
+        self.assertEqual(evidence(manifest)['preconditions'], [])
+        self.assertEqual(words(manifest)['identity_loads'], [site(code, code.index(0x7810))])
+        self.assertEqual(words(manifest)['pointer_words'], [12 - 36])
+        self.assertEqual(words(manifest)['spills'], [])
+
+    def test_another_displacement_is_not_the_stored_element(self):
+        # ldrb r0,[r2,#1] reads sp+1..sp+4: the stored byte is not that one.
+        code = frame_owner((0x4669, 0x1909, 0x9103, 0x2007, 0x7008, 0x9A03, 0x7850), index=RANGED)
+        _, (manifest, _) = admit(code)
+        self.assertEqual(words(manifest)['identity_loads'], [])
+        row, = evidence(manifest)['preconditions']
+        self.assertEqual((row['kind'], row['expression'], row['bound']), ('load', '(entry_R0 & 3)', 2))
+
+    def test_a_store_initialises_only_as_wide_a_load(self):
+        # r4 = (entry_R0 & 1) << 1 and one copied byte; mov r1,sp; adds r1,r1,r4;
+        # str r1,[sp,#12]; movs r0,#7; <store>; ldr r2,[sp,#12]; <load>
+        index = (0x1c04, 0x2101, 0x400c, 0x0064)
+        body = lambda store, load: (0x4669, 0x1909, 0x9103, 0x2007, store, 0x9A03, load)
+        _, (manifest, _) = admit(frame_owner(body(0x8008, 0x7810), count=1, index=index))  # strh; ldrb
+        self.assertEqual(len(words(manifest)['identity_loads']), 1)
+        # Both analyses refuse, so the plain refusal is the one reported.
+        with self.assertRaisesRegex(sip.Refusal, 'ranged stack address escapes to memory'):
+            admit(frame_owner(body(0x7008, 0x8810), count=1, index=index))                  # strb; ldrh
+
+    def test_identity_follows_exact_copies_and_new_values(self):
+        # r1 = sp + (entry_R0 & 3), then <body>; byte 3 is not copied, so only identity covers it.
+        def identity(body):
+            _, (manifest, _) = admit(frame_owner(FORCE + (0x4669, 0x1909) + body, index=RANGED))
+            return words(manifest)['identity_loads'], evidence(manifest)['preconditions']
+        # adds r2,r1,#1; movs r0,#7; strb r0,[r2]; ldrb r0,[r2]: a new value with its own identity
+        loads, rows = identity((0x1C4A, 0x2007, 0x7010, 0x7810))
+        self.assertEqual((len(loads), rows), (1, []))
+        # movs r0,#7; strb r0,[r1]; adds r2,r1,#1; ldrb r0,[r2]: not the stored element
+        loads, rows = identity((0x2007, 0x7008, 0x1C4A, 0x7810))
+        self.assertEqual((loads, len(rows)), ([], 1))
+        # adds r2,r1,#0; movs r0,#7; strb r0,[r2]; ldrb r0,[r1]: a copy keeps the identity
+        loads, rows = identity((0x1C0A, 0x2007, 0x7010, 0x7808))
+        self.assertEqual((len(loads), rows), (1, []))
+        # mov r8,r1; movs r0,#7; strb r0,[r1]; mov r2,r8; ldrb r0,[r2]; movs r0,#0; mov r8,r0
+        loads, rows = identity((0x4688, 0x2007, 0x7008, 0x4642, 0x7810, 0x2000, 0x4680))
+        self.assertEqual((len(loads), rows), (1, []))
+
+    def test_joins_keep_only_what_both_paths_hold(self):
+        def owner(body):
+            return frame_owner(FORCE + (0x4669, 0x1909, 0x2007, 0x7008) + body, index=RANGED)
+        # cmp r4,#0; beq; movs r0,#7; strb r0,[r1]; ldrb r0,[r1]: stored on one path only
+        _, (manifest, _) = admit(frame_owner(FORCE + (0x4669, 0x1909, 0x2C00, 0xD001, 0x2007, 0x7008, 0x7808),
+                                             index=RANGED))
+        self.assertEqual(words(manifest)['identity_loads'], [])
+        self.assertEqual(len(evidence(manifest)['preconditions']), 1)
+        # cmp r4,#0; beq T; adds r2,r1,#1; b J; T: adds r2,r1,#0; J: ldrb r0,[r2], both orders
+        for other, same in ((0x1C4A, 0x1C0A), (0x1C0A, 0x1C4A)):
+            with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+                admit(owner((0x2C00, 0xD001, other, 0xE000, same, 0x7810)))
+        # the same through a spill: beq T; adds r2,r1,#1; str r2,[sp,#8]; b J; T: adds r2,r1,#0;
+        # str r2,[sp,#8]; J: ldr r2,[sp,#8]; ldrb r0,[r2], both orders
+        for other, same in ((0x1C4A, 0x1C0A), (0x1C0A, 0x1C4A)):
+            with self.assertRaisesRegex(sip.Refusal, 'no defined source'):
+                admit(owner((0x2C00, 0xD002, other, 0x9202, 0xE001, same, 0x9202, 0x9A02, 0x7810)))
+
     def test_a_word_scalar_on_one_path_and_pointer_on_the_other_is_poison(self):
         # cmp r4,#0; beq T; mov r0,sp; b J; T: movs r0,#0; J: str r0,[sp,#12] is the register join;
         # here the word itself joins: beq T; mov r0,sp; str r0,[sp,#12]; b J; T: movs r0,#0;
@@ -137,6 +203,11 @@ class FrameWordTests(unittest.TestCase):
         with mock.patch.object(sip.Policy, 'note_returned', lambda *arguments: None):
             with self.assertRaisesRegex(sip.Refusal, 'is not a tracked local word'):
                 admit(frame_owner((0x4668, CALLEE, 0x9003) + ACCESS), **callee(0x4770))
+
+    def test_identity_ends_at_a_release(self):
+        # movs r0,#7; strb r0,[r1]; add sp,#4; sub sp,#4; ldrb r0,[r1]: the word was released.
+        with self.assertRaisesRegex(sip.Refusal, 'uninitialised|no array bytes'):
+            admit(frame_owner((0x4669, 0x1909, 0x2007, 0x7008, 0xB001, 0xB081, 0x7808), index=RANGED))
 
     # ---- F8: possible stack addresses ----------------------------------------------------
     # mov r0,sp; bl callee (bx lr): the core keeps R0 = sp+0 as the callee's returned alias.
