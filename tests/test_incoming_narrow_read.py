@@ -140,14 +140,14 @@ class IncomingNarrowReadTests(unittest.TestCase):
         (self.root / "baserom.bin").write_bytes(data.ljust(0x100, b"\0") + bytes.fromhex("7047"))
         (self.root / "src/08000000.c").write_text("/* synthetic fingerprint input */\n")
         return "\n".join([
-            f"* verification: `{evidence.FRAMED_LINKED_SCHEMA}`",
+            f"* source: `src/{BASE:08X}.c`", f"* verification: `{evidence.FRAMED_LINKED_SCHEMA}`",
             f"* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`",
             f"* stack frame: {evidence.STACK_SUMMARY}",
             f"* mapping SHA-256: `{evidence.mapping_fingerprint(mapping)}`",
-            f"* control flow: {evidence.CALL_SUMMARY}",
+            f"* control flow: {evidence.CALL_SUMMARY}", f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`",
             "* verified extent: complete ELF function symbol, including literal pools",
             "* relocations: none", f"* ROM bytes: `{data.hex()}` ({len(data)} bytes)",
-            f"* compiled : `{data.hex()}`", "* source plausibility: plausible",
+            f"* compiled : `{data.hex()}`", "* source plausibility: plausible", "* hand-asm allow list: not listed",
             f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"])
 
     def test_saved_framed_call_report_replays_the_same_rule(self):

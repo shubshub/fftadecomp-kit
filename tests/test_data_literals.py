@@ -116,20 +116,21 @@ class DataLiteralTests(unittest.TestCase):
         (self.root / "baserom.bin").write_bytes(self.body.ljust(0x100, b"\0") + b"\x70\x47")
         framed = match.uses_stack_frame(instructions)
         schema = evidence.FRAMED_DATA_SCHEMA if framed else evidence.DATA_SCHEMA
+        # The fields in match.py's order (kit #247 binds it).
         fields = [
-            f"* verification: `{schema}`",
+            f"* source: `src/{BASE:08X}.c`", f"* verification: `{schema}`",
             f"* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`",
+            *([f"* stack frame: {evidence.STACK_SUMMARY}"] if framed else []),
             f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.mapping)}`",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.data_mapping)}`",
             "* control flow: " + (evidence.CALL_SUMMARY if self.calls else "closed leaf CFG"),
-            "* verified extent: complete ELF function symbol, including literal pools",
+            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.data_mapping)}`",
+            f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`",
+            "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
             f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
             f"* compiled : `{self.body.hex()}`",
-            "* source plausibility: plausible", "* relocations: none",
+            "* source plausibility: plausible", "* hand-asm allow list: not listed",
             f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
         ]
-        if framed:
-            fields.append(f"* stack frame: {evidence.STACK_SUMMARY}")
         return "\n".join(fields)
 
     def test_middle_trailing_and_direct_call_full_path(self):
