@@ -89,7 +89,8 @@ class SpellingTests(unittest.TestCase):
 
     def test_hardware_exception_accepts_only_the_plain_spelling(self):
         direct = COMMENT + "*({q} u16 *)0x04000000 = value;"
-        bound = ("extern DmaRegisters dma3;\n" + COMMENT + "{q} DmaRegisters *dma = &dma3;\n"
+        bound = ("typedef struct {{ void *source; void *destination; u32 control; }} DmaRegisters;\n"
+                 "extern DmaRegisters dma3;\n" + COMMENT + "{q} DmaRegisters *dma = &dma3;\n"
                  "dma->control = value;\n")
         polling = COMMENT + "#define STATUS (*({q} u16 *)0x04000004)\nvoid w(void) {{ while (STATUS & 1) {{}} }}"
         mapping = {"dma3": "0x040000D4"}
@@ -164,11 +165,11 @@ class CensusFindingTests(unittest.TestCase):
         seen = set()
         for _ in range(20):
             markers = plausible.census_markers(["text"])
-            self.assertEqual(set(markers), set(SPELLINGS))
+            self.assertEqual(set(markers), set(SPELLINGS) | {plausible.HARDWARE})
             values = list(markers.values())
-            self.assertEqual(len(set(values)), 3)
+            self.assertEqual(len(set(values)), 4)
             for spelling, marker in markers.items():
-                self.assertEqual(len(marker), len(spelling))
+                self.assertEqual(len(marker), len(spelling if spelling in SPELLINGS else "volatile"))
                 self.assertRegex(marker, r"^__[A-Za-z0-9]+$")
                 self.assertFalse(any(other in marker for other in values if other != marker))
             seen.add(tuple(values))
@@ -179,15 +180,15 @@ class CensusFindingTests(unittest.TestCase):
 
     def test_markers_avoid_every_forbidden_text_and_each_other(self):
         # the first draw is distinct but forbidden, so it is drawn again
-        draws = iter("a" * 6 + "b" * 10 + "c" * 8 + "d" * 6 + "e" * 10 + "f" * 8)
+        draws = iter("a" * 6 + "b" * 10 + "c" * 8 + "g" * 6 + "d" * 6 + "e" * 10 + "f" * 8 + "h" * 6)
         markers = plausible.census_markers(["int __aaaaaa;"], choice=lambda letters: next(draws))
         self.assertEqual(markers, {"volatile": "__dddddd", "__volatile__": "__eeeeeeeeee",
-                                   "__volatile": "__ffffffff"})
+                                   "__volatile": "__ffffffff", plausible.HARDWARE: "__hhhhhh"})
         # a draw where one marker would sit inside another is drawn again
-        draws = iter("a" * 6 + "a" * 10 + "a" * 8 + "b" * 6 + "c" * 10 + "d" * 8)
+        draws = iter("a" * 6 + "a" * 10 + "a" * 8 + "x" * 6 + "b" * 6 + "c" * 10 + "d" * 8 + "y" * 6)
         markers = plausible.census_markers([], choice=lambda letters: next(draws))
         self.assertEqual(markers, {"volatile": "__bbbbbb", "__volatile__": "__cccccccccc",
-                                   "__volatile": "__dddddddd"})
+                                   "__volatile": "__dddddddd", plausible.HARDWARE: "__yyyyyy"})
 
     def test_marking_follows_the_lint_code_view(self):
         text = ('/* volatile */ volatile u8 a; // __volatile\n"__volatile__" __volatile__ u8 b;\n'
@@ -383,8 +384,14 @@ class CensusTests(CensusTree, unittest.TestCase):
         self.assertTrue(any("preprocessor query" in message for message in found), found)
 
     def test_typeof_in_a_qualified_unit_is_refused(self):
+        # `__typeof__` written out is refused by the lint's address walk (kit#357); through a macro
+        # the lint reads a call, and the census sees the typeof
         self.write('#include "ffta.h"\nvoid f(void)\n{\n' + COMMENT +
                    "    __typeof__(*(volatile u16 *)0x04000000) copy = 0;\n    copy = 1;\n}\n")
+        self.assertEqual([rule for _, rule, _, _ in plausible.check_file(self.tree / "src" / "08000000.c")],
+                         ["volatile"])
+        self.write('#include "ffta.h"\n#define TYPE_OF(x) __typeof__(x)\nvoid f(void)\n{\n' + COMMENT +
+                   "    TYPE_OF(*(volatile u16 *)0x04000000) copy = 0;\n    copy = 1;\n}\n")
         self.assertEqual(plausible.check_file(self.tree / "src" / "08000000.c"), [])
         self.assertTrue(any("typeof" in message for message in self.census()))
         self.write('#include "ffta.h"\ntypeof(1) x;\n')
@@ -506,11 +513,13 @@ class CensusTests(CensusTree, unittest.TestCase):
         self.write('#include "ffta.h"\nextern vola\\\ntile u8 x;\n')
         result, _ = self.run_checker()
         findings, allowed = match.plausibility_result(result, self.ADDRESS)
-        self.assertEqual(findings, ["08000000.c:0: ERROR: volatile-census"])
+        # the rules see the split qualifier in the joined view (kit#357), the census in cpp's output
+        self.assertEqual(findings, ["08000000.c:2: ERROR: volatile", "08000000.c:0: ERROR: volatile-census"])
         self.assertIsNone(allowed)
         result, document = self.run_checker(addr="zz")
         self.assertEqual(result.returncode, 1)
-        self.assertEqual([f["rule"] for f in document["findings"]], ["volatile-census"])
+        self.assertEqual([f["rule"] for f in document["findings"]], ["volatile", "volatile-census"])
+        self.assertIn("hexadecimal --addr", document["findings"][-1]["message"])
 
     def test_relative_paths_from_a_capture_directory(self):
         self.write('#include "ffta.h"\nextern vola\\\ntile u8 x;\n')
@@ -757,7 +766,10 @@ class CensusAsmTests(CensusTree, unittest.TestCase):
     def test_asm_the_rules_cannot_read_is_refused(self):
         for source in self.HIDDEN:
             with self.subTest(source=source):
-                self.assertEqual(rules(source), [])
+                # since kit#357 the rules see a spliced keyword in the joined view; a pasted one
+                # only the census can see
+                self.assertEqual(rules(source), ["inline-asm"] if "##" not in source and "%:" not in source
+                                 else [])
                 self.write(source)
                 found = self.census_rules()
                 self.assertEqual(len(found), 1, found)
@@ -786,8 +798,7 @@ class CensusAsmTests(CensusTree, unittest.TestCase):
                 self.assertIn("runs past the end of its line", found[0][1])
                 result, document = self.run_checker()
                 self.assertEqual(result.returncode, 1)
-                self.assertEqual([(f["rule"], f["line"]) for f in document["findings"]],
-                                 [("multiline-literal", 0)])
+                self.assertIn(("multiline-literal", 0), [(f["rule"], f["line"]) for f in document["findings"]])
         for text in ('const char *s = "x\\\" asm";\n', "char c = '\\'', d = '\\\\';\n",
                      'const char *t = "a\\\\";\n'):
             with self.subTest(text=text):
@@ -805,13 +816,12 @@ class CensusAsmTests(CensusTree, unittest.TestCase):
         result, document = self.run_checker()
         self.assertEqual((result.returncode, document["findings"]), (0, []))
         self.write(source % barrier)
-        self.assertEqual(rules(source % barrier), [])
         result, document = self.run_checker()
         self.assertEqual(result.returncode, 1)
-        self.assertEqual([f["rule"] for f in document["findings"]], ["multiline-literal"])
+        self.assertIn("multiline-literal", [f["rule"] for f in document["findings"]])
         self.write(source % '    a\\\nsm("" ::: "memory");\n')
         result, document = self.run_checker()
-        self.assertEqual([(f["rule"], f["line"]) for f in document["findings"]], [("inline-asm", 0)])
+        self.assertIn(("inline-asm", 0), [(f["rule"], f["line"]) for f in document["findings"]])
 
     def test_words_and_literals_are_not_asm(self):
         self.write('#include "ffta.h"\n#define CAT(a, b) a##b\nconst char *s = "asm";\n'
