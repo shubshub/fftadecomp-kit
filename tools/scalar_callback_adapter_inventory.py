@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 
 import match
-import owner_admission_profile as owner
 import owner_graph_profile as graph
 import function_thunk_profile as thunk
 import local_long_branch_profile as frame
@@ -33,6 +32,9 @@ def load(item, destination, base, offset):
 
 
 def verify(address, getter, rom, mapping, index, *, selector, manifest=None):
+    # owner_admission_profile imports this module through the two-word closure
+    # profiles; importing it here keeps this module importable first.
+    import owner_admission_profile as owner
     if type(selector) is not str or selector != SELECTOR:
         raise ValueError('scalar adapter requires its explicit inventory selector')
     if any(type(v) is not int for v in (address, getter)) or \
