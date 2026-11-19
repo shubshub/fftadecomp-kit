@@ -40,6 +40,7 @@ import switch_data_thunks
 import m4a_track_switch as music
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
+import division_switch_profile as division_switches
 import signed_divmod_profile as signed_divmod
 import unsigned_divmod_profile as unsigned_divmod
 import addressed_signed_runtime_profile as addressed_signed_runtime
@@ -1097,7 +1098,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                 raise ValueError("software-double calls require unique undefined global functions")
     if divsi3_bindings:
         if udivsi3_bindings or modsi3_bindings and signed_runtime_profile is None or data_relocations or function_relocations or \
-                switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+                switch_relocations and not division_switches.POLICY.enabled or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("signed quotient excludes other runtime, literal, switch and thunk profiles")
         for target_name in targets:
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
@@ -1147,7 +1149,8 @@ def call_bindings(image, name, address, mapping, rom_size,
         data_names = {binding[0] for binding in data_relocations.values()}
         for target_name in targets:
             if target_name not in data_names and target_name not in composed_thunks and not (
-                    function_thunks and target_name in function_thunk.ALIASES) and not (double_bindings is not None and
+                    function_thunks and target_name in function_thunk.ALIASES) and not (
+                    target_name == "__divsi3" and divsi3_bindings and division_switches.POLICY.enabled) and not (double_bindings is not None and
                     (software_double.call_target(target_name) is not None or target_name == "__modsi3")):
                 function_address_target(target_name, entries, address, symbol["size"], rom_size)
             definitions = [item for item in image["symbols"] if item["name"] == target_name]
@@ -1370,7 +1373,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                     for site, alias in divsi3_bindings.items()) or \
                 set(divsi3_bindings) != {site for site, target in calls.items() if divsi3.reserved(target)} or \
                 udivsi3_bindings or modsi3_bindings and signed_runtime_profile is None or data_relocations or function_relocations or \
-                switch_relocations or any(target in RUNTIME_HELPERS.values() for target in targets.values()):
+                switch_relocations and not division_switches.POLICY.enabled or \
+                any(target in RUNTIME_HELPERS.values() for target in targets.values()):
             raise ValueError("linked signed quotient bindings are incomplete or mixed")
     elif divsi3_bindings:
         raise ValueError("signed quotient bindings have no linked runtime")
@@ -1664,7 +1668,9 @@ def verify_addressed_modsi3_source(root, address, data, rom, mapping, source_dig
 def verify_divsi3(data, address, rom, mapping, manifest, *, selector=None):
     divsi3.schema(selector)
     framed = selector == divsi3.FRAMED_SELECTOR
-    fields = {"runtime", "calls", "divisors"} | ({"frame"} if framed else set())
+    relocations = division_switches.relocations(manifest, data, address)
+    fields = {"runtime", "calls", "divisors"} | ({"frame"} if framed else set()) | \
+        ({"switch"} if relocations is not None else set())
     if not isinstance(manifest, dict) or set(manifest) != fields or \
             framed and manifest.get("frame") is not True or \
             manifest["runtime"] != divsi3.RUNTIME or \
@@ -1703,7 +1709,7 @@ def verify_divsi3(data, address, rom, mapping, manifest, *, selector=None):
     observed = {}
     instructions = verify_leaf_instructions(
         data, address, True, calls, divsi3_context=(rom, mapping, bindings, observed),
-        signed_quotient_profile=selector)
+        signed_quotient_profile=selector, switch_relocations=relocations)
     if observed != expected:
         raise ValueError("signed quotient divisors disagree with final incoming CFG facts")
     return instructions
@@ -1742,13 +1748,19 @@ def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manif
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                  candidates[0].relative_to(root).as_posix())
-                bindings = {}
+                bindings, switches = {}, {}
                 got, calls, literals = link_calls(runner, workspace, args, original, address,
-                                                  mapping, len(rom), rom, divsi3_bindings=bindings)
+                                                  mapping, len(rom), rom, divsi3_bindings=bindings,
+                                                  switch_relocations=switches)
                 fresh_calls = [[site - address, bindings.get(site, f"func_{target:08X}")]
                                for site, target in sorted(calls.items())]
+                # The fresh ELF's switch relocations are the manifest's, exactly.
+                saved_switch = manifest.get("switch", {"relocations": []})
                 if not bindings or set(bindings.values()) != {"__divsi3"} or literals or \
-                        got != data or fresh_calls != manifest.get("calls"):
+                        got != data or fresh_calls != manifest.get("calls") or \
+                        not isinstance(saved_switch, dict) or \
+                        sorted([offset, addend] for offset, addend in switches.items()) != \
+                        saved_switch.get("relocations"):
                     raise ValueError("signed quotient lacks fresh canonical ELF provenance")
                 instructions = verify_divsi3(got, address, rom, mapping, manifest, selector=selector)
             checker = Path(__file__).resolve().with_name("plausible.py")
@@ -4467,7 +4479,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             call_resolver is not None or preloaded_switch or allow_switch_constants or
             allow_switch_scalar_frame or acyclic_state_budget is not None or
             ignored_leaf_alias_proof is not None or any(context is not None for context in (
-                switch_relocations, switch_data_relocations, udivsi3_context, modsi3_context,
+                None if division_switches.POLICY.enabled else switch_relocations,
+                switch_data_relocations, udivsi3_context, modsi3_context,
                 inert_spin_context, double_context, function_thunk_context, umodsi3_context,
                 ashldi3_context, float_context))):
         raise ValueError("framed signed quotient requires its isolated canonical Thumb context")
@@ -4605,7 +4618,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("inert spins exclude unproved arithmetic runtimes and call thunks")
     if divsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \
-                switch_relocations is not None or switch_data_relocations is not None or \
+                switch_relocations is not None and not (division_switches.POLICY.enabled and signed_runtime_context is None) or \
+                switch_data_relocations is not None or \
                 udivsi3_context is not None or modsi3_context is not None and signed_runtime_context is None or preloaded_switch:
             raise ValueError("signed quotient requires an isolated direct-call profile")
         divsi3.verify_context(data, address, validated_calls or {}, divsi3_context)
@@ -5374,7 +5388,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch is not None:
         pool_switch = function_thunk_context is not None and 'pool_switch' in function_thunk_context
         if (not scalar_switch_frame and double_context is None and not pool_switch and not root_buffer_switch and
-                switch_outgoing_stack is None and uses_stack_frame(instructions.values())) or any(
+                switch_outgoing_stack is None and not (
+                    divsi3_context is not None and signed_quotient_profile == divsi3.FRAMED_SELECTOR) and
+                uses_stack_frame(instructions.values())) or any(
                 target in RUNTIME_HELPERS.values() and not (
                     (pool_switch or switch_thunks is not None) and target in function_thunk.ALIASES.values())
                 for target in calls.values()):
@@ -6173,7 +6189,8 @@ def main():
                 divisors = {}
                 verify_leaf_instructions(got, addr, True, calls,
                                          divsi3_context=(rom, mapping, divsi3_bindings, divisors),
-                                         signed_quotient_profile=args.signed_quotient_profile)
+                                         signed_quotient_profile=args.signed_quotient_profile,
+                                         switch_relocations=switch_relocations or None)
                 quotient_evidence = {
                     "runtime": divsi3.RUNTIME,
                     "calls": [[site - addr, divsi3_bindings.get(site, f"func_{target:08X}")]
@@ -6181,6 +6198,8 @@ def main():
                     "divisors": [[site - addr, divisor] for site, divisor in sorted(divisors.items())]}
                 if args.signed_quotient_profile is not None:
                     quotient_evidence["frame"] = True
+                if switch_relocations:
+                    quotient_evidence["switch"] = switch_layout(got, addr, switch_relocations)
                 verified_instructions = verify_divsi3(got, addr, rom, mapping, quotient_evidence,
                                                        selector=args.signed_quotient_profile)
             elif modsi3_bindings:
@@ -6383,7 +6402,7 @@ def main():
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if data_buffer_evidence is not None:
         schema = data_buffer_schema
-    if switch_relocations:
+    if switch_relocations and quotient_evidence is None:
         schema = (PRELOADED_SWITCH_SCHEMA if preloaded_profile else
                   switch_data_thunks.SCHEMAS[thunk_switch_selector] if "thunk_policy" in switch_evidence else
                   typed_switch_frame.SCHEMA if "frame_policy" in switch_evidence else
@@ -6402,7 +6421,7 @@ def main():
     if remainder_evidence is not None:
         schema = modsi3.SCHEMA
     if quotient_evidence is not None:
-        schema = divsi3.schema(args.signed_quotient_profile)
+        schema = divsi3.schema(args.signed_quotient_profile, "switch" in quotient_evidence)
     if float_evidence is not None:
         schema = software_float.SCHEMA
     if shift_evidence is not None:
@@ -6675,7 +6694,7 @@ def main():
                         addr, got_body, address_manifest, fingerprint, mapping,
                         buffer_proof.fingerprint())
                     f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
-            if switch_relocations:
+            if switch_relocations and quotient_evidence is None:
                 summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
                            switch_data_thunks.SUMMARIES[thunk_switch_selector] if "thunk_policy" in switch_evidence else
                            typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else
@@ -6736,7 +6755,7 @@ def main():
                 proof_digest = modsi3.fingerprint(addr, got_body, remainder_evidence)
                 f.write(f"* signed remainder proof SHA-256: `{proof_digest}`\n")
             if quotient_evidence is not None:
-                summary = (divsi3.FRAMED_SUMMARY if args.signed_quotient_profile else divsi3.SUMMARY)
+                summary = divsi3.summary(args.signed_quotient_profile, "switch" in quotient_evidence)
                 f.write(f"* signed quotient: {summary}\n")
                 f.write(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
                 proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence,

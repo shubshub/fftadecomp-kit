@@ -927,11 +927,13 @@ def divsi3_report_matches(lines, root, address):
         mapping = mapping_snapshot(root)
         source_digest = source_fingerprint(root, address)
         verification = single("* verification: ")
-        selector = divsi3.FRAMED_SELECTOR if verification == f"`{divsi3.FRAMED_SCHEMA}`" else None
-        if verification != f"`{divsi3.schema(selector)}`" or mapping is None or \
+        selector = divsi3.FRAMED_SELECTOR if verification in (
+            f"`{divsi3.FRAMED_SCHEMA}`", f"`{divsi3.FRAMED_SWITCH_SCHEMA}`") else None
+        switched = verification in (f"`{divsi3.SWITCH_SCHEMA}`", f"`{divsi3.FRAMED_SWITCH_SCHEMA}`")
+        if verification != f"`{divsi3.schema(selector, switched)}`" or mapping is None or \
                 unquote("* source SHA-256: ") != source_digest or \
                 unquote("* mapping SHA-256: ") != mapping_fingerprint(mapping) or \
-                single("* signed quotient: ") != (divsi3.FRAMED_SUMMARY if selector else divsi3.SUMMARY) or \
+                single("* signed quotient: ") != divsi3.summary(selector, switched) or \
                 single("* control flow: ") != CALL_SUMMARY or \
                 unquote("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
                 single("* source plausibility: ") != "plausible" or \
@@ -953,7 +955,7 @@ def divsi3_report_matches(lines, root, address):
         data = bytes.fromhex(encoded)
         encoded_manifest = unquote("* signed quotient manifest: ")
         manifest = json.loads(encoded_manifest, object_pairs_hook=unique_members)
-        if divsi3.manifest_text(manifest) != encoded_manifest or \
+        if divsi3.manifest_text(manifest) != encoded_manifest or switched != ("switch" in manifest) or \
                 single("* ROM bytes: ") != f"`{data.hex()}` ({len(data)} bytes)" or \
                 single("**MATCH - byte identical** - ") != f"{len(data)}/{len(data)} bytes" or \
                 unquote("* signed quotient proof SHA-256: ") != divsi3.fingerprint(
@@ -1332,7 +1334,9 @@ def report_matches(report, root, address):
     if any(line.lstrip().startswith("* unsigned remainder") for line in lines):
         return False
     if profiles in ([f"* verification: `{divsi3.SCHEMA}`"],
-                     [f"* verification: `{divsi3.FRAMED_SCHEMA}`"]):
+                     [f"* verification: `{divsi3.FRAMED_SCHEMA}`"],
+                     [f"* verification: `{divsi3.SWITCH_SCHEMA}`"],
+                     [f"* verification: `{divsi3.FRAMED_SWITCH_SCHEMA}`"]):
         return divsi3_report_matches(lines, root, address)
     if any(line.lstrip().startswith("* signed quotient") for line in lines):
         return False
