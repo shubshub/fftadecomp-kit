@@ -47,8 +47,10 @@ def compare_function(name, real, stripped, permuted, signatures, symbol, size, p
             stripped_path_sha256=prerequisite.path_fingerprint(stripped_path),
             classified_dead_reads=sorted(classified)))
         # The original comparator's condition check remains strict. Typed versions
-        # in conditions remain outside this bounded composition.
-        return correspondence["real"], correspondence["stripped"]
+        # in conditions remain outside this bounded composition. The bijections let it
+        # pair object loads by the surviving events they read and follow (kit#378).
+        return (correspondence["real"], correspondence["stripped"],
+                dict(correspondence["real_bijection"]), dict(correspondence["stripped_bijection"]))
 
     result = semantics.compare_function(name, real, stripped, signatures, symbol, size,
         pinned, interfaces, unloaded_all_ones=True, _ordered_trace_check=ordered, _capture_load_provenance=True)

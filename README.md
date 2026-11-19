@@ -3910,13 +3910,11 @@ symbolically along every path, and the check requires:
     member, with only that store's own read-modify-write load, register
     operations that neither read nor overwrite the value, literal loads and
     unconditional branches in between. Neither the value nor the update's
-    flags may be used after the store. Such a load is skipped only where
-    the pairing of counterparts below fails, and only if the remaining loads
-    then pair up in order with the stripped compile's loads, each pair
-    agreeing in width, signedness, address and executor value, so that both
-    loads of a pair read the same value in ordinary memory. A source that
-    passes without the rule keeps its record, and one that no skip pairs up
-    keeps its refusal. The report lists these loads as `tested-update
+    flags may be used after the store. Such a load becomes an optional
+    counterpart, like a forwarded re-read below, but only where the pairing
+    of counterparts without it fails, and it is listed only if it stays
+    unpaired. A source that passes without the rule keeps its record, and
+    one that no skip pairs up keeps its refusal. The report lists these loads as `tested-update
     re-reads at [...]` and prints the rule's premise: nothing writes the member between
     the update re-read and the read of it just before, which the branch
     tests, so in ordinary memory the stripped compile's reuse of the tested
@@ -3924,7 +3922,25 @@ symbolically along every path, and the check requires:
     pairs traces itself, admits no such load.
     `volatile_tested_update.POLICY.enabled = False` restores the refusal;
   - a **counterpart**: matched in order to the stripped compile's loads of
-    the object, with the same address and width;
+    the object, with the same address, width, signedness and executor value,
+    and after the same number of trace events (kit#378). The count covers
+    every observable event the traces compare: stores and calls, and also
+    escapes, returns and loop markers. So both loads of a pair are the same
+    read: they read the same value in ordinary memory, and neither crosses
+    such an event to reach the other. Under the
+    overwritten-store composition, the events are first renumbered through
+    its map of the surviving events.
+  - A chained, ordinary-store or same-member constant re-read is an optional
+    counterpart. Where paths with different values of the member meet, the
+    stripped compile reloads it, and such a re-read pairs with that reload
+    when the pairing needs it. Otherwise it stays unpaired, which is what
+    explains it as the qualifier's read, and only then is it listed in the
+    report. So the reload cannot pair with a different, unexplained read of
+    the member instead.
+  - Where the loads line up by address and width but a pair does not, the
+    check refuses with `... and the stripped compile's load there reads a
+    different value; the qualifier added a read`, or with `... lies across a
+    store or call from it; ...`;
 * every access overlapping a pinned member to be exactly that member, at its
   offset and width (a byte of a halfword, a halfword over two bytes and a
   word over two halfwords are refused), and every such store to carry its
