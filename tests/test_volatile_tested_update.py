@@ -100,10 +100,11 @@ class TestedUpdateComparisonTests(unittest.TestCase):
         (report,) = fixtures.compare(real, stripped)
         self.assertEqual(report, ("func_08028C34", 1, [2], [], [], []))
         self.assertNotIn("tested-update", semantics.record(fixtures.SYMBOL, [report]))
-        # the tag is found after any optional part, and a plain list is not it
+        # the tag is found after any optional part, and a plain list is not it (the seventh
+        # positional part is the frame-read premises, kit#346, so the plain list follows it)
         tagged = report + ([], [], [], [], tested_update.Rereads([4]))
         self.assertIn("tested-update re-reads at [5]", semantics.record(fixtures.SYMBOL, [tagged]))
-        plain = report + ([], [], [], [], [4])
+        plain = report + ([], [], [], [], [], [4])
         self.assertNotIn("tested-update", semantics.record(fixtures.SYMBOL, [plain]))
         # nor is the tag read as one of the positional parts
         early = semantics.record(fixtures.SYMBOL, [report + (tested_update.Rereads([4]),)])
