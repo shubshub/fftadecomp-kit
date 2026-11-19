@@ -294,6 +294,19 @@ def compile_object(runner, workspace, args, root, address, source, thumb=True, r
     return object_data, text_data, image
 
 
+def debug_compile(runner, workspace, args, root, address, source, declaration, label, image):
+    """the -g twin of one semantic-check compile (escaped_local_extents): its assembly,
+    after its .text is shown to equal the checked compile's"""
+    rewrite = {"real": None,
+               "stripped": lambda text: volatile_semantics.strip_pinned_volatile(text, declaration),
+               "layout-perturbed": lambda text: volatile_semantics.perturb_pinned(text, declaration)}[label]
+    debug = argparse.Namespace(**{**vars(args), "flags": f"{args.flags} -g"})
+    _, _, debug_image = compile_object(runner, workspace, debug, root, address, source, rewrite=rewrite)
+    if debug_image["text"] != image["text"]:
+        raise volatile_semantics.SemanticError("the -g compile's code differs from the checked compile's")
+    return runner.read_binary(f"{workspace}/f.s").decode("utf-8")
+
+
 def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, owner_runtime_profile=None):
     """report records of the kit#90 semantic check, one per allowlisted object used.
 
@@ -344,6 +357,9 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
         data = rom[address-ROM_BASE:address-ROM_BASE+size]
         interfaces = ConditionalVolatileInterfaces(interfaces, data, address, rom,
             mapping, index_snapshot(root), data_snapshot(root), selector=args.owner_runtime_profile)
+    conditional_interfaces = getattr(args, "owner_runtime_profile", None) in (
+        "bounded-buffer-bios-fill-source-v1", "bounded-buffer-bios-fill-local-source-semantics-v1",
+        "bounded-buffer-bios-fill-overwritten-control-stores-v1")
     with runner.workspace() as workspace:
         diagnostics = []
         # the diagnostics are not the user's to silence: drop any -w and ask
@@ -405,9 +421,23 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
                     entry["symbol"], declaration, perturbed, interfaces, _ordinary_overwrite=True)
                 records.append(composition.record(entry["symbol"], results))
             else:
-                results = volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"], declaration,
-                                                     perturbed, interfaces)
+                def check():
+                    return volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"],
+                                                      declaration, perturbed, interfaces)
+                try:
+                    results, extents = check(), None
+                except volatile_semantics.SemanticError as refusal:
+                    if conditional_interfaces:
+                        raise
+                    import escaped_local_extents
+                    results, extents = escaped_local_extents.retry(refusal, {"real": real,
+                        "stripped": stripped, "layout-perturbed": perturbed}, lambda label: debug_compile(
+                        runner, workspace, args, str(root), address, source, declaration, label,
+                        {"real": real_image, "stripped": stripped_image,
+                         "layout-perturbed": perturbed_image}[label]), check,
+                        objects=lambda: parse_data_symbols(data_snapshot(root)), rom=rom)
                 records.append(volatile_semantics.record(entry["symbol"], results, perturbed=True))
+                records += [extents] if extents else []
     return records
 
 

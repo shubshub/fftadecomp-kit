@@ -166,6 +166,9 @@ TYPE_SIZES = {"u8": 1, "s8": 1, "char": 1, "vu8": 1, "vs8": 1,
               "u16": 2, "s16": 2, "short": 2, "vu16": 2, "vs16": 2,
               "u32": 4, "s32": 4, "int": 4, "long": 4, "vu32": 4, "vs32": 4,
               "bool8": 1, "bool32": 4}
+# {(compile label, function): escaped_local_extents.FrameModel} while that
+# rule re-runs a refused check; unset, every executor keeps the rule above.
+FRAME_MODELS = contextvars.ContextVar("escaped_local_frame_models", default=None)
 REGISTER_ALIASES = {"sb": "r9", "sl": "r10", "fp": "r11", "ip": "r12"}
 INVERSE = {"eq": "ne", "ne": "eq", "cs": "cc", "cc": "cs", "hs": "lo", "lo": "hs",
            "mi": "pl", "pl": "mi", "vs": "vc", "vc": "vs", "hi": "ls", "ls": "hi",
@@ -1210,6 +1213,11 @@ class Executor:
         self.instructions, self.labels, self.pools = function
         self.signatures, self.interfaces = signatures, interfaces
         self.symbol, self.size, self.pinned = layout
+        self.frame_model = (FRAME_MODELS.get() or {}).get((label, name))
+
+    def frame_private(self, address, width):
+        """a frame slot no escaped local reaches (escaped_local_extents)"""
+        return self.frame is not None and self.escaped and self.frame.private(self, address, width)
 
     def check_address(self, address, width, text, multiple=False, derived=False):
         """fail closed unless an access to the object is `symbol + constant` inside it,
@@ -1270,6 +1278,7 @@ class Executor:
         self.load_captures = [] if _capture_load_provenance else None
         self.escaped, self.known, self.conditions = False, {}, []
         self.frame_base = None
+        self.frame = self.frame_model.state() if self.frame_model is not None else None
         # registers and flags holding a value read back from memory: any load
         # but a literal word or a word reload of a clean word store (see
         # check_address and decide)
@@ -1285,6 +1294,7 @@ class Executor:
                                     self.name)
             if pc >= len(self.instructions):
                 raise SemanticError(f"{self.label} compile of {self.name}: execution runs off the end")
+            self.pc = pc
             result = self.step(pc, *self.instructions[pc])
             if result == "return":
                 path = Path(list(decisions), self.conditions, self.trace, self.records)
@@ -1339,19 +1349,29 @@ class Executor:
             if distance >= width_b or -distance >= width_a:
                 return "disjoint"
             return "overlap"
-        if is_stack(a) != is_stack(b) and (not self.escaped or private):
+        if is_stack(a) != is_stack(b) and self.frame is not None:
+            # escaped_local_extents: a variable frame offset may land anywhere in the frame but
+            # the saved registers (C bounds, as before an escape); a pointer not computed from
+            # sp reaches no internal slot
+            stack, width, other = (a, width_a, b) if is_stack(a) else (b, width_b, a)
+            if carries(other, SP):
+                return "disjoint" if private or self.frame.saved_area(stack, width) else "overlap"
+            if not self.escaped or private or self.frame_private(stack, width):
+                return "disjoint"
+        elif is_stack(a) != is_stack(b) and (not self.escaped or private):
             return "disjoint"
         ga, gb = global_symbol(a), global_symbol(b)
         if ga and gb and ga != gb:
             return "disjoint"
         return "overlap"
 
-    def load(self, width, signed, address, text):
+    def load(self, width, signed, address, text, peek=False):
         # Saved-register slots stay private even after the frame escapes:
         # the escaping pointer addresses locals, not the push area.
         saved = is_stack(address) and any(entry[0] == "store" and entry[5] and entry[2] == address
                                           for entry in self.memory)
-        stack = is_stack(address) and (not self.escaped or saved)
+        internal = self.frame_private(address, width)
+        stack = is_stack(address) and (not self.escaped or saved or internal)
         version, forwarded = "entry", None
         self.load_clean = False
         for entry in reversed(self.memory):
@@ -1371,13 +1391,15 @@ class Executor:
                 self.load_clean = width == 4 and width > max(PINNED_WIDTHS) and not derived
                 break
             if relation == "overlap":
-                if event is None:
+                if event is None or internal:
                     self.fail(text, "partially overlapping stack access")
                 version = ("store", event)
                 break
         if forwarded is not None:
             value = forwarded
         else:
+            if self.frame is not None and carries(address, SP) and not peek:
+                self.frame.reload(self, address, width, text)
             value = ("load", width, self.observed(address), version)
             if self.load_captures is not None:
                 self.load_captures.append((value, len(self.trace)))
@@ -1386,7 +1408,7 @@ class Executor:
         return value, forwarded is not None
 
     def current(self, width, address):
-        return self.load(width, False, address, "")[0]
+        return self.load(width, False, address, "", peek=True)[0]
 
     def observed(self, address):
         """an address as the trace records it: escaped stack slots relative to the escape"""
@@ -1413,12 +1435,16 @@ class Executor:
         if self.frame_base is None:
             self.frame_base = min(signed32(linear(pointer)[0]) for pointer in pointers)
         self.escaped = True
+        if self.frame is not None:
+            self.frame.escape(self, pointers, text)
         frame = {}
         for entry in self.memory:
             if entry[0] != "store" or not is_stack(entry[2]) or entry[5]:
                 continue
             offset, width, value = signed32(linear(entry[2])[0]), entry[1], entry[3]
             for byte in range(width):
+                if self.frame is not None and not self.frame.escaped_byte(offset + byte):
+                    continue
                 if width == 1:
                     part = value
                 elif isinstance(value, int):
@@ -1426,7 +1452,8 @@ class Executor:
                 else:
                     part = ("byte", byte, value)
                 frame[offset + byte - self.frame_base] = part
-        self.trace.append(("escape", tuple(sorted(frame.items()))))
+        self.trace.append(("escape", tuple(sorted(frame.items()))) +
+                          (self.frame.ordering(self) if self.frame is not None else ()))
 
     def store(self, width, address, value, saved=False, text="", derived=False):
         value = truncate(value, width * 8)
@@ -1435,7 +1462,16 @@ class Executor:
         event = None
         if not is_stack(address):
             self.escape([value], text)
-        if not is_stack(address) or self.escaped:
+            if self.frame is not None and carries(value, SP):
+                self.frame.consumers(self, None, [(address, value)], text)
+            elif self.frame is not None:
+                self.frame.stored(self, address, value, width, text)
+        elif self.frame is not None and self.escaped and carries(value, SP) and \
+                not self.frame_private(address, width):
+            self.escape([value], text)
+            self.frame.frame_target(self, address, width, text)
+            self.frame.kept(self, address, value)
+        if not is_stack(address) or (self.escaped and not self.frame_private(address, width)):
             event = len(self.trace)
             self.trace.append(("store", width, self.observed(address), value))
         self.memory.append(("store", width, address, value, event, saved, derived))
@@ -1557,6 +1593,13 @@ class Executor:
         if any(carries(argument, ("sym", self.symbol)) for argument in arguments):
             self.fail(text, f"the address of {self.symbol} is passed to a call")
         self.escape(arguments, text)
+        if self.frame is not None:
+            # an unnamed argument register the callee may read can hand it a frame address too
+            self.escape([self.regs[name] for name in sorted(record.guarded)], text)
+            self.frame.consumers(self, target, [(f"r{n}", argument) if n < 4 else (f"sp+{4 * (n - 4)}", argument)
+                                                for n, argument in enumerate(arguments)] +
+                                 [(name, self.regs[name]) for name in sorted(record.guarded)], text)
+            self.frame.call(self, count, text)
         event = len(self.trace)
         compared = self.local_fill_arguments(target, arguments, text, record)
         self.trace.append(("call", target, tuple(compared)))
@@ -1568,6 +1611,8 @@ class Executor:
         self.regs["r0"] = ("ret", opaque)
         for name in ("r1", "r2", "r3", "r12", "lr"):
             self.regs[name] = ("clobber", opaque, name)
+        if self.frame is not None:
+            self.frame.returned(self, target, arguments)
         self.derived -= {"r0", "r1", "r2", "r3", "r12", "lr"}
         self.flags, self.flags_derived = ("clobber", opaque), False
         record.flags_written = True

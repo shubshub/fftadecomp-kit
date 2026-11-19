@@ -3902,6 +3902,71 @@ The original, stripped and layout-perturbed objects have the same 23 typed
 relocations. A native test follows the original initializer, allocator and
 scheduler and reproduces bank and shadow writes when these premises fail.
 
+**Escaped-local extents (`escaped-local-extents-v1`,
+`tools/escaped_local_extents.py`).** Once a stack address escapes, the rule
+above makes every frame byte observable, compiler spill slots included. Two
+compiles that spill different values to a slot no C code can reach are then
+refused although they behave the same (0x0811B3B0 spills a byte in one compile
+and an address in the other to `sp+0x30`). When the semantic check refuses on
+the default path (not under the CpuSet interface selectors), match.py runs it
+once more with each compile's frame layout. Each of the three compiles is
+repeated with `-g`; its `.text` and parsed instruction stream must equal the
+checked compile's, and its DWARF 2 information gives every named local's frame
+slot, size and scope. In that run:
+
+* the function must have agbcc's frame shape: pushes, then at most one `sp`
+  decrement, and `sp` changes nowhere else but in epilogues that only pop,
+  restore r8-r11 and return;
+* every escaping frame address (a call argument, an argument register the
+  callee may read, a stored value) must lie strictly inside exactly one named
+  local whose scope covers the escaping instruction; a local it is one past
+  the end of escapes with it, in any scope. A frame address kept in the frame
+  outside an internal slot must sit in an escaped local or a stack-argument
+  word, and escapes in turn;
+* every consumer of an escaping address is recorded: the callee and register,
+  the local or stack word it is kept in, or the store target, which must be
+  proven ordinary RAM (never I/O such as a DMA source register, ROM or an
+  unknown pointer). A `memcpy` with a constant count inside the local is
+  proven when the ROM copy helper it links to (`func_081443FC`) matches its
+  pinned SHA-256 and the source defines no `memcpy`; it returns its
+  destination. Every other consumer is listed in the report as premised;
+* after an escape, a screen (not a proof): a value read back from the frame,
+  a result of a call that was given a frame address, or a word of memory read
+  straight after such a call may be stored only to proven RAM, and a `memcpy`
+  of frame bytes that may hold a frame address may copy only to the frame or
+  to proven RAM; a word store of it, or a copy to RAM, is listed. A frame
+  address that a premised consumer leaves in memory and this function passes
+  on by another route (in pieces, after a later call or store, through a later
+  call's result, or by a `memcpy` from non-frame memory) is not screened: it
+  rests on premise 1 through that consumer, which the report lists;
+* the escaped locals stay observable as before. A slot of the function's own
+  frame (between the body `sp` and the saved registers) that no escaped local
+  and no stack-argument word overlaps is internal: its stores are not events,
+  its loads forward across calls and must be exact, and only a pointer not
+  computed from `sp` is disjoint from it;
+* a frame load that is not forwarded (it stopped at a call) is refused when an
+  untraced store outside the escaped locals may overlap it, so no internal
+  value, and no frame address kept in one, comes back as an unknown value. A
+  variable frame offset may reach every slot but the saved registers (main,
+  before an escape, treats it as disjoint from every constant slot), and an
+  escape after such a store also compares the order of the stores that can
+  reach the escaped locals.
+
+The report then carries `* allowlisted volatile escaped-local extents
+(escaped-local-extents-v1): ...` with, per compile, the escaped locals, the
+premised and proven consumers, and the premises: each premised consumer, and
+any code reached through a pointer it keeps, stays within the declared extents
+of the locals listed with it, the declared types are the original's, and
+hardware gets a frame address only through a listed consumer; a pointer not computed from `sp` reaches no frame byte outside the
+escaped locals and a variable frame offset no saved-register slot; a callee
+reads or writes no stack word beyond its prototype's arguments and takes no
+input in r4-r11; and the `-g` twin's DWARF describes the checked compile's
+frame. A reviewer audits the premised consumers by name: a length-taking
+helper given a frame address (a CpuSet wrapper, an LZ77 decoder) is exactly
+where premise 1 can fail. If the second run refuses, the report keeps the
+first run's refusal. `escaped_local_extents.POLICY.enabled = False` turns the
+rule off. Inlined subroutines in the DWARF are not modelled and refuse.
+
 A passing semantic check still requires plausible source and complete ELF bytes
 identical to the ROM before a function earns match credit.
 
@@ -3980,7 +4045,8 @@ has these gaps:
 
 Focused checks: `PYTHONDONTWRITEBYTECODE=1 python tests/test_plausible_volatile_allowlist.py` and
 `PYTHONDONTWRITEBYTECODE=1 python tests/test_volatile_semantics.py` (the latter compiles with agbcc when it is installed);
-`python -m unittest discover -s tests -p 'test_volatile_indirect_calls.py'` covers typed indirect calls.
+`python -m unittest discover -s tests -p 'test_volatile_indirect_calls.py'` covers typed indirect calls,
+and `tests/test_volatile_escaped_extents.py` the escaped-local extents.
 
 It handles the compiler stage as `cc -> .s`, so it works with a classic cc1
 (GCC 2.9 / agbcc), with modern gcc and with clang. Any toolchain other than
