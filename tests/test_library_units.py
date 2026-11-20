@@ -296,7 +296,7 @@ class UnitToolchainTests(unittest.TestCase):
         self.assertEqual(orphan['excluded_ROM_credit'], 0)
         self.assertEqual(orphan['excluded_sections'], ['.rodata', '.rel.rodata'])
         self.assertIs(orphan['section_exclusion_performed'], True)
-        self.assertIs(orphan['prerequisite']['section_exclusion_performed'], True)
+        self.assertIs(orphan['prerequisite']['section_exclusion_performed'], False)
         self.assertEqual(orphan['prerequisite']['orphan_section']['bytes'], 8)
         self.assertTrue(match_evidence.report_matches(report, self.root.path, A))
         self.assertEqual(units.report_toolchain(report), 'agbcc-O1-v1')
@@ -634,6 +634,130 @@ class GateRuntimeErrorTests(unittest.TestCase):
         self.assertEqual(result.stdout, '')
         self.assertRegex(result.stderr, r'\Arefused: [^\n]+\n\Z')
         self.assertEqual(list((self.root.path / 'docs/match').iterdir()), [])
+
+
+@unittest.skipUnless(HAVE_COMPILER, 'fixed compiler required')
+class OrphanRecordTests(unittest.TestCase):
+    """The unit orphan record: the prerequisite's record as issued, the unit's own statement beside it."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Root([(A, COUNTDOWN, match.DEFAULT_CC, '-mthumb-interwork -O1'),
+                         (B, LOOP.format(address=B), match.DEFAULT_CC, match.DEFAULT_FLAGS)], [])
+        cls.root.write_table([row('testlib', A, cls.root.end(B), 'agbcc-O1-v1', A)])
+        cls.environment = patch.dict(os.environ, FFTA_ROM=str(cls.root.path / 'baserom.bin'))
+        cls.environment.start()
+        result = cls.root.run(A, '--unit-toolchain', 'agbcc-O1-v1', write=True)
+        assert result.returncode == 0, result.stdout + result.stderr
+        cls.report = cls.root.report(A)
+        cls.line = next(line for line in cls.report.splitlines() if line.startswith(units.ORPHAN_LINE))
+        cls.record = json.loads(units.binding(cls.report)[3])
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.environment.stop()
+        cls.root.temporary.cleanup()
+
+    def setUp(self):
+        (self.root.path / 'docs/match' / f'{A:08X}.md').write_text(self.report)
+
+    def with_record(self, record):
+        """The report with its orphan line replaced by `record`, canonically rendered."""
+        report = self.report.replace(self.line, f'{units.ORPHAN_LINE}`{units.canonical(record)}`')
+        self.assertNotEqual(report, self.report)
+        return report
+
+    def check_report(self, report):
+        """match.py --check-report against `report` as the saved file: (exit status, output)."""
+        (self.root.path / 'docs/match' / f'{A:08X}.md').write_text(report)
+        result = self.root.run(A, '--unit-toolchain', 'agbcc-O1-v1', '--check-report')
+        return result.returncode, result.stdout + result.stderr
+
+    def overridden(self):
+        """The record as it was written before: the prerequisite's flag overwritten, no unit statement."""
+        record = json.loads(units.canonical(self.record))
+        del record['contract']
+        record['prerequisite']['section_exclusion_performed'] = True
+        return record
+
+    def test_the_record_states_the_exclusion_once(self):
+        nested = self.record['prerequisite']
+        self.assertIs(nested['section_exclusion_performed'], False)
+        self.assertIn('explicit linker GC/exclusion', nested['contract'])
+        self.assertIn('remain required', nested['contract'])
+        self.assertIs(self.record['section_exclusion_performed'], True)
+        self.assertEqual(self.record['contract'], units.ORPHAN_CONTRACT)
+        self.assertEqual(units.ORPHAN_CONTRACT, (
+            'The prerequisite record is as the prerequisite issued it for the original object, before any '
+            'exclusion: its section_exclusion_performed and its contract describe the prerequisite alone. The '
+            'unit build then removed excluded_sections with objcopy and required the .text, its relocations and '
+            'the function symbol to be unchanged. The excluded bytes earn no ROM credit.'))
+        self.assertEqual(self.report.count('"section_exclusion_performed":true'), 1)
+        self.assertEqual(self.report.count('"section_exclusion_performed":false'), 1)
+
+    def test_the_prerequisite_record_is_the_one_the_prerequisite_issues(self):
+        import compiler_orphan_constants_prerequisite as prerequisite
+        root = self.root.path
+        tool = units.resolve('agbcc-O1-v1')
+        args = argparse.Namespace(cc=tool['cc'], cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
+                                  objcopy=match.DEFAULT_OBJCOPY, linker=match.DEFAULT_LD, flags=tool['flags'])
+        inputs = dict(selector=prerequisite.SELECTOR, mapping=match_evidence.mapping_snapshot(root),
+                      index=match.empty_body.index_snapshot(root), rom=(root / 'baserom.bin').read_bytes())
+        objects = match_evidence.data_snapshot(root)
+        runner = match.Runner(args.cc, 'Ubuntu', match.DEFAULT_WSL_PATH, root=str(root))
+        with runner.workspace() as workspace:
+            original, _, _ = match.compile_object(runner, workspace, args, root, A, f'src/{A:08X}.c')
+            preprocessed = runner.read_binary(f'{workspace}/f.i')
+            issued = prerequisite.verify(original, A, objects, preprocessed, **inputs)
+            record = units.exclude_orphan_constants(runner, workspace, args, original, A, inputs['rom'],
+                                                    inputs['mapping'], objects, inputs['index'])[3]
+        self.assertEqual(record['prerequisite'], issued)
+        self.assertEqual(record, self.record)
+        # the prerequisite replays its own record against the original object, and only its own
+        self.assertEqual(prerequisite.verify(original, A, objects, preprocessed, manifest=record['prerequisite'],
+                                             **inputs), issued)
+        with self.assertRaisesRegex(ValueError, 'manifest differs from fresh original replay'):
+            prerequisite.verify(original, A, objects, preprocessed,
+                                manifest=self.overridden()['prerequisite'], **inputs)
+
+    def test_the_issued_record_replays(self):
+        self.assertTrue(units.orphan_record_as_issued(self.record))
+        self.assertTrue(match_evidence.report_matches(self.report, self.root.path, A))
+        status, output = self.check_report(self.report)
+        self.assertEqual(status, 0, output)
+        self.assertIn(f'report  identical to the saved docs/match/{A:08X}.md', output)
+
+    def test_replay_refuses_the_record_that_overrode_the_prerequisite(self):
+        report = self.with_record(self.overridden())
+        self.assertFalse(match_evidence.report_matches(report, self.root.path, A))
+        status, output = self.check_report(report)
+        self.assertEqual(status, 1, output)
+        self.assertIn(f'report  DIFFERS from the saved docs/match/{A:08X}.md', output)
+
+    def test_replay_refuses_each_changed_exclusion_statement(self):
+        def changed(edit):
+            record = json.loads(units.canonical(self.record))
+            edit(record)
+            return record
+
+        cases = {
+            'nested flag': lambda record: record['prerequisite'].update(section_exclusion_performed=True),
+            'nested flag type': lambda record: record['prerequisite'].update(section_exclusion_performed=0),
+            'nested flag dropped': lambda record: record['prerequisite'].pop('section_exclusion_performed'),
+            'unit flag': lambda record: record.update(section_exclusion_performed=False),
+            'unit flag type': lambda record: record.update(section_exclusion_performed=1),
+            'unit statement dropped': lambda record: record.pop('contract'),
+            'unit statement edited': lambda record: record.update(contract=units.ORPHAN_CONTRACT + ' '),
+            'unit statement truncated': lambda record: record.update(contract=units.ORPHAN_CONTRACT[:-1]),
+            'unit statement empty': lambda record: record.update(contract=''),
+            'prerequisite dropped': lambda record: record.pop('prerequisite'),
+        }
+        for label, edit in cases.items():
+            with self.subTest(label=label):
+                self.assertFalse(match_evidence.report_matches(self.with_record(changed(edit)), self.root.path, A))
+        for label, record in {'list': [], 'empty': {}, 'text': 'x'}.items():
+            with self.subTest(label=label):
+                self.assertFalse(match_evidence.report_matches(self.with_record(record), self.root.path, A))
 
 
 if __name__ == '__main__':
