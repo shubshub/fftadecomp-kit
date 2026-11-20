@@ -631,6 +631,38 @@
           "who": "native-index-audit"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7d0ca449abbafa6397203209572122cf5e3047d5dc8501b6146f18e94a2c56d2",
+        "acknowledged_cursor": 7031883655,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7d0ca449abbafa6397203209572122cf5e3047d5dc8501b6146f18e94a2c56d2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800CE08\",\"who\":\"native-scanline-review\",\"note\":\"Validate the recovered scanline constructor against its three live table modes and complete native symbol\"}",
+          "created_at": "2026-11-20T06:03:45Z",
+          "id": 7031883655,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T06:03:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "d91f00860135c233bbaa2c972217a6a672951fbd12ce405381726247755ab67c",
+        "result": {
+          "address": "0x0800CE08",
+          "claim_id": 7031883655,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7031883655,
+          "status": "accepted",
+          "who": "native-scanline-review"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
