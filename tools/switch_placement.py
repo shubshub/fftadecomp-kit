@@ -89,11 +89,12 @@ def workspace(runner):
 
 def compile_object(runner, workspace, args, root, address, source, thumb=True):
     from match import elf_image, verify_dependencies
+    import plausible
     if thumb is not True:
         raise ValueError("placement is Thumb-only")
     temporary = shlex.quote(workspace)
     environment = f"export TMPDIR={temporary}; "
-    runner.sh(f"{environment}{args.cpp} -nostdinc -undef -I include {shlex.quote(source)} -o {temporary}/f.i")
+    runner.sh(f"{environment}{args.cpp} {plausible.CPP_OPTIONS} {shlex.quote(source)} -o {temporary}/f.i")
     verify_dependencies(runner.read_binary(f"{workspace}/f.i").decode("utf-8"), root, address)
     runner.sh(f"{environment}{args.cc} {args.flags} {temporary}/f.i -o {temporary}/f.raw.s")
     raw = runner.read_binary(f"{workspace}/f.raw.s")
