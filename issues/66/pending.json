@@ -631,6 +631,38 @@
           "who": "native-scanline-review"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "4a8106580c014a7f2af88a229363bf768af7ef4551c1ada6ccd1695e26145561",
+        "acknowledged_cursor": 7032318485,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4a8106580c014a7f2af88a229363bf768af7ef4551c1ada6ccd1695e26145561",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081311DC\",\"who\":\"native-pair-review\",\"note\":\"Recover the 40-byte object-pair guard with its real halfword output helper and original Thumb compiler; quota-limited native lane.\"}",
+          "created_at": "2026-11-20T06:30:28Z",
+          "id": 7032318485,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T06:30:28Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "af3b15535ce9452190584a1328e4b88320b30a050e82e862ad6031ff81f8cc4e",
+        "result": {
+          "address": "0x081311DC",
+          "claim_id": 7032318485,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7032318485,
+          "status": "accepted",
+          "who": "native-pair-review"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
