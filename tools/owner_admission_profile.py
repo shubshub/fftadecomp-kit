@@ -1641,6 +1641,12 @@ def stack_index_snapshot(root):
 
 
 def tile_row_profile(address, selector):
+    if selector == named_buffer.DATAFREE_SELECTOR and address == 0x080701BC:
+        import menu_unit_icon_grid as grid
+        return grid.UnitIconGridProof, 'unit_icon_grid', grid.environment_fingerprint
+    if selector == runtime_summary.SELECTOR and address == 0x080D8858:
+        import tile_effect_sound as sound
+        return sound.TileSoundProof, 'tile_effect_sound', sound.environment_fingerprint
     if selector == named_buffer.SELECTOR:
         if address == item_tile_row.OWNER:
             return item_tile_row.ItemTileRowProof, 'item_tile_row', item_tile_row.environment_fingerprint
