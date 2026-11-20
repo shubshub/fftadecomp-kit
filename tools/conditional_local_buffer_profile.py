@@ -48,9 +48,10 @@ SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1
 SCHEDULER_MANAGER_FIELD = 'conditional-scheduler-indirect-manager-v1'
 SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
+PANEL_TRANSFER = 'conditional-panel-transfer-scheduler-callbacks-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
-CALL_SITE_POLICIES = (SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR, menu_palette.SELECTOR, effect_registry.SELECTOR)
+CALL_SITE_POLICIES = (PANEL_TRANSFER, SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR, menu_palette.SELECTOR, effect_registry.SELECTOR)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
@@ -92,6 +93,7 @@ SCHEMAS = {
     'conditional-script-task-traversal-v1': 'elf-symbol-thumb-conditional-script-task-traversal-v1',
     'conditional-transfer-task-construction-v1': 'elf-symbol-thumb-conditional-transfer-task-construction-v1',
     'conditional-transfer-tree-destruction-v1': 'elf-symbol-thumb-conditional-transfer-tree-destruction-v1',
+    PANEL_TRANSFER: 'elf-symbol-thumb-' + PANEL_TRANSFER,
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
     STATE: 'elf-symbol-thumb-conditional-local-state-iterator-v1',
@@ -228,7 +230,10 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             runtime_names = ('_call_via_r2', '_call_via_r3')
         elif self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
-            if self.policy == menu_palette.SELECTOR:
+            if self.policy == PANEL_TRANSFER:
+                import panel_transfer_callbacks as panel
+                self.scheduler_call_sites = panel.bind(self, data, address, ins, edges, calls)
+            elif self.policy == menu_palette.SELECTOR:
                 self.scheduler_call_sites = menu_palette.bind(self, data, address, ins, edges, calls)
             elif self.policy == effect_registry.SELECTOR:
                 self.scheduler_call_sites = effect_registry.bind(self, data, address, ins, edges, calls)
@@ -346,6 +351,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
     def check_indirect_target(self, address, aliases, returns, *, site):
         if not thunk.reserved(address):
             return
+        if self.policy == PANEL_TRANSFER:
+            import panel_transfer_callbacks as panel
+            return panel.check_indirect(self, site, address, aliases, returns)
         if self.policy == menu_palette.SELECTOR:
             return menu_palette.check_indirect(self, site, address, aliases, returns)
         require(self.policy in (STATE, FLAGGED_STATE, SCHEDULER_ZERO_DESCRIPTOR, effect_init.SELECTOR) and self.calls.get(site) == address == 0x0814224C,
@@ -378,6 +386,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == PANEL_TRANSFER and thunk.reserved(address):
+                import panel_transfer_callbacks as panel
+                return panel.check_call(self, site, address, aliases, slots)
             if self.policy == menu_palette.SELECTOR and site in (menu_palette.SETUP_SITE, menu_palette.COPY_SITE):
                 return menu_palette.check_call(self, site, aliases, stack, slots, constants)
             if self.policy == effect_init.SELECTOR and address == effect_init.THUNK:
@@ -520,6 +531,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             if self.policy == effect_registry.SELECTOR:
                 return effect_registry.manifest(self)
             scheduler = call_sites.manifest(self)
+            if self.policy == PANEL_TRANSFER:
+                import panel_transfer_callbacks as panel
+                return panel.finish(self, scheduler)
             if self.policy == effect_init.SELECTOR:
                 return effect_init.manifest(self, scheduler)
             return scene_fill.manifest(self, scheduler) if self.policy == scene_fill.SELECTOR else scheduler

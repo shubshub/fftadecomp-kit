@@ -4267,7 +4267,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
                              incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
-                             switch_thunk_premises=None, dma_fills=None):
+                             switch_thunk_premises=None, dma_fills=None, menu_list_frame=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4843,12 +4843,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     literal_adjustments = set()
     shifted_stack_constants = set()
     literal_stack_constants = set()
+    cursor = buffer_proof.owner_switch.cursor if root_buffer_switch else None
+    if cursor is not None and path_states is not None:
+        raise ValueError("owner cursor requires the ordinary joined frame walk")
     while pending:
+        iteration = 0
         if path_states is None:
-            current = pending.pop()
+            state_key = pending.pop()
+            current, iteration = state_key if isinstance(state_key, tuple) else (state_key, 0)
+            incoming_state = states[state_key]
         else:
             current, incoming_state = pending.pop()
-            states[current] = incoming_state
         if current % alignment or not address <= current < end:
             raise ValueError("function has no verified return: non-leaf control flow leaves the symbol")
         if current not in instructions:
@@ -4872,12 +4877,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if thumb and CS_GRP_INT not in instruction.groups and instruction.mnemonic != "blx" and \
                 not armv4t.instruction(instruction):
             raise ValueError("reachable Thumb instruction is not an ARMv4T encoding or a BL pair")
-        return_registers = set(states[current][0])
-        stack = list(states[current][1])
-        aliases = dict(states[current][2])
-        constants = dict(states[current][3])
-        pointer_slots = dict(states[current][4])
-        words = dict(states[current][5])
+        return_registers = set(incoming_state[0])
+        stack = list(incoming_state[1])
+        aliases = dict(incoming_state[2])
+        constants = dict(incoming_state[3])
+        pointer_slots = dict(incoming_state[4])
+        words = dict(incoming_state[5])
+        if cursor is not None and current == cursor.store:
+            cursor.check_store(iteration, aliases, stack, constants, pointer_slots, return_registers)
         word_mode = buffer_proof is not None and buffer_proof.word_provenance
         if bounded_index is not None and (pointer_slots or words or any(
                 saved_return and not saved_slot for saved_return, saved_slot, _ in stack)):
@@ -4905,7 +4912,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # The outgoing-argument switch frame proof carries its pending words
         # across these edges and refuses an LR read after one; the restoring
         # frame proof below re-proves every edge.
-        local_branch = (calling and (double_context is not None or switch_outgoing_stack is not None or
+        local_branch = (calling and (menu_list_frame is not None and current in menu_list_frame.BRANCHES or
+                                     double_context is not None or switch_outgoing_stack is not None or
                                      addressed_signed_runtime.local_branches(addressed_signed_runtime_context)) and
                         len(operands) == 1 and operands[0].type == ARM_OP_IMM and
                         address <= operands[0].imm < end)
@@ -5409,7 +5417,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     path_state_count += 1
                     pending.append((successor, outgoing))
                 continue
-            previous = states.get(successor)
+            state_key = cursor.state_key(current, successor, iteration) if cursor is not None else successor
+            if state_key is None:
+                continue
+            previous = states.get(state_key)
             if previous is None:
                 merged = outgoing
             else:
@@ -5455,8 +5466,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                 if constants.get(register) == value), merged_slots,
                           tuple((slot,value) for slot,value in previous[5] if words.get(slot)==value))
             if previous != merged:
-                states[successor] = merged
-                pending.append(successor)
+                states[state_key] = merged
+                pending.append(state_key)
     if acyclic_state_budget is not None:
         # Exact states never merge. The complete reached graph must also be a
         # DAG, including cycles whose repeated states needed no new work item.
@@ -5650,7 +5661,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             inert_spin_context["tails"] = [current - address for current in tails]
         if "loop" in inert_spin_context:
             inert_spin_context["loop"] = loop
-    if local_branches:
+    if menu_list_frame is not None:
+        from menu_list_frame import MenuListFrame
+        if type(menu_list_frame) is not MenuListFrame or type(buffer_proof) is not FunctionBufferCallProof:
+            raise ValueError("menu list long branches require the typed function-buffer walk")
+        menu_list_frame.finish(data, address, instructions, edges, local_branches, calls, buffer_proof)
+    elif local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
     if function_thunk_context is not None and 'pool_switch' in function_thunk_context:
@@ -6070,7 +6086,7 @@ def main():
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
     ap.add_argument("--palette-closure-bundle", help="canonical independently authenticated palette artifact bundle for first compilation")
-    ap.add_argument("--owner-runtime-profile", choices=("immediate-dma-stack-fill-v1", "compiler-orphan-address-constants-O0-v1", "conditional-cone-tile-stack-footprint-v1", "conditional-scheduler-projected-outputs-v1", "conditional-scheduler-descriptor-calls-v1", "conditional-scheduler-branch-descriptor-calls-v1", "conditional-scheduler-following-call-v1", "conditional-scheduler-eight-target-branches-v1", "conditional-scheduler-twenty-four-target-branches-v1", "conditional-scheduler-live-local-alias-calls-v1", "conditional-scheduler-live-local-alias-payload-calls-v1", "conditional-scheduler-event-definition-v1", "conditional-scheduler-twenty-four-target-following-calls-v1", "conditional-scheduler-three-per-path-calls-v1", "conditional-scheduler-sequential-leaf-output-calls-v1", "conditional-scheduler-sequential-killed-alias-calls-v1", "conditional-scheduler-u16-counted-loop-v1", "conditional-scheduler-sequential-live-alias-counted-loops-v1", "conditional-scheduler-three-per-path-live-alias-v1", "conditional-scheduler-guarded-descriptor-calls-v1", "conditional-scheduler-descriptor-payload-calls-v1", "conditional-scheduler-descriptor-payload8-calls-v1", "conditional-scheduler-halfword-output-payload-v1", "conditional-scheduler-two-payload-calls-v1", "conditional-scheduler-entry-descriptor-calls-v1", "conditional-scene-mode6-position-v1", "conditional-scheduler-zero-descriptor-v1", "conditional-scheduler-entry-branch-descriptor-calls-v1", "conditional-scheduler-indirect-manager-v1", "conditional-scheduler-manager-offset-v1", "conditional-scheduler-manager-paths-v1", "conditional-scheduler-call-site-summaries-v1", "conditional-scheduler-palette-copy-v1", "conditional-scheduler-call-site-summaries-v2", "conditional-scheduler-sdk-halfword-fill-v1", "conditional-effect-initialized-scheduler-v1", "conditional-menu-palette-scheduler-v1", "conditional-effect-registry-scheduler-v1", "conditional-local-state-iterator-v1", "conditional-flagged-local-state-iterator-v1", "conditional-script-task-traversal-v1", "conditional-transfer-task-construction-v1", "conditional-transfer-tree-destruction-v1", "conditional-local-output-word-call-v1", "numeric-data-switch-source-v1", "canonical-integer-scalar-data-source-v1", "canonical-integer-two-words-source-v1", "canonical-integer-three-words-source-v1", "conditional-palette-source-compilation-v1", "canonical-integer-private-locals-data-source-v1", "canonical-integer-six-words-data-source-v1", "canonical-integer-two-words-aligned-data-source-v1", "canonical-integer-two-words-data-source-v1", "canonical-integer-scalar-source-v1", "ordinary-multiple-switch-source-v1", "restoring-owner-runtime-v1", "restoring-owner-switch-aligned-v1", "restoring-owner-switch-cycles-function-words-v1",
+    ap.add_argument("--owner-runtime-profile", choices=("immediate-dma-stack-fill-v1", "compiler-orphan-address-constants-O0-v1", "conditional-cone-tile-stack-footprint-v1", "conditional-scheduler-projected-outputs-v1", "conditional-scheduler-descriptor-calls-v1", "conditional-scheduler-branch-descriptor-calls-v1", "conditional-scheduler-following-call-v1", "conditional-scheduler-eight-target-branches-v1", "conditional-scheduler-twenty-four-target-branches-v1", "conditional-scheduler-live-local-alias-calls-v1", "conditional-scheduler-live-local-alias-payload-calls-v1", "conditional-scheduler-event-definition-v1", "conditional-scheduler-twenty-four-target-following-calls-v1", "conditional-scheduler-three-per-path-calls-v1", "conditional-scheduler-sequential-leaf-output-calls-v1", "conditional-scheduler-sequential-killed-alias-calls-v1", "conditional-scheduler-u16-counted-loop-v1", "conditional-scheduler-sequential-live-alias-counted-loops-v1", "conditional-scheduler-three-per-path-live-alias-v1", "conditional-scheduler-guarded-descriptor-calls-v1", "conditional-scheduler-descriptor-payload-calls-v1", "conditional-scheduler-descriptor-payload8-calls-v1", "conditional-scheduler-halfword-output-payload-v1", "conditional-scheduler-two-payload-calls-v1", "conditional-scheduler-entry-descriptor-calls-v1", "conditional-scene-mode6-position-v1", "conditional-scheduler-zero-descriptor-v1", "conditional-scheduler-entry-branch-descriptor-calls-v1", "conditional-scheduler-indirect-manager-v1", "conditional-scheduler-manager-offset-v1", "conditional-scheduler-manager-paths-v1", "conditional-scheduler-call-site-summaries-v1", "conditional-panel-transfer-scheduler-callbacks-v1", "conditional-scheduler-palette-copy-v1", "conditional-scheduler-call-site-summaries-v2", "conditional-scheduler-sdk-halfword-fill-v1", "conditional-effect-initialized-scheduler-v1", "conditional-menu-palette-scheduler-v1", "conditional-effect-registry-scheduler-v1", "conditional-local-state-iterator-v1", "conditional-flagged-local-state-iterator-v1", "conditional-script-task-traversal-v1", "conditional-transfer-task-construction-v1", "conditional-transfer-tree-destruction-v1", "conditional-local-output-word-call-v1", "numeric-data-switch-source-v1", "canonical-integer-scalar-data-source-v1", "canonical-integer-two-words-source-v1", "canonical-integer-three-words-source-v1", "conditional-palette-source-compilation-v1", "canonical-integer-private-locals-data-source-v1", "canonical-integer-six-words-data-source-v1", "canonical-integer-two-words-aligned-data-source-v1", "canonical-integer-two-words-data-source-v1", "canonical-integer-scalar-source-v1", "ordinary-multiple-switch-source-v1", "restoring-owner-runtime-v1", "restoring-owner-switch-aligned-v1", "restoring-owner-switch-cycles-function-words-v1",
                                                       "restoring-owner-r3-thunk-switch-v1", "restoring-owner-scalar-switch-v1", "restoring-owner-switch-entry-word-v1", "restoring-owner-switch-entry-two-words-data-v1",
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
@@ -6727,7 +6743,8 @@ def main():
                             # Typed objects beside the function-buffer proof.
                             verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
-                                                  data_relocations, function_relocations)
+                                                  data_relocations, function_relocations,
+                                                  index=empty_index if addr in (data_buffer.MENU_LIST_ADDRESS, 0x0801A518) else None)
                         else:
                             verified_instructions, buffer_proof = verify_function_buffers(
                                 got, addr, rom, mapping, address_manifest)
@@ -6915,6 +6932,8 @@ def main():
             library_units.recheck(ROOT, unit_context)
         except ValueError as error:
             sys.exit(f"refused: {error}")
+    if (schema == data_buffer.MENU_LIST_SCHEMA or addr == 0x0801A518) and empty_body.index_snapshot(ROOT) != empty_index:
+        sys.exit("function index changed during data-buffer verification")
     if schema in (FUNCTION_BUFFER_SCHEMA, *data_buffer.SCHEMAS) and report_rom_path(ROOT) != rom_file:
         sys.exit("selected ROM changed during verification; re-run match.py")
     if spin_profile and (inert_spin.index_snapshot(ROOT) != function_index or report_rom_path(ROOT) != rom_file):

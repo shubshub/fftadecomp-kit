@@ -105,17 +105,26 @@ class OwnerSwitch:
             successors=list(edges[transfer]),
             table_words_sha256=hashlib.sha256(b''.join(
                 data[offset:offset + 4] for offset in sorted(words))).hexdigest())
+        self.cursor = None
+        from menu_local_cursor import OWNER, END, MenuCursor
+        if plain and address == OWNER and address + len(data) == END:
+            self.cursor = MenuCursor(instructions, edges)
         self.complete = False
 
     def evidence(self):
         require(self.complete, 'owner switch walk is incomplete')
+        if self.cursor is not None:
+            self.record['local_cursor'] = self.cursor.evidence()
         return self.record
 
     def lines(self):
         record = self.evidence()
+        cursor = record.get('local_cursor')
+        detail = (f"; counted local STM at 0x{cursor['store']:08X} through SP offsets {cursor['offsets']}, "
+                  f"adjacent output at SP+{cursor['adjacent_output']}" if cursor else '')
         return [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
                 f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
-                f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}']
+                f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']
 
 
 def retries(manifest, args, calls, data_relocations, function_relocations, thumb, matches_rom):

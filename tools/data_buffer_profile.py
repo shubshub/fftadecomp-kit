@@ -1,6 +1,6 @@
 """Typed named-data literals beside the version-2 bounded buffer proof.
 
-Two schemas, one per matcher path that reaches a buffer call with named data:
+Schemas for matcher paths that reach a buffer call with named data:
 
 * ``elf-symbol-thumb-data-buffer-calls-v1`` (plain direct-call path): the
   version-2 register and stack buffer proof with bounded loop replay
@@ -9,6 +9,7 @@ Two schemas, one per matcher path that reaches a buffer call with named data:
 * ``elf-symbol-thumb-function-data-buffer-calls-v1`` (function-literal path):
   the same proof with the function-buffer restrictions
   (``FunctionBufferCallProof``), beside typed object and function literals.
+* The menu list callback adds a restoring-frame proof for its two far epilogue jumps.
 
 Both require typed provenance for every reached RAM or ROM address-domain
 literal word, as the complete-owner selectors do; untyped words in the fixed
@@ -28,14 +29,18 @@ import sys
 import tempfile
 
 import rom_mirror
+from menu_list_frame import MenuListFrame, ADDRESS as MENU_LIST_ADDRESS
 
 SCHEMA = "elf-symbol-thumb-data-buffer-calls-v1"
 FUNCTION_SCHEMA = "elf-symbol-thumb-function-data-buffer-calls-v1"
-SCHEMAS = (SCHEMA, FUNCTION_SCHEMA)
+MENU_LIST_SCHEMA = "elf-symbol-thumb-menu-list-long-branches-v1"
+SCHEMAS = (SCHEMA, FUNCTION_SCHEMA, MENU_LIST_SCHEMA)
 PREMISE = "premise, not checked: named objects do not overlap any live stack"
 SUMMARIES = {
     SCHEMA: "typed ABS32 object literals beside the ROM-checked version-2 buffer proof; "
             "every reached RAM/ROM address word typed; " + PREMISE,
+    MENU_LIST_SCHEMA: "typed object and function literals with two same-owner long BL jumps, restoring "
+                      "frame and ROM-checked byte outputs; " + PREMISE,
     FUNCTION_SCHEMA: "typed ABS32 object and canonical function literals beside the ROM-checked "
                      "version-2 function-buffer proof; every reached RAM/ROM address word typed; " + PREMISE,
 }
@@ -98,13 +103,14 @@ def reached_words(data, address, instructions):
     return {offset: (value, sorted(sites)) for offset, (value, sites) in words.items()}
 
 
-def numeric_hardware(data, address, mapping, instructions, calls, words, remaining):
+def numeric_hardware(data, address, mapping, instructions, calls, words, remaining, *, branches_expected=None):
     """The owner rule's numeric hardware class, over the exact complete owner graph."""
     import owner_admission_profile as owner
     import owner_graph_profile as graph
     refinement = owner.refine(data, address, mapping)
     graph_instructions, edges, branches, _, table_words = graph.graph(data, address, refinement)
-    if branches or table_words or set(graph_instructions) != {item.address for item in instructions}:
+    if branches != (branches_expected or {}) or table_words or \
+            set(graph_instructions) != {item.address for item in instructions}:
         raise ValueError("numeric hardware words require the exact complete owner graph")
     partition = {"words": [{"address": address + offset, "value": value, "load_sites": sites,
                             "switch_word": False} for offset, (value, sites) in sorted(words.items())]}
@@ -119,7 +125,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     offset to (name, value) and function_relocations each function word offset
     to (name, value), all from the exact link of the original ELF.  index is the
     function index snapshot that the plain path's default-walk summaries read
-    (copy_helper_summary_profile, switch_callee_profile); the function-literal path takes none.
+    (copy_helper_summary_profile, switch_callee_profile) and the restoring menu frame requires.
     switch_relocations, the owner's own jump table from the same link, is walked by
     owner_switch_buffer_profile on the plain path only; its table pointer is that
     proof's word, not an untyped literal.
@@ -146,7 +152,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         bound, literals = match.function_address_bindings(data, address, rom, mapping, objects, manifest)
         if bound != calls:
             raise ValueError("data-buffer calls differ from their canonical bindings")
-        proof = match.FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
+        if address == 0x0801A518:
+            from map_record_loader import MapRecordProof
+            proof = MapRecordProof(data, rom, mapping, index, calls)
+        else:
+            proof = match.FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
         # thunks; the object words are bound like the function-literal path's.
@@ -168,12 +178,20 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                                       copy_helper_index=index, switch_callee_index=index)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
+    frame = None
+    if address == MENU_LIST_ADDRESS and schema == FUNCTION_SCHEMA:
+        if switch_relocations or dma_fills is not None:
+            raise ValueError("menu list has no switch table or DMA fill proof")
+        frame = MenuListFrame(data, rom, mapping, index, objects, data_relocations, function_relocations)
     if switch_relocations:
         # The owner's own jump table; only the plain proof takes it (owner_switch_buffer_profile).
         import owner_switch_buffer_profile as owner_switch
         instructions = owner_switch.walk(proof, data, address, calls, switch_relocations)
     elif schema == FUNCTION_SCHEMA:
-        instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
+        instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof, menu_list_frame=frame)
+        if frame is not None:
+            schema = MENU_LIST_SCHEMA
+            manifest["restoring_menu_frame"] = frame.evidence
     else:
         instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
                                                       incoming_narrow_reads=True, dma_fills=dma_fills)
@@ -199,7 +217,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     hardware = []
     if any(HARDWARE_WINDOW[0] <= words[offset][0] < HARDWARE_WINDOW[1] for offset in remaining):
         import owner_admission_profile as owner
-        hardware = numeric_hardware(data, address, mapping, instructions, calls, words, remaining)
+        hardware = numeric_hardware(data, address, mapping, instructions, calls, words, remaining,
+                                    branches_expected=frame.BRANCHES if frame is not None else None)
         if hardware:
             manifest["numeric_hardware_words"] = owner.numeric_hardware_record(hardware)
     untyped = sorted(remaining - {row[0] for row in hardware})
@@ -210,6 +229,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                                     for offset in untyped] +
                                    [f"typed word 0x{address + offset:08X} outside the address domain"
                                     for offset in outside]))
+    if schema == FUNCTION_SCHEMA and address == 0x0801A518:
+        manifest["record_loader"] = proof.finish()
     return instructions, proof, schema, manifest
 
 
@@ -225,12 +246,14 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                        DEFAULT_WSL_PATH, Runner, compile_object, link_calls, _run_replay_process,
                        plausibility_result)
     from match_evidence import source_paths, source_fingerprint, mapping_snapshot, data_snapshot, report_rom_path
+    from inert_spin_profile import index_snapshot
     if _replay_active.get():
         raise ValueError("recursive data-buffer replay is unsupported")
     token = _replay_active.set(True)
     try:
         root = Path(root)
         selected_rom = report_rom_path(root)
+        index = index_snapshot(root) if (root / "symbols/functions.txt").is_file() else None
 
         def unchanged():
             return source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == mapping and \
@@ -260,9 +283,6 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                                                   allow_switch_data=True)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
-            from inert_spin_profile import index_snapshot
-            # Without a function index no default-walk summary applies, and the walk refuses as before.
-            index = index_snapshot(root) if (root / "symbols/functions.txt").is_file() else None
             result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
                            switch_relocations=switches, dma_fills=dma_fills)
             checker = Path(__file__).with_name("plausible.py")
@@ -273,6 +293,8 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
             findings, allowed = plausibility_result(checked, address)
             if findings or allowed or source_fingerprint(captured, address) != source_digest:
                 raise ValueError("data-buffer captured source changed or is implausible")
+        if result[2] == MENU_LIST_SCHEMA and index_snapshot(root) != index:
+            raise ValueError("menu list function index changed during replay")
         if not unchanged():
             raise ValueError("data-buffer replay inputs changed")
         return result

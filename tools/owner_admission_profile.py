@@ -63,6 +63,7 @@ import bios_mixed_cpuset_fast_fill_profile as mixed_fill
 import sprite_node_affine
 import bios_bg_affine_set_profile as bg_affine
 import bg_affine_transparent_leaf_profile as transparent_leaf
+import affine_sequence_task
 import nested_formal_output_buffer_profile as nested_output
 import direct_halfword_output_buffer_profile as direct_output
 import three_halfword_output_buffer_profile as three_output
@@ -504,14 +505,20 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     validate_span(data,address,rom,mapping,index)
     if buffer_selector:
         named_buffer.validate_owner(data,address,rom,mapping,index)
-    refinement = (bios_switch.refine if selector == bios_switch.SELECTOR else refine)(data,address,mapping)
+    menu_modes = selector == stack_index.SELECTOR and address == 0x0807DDB8
+    interposed_object = menu_modes or selector == bios_switch.SELECTOR
+    refinement = (bios_switch.refine if interposed_object else refine)(data,address,mapping)
     selected_rows=[line.split() for line in index.decode().splitlines()
                    if line.split() and line.split()[0]==f'{address:08X}']
     if not buffer_selector and (len(selected_rows)!=1 or len(selected_rows[0])<4 or int(selected_rows[0][3])!=refinement['instrs']):
         raise ValueError('complete-owner text reachable instruction count differs')
     ins, edges, branches, calls, words = graph.graph(data,address,refinement,
-        one_object_word_switch=selector == bios_switch.SELECTOR)
-    if selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
+        one_object_word_switch=interposed_object)
+    if menu_modes:
+        import menu_mode_dispatcher
+        proof = menu_mode_dispatcher.prove(data, rom, mapping, index, objects, ins, edges,
+            branches, calls, words, refinement, bindings, rodata, premises)
+    elif selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
         import sprite_tile_selection
         proof = sprite_tile_selection.prove(data, rom, mapping, index, objects, bindings,
                                            ins, edges, calls, refinement, words)
@@ -717,6 +724,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                    named_buffer.GuardedAliasBufferProof if selector == named_buffer.GUARDED_ALIAS_SELECTOR else
                    named_buffer.GuardedSwitchBufferProof if selector == named_buffer.GUARDED_SWITCH_SELECTOR else
                    transparent_leaf.BgAffineTransparentLeafProof if selector == named_buffer.BG_AFFINE_TRANSPARENT_SELECTOR else
+                   affine_sequence_task.AffineSequenceProof if selector == named_buffer.BG_AFFINE_SCRATCH_SELECTOR and address == affine_sequence_task.ROOT else
                    bg_affine.BgAffineSetScratchProof if selector == named_buffer.BG_AFFINE_SCRATCH_SELECTOR else
                    bg_affine.BgAffineSetProof if selector == named_buffer.BG_AFFINE_SELECTOR else
                    mixed_fill.MixedCpuSetFastFillProof if selector == named_buffer.MIXED_CPUSET_FAST_FILL_SELECTOR else
@@ -1062,6 +1070,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     if selector in local_calls.CALL_SITE_POLICIES:
         import scheduler_call_site_profile as call_sites
         call_sites.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
+        if selector == local_calls.PANEL_TRANSFER:
+            import panel_transfer_callbacks as panel
+            panel.check_bindings(proof['buffers']['conditional_local_calls'], bindings)
     if selector == shadow_matrix.SELECTOR:
         # The closed original-binding adapter has authenticated memcpy to this
         # actual indexed helper. Existing literal validation uses its entry name.
@@ -1075,7 +1086,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         raise ValueError('runtime summary buffers exclude function literals and switches')
     if indexed_leaf_switch and (rodata or not bindings['data']):
         raise ValueError('bounded-index leaf switch requires named data without a copied object initializer')
-    if selector in rom_copy.SELECTORS and (bindings['functions'] or (bindings['switches'] and not indexed_leaf_switch) or not (bindings['data'] or rodata)):
+    if selector in rom_copy.SELECTORS and not menu_modes and (bindings['functions'] or (bindings['switches'] and not indexed_leaf_switch) or not (bindings['data'] or rodata)):
         raise ValueError('ROM table copy owner requires named data or an object initialiser and excludes function literals and switches')
     if selector == query_callee.SELECTOR and (bindings['functions'] or bindings['switches']):
         raise ValueError('known-query callee owner excludes function literals and switches')
@@ -1110,7 +1121,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     thunk.verify_literal_bindings(data,address,ins.values(),calls,mapping,functions)
     data_literals = ({offset:literals[offset] for offset,name,addend in bindings['data']}
                      if selector in (*local_calls.SELECTORS, *named_buffer.THUNK_SELECTORS, query_cont.SELECTOR, nested_query.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, spilled_loop.SELECTOR)
-                     or selector == named_buffer.EQUIPMENT_SELECTOR and address == 0x080C01D0 else literals)
+                     or menu_modes or selector == named_buffer.EQUIPMENT_SELECTOR and address == 0x080C01D0 else literals)
     thunk.verify_data_bindings(calls,data_literals,match.parse_data_symbols(objects),json.loads(mapping))
     # All actual address-domain PC words require typed object/function provenance,
     # a ROM wait-state mirror word folded onto the ROM it names. Exact local switch
@@ -1371,6 +1382,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
            for item in image['symbols']):
         raise ValueError('unresolved owner symbol outside exact binding roles')
     for records in result.values():records.sort()
+    if selector == stack_index.SELECTOR and address == 0x0807DDB8:
+        import menu_mode_dispatcher
+        menu_mode_dispatcher.check_original(image, result, targets)
     if selector == stack_index.SELECTOR and address == 0x080D8E00:
         active_shuffle.compiler_symbol_roles(image, targets)
         if any(row['size'] for row in image['symbols'] if row['name'] in targets):
@@ -1479,6 +1493,10 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
         raise ValueError('unknown complete-owner selector')
     elif '__udivsi3' not in targets or not any(name in thunk.ALIASES for name in targets):
         raise ValueError('owner profile requires actual compiler UDIV and indirect thunk calls')
+    if selector == local_calls.PANEL_TRANSFER:
+        active_shuffle.compiler_symbol_roles(image, targets)
+        if any(row['size'] for row in image['symbols'] if row['name'] in targets):
+            raise ValueError('panel transfer compiler references must have zero size')
     if selector == local_calls.menu_palette.SELECTOR:
         local_calls.menu_palette.check_bindings(result)
     if selector == local_calls.menu_palette.SELECTOR or selector == finite_loop.SELECTOR and address == 0x080C68EC:
@@ -1503,6 +1521,9 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     preprocessed=runner.read_binary(workspace+'/f.i').decode()
     thunk.namespace(preprocessed)
     from plausible import strip_comments_and_strings
+    if selector == stack_index.SELECTOR and address == 0x0807DDB8 and re.search(
+            r'\bmemcpy\b',strip_comments_and_strings(preprocessed)):
+        raise ValueError("menu initializer memcpy must be compiler-emitted")
     reserved = (r'\b(?:__divsi3|__modsi3|__udivsi3|__umodsi3)\b'
                 if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
     if re.search(reserved,strip_comments_and_strings(preprocessed)):
@@ -1563,9 +1584,9 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     if (name_entry or sprite_selection or selector == dma_fill.SELECTOR and address == boot_dma.OWNER or
             selector == finite_loop.SELECTOR and address in (0x080C68EC, 0x08096CB8) or
             selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC or
-            selector in (local_calls.menu_palette.SELECTOR, named_buffer.MOVEMENT_TILE_SELECTOR, named_buffer.MOVEMENT_OVERLAY_SELECTOR, named_buffer.MOVEMENT_PATH_SELECTOR, named_buffer.ROSTER_SORT_SELECTOR, named_buffer.ROSTER_FILTER_SELECTOR, named_buffer.EQUIPMENT_SELECTOR, script_walk.SELECTOR, constructor.SELECTOR, transfer_tree.SELECTOR, transfer_task.SELECTOR, small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR)):
+            selector in (local_calls.PANEL_TRANSFER, local_calls.menu_palette.SELECTOR, named_buffer.MOVEMENT_TILE_SELECTOR, named_buffer.MOVEMENT_OVERLAY_SELECTOR, named_buffer.MOVEMENT_PATH_SELECTOR, named_buffer.ROSTER_SORT_SELECTOR, named_buffer.ROSTER_FILTER_SELECTOR, named_buffer.EQUIPMENT_SELECTOR, script_walk.SELECTOR, constructor.SELECTOR, transfer_tree.SELECTOR, transfer_task.SELECTOR, small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR)):
         small_copy_binding.check_linked(linked,address,targets)
-    if name_entry or sprite_selection or selector in (local_calls.menu_palette.SELECTOR, named_buffer.EQUIPMENT_SELECTOR) or selector == finite_loop.SELECTOR and address == 0x080C68EC:
+    if name_entry or sprite_selection or selector in (local_calls.PANEL_TRANSFER, local_calls.menu_palette.SELECTOR, named_buffer.EQUIPMENT_SELECTOR) or selector == finite_loop.SELECTOR and address == 0x080C68EC:
         local_calls.menu_palette.check_linked(linked, targets)
     if (selector, address) in ((named_buffer.SELECTOR, 0x0800CE08), (named_buffer.DATAFREE_SELECTOR, 0x080142DC), (named_buffer.SELECTOR, 0x0806ED30),
                                (stack_index.SELECTOR, 0x080D8E00)):
@@ -1632,7 +1653,8 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER:
         environment_reader = scaled_polygon.environment_fingerprint
     scroll_wave = selector == stack_index.SELECTOR and address == 0x080D8E00
-    if scroll_wave:
+    checked_index_environment = scroll_wave or (selector == stack_index.SELECTOR and address == 0x0807DDB8)
+    if checked_index_environment:
         environment_reader = known_query.environment_fingerprint
     item_menu = selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC
     if item_menu:
@@ -1807,8 +1829,8 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         raise ValueError('item menu verifier environment changed during compilation')
     if selector == named_buffer.MOVEMENT_TILE_SELECTOR and manifest['proof']['environment'] != environment:
         raise ValueError('movement tile verifier environment changed during compilation')
-    if scroll_wave and manifest['proof']['environment'] != environment:
-        raise ValueError('scroll-wave verifier environment changed during compilation')
+    if checked_index_environment and manifest['proof']['environment'] != environment:
+        raise ValueError('stack-index verifier environment changed during compilation')
     if environment is not None and environment != environment_reader():
         raise ValueError('entry admission producers, selected binaries or runtime changed during compilation')
     return data,manifest,source,mapping,index,objects,rom,count,raw
