@@ -197,6 +197,7 @@ class Policy:
     def __init__(self, owner, size, selector=SELECTOR):
         self.owner, self.size = owner, size
         self.selector = selector
+        self.owner_switch = None    # a complete, canonical call-free owner dispatch
         self.forwarding = None      # v2: the buffer proof whose forwarded-slot facts bind the owner
         self.derivations = set()
         self.accesses = set()
@@ -254,6 +255,15 @@ class Policy:
                 self.returned.setdefault(site, {}).setdefault(number, set()).add(offset)
 
     def finish(self, data, address, instructions, copies):
+        if self.owner_switch is not None:
+            if self.spills or self.returned or copies or self.owner_switch.key[:3] != (bytes(data), address, {}):
+                refuse("bounded-index leaf switch excludes pointer spills, returned aliases and copies")
+            self.evidence = prove_words(data, address, [i.address for i in instructions],
+                                        self.derivations, self.accesses, {}, selector=self.selector,
+                                        leaf_switch=self.owner_switch)
+            if self.evidence["preconditions"]:
+                refuse("bounded-index leaf switch requires locally proved indices")
+            return self.evidence
         self.evidence = prove(data, address, sorted(instruction.address for instruction in instructions),
                               frozenset(self.derivations), frozenset(self.accesses), copies,
                               selector=self.selector,
@@ -562,6 +572,8 @@ class Analysis:
         self.origins = {destination for destination, _ in copies.values()}
         self.writers = set()        # stores through non-stack addresses, and calls
         self.check = False
+        self.switch_site = None
+        self.switch_edges = ()
         thresholds = {0, MASK}
         for bit in range(33):
             thresholds.update({(1 << bit) - 1, min(MASK, 1 << bit)})
@@ -836,6 +848,10 @@ class Analysis:
         state = state.copy()
         r = lambda n: n & 7
         follow = site + 2
+        if site == self.switch_site:
+            # The authenticated MOV PC,Rm preserves all general registers and flags.
+            self.scalar_use(state, ((raw >> 3) & 15,), "a switch destination")
+            return [(target, state.copy()) for target in self.switch_edges]
         if raw & 0xF800 == 0xF000:
             second = self.halfword(site + 2)
             if second & 0xF800 != 0xF800:
@@ -1108,6 +1124,8 @@ class Analysis:
 
     # ---- driver -------------------------------------------------------
     def successors(self, site):
+        if site == self.switch_site:
+            return self.switch_edges
         raw = self.halfword(site)
         if raw & 0xF800 == 0xF000:
             return (site + 4,)
@@ -1244,10 +1262,18 @@ def prove(data, address, verified_sites, derivations, accesses, copies, *, selec
 
 
 def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-                forwarding=None, analysis_type=None):
+                forwarding=None, analysis_type=None, leaf_switch=None):
     """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
     analysis = (analysis_type or Analysis)(bytes(data), address, derivations, accesses, dict(copies),
                                            signed_shift_congruence=selector == SELECTOR_V2)
+    if leaf_switch is not None:
+        from owner_switch_buffer_profile import OwnerSwitch
+        if (type(leaf_switch) is not OwnerSwitch or selector != SELECTOR_V2 or analysis_type is not None
+                or forwarding is not None or copies or leaf_switch.key[:3] != (bytes(data), address, {})
+                or set(verified_sites) != leaf_switch.instructions):
+            refuse("bounded-index switch requires its exact authenticated call-free owner")
+        analysis.switch_site = leaf_switch.record["transfer"]
+        analysis.switch_edges = tuple(leaf_switch.record["successors"])
     sites = analysis.syntactic_sites()
     if sites - set(verified_sites) - {site + 2 for site in sites
                                        if analysis.halfword(site) & 0xF800 == 0xF000} or \
