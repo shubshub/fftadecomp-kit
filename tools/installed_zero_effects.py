@@ -138,3 +138,11 @@ def verify_conditional(payload,destination,entry,count,*,selector):
         actual_caller_count_proved=False,source_or_native_admission=False,
         limits='Conditional exact instruction effects only. No allocation, initialization of unrelated bytes, '
             'hardware/MMIO memory semantics, installed identity, caller provenance or native theorem.')
+
+
+def verify_aligned_menu_ring(payload, destination):
+    """Execute the one larger original initialization of 32 menu request entries."""
+    if destination != 0x03005E78 or len(payload) != 176 or hashlib.sha256(payload).hexdigest() != \
+            "ce26dd719323641c1c4cbfa501368306ce6e31e193dabce7e84c7067f7590130":
+        raise ValueError("menu allocation requires its original installed Thumb image")
+    return _case(payload, destination, destination, 0x394, 0)

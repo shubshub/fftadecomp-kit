@@ -72,6 +72,10 @@ def tile_search(rom, ins):
     for site, list_register, displacement in ((0x080989EA, 'r1', '0x24'), (0x08098A4C, 'r0', '0x34')):
         block(ins, site, f'ldr r0, [{list_register}, #0x10]', f'ldr r1, [pc, #{displacement}]',
               'mov r2, sp', 'bl #0x80c7cc0', 'ldr r0, [sp, #8]')
+    tile_callback(rom)
+
+
+def tile_callback(rom):
     ops(rom, ITERATOR, 'push {r4, r5, r6, lr}', 'adds r6, r1, #0', 'adds r5, r2, #0',
         'ldr r4, [r0, #4]', 'b #0x80c7ccc', 'ldr r4, [r4, #8]', 'cmp r4, #0',
         'beq #0x80c7cdc', 'adds r0, r4, #0', 'adds r1, r5, #0', 'bl #0x814225c',

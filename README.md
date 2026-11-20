@@ -1751,6 +1751,15 @@ callback and checks the installed copy image for each supported byte count.
 Set `FFTA_MOVEMENT_PATH_ROOT` to a USA checkout containing the C source to run
 `tests/test_movement_path_prefix.py`.
 
+The movement overlay at `08098A88` uses
+`--owner-runtime-profile conditional-movement-overlay-v1`. It gates setup
+and scanning on grid and display readiness. Its second phase checks all 256
+tiles, queries occupants of reachable tiles, and marks empty destinations.
+The profile verifies the two unsigned divisions by ten, the tile callback
+literal, the twelve-byte local query, and the boot-installed display clear.
+The renderer and its buffers must be initialized. Set `FFTA_MOVEMENT_OVERLAY_ROOT`
+to an indexed USA checkout with this source to run `tests/test_movement_overlay.py`.
+
 The menu routine at `08027528` uses
 `--owner-runtime-profile conditional-unit-entry-output-array-v1`. The producer at
 `0809F78C` treats the low 16 count bits as signed. For a positive count it writes
@@ -6704,3 +6713,14 @@ and tile data must be initialized, valid for the original accesses, and
 separate from active frames. Set `FFTA_ACTION_COORDINATE_ROOT` to the game
 tree to run `tests/test_action_coordinate_query.py` against the original ROM
 and both coordinate-query callers' match reports.
+
+The USA menu initializer at `0804C8C4` uses the slot-zero routine copied into
+IWRAM at boot to clear its 916-byte ring. The
+`addressed-native-menu-ring-initializer-v1` selector checks the original
+allocation, call through R2, two BIOS halfword fills and three typed handlers
+installed in a five-slot runner. The ring holds 32 request records of 28 bytes.
+The contract requires the original installed code, a successful aligned
+allocation, separate live buffers and private stack, ordinary BIOS behavior,
+and exclusive ownership during initialization. Set `FFTA_MENU_RING_ROOT` to
+the game tree to run the original boot, dispatch and cleanup tests in
+`tests/test_menu_ring_initializer.py`.
