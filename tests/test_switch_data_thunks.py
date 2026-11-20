@@ -539,7 +539,7 @@ class ProofTests(unittest.TestCase):
     def test_widening_does_not_let_mixed_absorb_an_exact_rom_address(self):
         # r1 is [&g_right] + 1 (MIXED) on entry and 0x80 from the second pass on, so
         # (r1 << 20) + k is an exact address inside this caller on every later pass.
-        # The joined state stays MIXED, but the exact value arriving there is a change.
+        # The join keeps the exact value arriving at the MIXED entry, so the entry changes.
         def callback(table, count):
             return dict(post=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x3101), ('h', 0x2000 | count),
                               ('label', 'again'), ('h', 0x050C), ('h', 0x3400 | table), ('h', 0x2180),
@@ -556,6 +556,85 @@ class ProofTests(unittest.TestCase):
                             ('h', 0x2180), ('h', 0x3A01), ('h', 0x2A00), ('bhi', 'again')))
         with self.assertRaisesRegex(ValueError, 'cannot be stored'):
             verify(store)
+
+    def test_a_mixed_path_cannot_hide_an_exact_value_at_a_join(self):
+        # kit #367: r1 = [&g_right] + 1 (a constant met a loaded value) on one path and 0x80 on
+        # another. Joined, r1 must keep 0x80 for the ROM check: (0x80 << 20) is this caller.
+        mixed = (('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x3101))  # ldr r1, [r3]; adds r1, #1
+        rom = (('h', 0x050C),)                                         # lsls r4, r1, #20
+        store = (*rom, ('h', 0x3415), ('h', 0x601C))                   # adds r4, #0x15; str r4, [r3]
+
+        def count_down(count, body):
+            # movs r0, #count; again: body; movs r1, #0x80; subs r0, #1; cmp r0, #0; bhi again
+            return (*mixed, ('h', 0x2000 | count), ('label', 'again'), *body,
+                    ('h', 0x2180), ('h', 0x3801), ('h', 0x2800), ('bhi', 'again'))
+
+        def callback(table, count):
+            # From the second pass on r4 is the caller's own table, so r2 is its case0 address.
+            return (*count_down(count, (*rom, ('h', 0x3400 | table))), ('h', 0x6822))  # ldr r2, [r4]
+
+        table = build(post=callback(0, 1))[1]['table']
+        for count in (10, 20):
+            body, labels, _ = fixture = build(post=callback(table, count))
+            self.assertEqual(labels['table'], table)
+            self.assertEqual(struct.unpack_from('<I', body, table)[0], BASE + labels['case0'])
+            with self.subTest('callback from the own table', count=count), \
+                    self.assertRaisesRegex(ValueError, 'thunk target register can hold a local code address'):
+                verify(fixture)
+        stores = {
+            'count-down loop, 10 passes': count_down(10, store),
+            'count-down loop, 20 passes': count_down(20, store),
+            'count-up loop': (*mixed, ('h', 0x2200), ('label', 'again'), *store, ('h', 0x2180),
+                              ('h', 0x3201), ('h', 0x2A14), ('bhi', 'again')),  # adds r2, #1; cmp r2, #20
+            'loop without a counter': (*mixed, ('h', 0x2200), ('label', 'again'), *store, ('h', 0x2180),
+                                       ('bhi', 'again')),
+            # No loop: only the visit order differs between the two.
+            'join, exact on the taken edge': (('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x2A00), ('bhi', 'skip'),
+                                              *mixed[1:], ('label', 'skip'), *store),
+            'join, mixed on the taken edge': (*mixed, ('h', 0x2A00), ('bhi', 'skip'), ('h', 0x2180),
+                                              ('label', 'skip'), *store),
+        }
+        for label, tail in stores.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                verify(build(tail=tail))
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                leaf(build(tail=tail), switch_thunks=PLAIN)
+        # Two exact values: the join covers both, so (0x80 << 20) is not lost behind 0x40.
+        for first, second in ((0x2180, 0x2140), (0x2140, 0x2180)):  # movs r1, #0x80 / #0x40
+            tail = (('ldr', 3, 'object'), ('h', first), ('h', 0x2A00), ('bhi', 'skip'), ('h', second),
+                    ('label', 'skip'), *store)
+            with self.subTest('two exact values', first=first), \
+                    self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                leaf(build(tail=tail), switch_thunks=PLAIN)
+        # The joined register stays constant-derived, so it is still no callback.
+        for label, post in {
+                'exact on the taken edge': (('ldr', 3, 'object'), ('h', 0x2204), ('h', 0x2900), ('bhi', 'skip'),
+                                            ('h', 0x681A), ('h', 0x3201), ('label', 'skip')),
+                'mixed on the taken edge': (('ldr', 3, 'object'), ('h', 0x681A), ('h', 0x3201), ('h', 0x2900),
+                                            ('bhi', 'skip'), ('h', 0x2204), ('label', 'skip'))}.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'holds a constant-derived value'):
+                verify(build(post=post))
+        # Small exact values joined with mixed ones stay ordinary, as in shipped 08011860 (a store
+        # tail where one path sets r0 = 5) and 080C5F94 (a clamp, then the value is narrowed and stored).
+        for label, tail in {
+                'shared store tail': (('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x6818), ('h', 0x3001),
+                                      ('h', 0x2A00), ('bhi', 'skip'), ('h', 0x2005), ('label', 'skip'),
+                                      ('h', 0x7208)),                          # strb r0, [r1, #8]
+                'clamp': (('ldr', 3, 'object'), ('h', 0x681A), ('h', 0x3201), ('h', 0x2A40), ('bhi', 'skip'),
+                          ('h', 0x2240), ('label', 'skip'),
+                          ('h', 0x03D2), ('h', 0x0C12), ('h', 0x605A))}.items():  # lsls #15; lsrs #16; str
+            with self.subTest(label):
+                verify(build(tail=tail))
+                leaf(build(tail=tail), switch_thunks=PLAIN)
+
+    def test_the_constant_join_keeps_every_exact_value(self):
+        mixed, low, high = thunks.MIXED, (4, 4), (0x80, 0x90)
+        self.assertEqual(thunks.join(mixed, mixed), mixed)
+        for value in (low, high):
+            self.assertEqual(thunks.join(mixed, value), value)
+            self.assertEqual(thunks.join(value, mixed), value)
+        self.assertEqual(thunks.join(low, high), (4, 0x90))
+        self.assertEqual(thunks.join(high, low), (4, 0x90))
 
     def test_identity_operations_are_moves(self):
         # A call result copied with adds rd, rs, #0, stored, then a callback loaded: no constant contributes.
