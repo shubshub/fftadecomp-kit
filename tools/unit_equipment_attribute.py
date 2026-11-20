@@ -48,6 +48,10 @@ def bindings(calls=CALLS):
 
 def check_original(image, address, original, targets):
     from active_entry_shuffle_profile import compiler_symbol_roles
+    import action_slot_predicate as predicate
+    if address == predicate.OWNER:
+        predicate.check_original(image, original, targets)
+        return
     import battle_action_value as battle
     import positioned_equipment_chance as chance
     import equipment_selection_list as selection
@@ -105,7 +109,10 @@ def check_source(root, address):
         require(sha256(tokens.encode()).hexdigest() == dispatch.HEADER_HASH,
                 'battle dispatch callback declarations or state layout differ')
     import random_equipment_removal as random_removal
+    import action_slot_predicate as predicate
     reserved = (name,)
+    if address == predicate.OWNER:
+        reserved += ('ActionState', predicate.STATE_NAME, *(f'func_{target:08X}' for target in predicate.CALLS.values()))
     if address == random_removal.OWNER:
         reserved += ('ActionState', *random_removal.TARGETS)
     if address == chance.OWNER:
@@ -124,13 +131,13 @@ def check_source(root, address):
     if address == selection.OWNER:
         reserved += ('SelectionState', 'SelectionEntry', 'Actor080C2618', *selection.OBJECTS,
                      *(f'func_{target:08X}' for target in selection.CALLS.values()))
-    require(address in (random_removal.OWNER, OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER, selection.OWNER, removal.OWNER, target_chance.OWNER) and plausible.include_closure(root, source) ==
+    require(address in (predicate.OWNER, random_removal.OWNER, OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER, selection.OWNER, removal.OWNER, target_chance.OWNER) and plausible.include_closure(root, source) ==
             (headers, []) and
             base_header((root/'include/ffta.h').read_bytes(), reserved) and
             not any(s in text for s in (chr(92), '??', '%:', chr(0))),
             'equipment owner requires its reviewed C types and local array')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
-    expected = {random_removal.OWNER: random_removal.SOURCE_HASH, OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
+    expected = {predicate.OWNER: predicate.SOURCE_HASH, random_removal.OWNER: random_removal.SOURCE_HASH, OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
                 battle.OWNER: battle.SOURCE_HASH, guard.OWNER: guard.SOURCE_HASH,
                 dispatch.OWNER: dispatch.SOURCE_HASH, chance.OWNER: chance.SOURCE_HASH,
                 selection.OWNER: selection.SOURCE_HASH, removal.OWNER: removal.SOURCE_HASH,
@@ -294,6 +301,9 @@ def scene_rows(rom):
 
 def prove(data, address, rom, mapping, index, objects, original, ins, calls, refinement, words):
     from software_float_profile import ROM_SHA256
+    import action_slot_predicate as predicate
+    if address == predicate.OWNER:
+        return predicate.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     import battle_action_value as battle
     import positioned_equipment_chance as chance
     import equipment_selection_list as selection

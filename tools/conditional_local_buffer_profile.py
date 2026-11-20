@@ -48,10 +48,11 @@ SCHEDULER_ENTRY_BRANCH = 'conditional-scheduler-entry-branch-descriptor-calls-v1
 SCHEDULER_MANAGER_FIELD = 'conditional-scheduler-indirect-manager-v1'
 SCHEDULER_MANAGER_OFFSET = 'conditional-scheduler-manager-offset-v1'
 SCHEDULER_MANAGER_PATHS = 'conditional-scheduler-manager-paths-v1'
+PARTY_EFFECT = 'conditional-party-effect-scheduler-v1'
 PANEL_TRANSFER = 'conditional-panel-transfer-scheduler-callbacks-v1'
 SCHEDULER_CALL_SITES = 'conditional-scheduler-call-site-summaries-v1'
 SCHEDULER_CALL_SITES_V2 = 'conditional-scheduler-call-site-summaries-v2'
-CALL_SITE_POLICIES = (PANEL_TRANSFER, SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR, menu_palette.SELECTOR, effect_registry.SELECTOR)
+CALL_SITE_POLICIES = (PARTY_EFFECT, PANEL_TRANSFER, SCHEDULER_CALL_SITES, SCHEDULER_CALL_SITES_V2, scene_fill.SELECTOR, effect_init.SELECTOR, menu_palette.SELECTOR, effect_registry.SELECTOR)
 PAYLOAD_FIELDS = {SCHEDULER_PAYLOAD: 4, SCHEDULER_PAYLOAD8: 8, SCHEDULER_HALFWORD_PAYLOAD: 4, SCHEDULER_TWO_PAYLOAD: (4, 8), SCHEDULER_LIVE_ALIAS_PAYLOAD: 4, SCHEDULER_EVENT: 4}
 STATE = 'conditional-local-state-iterator-v1'
 FLAGGED_STATE = 'conditional-flagged-local-state-iterator-v1'
@@ -93,6 +94,7 @@ SCHEMAS = {
     'conditional-script-task-traversal-v1': 'elf-symbol-thumb-conditional-script-task-traversal-v1',
     'conditional-transfer-task-construction-v1': 'elf-symbol-thumb-conditional-transfer-task-construction-v1',
     'conditional-transfer-tree-destruction-v1': 'elf-symbol-thumb-conditional-transfer-tree-destruction-v1',
+    PARTY_EFFECT: 'elf-symbol-thumb-' + PARTY_EFFECT,
     PANEL_TRANSFER: 'elf-symbol-thumb-' + PANEL_TRANSFER,
     SCHEDULER_CALL_SITES: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES,
     SCHEDULER_CALL_SITES_V2: 'elf-symbol-thumb-' + SCHEDULER_CALL_SITES_V2,
@@ -242,6 +244,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
                 self.scheduler_call_sites = call_sites.bind(data, address, ins, edges, scheduler_calls)
             if self.policy == scene_fill.SELECTOR:
                 scene_fill.bind(self, data, address, edges, calls)
+            if self.policy == PARTY_EFFECT:
+                import party_effect_scheduler as party
+                party.bind(self, data, address, ins, edges, calls)
             call_sites.bind_forwarding(self, edges)
             dependencies = tuple(self.scheduler_call_sites['dependencies'])
             runtime_names = call_sites.RUNTIME_NAMES
@@ -386,6 +391,17 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             return descriptor.check_call(self, address, aliases, stack, slots, constants, site)
         if self.policy in CALL_SITE_POLICIES:
             import scheduler_call_site_profile as call_sites
+            if self.policy == PARTY_EFFECT:
+                import party_effect_scheduler as party
+                result = party.check_special(self, address, aliases, stack, slots, constants or {}, site)
+                if result is not None:
+                    return result
+                frame_mode, budget = self.callee_frames, self.exact_alias_state_budget
+                self.callee_frames, self.exact_alias_state_budget = False, None
+                try:
+                    return super().check_call(address, aliases, stack, slots, constants=constants, site=site, words=words)
+                finally:
+                    self.callee_frames, self.exact_alias_state_budget = frame_mode, budget
             if self.policy == PANEL_TRANSFER and thunk.reserved(address):
                 import panel_transfer_callbacks as panel
                 return panel.check_call(self, site, address, aliases, slots)
@@ -531,6 +547,9 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             if self.policy == effect_registry.SELECTOR:
                 return effect_registry.manifest(self)
             scheduler = call_sites.manifest(self)
+            if self.policy == PARTY_EFFECT:
+                import party_effect_scheduler as party
+                return party.finish(self, scheduler)
             if self.policy == PANEL_TRANSFER:
                 import panel_transfer_callbacks as panel
                 return panel.finish(self, scheduler)
