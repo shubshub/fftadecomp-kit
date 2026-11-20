@@ -1,6 +1,5 @@
 """Two-stage battle movement overlay with an original caller and finite board scan."""
 from hashlib import sha256
-from pathlib import Path
 import struct
 
 import known_query_stack_buffer_profile as quotient
@@ -11,14 +10,14 @@ import plausible
 from ability_range_local_bytes import block, require
 from active_entry_shuffle_profile import compiler_symbol_roles
 from known_query_native_closure_profile import environment_fingerprint
-from sdk_cpuset_halfword import TOKEN, base_header
 from software_double_profile import indices, span_record
 from software_float_profile import ROM_SHA256
 from unit_equipment_attribute import ops, word
 
 OWNER, END = 0x08098A88, 0x08098BAE
 SOURCE = 'src/08098A88.c'
-SOURCE_TOKENS = '088eb32f1e818a89bd903b560408a927e23c82fecc565f9e9555d9bc61125d88'
+SOURCE_TOKENS = '7cbc020be28fbd7e90bccbd5bcf60ade317e23adcf611c2332640800d46bc1c5'
+LEGACY_TOKENS = '088eb32f1e818a89bd903b560408a927e23c82fecc565f9e9555d9bc61125d88'
 READY, DISPLAY, SETUP = 0x08149368, 0x0801D8B8, 0x0801D938
 MOVEMENT, DIV, MARK, SHOW = 0x080CA3EC, 0x08142AB0, 0x0801D624, 0x0801D918
 UNIT_RANGE, DRAW, QUADRANT = 0x080CA394, 0x0801D130, 0x0801CF10
@@ -43,15 +42,7 @@ def bindings():
 
 
 def check_source(root, address):
-    root = Path(root)
-    source = root / SOURCE
-    text = source.read_text()
-    require(address == OWNER and plausible.include_closure(root, source) == ({SOURCE, 'include/ffta.h'}, [])
-            and base_header((root/'include/ffta.h').read_bytes(), ('func_08098A88',))
-            and not any(fragment in text for fragment in (chr(92), '??', '%:', chr(0))),
-            'movement overlay requires its ordinary C source')
-    tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
-    require(sha256(tokens.encode()).hexdigest() == SOURCE_TOKENS, 'movement overlay C types or state machine differ')
+    path.check_movement_source(root, address, OWNER, SOURCE, SOURCE_TOKENS, LEGACY_TOKENS)
 
 
 def check_original(image, address, roles, targets):
@@ -87,7 +78,7 @@ def board_scan(ins):
           'bge #0x8098ae6', 'ldr r0, [sp, #0x10]', 'cmp r0, #0xf', 'ble #0x8098ad0')
 
 
-def eligibility_result(rom, mapping):
+def eligibility_result(rom, mapping, *, caller_test=0x08098B08):
     import owner_admission_profile as owner
 
     start, end = path.ELIGIBLE, path.EXTENTS[path.ELIGIBLE]
@@ -104,7 +95,7 @@ def eligibility_result(rom, mapping):
     require({site for site, successors in edges.items() if not successors} == {ret}
             and entries == {(true, true+2), (false, restore)},
             'eligibility result requires a full-word 0 or 1 on every return')
-    return dict(callee=start, returns=[ret], definitions=[[true, 1], [false, 0]], caller_test=0x08098B08)
+    return dict(callee=start, returns=[ret], definitions=[[true, 1], [false, 0]], caller_test=caller_test)
 
 
 def display_setup(rom, mapping, index):

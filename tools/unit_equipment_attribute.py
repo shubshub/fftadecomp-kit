@@ -49,12 +49,14 @@ def bindings(calls=CALLS):
 def check_original(image, address, original, targets):
     from active_entry_shuffle_profile import compiler_symbol_roles
     import battle_action_value as battle
+    import positioned_equipment_chance as chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     if address == dispatch.OWNER:
         dispatch.check_original(image, original, targets)
         return
-    calls = {OWNER: CALLS, battle.OWNER: battle.CALLS, guard.OWNER: guard.CALLS}.get(address)
+    calls = {OWNER: CALLS, battle.OWNER: battle.CALLS, guard.OWNER: guard.CALLS,
+             chance.OWNER: chance.CALLS}.get(address)
     require(calls is not None, 'unexpected equipment owner')
     expected = bindings(calls)
     expected_targets = {f'func_{target:08X}': (target, False) for target in calls.values()}
@@ -72,6 +74,7 @@ def check_source(root, address):
     import plausible
     root = Path(root)
     import battle_action_value as battle
+    import positioned_equipment_chance as chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     name = f'func_{address:08X}'
@@ -87,15 +90,25 @@ def check_source(root, address):
         tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(header)))
         require(sha256(tokens.encode()).hexdigest() == dispatch.HEADER_HASH,
                 'battle dispatch callback declarations or state layout differ')
-    require(address in (OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER) and plausible.include_closure(root, source) ==
+    reserved = (name,)
+    if address == chance.OWNER:
+        headers.add(chance.HEADER_PATH)
+        header = (root / chance.HEADER_PATH).read_text()
+        require(not any(marker in header for marker in (chr(92), '??', '%:', chr(0))),
+                'unexpected positioned equipment header syntax')
+        tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(header)))
+        require(sha256(tokens.encode()).hexdigest() == chance.HEADER_HASH,
+                'positioned equipment unit fields or helper declarations differ')
+        reserved += ('Unit', 'positioned_chance', 'func_0812EF94', *(f'func_{target:08X}' for target in chance.CALLS.values()))
+    require(address in (OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER) and plausible.include_closure(root, source) ==
             (headers, []) and
-            base_header((root/'include/ffta.h').read_bytes(), (name,)) and
+            base_header((root/'include/ffta.h').read_bytes(), reserved) and
             not any(s in text for s in (chr(92), '??', '%:', chr(0))),
             'equipment owner requires its reviewed C types and local array')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
     expected = {OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
                 battle.OWNER: battle.SOURCE_HASH, guard.OWNER: guard.SOURCE_HASH,
-                dispatch.OWNER: dispatch.SOURCE_HASH}[address]
+                dispatch.OWNER: dispatch.SOURCE_HASH, chance.OWNER: chance.SOURCE_HASH}[address]
     require(sha256(tokens.encode()).hexdigest() == expected,
             'equipment declarations, local array, or reviewed arithmetic differ')
 
@@ -256,8 +269,11 @@ def scene_rows(rom):
 def prove(data, address, rom, mapping, index, objects, original, ins, calls, refinement, words):
     from software_float_profile import ROM_SHA256
     import battle_action_value as battle
+    import positioned_equipment_chance as chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
+    if address == chance.OWNER:
+        return chance.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == dispatch.OWNER:
         return dispatch.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == guard.OWNER:

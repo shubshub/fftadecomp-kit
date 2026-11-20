@@ -22,7 +22,8 @@ COPY_SLOT, COPY_ENTRY = 0x0836D4BC, 0x03005EE8
 FIRST, LAST, CAPACITY = 0x03006108, 0x03006164, 24
 CALLS = {38: VALID, 68: ITERATOR, 90: PATH, 138: ELIGIBLE, 166: ITERATOR}
 SOURCE = 'src/080989AC.c'
-SOURCE_TOKENS = 'a919efd2e63e95ec62f81bbfee9034c668b133a7437466fc4ca4bea7776b5c4b'
+SOURCE_TOKENS = 'e8c9d832f2060486bd7f55c8e654dcc019813a0b482fc3881bf1e7c2ebb6df6f'
+LEGACY_TOKENS = 'a919efd2e63e95ec62f81bbfee9034c668b133a7437466fc4ca4bea7776b5c4b'
 
 # Exact indexed Thumb boundaries in the authenticated USA ROM. The owner count
 # is also derived independently from the reached graph in prove().
@@ -49,16 +50,35 @@ def check_original(image, address, roles, targets):
             'movement path helper reference has a size')
 
 
-def check_source(root, address):
+MOVEMENT_HEADERS = {
+    'include/object_list.h': '5caf34cfd3339b501feb0c13cfd494c0f68248e81bd3a15987fafab1d54e977e',
+    'include/movement_tile.h': 'b07f3451fa87a09621c2043c1b5feacf3c5c54d71700020482d3f49177eab2a8',
+}
+
+
+def check_movement_source(root, address, owner, source, shared_tokens, legacy_tokens=None):
     root = Path(root)
-    source = root / SOURCE
-    text = source.read_text()
-    require(address == OWNER and plausible.include_closure(root, source) == ({SOURCE, 'include/ffta.h'}, [])
-            and base_header((root/'include/ffta.h').read_bytes(), ('func_080989AC',))
-            and not any(fragment in text for fragment in (chr(92), '??', '%:', chr(0))),
-            'movement path requires its reviewed declarations and ordinary header')
+    path = root / source
+    text = path.read_text()
+    paths, errors = plausible.include_closure(root, path)
+    require(address == owner and not errors
+            and base_header((root / 'include/ffta.h').read_bytes(), (f'func_{owner:08X}',))
+            and not any(marker in text for marker in (chr(92), '??', '%:', chr(0))),
+            'movement source or base header differs')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
-    require(sha256(tokens.encode()).hexdigest() == SOURCE_TOKENS, 'movement path source layout or traversal differs')
+    digest = sha256(tokens.encode()).hexdigest()
+    ordinary = {source, 'include/ffta.h'}
+    if legacy_tokens is not None and paths == ordinary:
+        require(digest == legacy_tokens, 'movement source differs from its reviewed predecessor')
+        return
+    require(paths == ordinary | set(MOVEMENT_HEADERS) and digest == shared_tokens
+            and all(sha256((root / name).read_bytes()).hexdigest() == expected
+                    for name, expected in MOVEMENT_HEADERS.items()),
+            'movement source or shared tile declarations differ')
+
+
+def check_source(root, address):
+    check_movement_source(root, address, OWNER, SOURCE, SOURCE_TOKENS, LEGACY_TOKENS)
 
 
 def tile_search(rom, ins):

@@ -73,9 +73,11 @@ class OwnerSwitch:
         import analyze
         import match
         import owner_graph_profile as graph
-        require(type(proof) is match.BufferCallProof and proof.stack_arguments is True and
-                proof.switch_callees is not None and proof.owner_switch is None,
-                'owner switch requires the default plain stack-argument buffer proof')
+        from stack_index_precondition_profile import StackIndexV2BufferProof
+        plain = type(proof) is match.BufferCallProof and proof.switch_callees is not None
+        indexed_leaf = type(proof) is StackIndexV2BufferProof and not calls
+        require((plain or indexed_leaf) and proof.stack_arguments is True and proof.owner_switch is None,
+                'owner switch requires the default plain stack-argument buffer proof or a bounded-index leaf')
         data = bytes(data)
         refinement = analyze.refine_function(data, address, json.loads(json.dumps(proof.entries)),
             max_bytes=len(data), max_instructions=len(data) // 2, rom_end=0x09000000,
@@ -89,6 +91,13 @@ class OwnerSwitch:
                 'owner switch differs from its linked relocations')
         layout = {key: value for key, value in switches[0].items() if key != 'schema'}
         transfer = address + layout['dispatch'] + 8
+        if indexed_leaf:
+            partition = graph.partition(data, address, refinement, instructions, words)
+            for word in partition['words']:
+                if word['switch_word']:
+                    expected = [transfer - 6] if word['address'] == address + layout['literal'] else []
+                    require(word['load_sites'] == expected,
+                            'bounded-index leaf switch words may only feed the canonical dispatch')
         self.key = (data, address, dict(actual), dict(words))
         self.instructions = frozenset(instructions)
         self.record = dict(policy=POLICY, address=address, end=address + len(data), bytes=len(data),
@@ -129,6 +138,10 @@ def walk(proof, data, address, calls, linked):
     import match
     owner = OwnerSwitch(proof, data, address, calls, linked)
     proof.owner_switch = owner
+    if proof.index_policy is not None:
+        proof.index_policy.owner_switch = owner
+        from named_data_buffer_profile import RootReturnScratchMixin
+        RootReturnScratchMixin.bind_return_root(proof, address, data, indexed_leaf=owner)
     _, _, calls, words = owner.key
     instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
                                                   switch_relocations=words)

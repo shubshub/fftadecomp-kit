@@ -1751,6 +1751,14 @@ callback and checks the installed copy image for each supported byte count.
 Set `FFTA_MOVEMENT_PATH_ROOT` to a USA checkout containing the C source to run
 `tests/test_movement_path_prefix.py`.
 
+The tile query at `08099FB0` uses
+`--owner-runtime-profile conditional-movement-tile-stop-v1`. It divides
+movement by ten, checks whether the actor can reach the tile, then walks the
+object list. An empty tile or one already occupied by the actor is accepted.
+The report checks the callback address against the ROM and the field offsets
+against the shared C declarations. Run `tests/test_movement_tile_stop.py`
+with `FFTA_MOVEMENT_TILE_ROOT` pointing to the recovered game checkout.
+
 The movement overlay at `08098A88` uses
 `--owner-runtime-profile conditional-movement-overlay-v1`. It gates setup
 and scanning on grid and display readiness. Its second phase checks all 256
@@ -1774,6 +1782,14 @@ the same 20 words that the producer initialized. The selected indices must be in
 Valid external heap objects, entries that survive the free, and a writable menu
 destination remain runtime conditions. Set `FFTA_UNIT_OUTPUT_ROOT` to the indexed
 USA game checkout to run `tests/test_unit_entry_output.py`.
+
+The decimal formatter at `080142DC` uses
+`--owner-runtime-profile bounded-buffer-datafree-caller-v1`. The game formats
+a 16-bit number into six characters and converts them to two-byte glyphs.
+Its aligned length routine reads two words, including one byte beyond the
+terminator whose value does not affect the result. The caller supplies room
+for two bytes per output column and the terminator. Set
+`FFTA_DECIMAL_FIELD_ROOT` to run `tests/test_decimal_field.py`.
 
 The 176-byte equipment attribute routine at `0812F5E0` uses
 `--owner-runtime-profile conditional-unit-equipment-attribute-v1`. Its caller
@@ -1802,6 +1818,14 @@ Set `FFTA_BATTLE_ACTION_ROOT` to the indexed USA checkout with the saved
 report to run `tests/test_battle_action_value.py`. Both original AI callers
 execute on map 0, loaded from its three original ROM resources. They observe
 the actor initialization, range output, item arguments and returned score.
+
+The 130-byte position-dependent chance calculation at `0812C8DC` takes the
+first selected item and the signed coordinates of both units. If the
+evaluator returns a nonzero result and the target's flag is set, it returns
+100. The verifier checks all 12 direct calls in ten indexed functions. Each
+call retains the same two-item precondition after changes to a unit's
+equipment. Set `FFTA_POSITIONED_CHANCE_ROOT` to run
+`tests/test_positioned_equipment_chance.py`.
 
 The equipment profile also covers the 192-byte eligibility predicate at
 `080C48A4`. Its signed halfword temporary receives the collector count
@@ -2366,6 +2390,13 @@ report relabelled as v1 fails replay.
 ```sh
 python tools/match.py --root ../fftadecomp 0x080DE9E0 --owner-runtime-profile named-data-buffer-stack-index-v2
 ```
+
+At `080268DC`, a nine-case switch selects up to three unit-template slots
+before a loop reads them. The verifier checks the switch targets against the
+linked jump table and follows all nine cases plus the default. The loop index
+must stay within initialized bytes on every incoming path. This leaf needs
+no caller-supplied index bound. Run `tests/test_stack_index_owner_switch.py`
+for the switch and stack-read regression cases.
 
 **Forwarded stack arguments.** The coordinate wrappers `func_080DBD78`,
 `func_080DBDA0` and `func_080DBDC8` take the owner's local `s16` outputs and
