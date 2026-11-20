@@ -77,6 +77,10 @@ symbolically along every path, and the check requires
      identical ordered provenance in both compiles. Only copies, the update
      and the store's own dead insertion read may follow; no unrelated value,
      address or flag use is allowed (forwarded_constant_update);
+   * a tested update re-read, `if (sym.x < N) sym.x++;`: the member read
+     again after its test, with nothing between that could write it, for
+     one immediate `add`/`sub` stored back to it (volatile_tested_update,
+     which prints its premise in the record);
    * a counterpart of the stripped compile's loads of the object, matched
      in order with the same address and width;
 4. every access overlapping a pinned member to be exactly that member: its
@@ -123,12 +127,12 @@ which can admit it only by a proof over every iteration of its loops.
 
 Known limits (false refusals, never false acceptance of a qualifier
 effect): reading a pinned member twice where an ordinary declaration would
-reuse the first value (`if (x) ...; if (x) ...`) is refused, as are loops
-whose exit depends on unknown values that the induction cannot prove,
-stripped compiles that legally reorder accesses around a pinned one, and
-equivalent code that the expression normaliser cannot prove equal.  For
-halfword members that includes a narrow read (`(u8)sym.h`, `sym.h &
-0xFF`), which the stripped compile narrows to an
+reuse the first value (`if (x) ...; if (x) ...`) is refused, except for the
+tested update above.  So are loops whose exit depends on unknown values that
+the induction cannot prove, stripped compiles that legally reorder accesses
+around a pinned one, and equivalent code that the expression normaliser
+cannot prove equal.  For halfword members that includes a narrow read
+(`(u8)sym.h`, `sym.h & 0xFF`), which the stripped compile narrows to an
 `ldrb` of the low byte that the overlap rule refuses; a signed read
 (`(s16)sym.h`), whose `lsl`/`asr` the normaliser does not equate with the
 other compile's sign extension; and the mixed chain `sym.h = (sym.b = a)`,
@@ -2635,6 +2639,9 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
 
+    import volatile_tested_update as tested_update
+    tested = set()          # loads explained by volatile_tested_update
+
     def where(address):
         offset = object_offset(address, symbol, size)
         return f"{symbol}+{offset:#x}" if offset is not None else show(address)
@@ -2658,6 +2665,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 2. classify every load of the object in the real compile
         counterparts, explained_stores = [], set()
         classified_dead_reads = set()
+        candidates = set()      # volatile_tested_update: skipped only where the stripped compile lacks them
         for position, record in enumerate(records):
             if record.kind == "loop":
                 # volatile_loop_induction (kit#137): the code after a loop cut runs once per
@@ -2719,6 +2727,11 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         lambda address: object_offset(address, symbol, size) is None):
                     ordinary.add(record.index)
                     continue
+                # not under a caller's own trace pairing (the overwritten-store composition),
+                # whose record would not print the rule's premise
+                if _ordered_trace_check is None and \
+                        tested_update.tested_update_reread(records, position, pinned_width):
+                    candidates.add(id(record))
             counterparts.append((record.width, record.signed, where(record.address), record))
         # 3. every store to a pinned member carries its read-modify-write load
         for position, record in enumerate(records):
@@ -2767,10 +2780,17 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the real and stripped compiles differ in observable "
                                 f"behaviour (path {number}, event {index + 1}: real "
                                 f"{show_event(mine)}, stripped {show_event(theirs)})")
-        theirs = [LOOP_CUT if r.kind == "loop" else (r.width, r.signed, where(r.address))
-                  for r in other.records
-                  if r.kind == "loop" or r.kind == "load" and object_offset(r.address, symbol, size) is not None]
+        loads = [r for r in other.records
+                 if r.kind == "loop" or r.kind == "load" and object_offset(r.address, symbol, size) is not None]
+        theirs = [LOOP_CUT if r.kind == "loop" else (r.width, r.signed, where(r.address)) for r in loads]
         mine = [entry[:3] for entry in counterparts]
+        skipped = None
+        if mine != theirs:
+            skipped = tested_update.explained(counterparts, theirs, [getattr(r, "value", None) for r in loads],
+                                              candidates)
+        if skipped:
+            tested |= {entry[3].index for entry in counterparts if id(entry[3]) in skipped}
+            mine = [entry[:3] for entry in counterparts if id(entry[3]) not in skipped]
         if mine != theirs:
             index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b), min(len(mine), len(theirs)))
             if index < len(mine) and mine[index] == LOOP_CUT and \
@@ -2785,6 +2805,10 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    if tested:
+        # tagged, so record() finds it after whatever optional parts precede it
+        return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
+                         tested_update.Rereads(sorted(tested)))
     if indirect:
         return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect))
     if conditional:
@@ -2983,9 +3007,12 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
 def record(symbol, results, perturbed=False):
     """the report record for a passed semantic check"""
     parts = []
+    import volatile_tested_update as tested_update
     for name, paths, read_modify_write, chained, *extra in results:
         loops = next((part for part in extra if getattr(part, "loop_induction", False)), None)
         extra = [part for part in extra if not getattr(part, "loop_induction", False)]
+        tested = next((part for part in extra if isinstance(part, tested_update.Rereads)), [])
+        extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
         unloaded, relied, updates, ordinary, conditional, indirect = (extra + [[], [], [], [], [], []])[:6]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -2995,6 +3022,8 @@ def record(symbol, results, perturbed=False):
                      (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
                      (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
+                     (f", tested-update re-reads at {list(n + 1 for n in tested)} "
+                      f"({tested_update.NAME}, premise: {tested_update.POLICY.premise})" if tested else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
                      (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
