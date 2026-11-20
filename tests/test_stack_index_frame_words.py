@@ -843,5 +843,88 @@ class CalleeReachTests(unittest.TestCase):
             self.reach({}, address=CALLEE)
 
 
+class ShadowedRefusalTests(unittest.TestCase):
+    """Three refusals that another check shadows for the owners the core hands to the analysis.
+    The analysis is run alone, with deferred spills, ROM copies and returned aliases given directly.
+
+    The owner is push {r4,lr}; sub sp,#8; <body>; movs r0,#0; add sp,#8; pop {r4}; pop {r1};
+    bx r1, so sp+k is entry_SP + k - 16.  Its body starts at OWNER + 4, and CALLEE is `bx lr`."""
+
+    def analyse(self, *body, spills=(), copies=None, returned=None):
+        code = (0xB510, 0xB082) + body + (0x2000, 0xB002, 0xBC10, 0xBC02, 0x4708)
+        reach = fw.CalleeReach(lambda target: struct.pack('<H', 0x4770), fw.POLICY.swis)
+        analysis = fw.FrameWordsAnalysis(assemble(OWNER, code), OWNER, set(), set(), copies or {},
+                                         spills=frozenset(spills), reach=reach, returned=returned)
+        analysis.run()
+        return analysis.frame_words_evidence()
+
+    def test_exact_address_stored_where_the_core_did_not_defer_refuses(self):
+        """No owner is known to reach this refusal through `owner.verify`.  The core defers every
+        `str Rd,[sp,#k]` of a stack alias, so that site is always in ``spills``, and it refuses
+        the same store through an alias register ("stack aliases cannot be stored or spilled")."""
+        message = 'exact stack address stored to a local word the core did not defer'
+        spill, site = (0x4668, 0x9001), OWNER + 6          # mov r0,sp; str r0,[sp,#4]
+        cases = {'sp': spill,
+                 'alias': (0x4668, 0x4669, 0x6048)}        # mov r0,sp; mov r1,sp; str r0,[r1,#4]
+        for name, body in cases.items():
+            with self.subTest(name), self.assertRaisesRegex(sip.Refusal, message):
+                self.analyse(*body)
+        # At a site the core deferred, the SP store makes the pointer word.
+        found = self.analyse(*spill, spills={site})
+        self.assertEqual((found['pointer_words'], found['spills']), ([-12], [site]))
+        # A deferred site does not cover another one: str r0,[sp,#0] follows it.
+        with self.assertRaisesRegex(sip.Refusal, message):
+            self.analyse(*spill, 0x9000, spills={site})
+
+    def test_stack_address_stored_through_a_possible_address_refuses(self):
+        """Reached through `owner.verify`, with a spill deferred, only by values the inherited check
+        refuses too, under another message: a variable address (the last owner below) or a reloaded
+        pointer word.  The core refuses an exact or a possible address stored this way ("stack
+        aliases cannot be stored or spilled")."""
+        message = 'stack address stored through a possible stack address'
+        # The call leaves R0 = sp+0, or no address.
+        returned = {OWNER + 4: {0: frozenset({-16})}}
+        cases = {'exact': (0x4669, 0x6001),                # mov r1,sp; str r1,[r0]
+                 'possible': (0x6000,),                    # str r0,[r0]
+                 # mov r1,sp; movs r2,#0; stmia r0!,{r1,r2}: one address among the stored values
+                 'block': (0x4669, 0x2200, 0xC006)}
+        for name, store in cases.items():
+            with self.subTest(name), self.assertRaisesRegex(sip.Refusal, message):
+                self.analyse(CALLEE, *store, returned=returned)
+        # Scalars go through the same address, by either store (movs r1,#0 first).
+        self.analyse(CALLEE, 0x2100, 0x6001, returned=returned)
+        self.analyse(CALLEE, 0x2100, 0x2200, 0xC006, returned=returned)
+        # adds r5,r0,#0; mov r1,sp; adds r1,r1,r4; str r1,[r5,#4] stores a variable address through
+        # a returned alias.  FORCE defers a spill, so the plain analysis is not run first.
+        body = FrameWordTests.RETURNED + (0x1C05, 0x4669, 0x1909, 0x6069) + ACCESS
+        with self.assertRaisesRegex(sip.Refusal, message):
+            admit(frame_owner(FORCE + body), **callee(0x4770))
+        with self.assertRaisesRegex(sip.Refusal, 'ranged stack address escapes to memory'):
+            admit(frame_owner(body), **callee(0x4770))
+
+    def test_rom_copy_over_a_pointer_word_refuses(self):
+        """No owner reaches this refusal through `owner.verify`.  A copy helper reads R0, its
+        destination, and a callee that reads a register holding a stack address either refuses
+        ("receives a stack address") or has every tracked word forgotten before the copy is
+        checked.  The refusal fires only for a callee whose walk reports R0 unread: here `bx lr`,
+        which the core would not take for a copy helper."""
+        message = 'ROM copy destination overlaps a pointer-bearing local word'
+        spill, call = OWNER + 6, OWNER + 8
+
+        def copy(store, destination, count):
+            # mov r0,sp; <str r0 to a local word>; bl callee, a ROM copy of ``count`` bytes
+            return self.analyse(0x4668, store, CALLEE, spills={spill},
+                                copies={call: (destination, count)})
+        # Five bytes to sp+0 reach the word at sp+4 by their last byte, and the one at sp+0 by
+        # their first.
+        for store in (0x9001, 0x9000):
+            with self.subTest(store=hex(store)), self.assertRaisesRegex(sip.Refusal, message):
+                copy(store, -16, 5)
+        # Four bytes end where the word at sp+4 begins, or begin where the one at sp+0 ends.
+        found = copy(0x9001, -16, 4)
+        self.assertEqual((found['pointer_words'], found['calls']), ([-12], [[call, CALLEE, 0, [], []]]))
+        self.assertEqual(copy(0x9000, -12, 4)['pointer_words'], [-16])
+
+
 if __name__ == '__main__':
     unittest.main()
