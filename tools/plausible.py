@@ -1720,6 +1720,10 @@ MARKER_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 # need not import match.py, and with it every profile module, except on
 # Windows; a test keeps the two equal.
 CENSUS_CPP = "cpp"
+# The preprocessor options of the census and of both compiles match.py runs
+# for a report, match.compile_object and switch_placement.compile_object: one
+# string, so an option added to a compile reaches the census too.
+CPP_OPTIONS = "-nostdinc -undef -I include"
 
 
 # the marker of a qualifier the hardware exception admits (kit#357): its own,
@@ -1907,7 +1911,7 @@ def volatile_census(address, linted):
     if not hinted:
         return []
     try:
-        command = f"{CENSUS_CPP} -nostdinc -undef -I include {shlex.quote(relative)}"
+        command = f"{CENSUS_CPP} {CPP_OPTIONS} {shlex.quote(relative)}"
         base = tree.resolve()
         (base / "build").mkdir(exist_ok=True)
         # inside the tree, like match.py's own workspaces, so a WSL runner reaches it too

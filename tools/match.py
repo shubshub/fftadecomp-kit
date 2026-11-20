@@ -275,7 +275,7 @@ def compile_object(runner, workspace, args, root, address, source, thumb=True, r
     if oam_prefix:
         import oam_list_context as oam
         includes = oam.prefix_options(address, source, oam_prefix)
-    runner.sh(f"{environment}{args.cpp} -nostdinc -undef -I include {includes}{shlex.quote(source)} "
+    runner.sh(f"{environment}{args.cpp} {plausibility.CPP_OPTIONS} {includes}{shlex.quote(source)} "
               f"-o {temporary}/f.i")
     preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
     if oam_prefix:

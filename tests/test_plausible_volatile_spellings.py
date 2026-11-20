@@ -959,5 +959,85 @@ class ProvenanceShapeTests(unittest.TestCase):
 
 
 
+class SharedCppOptionsTests(CensusTree, unittest.TestCase):
+    """every compile match.py runs for a report preprocesses with the census's options (plausible.CPP_OPTIONS)"""
+    SOURCE = "src/08000000.c"
+    OAM_OWNER = 0x08001244
+    # the ordered OAM list context reads its predecessors first, the census does not: the one known difference
+    OAM_INCLUDES = {(0x0800105C, 0x08001194): "-include src/0800105C.c -include src/08001194.c ",
+                    (0x08001194,): "-include src/08001194.c "}
+
+    class Stop(Exception):
+        pass
+
+    def first_command(self, compile_object, address, source, **options):
+        """the first command compile_object hands its runner, without TMPDIR and the output"""
+        import match
+        commands = []
+
+        def sh(command):
+            commands.append(command)
+            raise self.Stop
+
+        with self.assertRaises(self.Stop):
+            compile_object(mock.Mock(sh=sh), "build/work", mock.Mock(cpp=match.DEFAULT_CPP), self.tree,
+                           address, source, **options)
+        self.assertEqual(len(commands), 1)
+        prefix, suffix = "export TMPDIR=build/work; ", " -o build/work/f.i"
+        self.assertTrue(commands[0].startswith(prefix) and commands[0].endswith(suffix), commands)
+        return commands[0][len(prefix):-len(suffix)]
+
+    def compile_commands(self):
+        """{context: (address, cpp command)} for every compile of a report, less the OAM -include options"""
+        import match
+        import switch_placement
+        commands = {}
+        for thumb in (True, False):
+            commands[f"match.compile_object thumb={thumb}"] = (
+                self.ADDRESS, self.first_command(match.compile_object, self.ADDRESS, self.SOURCE, thumb=thumb))
+        commands["switch_placement.compile_object"] = (
+            self.ADDRESS, self.first_command(switch_placement.compile_object, self.ADDRESS, self.SOURCE))
+        for prefix, includes in self.OAM_INCLUDES.items():
+            command = self.first_command(match.compile_object, self.OAM_OWNER, f"src/{self.OAM_OWNER:08X}.c",
+                                         oam_prefix=prefix)
+            before, found, after = command.partition(includes)
+            self.assertEqual(found, includes, command)
+            label = " ".join(f"{member:08X}" for member in prefix)
+            commands[f"match.compile_object oam_prefix={label}"] = (self.OAM_OWNER, before + after)
+        return commands
+
+    def census_command(self, address):
+        """the preprocessor command the census runs on the addressed source, without the output"""
+        self.write('#include "ffta.h"\nextern volatile u8 x;\n', name=f"{address:08X}.c")
+        commands = []
+
+        def run(command, root):
+            commands.append(command)
+            raise RuntimeError("stopped before cpp")
+
+        with mock.patch.object(plausible, "census_run", side_effect=run):
+            found = [message for _, _, message in plausible.volatile_census(address, self.linted())]
+        self.assertTrue(any("could not preprocess" in message for message in found), found)
+        self.assertEqual(len(commands), 1)
+        command, output = commands[0].rsplit(" -o ", 1)
+        self.assertRegex(output, r"\Abuild/ffta_census_[^/ ]+/real\.i\Z")
+        return command
+
+    def test_every_compile_and_the_census_run_the_same_command(self):
+        for context, (address, command) in self.compile_commands().items():
+            with self.subTest(context=context):
+                self.assertEqual(command, f"cpp -nostdinc -undef -I include src/{address:08X}.c")
+                self.assertEqual(self.census_command(address), command)
+
+    def test_an_option_added_to_the_shared_string_reaches_every_command(self):
+        self.compile_commands()  # match.py and switch_placement.py are imported before the string changes
+        options = plausible.CPP_OPTIONS + " -DADDED_OPTION"
+        with mock.patch.object(plausible, "CPP_OPTIONS", options):
+            for context, (address, command) in self.compile_commands().items():
+                with self.subTest(context=context):
+                    self.assertEqual(command, f"cpp {options} src/{address:08X}.c")
+                    self.assertEqual(self.census_command(address), command)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -4139,7 +4139,12 @@ may read (the source, `src/**/*.h`, `include/**`) holds `volatile`, `asm`,
 `##`, `%:`, `??=` or `??/` once backslashes and whitespace are deleted. Its
 scratch files live under the tree's `build/`, like match.py's workspaces. It
 runs `plausible.CENSUS_CPP`, which a test keeps equal to `match.DEFAULT_CPP`,
-from the tree's root. It imports match.py only on Windows, to run through
+from the tree's root, with the options in `plausible.CPP_OPTIONS`, the one
+string both of match.py's compiles (`match.compile_object` and, for the
+switch-constants profiles, `switch_placement.compile_object`) take their
+preprocessor options from; only the ordered OAM list context adds options,
+the `-include` of its predecessors. It imports match.py only on Windows, to
+run through
 `match.Runner` without `wsl_path`, so on WSL `cpp` must be on the login
 `PATH`. Elsewhere the lint never loads match.py's profile modules.
 
