@@ -320,10 +320,11 @@ class AddressedNumericHardwareWordTests(unittest.TestCase):
         return numeric_destination(f, value)
 
     def test_selector_set_is_exactly_the_bios_fill_data_selectors(self):
-        # The MPlayExtender selector is a BIOS fill data selector under its own
-        # name: its saved report records three numeric hardware words.
+        # Two BIOS fill data selectors have names of their own.  The MPlayExtender
+        # selector's saved report records three numeric hardware words; the menu ring
+        # initializer's (#420) reaches no word in the hardware window, so it records none.
         self.assertEqual(set(profile.NUMERIC_HARDWARE_SELECTORS),
-                         set(ADDRESSED_SELECTORS) | {max_lines.SELECTOR})
+                         set(ADDRESSED_SELECTORS) | {max_lines.SELECTOR, profile.MENU_RING_SELECTOR})
         self.assertEqual({selector for selector in profile.SCHEMAS
                           if selector.startswith('addressed-native-bios-fill-') and selector.endswith('-data-v1')},
                          set(ADDRESSED_SELECTORS))
