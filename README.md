@@ -3352,6 +3352,9 @@ Three further rules keep a thunk from becoming an arbitrary jump:
   object address) feed add, sub, shifts and logical operations; a result that
   reaches the ROM range, or any other operation on a constant, becomes tainted,
   and a loop that keeps changing a constant is tainted after sixteen revisits.
+  Only the registers a revisit changes are tainted: an entry whose joined state
+  is unchanged keeps it, except that an exact value arriving at a constant-derived
+  (MIXED) entry counts as a change, since MIXED would drop that value's ROM check.
   A constant combined with a loaded value stays constant-derived.
   `adds/subs rd, rs, #0` (and `movs rd, rs`) are register copies and carry the
   source's state over unchanged. Once a

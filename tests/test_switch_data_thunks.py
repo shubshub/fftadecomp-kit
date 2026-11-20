@@ -514,6 +514,49 @@ class ProofTests(unittest.TestCase):
         # The same literal used as a plain value, never as the thunk register, stays ordinary.
         verify(build(post=(*obj, ('h', 0x041A), ('ldr', 2, 'object'), ('h', 0x6812)), **lit))
 
+    def test_widening_taints_only_the_constants_a_loop_changes(self):
+        # r5 = [&g_right] + 4 is constant-derived (MIXED) and loop-invariant; r1 counts up, so
+        # the loop head passes CONSTANT_BUDGET. Only r1 is widened: a store through r5 (or the
+        # invariant object address in r3) after the loop stays ordinary.
+        def loop(*after):
+            return dict(post=(('ldr', 3, 'object'), ('h', 0x681D), ('h', 0x3504), ('h', 0x681E),
+                              ('h', 0x2100), ('label', 'again'), ('h', 0x3101), ('h', 0x2905),
+                              ('bhi', 'again'), *after, ('ldr', 2, 'object'), ('h', 0x6812)))
+        verify(build(**loop(('h', 0x602E))))  # str r6, [r5]
+        verify(build(**loop(('h', 0x601E), ('h', 0x602E))))  # str r6 through the invariant r3, then r5
+        # The widened counter is still tainted: a store through it refuses (the first, unwidened
+        # pass over the same store passes, so only the widening can refuse it).
+        with self.assertRaisesRegex(ValueError, 'cannot be stored'):
+            leaf(build(**loop(('h', 0x600E))), switch_thunks=PLAIN)  # str r6, [r1]
+        # A register the loop rewrites with a changing constant is widened, whatever it held before.
+        changing = dict(post=(('ldr', 3, 'object'), ('h', 0x681D), ('h', 0x3504), ('h', 0x681E),
+                              ('h', 0x2100), ('label', 'again'), ('h', 0x3101), ('h', 0x1C4D),
+                              ('h', 0x2905), ('bhi', 'again'), ('h', 0x602E),
+                              ('ldr', 2, 'object'), ('h', 0x6812)))  # adds r5, r1, #1 in the loop
+        with self.assertRaisesRegex(ValueError, 'cannot be stored'):
+            leaf(build(**changing), switch_thunks=PLAIN)
+
+    def test_widening_does_not_let_mixed_absorb_an_exact_rom_address(self):
+        # r1 is [&g_right] + 1 (MIXED) on entry and 0x80 from the second pass on, so
+        # (r1 << 20) + k is an exact address inside this caller on every later pass.
+        # The joined state stays MIXED, but the exact value arriving there is a change.
+        def callback(table, count):
+            return dict(post=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x3101), ('h', 0x2000 | count),
+                              ('label', 'again'), ('h', 0x050C), ('h', 0x3400 | table), ('h', 0x2180),
+                              ('h', 0x3801), ('h', 0x2800), ('bhi', 'again'), ('h', 0x6822)))
+        table = build(**callback(0, 1))[1]['table']
+        fixture = build(**callback(table, 20))  # r2 = table[0], a case address, past the budget
+        self.assertEqual(fixture[1]['table'], table)
+        with self.assertRaisesRegex(ValueError, 'local code address'):
+            verify(fixture)
+        # The same loop, counting r2 down from 20, stores r4 = (r1 << 20) + 0x15 on each pass:
+        # from the second pass on that is 0x08000015, an address inside this caller.
+        store = build(tail=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x3101), ('h', 0x2214),
+                            ('label', 'again'), ('h', 0x050C), ('h', 0x3415), ('h', 0x601C),
+                            ('h', 0x2180), ('h', 0x3A01), ('h', 0x2A00), ('bhi', 'again')))
+        with self.assertRaisesRegex(ValueError, 'cannot be stored'):
+            verify(store)
+
     def test_identity_operations_are_moves(self):
         # A call result copied with adds rd, rs, #0, stored, then a callback loaded: no constant contributes.
         def copy_store(copy):
