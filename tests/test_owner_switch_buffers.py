@@ -337,19 +337,11 @@ class OwnerSwitchTests(unittest.TestCase):
             data_buffer.prove(f['data'], A, f['rom'], f['mapping'], objects, calls, literals,
                               index=f['index'], switch_relocations=words)
 
-    def test_every_foreign_line_list_names_the_owner_line(self):
-        # Wherever a report check lists the switch-callee line, it lists the owner-switch line too.
-        import ast
-        tree = ast.parse((ROOT / 'tools/match_evidence.py').read_text())
-        lists = [node for node in ast.walk(tree) if isinstance(node, (ast.Tuple, ast.List, ast.BoolOp))]
-        strings = lambda node: [item.value for item in ast.walk(node)
-                                if isinstance(item, ast.Constant) and isinstance(item.value, str)]
-        named = [node for node in lists if any(value.startswith('* buffer switch callee') for value in strings(node))
-                 and not any(isinstance(child, (ast.Tuple, ast.List, ast.BoolOp)) for child in ast.iter_child_nodes(node))]
-        self.assertGreaterEqual(len(named), 7)
-        for node in named:
-            with self.subTest(line=node.lineno):
-                self.assertTrue(any(value.startswith(owner_switch.LINE) for value in strings(node)))
+    def test_every_foreign_report_check_refuses_the_owner_line(self):
+        # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES, and
+        # one with it compares every such line with the recomputed proof
+        # (test_closed_report_replay.BufferLineTests replays each check).  The owner-switch line is such a line.
+        self.assertTrue(owner_switch.LINE.startswith(evidence.BUFFER_LINES))
         self.assertIn(owner_switch.LINE, data_buffer.FIELDS)
 
 

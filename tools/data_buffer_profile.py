@@ -317,7 +317,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
 
 def report_matches(report, root, address):
     from match import DEFAULT_CC, DEFAULT_FLAGS, uses_stack_frame
-    from match_evidence import (CALL_SUMMARY, STACK_BUFFER_SUMMARY, STACK_SUMMARY, data_snapshot,
+    from match_evidence import (CALL_SUMMARY, STACK_BUFFER_SUMMARY, STACK_SUMMARY, buffer_proof_lines, data_snapshot,
                                 mapping_fingerprint, mapping_snapshot, report_rom_path, source_fingerprint)
     import dma_fill_profile as dma_fill
     lines = report.splitlines()
@@ -395,10 +395,7 @@ def report_matches(report, root, address):
         if not (proved_schema == schema and proved == manifest and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
-                [line for line in lines if key(line) in ("* buffer loop replay", "* buffer copy summary",
-                                                         "* buffer switch callee", "* buffer owner switch")] ==
-                proof.loop_replay_lines() and
-                [line for line in lines if key(line).startswith("* buffer BIOS")] == proof.bios_summary_lines() and
+                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
                                                    functions, objects, proof.fingerprint()) and
                 source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == functions and

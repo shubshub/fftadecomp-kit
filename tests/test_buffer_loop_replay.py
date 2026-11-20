@@ -496,23 +496,14 @@ class BufferLoopReplayTests(unittest.TestCase):
             self.assertEqual(violations, [])
 
     def test_replay_lines_are_refused_when_indented_or_in_other_reports(self):
-        import ast
         proof = self.fixture(counted(4), frame=8)
         (line,) = proof.loop_replay_lines()
         self.assertFalse(self.accepted(self.report_lines(proof, " " + line)))
         self.assertFalse(self.accepted(self.report_lines(proof, line, " " + line)))
         self.assertFalse(self.accepted(self.report_lines(proof, line, "\t* buffer extra: x")))
-        marker = "* buffer loop replay"
-        tree = ast.parse((ROOT / "tools" / "match_evidence.py").read_text())
-        lists = [n for n in ast.walk(tree) if isinstance(n, ast.Tuple)
-                 and any(isinstance(e, ast.Constant) and isinstance(e.value, str)
-                         and e.value.startswith("* buffer proof") for e in n.elts) and len(n.elts) >= 5]
-        self.assertGreaterEqual(len(lists), 5)
-        for node in lists:
-            with self.subTest(line=node.lineno):
-                self.assertTrue(any(isinstance(e, ast.Constant) and isinstance(e.value, str)
-                                    and e.value.startswith(marker) for e in node.elts),
-                                "forbidden-marker list lacks the replay line")
+        # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES
+        # (test_closed_report_replay.BufferLineTests replays each check).  The replay line is such a line.
+        self.assertTrue(line.startswith(evidence.BUFFER_LINES))
 
     def test_pinned_preserving_callee_moves_a_pair_from_trusted_to_proved(self):
         import hashlib

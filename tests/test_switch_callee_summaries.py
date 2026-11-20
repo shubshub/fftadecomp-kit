@@ -372,19 +372,14 @@ class WiringTests(unittest.TestCase):
         self.assertIn('* buffer switch callee', data_buffer.FIELDS)
 
     def test_other_reports_refuse_the_switch_callee_line(self):
-        tree = ast.parse((ROOT / 'tools' / 'match_evidence.py').read_text())
-        lists = [node for node in ast.walk(tree) if isinstance(node, ast.Tuple) and any(
-            isinstance(item, ast.Constant) and isinstance(item.value, str) and
-            item.value.startswith('* buffer loop replay') for item in node.elts)]
-        self.assertGreaterEqual(len(lists), 6)
-        for node in lists:
-            with self.subTest(line=node.lineno):
-                self.assertTrue(any(isinstance(item, ast.Constant) and isinstance(item.value, str) and
-                                    item.value.startswith('* buffer switch callee') for item in node.elts))
-        # The function-buffer report compares the switch callee lines with the recomputed proof.
-        self.assertTrue(any(isinstance(node, ast.Call) and getattr(node.func, 'attr', None) == 'startswith' and
-                            node.args and isinstance(node.args[0], ast.Constant) and
-                            node.args[0].value == '* buffer switch callee' for node in ast.walk(tree)))
+        # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES, and
+        # one with it compares every such line with the recomputed proof
+        # (test_closed_report_replay.BufferLineTests replays each check).  The switch callee line is such a line.
+        tree = ast.parse((ROOT / 'tools' / 'switch_callee_profile.py').read_text())
+        written = [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant) and
+                   isinstance(node.value, str) and node.value.startswith('* ')]
+        self.assertEqual(written, ['* buffer switch callee: `'])
+        self.assertTrue(written[0].startswith(evidence.BUFFER_LINES))
 
     def test_switch_callees_are_never_assigned_outside_the_constructor(self):
         for path in sorted((ROOT / 'tools').glob('*.py')):

@@ -590,15 +590,16 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         self.assertFalse(self.accepted(self.report(proof, lines=[]), stack_arguments=True))
 
     def test_foreign_report_validators_refuse_the_lines(self):
-        tree = ast.parse((ROOT / "tools" / "match_evidence.py").read_text())
-        lists = [node for node in ast.walk(tree) if isinstance(node, ast.Tuple)
-                 and any(isinstance(e, ast.Constant) and isinstance(e.value, str)
-                         and e.value.startswith("* buffer loop replay") for e in node.elts)]
-        self.assertGreaterEqual(len(lists), 6)
-        for node in lists:
-            with self.subTest(line=node.lineno):
-                self.assertTrue(any(isinstance(e, ast.Constant) and e.value == "* buffer BIOS"
-                                    for e in node.elts))
+        # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES, and
+        # one with it compares every such line with the recomputed proof
+        # (test_closed_report_replay.BufferLineTests replays each check).  The three summary lines are such lines.
+        tree = ast.parse((ROOT / "tools" / "bios_wrapper_summary_profile.py").read_text())
+        written = [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant)
+                   and isinstance(node.value, str) and node.value.startswith("* ")]
+        self.assertEqual(len(written), 3)
+        for line in written:
+            with self.subTest(line=line):
+                self.assertTrue(line.startswith(evidence.BUFFER_LINES))
 
     def test_only_the_plain_path_opts_in(self):
         found = []
