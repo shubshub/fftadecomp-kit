@@ -312,5 +312,87 @@ class CountedSchedulerTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
 
 
+def looped_alias_caller(before=(), after=(), *, high_saves=False):
+    """The counted loop over a 32-byte frame: the descriptor at SP, one more private word at SP+28.
+
+    before and after are emitted on each side of the looped scheduler call.
+    """
+    data = bytearray(half(0xb5f0))
+    if high_saves:
+        data += half(0x464f, 0x4646, 0xb4c0)
+    data += half(0xb088, 0x0412, 0x0c16, 0x2500, 0x42b5)    # sub sp, #32; r6 = (u16)r2; r5 = 0; cmp r5, r6
+    guard = len(data)
+    data += half(0xd200, 0x4669, 0x2000, 0x8288, 0x2100, 0x2118, 0xaa00, 0x2300, *before)
+    scheduler = A + len(data)
+    data += bl(scheduler, S) + half(*after, 0x2800)
+    skip = len(data)
+    data += half(0xd000)
+    ordinary = A + len(data)
+    data += bl(ordinary, B)
+    tail = len(data)
+    data += half(0x1c68, 0x0400, 0x0c05, 0x42b5)            # r5 = (u16)(r5 + 1); cmp r5, r6
+    latch = len(data)
+    data += half(0xd300, 0xb008)
+    if high_saves:
+        data += half(0xbc18, 0x4698, 0x46a1)
+    data += half(0xbcf0, 0xbc01, 0x4700)
+    for source, destination in ((guard, latch + 2), (skip, tail), (latch, guard + 2)):
+        data[source] = (destination - source - 4) // 2 & 255
+    return bytes(data), {scheduler: S, ordinary: B}, scheduler
+
+
+class LoopedSiteAliasTests(unittest.TestCase):
+    """The one scheduler site of this selector is inside its loop, and neither it nor its callback is walked."""
+
+    def test_descriptor_alone_at_the_looped_scheduler_site(self):
+        for shape, offset in ((dict(), -52), (dict(high_saves=True), -60)):
+            with self.subTest(shape=shape):
+                data, calls, site = looped_alias_caller(**shape)
+                p = bound(data, calls)
+                self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
+                self.assertEqual(p.observations[site]['aliases'], [(R0 + 2, offset)])
+
+    def test_descriptor_address_copy_across_the_looped_scheduler_call(self):
+        # The copy dies before the ordinary helper, which admits no alias at all.
+        for register in (4, 7):
+            with self.subTest(register=register):
+                data, calls, site = looped_alias_caller((0xA800 | register << 8,),      # add rX, sp, #0
+                                                        (0x2000 | register << 8,))      # movs rX, #0
+                p = bound(data, calls)
+                self.assertTrue(match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p))
+                self.assertEqual(p.observations[site]['aliases'], [(R0 + 2, -52), (R0 + register, -52)])
+
+    def test_looped_scheduler_call_refuses_every_other_preserved_alias(self):
+        # Each alias dies before the ordinary helper, so only the looped scheduler site can refuse it.
+        cases = (('another private object', dict(), (0xAC07,), (0x2400,)),      # add r4, sp, #28; movs r4, #0
+                 ('interior address', dict(), (0xAF01,), (0x2700,)),            # add r7, sp, #4; movs r7, #0
+                 ('high register', dict(high_saves=True),                       # r8 = sp through r4
+                  (0xAC00, 0x46A0, 0x2400), (0x46A0,)))                         # mov r8, r4 on each side
+        for name, shape, before, after in cases:
+            with self.subTest(case=name):
+                data, calls, _ = looped_alias_caller(before, after, **shape)
+                p = bound(data, calls)
+                with self.assertRaisesRegex(ValueError, 'other than the R2 descriptor and R4-R7 copies'):
+                    match.verify_leaf_instructions(data, A, True, calls, buffer_proof=p)
+
+    def test_looped_site_alias_rule_on_the_tracked_state(self):
+        stack = [LOCAL] * 8 + [SAVED] * 5
+        data, calls, site = looped_alias_caller()
+        for aliases, message in (({R0+2: -52, R0+4: -24}, 'R4-R7 copies'),
+                                 ({R0+2: -52, R0+7: -48}, 'R4-R7 copies'),
+                                 ({R0+2: -52, R0+4: -52, R0+5: -24}, 'R4-R7 copies'),
+                                 ({R0+2: -48, R0+4: -52}, 'R4-R7 copies'),       # descriptor at SP+4, R4 at SP
+                                 ({R0+2: -52, R0+8: -52}, 'R4-R7 copies'),
+                                 ({R0+2: -52, R0+9: -52}, 'R4-R7 copies'),
+                                 ({R0+2: -52, R0+11: -52}, 'R4-R7 copies'),
+                                 ({R0+2: -52, R0+3: -52}, 'additional register'),
+                                 ({R0+2: -52, R0+12: -52}, 'additional register')):
+            with self.subTest(aliases=aliases), self.assertRaisesRegex(ValueError, message):
+                bound(data, calls).check_call(S, aliases, stack, {}, site=site)
+        p = bound(data, calls)
+        p.check_call(S, {R0+2: -52, R0+4: -52, R0+7: -52}, stack, {}, site=site)
+        self.assertEqual(p.observations[site]['aliases'], [(R0+2, -52), (R0+4, -52), (R0+7, -52)])
+
+
 if __name__ == '__main__':
     unittest.main()

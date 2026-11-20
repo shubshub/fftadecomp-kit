@@ -6616,11 +6616,25 @@ and returning calls. It does not prove that any array has that capacity.
 
 Every reached call still passes the full existing frame and pointer-provenance
 checks. Ordinary calls reject all tracked local aliases and pointer words.
+The scheduler site is inside the loop, so besides the R2 descriptor it admits
+only copies of the descriptor address in R4-R7, as at the looped scheduler
+sites of the live-alias counted-loop selector below.
 The 28-byte descriptor contract is reapplied on every abstract incoming path;
 allocation separation, physical access, protected-frame preservation and no
 retained descriptor pointer remain explicit premises across iterations. No
 callback effect, memory permission, actual count, or unconditional termination
-claim follows. Existing acyclic scheduler selectors retain their strict guards.
+claim follows. The other scheduler selectors are unchanged, and not all of
+them refuse an owner loop: `conditional-scheduler-descriptor-calls-v1`,
+`conditional-scheduler-descriptor-payload-calls-v1`,
+`conditional-scheduler-descriptor-payload8-calls-v1`,
+`conditional-scheduler-two-payload-calls-v1`,
+`conditional-scheduler-entry-descriptor-calls-v1`,
+`conditional-scheduler-indirect-manager-v1` and
+`conditional-scheduler-manager-offset-v1` have no cycle guard, and their one
+scheduler call keeps the rule for a call outside a loop even inside one. Under
+`conditional-scheduler-two-payload-calls-v1` that rule admits and records a
+preserved-register alias to any private word; under the other six it admits
+and records one to any private word or saved-register word.
 
 ### Sequential live-alias scheduler compositions with counted loops
 
