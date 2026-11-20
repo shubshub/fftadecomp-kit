@@ -865,5 +865,68 @@ class SelectorTests(unittest.TestCase):
                     self.assertEqual(evidence.saved_selectors(report).arguments, forwarded[address])
 
 
+class BufferLineTests(BranchTests):
+    """Every replay branch refuses, in its own line check, a buffer or DMA fill line its evidence does not write.
+
+    BranchTests' fixtures run again with the whole-text comparison answered True, so the refusal
+    is the branch's own.  A branch without buffer evidence refuses every line that starts with
+    evidence.BUFFER_LINES; a branch with it holds every such line to its proof, which here writes
+    one replay line and one BIOS line: they replay as match.py writes them and not swapped.  The
+    DMA fill lines are refused by the guard in report_matches or by the replay that recomputes
+    them.  The inserted lines are one of each kind match.py writes, each head line without its
+    colon, one of no known kind and the bare prefix with a colon, each as a field and indented,
+    after the plausibility line and where match.py writes the buffer proof lines.
+    """
+
+    PROOF = "* buffer proof SHA-256: `" + "ab" * 32 + "`"   # the fixture proof's fingerprint line
+    OWN = ("* buffer loop replay: `bounded-loop-replay-v2` callee 0x08000400 sites 0x08000002",
+           "* buffer BIOS summaries: `fixture` written by the proof")
+    LINES = (
+        f"* buffer calls: {evidence.STACK_BUFFER_SUMMARY}",
+        "* buffer calls forged",
+        PROOF,
+        "* buffer proof SHA-256 forged",
+        "* buffer loop replay: `bounded-loop-replay-v2` callee 0x08000400 sites none writes sp+0:4; "
+        "proved none; trusted none; pruned edges 0",
+        "* buffer copy summary: `fixture` 0x08000400 at 0x08000002: forged",
+        "* buffer switch callee: `fixture` 0x08000400: dispatch at 0x08000402",
+        "* buffer owner switch: `fixture`",
+        "* buffer BIOS summaries: `fixture` forged",
+        "* buffer BIOS premise: forged",
+        "* buffer BIOS manifest: `[]`",
+        "* buffer unlisted: forged",
+        "* buffer: forged",
+        "* DMA fills: forged",
+        "* DMA fill premise: forged",
+        '* DMA fill manifest: `{"sites":[]}`',
+    )
+
+    def proof(self, stack_arguments, body=None):
+        proof = super().proof(stack_arguments, body)
+        proof.loop_replay_lines, proof.bios_summary_lines = (lambda: [self.OWN[0]]), (lambda: [self.OWN[1]])
+        return proof
+
+    def assert_closed(self, report, root):
+        lines = report.split("\n")
+        places = {"plausibility": lines.index("* source plausibility: plausible") + 1}
+        if self.PROOF in lines:
+            places["buffer proof"] = lines.index(self.PROOF) + 1
+            self.assertEqual(tuple(lines[places["buffer proof"]:][:2]), self.OWN)
+        self.assertTrue(evidence.report_matches(report, root, BASE), "the untampered report must replay")
+        with mock.patch.object(evidence, "closed_report", self.returns(True)):
+            self.assertTrue(evidence.report_matches(report, root, BASE), "the untampered report must replay")
+            for place, at in places.items():
+                for forged in self.LINES:
+                    for line in (forged, "  " + forged):
+                        with self.subTest(after=place, line=line):
+                            self.assertFalse(evidence.report_matches(
+                                "\n".join(lines[:at] + [line] + lines[at:]), root, BASE))
+            if self.PROOF in lines:
+                at = places["buffer proof"]
+                with self.subTest(swapped=self.OWN):
+                    self.assertFalse(evidence.report_matches(
+                        "\n".join(lines[:at] + [self.OWN[1], self.OWN[0]] + lines[at + 2:]), root, BASE))
+
+
 if __name__ == "__main__":
     unittest.main()
