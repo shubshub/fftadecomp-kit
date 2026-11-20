@@ -379,6 +379,62 @@ class DataBufferNativeTests(unittest.TestCase):
         self.assertRefused(root, "typed word 0x")
         self.assertRefused(root, "outside the address domain")
 
+    # --- ROM wait-state mirrors (#377): 0x0A000000-0x0DFFFFFF is the same ROM ---
+
+    def test_untyped_rom_mirror_words_are_refused_as_rom_words(self):
+        for name, value in (("ws1", 0x0A000300), ("ws2", 0x0C000300), ("ws0", 0x08000300)):
+            extra = f"    data_02000000[2] = *(const u16 *)0x{value:08X};\n"
+            with self.subTest(word=name):
+                self.assertRefused(self.fixture(name, PLAIN % dict(size=4, last=3, extra=extra)),
+                                   f" = 0x{value:08X}")
+
+    def test_sram_words_and_masks_beside_a_buffer_call_stay_numbers(self):
+        for name, extra in (("sram", "    *(unsigned char *)0x0E000010 = buffer[3];\n"),
+                            ("mask", "    *(u32 *)(data_02000000 + 4) = buffer[3] & 0x0FFFFFFF;\n")):
+            with self.subTest(word=name):
+                root = self.fixture(name, PLAIN % dict(size=4, last=3, extra=extra))
+                code, output, report = run(root)
+                self.assertEqual(code, 0, output)
+                self.assertEqual(verification(report), data_buffer.SCHEMA)
+                self.assertTrue(self.replays(report, root))
+
+    def test_a_typed_object_spelled_through_a_mirror_is_refused(self):
+        # An addend can carry a typed object word into a mirror: of other ROM bytes, or of the
+        # caller's own (linking refuses that one, as for the caller's own wait-state-0 bytes).
+        source = (PLAIN % dict(size=4, last=3, extra="    data_02000000[2] = *(u16 *)(data_06000000 + %s);\n")).replace(
+            "extern u16 data_02000000[];\n", "extern u16 data_02000000[];\nextern char data_06000000[];\n")
+        objects = dict(OBJECTS, data_06000000="0x06000000")
+        root = self.fixture("typed_mirror", source % "0x04000300", objects=objects)
+        self.assertRefused(root, "typed word 0x")
+        self.assertRefused(root, "outside the address domain")
+        for name, addend in (("typed_own_ws1", "0x04000200"), ("typed_own_ws2", "0x06000204")):
+            with self.subTest(addend=addend), \
+                    self.assertRaisesRegex(ValueError, "data relocation overflows or references its own function"):
+                self.fixture(name, source % addend, objects=objects)
+
+    def test_a_mirror_function_pointer_through_a_thunk_needs_function_provenance(self):
+        source = HEADER + """extern void func_08000400(u16 value, u16 *out);
+void func_08000200(u16 value)
+{
+    u16 buffer[4];
+    void (*f)(u16, u16 *) = (void (*)(u16, u16 *))%s;
+
+    func_08000400(value, buffer);
+    f(value, 0);
+    data_02000000[0] = buffer[0];
+}
+"""
+        callees = (("func_08000400", STORES), ("func_08000500", "bx lr"))
+        for pointer in ("0x0A000501", "0x0C000501", "0x08000501"):
+            with self.subTest(pointer=pointer):
+                root = self.fixture("pointer_" + pointer, source % pointer, callees, large=True)
+                self.assertRefused(root, "code-entry thunk literals require canonical function provenance")
+        # The named spelling keeps its own refusal: no data-buffer report takes a runtime thunk literal.
+        named = (source % "func_08000500").replace(
+            "extern void func_08000400", "extern void func_08000500(u16 value, u16 *out);\nextern void func_08000400")
+        with self.assertRaisesRegex(match.Refusal, "function-address evidence does not support runtime call thunks"):
+            self.fixture("pointer_named", named, callees, large=True)
+
     def test_untyped_hardware_numbers_are_recorded_and_bound(self):
         root = self.fixture("vram", PLAIN % dict(size=4, last=3, extra="    *(u16 *)0x06001000 = buffer[1];\n"))
         code, output, report = run(root)

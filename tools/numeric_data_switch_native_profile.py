@@ -10,6 +10,7 @@ from pathlib import Path
 import struct
 
 import canonical_integer_native_profile as scalar_native
+import rom_mirror
 
 SELECTOR = 'numeric-data-switch-source-v1'
 SCHEMA = 'elf-symbol-thumb-numeric-data-switch-source-v1'
@@ -68,7 +69,7 @@ def verify_structure(data, address, rom, mapping, index, bindings,
     for word in partition['words']:
         value = word['value']
         if reserved(value) or (not word['switch_word'] and any(
-                int(row['rom'], 16) & ~1 == value & ~1 for row in entries)):
+                int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries)):
             raise ValueError('numeric-data switch cannot materialize runtime or function addresses')
         if not word['switch_word'] and word['address'] not in data_sites and not 0 <= value <= 0xffff:
             raise ValueError('numeric-data switch scalar literals require bounded u16 category')

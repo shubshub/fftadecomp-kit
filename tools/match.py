@@ -55,6 +55,7 @@ import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import empty_body_profile as empty_body
 import library_units
+import rom_mirror
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -143,7 +144,7 @@ UDIVSI3_IDENTITIES = (
 
 
 def is_udivsi3_address(address):
-    return any(start <= address & ~1 < end for start, end, _ in UDIVSI3_IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _ in UDIVSI3_IDENTITIES)
 
 
 def verify_udivsi3_identity(rom, mapping):
@@ -663,6 +664,8 @@ def parse_data_symbols(snapshot):
         if is_udivsi3_address(int(value, 16)) or modsi3.reserved(int(value, 16)) or \
                 divsi3.reserved(int(value, 16)) or umodsi3.reserved(int(value, 16)) or ashldi3.reserved(int(value, 16)) or software_double.reserved(int(value, 16)) or software_float.reserved(int(value, 16)):
             raise ValueError("division runtime cannot be bound as data")
+        if rom_mirror.mirror(int(value, 16)):
+            raise ValueError("a data symbol names a ROM wait-state mirror, not its canonical ROM address")
         symbols[name] = int(value, 16)
     return symbols
 
@@ -891,7 +894,7 @@ def call_bindings(image, name, address, mapping, rom_size,
                 target = data_symbols[target_name]
                 addend = struct.unpack_from("<i", image["text"], relocation)[0]
                 value = target + addend
-                if not 0 <= value <= 0xFFFFFFFF or address <= value < address + symbol["size"]:
+                if not 0 <= value <= 0xFFFFFFFF or address <= rom_mirror.canonical(value) < address + symbol["size"]:
                     raise ValueError("data relocation overflows or references its own function")
                 if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value) or software_float.reserved(value):
                     raise ValueError("division runtime cannot be bound through a data addend")
@@ -2081,7 +2084,7 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
                         not -0x80000000 <= addend <= 0x7FFFFFFF:
                     raise ValueError("invalid function-address object binding")
                 value = objects[name] + addend
-                if not 0 <= value <= 0xFFFFFFFF or address <= value < address + len(data):
+                if not 0 <= value <= 0xFFFFFFFF or address <= rom_mirror.canonical(value) < address + len(data):
                     raise ValueError("function-address object binding overflows or references itself")
                 if is_udivsi3_address(value) or modsi3.reserved(value) or divsi3.reserved(value) or umodsi3.reserved(value) or ashldi3.reserved(value) or software_double.reserved(value) or software_float.reserved(value):
                     raise ValueError("division runtime cannot be bound through an object addend")
@@ -2747,7 +2750,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         spans.append((address, address + len(data)))
         for name, value in data_relocations.values():
             for target in (objects[name], value):
-                if function_thunk.reserved(target) or any(start <= target & ~1 < end for start, end in spans):
+                if function_thunk.reserved(target) or any(start <= rom_mirror.canonical(target) & ~1 < end for start, end in spans):
                     raise ValueError("switch function-literal callers cannot bind code entries "
                                      "or indexed function spans as data")
     calls = {}
@@ -2817,7 +2820,7 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         spans.append((address, address + len(data)))
         for name, value in data_relocations.values():
             for target in (objects[name], value):
-                if function_thunk.reserved(target) or any(start <= target & ~1 < end for start, end in spans):
+                if function_thunk.reserved(target) or any(start <= rom_mirror.canonical(target) & ~1 < end for start, end in spans):
                     raise ValueError("switch thunk callers cannot bind code entries "
                                      "or indexed function spans as data")
         function_thunk.verify_literal_bindings(data, address, instructions, calls, mapping, {})

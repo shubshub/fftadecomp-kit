@@ -15,6 +15,7 @@ import match
 import owner_admission_profile as owner
 import owner_graph_profile as graph
 import owner_runtime_profile as operations
+import rom_mirror
 
 SELECTOR = 'one-numeric-thunk-scalar-switch-inventory-v1'
 SCHEMA = 'thumb-one-numeric-thunk-scalar-switch-inventory-v1'
@@ -111,7 +112,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         if value in match.RUNTIME_HELPERS.values() or match.is_udivsi3_address(value) or any(
                 module.reserved(value) for module in (thunks, match.divsi3, match.modsi3,
                     match.umodsi3, match.ashldi3, match.software_double, match.software_float)) or \
-                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == value & ~1 for row in entries):
+                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries):
             raise ValueError('numeric switch cannot materialize runtime/thunk/function addresses')
     modules = (analyze, numeric, zero, thunks, frame, match, match.armv4t, owner, graph, operations)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}

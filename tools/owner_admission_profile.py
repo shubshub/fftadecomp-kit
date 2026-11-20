@@ -97,6 +97,7 @@ import finite_spilled_scalar_loop_profile as spilled_loop
 import guarded_bios_division_profile as bios_div
 import runtime_summary_profile as runtime_summary
 from inert_spin_profile import fixed_configuration, index_snapshot, validate_span, marker_text
+import rom_mirror
 
 SCHEMA = 'elf-symbol-thumb-restoring-owner-runtime-v1'
 SELECTOR = 'restoring-owner-runtime-v1'
@@ -1033,13 +1034,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     data_literals = ({offset:literals[offset] for offset,name,addend in bindings['data']}
                      if selector in (*local_calls.SELECTORS, *named_buffer.THUNK_SELECTORS, query_cont.SELECTOR, nested_query.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, spilled_loop.SELECTOR) else literals)
     thunk.verify_data_bindings(calls,data_literals,match.parse_data_symbols(objects),json.loads(mapping))
-    # All actual address-domain PC words require typed object/function provenance.
-    # Exact local switch words are proved separately; numerical scalars remain scalar.
+    # All actual address-domain PC words require typed object/function provenance,
+    # a ROM wait-state mirror word folded onto the ROM it names. Exact local switch
+    # words are proved separately; numerical scalars remain scalar.
     address_words = {row['address']-address for row in proof['partition']['words']
-        if row['load_sites'] and not row['switch_word'] and
-        (0x02000000 <= row['value'] < 0x04000000 or
-         0x04000000 <= row['value'] < 0x08000000 or
-         0x08000000 <= row['value'] < 0x09000000)}
+        if row['load_sites'] and not row['switch_word'] and rom_mirror.typed_domain(row['value'])}
     if selector in (bios_switch.SELECTOR, named_buffer.BIOS_FILL_SELECTOR, named_buffer.BIOS_LOCAL_FILL_SELECTOR, named_buffer.BIOS_OVERWRITE_SELECTOR):
         controls = {row[0] for row in proof['bios_scalar_control_words']}
         if controls & set(literals):
@@ -1062,7 +1061,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if hardware:
             address_words -= {row[0] for row in hardware}
             proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
-    if address_words != set(literals):
+    if address_words != set(literals) or any(rom_mirror.mirror(value) for _, value in literals.values()):
         raise ValueError('owner address literals require exact typed object/function coverage')
     schema = runtime_summary.SCHEMAS[selector] if selector in runtime_summary.SELECTORS else bios_switch.SCHEMA if selector == bios_switch.SELECTOR else transfer_task.SCHEMA if selector == transfer_task.SELECTOR else small_copy_binding.SCHEMA if selector == small_copy_binding.SELECTOR else copy_binding.SCHEMA if selector == copy_binding.SELECTOR else local_calls.SCHEMAS[selector] if selector in local_calls.SELECTORS else spilled_loop.SCHEMA if selector == spilled_loop.SELECTOR else finite_loop.SCHEMA if selector == finite_loop.SELECTOR else stack_query.DIVISION_SCHEMA if selector == stack_query.DIVISION_SELECTOR else stack_query.SCHEMA if selector == stack_query.SELECTOR else nested_query.SCHEMA if selector == nested_query.SELECTOR else query_cont.SCHEMA if selector == query_cont.SELECTOR else list_query.SCHEMA if selector == list_query.SELECTOR else known_query.SCHEMA if selector == known_query.SELECTOR else tree_callback.SCHEMA if selector == tree_callback.SELECTOR else callback_closure.SCHEMA if selector == callback_closure.SELECTOR else literal_callback.SCHEMA if selector == literal_callback.SELECTOR else THUNK_SWITCH_SCHEMA if selector == THUNK_SWITCH_SELECTOR else DIRECT_SWITCH_SCHEMA if selector == DIRECT_SWITCH_SELECTOR else ENTRY_DATA_SWITCH_SCHEMA if selector == ENTRY_DATA_SWITCH_SELECTOR else ENTRY_SWITCH_SCHEMA if selector == ENTRY_SWITCH_SELECTOR else \
         shadow_matrix.SCHEMA if selector == shadow_matrix.SELECTOR else \
@@ -1153,7 +1152,7 @@ def preflight(data,address,rom,mapping,index,objects, *, selector=SELECTOR):
         value=word['value'];offset=word['address']-address
         if offset in controls:
             continue
-        if not word['load_sites'] or word['switch_word'] or not 0x02000000<=value<0x09000000:
+        if not word['load_sites'] or word['switch_word'] or not rom_mirror.typed_domain(value):
             continue
         owners=[row for row in entries if int(row['rom'],16)==value&~1]
         if owners:

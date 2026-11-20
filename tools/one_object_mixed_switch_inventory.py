@@ -17,6 +17,7 @@ import owner_runtime_profile as operations
 import software_double_profile as canonical
 import software_float_profile as native
 import zero_aware_unsigned_quotient_inventory as unsigned
+import rom_mirror
 
 SELECTOR = 'one-object-word-udiv-div-target-state-inventory-v1'
 SCHEMA = 'thumb-one-object-word-udiv-div-target-state-inventory-v1'
@@ -119,7 +120,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         if value in match.RUNTIME_HELPERS.values() or match.is_udivsi3_address(value) or any(
                 module.reserved(value) for module in (thunks, quotient, match.modsi3,
                     match.umodsi3, match.ashldi3, canonical, native)) or \
-                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == value & ~1 for row in entries):
+                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries):
             raise ValueError('one-object mixed switch cannot materialize a runtime/thunk/function address')
     div = canonical.prove_division_closure(rom, mapping, index)
     udiv = unsigned.prove_quotient_closure(rom, mapping, index)

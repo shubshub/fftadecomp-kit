@@ -15,6 +15,7 @@ import owner_graph_profile as graph
 import owner_runtime_profile as operations
 import zero_word_thunk_switch_inventory as zero
 import one_object_mixed_switch_inventory as object_policy
+import rom_mirror
 
 SELECTOR = 'one-object-thunk-switch-inventory-v1'
 SCHEMA = 'thumb-one-object-conditional-thunk-switch-inventory-v1'
@@ -95,7 +96,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         if value in match.RUNTIME_HELPERS.values() or match.is_udivsi3_address(value) or any(
                 module.reserved(value) for module in (thunks, object_policy.quotient, match.modsi3,
                     match.umodsi3, match.ashldi3, object_policy.canonical, object_policy.native)) or \
-                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == value & ~1 for row in entries):
+                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries):
             raise ValueError('thunk switch cannot materialize a runtime/thunk/function address')
     operations.verify_operations(instructions, edges, address, branches, calls, refinement)
     adjustments = []

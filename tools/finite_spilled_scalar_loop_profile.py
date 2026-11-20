@@ -16,6 +16,7 @@ import owner_graph_profile as graph
 import owner_runtime_profile as operations
 import function_thunk_profile as thunk
 import local_long_branch_profile as frame_source
+import rom_mirror
 import ignored_leaf_alias_profile as leaf_source
 import consumer_scratch_alias_profile as read_source
 from capstone.arm import ARM_OP_IMM, ARM_OP_REG, ARM_REG_SP, ARM_REG_PC, ARM_REG_LR
@@ -111,7 +112,7 @@ class CallEffects:
             partition=graph.partition(data,target,refinement,ins,words)
             names=match.parse_data_symbols(self.objects)
             for word in partition['words']:
-                if 0x02000000 <= word['value'] < 0x09000000:
+                if rom_mirror.typed_domain(word['value']):
                     require(word['value'] in names.values(), 'private callee literal lacks canonical data identity')
             native=frame.prove_frame(ins,edges,target,{},calls,stack_aliases=True)
             require(row['instrs']==len(ins), 'ordinary private-frame callee count differs')

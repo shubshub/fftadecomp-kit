@@ -3,6 +3,8 @@
 import hashlib
 import json
 
+import rom_mirror
+
 SCHEMA = "elf-symbol-thumb-modsi3-s16-v1"
 SUMMARY = "pinned Thumb signed remainder with CFG-proven signed16 dividend and nonzero divisor"
 RUNTIME = "agbcc-thumb-modsi3-v1"
@@ -21,7 +23,7 @@ class AddressedRemainderRequired(ValueError):
 
 
 def reserved(address):
-    return any(start <= address & ~1 < end for start, end, _ in IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _ in IDENTITIES)
 
 
 def address_literal(value):

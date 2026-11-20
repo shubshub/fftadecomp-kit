@@ -394,6 +394,20 @@ class AlignmentFillTests(unittest.TestCase):
         mapping, index = self.indices([(A, A + self.size + 2), (B, B + 2)])
         self.refused('complete aligned owner/target span', mapping=mapping, index=index)
 
+    def test_named_data_through_a_rom_mirror_of_the_owner_is_refused(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377): an addend that
+        # carries named data into a mirror of the owner refers to the owner.
+        image, text = self.image, self.image['text_index']
+        site = next(struct.unpack_from('<I', image['section_data'][index], position)[0]
+                    for index in image['relocations'] if image['sections'][index][7] == text
+                    for position in range(0, image['sections'][index][5], 8)
+                    if image['symbol_tables'][image['sections'][index][6]][struct.unpack_from(
+                        '<I', image['section_data'][index], position + 4)[0] >> 8]['name'] == 'data_03001000')
+        for target in (A + self.size + 0x02000000, A + 0x04000000):
+            addend = struct.pack('<I', target - SYMBOLS['data_03001000'])
+            with self.subTest(target=hex(target)):
+                self.refused('refers to owner', original_elf=self.patched((self.text_offset + site, addend)))
+
     def test_data_or_function_address_at_the_fill_is_refused(self):
         fill = A + self.size
         objects = json.dumps({'data_03001000': f'0x{fill:08X}', 'data_03001004': '0x03001004'}).encode()

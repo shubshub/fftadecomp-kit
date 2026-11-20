@@ -3,6 +3,8 @@
 import hashlib
 import json
 
+import rom_mirror
+
 SCHEMA = "elf-symbol-thumb-umodsi3-constant-v1"
 SUMMARY = "pinned Thumb unsigned remainder with CFG-proven nonzero unsigned32 constant divisors"
 RUNTIME = "agbcc-thumb-umodsi3-v1"
@@ -16,7 +18,7 @@ IDENTITIES = (
 
 
 def reserved(address):
-    return any(start <= address & ~1 < end for start, end, _ in IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _ in IDENTITIES)
 
 
 def manifest_text(manifest):

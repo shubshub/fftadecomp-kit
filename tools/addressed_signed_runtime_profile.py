@@ -22,6 +22,7 @@ import tempfile
 import divsi3_profile as quotient
 import m4a_max_lines as max_lines
 import modsi3_profile as remainder
+import rom_mirror
 import umodsi3_profile as unsigned_remainder
 
 SELECTOR = 'addressed-signed-runtime-v1'
@@ -303,9 +304,9 @@ def object_value(name, addend, objects, entries, address, size, *, image=False):
     alias = image and addend == 0 and value % 2 == 0 and \
         sum(int(row['rom'], 16) == value for row in entries) == 1 and \
         sum(int(row['rom'], 16) <= value < int(row['end'], 16) for row in entries) == 1
-    if not 0 <= value <= 0xFFFFFFFF or address <= value < address + size or \
+    if not 0 <= value <= 0xFFFFFFFF or address <= rom_mirror.canonical(value) < address + size or \
             any(match.function_thunk.reserved(target) for target in (base, value)) or not alias and any(
-            int(row['rom'], 16) <= (target & ~1) < int(row['end'], 16)
+            int(row['rom'], 16) <= (rom_mirror.canonical(target) & ~1) < int(row['end'], 16)
             for row in entries for target in (base, value)):
         raise ValueError('addressed data overflows or aliases indexed code')
     return value

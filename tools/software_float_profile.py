@@ -10,6 +10,8 @@ import subprocess
 import sys
 import tempfile
 
+import rom_mirror
+
 SCHEMA = "elf-symbol-thumb-sf-mul-fixuns-target-v1"
 RUNTIME = "agbcc-thumb-sf-mul-fixuns-extend-lt-closure-v2"
 ABI = "agbcc-thumb-sf-df-mixed-result-r0-r1-v2"
@@ -64,7 +66,7 @@ _replay_active = ContextVar("software_float_replay_active", default=False)
 
 
 def reserved(address):
-    return any(start <= address & ~1 < end for start, end, _, _ in IDENTITIES)
+    return any(start <= rom_mirror.canonical(address) & ~1 < end for start, end, _, _ in IDENTITIES)
 
 
 def index_snapshot(root):

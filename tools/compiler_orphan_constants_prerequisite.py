@@ -7,6 +7,7 @@ import struct
 
 import analyze
 import match
+import rom_mirror
 
 SELECTOR = 'compiler-orphan-address-constants-prerequisite-v1'
 SCHEMA = 'thumb-compiler-orphan-address-constants-prerequisite-v1'
@@ -271,7 +272,7 @@ def verify(original_elf, address, objects, preprocessed_source, *, selector, man
                             'orphan address requires genuine aligned named-data identity')
                     value=data_symbols[target['name']]+addend
                     # The owner and its alignment fill.
-                    require(0 <= value <= 0xFFFFFFFF and not address <= value < address+len(image['text']),
+                    require(0 <= value <= 0xFFFFFFFF and not address <= rom_mirror.canonical(value) < address+len(image['text']),
                             'orphan named-data addend overflows or refers to owner')
             relocations[row[7]].append((site,target['name'],addend))
     require(all(row['section'] or not row['name'] or row['name'] in used for row in symbols),

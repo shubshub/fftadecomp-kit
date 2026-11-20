@@ -348,6 +348,22 @@ class VerificationTests(unittest.TestCase):
             with self.subTest(value=hex(value)), self.assertRaisesRegex(ValueError, message):
                 verify(body, manifest, mapping, objects)
 
+    def test_data_cannot_name_a_rom_mirror_of_a_function_span(self):
+        # 0x0A000000-0x0DFFFFFF maps the same ROM as 0x08000000 (#377); an addend that
+        # carries the object word into a mirror of an indexed function names that function.
+        for value in (CALLBACK + 0x02000000, (CALLBACK | 1) + 0x04000000, BASE + 4 + 0x02000000):
+            body, labels, manifest, mapping = fixture()
+            struct.pack_into("<I", body, labels["late_object"], value)
+            manifest["data"][-1][2] = value - OBJECT
+            with self.subTest(value=hex(value)), \
+                    self.assertRaisesRegex(ValueError, "cannot bind code entries or indexed function spans"):
+                verify(body, manifest, mapping)
+        # The SRAM/flash bus is not ROM.
+        body, labels, manifest, mapping = fixture()
+        struct.pack_into("<I", body, labels["late_object"], CALLBACK + 0x06000000)
+        manifest["data"][-1][2] = CALLBACK + 0x06000000 - OBJECT
+        verify(body, manifest, mapping)
+
     def test_table_pointer_has_no_other_reader_in_either_shape(self):
         for pool in ((), ("object", "scalar")):
             with self.subTest(pool=pool):
