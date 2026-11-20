@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "586def10789f456afe5205308db6e0d176e2ad60d0b909ea9728974a1573888a",
+    "acknowledged_cursor": 7028046015,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "586def10789f456afe5205308db6e0d176e2ad60d0b909ea9728974a1573888a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080A8498\",\"who\":\"astra-sprite-60\",\"note\":\"Recover the complete original function and compare its compiled Thumb bytes.\"}",
+      "created_at": "2026-11-20T02:02:53Z",
+      "id": 7028045773,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T02:02:53Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f5c8c49a0c3b63d2b185c1dca2d8e43f26d877d4e0cc9b764741ff096c585ed3",
+    "result": {
+      "address": "0x080A8498",
+      "claim_id": 7028045773,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7028045773,
+      "status": "accepted",
+      "who": "astra-sprite-60"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "0a96d820edd77e8a95f3ab4e043b299edcb8d92a8a39f074c23e017023a22306",
+    "acknowledged_cursor": 7028434180,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0a96d820edd77e8a95f3ab4e043b299edcb8d92a8a39f074c23e017023a22306",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A8498\",\"who\":\"astra-sprite-60\",\"claim_id\":7028045773,\"reason\":\"Parked byte-identical 80-byte wrapper pending nested runtime proof in shubshub/fftadecomp#301\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T02:27:34Z",
+      "id": 7028434110,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T02:27:34Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2151a3981f1bdda27a57ba68b83f12abfa47d9457a3988b8a4ff1b5fce8b4a0d",
+    "result": {
+      "address": "0x080A8498",
+      "claim_id": 7028045773,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7028434110,
+      "status": "accepted",
+      "who": "astra-sprite-60"
+    }
+  }
+}

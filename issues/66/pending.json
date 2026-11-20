@@ -350,7 +350,35 @@
           "who": "astra-sound"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "70f7bf6a43760fad13a5249f87e43b23b0b7d8926ba0b8beb8abfd7cc6fc05ac",
+        "acknowledged_cursor": 7028434180,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "70f7bf6a43760fad13a5249f87e43b23b0b7d8926ba0b8beb8abfd7cc6fc05ac",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080016D4\",\"who\":\"astra-sound\",\"claim_id\":6993132689,\"reason\":\"Parked the ordinary 424-byte recovery; original ROM symbol is 460 bytes in shubshub/fftadecomp#301\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T02:27:34Z",
+          "id": 7028434180,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2151a3981f1bdda27a57ba68b83f12abfa47d9457a3988b8a4ff1b5fce8b4a0d",
+        "result": {
+          "address": "0x080016D4",
+          "claim_id": 6993132689,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7028434180,
+          "status": "accepted",
+          "who": "astra-sound"
+        }
+      }
     },
     {
       "claim": {
@@ -890,7 +918,35 @@
           "who": "astra-sprite-60"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "0a96d820edd77e8a95f3ab4e043b299edcb8d92a8a39f074c23e017023a22306",
+        "acknowledged_cursor": 7028434180,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "0a96d820edd77e8a95f3ab4e043b299edcb8d92a8a39f074c23e017023a22306",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080A8498\",\"who\":\"astra-sprite-60\",\"claim_id\":7028045773,\"reason\":\"Parked byte-identical 80-byte wrapper pending nested runtime proof in shubshub/fftadecomp#301\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T02:27:34Z",
+          "id": 7028434110,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2151a3981f1bdda27a57ba68b83f12abfa47d9457a3988b8a4ff1b5fce8b4a0d",
+        "result": {
+          "address": "0x080A8498",
+          "claim_id": 7028045773,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7028434110,
+          "status": "accepted",
+          "who": "astra-sprite-60"
+        }
+      }
     },
     {
       "claim": {
@@ -922,7 +978,35 @@
           "who": "astra-flow-60"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "c0fa9f9afd2b5ebf9ab9eaefb65d4f82f475c150b2bf85b060693405f5246978",
+        "acknowledged_cursor": 7028434180,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c0fa9f9afd2b5ebf9ab9eaefb65d4f82f475c150b2bf85b060693405f5246978",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08016A98\",\"who\":\"astra-flow-60\",\"claim_id\":7028045811,\"reason\":\"Matched the 84-byte tilemap rectangle clear in shubshub/fftadecomp#301\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T02:27:34Z",
+          "id": 7028434049,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2151a3981f1bdda27a57ba68b83f12abfa47d9457a3988b8a4ff1b5fce8b4a0d",
+        "result": {
+          "address": "0x08016A98",
+          "claim_id": 7028045811,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7028434049,
+          "status": "accepted",
+          "who": "astra-flow-60"
+        }
+      }
     },
     {
       "claim": {
@@ -954,7 +1038,35 @@
           "who": "astra-scene-60"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "5583d1cc598166e60125ca18206406dccc54065a6725bf541148fb4bb954af89",
+        "acknowledged_cursor": 7028434180,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "5583d1cc598166e60125ca18206406dccc54065a6725bf541148fb4bb954af89",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800A0B8\",\"who\":\"astra-scene-60\",\"claim_id\":7028046015,\"reason\":\"Parked byte-identical 84-byte script wrapper pending opcode-callback proof in shubshub/fftadecomp#301\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T02:27:34Z",
+          "id": 7028434090,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:27:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2151a3981f1bdda27a57ba68b83f12abfa47d9457a3988b8a4ff1b5fce8b4a0d",
+        "result": {
+          "address": "0x0800A0B8",
+          "claim_id": 7028046015,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7028434090,
+          "status": "accepted",
+          "who": "astra-scene-60"
+        }
+      }
     },
     {
       "claim": {
