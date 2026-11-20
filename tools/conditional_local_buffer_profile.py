@@ -467,13 +467,16 @@ class ConditionalLocalBufferProof(named.NamedDataBufferProof):
             require({reg for reg in aliases if reg in match.CALLER_CLOBBERED} == {r2} and not slots,
                     'scheduler contract excludes additional register or pointer-word aliases')
             offset, width = aliases[r2], 28
-            if self.policy in LOOP_LIVE_ALIAS and site in self.branch_calls['looped_scheduler_sites']:
+            if (self.policy == SCHEDULER_LOOP or
+                    self.policy in LOOP_LIVE_ALIAS and site in self.branch_calls['looped_scheduler_sites']):
                 # The scheduler and its callback are never walked. Outside loops the
                 # existing descriptor premise admits recorded preserved-register
                 # aliases. A repeated invocation inside a loop admits only R4-R7
                 # holding the descriptor's own address: R2 already hands every
                 # invocation that address, and the loop bound already rests on
-                # R4-R7 surviving each call.
+                # R4-R7 surviving each call. The u16 counted loop has no site
+                # outside its loop: its layout requires the one scheduler site
+                # inside the loop body.
                 require(all(match.ARM_REG_R0+4 <= reg <= match.ARM_REG_R0+7 and value == offset
                             for reg, value in aliases.items() if reg != r2),
                         'looped scheduler calls exclude every local alias other than the R2 descriptor '
