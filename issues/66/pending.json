@@ -602,7 +602,35 @@
           "who": "native-scanline-review"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ff6dde8454ccb1b7174308296d0762b43d84b707556e92405e7b428da8a11141",
+        "acknowledged_cursor": 7032258908,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ff6dde8454ccb1b7174308296d0762b43d84b707556e92405e7b428da8a11141",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800CE08\",\"who\":\"native-scanline-review\",\"claim_id\":7031883655,\"reason\":\"Native 254-byte/114-instruction constructor match in merged game PR #323\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T06:26:47Z",
+          "id": 7032258908,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T06:26:47Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "fa9b37d54354becc91b771f2a13bd9e4691ca595ce8cdaa527a407a51e435055",
+        "result": {
+          "address": "0x0800CE08",
+          "claim_id": 7031883655,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7032258908,
+          "status": "accepted",
+          "who": "native-scanline-review"
+        }
+      }
     }
   ],
   "issue": 66,
