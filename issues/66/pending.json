@@ -663,6 +663,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "73a04091e69a9a3a2057f258de61d374296395e6df6c26206c35cd8daf9ba6fb",
+        "acknowledged_cursor": 7031394210,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "73a04091e69a9a3a2057f258de61d374296395e6df6c26206c35cd8daf9ba6fb",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800D324\",\"who\":\"astra-0800d324\",\"note\":\"Validate the four-plane writer in the same verified 3-entry scroll constructor table\"}",
+          "created_at": "2026-11-20T05:31:40Z",
+          "id": 7031394210,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T05:31:40Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "a513dbfacd7b73cb9e0e9e467b860ffd6358f3e63be68585998f1fdb15ba7f00",
+        "result": {
+          "address": "0x0800D324",
+          "claim_id": 7031394210,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7031394210,
+          "status": "accepted",
+          "who": "astra-0800d324"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
