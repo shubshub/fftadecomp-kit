@@ -474,7 +474,35 @@
           "who": "lane77-08035AD8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "7a5a67248f300e95cb4a88c82b39354ddb090374c9a8960577b0b1ec5dc197b6",
+        "acknowledged_cursor": 7038830729,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7a5a67248f300e95cb4a88c82b39354ddb090374c9a8960577b0b1ec5dc197b6",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08035AD8\",\"who\":\"lane77-08035AD8\",\"claim_id\":7038456554,\"reason\":\"Verified whole Thumb function merged in game PR #330.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T11:51:35Z",
+          "id": 7038830729,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T11:51:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e3c7bb001945f310a461f5b8ea2d65ae06d87f7d95330530a2a7691d2ca6bc1d",
+        "result": {
+          "address": "0x08035AD8",
+          "claim_id": 7038456554,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7038830729,
+          "status": "accepted",
+          "who": "lane77-08035AD8"
+        }
+      }
     },
     {
       "claim": {
@@ -506,7 +534,35 @@
           "who": "dma-review77"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "e1972c2d73fedd27a137180fe137b0b9939cef300d8d1f0f90e2673dfb2700ca",
+        "acknowledged_cursor": 7038830729,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e1972c2d73fedd27a137180fe137b0b9939cef300d8d1f0f90e2673dfb2700ca",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0814011C\",\"who\":\"dma-review77\",\"claim_id\":7038470828,\"reason\":\"Verified whole Thumb function merged in game PR #330.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T11:51:35Z",
+          "id": 7038830668,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T11:51:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e3c7bb001945f310a461f5b8ea2d65ae06d87f7d95330530a2a7691d2ca6bc1d",
+        "result": {
+          "address": "0x0814011C",
+          "claim_id": 7038470828,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7038830668,
+          "status": "accepted",
+          "who": "dma-review77"
+        }
+      }
     },
     {
       "claim": {
