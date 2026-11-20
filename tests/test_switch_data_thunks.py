@@ -24,6 +24,7 @@ import report_fixtures
 import function_thunk_profile as function_thunk
 import switch_data_thunks as thunks
 import switch_pool_outgoing_frame as pool_switch_frame
+import switch_wide_scalars as wide_scalars
 
 BASE = 0x08000000
 CALLEE = BASE + 0x1000
@@ -1351,6 +1352,102 @@ class ReportTests(unittest.TestCase):
                 # Thunk-free reports never recover a thunk selector.
                 self.assertIsNone(thunks.selector_for_report(
                     f'* verification: `{evidence.SWITCH_U16_SCALAR_SCHEMA}`'))
+
+
+# Case 1 stores 0x12345678, a literal word no immediate builds: a wide scalar word (switch_wide_scalars).
+WIDE = SOURCE.replace('data_02000100 = 0;', 'data_02000100 = (void *)0x12345678;')
+# Case 3 stores 0x1234 as well, so the wide word sits beside a u16 scalar word.
+WIDE_BESIDE = WIDE.replace('*state = 1;', 'data_02000100 = (void *)0x1234;\n        *state = 1;')
+
+
+def issue(test, source, objects, entries, selector, *, link, rom_words):
+    """Compile `source`, lay it into a ROM beside the `entries` stubs and the `rom_words`, and write its
+    report with match.main() under `selector`; returns (root, report text). The environment stays patched
+    until the test ends."""
+    scratch = Path(os.environ.get('FFTA_TEST_SCRATCH', ROOT / 'build'))
+    scratch.mkdir(parents=True, exist_ok=True)
+    directory = tempfile.TemporaryDirectory(prefix='switch_wide_', dir=scratch)
+    test.addCleanup(directory.cleanup)
+    root = Path(directory.name)
+    for name in ('src', 'include', 'config', 'symbols'):
+        (root / name).mkdir()
+    environment = {key: value for key, value in os.environ.items() if key != 'FFTA_ROM'}
+    environment.update(TMPDIR=str(root), PYTHONDONTWRITEBYTECODE='1')
+    test.enterContext(patch.dict(os.environ, environment, clear=True))
+    (root / 'src/08000000.c').write_text(source)
+    (root / 'config/data_symbols.json').write_bytes(objects)
+    rom = bytearray(max(address + 4 - BASE for address, _ in rom_words))
+    for address, words in rom_words:
+        struct.pack_into('<HH', rom, address - BASE, *words)
+    args = argparse.Namespace(cc=match.DEFAULT_CC, cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
+                              objcopy=match.DEFAULT_OBJCOPY, linker=match.DEFAULT_LD, flags=match.DEFAULT_FLAGS)
+    runner = match.Runner(match.DEFAULT_CC, root=root, timeout=120)
+    with runner.workspace() as workspace:
+        _, _, original = match.compile_object(runner, workspace, args, root, BASE, 'src/08000000.c')
+        symbol, _ = match.function_record(original, 'func_08000000', BASE, True)
+        spans = [(BASE, symbol['size']), *entries]
+        functions = json.dumps([{'rom': f'0x{start:08X}', 'end': f'0x{start + size:08X}', 'mode': 'thumb'}
+                                for start, size in spans]).encode()
+        (root / 'config/functions.json').write_bytes(functions)
+        (root / 'symbols/functions.txt').write_text(''.join(
+            f'{start:08X} {start + size:08X} {size} 1 return\n' for start, size in spans))
+        body, _, _ = match.link_calls(runner, workspace, args, original, BASE, functions, len(rom), bytes(rom),
+                                      objects, {}, {}, allow_switch_data=True, **link)
+    rom[:len(body)] = body
+    (root / 'baserom.bin').write_bytes(rom)
+    output = io.StringIO()
+    with patch.object(sys, 'argv', ['match.py', '--root', str(root), '0x08000000',
+                                    '--switch-data-profile', selector]), \
+            patch.object(match, 'ROOT', match.ROOT), contextlib.redirect_stdout(output):
+        test.assertEqual(match.main(), 0, output.getvalue())
+    return root, (root / 'docs/match/08000000.md').read_text()
+
+
+def check_wide_report(test, root, report, schema, u16_words):
+    """An issued `schema` report binds 0x12345678 as its one wide word beside `u16_words` u16 words, prints
+    the wide-scalar premise once and replays; with that line removed it does not."""
+    lines, line, prefix = report.splitlines(), wide_scalars.report_line(), '* switch manifest: `'
+    manifest = json.loads(next(text for text in lines if text.startswith(prefix))[len(prefix):-1])
+    test.assertIn(f'* verification: `{schema}`', lines)
+    test.assertEqual(manifest['wide_scalar_policy'], wide_scalars.POLICY)
+    test.assertEqual([value for _, value in manifest['wide_scalars']], [0x12345678])
+    test.assertEqual(len(manifest['scalars']), u16_words)
+    test.assertEqual(lines.count(line), 1, report)
+    test.assertTrue(evidence.report_matches(report, root, BASE))
+    test.assertTrue(evidence.switch_report_matches(lines, root, BASE, data_profile=True))
+    test.assertFalse(evidence.switch_report_matches([text for text in lines if text != line], root, BASE,
+                                                    data_profile=True))
+    test.assertFalse(evidence.report_matches(report.replace(line + '\n', ''), root, BASE))
+
+
+class ThunkWideScalarTests(unittest.TestCase):
+    """Wide scalar words (switch_wide_scalars) under the thunk selectors."""
+
+    def test_issued_reports_print_the_premise_and_replay(self):
+        objects = json.dumps({'data_02000100': '0x02000100', 'data_02000200': '0x02000200'}).encode()
+        for name, source, u16_words in (('beside u16 words', WIDE_BESIDE, 1), ('without u16 words', WIDE, 0)):
+            with self.subTest(name):
+                root, report = issue(self, source, objects, [(BASE + 0x400, 2), (BASE + 0x410, 2)], PLAIN,
+                                     link={'switch_thunks': PLAIN}, rom_words=[(THUNK_R2, (0x4710, 0x46C0))])
+                check_wide_report(self, root, report, thunks.SCHEMAS[PLAIN], u16_words)
+
+    def test_a_wide_word_is_a_constant_to_the_thunk_target_walk(self):
+        def wide(fixture):
+            return dict(fixture[2], scalars=[], wide_scalar_policy=wide_scalars.POLICY,
+                        wide_scalars=fixture[2]['scalars'])
+        # 0x80000100 names nothing, and as a plain value it binds without a u16 word in both frame variants.
+        for frame in (False, True):
+            with self.subTest(frame=frame):
+                f = build(scalar=True, scalar_value=0x80000100, frame=frame)
+                verify(f, wide(f))
+        # Shifted right by four it is 0x08000010, inside the caller; copied, it is still no loaded callback.
+        for name, half, message in (('lsrs r2, r3, #4', 0x091A, 'local code address'),
+                                    ('adds r2, r3, #0', 0x1C1A, 'constant-derived')):
+            for frame in (False, True):
+                f = build(post=(('ldr', 0, 'object'), ('h', half)), scalar=True, scalar_value=0x80000100,
+                          frame=frame)
+                with self.subTest(name, frame=frame), self.assertRaisesRegex(ValueError, message):
+                    verify(f, wide(f))
 
 
 if __name__ == '__main__':

@@ -20,6 +20,9 @@ sys.path.insert(0, str(TASK / "tools"))
 import match
 import match_evidence as evidence
 import report_fixtures
+import switch_wide_scalars as wide_scalars
+# Imported as a module, for issue() and check_wide_report(): its TestCase classes would run here again.
+import test_switch_data_thunks as thunk_tests
 
 assert Path(match.__file__).resolve() == TASK / "tools/match.py"
 assert Path(evidence.__file__).resolve() == TASK / "tools/match_evidence.py"
@@ -718,6 +721,44 @@ class CompiledFrameSourceTests(CompiledSourceTests):
     schema = FRAME_V1
     refused = (None, evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR, "u16-scalars-frame-v1",
                evidence.SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR)
+
+
+# Case 4 stores 0x12345678, a wide scalar word (switch_wide_scalars), beside the u16 words 0x444 and 0x555.
+WIDE_BESIDE_SOURCE = SOURCE.replace("g_object = 9;", "g_object = 0x12345678;")
+# With both u16 constants small enough for an immediate, the wide word is the only scalar word.
+WIDE_SOURCE = WIDE_BESIDE_SOURCE.replace("0x444", "4").replace("0x555", "5")
+
+
+class FunctionLiteralWideScalarTests(unittest.TestCase):
+    """Wide scalar words (switch_wide_scalars) under the function-literal selectors."""
+
+    def test_issued_reports_print_the_premise_and_replay(self):
+        objects = json.dumps({"g_object": f"0x{OBJECT:08X}"}).encode()
+        for name, source, u16_words in (("beside u16 words", WIDE_BESIDE_SOURCE, 2),
+                                        ("without u16 words", WIDE_SOURCE, 0)):
+            with self.subTest(name):
+                root, report = thunk_tests.issue(
+                    self, source, objects, [(CALLBACK, 2), (OTHER, 2)],
+                    evidence.SWITCH_FUNCTION_U16_SCALAR_SELECTOR, link={"switch_function_literals": True},
+                    rom_words=[(CALLBACK, (0x4770, 0)), (OTHER, (0x4770, 0))])
+                self.assertIn('"function_policy":', report)
+                thunk_tests.check_wide_report(self, root, report, V1, u16_words)
+
+    def test_a_wide_word_binds_in_every_function_literal_shape(self):
+        # The late scalar word holds 0.5f: the only scalar word on the fixed pool, and beside the
+        # interposed u16 word on the dispatch-identified pool; with and without the outgoing frame.
+        for pool in ((), ("object", "scalar")):
+            for frame in (False, True):
+                body, labels, manifest, mapping = fixture(pool, frame=frame)
+                struct.pack_into("<I", body, labels["late_scalar"], 0x3F000000)
+                wide = dict(manifest, scalars=manifest["scalars"][:-1], wide_scalar_policy=wide_scalars.POLICY,
+                            wide_scalars=[[labels["late_scalar"], 0x3F000000]])
+                as_u16 = dict(manifest, scalars=[*wide["scalars"], *wide["wide_scalars"]])
+                with self.subTest(pool=pool, frame=frame):
+                    self.assertEqual(len(wide["scalars"]), len(pool) // 2)
+                    verify(body, wide, mapping)
+                    with self.assertRaisesRegex(ValueError, "exact nonoverlapping values"):
+                        verify(body, as_u16, mapping)
 
 
 if __name__ == "__main__":
