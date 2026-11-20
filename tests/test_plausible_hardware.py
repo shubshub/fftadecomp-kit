@@ -9,7 +9,9 @@ import plausible
 
 class HardwareVolatileTests(unittest.TestCase):
     comment = "/* plausible: DMA3 hardware requires ordered access and polling. */\n"
-    declaration = "extern DmaRegisters dma3;\n"
+    # a register block must be defined where it is bound, so its size is known (kit#357)
+    declaration = ("typedef struct { const void *source; void *destination; u32 control; } DmaRegisters;\n"
+                   "extern DmaRegisters dma3;\n")
     binding = "volatile DmaRegisters *dma = &dma3;\n"
     mapping = {"dma3": "0x040000D4"}
 

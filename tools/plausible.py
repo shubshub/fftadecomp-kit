@@ -47,9 +47,17 @@ are refused outright.  With --addr the addressed source's translation unit is
 also checked after cpp (volatile_census): each qualifier the compiler will see
 must be one this run read as a qualifier, in code, in a file it linted, and
 the unit may hold no asm keyword.
+
+A file with a line splice is checked twice, as written and with its splices
+joined, and a finding of either view is a finding (kit#357).  The hardware
+exception holds for a scalar direct access, or a bound register block, that
+lies wholly inside the I/O window; with --addr the census also checks that
+cpp leaves each qualifier it admits where it still holds.
 """
 
 import argparse
+import bisect
+import functools
 import hashlib
 import json
 import os
@@ -81,7 +89,9 @@ RULES = [
     ("inline-asm", "error", r"\b(?:__asm__|__asm|asm)\b",
      "inline assembly: the point of a matching decomp is C that compiles to the "
      "original code, not asm pasted into a C file"),
-    ("asm-include", "error", r'#\s*include\s+"[^"]*\.(s|S)"',
+    # matched against the view that keeps string literals (check_view): the
+    # code view blanks the quoted file name
+    ("asm-include", "error", r'(?m)^[ \t]*#[ \t]*include[ \t]*["<][^">\n]*\.[sS][">]',
      "including an assembly file"),
     ("optimize-pragma", "error",
      r"#\s*pragma\s+(?:GCC\s+)?optimize\b|__attribute__\s*\(\(?[^)]*optimize",
@@ -187,33 +197,526 @@ def justified(text, line_no):
     return False
 
 
+# The hardware-register exception (kit#357): a justified `volatile` is exempt
+# only where every access through it stays inside the I/O window
+# [0x04000000, IO_END).  The direct form `*(volatile T *)ADDR` admits only a
+# scalar T, in a context the address walk (access_context) knows keeps the
+# access a value; the bound form `volatile T *local = &symbol;` admits a scalar
+# T or a struct of scalars and pointers defined in the same text, which must
+# fit in the window from the symbol's mapped address.
+IO_START, IO_END = 0x04000000, 0x04000400
+SCALAR_SIZES = {"u8": 1, "s8": 1, "u16": 2, "s16": 2, "u32": 4, "s32": 4}
+BUILTIN_SIZES = {("char",): 1, ("short",): 2, ("short", "int"): 2, ("int",): 4,
+                 ("long",): 4, ("long", "int"): 4, (): 4}
+HARDWARE_TYPE = r"(?:struct\s+|union\s+)?[A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*"
+HARDWARE_DIRECT = re.compile(r"\*\s*\(\s*(?P<v>volatile)\s+(?P<type>" + HARDWARE_TYPE +
+                             r")\s*\*\s*\)\s*(?P<address>0x[0-9a-fA-F]+)[uUlL]*\b(?=\s*(?:[;=),]|$))")
+HARDWARE_BOUND = re.compile(r"\b(?P<v>volatile)\s+(?P<type>" + HARDWARE_TYPE +
+                            r")\s*\*\s*(?:const\s+)?(?P<local>[A-Za-z_]\w*)\s*=\s*"
+                            r"&\s*(?P<symbol>[A-Za-z_]\w*)\s*;")
+
+
+def scalar_size(ctype):
+    """the size of the scalar integer type spelt ctype, or None"""
+    words = ctype.split()
+    if len(words) == 1 and words[0] in SCALAR_SIZES:
+        return SCALAR_SIZES[words[0]]
+    if words and words[0] in ("signed", "unsigned"):
+        words = words[1:]
+    elif not words:
+        return None
+    return BUILTIN_SIZES.get(tuple(words))
+
+
+QUALIFIER_WORDS = {"const", "volatile"}
+TYPE_WORDS = {"signed", "unsigned", "char", "short", "int", "long", "void", "float", "double",
+              "struct", "union", "enum"} | QUALIFIER_WORDS
+IDENTIFIER = re.compile(r"[A-Za-z_]\w*")
+DIRECTIVE = re.compile(r"(?m)^[ \t]*#(?:\\\n|[^\n])*")
+# a declaration's specifiers that are neither a type nor a declarator
+SPECIFIER_WORDS = {"typedef", "extern", "static", "auto", "register", "inline", "__inline", "__inline__",
+                   "__extension__", "__const", "__const__", "__volatile", "__volatile__", "__restrict",
+                   "__restrict__"} | QUALIFIER_WORDS
+TYPEOF_WORDS = {"typeof", "__typeof", "__typeof__"}
+
+
+def blank_directives(text):
+    """text with every preprocessor directive, splices included, blanked to spaces"""
+    return DIRECTIVE.sub(lambda directive: re.sub(r"[^\n]", " ", directive[0]), text)
+
+
+def strip_attributes(text):
+    """text with every `__attribute__((...))` blanked, however deep its parentheses"""
+    out = list(text)
+    for word in re.finditer(r"\b__attribute(?:__)?\b", text):
+        index = word.end()
+        while index < len(text) and text[index].isspace():
+            index += 1
+        depth, end = 0, index
+        while end < len(text) and text[index] == "(":
+            depth += (text[end] == "(") - (text[end] == ")")
+            end += 1
+            if depth <= 0:
+                break
+        out[word.start():end] = " " * (end - word.start())
+    return "".join(out)
+
+
+def declaration_start(code, position):
+    """the offset where the declaration holding position begins: after the previous `;`, block `{` or `}`"""
+    index = position
+    while index > 0:
+        char = code[index - 1]
+        if char in ")]}":
+            opener, depth, open_ = {")": "(", "]": "[", "}": "{"}[char], 0, None
+            for back in range(index - 1, -1, -1):
+                depth += (code[back] == char) - (code[back] == opener)
+                if depth == 0:
+                    open_ = back
+                    break
+            if open_ is None:
+                return index
+            if char == "}" and not re.search(r"\b(?:struct|union|enum)\s*(?:[A-Za-z_]\w*\s*)?\Z", code[:open_]):
+                return index
+            index = open_
+            continue
+        if char in ";{([":
+            return index
+        index -= 1
+    return 0
+
+
+@functools.lru_cache(maxsize=16)
+def typedef_declarations(code):
+    """((name, declaration), ...) for every name a typedef in code declares, wherever `typedef` stands.
+
+    C lets `typedef` stand anywhere among the specifiers (`unsigned char
+    typedef u8;`), so each declaration is read whole, from its start.
+    Attributes are blanked for the parse, so one between `struct` and its
+    body does not hide where the declaration starts, but each declaration is
+    returned as written, so `__attribute__((mode(DI)))` keeps a typedef from
+    reading as canonical.
+    """
+    raw = blank_directives(code)
+    code = strip_attributes(raw)
+    found = []
+    for match in re.finditer(r"\btypedef\b", code):
+        start = declaration_start(code, match.start())
+        depth, end = 0, match.end()
+        while end < len(code) and not (code[end] == ";" and depth <= 0):
+            depth += code[end] in "({[" or -(code[end] in ")}]")
+            end += 1
+        tokens = re.findall(r"[A-Za-z_]\w*|\S", code[start:end])
+        position, typed = 0, False
+        while position < len(tokens):
+            token = tokens[position]
+            if token in ("struct", "union", "enum") or token in TYPEOF_WORDS:
+                typed, position = True, position + 1
+                if token not in TYPEOF_WORDS and position < len(tokens) and IDENTIFIER.fullmatch(tokens[position]):
+                    position += 1
+                if position < len(tokens) and tokens[position] in ("{", "("):
+                    depth = 0
+                    while position < len(tokens):
+                        depth += (tokens[position] in "{(") - (tokens[position] in "})")
+                        position += 1
+                        if depth == 0:
+                            break
+            elif token in SPECIFIER_WORDS:
+                position += 1
+            elif token in TYPE_WORDS:
+                typed, position = True, position + 1
+            elif not typed and IDENTIFIER.fullmatch(token):
+                typed, position = True, position + 1
+            else:
+                break
+        depth, named = 0, False
+        for token in tokens[position:]:
+            if token in ("(", "["):
+                depth += 1
+            elif token in (")", "]"):
+                depth -= 1
+            elif token == "," and depth == 0:
+                named = False
+            elif not named and IDENTIFIER.fullmatch(token) and token not in SPECIFIER_WORDS:
+                found.append((token, raw[start:end + 1]))
+                named = True
+    return tuple(found)
+
+
+def names_hold(code, ctype, unit=False):
+    """do the names in ctype mean in code what the size rules assume (kit#357)?
+
+    A scalar name (u8 .. s32) may only be declared by a typedef of a builtin
+    integer type of its size, `typedef unsigned short u16;`: a typedef in a
+    block, or in a file without ffta.h, could make it an array or a struct.  In
+    a preprocessed translation unit (unit) it must be declared exactly once.  A
+    struct's typedef name must be declared exactly once.
+    """
+    declared = typedef_declarations(code)
+    for word in ctype.split():
+        if word in SCALAR_SIZES:
+            declarations = [statement.strip() for name, statement in declared if name == word]
+            for statement in declarations:
+                canonical = re.fullmatch(r"typedef\s+(?P<words>(?:signed|unsigned|char|short|int|long)"
+                                         r"(?:\s+(?:signed|unsigned|char|short|int|long))*)\s+" + word +
+                                         r"\s*;", statement)
+                if canonical is None or scalar_size(canonical["words"]) != SCALAR_SIZES[word]:
+                    return False
+            if unit and len(declarations) != 1:
+                return False
+    if IDENTIFIER.fullmatch(ctype) and scalar_size(ctype) is None:
+        return sum(name == ctype for name, _ in declared) == 1
+    return True
+
+
+def struct_size(code, ctype, unit=False):
+    """agbcc's size for the struct ctype names, from its one definition in code.
+
+    None unless every member is a scalar integer or a pointer, declared one to
+    a declaration: no arrays, bit-fields, nested types or unknown typedefs, and
+    every scalar name a member uses holds (names_hold).  Members are aligned to
+    their size, and the struct is rounded up to a multiple of 4, as agbcc
+    rounds every struct (STRUCTURE_SIZE_BOUNDARY 32).
+    """
+    tag = re.fullmatch(r"struct\s+([A-Za-z_]\w*)", ctype)
+    if tag:
+        heads = [match.end() for match in re.finditer(r"\bstruct\s+" + tag[1] + r"\s*\{", code)]
+    elif IDENTIFIER.fullmatch(ctype):
+        heads = []
+        for match in re.finditer(r"\btypedef\s+struct\s*(?:[A-Za-z_]\w*\s*)?\{", code):
+            close = code.find("}", match.end())
+            if close >= 0 and re.match(r"\s*" + re.escape(ctype) + r"\s*;", code[close + 1:]):
+                heads.append(match.end())
+    else:
+        return None
+    if len(heads) != 1:
+        return None
+    close = code.find("}", heads[0])
+    if close < 0:
+        return None
+    offset = 0
+    for member in code[heads[0]:close].split(";"):
+        if not member.strip():
+            continue
+        match = re.fullmatch(r"\s*(?:const\s+)?(?P<type>[A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*?)\s*"
+                             r"(?P<pointer>\*+\s*(?:const\s*)?)?(?P<name>[A-Za-z_]\w*)\s*", member)
+        if match is None or not all(names_hold(code, word, unit) for word in match["type"].split()
+                                    if word in SCALAR_SIZES):
+            return None
+        size = 4 if match["pointer"] else scalar_size(match["type"])
+        if size is None:
+            return None
+        offset = (offset + size - 1) // size * size + size
+    return (offset + 3) // 4 * 4 if offset else None
+
+
+DIGRAPHS = {"<:": "[ ", ":>": " ]", "<%": "{ ", "%>": " }", "%:%:": "##  ", "%:": "# "}
+
+
+def spell_digraphs(code, view=None):
+    """code (comments and literals already blanked) with each digraph spelt as its bracket or `#`.
+
+    cpp and agbcc read `%:` as `#`, `<%` as `{` and `<:` as `[` (kit#408).
+    Outside a literal no valid C has these pairs otherwise, and the offsets
+    are kept.  Given view, another view of the same text (one that keeps its
+    literals, say), the digraphs code holds are spelt in view instead, so a
+    literal's text is left as it is.
+    """
+    out = list(code if view is None else view)
+    for digraph in re.finditer(r"%:%:|<:|:>|<%|%>|%:", code):
+        out[digraph.start():digraph.end()] = DIGRAPHS[digraph[0]]
+    return "".join(out)
+
+
+def operand_view(text):
+    """text with comments blanked and every literal filled with `0`, keeping offsets.
+
+    In the code view a literal is blank, so `'c' & x` reads as a unary `&`; here
+    the literal is still an operand.  Digraphs are spelt as what they stand for.
+    """
+    code = strip_comments_and_strings(text)
+    out = list(code)
+    for literal in re.finditer(r'"(?:\\.|[^"\\\n])*"|\'(?:\\.|[^\'\\\n])*\'', text):
+        if code[literal.start()] == " " and not code[literal.start():literal.end()].strip():
+            out[literal.start():literal.end()] = "0" * (literal.end() - literal.start())
+    return spell_digraphs("".join(out))
+
+
+# The address walk (kit#357).  It reads tokens, never a fixed window, and it
+# is a whitelist: from the access it steps outward only through what can keep
+# an lvalue (parentheses, casts, the comma operator GNU C lets stand as an
+# lvalue, the conditional operator, and the transparent keywords), and it
+# admits only a context it knows makes the access a value: an operator, an
+# assignment, a call's argument, a condition or a statement.  Anything else it
+# does not model, such as `sizeof`, `__typeof__`, a name or a stray token,
+# refuses.
+STATEMENT_WORDS = {"return", "case", "else", "do"}
+CONTROL_WORDS = {"if", "while", "for", "switch"}
+LVALUE_WORDS = {"__extension__", "__real__", "__real", "__imag__", "__imag"}
+SIZE_WORDS = {"sizeof", "__alignof__", "__alignof"}
+KEYWORDS = TYPE_WORDS | STATEMENT_WORDS | CONTROL_WORDS | LVALUE_WORDS | SIZE_WORDS | SPECIFIER_WORDS | \
+    TYPEOF_WORDS | {"break", "continue", "default", "goto", "asm"}
+VALUE_TOKENS = {"=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "^=", "|=", "+", "-", "*", "/", "%",
+                "<<", ">>", "<", ">", "<=", ">=", "==", "!=", "^", "|", "&&", "||", "!", "~", "++", "--",
+                "[", ";", "{", "}"} | STATEMENT_WORDS
+OPENERS = {")": "(", "]": "[", "}": "{"}
+NUMBER = re.compile(r"\.?\d")
+WALK_TOKEN = re.compile(r"[A-Za-z_$][\w$]*|\.?\d(?:[eEpP][-+]|[\w.])*|->|\+\+|--|<<=|>>=|\.\.\.|##|"
+                        r"[-+*/%&|^!=<>]=|<<|>>|&&|\|\||\S")
+
+
+class WalkRun:
+    """a run of tokens with their offsets, matching brackets and innermost open bracket"""
+
+    def __init__(self, text, begin, end):
+        tokens = list(WALK_TOKEN.finditer(text, begin, end))
+        self.starts = [token.start() for token in tokens]
+        self.texts = [token[0] for token in tokens]
+        self.partner = [None] * len(tokens)
+        self.enclosing = [None] * len(tokens)
+        stack = []
+        for index, token in enumerate(self.texts):
+            self.enclosing[index] = stack[-1] if stack else None
+            if token in ("(", "[", "{"):
+                stack.append(index)
+            elif token in OPENERS and stack and self.texts[stack[-1]] == OPENERS[token]:
+                self.partner[index] = stack.pop()
+                self.partner[self.partner[index]] = index
+
+
+@functools.lru_cache(maxsize=8)
+def walk_runs(view):
+    """(the code's tokens, directive starts, (start, end, the body's tokens) per directive) of a view.
+
+    Directives are not code: a macro's body is walked on its own, from its
+    start, and the census walks what cpp made of it.  Splices are whitespace.
+    """
+    spliced = view.replace("\\\n", "  ")
+    directives = [(directive.start(), directive.end()) for directive in DIRECTIVE.finditer(view)]
+    bodies = []
+    for start, end in directives:
+        head = re.match(r"[ \t]*#[ \t]*(?:define[ \t]+[A-Za-z_]\w*(?:\([^)]*\))?|[A-Za-z_]\w*)?", spliced[start:end])
+        bodies.append((start, end, WalkRun(spliced, start + head.end(), end)))
+    return WalkRun(blank_directives(spliced), 0, len(view)), [start for start, _ in directives], bodies
+
+
+def walk_position(view, offset):
+    """(run, index) of the token that starts at offset, or None"""
+    code, starts, bodies = walk_runs(view)
+    run = code
+    directive = bisect.bisect_right(starts, offset) - 1
+    if directive >= 0 and offset < bodies[directive][1]:
+        run = bodies[directive][2]
+    index = bisect.bisect_left(run.starts, offset)
+    return (run, index) if index < len(run.starts) and run.starts[index] == offset else None
+
+
+def is_name(token, typedefs):
+    """is token an object's or a function's name: an identifier that is no keyword or type?"""
+    return (IDENTIFIER.fullmatch(token) is not None and token not in KEYWORDS and not token.startswith("__")
+            and token not in SCALAR_SIZES and (typedefs is None or token not in typedefs))
+
+
+def control_header(run, open_):
+    return open_ > 0 and run.texts[open_ - 1] in CONTROL_WORDS
+
+
+def type_name(run, open_, typedefs):
+    """does the group opened at open_ hold only a type name?"""
+    close = run.partner[open_]
+    tokens = run.texts[open_ + 1:close] if close is not None else []
+    if not tokens or any(not (IDENTIFIER.fullmatch(token) or token == "*") for token in tokens):
+        return False
+    names = [token for token in tokens if token != "*" and token not in QUALIFIER_WORDS]
+    if any(name in TYPE_WORDS for name in names):
+        return True
+    return len(names) == 1 and (typedefs is None or names[0] in typedefs or names[0] in SCALAR_SIZES)
+
+
+def is_cast(run, open_, typedefs):
+    """is the group opened at open_ a cast's type name?  None when the brackets do not match.
+
+    typedefs, the names that are types, tells a cast `(T)` from a
+    parenthesized operand `(x)`; without it a lone name counts as a type.
+    """
+    while True:
+        if not type_name(run, open_, typedefs):
+            return False
+        if open_ == 0:
+            return True
+        token = run.texts[open_ - 1]
+        if token == ")":
+            inner = run.partner[open_ - 1]
+            if inner is None:
+                return None
+            if control_header(run, inner):
+                return True
+            open_ = inner
+            continue
+        if IDENTIFIER.fullmatch(token):
+            return token in STATEMENT_WORDS or token in LVALUE_WORDS
+        return not (token in ("]", "++", "--") or NUMBER.match(token))
+
+
+def operand_end(run, index, typedefs):
+    """does the token at index end an operand, so that a `&` or `*` after it is binary?"""
+    if index < 0:
+        return False
+    token = run.texts[index]
+    if token == ")":
+        open_ = run.partner[index]
+        return open_ is not None and is_cast(run, open_, typedefs) is False and not control_header(run, open_)
+    return token in ("]", "++", "--") or NUMBER.match(token) is not None or is_name(token, typedefs)
+
+
+def converts_to_value(view, run, ampersand, typedefs):
+    """is the unary `&` at ampersand at once the operand of a cast to `void *` or to an integer type?
+
+    Such a value carries no volatile qualifier: nothing reaches memory through
+    it without a new cast, and a new volatile cast is a qualifier of its own,
+    exempt only as a direct access to a literal address.  So a register's
+    address passed on as a DMA source or destination is admitted.
+    """
+    close = ampersand - 1
+    if close < 0 or run.texts[close] != ")":
+        return False
+    open_ = run.partner[close]
+    if open_ is None or not is_cast(run, open_, typedefs):
+        return False
+    content = " ".join(run.texts[open_ + 1:close])
+    if re.fullmatch(r"(?:const )?void \*", content):
+        return True
+    return ("*" not in content.split() and scalar_size(content) is not None and
+            all(names_hold(view, word, typedefs is not None) for word in content.split() if word in SCALAR_SIZES))
+
+
+def access_context(view, start, typedefs=None):
+    """why the operand whose first token is at start may not be a plain access, or None if it is (kit#357).
+
+    "address" when a unary `&` reaches it through parentheses, casts, comma
+    or conditional operators or a transparent keyword, unless the address is
+    converted at once to a value (converts_to_value); "unknown" when the walk
+    meets a context it does not model.  view is operand_view's; typedefs is
+    given for a preprocessed unit (is_cast).
+    """
+    position = walk_position(view, start)
+    if position is None:
+        return "unknown"
+    run, node = position
+    group = False
+    while True:
+        before = node - 1
+        if before < 0:
+            return None
+        token = run.texts[before]
+        if token == ")":
+            open_ = run.partner[before]
+            cast = None if open_ is None else is_cast(run, open_, typedefs)
+            if cast:
+                node = open_
+                continue
+            if cast is not None and (control_header(run, open_) or group):
+                return None
+            return "unknown"
+        if token in LVALUE_WORDS:
+            node = before
+            continue
+        if token == "&":
+            if operand_end(run, before - 1, typedefs):
+                return None
+            return None if converts_to_value(view, run, before, typedefs) else "address"
+        if token in VALUE_TOKENS:
+            return None
+        if token == "(":
+            node, group = before, True
+            continue
+        if token in (",", "?", ":"):
+            outer = run.enclosing[before]
+            if outer is None or run.texts[outer] != "(":
+                return None
+            node, group = outer, True
+            continue
+        if group and (token == "]" or token in CONTROL_WORDS or is_name(token, typedefs)):
+            return None
+        return "unknown"
+
+
+def direct_access_holds(code, match, view=None, typedefs=None):
+    """does a HARDWARE_DIRECT match access exactly a register inside the I/O window?"""
+    size = scalar_size(match["type"])
+    address = int(match["address"], 16)
+    return (size is not None and IO_START <= address and address + size <= IO_END and
+            names_hold(join_splices(code), match["type"], typedefs is not None) and
+            access_context(view if view is not None else operand_view(code), match.start(), typedefs) is None)
+
+
+def bound_target_holds(code, match, data_symbols, unit=False):
+    """is a HARDWARE_BOUND binding's symbol mapped in the window, with the whole pointed-to type inside it?"""
+    value = data_symbols.get(match["symbol"])
+    try:
+        address = int(value, 0) if isinstance(value, str) else int(value)
+    except (TypeError, ValueError):
+        return False
+    joined = join_splices(code)
+    size = scalar_size(match["type"]) or struct_size(joined, match["type"], unit)
+    return (size is not None and IO_START <= address and address + size <= IO_END and
+            names_hold(joined, match["type"], unit))
+
+
+def bound_use_holds(code, ref, view=None, typedefs=None):
+    """is this use of a bound MMIO pointer an immediate member access or dereference, in a plain access?"""
+    view = view if view is not None else operand_view(code)
+    position = walk_position(view, ref.start())
+    if position is None:
+        return False
+    run, index = position
+    texts = run.texts
+    if index + 2 < len(texts) and texts[index + 1] == "->" and IDENTIFIER.fullmatch(texts[index + 2]):
+        return access_context(view, ref.start(), typedefs) is None
+    # a lone name in parentheses before the `*` counts as an operand here, unless the unit's
+    # typedefs say it is a type: `(factor) * port` must not read as a dereference
+    if index > 0 and texts[index - 1] == "*" and \
+            not operand_end(run, index - 2, typedefs if typedefs is not None else frozenset()):
+        after = texts[index + 1] if index + 1 < len(texts) else None
+        return (after not in ("[", "(", "++", "--", "+=", "-=", "->", ".") and
+                access_context(view, run.starts[index - 1], typedefs) is None)
+    return False
+
+
+def symbol_holds(code, symbol):
+    """is every occurrence of symbol in code an `extern` declaration of it, or the operand of `&`?"""
+    declarations = [match.span() for match in re.finditer(
+        r"(?m)^\s*extern\s+" + HARDWARE_TYPE + r"\s+" + re.escape(symbol) + r"\s*;", code)]
+    return bool(declarations) and all(
+        any(start <= ref.start() < end for start, end in declarations) or
+        re.search(r"&\s*\Z", code[max(0, ref.start() - 64):ref.start()])
+        for ref in re.finditer(r"\b" + re.escape(symbol) + r"\b", code))
+
+
 def hardware_volatile_offsets(text, code, data_symbols):
     """Recognize documented, directly bound MMIO qualifiers, not local steering."""
     allowed = set()
     if not re.search(r"\bvolatile\b", code):
         return allowed
+    code = spell_digraphs(code)
     comments = []
     tokens = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*[\s\S]*?\*/'
     for token in re.finditer(tokens, text):
         if token[0].startswith(("//", "/*")) and JUSTIFY in token[0]:
             comments.append(text.count("\n", 0, token.end()) + 1)
+    view = operand_view(text)
 
     def justified_io(offset, address):
         line = text.count("\n", 0, offset) + 1
-        return 0x04000000 <= address < 0x04000400 and any(
+        return IO_START <= address < IO_END and any(
             comment in (line, line - 1) for comment in comments)
 
-    ctype = r"(?:struct\s+|union\s+)?[A-Za-z_]\w*(?:\s+[A-Za-z_]\w*)*"
-    direct = (r"\*\s*\(\s*(?P<v>volatile)\s+" + ctype +
-              r"\s*\*\s*\)\s*(?P<address>0x[0-9a-fA-F]+)[uUlL]*\b(?=\s*(?:[;=),]|$))")
-    for match in re.finditer(direct, code):
-        if justified_io(match.start("v"), int(match["address"], 16)):
+    for match in HARDWARE_DIRECT.finditer(code):
+        if direct_access_holds(code, match, view) and justified_io(match.start("v"), int(match["address"], 16)):
             allowed.add(match.start("v"))
 
-    bound = (r"\b(?P<v>volatile)\s+" + ctype +
-             r"\s*\*\s*(?:const\s+)?(?P<local>[A-Za-z_]\w*)\s*=\s*"
-             r"&\s*(?P<symbol>[A-Za-z_]\w*)\s*;")
-    bindings = list(re.finditer(bound, code))
+    ctype = HARDWARE_TYPE
+    bindings = list(HARDWARE_BOUND.finditer(code))
     for match in bindings:
         symbol = match["symbol"]
         value = data_symbols.get(symbol)
@@ -233,40 +736,46 @@ def hardware_volatile_offsets(text, code, data_symbols):
         local_uses = re.finditer(r"\b" + re.escape(match["local"]) + r"\b", code)
         declarations = [item.span("local") for item in bindings
                         if item["local"] == match["local"]]
-        def conditional_dereference(before):
-            prefix = before.rstrip()
-            if not prefix.endswith("*"):
-                return False
-            prefix = prefix[:-1].rstrip()
-            if re.search(r"\belse$", prefix):
-                return True
-            if not prefix.endswith(")"):
-                return False
-            depth = 0
-            for index in range(len(prefix) - 1, -1, -1):
-                if prefix[index] == ")":
-                    depth += 1
-                elif prefix[index] == "(":
-                    depth -= 1
-                    if depth == 0:
-                        return re.search(r"\bif\s*$", prefix[:index]) is not None
-            return False
-
-        def direct_access(ref):
-            before, after = code[:ref.start()], code[ref.end():]
-            if re.match(r"\s*->", after):
-                return not re.search(r"&\s*$", before)
-            return ((re.search(r"(?:^|[=(:,;{}!~?&|^<>+\-/%\[\]])\s*\*\s*$|\breturn\s+\*\s*$", before) is not None or
-                     conditional_dereference(before)) and
-                    re.search(r"&\s*\*\s*$", before) is None and
-                    re.match(r"\s*(?:\[|\+\+|--|\+=|-=|->|\.)", after) is None)
-
-        if any(ref.span() not in declarations and not direct_access(ref)
+        if any(ref.span() not in declarations and not bound_use_holds(code, ref, view)
                for ref in local_uses):
             continue
-        if justified_io(match.start("v"), address):
+        if bound_target_holds(code, match, data_symbols) and justified_io(match.start("v"), address):
             allowed.add(match.start("v"))
     return allowed
+
+
+def exempt_shape_holds(code, offset, data_symbols, view=None, typedefs=None):
+    """does the qualifier at offset of a preprocessed unit sit where the hardware exception holds?
+
+    The census's placement check (kit#357), on the whole unit, so every typedef
+    and macro is in view: the qualifier must begin a direct access that holds,
+    or a binding that holds, whose symbol is the extern object (never
+    redeclared) and whose every later use in its block is a member access or
+    dereference whose address is never taken.  The justification was checked
+    where the qualifier is written; a macro can move it, not justify it.
+    """
+    view = view if view is not None else code
+    window = code[max(0, offset - 256):offset]
+    prefix = re.search(r"\*\s*\(\s*\Z", window)
+    if prefix:
+        match = HARDWARE_DIRECT.match(code, offset - len(window) + prefix.start())
+        if match and match.start("v") == offset and direct_access_holds(code, match, view, typedefs):
+            return True
+    match = HARDWARE_BOUND.match(code, offset)
+    if match is None or not bound_target_holds(code, match, data_symbols, typedefs is not None) or \
+            not symbol_holds(code, match["symbol"]):
+        return False
+    depth, end = 0, len(code)
+    for index in range(match.end(), len(code)):
+        if code[index] == "{":
+            depth += 1
+        elif code[index] == "}":
+            depth -= 1
+            if depth < 0:
+                end = index
+                break
+    local = re.compile(r"\b" + re.escape(match["local"]) + r"\b")
+    return all(bound_use_holds(code, ref, view, typedefs) for ref in local.finditer(code, match.end(), end))
 
 
 def volatile_allow_path():
@@ -882,6 +1391,9 @@ def statement_macro_tails(code):
     return tails
 
 
+JOINED = " (with the file's line splices joined, as cpp reads it)"
+
+
 def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
                closure=None, untranslated=None, tree=None, project=None):
     """returns list of findings: (line, rule, severity, message)
@@ -890,28 +1402,50 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     an allowlisted volatile object names can be exempted, so None never is.
     closure is include_closure() of the file; without it no file is assumed
     unable to see an allowlisted declaration.
+
+    cpp joins line splices before it reads a token, so a file with a splice
+    is checked twice: as written, and with its splices joined (kit#357).  A
+    finding of either view is a finding, so an exemption holds only where both
+    views admit it, and a token split across a splice (`a\\<newline>sm`,
+    `whi\\<newline>le (0)`) meets its rule.  A joined-view finding the written
+    view does not also make on the same logical line is reported on that
+    line's first physical line, marked JOINED.
     """
-    code = strip_comments_and_strings(text)
+    findings = check_view(text, origin, data_symbols, relpath, volatile_allow, closure,
+                          untranslated, tree, project)
+    splice_lines = {text.count("\n", 0, match.start()) + 1 for match in re.finditer(SPLICE, text)}
+    if not splice_lines:
+        return findings
+    first, logical, shift = {0: 0}, {0: 0}, 0
+    for line in range(1, text.count("\n") + 2):
+        logical[line] = line - shift
+        first.setdefault(line - shift, line)
+        shift += line in splice_lines
+    seen = {}
+    for line, rule, _, _ in findings:
+        key = (logical.get(line, line), rule)
+        seen[key] = seen.get(key, 0) + 1
+    for line, rule, severity, message in check_view(join_splices(text), origin, data_symbols, relpath,
+                                                    volatile_allow, closure, None, tree, project):
+        if seen.get((line, rule), 0):
+            seen[(line, rule)] -= 1
+            continue
+        findings.append((first.get(line, line), rule, severity, message + JOINED))
+    findings.sort(key=lambda f: (f[0], f[1]))
+    return findings
+
+
+def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
+               closure=None, untranslated=None, tree=None, project=None):
+    """check_text's findings for one view of a file: the text as given, splices and all.
+
+    Every rule reads the code with its digraphs spelt as cpp reads them, so
+    `%:if 0` meets the rule `#if 0` does (kit#408).
+    """
+    unspelt = strip_comments_and_strings(text)
+    code = spell_digraphs(unspelt)
     macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
-    splices = [match.span() for match in re.finditer(SPLICE, text)]
-    if splices:
-        # cpp joins line splices before it reads a token, so an exemption holds
-        # only where it also holds in the joined text: a splice can hide a
-        # retarget from these scans (`d\<newline>ma = &ram;`), or open a comment
-        # only cpp sees (`/\<newline>*`) that turns a statement into a macro tail.
-        def physical(offset):
-            """the offset in text of the joined text's character at offset"""
-            for start, end in splices:
-                if start > offset:
-                    break
-                offset += end - start
-            return offset
-        joined_text = join_splices(text)
-        joined = strip_comments_and_strings(joined_text)
-        macro_tails &= {physical(offset) for offset in statement_macro_tails(joined)}
-        hardware_qualifiers &= {physical(offset) for offset in
-                                hardware_volatile_offsets(joined_text, joined, data_symbols or {})}
     if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
             {relpath, "include/ffta.h"}, []):
         import boot_dma0_shadow as dma
@@ -1054,8 +1588,9 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         findings.append((code.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
                          f"`{name}` asks the preprocessor about the files or the build: no gcc 2.95-era "
                          "source does, and it can tell the volatile census's copy from the tree"))
+    literals = spell_digraphs(unspelt, strip_comments_and_strings_keep_strings(text))
     for rid, sev, pat, msg in RULES:
-        for m in re.finditer(pat, code):
+        for m in re.finditer(pat, literals if rid == "asm-include" else code):
             if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
                 continue
             if rid == "dead-code" and m.start() in macro_tails:
@@ -1169,30 +1704,42 @@ MARKER_LETTERS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789
 CENSUS_CPP = "cpp"
 
 
+# the marker of a qualifier the hardware exception admits (kit#357): its own,
+# so the census can check where cpp puts it
+HARDWARE = "hardware"
+
+
 def census_markers(forbidden, choice=None):
     """a fresh marker per spelling: a reserved identifier as long as the spelling, `__` and letters or digits.
 
-    Drawn at random on every run, so no source can spell one, and redrawn until
-    none occurs in any of the forbidden texts (every input, raw and squeezed,
-    and the real unit) or in another marker.
+    One more marker, under HARDWARE and as long as `volatile`, renames the
+    qualifiers the hardware exception admits.  Drawn at random on every run,
+    so no source can spell one, and redrawn until none occurs in any of the
+    forbidden texts (every input, raw and squeezed, and the real unit) or in
+    another marker.
     """
     import secrets
     choice = choice or secrets.choice
     while True:
         markers = {spelling: "__" + "".join(choice(MARKER_LETTERS) for _ in range(len(spelling) - 2))
-                   for spelling in VOLATILE_SPELLINGS}
+                   for spelling in VOLATILE_SPELLINGS + (HARDWARE,)}
         values = list(markers.values())
         if all(a == b or a not in b for a in values for b in values) and \
                 not any(value in text for value in values for text in forbidden):
             return markers
 
 
-def census_marked(text, markers):
-    """text with every qualifier of the lint's code view replaced by its marker"""
+def census_marked(text, markers, exempt=frozenset()):
+    """text with every qualifier of the lint's code view replaced by its marker.
+
+    A qualifier at an offset in exempt (one the hardware exception admits) gets
+    the HARDWARE marker instead.
+    """
     code = strip_comments_and_strings(text)
     pieces, last = [], 0
     for match in VOLATILE_QUALIFIER.finditer(code):
-        pieces += [text[last:match.start()], markers[match[0]]]
+        marker = markers[HARDWARE] if match.start() in exempt and HARDWARE in markers else markers[match[0]]
+        pieces += [text[last:match.start()], marker]
         last = match.end()
     return "".join(pieces) + text[last:]
 
@@ -1222,7 +1769,7 @@ def census_findings(real, marked, markers):
         findings.append("a qualifier is pasted into a longer token in the translation unit")
     restored = marked
     for spelling, marker in markers.items():
-        restored = restored.replace(marker, spelling)
+        restored = restored.replace(marker, spelling if spelling in VOLATILE_SPELLINGS else "volatile")
     if restored != real:
         findings.append("the translation unit changes when only its linted qualifiers are renamed: "
                         "it depends on more than the text of its linted files")
@@ -1230,6 +1777,30 @@ def census_findings(real, marked, markers):
         findings.append("typeof in a translation unit that holds a volatile qualifier: it can copy "
                         "the qualifier onto an object the source never qualifies")
     return findings
+
+
+def census_placement(marked, markers, data_symbols):
+    """why a qualifier the hardware exception admitted is not where it holds in the marked unit (kit#357)"""
+    marker = markers.get(HARDWARE)
+    if marker is None or marker not in marked:
+        return []
+    unit = marked.replace(marker, "volatile")
+    code, view = spell_digraphs(strip_comments_and_strings(unit)), operand_view(unit)
+    typedefs = {name for name, _ in typedef_declarations(code)}
+    for match in re.finditer(re.escape(marker), marked):
+        if exempt_shape_holds(code, match.start(), data_symbols, view, typedefs):
+            continue
+        window = code[max(0, match.start() - 256):match.start()]
+        prefix = re.search(r"\*\s*\(\s*\Z", window)
+        access = prefix and HARDWARE_DIRECT.match(code, match.start() - len(window) + prefix.start())
+        if access and access_context(view, access.start(), typedefs) == "address":
+            return ["a justified hardware register's address is taken in the translation unit: the hardware "
+                    "exception admits a register's address only when it is converted at once to `void *` or "
+                    "to an integer, since a pointer could reach memory outside the I/O window (this is "
+                    "conservative)"]
+        return ["a justified hardware qualifier is not in an access the hardware exception admits once the "
+                "translation unit is preprocessed: a macro, a typedef or the code around it changed the access"]
+    return []
 
 
 def census_unit(source):
@@ -1352,6 +1923,11 @@ def volatile_census(address, linted):
             if len(identities) != len(reads):
                 return [(source, "volatile-census", "the translation unit reads one file under two names")]
             markers = census_markers(forbidden + [real])
+            try:
+                data_symbols = json.loads((base / "config" / "data_symbols.json").read_text())
+            except (OSError, ValueError):
+                data_symbols = {}
+            data_symbols = data_symbols if isinstance(data_symbols, dict) else {}
             copy = work / "copy"
             for top in ("src", "include"):
                 for directory, _, _ in os.walk(base / top):
@@ -1359,12 +1935,15 @@ def volatile_census(address, linted):
             for name, path in reads.items():
                 target = copy / name
                 target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(census_marked(lint_text(path.read_bytes()), markers).encode("utf-8"))
+                lint = lint_text(path.read_bytes())
+                exempt = hardware_volatile_offsets(lint, strip_comments_and_strings(lint), data_symbols)
+                target.write_bytes(census_marked(lint, markers, exempt).encode("utf-8"))
             census_run(f"{command} -o ../marked.i", copy)
             marked = (work / "marked.i").read_bytes().decode("utf-8")
     except (OSError, ValueError, RuntimeError, ImportError, subprocess.SubprocessError) as error:
         return [(source, "volatile-census", f"the volatile census could not preprocess the source: {error}")]
-    return [(source, "volatile-census", message) for message in census_findings(real, marked, markers)]
+    return [(source, "volatile-census", message) for message in
+            census_findings(real, marked, markers) + census_placement(marked, markers, data_symbols)]
 
 
 def asm_allow_path():

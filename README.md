@@ -3812,6 +3812,57 @@ window by `config/data_symbols.json`. Such a pointer may only be used for
 member access; retargeting, shadowing and escapes remain rejected. A comment
 alone cannot permit volatile RAM or local variables, asm or steering pragmas.
 
+The exception holds for the access, not just the address (kit#357):
+
+* **The direct form.** `*(volatile T *)ADDR` needs a scalar integer `T`
+  (u8, u16, u32, s8, s16, s32, or a builtin spelling such as
+  `unsigned short`), and the whole access must lie inside the window. A struct
+  `T` is refused, since its members can lie past the window.
+* **The bound form.** `volatile T *p = &symbol;` needs a scalar `T`, or a
+  struct of scalars and pointers defined once in the same file. Its whole
+  size, rounded up to 4 bytes as agbcc rounds every struct, must fit in the
+  window from the symbol's mapped address. Every later use of `p` must be
+  `p->member` or `*p`.
+* **The access must stay a value.** The address walk reads tokens outward
+  from the access (or from the use of `p`). It passes through what keeps an
+  lvalue: parentheses, casts, the comma operator (GNU C lets it stand as an
+  lvalue), the conditional operator, and `__extension__`, `__real__` and
+  `__imag__`. It admits the access only when it reaches a context that makes
+  it a value: an operator, an assignment, a call's argument, a condition, an
+  initializer or a statement. A unary `&` on the way is refused, unless the
+  address is converted at once to `void *` or an integer, as a DMA source or
+  destination is: such a value reaches no memory without a new cast, and a
+  new volatile cast is a qualifier of its own. The walk is a whitelist, so a
+  context it does not model is refused too: `sizeof`, `__typeof__`, an
+  object-like macro or an unknown name before the access. Keeping a
+  register's address as a pointer is refused even where that would be safe;
+  this is conservative.
+* **The names.** The forms judge a type by its name, so the names must mean
+  what the rules assume. A scalar name may only be declared as
+  `typedef <builtin integer> NAME;` of its size, and in the preprocessed
+  unit exactly once. `typedef` is read wherever it stands among the
+  specifiers (`unsigned char typedef u8[2];` declares `u8`). A bound struct's
+  typedef name must be declared exactly once, and every scalar name its
+  members use must hold too.
+* **Macros.** With `--addr`, the volatile census (below) gives every
+  qualifier this exception admits a marker of its own. Each one must sit in
+  cpp's output where the direct or bound form still holds. The binding's
+  symbol must be the external data symbol itself: declared `extern`, and
+  used only after `&`, so neither a macro nor a block-scope or file-scope
+  declaration shadows it. A macro that turns the access into something else
+  is refused: a scalar's name redefined as `s8 *)&data_x = 1, *(s8`, a
+  binding taken apart by a function-like macro, or `&` before a register
+  macro. The justification is checked where the qualifier is written; a macro
+  can move a qualifier, but it cannot justify one.
+
+**Line splices (kit#357).** cpp deletes backslash-newline before it reads a
+token, so a file with a splice is checked twice: as written and with its
+splices joined. A finding of either view is a finding, so an exemption holds
+only where both views admit it, and a token split across a splice
+(`a\` newline `sm`, `whi\` newline `le (0)`) still meets its rule. A finding
+only the joined view makes is reported on its logical line's first physical
+line and marked as such. A file without a splice is checked once.
+
 **Every spelling of the qualifier (kit#93).** agbcc reads `volatile`,
 `__volatile__` and `__volatile` as the same qualifier (`gcc/c-parse.gperf`).
 The `volatile` rule refuses all three. Every exception (the hardware forms
@@ -3846,9 +3897,10 @@ spell one. That is the census's guarantee. A source that can tell the copy
 from the tree, by a pasted query or any other means, can make the copy take
 another branch. But it cannot make the copy produce a marker where the real
 unit holds a qualifier that the lint did not read, so the comparison below
-refuses it. The one exception is a macro that carries an exempt qualifier
-somewhere else (kit#357), and that needs no detection at all. The source is
-refused (`volatile-census`) when:
+refuses it. The one exception would be a macro that carries an exempt
+qualifier somewhere else, and that needs no detection at all. For the
+hardware exception, the placement check above refuses it (kit#357). The
+source is refused (`volatile-census`) when:
 
 * the copy still holds a qualifier: token pasting, a line splice, or text the
   lint reads as a comment or literal (kit#129) made it;
@@ -3877,9 +3929,9 @@ from the tree's root. It imports match.py only on Windows, to run through
 
 What the census proves is where each qualifier came from: every qualifier agbcc
 compiles is one the lint read, in code, in a file this run lints, and so was
-refused or exempted by an exception above. It does not check where an exempt
-qualifier ends up: a macro can carry a justified hardware qualifier onto other
-memory, which is the hardware exception's business (kit#357). The census runs
+refused or exempted by an exception above. Where a hardware-exempt qualifier
+ends up is checked separately, as described above (kit#357). Qualifiers that
+the allow list and the per-file modules exempt are placed by their own pins. The census runs
 wherever the lint runs with `--addr`: match.py's ordinary path (and so
 `status.py --verify`) and every profile that lints a captured copy. It does not
 run for 0x08001244 (`oam_list_context`, whose `-include` prefix units it does
