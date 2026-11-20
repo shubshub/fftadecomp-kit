@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "87117b814e00854b3d5ba6de823ed200fca26fccca56946907832363a84ab893",
+    "acknowledged_cursor": 7039391222,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "87117b814e00854b3d5ba6de823ed200fca26fccca56946907832363a84ab893",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0804DF08\",\"who\":\"lane77-0804DF08\",\"note\":\"Verify parked original agbcc C and its native call/frame or switch evidence for publication.\"}",
+      "created_at": "2026-11-20T12:20:39Z",
+      "id": 7039391188,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:20:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38037f2491984c6dc4996e7a08fc87d7888506ab410c5111009eb6cf8b26864c",
+    "result": {
+      "address": "0x0804DF08",
+      "claim_id": 7039391188,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7039391188,
+      "status": "accepted",
+      "who": "lane77-0804DF08"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "322318ae99e5f4bd934d86eb1759032c09893c1d23a4d72df2643d7e2211cc5f",
+    "acknowledged_cursor": 7039811397,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "322318ae99e5f4bd934d86eb1759032c09893c1d23a4d72df2643d7e2211cc5f",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0804DF08\",\"who\":\"lane77-0804DF08\",\"claim_id\":7039391188,\"reason\":\"Parked with 213/254 matching bytes. Both real caller paths and signed bounds passed; loop induction and register allocation still differ. Evidence in game PR #334.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T12:42:05Z",
+      "id": 7039811002,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:42:05Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "404be7b96e8a82e552cb97af62a3923ca0051550d9464a67076fb7e0427246f5",
+    "result": {
+      "address": "0x0804DF08",
+      "claim_id": 7039391188,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7039811002,
+      "status": "accepted",
+      "who": "lane77-0804DF08"
+    }
+  }
+}
