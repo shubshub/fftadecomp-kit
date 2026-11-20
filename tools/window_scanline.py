@@ -406,12 +406,16 @@ def record(root, address):
 
 def report_body(report, root, address):
     from rompath import rom_path
-    length = OWNER_SHAPES[address][0][0]
+    length = 156 if address == 0x080D9C58 else OWNER_SHAPES[address][0][0]
     with open(rom_path(root), 'rb') as stream:
         stream.seek(address-BASE)
         body = stream.read(length)
     lines = report.splitlines()
-    schema = 'elf-symbol-thumb-frame-v1' if not CALLEES[address] else 'elf-symbol-thumb-frame-calls-v1'
+    if address == 0x080D9C58:
+        from match_evidence import FRAMED_FUNCTION_ADDRESS_SCHEMA
+        schema = FRAMED_FUNCTION_ADDRESS_SCHEMA
+    else:
+        schema = 'elf-symbol-thumb-frame-v1' if not CALLEES[address] else 'elf-symbol-thumb-frame-calls-v1'
     if address == SHIFTED_ELLIPSE:
         from named_data_buffer_profile import ROOT_SCRATCH_SCHEMA
         schema = ROOT_SCRATCH_SCHEMA

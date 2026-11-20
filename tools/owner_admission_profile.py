@@ -1344,6 +1344,8 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                     if selector == small_copy_binding.SELECTOR and name == 'memcpy' else
                     copy_binding.original_target(image,address,rom,mapping,index,objects,site,target)
                     if selector == copy_binding.SELECTOR and name == 'memcpy' else
+                    installed_shuffle.REMAINDER if selector == named_buffer.EQUIPMENT_SELECTOR and
+                    address == 0x0813325C and site == 0x2C and name == '__modsi3' else
                     stat_drain.DIV if selector == stat_drain.SELECTOR and name == '__divsi3' else
                     installed_shuffle.REMAINDER if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR) and name == '__modsi3' else
                     integer_native.scalar.OPERATIONS[name] if selector in (integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) and name in integer_native.scalar.OPERATIONS else

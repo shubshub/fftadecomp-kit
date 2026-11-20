@@ -394,7 +394,12 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
                            rewrite=lambda text: volatile_semantics.perturb_pinned(text, declaration))
             perturbed = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
             from named_data_buffer_profile import BIOS_OVERWRITE_SELECTOR
-            if address == 0x0800C4B4:
+            if getattr(args, "owner_runtime_profile", None) == "conditional-scheduler-palette-copy-v1":
+                import scene_palette_copy
+                from inert_spin_profile import index_snapshot
+                records.extend(scene_palette_copy.records(address, rom, mapping, index_snapshot(root),
+                    interfaces, real, stripped, perturbed, preprocessed, entry))
+            elif address == 0x0800C4B4:
                 import scanline_dispatch
                 records.append(scanline_dispatch.record((real, stripped, perturbed),
                     (real_image, stripped_image, perturbed_image), preprocessed, entry, interfaces,
@@ -2105,7 +2110,11 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
 
 def verify_function_addresses(data, address, rom, mapping, data_mapping, manifest):
     calls, literals = function_address_bindings(data, address, rom, mapping, data_mapping, manifest)
-    instructions = verify_leaf_instructions(data, address, True, calls)
+    if address == 0x080D9C58:
+        import window_task
+        instructions = window_task.frame(data, rom, mapping, calls, manifest)
+    else:
+        instructions = verify_leaf_instructions(data, address, True, calls)
     verify_data_literals(instructions, address, literals)
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
@@ -6061,7 +6070,7 @@ def main():
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
     ap.add_argument("--palette-closure-bundle", help="canonical independently authenticated palette artifact bundle for first compilation")
-    ap.add_argument("--owner-runtime-profile", choices=("immediate-dma-stack-fill-v1", "compiler-orphan-address-constants-O0-v1", "conditional-cone-tile-stack-footprint-v1", "conditional-scheduler-projected-outputs-v1", "conditional-scheduler-descriptor-calls-v1", "conditional-scheduler-branch-descriptor-calls-v1", "conditional-scheduler-following-call-v1", "conditional-scheduler-eight-target-branches-v1", "conditional-scheduler-twenty-four-target-branches-v1", "conditional-scheduler-live-local-alias-calls-v1", "conditional-scheduler-live-local-alias-payload-calls-v1", "conditional-scheduler-event-definition-v1", "conditional-scheduler-twenty-four-target-following-calls-v1", "conditional-scheduler-three-per-path-calls-v1", "conditional-scheduler-sequential-leaf-output-calls-v1", "conditional-scheduler-sequential-killed-alias-calls-v1", "conditional-scheduler-u16-counted-loop-v1", "conditional-scheduler-sequential-live-alias-counted-loops-v1", "conditional-scheduler-three-per-path-live-alias-v1", "conditional-scheduler-guarded-descriptor-calls-v1", "conditional-scheduler-descriptor-payload-calls-v1", "conditional-scheduler-descriptor-payload8-calls-v1", "conditional-scheduler-halfword-output-payload-v1", "conditional-scheduler-two-payload-calls-v1", "conditional-scheduler-entry-descriptor-calls-v1", "conditional-scene-mode6-position-v1", "conditional-scheduler-zero-descriptor-v1", "conditional-scheduler-entry-branch-descriptor-calls-v1", "conditional-scheduler-indirect-manager-v1", "conditional-scheduler-manager-offset-v1", "conditional-scheduler-manager-paths-v1", "conditional-scheduler-call-site-summaries-v1", "conditional-scheduler-call-site-summaries-v2", "conditional-scheduler-sdk-halfword-fill-v1", "conditional-effect-initialized-scheduler-v1", "conditional-menu-palette-scheduler-v1", "conditional-effect-registry-scheduler-v1", "conditional-local-state-iterator-v1", "conditional-flagged-local-state-iterator-v1", "conditional-script-task-traversal-v1", "conditional-transfer-task-construction-v1", "conditional-transfer-tree-destruction-v1", "conditional-local-output-word-call-v1", "numeric-data-switch-source-v1", "canonical-integer-scalar-data-source-v1", "canonical-integer-two-words-source-v1", "canonical-integer-three-words-source-v1", "conditional-palette-source-compilation-v1", "canonical-integer-private-locals-data-source-v1", "canonical-integer-six-words-data-source-v1", "canonical-integer-two-words-aligned-data-source-v1", "canonical-integer-two-words-data-source-v1", "canonical-integer-scalar-source-v1", "ordinary-multiple-switch-source-v1", "restoring-owner-runtime-v1", "restoring-owner-switch-aligned-v1", "restoring-owner-switch-cycles-function-words-v1",
+    ap.add_argument("--owner-runtime-profile", choices=("immediate-dma-stack-fill-v1", "compiler-orphan-address-constants-O0-v1", "conditional-cone-tile-stack-footprint-v1", "conditional-scheduler-projected-outputs-v1", "conditional-scheduler-descriptor-calls-v1", "conditional-scheduler-branch-descriptor-calls-v1", "conditional-scheduler-following-call-v1", "conditional-scheduler-eight-target-branches-v1", "conditional-scheduler-twenty-four-target-branches-v1", "conditional-scheduler-live-local-alias-calls-v1", "conditional-scheduler-live-local-alias-payload-calls-v1", "conditional-scheduler-event-definition-v1", "conditional-scheduler-twenty-four-target-following-calls-v1", "conditional-scheduler-three-per-path-calls-v1", "conditional-scheduler-sequential-leaf-output-calls-v1", "conditional-scheduler-sequential-killed-alias-calls-v1", "conditional-scheduler-u16-counted-loop-v1", "conditional-scheduler-sequential-live-alias-counted-loops-v1", "conditional-scheduler-three-per-path-live-alias-v1", "conditional-scheduler-guarded-descriptor-calls-v1", "conditional-scheduler-descriptor-payload-calls-v1", "conditional-scheduler-descriptor-payload8-calls-v1", "conditional-scheduler-halfword-output-payload-v1", "conditional-scheduler-two-payload-calls-v1", "conditional-scheduler-entry-descriptor-calls-v1", "conditional-scene-mode6-position-v1", "conditional-scheduler-zero-descriptor-v1", "conditional-scheduler-entry-branch-descriptor-calls-v1", "conditional-scheduler-indirect-manager-v1", "conditional-scheduler-manager-offset-v1", "conditional-scheduler-manager-paths-v1", "conditional-scheduler-call-site-summaries-v1", "conditional-scheduler-palette-copy-v1", "conditional-scheduler-call-site-summaries-v2", "conditional-scheduler-sdk-halfword-fill-v1", "conditional-effect-initialized-scheduler-v1", "conditional-menu-palette-scheduler-v1", "conditional-effect-registry-scheduler-v1", "conditional-local-state-iterator-v1", "conditional-flagged-local-state-iterator-v1", "conditional-script-task-traversal-v1", "conditional-transfer-task-construction-v1", "conditional-transfer-tree-destruction-v1", "conditional-local-output-word-call-v1", "numeric-data-switch-source-v1", "canonical-integer-scalar-data-source-v1", "canonical-integer-two-words-source-v1", "canonical-integer-three-words-source-v1", "conditional-palette-source-compilation-v1", "canonical-integer-private-locals-data-source-v1", "canonical-integer-six-words-data-source-v1", "canonical-integer-two-words-aligned-data-source-v1", "canonical-integer-two-words-data-source-v1", "canonical-integer-scalar-source-v1", "ordinary-multiple-switch-source-v1", "restoring-owner-runtime-v1", "restoring-owner-switch-aligned-v1", "restoring-owner-switch-cycles-function-words-v1",
                                                       "restoring-owner-r3-thunk-switch-v1", "restoring-owner-scalar-switch-v1", "restoring-owner-switch-entry-word-v1", "restoring-owner-switch-entry-two-words-data-v1",
                                                       "restoring-owner-acyclic-v1",
                                                       "restoring-owner-ignored-leaf-alias-v1",
@@ -6204,6 +6213,12 @@ def main():
         if consistent_source is not None and source_fingerprint(ROOT, addr) != consistent_source:
             sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
         return result
+
+    if args.owner_runtime_profile == "conditional-scheduler-palette-copy-v1":
+        import scene_palette_copy
+        if not volatile_finding and not any(line.startswith(scene_palette_copy.RECORD) for line in volatile_records):
+            sys.exit("verdict NOT VERIFIED - palette-copy selector requires its volatile proof")
+        return selector_issue(scene_palette_copy.issue)
 
     if args.owner_runtime_profile == "libgcc-divdi3-v1":
         import libgcc_divdi3
