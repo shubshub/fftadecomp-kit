@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "df6b0c30c301af6a89059353d73d5abe2d05cf6f9e37a41b38774f5934eb022d",
+    "acknowledged_cursor": 7030100013,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "df6b0c30c301af6a89059353d73d5abe2d05cf6f9e37a41b38774f5934eb022d",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08096CB8\",\"who\":\"astra-08096cb8\",\"note\":\"Recover USA scene routine and verify byte match\"}",
+      "created_at": "2026-11-20T04:07:27Z",
+      "id": 7030100013,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:07:27Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e026bcf4e477f9b1ffbb616285139d12e5d714ec1efb015225d198536f2345f4",
+    "result": {
+      "address": "0x08096CB8",
+      "claim_id": 7030100013,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7030100013,
+      "status": "accepted",
+      "who": "astra-08096cb8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "8fbc2c738d60cfcc0759782000d5051d4e2e776987142de56195ec575d71fb37",
+    "acknowledged_cursor": 7030579977,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8fbc2c738d60cfcc0759782000d5051d4e2e776987142de56195ec575d71fb37",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08096CB8\",\"who\":\"astra-08096cb8\",\"claim_id\":7030100013,\"reason\":\"Native match in merged game PR #313\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T04:38:55Z",
+      "id": 7030579977,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:38:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fba41832fadc25dc0f963dafb6e23986dbb6444a56ca3ac690c9bb1f9d105422",
+    "result": {
+      "address": "0x08096CB8",
+      "claim_id": 7030100013,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7030579977,
+      "status": "accepted",
+      "who": "astra-08096cb8"
+    }
+  }
+}

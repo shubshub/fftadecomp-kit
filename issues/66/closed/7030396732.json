@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "4a8e039f71999e4738532fc0fe5f4bd7f17ef438ebc28fe86d150b506c19c698",
+    "acknowledged_cursor": 7030404774,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "4a8e039f71999e4738532fc0fe5f4bd7f17ef438ebc28fe86d150b506c19c698",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806D22A\",\"who\":\"astra-0806d22a\",\"note\":\"Bounded matching pass for original USA function\"}",
+      "created_at": "2026-11-20T04:26:52Z",
+      "id": 7030396732,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:26:52Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "d3bf866b2d4d274ee97c7d3501cafa2c972421b0e4f206e91c9d85d8c2e9494e",
+    "result": {
+      "address": "0x0806D22A",
+      "claim_id": 7030396732,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7030396732,
+      "status": "accepted",
+      "who": "astra-0806d22a"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "2495e12d989c0e8583ed9895d69f1e44a56b8ae98c32f06087d2d214b5c97184",
+    "acknowledged_cursor": 7030579977,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "2495e12d989c0e8583ed9895d69f1e44a56b8ae98c32f06087d2d214b5c97184",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806D22A\",\"who\":\"astra-0806d22a\",\"claim_id\":7030396732,\"reason\":\"Parked with evidence in merged game PR #313\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T04:38:55Z",
+      "id": 7030579910,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:38:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fba41832fadc25dc0f963dafb6e23986dbb6444a56ca3ac690c9bb1f9d105422",
+    "result": {
+      "address": "0x0806D22A",
+      "claim_id": 7030396732,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7030579910,
+      "status": "accepted",
+      "who": "astra-0806d22a"
+    }
+  }
+}

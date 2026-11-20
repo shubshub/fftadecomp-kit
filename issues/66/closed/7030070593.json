@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dd1b3651d5650609d5985058abd2de8b368231fab10b06200a8b6f9b2bfa87ed",
+    "acknowledged_cursor": 7030070683,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dd1b3651d5650609d5985058abd2de8b368231fab10b06200a8b6f9b2bfa87ed",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08021854\",\"who\":\"astra-08021854\",\"note\":\"Recover native C and verify against the USA ROM\"}",
+      "created_at": "2026-11-20T04:05:31Z",
+      "id": 7030070593,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:05:31Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "62377862e89c87774dfbe02726f904d889257b6c0d3bdf30d50af9ebb8c49f2e",
+    "result": {
+      "address": "0x08021854",
+      "claim_id": 7030070593,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7030070593,
+      "status": "accepted",
+      "who": "astra-08021854"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "867523541fa58daf8281188347dd6e2b57188e90961fb60ecccbe04ed5fac52a",
+    "acknowledged_cursor": 7030579977,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "867523541fa58daf8281188347dd6e2b57188e90961fb60ecccbe04ed5fac52a",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08021854\",\"who\":\"astra-08021854\",\"claim_id\":7030070593,\"reason\":\"Native match in merged game PR #313\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T04:38:55Z",
+      "id": 7030579926,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:38:55Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "fba41832fadc25dc0f963dafb6e23986dbb6444a56ca3ac690c9bb1f9d105422",
+    "result": {
+      "address": "0x08021854",
+      "claim_id": 7030070593,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7030579926,
+      "status": "accepted",
+      "who": "astra-08021854"
+    }
+  }
+}
