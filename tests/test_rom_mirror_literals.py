@@ -267,5 +267,78 @@ class OrdinaryCalleeLiteralTests(unittest.TestCase):
                     check(value)
             check(0x02001000, b'{"g_object":"0x02001000"}')
 
+
+class OwnerComparisonOnlyWordTests(unittest.TestCase):
+    """The owner rule's two comparison-only exemptions refuse every ROM word.
+
+    The transfer-tree sentinel and the DMA channel threshold are each pinned to one
+    value by their own profile, so no owner that profile accepts holds another word
+    there. Each profile's proof is replaced here by the facts the owner rule reads
+    from it, which shows the owner rule alone with words the profile refuses first.
+    """
+    WORD = 4
+    OTHER = 0x08010000  # a second indexed Thumb function
+
+    def verify(self, module, key, field, address, value):
+        import owner_admission_profile as owner
+        body = struct.pack("<HHI", 0x4800, 0x4770, value)  # ldr r0,[pc,#0]; bx lr; .word value
+        rom = bytearray(0x20000)
+        rom[address - match.ROM_BASE:address - match.ROM_BASE + len(body)] = body
+        rom[self.OTHER - match.ROM_BASE:self.OTHER - match.ROM_BASE + 2] = struct.pack("<H", 0x4770)  # bx lr
+        mapping = json.dumps([{"rom": f"0x{address:08X}", "end": f"0x{address + len(body):08X}",
+                               "mode": "thumb", "instrs": 2},
+                              {"rom": f"0x{self.OTHER:08X}", "end": f"0x{self.OTHER + 2:08X}",
+                               "mode": "thumb", "instrs": 1}]).encode()
+        index = (f"{address:08X} {address + len(body):08X} {len(body)} 2 return\n"
+                 f"{self.OTHER:08X} {self.OTHER + 2:08X} 2 1 return\n").encode()
+        refinement = owner.refine(body, address, mapping)
+        ins = owner.graph.graph(body, address, refinement)[0]
+        proof = dict(schema=module.SCHEMA, instructions=len(ins), calls=[], runtime_calls=[],
+                     partition=owner.graph.partition(body, address, refinement, ins, {}),
+                     **{key: {field: self.WORD}})
+        with patch.object(module, "prove", lambda *args, **named: proof):
+            return owner.verify(body, address, bytes(rom), mapping, index, b"{}", selector=module.SELECTOR,
+                                bindings=dict(calls=[], data=[], functions=[], switches=[]))[0]["proof"]
+
+    def check(self, module, key, field, address, canonical, message):
+        for value in (0x0A000000, 0x0A02BA50, 0x0C02BA50, 0x0AFFFFFC, 0x0CFFFFFF):
+            with self.subTest(address=hex(address), value=hex(value)), self.assertRaisesRegex(ValueError, message):
+                self.verify(module, key, field, address, value)
+        # Unchanged: the profile's own value is exempt, and a word outside the typed
+        # domain (SRAM, a mirror of the space past the image, a number) is not.
+        proof = self.verify(module, key, field, address, canonical)
+        self.assertEqual((proof[key], [row["value"] for row in proof["partition"]["words"]]),
+                         ({field: self.WORD}, [canonical]))
+        for value in (0x0E000000, 0x0FFFFFFF, 0x0BFFFFFC, 0x1234):
+            with self.subTest(address=hex(address), value=hex(value)), self.assertRaisesRegex(ValueError, message):
+                self.verify(module, key, field, address, value)
+
+    def test_a_mirror_word_is_not_the_transfer_tree_sentinel(self):
+        import transfer_tree_destruction as tree
+        self.check(tree, "transfer_tree", "compared_address_word", tree.OWNER, tree.SENTINEL,
+                   "destruction sentinel must be a comparison-only address")
+
+    def test_a_mirror_word_is_not_the_dma_channel_threshold(self):
+        import immediate_dma_fill as dma
+        for address in sorted(dma.ROOTS):
+            self.check(dma, "dma_fill", "address_limit_word", address, 0x07FFFFFF,
+                       "DMA channel threshold must be a comparison-only scalar")
+
+    def test_a_rom_word_is_never_comparison_only(self):
+        # The owner's own entry and another indexed function's, with and without the
+        # Thumb bit, that function's two mirror spellings, and both ends of the
+        # wait-state-0 ROM.
+        import immediate_dma_fill as dma
+        import transfer_tree_destruction as tree
+        sites = [(tree, "transfer_tree", "compared_address_word", tree.OWNER,
+                  "destruction sentinel must be a comparison-only address")]
+        sites += [(dma, "dma_fill", "address_limit_word", address,
+                   "DMA channel threshold must be a comparison-only scalar") for address in sorted(dma.ROOTS)]
+        for module, key, field, address, message in sites:
+            for value in (address, address | 1, self.OTHER, self.OTHER | 1, 0x0A010001, 0x0C010001,
+                          match.ROM_BASE, 0x08FFFFFF):
+                with self.subTest(address=hex(address), value=hex(value)), self.assertRaisesRegex(ValueError, message):
+                    self.verify(module, key, field, address, value)
+
 if __name__ == "__main__":
     unittest.main()
