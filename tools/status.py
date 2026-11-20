@@ -19,7 +19,9 @@ A function counts as matched when src/<addr>.c exists *and* its match report
 says the bytes are identical.  --verify recompiles instead of trusting the
 report, which is what CI should do.
 --write --verify also regenerates the reports so offline checks stay current.
---verify alone and --check never rewrite match reports.
+--verify alone and --check never rewrite match reports.  --verify alone holds
+each saved report to the text match.py writes now and then to the pins a
+replay keys by address (match_evidence.address_pins).
 
 --badges writes functions.json and bytes.json in the shields.io *endpoint*
 format, to be published on a `badges` branch and rendered with
@@ -37,7 +39,7 @@ import re
 import subprocess
 import sys
 from threading import Lock, active_count
-from match_evidence import (report_matches, saved_selectors,
+from match_evidence import (report_matches, issued_report_pins, saved_selectors,
                             SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
                             SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR,
                             SWITCH_FUNCTION_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
@@ -280,6 +282,7 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         addressed_runtime_profile = False
         saved_arguments = []
         compared = False
+        saved_report = None
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
@@ -357,6 +360,23 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             else:
                 ok = False
                 problems.append(f"{addr}: no match report in docs/match/")
+        elif ok:
+            # The comparison binds the saved text to this compile.  Whether this address may
+            # carry that schema is asked only by the pins a replay keys by address.  The text
+            # pinned is the one read before match.py ran, and only if the file still holds it.
+            try:
+                with open(rep, encoding="utf-8") as report_file:
+                    current = report_file.read()
+            except (OSError, UnicodeError):
+                current = None
+            if current is None or current != saved_report:
+                problems.append(f"{addr}: the saved report changed or vanished during the "
+                                "comparison; re-run status.py")
+                return 0, 0, problems, []
+            if not issued_report_pins(current, root, int(addr, 16)):
+                problems.append(f"{addr}: match.py writes this report, but the replay pin for "
+                                "this address refuses it")
+                return 0, 0, problems, []
         if ok:
             extents, extent_errors = [], []
             evidence = [(matcher_extent, result.stdout)] if verify else []

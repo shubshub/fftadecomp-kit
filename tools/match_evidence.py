@@ -1393,6 +1393,91 @@ def strip_volatile_records(report, records):
     return "\n".join(lines[:anchors[0] + 1] + lines[anchors[0] + 1 + len(records):])
 
 
+def address_pins(report, root, address, records):
+    """whether `report` may stand at `address`: the pins a replay keys by address.
+
+    A pinned function is admitted as one reviewed body under one schema, and
+    some of them only while the source uses its allowlisted volatile object, so
+    `records` are the allowlisted volatile records the report must carry.  A
+    failed pin is False or one of the errors report_matches catches.
+    """
+    if address == 0x08006720 and records:
+        import blend_keyframe_loop
+        blend_keyframe_loop.report_scope(report)
+    if address == 0x0800C4B4:
+        import scanline_dispatch
+        if not records or not scanline_dispatch.report_body(report, root):
+            return False
+    if address == 0x080C62CC:
+        import history_word_copy
+        if not records or not history_word_copy.report_body(report, root):
+            return False
+    if address == 0x080EF484:
+        import scroll_prefix_scene
+        if not records or not scroll_prefix_scene.report_body(report, root):
+            return False
+    if address == 0x08000718:
+        import boot_dma0_shadow
+        if not boot_dma0_shadow.report_body(report, root):
+            return False
+    if address == 0x08000FC8:
+        import affine_oam_slot
+        if not affine_oam_slot.report_body(report, root):
+            return False
+    if address == 0x0804BF78:
+        import tile_cpufill32
+        if not tile_cpufill32.report_body(report, root):
+            return False
+    if address == 0x08141FC8:
+        import flash_program_byte
+        if not flash_program_byte.report_body(report, root):
+            return False
+    if address == 0x0814189C:
+        import flash_bank_command
+        if not flash_bank_command.report_body(report, root):
+            return False
+    if address == 0x0800DB0C:
+        import blend_ramp
+        if not blend_ramp.report_body(report, root):
+            return False
+    if address == 0x0800D3BC:
+        import bg_affine_rows
+        if not bg_affine_rows.report_body(report, root):
+            return False
+    if address == 0x0800DE70:
+        import scanline_pair
+        if not scanline_pair.report_body(report, root):
+            return False
+    if address == 0x0800C720:
+        import scanline_wave
+        if not scanline_wave.report_body(report, root):
+            return False
+    if address == 0x081457FC:
+        import m4a_dma_counter
+        if not m4a_dma_counter.report_body(report, root):
+            return False
+    if any(line.startswith("* allowlisted volatile scanline:") for line in records):
+        import window_scanline
+        if not window_scanline.report_body(report, root, address):
+            return False
+    return True
+
+
+def issued_report_pins(report, root, address):
+    """address_pins for a saved report that is exactly the one match.py writes now.
+
+    status.py --verify calls this after match.py --check-report finds the two
+    identical.  That comparison binds every line to this compile, so the
+    records the report carries are the ones match.py just computed; it does
+    not ask whether this address may carry that schema at all.
+    """
+    try:
+        return address_pins(report, root, address, volatile_record_lines(report))
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
+            RuntimeError, subprocess.SubprocessError):
+        return False
+
+
 def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
@@ -1494,65 +1579,8 @@ def report_matches(report, root, address):
                 unit_arguments = library_units.report_arguments(report)
                 records += (allowlisted_volatile_semantics(root, address) if unit_arguments is None else
                             allowlisted_volatile_semantics(root, address, unit_arguments))
-        if address == 0x08006720 and records:
-            import blend_keyframe_loop
-            blend_keyframe_loop.report_scope(report)
-        if address == 0x0800C4B4:
-            import scanline_dispatch
-            if not records or not scanline_dispatch.report_body(report, root):
-                return False
-        if address == 0x080C62CC:
-            import history_word_copy
-            if not records or not history_word_copy.report_body(report, root):
-                return False
-        if address == 0x080EF484:
-            import scroll_prefix_scene
-            if not records or not scroll_prefix_scene.report_body(report, root):
-                return False
-        if address == 0x08000718:
-            import boot_dma0_shadow
-            if not boot_dma0_shadow.report_body(report, root):
-                return False
-        if address == 0x08000FC8:
-            import affine_oam_slot
-            if not affine_oam_slot.report_body(report, root):
-                return False
-        if address == 0x0804BF78:
-            import tile_cpufill32
-            if not tile_cpufill32.report_body(report, root):
-                return False
-        if address == 0x08141FC8:
-            import flash_program_byte
-            if not flash_program_byte.report_body(report, root):
-                return False
-        if address == 0x0814189C:
-            import flash_bank_command
-            if not flash_bank_command.report_body(report, root):
-                return False
-        if address == 0x0800DB0C:
-            import blend_ramp
-            if not blend_ramp.report_body(report, root):
-                return False
-        if address == 0x0800D3BC:
-            import bg_affine_rows
-            if not bg_affine_rows.report_body(report, root):
-                return False
-        if address == 0x0800DE70:
-            import scanline_pair
-            if not scanline_pair.report_body(report, root):
-                return False
-        if address == 0x0800C720:
-            import scanline_wave
-            if not scanline_wave.report_body(report, root):
-                return False
-        if address == 0x081457FC:
-            import m4a_dma_counter
-            if not m4a_dma_counter.report_body(report, root):
-                return False
-        if any(line.startswith("* allowlisted volatile scanline:") for line in records):
-            import window_scanline
-            if not window_scanline.report_body(report, root, address):
-                return False
+        if not address_pins(report, root, address, records):
+            return False
         report = strip_volatile_records(report, records)
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
