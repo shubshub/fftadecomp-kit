@@ -1654,6 +1654,13 @@ and 48 call sites. Both numbers are cost bounds, not proof obligations: the
 walk visits each site once and bounds invocations per path by itself, each
 distinct target body is authenticated once, and the owner replay checks every
 call site on its own, so the work grows linearly with the number of sites.
+The call-site bound was 40. It was raised to 48 (kit `#203`) because `080F6060`
+(44 call sites) was refused on that bound alone; the scan in that pull request
+found one more function that 48 covers, `080F6520` (43). The bound limits the
+cost of the whole-owner proof and is not part of the frame argument:
+`conditional-scheduler-call-site-summaries-v1` applies the 28-byte descriptor
+contract at each site with no bound on the number of call sites, and verifies
+`080EFD50` with 50.
 
 `conditional-scheduler-following-call-v1` permits ordinary calls after exactly
 one scheduler site in an acyclic caller, with the original four-target and
@@ -6475,6 +6482,9 @@ instructions. None of these bounds carries a proof obligation: the per-path
 bound still limits how often the scheduler runs, every scheduler site is checked
 against the descriptor contract on its own, the CFG checks are linear, and each
 call site adds one per-call check that keeps its own replay or walk budget.
+The call-site bound was raised from 40 to 48 in the same change as that of
+`conditional-scheduler-three-per-path-calls-v1` (see "Conditional local-buffer
+interfaces"), and it bounds cost in the same way.
 
 It adds two refinements to the live-alias rule for ordinary calls, and only for
 this selector:

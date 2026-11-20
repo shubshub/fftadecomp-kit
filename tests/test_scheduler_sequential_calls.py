@@ -22,6 +22,7 @@ import conditional_local_buffer_profile as local
 import named_data_buffer_profile as named
 import owner_admission_profile as owner
 import scheduler_branch_profile as branch
+import scheduler_loop_composition_profile as composition
 from test_scheduler_predicates import half, fixture
 from test_scheduler_loop_composition import Program, descriptor_call
 
@@ -307,12 +308,17 @@ class SequentialNativeTests(unittest.TestCase):
                 p=self.bound(body=bad,rom=bytes(rom))
                 match.verify_leaf_instructions(bad,self.a,True,self.calls,buffer_proof=p)
 
-    def test_real_compiler_full_32_target_40_site_boundary(self):
+    def test_real_compiler_32_targets_and_40_sites_inside_the_call_site_bound(self):
+        # The compiled fixture has 40 call sites: the old bound, and fewer
+        # than the bound the tool reports now. The edge of the bound is
+        # checked on raw Thumb owners by SequentialCallSiteBoundTests.
         root,body,calls=self.fixture.prepare('budget-fixture','budget')
         p=self.fixture.proof(root,body,calls)
         match.verify_leaf_instructions(body,self.a,True,calls,buffer_proof=p)
         manifest=p.contract_manifest()
         self.assertEqual(len(calls),40)
+        self.assertEqual(manifest['branch_calls']['call_site_budget'],call_site_bound())
+        self.assertLess(len(calls),call_site_bound())
         self.assertEqual(len(manifest['branch_calls']['ordinary_targets']),32)
         self.assertEqual(len(p.requested),36)
         self.assertEqual(set(p.records),set(calls.values())|{0x08005954})
@@ -437,6 +443,41 @@ class SequentialAdditionalTests(unittest.TestCase):
             else:row['end']='0x%08X'%(B+4)
             with self.subTest(variant=variant),self.assertRaises(ValueError):
                 self.bound(mapping=json.dumps(changed).encode())
+
+
+def call_site_bound():
+    """The call-site bound of the three-per-path phase rule, as the tool reports it."""
+    return phases(*sequence([B,S]))['call_site_budget']
+
+
+class SequentialCallSiteBoundTests(unittest.TestCase):
+    """The bound is read from the tool. It was 40, is 48, and bounds the cost of the owner proof."""
+
+    def test_bound_the_tool_reports_is_48_and_is_the_last_admitted_count(self):
+        bound=call_site_bound()
+        self.assertEqual(bound,48)
+        # conditional-scheduler-three-per-path-live-alias-v1 keeps its own
+        # copy of the bound, raised from 40 in the same change.
+        self.assertEqual(composition.WIDE_LIMITS['call_sites'],bound)
+        manifest=budget_replay(*budget_owner(bound)).contract_manifest()
+        self.assertEqual(len(manifest['observations']),bound)
+        self.assertEqual(manifest['branch_calls']['call_site_budget'],bound)
+        with self.assertRaisesRegex(ValueError,'call-site or target bounds'):
+            budget_replay(*budget_owner(bound+1))
+
+    def test_40_43_and_44_sites_are_inside_the_bound(self):
+        # 40 was the bound. 44 is the call-site count of 080F6060, which was
+        # refused on that bound alone; 43 is that of 080F6520, the other
+        # verified function above 40.
+        for sites in (40,43,44):
+            with self.subTest(sites=sites):
+                data,calls=budget_owner(sites)
+                manifest=budget_replay(data,calls).contract_manifest()
+                self.assertEqual(len(calls),sites)
+                self.assertEqual(len(manifest['observations']),sites)
+                self.assertEqual(len(manifest['branch_calls']['ordinary_targets']),32)
+                self.assertEqual(manifest['branch_calls']['call_site_budget'],call_site_bound())
+                self.assertLess(sites,call_site_bound())
 
 
 if __name__=='__main__':unittest.main()
