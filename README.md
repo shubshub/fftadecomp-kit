@@ -6789,3 +6789,13 @@ six tabs. The largest tab admits 252 rows. The
 arrays and the destination pane can hold the result. Set
 `FFTA_SHOP_CATEGORY_ROOT` and `FFTA_ITEM_LIST_ROOT` to the game tree to
 run the corresponding tests.
+
+### Menu item tile row
+
+The USA menu callers at `0806AF7C` and `0806CFF8` use `080702E8` to draw
+an item row. Its `named-data-buffer-v1` proof checks all 522 icon streams
+against the decoder's 128-byte destination and follows both callers through
+the original decoder. Callers must supply an item ID below 376. The decoder
+cursor must be reset before it is used again after the row returns.
+Set `FFTA_ITEM_TILE_ROW_ROOT` to the game tree to run
+`tests/test_menu_item_tile_row.py`.
