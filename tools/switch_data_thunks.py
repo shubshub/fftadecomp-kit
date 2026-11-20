@@ -15,6 +15,7 @@ import hashlib
 import json
 
 import m4a_track_switch as music
+import rom_mirror
 
 from armv4t import ARMV4T, CONDITIONS, encoding as armv4t_encoding  # noqa: F401 (kit #180 shared checker)
 
@@ -100,7 +101,8 @@ def thunk_sites(selector, calls):
     return sites
 
 
-ROM_LOW, ROM_HIGH = 0x08000000, 0x0E000000
+# Wait state 0 starts the ROM; the last wait-state mirror ends it (rom_mirror).
+ROM_LOW, ROM_HIGH = 0x08000000, rom_mirror.MIRRORS[1]
 # Binary operations whose exact result over constants is modelled; any other operation
 # with a constant-derived source makes its result a possible code address.
 BINARY = frozenset(('add', 'adds', 'sub', 'subs', 'lsls', 'lsrs', 'orrs', 'ands', 'eors', 'bics'))
@@ -196,6 +198,11 @@ def canonical(address):
     GPIO port (0x080000C4-0x080000C9) or the 0x0D window, where an EEPROM may answer. On this
     cartridge (FLASH512 save, 16 MiB ROM) that window is a plain ROM mirror, as kit #406 folds it,
     so treating its bytes as unfixed is conservative.
+
+    The ROM fold is ``rom_mirror.canonical``. That function classes a literal word and folds all
+    of 0x0A000000-0x0DFFFFFF, the 0x0D window and the GPIO port's mirrors included; this one
+    names the byte a store can leave and keeps those two unfixed, so the two differ there on
+    purpose.
     """
     address &= 0xFFFFFFFF
     region = address >> 24
@@ -211,13 +218,13 @@ def canonical(address):
         offset = address % 0x20000
         return 0x06000000 + (offset - 0x8000 if offset >= 0x18000 else offset)
     if 0x08 <= region <= 0x0C and not 0xC4 <= address % 0x2000000 < 0xCA:
-        return 0x08000000 + address % 0x2000000
+        return rom_mirror.canonical(address)
     return None
 
 
 def rom(key):
     """Whether a canonical byte is cartridge ROM, which ignores writes: no store leaves a byte there."""
-    return key is not None and 0x08000000 <= key < 0x0A000000
+    return key is not None and ROM_LOW <= key < rom_mirror.MIRRORS[0]
 
 
 ANY, ZERO, SIGN = 'any', 'zero', 'sign'

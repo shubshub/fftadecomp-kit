@@ -1450,5 +1450,83 @@ class ThunkWideScalarTests(unittest.TestCase):
                     verify(f, wide(f))
 
 
+class RomMirrorFoldTests(unittest.TestCase):
+    """The store model folds the ROM windows through rom_mirror, except where a byte is not fixed."""
+    GPIO = range(0xC4, 0xCA)
+    SAMPLES = (0, 0xC2, 0xC3, 0xCA, 0xCB, 0x1234, 0x142244, 0xFFFFFF, 0x1000000, 0x10000C4, 0x1FFFFFF)
+
+    def test_the_rom_windows_fold_as_rom_mirror_does(self):
+        import rom_mirror
+        for window in (0x08000000, 0x0A000000, 0x0C000000):
+            for offset in self.SAMPLES:
+                if window + offset >= 0x0D000000:
+                    continue
+                with self.subTest(address=hex(window + offset)):
+                    self.assertEqual(thunks.canonical(window + offset), rom_mirror.canonical(window + offset))
+                    self.assertEqual(thunks.canonical(window + offset), 0x08000000 + offset)
+                    self.assertTrue(thunks.rom(thunks.canonical(window + offset)))
+                    self.assertEqual(thunks.canonical(0x100000000 + window + offset), 0x08000000 + offset)
+
+    def test_the_rom_fold_is_rom_mirrors_own(self):
+        import rom_mirror
+        folded = object()
+        with patch.object(rom_mirror, 'canonical', return_value=folded) as fold:
+            for address in (0x08000010, 0x0A000010, 0x0BFFFFFF, 0x0C000010, 0x0CFFFFFF):
+                with self.subTest(address=hex(address)):
+                    self.assertIs(thunks.canonical(address), folded)
+                    fold.assert_called_with(address)
+            # RAM and video mirrors are this module's own, and an unfixed byte is never folded.
+            fold.reset_mock()
+            self.assertEqual(thunks.canonical(0x02042000), 0x02002000)
+            self.assertIsNone(thunks.canonical(0x0D000010))
+            self.assertIsNone(thunks.canonical(0x0A0000C4))
+            self.assertIsNone(thunks.canonical(0x0E000000))
+            fold.assert_not_called()
+
+    def test_the_0x0D_window_and_the_gpio_port_stay_unfixed_where_rom_mirror_folds_them(self):
+        # The one place the two differ: rom_mirror classes a literal word and folds every mirror;
+        # the store model names a byte and keeps these unfixed. Neither side may change alone.
+        import rom_mirror
+        for address in (0x0D000000, 0x0D000010, 0x0D142244, 0x0DFFFF00, 0x0DFFFFFF):
+            with self.subTest(address=hex(address)):
+                self.assertIsNone(thunks.canonical(address))
+                self.assertEqual(rom_mirror.canonical(address), address - 0x04000000)
+                self.assertTrue(thunks.rom(rom_mirror.canonical(address)))
+        for window in (0x08000000, 0x0A000000, 0x0C000000):
+            for offset in self.GPIO:
+                with self.subTest(address=hex(window + offset)):
+                    self.assertIsNone(thunks.canonical(window + offset))
+                    self.assertEqual(rom_mirror.canonical(window + offset), 0x08000000 + offset)
+
+    def test_a_possible_code_address_is_any_word_in_the_rom_or_its_mirrors(self):
+        import rom_mirror
+        self.assertEqual((thunks.ROM_LOW, thunks.ROM_HIGH), (0x08000000, 0x0E000000))
+        self.assertEqual(thunks.ROM_HIGH, rom_mirror.MIRRORS[1])
+        for value in (0x08000000, 0x09FFFFFF, 0x0A000000, 0x0C000000, 0x0D000000, 0x0DFFFFFF):
+            with self.subTest(value=hex(value)):
+                self.assertTrue(thunks.ROM_LOW <= value < thunks.ROM_HIGH)
+                self.assertTrue(thunks.rom(rom_mirror.canonical(value)))
+        for value in (0x07FFFFFF, 0x0E000000):
+            with self.subTest(value=hex(value)):
+                self.assertFalse(thunks.ROM_LOW <= value < thunks.ROM_HIGH)
+                self.assertFalse(thunks.rom(rom_mirror.canonical(value)))
+        # Only wait state 0 is a canonical ROM byte: a mirror address is folded before the test.
+        self.assertTrue(thunks.rom(0x08000000) and thunks.rom(0x09FFFFFF))
+        self.assertFalse(thunks.rom(0x07FFFFFF) or thunks.rom(0x0A000000) or thunks.rom(0x0D000000)
+                         or thunks.rom(None))
+
+    def test_a_constant_in_any_rom_window_cannot_be_stored(self):
+        # r3 = &g_right; r1 = window << 24; str r1, [r3]. A constant in the ROM or in either mirror,
+        # the 0x0D window included, may be a code address; one below or above them is a number.
+        obj = ('ldr', 3, 'object')
+        for window in (0x08, 0x09, 0x0A, 0x0B, 0x0C, 0x0D):
+            with self.subTest(window=hex(window)), \
+                    self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                verify(build(tail=(obj, ('h', 0x2100 | window), ('h', 0x0609), ('h', 0x6019))))
+        for window in (0x07, 0x0E):
+            with self.subTest(window=hex(window)):
+                verify(build(tail=(obj, ('h', 0x2100 | window), ('h', 0x0609), ('h', 0x6019))))
+
+
 if __name__ == '__main__':
     unittest.main()
