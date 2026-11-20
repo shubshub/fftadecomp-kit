@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8f6beba93725668a26eed5d7f825ebe61584d3bb2d8256e48a735025a9a18616",
+    "acknowledged_cursor": 7038897961,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8f6beba93725668a26eed5d7f825ebe61584d3bb2d8256e48a735025a9a18616",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081037B0\",\"who\":\"lane77-081037B0\",\"note\":\"Verify parked original agbcc C and its native call/frame or switch evidence for publication.\"}",
+      "created_at": "2026-11-20T11:55:09Z",
+      "id": 7038897961,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T11:55:09Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38c0d290a33803eff3a94e4af262e466bb305f3e2bdb778a88b360f625c64fff",
+    "result": {
+      "address": "0x081037B0",
+      "claim_id": 7038897961,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7038897961,
+      "status": "accepted",
+      "who": "lane77-081037B0"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "ae9f95e4c27fd660a391870e8e1d7d8e2d8b8ff444ea4ebe1ff96d085fed42e9",
+    "acknowledged_cursor": 7039391222,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "ae9f95e4c27fd660a391870e8e1d7d8e2d8b8ff444ea4ebe1ff96d085fed42e9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081037B0\",\"who\":\"lane77-081037B0\",\"claim_id\":7038897961,\"reason\":\"Remains parked. Native coincident-position facing produces index 255 and out-of-frame reads. Seven child initializers copied points synchronously. Evidence in game PR #332.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T12:20:10Z",
+      "id": 7039382070,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:20:10Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38037f2491984c6dc4996e7a08fc87d7888506ab410c5111009eb6cf8b26864c",
+    "result": {
+      "address": "0x081037B0",
+      "claim_id": 7038897961,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7039382070,
+      "status": "accepted",
+      "who": "lane77-081037B0"
+    }
+  }
+}
