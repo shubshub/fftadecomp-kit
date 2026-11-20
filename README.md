@@ -2226,9 +2226,9 @@ makes. R12 is not return-visible, so a ranged address left in it at the
 owner's return is admitted, as the core treats IP as ABI scratch at a return.
 Escapes of an array's exact address are still the buffer
 proof's business and refuse unless a callee is proved to bound them. Functions
-with pointer-bearing, word-provenance or return-carrying local words are
-outside the policy. The policy applies only to the owner itself, never to
-walked callees.
+with word-provenance or return-carrying local words are outside the policy, and
+pointer-bearing local words only under the frame-words rule below. The policy
+applies only to the owner itself, never to walked callees.
 
 What the report does not claim: that any caller satisfies a premise (the
 review records that a person checked, nothing proves it; discharging rows at
@@ -2237,6 +2237,115 @@ length (the extent is the compiler's object, so a source array shorter than its
 object is not detected), the physical stack, source readability or
 termination. The premise lines are the reviewable list of what must hold
 whenever each site runs.
+
+#### Frame words: spilled stack addresses and counters
+
+Under register pressure agbcc spills what the analysis above tracks only in
+registers. `func_080E4EB0` keeps the bases of four `s16[6]` arrays and the
+element addresses `&x[i]`, `&y[j]` in local words (`mov r2,sp; adds r2,#0x1c;
+str r2,[sp,#0x88]`, `str r1,[sp,#0x5c]`), and its `u8` loop counter at
+`sp+0x48`, bounded only by `ldr r2,[sp,#0x48]; cmp r2,#2; bhi`. Without frame
+words both selectors refuse such a frame: the core refuses every
+pointer-bearing local word under a variable-index policy ("variable stack
+indices exclude pointer-bearing or return-carrying local words"), the analysis
+refuses a stored variable address ("ranged stack address escapes to memory"),
+and a reloaded counter has no defined source.
+
+`tools/stack_index_frame_words_profile.py` extends the analysis word by word.
+It runs on the default path of both selectors, and only where the plain
+analysis cannot be used: when the core deferred an exact stack-address spill to
+it, or when the plain analysis refuses. A report the plain analysis admits keeps
+its evidence, and a function both refuse keeps the plain refusal. Its
+obligations, each with its refusal:
+
+1. **Callee stack reach.** A callee's mapped ROM bytes are walked, with
+   everything it calls: every instruction is ARMv4T Thumb (or SWI), SP is used
+   only by `push`, `pop`, `add/sub sp,#imm` and `ldr/str Rd,[sp,#imm]`, and
+   every return is proved to use the saved LR (a nested callee that may write
+   the saved LR word unsaves it). The walk yields the bytes above the entry SP
+   the callee may touch, the registers of R0-R3 and R12 it may read before
+   writing, and those it writes on every path (a nested call surely writes only
+   what every return of the inner callee writes). The only BIOS call the walk
+   admits is SWI 6 (`Div`), under a GBATEK premise printed in the report; its
+   handler stores R2 below SP, so R2 counts as read.
+2. **Unread argument registers.** A variable stack address left in R0-R3 at a
+   call is not an escape when the walk proves the callee never reads that
+   register before writing it (080E4EB0 leaves `&x[j]` in R3 across the
+   division wrapper `0x08141870`). After the call it is unusable unless the
+   callee writes it on every path. The rule covers R0-R3 only, never R12.
+3. **Pointer words.** A stack address (exact, variable, or a join that may be
+   either) is stored only as a whole, aligned, allocated local word at a fixed
+   offset; the word becomes pointer-bearing ("stack address stored outside a
+   whole allocated local word"). An exact address is accepted only at a
+   `str Rd,[sp,#k]` the core deferred, and the core then keeps no pointer slot
+   for it ("exact stack address stored to a local word the core did not
+   defer"; "deferred stack-address spill ... is not a tracked local word"). A
+   word that holds a pointer on one path of a join only is treated as
+   pointer-bearing ("mixed provenance").
+4. **Reloads.** A whole-word reload yields the stored address as a value the
+   analysis owns, so every use is checked here exactly as for a variable
+   address: no escape to calls, memory, comparisons or returns, and every
+   access through it inside allocated local words. Partial reads and stores
+   and block transfers over a pointer word refuse ("partial read of a
+   pointer-bearing local word", "partial store over a pointer-bearing local
+   word", "block transfer over a pointer-bearing local word").
+5. **Variable accesses avoid pointer words.** A proved range or a premise array
+   that overlaps a word that may hold a pointer at that point refuses ("index
+   range overlaps a pointer-bearing local word at entry-SP-n"). So a pointer word
+   in a variable store's value hull is outside the range it may write, and keeps
+   its value.
+6. **Calls beside pointer words.** At a call while a pointer word exists, the
+   callee is walked. A pointer word inside its reach, or any pointer word when
+   the walk refuses, refuses the owner ("callee 0x... may reach the
+   pointer-bearing local word"). So does a callee that may read a register
+   holding a stack address ("receives a stack address"), since the core bounds
+   its writes against slots it does not have.
+7. **Release.** After `add sp`/`pop` releases a pointer word, a call or any SP
+   move down refuses, so no released address is read back while the owner runs.
+8. **Possible stack addresses.** The core keeps some registers as exact stack
+   aliases that the analysis cannot pin to one value: the aliases a walked
+   callee returns (on some return paths, in any alternative), which the core
+   reports for every call site, and a join of an exact alias with a scalar or
+   with another exact alias. The analysis holds each as the set of entry-SP
+   offsets it may be (up to 16, moved by `add`/`sub` immediates and `stmia`/
+   `ldmia` write-back), or as "any local word". A load or store through one may
+   reach every candidate word, and a pointer-bearing candidate refuses ("store
+   through a possible stack address may reach the pointer-bearing local word at
+   entry-SP-n", and the same for a load). Spilled, one is a pointer word whose
+   reload is unusable as a base.
+9. **Element identity.** A load through an owned address is initialised when the
+   same address value (one identity per defining instruction) was stored
+   through at the same displacement with at least the same width on every path
+   since; byte-level initialisation covers everything else.
+10. **Scalar words.** A whole scalar word stored at a fixed offset keeps its
+    value range but not its derivation. A register loaded from or stored to the
+    word mirrors it until either is written, and `cmp` plus branch refinement of
+    the register refines the word; a refinement never rewrites a pointer word.
+    Every write that may reach a word ends its mirrors, whether the word is
+    tracked or not, and forgets the scalar words it may overwrite: a variable
+    store those in its value hull, a store through a possible stack address its
+    candidates, a callee those inside its reach, or every one when it may read a
+    register holding a stack address. A call walks the callee while a word is
+    mirrored too, since a mirror held in R4-R11 survives the call. Joins keep a
+    scalar word only where both paths track it.
+11. **No premise on a constant.** No premise is stated on an index with no
+    variable in it ("index is the constant N"): it is the same on every run, so
+    the premise would be always true or always false. A reloaded constant word
+    makes such an index common.
+
+The report adds one line, bound in the fingerprint and re-derived on replay (080E4EB0's):
+
+```
+* stack index frame words: pointer-bearing local words entry_SP-0x68, ...; deferred exact spills 0x080E504C, 0x080E5052, 0x080E5058; 14 identity-initialised loads; 33 calls with ROM-walked callee stack reach (at most 0 bytes above the callee's entry SP), none reaching a pointer-bearing word; stack addresses left in argument registers the callee never reads: R3 at 0x080E50F6, ...; calls this analysis did not walk (0x080E4F58, ...): their results are trusted, as the core trusts every callee it does not walk, to hold no address into this frame; GBATEK premise, not proved from ROM bytes: BIOS SWI 6 (Div) takes R0 and R1 and returns in R0, R1 and R3; the SWI handler saves SPSR, R11, R12 and R14 on the supervisor stack, then switches into System mode so that all further stack operations use the user stack, the caller's, below its SP; it reads and writes no word at or above the caller's SP
+```
+
+`stack_index_frame_words_profile.POLICY` is the one switch: disabled, the core
+and the plain analysis refuse exactly as before. The walk trusts what every
+call in the kit already trusts: callees preserve R4-R11 and SP, and neither they
+nor interrupt handlers read a stack word below their entry SP before writing it.
+Like the core, the analysis also trusts that a callee it does not walk (other
+than the authenticated ROM table copy helper) returns no address into the
+caller's frame; the report lists every such call.
 
 #### Version 2: forwarded callee stack arguments and sign-extended indices
 
@@ -2319,8 +2428,9 @@ A trusted pointer-free callee that does read below its entry SP would not be
 caught; that is exactly what the recorded premise covers, and a reviewer of a
 matched function should confirm it for the listed call sites.
 
-The forwarded slot is owned by the inspected callee, not by the owner, so v1's
-exclusion of pointer-bearing local words in the owner is unchanged.
+The forwarded slot is owned by the inspected callee, not by the owner; the
+owner's own pointer words are the frame-words rule's, which refuses a callee
+handed a stack address while one exists.
 
 **Sign-extended scaled indices.** `index = (s8)f(); t[index]` with a word
 element compiles to `lsls #24; asrs #22`. v1 knows nothing about an `asrs` whose

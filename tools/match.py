@@ -5077,6 +5077,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 buffer_proof.finish_call_constants(constants, returned_aliases,
                                                    site=current, target=operands[0].imm)
             aliases.update(returned_aliases)
+            if bounded_index is not None:
+                # Frame words cannot see these aliases in their own values: they are told.
+                bounded_index.note_returned(current, returned_aliases, call_alternatives)
             stack = [(saved_return and saved_slot, saved_slot, local_word)
                      for saved_return, saved_slot, local_word in stack]
             successors = (current + instruction.size,)
@@ -5273,7 +5276,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                                                   aliases, return_registers)
                                         continue
                                     raise ValueError("stack-frame write is outside the tracked frame")
-                                if registers[0] in aliases and stack_arguments:
+                                # A spilled stack address under a variable-index policy is the
+                                # stack-index analysis's to track word by word (frame words).
+                                spilled = registers[0] in aliases and bounded_index is not None and \
+                                    bounded_index.defer_spill(instruction)
+                                if registers[0] in aliases and stack_arguments and not spilled:
                                     buffer_proof.access(offset, 4, stack)
                                     buffer_proof.validate_pointer_value(aliases[registers[0]], stack)
                                     pointer_slots[offset] = aliases[registers[0]]
@@ -5282,6 +5289,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                     if not stack[slot][2]:
                                         raise ValueError("stack-frame store overlaps a saved register or return-address word")
                                     pointer_slots.pop(offset, None)
+                                    if spilled:
+                                        allowed_aliases.add(registers[0])
                                 stack[slot] = (registers[0] in return_registers,
                                                stack[slot][1], stack[slot][2])
                             else:

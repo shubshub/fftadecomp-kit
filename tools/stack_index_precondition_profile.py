@@ -200,6 +200,9 @@ class Policy:
         self.forwarding = None      # v2: the buffer proof whose forwarded-slot facts bind the owner
         self.derivations = set()
         self.accesses = set()
+        self.spills = set()         # exact stack addresses spilled by `str Rd,[sp,#k]` (frame words)
+        self.returned = {}          # call site -> {register: entry-SP offsets} the core keeps as aliases
+        self.callee_span = None     # set by the buffer proof: callee address -> mapped bytes
         self.evidence = None
 
     def applies(self, address, data):
@@ -232,11 +235,33 @@ class Policy:
         self.accesses.add(instruction.address)
         return True
 
+    def defer_spill(self, instruction):
+        """`str Rd,[sp,#k]` of an exact stack address: frame words track the word instead."""
+        import stack_index_frame_words_profile as frame_words
+        if not frame_words.POLICY.defers(instruction):
+            return False
+        self.spills.add(instruction.address)
+        return True
+
+    def note_returned(self, site, result, alternatives=None):
+        """The stack aliases the core keeps after the call at ``site``, in every alternative.
+
+        Each may hold on some return paths only.  Every visit of the site adds to the record, so
+        it covers the core's final state there.  A key that is not R0-R12 is recorded as None."""
+        for found in (result, *(alternatives or ())):
+            for register, offset in found.items():
+                number = register - ARM_REG_R0 if ARM_REG_R0 <= register <= ARM_REG_R0 + 12 else None
+                self.returned.setdefault(site, {}).setdefault(number, set()).add(offset)
+
     def finish(self, data, address, instructions, copies):
         self.evidence = prove(data, address, sorted(instruction.address for instruction in instructions),
                               frozenset(self.derivations), frozenset(self.accesses), copies,
                               selector=self.selector,
-                              forwarding=None if self.forwarding is None else self.forwarding.forwarding_facts())
+                              forwarding=None if self.forwarding is None else self.forwarding.forwarding_facts(),
+                              spills=frozenset(self.spills), callee_span=self.callee_span,
+                              returned={site: {register: frozenset(offsets)
+                                               for register, offsets in found.items()}
+                                        for site, found in self.returned.items()})
         return self.evidence
 
 
@@ -256,6 +281,9 @@ def precondition_lines(evidence):
                      f"width {row['width']}, unproved runtime premise"
                      f"{', may be owner-written' if row['may_be_owner_written'] else ''}, "
                      f"accepted by {row['discharged_by']}")
+    if "frame_words" in evidence:
+        import stack_index_frame_words_profile as frame_words
+        lines.extend(frame_words.lines(evidence["frame_words"]))
     return lines
 
 
@@ -1208,9 +1236,18 @@ def forwarded_lines(evidence):
 
 
 def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-          forwarding=None):
-    analysis = Analysis(bytes(data), address, derivations, accesses, dict(copies),
-                        signed_shift_congruence=selector == SELECTOR_V2)
+          forwarding=None, spills=frozenset(), callee_span=None, returned=None):
+    import stack_index_frame_words_profile as frame_words
+    return frame_words.prove(prove_words, data, address, verified_sites, derivations, accesses, copies,
+                             selector=selector, forwarding=forwarding, spills=spills,
+                             callee_span=callee_span, returned=returned or {})
+
+
+def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
+                forwarding=None, analysis_type=None):
+    """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
+    analysis = (analysis_type or Analysis)(bytes(data), address, derivations, accesses, dict(copies),
+                                           signed_shift_congruence=selector == SELECTOR_V2)
     sites = analysis.syntactic_sites()
     if sites - set(verified_sites) - {site + 2 for site in sites
                                        if analysis.halfword(site) & 0xF800 == 0xF000} or \
@@ -1236,6 +1273,8 @@ def prove(data, address, verified_sites, derivations, accesses, copies, *, selec
             "preconditions": preconditions}
     if forwarding is not None:
         evidence["forwarded_stack_arguments"] = forwarding_evidence(analysis, forwarding)
+    if analysis_type is not None:
+        evidence["frame_words"] = analysis.frame_words_evidence()
     return evidence
 
 
@@ -1247,6 +1286,8 @@ class StackIndexBufferProof(rom_copy.RomTableCopyBufferProof):
     def __init__(self, rom, mapping, index, objects, *, rodata=None, data=None, address=None):
         super().__init__(rom, mapping, index, objects, rodata=rodata, data=data, address=address)
         self.index_policy = Policy(address, len(data), self.selector)
+        # The plain mapped span: frame words walk callees without charging this proof's budget.
+        self.index_policy.callee_span = lambda callee: match.BufferCallProof.span(self, callee)
 
     def index_copies(self):
         return {site: (record["destination_offset"], record["count"])
