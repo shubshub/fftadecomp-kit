@@ -1271,6 +1271,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7ddf35ffe8e9c32d975cb8802b510d92ad14ad03b99f0c498b5ed235eaea3d44",
+        "acknowledged_cursor": 7028542456,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7ddf35ffe8e9c32d975cb8802b510d92ad14ad03b99f0c498b5ed235eaea3d44",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08087160\",\"who\":\"astra-08087160\",\"note\":\"Recover the original 416-byte routine and compare its callers.\"}",
+          "created_at": "2026-11-20T02:34:44Z",
+          "id": 7028542456,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:34:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f1c1f0f2c2aa194987a842db1a09c8c106519f64534be8d7d2ac7bb3c35e71d4",
+        "result": {
+          "address": "0x08087160",
+          "claim_id": 7028542456,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7028542456,
+          "status": "accepted",
+          "who": "astra-08087160"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
