@@ -784,5 +784,86 @@ class ShelvedCounterexampleTests(unittest.TestCase):
                                       str(caught.exception))
 
 
+class RuntimeHelperAndSwiCallTests(Base):
+    """a runtime helper or an SWI falls under the induction run's call model like any other call"""
+
+    READER = 0x0802A2C0     # adds r0, r2, r3; bx lr: reads r2 and r3, which `void (int)` does not name
+    DIVIDE = ("mov\tr0, r4", "mov\tr1, r4")
+
+    def interfaces(self):
+        rom, functions = synthetic_rom()
+        rom = bytearray(rom) + bytes(self.READER + 4 - 0x08000000 - len(rom))
+        rom[self.READER - 0x08000000:self.READER - 0x08000000 + 4] = bytes.fromhex("d0187047")
+        return semantics.RomInterfaces(bytes(rom), functions + [{"rom": f"0x{self.READER:08X}", "mode": "thumb"}])
+
+    @unittest.skipUnless(capstone, "capstone required")
+    def test_a_runtime_helper_may_leave_r2_and_r3_alone(self):
+        # the helper is passed r0 and r1 only, and the ROM's helpers return on some paths
+        # without writing r2 or r3: what a later callee reads there is the value from
+        # before the helper
+        self.assertEqual(self.interfaces()("func_0802A2C0"), (frozenset({"r2", "r3"}), frozenset({"r0"})))
+        for helper in sorted(semantics.RUNTIME_ARITY):
+            for register, other in (("r2", "r3"), ("r3", "r2")):
+                def body(*before):
+                    return FRAME + loop(f"mov\t{other}, #1", *before, *self.DIVIDE, f"bl\t{helper}",
+                                        "mov\tr0, #0", "bl\tfunc_0802A2C0") + MEMBER + END
+                with self.subTest(helper=helper, register=register):
+                    message = self.refused(body(("real", f"mov\t{register}, #7"),
+                                                ("stripped", f"mov\t{register}, #8")),
+                                           "differ in observable behaviour", self.interfaces())
+                    self.assertIn(f"real call func_0802A2C0(0x0) with r2 unwritten(0x1, r2, "
+                                  f"{'0x7' if register == 'r2' else '0x1'}), r3 unwritten(0x1, r3, "
+                                  f"{'0x7' if register == 'r3' else '0x1'}), stripped call", message)
+                    # the same value in both compiles is no difference
+                    self.compare(body(f"mov\t{register}, #7"), self.interfaces())
+
+    @unittest.skipUnless(capstone, "capstone required")
+    def test_a_register_a_helper_may_leave_alone_is_live_through_it(self):
+        # set before the loop and read after the helper in it: the register is live at
+        # the cut, so it is related there (not poisoned as a location the helper kills)
+        for helper in sorted(semantics.RUNTIME_ARITY):
+            for register, other in (("r2", "r3"), ("r3", "r2")):
+                def body(*before):
+                    return FRAME + (f"mov\t{other}, #1",) + before + \
+                        loop(*self.DIVIDE, f"bl\t{helper}", "mov\tr0, #0", "bl\tfunc_0802A2C0") + MEMBER + END
+                with self.subTest(helper=helper, register=register):
+                    self.compare(body(f"mov\t{register}, #7"), self.interfaces())
+                    self.refused(body(("real", f"mov\t{register}, #7"), ("stripped", f"mov\t{register}, #8")),
+                                 "differ in observable behaviour", self.interfaces())
+
+    @unittest.skipUnless(capstone, "capstone required")
+    def test_a_helpers_arguments_and_result_are_those_of_the_call(self):
+        # r1 is an argument: it is compared at the helper itself
+        body = FRAME + loop(("real", "mov\tr1, #7"), ("stripped", "mov\tr1, #8"), "mov\tr0, r4",
+                            "bl\t__divsi3") + MEMBER + END
+        message = self.refused(body, "differ in observable behaviour")
+        self.assertIn("real call __divsi3(", message)
+        for helper in sorted(semantics.RUNTIME_ARITY):
+            with self.subTest(helper=helper):
+                # the result does not hang on the call site, which the dead load moves ...
+                self.compare(FRAME + MEMBER + loop(*self.DIVIDE, f"bl\t{helper}", "bl\tfunc_08000240") + END,
+                             self.interfaces())
+                # ... and it may be an address
+                self.compare(FRAME + loop(*self.DIVIDE, f"bl\t{helper}", "ldrb\tr0, [r0]", "bl\tfunc_08000240") +
+                             MEMBER + END, self.interfaces())
+                # a callee with no ROM interface reads all of r0-r3 after it
+                self.compare(FRAME + loop(*self.DIVIDE, f"bl\t{helper}", "bl\tfunc_0802A2C0") + MEMBER + END)
+
+    @unittest.skipUnless(capstone, "capstone required")
+    def test_an_swi_compares_all_of_r0_to_r3(self):
+        for register, other in (("r2", "r3"), ("r3", "r2")):
+            def body(*before):
+                return FRAME + loop(f"mov\t{other}, #1", *before, *self.DIVIDE, "swi\t6", "mov\tr0, #0",
+                                    "bl\tfunc_0802A2C0") + MEMBER + END
+            with self.subTest(register=register):
+                message = self.refused(body(("real", f"mov\t{register}, #7"), ("stripped", f"mov\t{register}, #8")),
+                                       "differ in observable behaviour", self.interfaces())
+                self.assertIn("real call ('swi', '6')(", message)
+                self.compare(body(f"mov\t{register}, #7"), self.interfaces())
+        # what an SWI leaves does not hang on the call site
+        self.compare(FRAME + MEMBER + loop(*self.DIVIDE, "mov\tr2, #0", "mov\tr3, #0", "swi\t6", "mov\tr0, r1",
+                                           "bl\tfunc_08000240") + END, self.interfaces())
+
+
 if __name__ == "__main__":
     unittest.main()
