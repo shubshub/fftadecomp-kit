@@ -2123,7 +2123,7 @@ def verify_function_buffers(data, address, rom, mapping, manifest):
     calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest)
     if manifest["data"] or not calls:
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
-    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
+    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
     if proof.span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     instructions = verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
@@ -3407,12 +3407,16 @@ class BufferCallProof:
     switch_callees = None
     # Default-path OwnerSwitch (owner_switch_buffer_profile), bound per plain instance only.
     owner_switch = None
+    # Default-path DeadStackRegisters (dead_register), set only by
+    # BufferCallProof(..., dead_registers=True) on the exact plain and function-literal
+    # stack-argument proofs; None keeps every refused callee inspection a refusal.
+    dead_registers = None
 
     """Check bounded buffer arguments and their aliases against the current ROM."""
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
                  loop_replay=False, bios_wrappers=False, copy_helper_index=None,
-                 switch_callee_index=None):
+                 switch_callee_index=None, dead_registers=False):
         if bios_wrappers is not False:
             if bios_wrappers is not True or type(self) is not BufferCallProof or \
                     discarded_exit_scratch is not None or bios_fill_proof is not None:
@@ -3448,6 +3452,12 @@ class BufferCallProof:
             if type(self) is not BufferCallProof or stack_arguments is not True:
                 raise ValueError("switch callees require the plain stack-argument buffer proof")
             self.switch_callees = SwitchCallees(rom, mapping, switch_callee_index)
+        if dead_registers is not False:
+            if dead_registers is not True or stack_arguments is not True or \
+                    type(self) not in (BufferCallProof, FunctionBufferCallProof):
+                raise ValueError("dead stack registers require the plain or function-literal stack-argument proof")
+            from dead_register import DeadStackRegisters
+            self.dead_registers = DeadStackRegisters(self)
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
@@ -3562,6 +3572,48 @@ class BufferCallProof:
                  self.discarded_exit_scratch is not None or self.bios_fill_proof is not None)
 
     def check_arguments(self, address, arguments, stack, incoming, protected, **context):
+        if self.dead_registers is None:
+            return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
+        saved = self._snapshot_ledgers()
+        try:
+            return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
+        except ValueError:
+            # A callee inspected only for stack addresses it overwrites unread is an
+            # alias-free call; the records of the refused inspection are discarded.
+            if self.dead_registers.call(address, arguments, incoming, protected, context, saved) is None:
+                raise
+            return self.word_result({}, {})
+
+    def _snapshot_ledgers(self):
+        """Every ledger an inspection writes, so an aborted or replaced pass leaves no record."""
+        return (({callee: set(records) for callee, records in self.loop_replays.items()},
+                 dict(self.dependencies), dict(self.callee_clobbers), dict(self.callee_trusted)),
+                self.bios_summaries.copy() if self.bios_summaries is not None else None,
+                None if self.copy_summaries is None else
+                (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations)),
+                dict(self.switch_callees.records) if self.switch_callees is not None else None,
+                self.dead_registers.snapshot() if self.dead_registers is not None else None)
+
+    def _restore_ledgers(self, saved):
+        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot = saved
+        for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
+                                  snapshot):
+            ledger.clear()
+            ledger.update(values)
+        if bios_snapshot is not None:
+            self.bios_summaries.restore(bios_snapshot)
+        if copy_snapshot is not None:
+            for ledger, values in zip((self.copy_summaries.contracts, self.copy_summaries.observations),
+                                      copy_snapshot):
+                ledger.clear()
+                ledger.update(values)
+        if switch_snapshot is not None:
+            self.switch_callees.records.clear()
+            self.switch_callees.records.update(switch_snapshot)
+        if dead_snapshot is not None:
+            self.dead_registers.restore(dead_snapshot)
+
+    def _replayed_arguments(self, address, arguments, stack, incoming, protected, **context):
         if self.runtime_summaries is not None and self.runtime_summaries.covers(address):
             return self.runtime_summaries.call(self, address, arguments, stack, incoming,
                                                protected, **context)
@@ -3569,32 +3621,13 @@ class BufferCallProof:
             # The calls the plain walk would otherwise inspect; the rest stay ordinary.
             return self.bios_summaries.call(self, address, arguments, stack, incoming,
                                             protected, **context)
-        snapshot = ({callee: set(records) for callee, records in self.loop_replays.items()},
-                    dict(self.dependencies), dict(self.callee_clobbers),
-                    dict(self.callee_trusted))
-        bios_snapshot = self.bios_summaries.copy() if self.bios_summaries is not None else None
-        copy_snapshot = None if self.copy_summaries is None else \
-            (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations))
-        switch_snapshot = dict(self.switch_callees.records) if self.switch_callees is not None else None
+        saved = self._snapshot_ledgers()
         try:
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=False, **context)
         except _LoopReplayRequired:
             # Records of the aborted joined pass never enter the evidence.
-            for ledger, saved in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
-                                     snapshot):
-                ledger.clear()
-                ledger.update(saved)
-            if bios_snapshot is not None:
-                self.bios_summaries.restore(bios_snapshot)
-            if copy_snapshot is not None:
-                for ledger, saved in zip((self.copy_summaries.contracts, self.copy_summaries.observations),
-                                         copy_snapshot):
-                    ledger.clear()
-                    ledger.update(saved)
-            if switch_snapshot is not None:
-                self.switch_callees.records.clear()
-                self.switch_callees.records.update(switch_snapshot)
+            self._restore_ledgers(saved)
             return self._check_arguments(address, arguments, stack, incoming, protected,
                                          replay=True, **context)
 
@@ -4153,6 +4186,8 @@ class BufferCallProof:
             lines.extend(self.switch_callees.lines())
         if self.owner_switch is not None:
             lines.extend(self.owner_switch.lines())
+        if self.dead_registers is not None:
+            lines.extend(self.dead_registers.lines())
         return lines
 
     def bios_summary_lines(self):
@@ -4199,6 +4234,10 @@ class BufferCallProof:
         if self.owner_switch is not None:
             # Only an owner walked over its own jump table adds this.
             digest.update(json.dumps(self.owner_switch.evidence(), sort_keys=True,
+                                     separators=(",", ":")).encode())
+        if self.dead_registers is not None and self.dead_registers.observed():
+            # Only a proof that accepted a dead stack-address register adds this.
+            digest.update(json.dumps(self.dead_registers.evidence(), sort_keys=True,
                                      separators=(",", ":")).encode())
         return digest.hexdigest()
 
@@ -6770,7 +6809,8 @@ def main():
                     buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
                                                    bios_wrappers=True,
                                                    copy_helper_index=inert_spin.index_snapshot(ROOT),
-                                                   switch_callee_index=inert_spin.index_snapshot(ROOT))
+                                                   switch_callee_index=inert_spin.index_snapshot(ROOT),
+                                                   dead_registers=True)
                     dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
                     verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
                                                                       buffer_proof=buffer_proof,

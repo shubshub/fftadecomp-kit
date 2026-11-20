@@ -8,6 +8,7 @@ import hashlib
 import json
 import struct
 
+import dead_register
 import rom_mirror
 
 SELECTOR = 'incoming-scratch-overwrite-ordinary-v1'
@@ -163,23 +164,24 @@ class IncomingScratchOverwriteProof:
         # are retained exactly, rather than cleared or promoted by this proof.
         snapshot = repr((aliases, stack, pointer_slots, initialized))
         instructions, edges, record = self.ordinary(target)
-        live, killed, prefix = set(selected), {}, []
-        current = target
-        while live:
+
+        def step(current, live):
             instruction = instructions[current]
             reads, writes = prefix_effects(instruction)
             if reads & live:
                 raise ValueError('scratch overwrite observes incoming alias before full kill')
-            for register in live & writes:
-                killed[register] = current
-            live -= writes
-            prefix.append([current-target, bytes(instruction.bytes).hex()])
-            if live:
+            if live - writes:
                 if edges[current] != (current + instruction.size,):
                     raise ValueError('scratch overwrite requires an unconditional entry-prefix kill')
-                current += instruction.size
-                if current not in instructions:
+                if current + instruction.size not in instructions:
                     raise ValueError('scratch overwrite lacks a complete prior-to-use kill')
+            return writes, (current + instruction.size,)
+        result = dead_register.prove(target, selected, step,
+                                     end='scratch overwrite lacks a complete prior-to-use kill',
+                                     cycle='scratch overwrite lacks a complete prior-to-use kill',
+                                     budget='scratch overwrite prefix exceeds its state budget')
+        killed = {register: current for current, register in result.kills}
+        prefix = [[current-target, bytes(instructions[current].bytes).hex()] for current in result.visited]
         if snapshot != repr((aliases, stack, pointer_slots, initialized)):
             raise ValueError('scratch overwrite changed caller pointer-slot or initialization facts')
         self.dependencies[target] = record

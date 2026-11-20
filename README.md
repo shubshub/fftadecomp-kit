@@ -1205,6 +1205,39 @@ a 44-byte frame) is admitted, and the bound write set then covers its spilled
 locals at `sp+0x18` and `sp+0x1C`. As stated above, the bounds are allocated
 stack words, not C objects.
 
+### Dead stack-address registers at calls
+
+The default stack-argument buffer proofs (the frame-buffer version-2 retry, the
+function-buffer proof, both typed-data buffer proofs and their report checks,
+which pass `dead_registers=True`) inspect every callee that receives a stack
+address in a register. When that inspection refuses, the callee was inspected
+only for stack addresses in R0-R3 (none in R12 or LR, no pointer-bearing frame
+word, no word provenance), and every path from the callee's entry writes each
+of those registers before reading it, the call is a call that receives no
+stack address: the callee is not inspected, as such a call never is, and every
+record of the refused inspection is discarded. `081102F4` and `081112A0` reach
+`080035D0` and `080035A8` with a stale out-parameter address in R1, which each
+callee overwrites at its sixth instruction.
+
+The entry proof is `dead_register.prove`, the walk the incoming-scratch
+overwrite selector, the R6 callback scratch-prefix kill and the dead-argument
+named-data walk use with their own instruction tables. Here it decodes one
+ARMv4T Thumb instruction at a time: a read of a live register (including
+`push`, stores, copies and compares) refuses, an unconditional write kills it,
+`b` follows its edges, and a call, return, `bx`, write of PC, SWI or any other
+transfer reached while a value is live refuses. Every path must reach its
+killing writes: a cycle that can avoid them refuses (least fixpoint), and the
+walk stops at 4,096 states.
+
+A stack address left in a register at a return is still refused ("local stack
+pointer escapes through a return register"), as before. When the proof fails,
+the inspection's refusal stands unchanged. Each accepted call is stated on a
+`* buffer dead register:` line (site, callee, register, offset and killing
+writes), and the records, with the hash of every callee body the walk read, are
+bound into the buffer proof fingerprint; a proof that accepts nothing keeps its
+fingerprint and lines. An admitted walk never reaches the rule, so only
+refusals change. Synthetic boundaries are in `tests/test_dead_stack_registers.py`.
+
 ### GBA BIOS wrappers in plain buffer walks
 
 The plain register and stack buffer proofs (`elf-symbol-thumb-frame-buffer-calls-v1`

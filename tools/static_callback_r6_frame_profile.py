@@ -11,6 +11,7 @@ import importlib
 import json
 from pathlib import Path
 
+import dead_register
 import match
 import owner_graph_profile as graph
 import local_long_branch_profile as frame
@@ -358,13 +359,8 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
         if calls.get(site) != address:
             raise ValueError('scratch prefix differs from its exact consumer call')
         data, ins, edges, calls, partition = self._graph(address)
-        start = (address, frozenset(registers))
-        pending, transitions, safe, kills = [start], {}, set(), set()
-        while pending:
-            state = pending.pop()
-            if state in transitions or state in safe:
-                continue
-            current, live = state
+
+        def step(current, live):
             item = ins[current]
             read, written = map(set, item.regs_access())
             if read & live:
@@ -373,30 +369,17 @@ class R6FrameCallbackProof(r7.StaticCallbackTargetPreservationProof):
                 raise ValueError('scratch prefix calls before killing every incoming value')
             if written & live and item.cc not in (match.ARM_CC_AL, match.ARM_CC_INVALID):
                 raise ValueError('scratch prefix killing write is conditional')
-            kills.update((current, register-match.ARM_REG_R0) for register in written & live)
-            following = live - written
-            if not following:
-                safe.add(state)
-                continue
-            if not edges[current]:
-                raise ValueError('scratch prefix returns without killing every incoming value')
-            transitions[state] = [(target, frozenset(following)) for target in edges[current]]
-            pending.extend(transitions[state])
-            if len(transitions) + len(safe) > 4096:
-                raise ValueError('scratch prefix kill state budget exceeded')
-        while True:
-            added = {state for state, successors in transitions.items()
-                     if state not in safe and all(target in safe for target in successors)}
-            if not added:
-                break
-            safe.update(added)
-        if start not in safe:
-            raise ValueError('scratch prefix has a path without eventual killing writes')
+            return written, edges[current]
+        result = dead_register.prove(address, registers, step,
+                                     end='scratch prefix returns without killing every incoming value',
+                                     cycle='scratch prefix has a path without eventual killing writes',
+                                     budget='scratch prefix kill state budget exceeded')
+        kills = {(current, register-match.ARM_REG_R0) for current, register in result.kills}
         record = dict(address=address, body_sha256=hashlib.sha256(data).hexdigest(),
             partition=partition, consumer=consumer, consumer_sha256=hashlib.sha256(caller).hexdigest(),
             consumer_partition=caller_partition, site=site,
             registers=sorted(register-match.ARM_REG_R0 for register in registers),
-            states=len(safe), killing_writes=[list(row) for row in sorted(kills)])
+            states=result.states, killing_writes=[list(row) for row in sorted(kills)])
         self._scratch_prefix_obligations[json.dumps(record, sort_keys=True)] = record
         return record
 
