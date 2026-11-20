@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "313ea93d495d7b138119480fae7836f1358c1ed669739bd0189c454aa1f21bf4",
+    "acknowledged_cursor": 7029144417,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "313ea93d495d7b138119480fae7836f1358c1ed669739bd0189c454aa1f21bf4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0806ED30\",\"who\":\"astra-0806ed30\",\"note\":\"Recover the 360-byte indexed routine against the USA ROM\"}",
+      "created_at": "2026-11-20T03:08:54Z",
+      "id": 7029144417,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T03:08:54Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "e0f150b03890c9fa80cbcf63dbe578b7ef27d1531e543753ab93d3492c984f5e",
+    "result": {
+      "address": "0x0806ED30",
+      "claim_id": 7029144417,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7029144417,
+      "status": "accepted",
+      "who": "astra-0806ed30"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "7dbff6c13cbed6ca146293a30dbd361ad2036b680f68f0515278753769758b80",
+    "acknowledged_cursor": 7030160862,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "7dbff6c13cbed6ca146293a30dbd361ad2036b680f68f0515278753769758b80",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0806ED30\",\"who\":\"astra-0806ed30\",\"claim_id\":7029144417,\"reason\":\"Byte-identical match in merged game PR #307\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T04:10:57Z",
+      "id": 7030154101,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T04:10:57Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "5d9892870cdd42cb97b81de82169f4a3c74aac877a55e0175aa31d0a2f8bd2aa",
+    "result": {
+      "address": "0x0806ED30",
+      "claim_id": 7029144417,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7030154101,
+      "status": "accepted",
+      "who": "astra-0806ed30"
+    }
+  }
+}
