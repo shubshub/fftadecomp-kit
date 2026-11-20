@@ -349,13 +349,15 @@ class StateLimitTests(unittest.TestCase):
 
 
 class ManifestTests(unittest.TestCase):
-    def test_policy_marker_is_exact_and_requires_the_pool(self):
+    def test_policy_marker_is_exact_and_pool_shape_is_bound(self):
         body, _, manifest, mapping = fixture()
         with self.assertRaisesRegex(ValueError, "canonical stack policy"):
             verify(body, dict(manifest, stack_policy="other-policy"), mapping)
         without_pool = copy.deepcopy(manifest)
         without_pool.pop("pool_policy")
-        with self.assertRaisesRegex(ValueError, "canonical stack policy"):
+        # Without the pool marker this is the u16-scalars-fixed-frame-v1 shape, whose
+        # fixed layout cannot describe an interposed pool.
+        with self.assertRaisesRegex(ValueError, "adjacent unsigned guard and five-op dispatch"):
             verify(body, without_pool, mapping)
         typed = dict(manifest, frame_policy=typed_frame.SELECTOR)
         with self.assertRaises(ValueError):

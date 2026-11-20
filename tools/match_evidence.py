@@ -16,6 +16,7 @@ import plain_report_fields
 import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
+import switch_wide_scalars as wide_scalars
 import switch_data_thunks
 import m4a_track_switch as music
 import subprocess
@@ -626,7 +627,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
             f"`{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
         thunk_selector = next((selector for selector, schema in switch_data_thunks.SCHEMAS.items()
                                if data_profile and single("* verification: ") == f"`{schema}`"), None)
-        pool_frame = function_frame or data_profile and \
+        fixed_frame = data_profile and single("* verification: ") == f"`{pool_switch_frame.FIXED_SCHEMA}`"
+        pool_frame = function_frame or fixed_frame or data_profile and \
             single("* verification: ") == f"`{pool_switch_frame.SCHEMA}`" or \
             thunk_selector is not None and switch_data_thunks.framed(thunk_selector)
         function_data = function_frame or data_profile and single("* verification: ") in (
@@ -634,7 +636,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         pool_data = data_profile and single("* verification: ") in (
             f"`{SWITCH_POOL_U16_SCALAR_SCHEMA}`", f"`{pool_switch_frame.SCHEMA}`",
             f"`{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`", f"`{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`")
-        scalar_data = pool_data or function_data or data_profile and \
+        scalar_data = pool_data or function_data or fixed_frame or data_profile and \
             single("* verification: ") == f"`{SWITCH_U16_SCALAR_SCHEMA}`"
         multiple_data = outgoing_frame or scalar_data or thunk_selector is not None or data_profile and \
             single("* verification: ") == f"`{SWITCH_MULTIPLE_DATA_SCHEMA}`"
@@ -642,6 +644,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                    typed_switch_frame.SUMMARY if outgoing_frame else
                    SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if function_frame and pool_data else
                    SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY if function_frame else
+                   pool_switch_frame.FIXED_SUMMARY if fixed_frame else
                    pool_switch_frame.SUMMARY if pool_frame else
                    SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if function_data and pool_data else
                    SWITCH_FUNCTION_U16_SCALAR_SUMMARY if function_data else
@@ -663,6 +666,7 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                       typed_switch_frame.SCHEMA if outgoing_frame else
                       SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA if function_frame and pool_data else
                       SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA if function_frame else
+                      pool_switch_frame.FIXED_SCHEMA if fixed_frame else
                       pool_switch_frame.SCHEMA if pool_frame else
                       SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA if function_data and pool_data else
                       SWITCH_FUNCTION_U16_SCALAR_SCHEMA if function_data else
@@ -715,6 +719,11 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
             return False
         if function_data != (isinstance(manifest, dict) and
                              manifest.get("function_policy") == SWITCH_FUNCTION_POLICY):
+            return False
+        # The wide-scalar premise is printed in, and only in, a report that applies it.
+        if [line for line in lines if line.lstrip().startswith(wide_scalars.REPORT_PREFIX.lstrip())] != (
+                [wide_scalars.report_line()] if isinstance(manifest, dict) and
+                "wide_scalar_policy" in manifest else []):
             return False
         rom = Path(report_rom_path(root)).read_bytes()
         _, control_flow = verify_switches(data, address, rom, mapping, manifest,
@@ -1361,6 +1370,7 @@ def report_matches(report, root, address):
                     [f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{pool_switch_frame.SCHEMA}`"],
+                    [f"* verification: `{pool_switch_frame.FIXED_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`"],

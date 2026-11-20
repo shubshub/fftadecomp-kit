@@ -314,6 +314,8 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
                     if f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
                     pool_switch_frame.SELECTOR
                     if f"* verification: `{pool_switch_frame.SCHEMA}`" in saved_report.splitlines() else
+                    pool_switch_frame.FIXED_SELECTOR
+                    if f"* verification: `{pool_switch_frame.FIXED_SCHEMA}`" in saved_report.splitlines() else
                     SWITCH_FUNCTION_U16_SCALAR_SELECTOR
                     if f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
                     SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR
