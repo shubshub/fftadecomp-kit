@@ -4753,11 +4753,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if switch_data_relocations is not None and switch_relocations is None:
         raise ValueError("switch-data requires a verified local switch")
     root_buffer_switch = False
+    cursor = None
     if switch_relocations is not None:
         from named_data_buffer_profile import root_switch_context
         from owner_switch_buffer_profile import context as owner_switch_context
-        root_buffer_switch = owner_switch_context(buffer_proof, data, address, validated_calls,
-            switch_relocations, switch_data_relocations) or root_switch_context(buffer_proof, data, address,
+        owner_switch = owner_switch_context(buffer_proof, data, address, validated_calls,
+                                            switch_relocations, switch_data_relocations)
+        if owner_switch:
+            cursor = buffer_proof.owner_switch.cursor
+        root_buffer_switch = owner_switch or root_switch_context(buffer_proof, data, address,
             validated_calls, switch_relocations, switch_data_relocations)
         if not thumb or buffer_proof is not None and not root_buffer_switch or call_resolver is not None:
             raise ValueError("switch evidence cannot combine frame or buffer proof profiles")
@@ -4843,7 +4847,6 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     literal_adjustments = set()
     shifted_stack_constants = set()
     literal_stack_constants = set()
-    cursor = buffer_proof.owner_switch.cursor if root_buffer_switch else None
     if cursor is not None and path_states is not None:
         raise ValueError("owner cursor requires the ordinary joined frame walk")
     while pending:
