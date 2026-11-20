@@ -41,7 +41,7 @@ class ProcessVerificationTests(unittest.TestCase):
         return status.collect(str(self.root), True, worker_processes=workers, **kwargs)
 
     def test_actual_processes_check_every_source_once_and_keep_order(self):
-        self.fixture([0x08000000 + i * 16 for i in range(32)])
+        self.fixture([0x08000000 + i * 16 for i in range(32)], reports=True)
         ctx = multiprocessing.get_context('fork')
         count, active, peak = [ctx.Value('i', 0) for _ in range(3)]
         lock, barrier, last_failure_done, done = ctx.Lock(), ctx.Barrier(8), ctx.Event(), ctx.Value('i', 0)
@@ -149,7 +149,7 @@ class ProcessVerificationTests(unittest.TestCase):
         self.assertEqual((self.root / '08000020.replays').read_text(), 'changed\nstale\n')
 
     def test_parent_keeps_late_extent_and_cross_worker_overlap_checks(self):
-        self.fixture([0x0814FFF0, 0x08150000, 0x08150010, 0x08150020])
+        self.fixture([0x0814FFF0, 0x08150000, 0x08150010, 0x08150020], reports=True)
         responses = {'0814FFF0': fixtures.matched_output(24),
                      '08150000': fixtures.matched_output(),
                      '08150010': fixtures.matched_output(10),

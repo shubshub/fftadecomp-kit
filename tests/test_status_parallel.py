@@ -109,12 +109,14 @@ class StatusParallelTests(unittest.TestCase):
         for name in ("config", "src", "docs/match"):
             (self.root / name).mkdir(parents=True)
 
-    def fixture(self, addresses):
+    def fixture(self, addresses, reports=False):
         entries = [{"rom": f"0x{address:08X}", "end": f"0x{address + 8:08X}",
                     "mode": "thumb"} for address in addresses]
         (self.root / "config/functions.json").write_text(json.dumps(entries))
         for address in addresses:
             (self.root / f"src/{address:08X}.c").write_text("void fixture(void) {}\n")
+            if reports:
+                (self.root / f"docs/match/{address:08X}.md").write_text("fixture report\n")
         rom = self.root / "fixture.rom"
         with rom.open("wb") as stream:
             stream.truncate(0x150100)
@@ -124,7 +126,7 @@ class StatusParallelTests(unittest.TestCase):
         return status.collect(str(self.root), True, jobs=jobs, **kwargs)
 
     def test_ordered_counts_and_errors_match_serial_despite_completion_order(self):
-        self.fixture([0x08000000 + i * 16 for i in range(8)])
+        self.fixture([0x08000000 + i * 16 for i in range(8)], reports=True)
         (self.root / "src/08000100.c").write_text("void unknown(void) {}\n")
         expected = (8, 5, 64, 40, ["08000010: DOES NOT MATCH", "08000030: DOES NOT MATCH",
                                  "08000060: DOES NOT MATCH",
@@ -214,7 +216,7 @@ class StatusParallelTests(unittest.TestCase):
                                               "stale-thunk", "stale-source", "ordinary"]))
 
     def test_late_complete_extent_and_overlap_refusals_keep_order(self):
-        self.fixture([0x0814FFF0, 0x08150000, 0x08150010, 0x08150020, 0x08150030])
+        self.fixture([0x0814FFF0, 0x08150000, 0x08150010, 0x08150020, 0x08150030], reports=True)
         responses = {"0814FFF0": matched_output(24), "08150000": matched_output(),
                      "08150010": matched_output(10),
                      "08150020": "verdict MATCH - byte identical\n"
@@ -245,7 +247,7 @@ class StatusParallelTests(unittest.TestCase):
         duplicate_checks_wait_for_each_other(self, 6)
 
     def test_default_and_offline_paths_do_not_create_workers(self):
-        self.fixture([0x08000000])
+        self.fixture([0x08000000], reports=True)
         with patch.object(status, "ThreadPoolExecutor") as executor, \
                 patch.object(status.subprocess, "run", return_value=
                              subprocess.CompletedProcess([], 0, matched_output(), "")):
@@ -259,7 +261,7 @@ class StatusParallelTests(unittest.TestCase):
                 self.collect(jobs)
 
     def test_twenty_four_workers_preserve_serial_counts_and_failures(self):
-        self.fixture([0x08000000 + i * 16 for i in range(32)])
+        self.fixture([0x08000000 + i * 16 for i in range(32)], reports=True)
         lock, barrier, sizes = Lock(), Barrier(24), []
         active, peak, started = 0, 0, 0
 

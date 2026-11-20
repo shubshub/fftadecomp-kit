@@ -23,7 +23,7 @@ class LargePoolTests(unittest.TestCase):
     collect=fixtures.StatusParallelTests.collect
 
     def test_64_workers_keep_every_source_ordered_with_failures(self):
-        self.fixture([0x08000000+i*16 for i in range(128)])
+        self.fixture([0x08000000+i*16 for i in range(128)],reports=True)
         lock,barrier,other_done,sizes=Lock(),Barrier(64),Event(),[]
         active=peak=0
         started,completed=[],[]
