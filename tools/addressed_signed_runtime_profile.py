@@ -89,14 +89,15 @@ BIOS_READONLY_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-word0-data-v1
 BIOS_READONLY_TWO_SELECTOR = 'addressed-native-bios-fill-readonly-two-words-v1'
 BIOS_READONLY_THREE_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-three-words-data-v1'
 BIOS_READONLY_FOUR_DATA_SELECTOR = 'addressed-native-bios-fill-readonly-four-words-data-v1'
+MENU_RING_SELECTOR = 'addressed-native-menu-ring-initializer-v1'
 BIOS_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-function-literals-data-v1'
 BIOS_SCALAR_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-function-literals-data-v1'
 BIOS_ORDINARY_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-ordinary-function-literals-data-v1'
 SCALAR_CONTROL_SELECTORS = (max_lines.SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                             BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS)
-FUNCTION_DATA_SELECTORS = (max_lines.SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
+FUNCTION_DATA_SELECTORS = (MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                            BIOS_ORDINARY_FUNCTION_DATA_SELECTOR)
-BIOS_SELECTORS = (max_lines.SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
+BIOS_SELECTORS = (MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
 BIOS_ORDINARY_SELECTOR = 'addressed-native-bios-ordinary-v1'
 BIOS_ORDINARY_DATA_SELECTOR = 'addressed-native-bios-ordinary-data-v1'
 BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR = 'addressed-native-bios-ordinary-readonly-two-words-data-v1'
@@ -120,7 +121,7 @@ INTEGER_SELECTORS = (INTEGER_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_READONLY_S
                      INTEGER_THREE_DATA_SELECTOR, INTEGER_FOUR_DATA_SELECTOR)
 UNSIGNED_CAPABLE_SELECTORS = (*BIOS_ORDINARY_SELECTORS, *BIOS_SELECTORS, *UNSIGNED_SELECTORS, *INTEGER_SELECTORS, UNSIGNED_READONLY_SELECTOR, UNSIGNED_BUFFER_SELECTOR,
                              UNSIGNED_BUFFER_DATA_SELECTOR, COMPILER_THUNKS_DATA_SELECTOR)
-CALLBACK_SELECTORS = (CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_DATA_SELECTOR)
+CALLBACK_SELECTORS = (MENU_RING_SELECTOR, CALLBACK_SELECTOR, R3_CALLBACK_SELECTOR, BIOS_R2_ORDINARY_DATA_SELECTOR)
 DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_ORDINARY_DATA_SELECTOR, BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_DATA_SELECTOR, DATA_SELECTOR, READONLY_TWO_DATA_SELECTOR, *CALLBACK_SELECTORS,
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
                   INTEGER_FOUR_DATA_SELECTOR, BUFFER_DATA_SELECTOR, UNSIGNED_BUFFER_DATA_SELECTOR,
@@ -143,7 +144,7 @@ THUNK_CONTRACT = ('conditional returning opaque callee via canonical _call_via_r
 THUNK_TARGET_POLICY = 'all-path-memory-word-load-target-v1'
 DATA_CONTRACT = ('typed named ABS32 object identity only; no physical readability, '
                  'allocation, pointee type, memory safety or C semantic facts')
-SCHEMAS = {max_lines.SELECTOR: max_lines.SCHEMA, COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
+SCHEMAS = {MENU_RING_SELECTOR: 'elf-symbol-thumb-' + MENU_RING_SELECTOR, max_lines.SELECTOR: max_lines.SCHEMA, COMPILER_DATA_SELECTOR: COMPILER_DATA_SCHEMA,
             COMPILER_THUNKS_DATA_SELECTOR: COMPILER_THUNKS_DATA_SCHEMA,
             COMPILER_TWO_DATA_SELECTOR: COMPILER_TWO_DATA_SCHEMA,
             COMPILER_THREE_DATA_SELECTOR: COMPILER_THREE_DATA_SCHEMA,
@@ -370,6 +371,11 @@ def data_producer_fingerprint(selector=DATA_SELECTOR):
                  ('match_evidence', 'inert_spin_profile', 'analyze', 'plausible'))
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         paths.add(Path(importlib.import_module('bios_cpuset_fill_profile').__file__))
+    if selector == MENU_RING_SELECTOR:
+        paths.update(Path(importlib.import_module(name).__file__) for name in
+                     ('menu_ring_initializer', 'installed_zero_effects', 'installed_copy_effects',
+                      'iwram_installation_prerequisite', 'literal_callback_closure_profile',
+                      'scheduler_event_definition'))
     if selector == max_lines.SELECTOR:
         paths.add(Path(max_lines.__file__))
     if selector in CODE_IMAGE_SELECTORS:
@@ -662,6 +668,8 @@ def prepare(data, address, calls, context):
     import match
     import owner_admission_profile as owner
     selector = context_selector(context)
+    if selector == MENU_RING_SELECTOR and (address != 0x0804C8C4 or len(data) != 184):
+        raise ValueError('menu ring initializer requires its complete original owner')
     if type(context[3]) is not dict or not context[3] or \
             type(context[4]) is not dict or context[4]:
         raise ValueError('addressed signed runtimes require a fresh exact context')
@@ -944,9 +952,14 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
         context[4]['linker_absolute'] = max_lines.verify_use(data, instructions, edges, partition, calls, literals)
         context[4]['m4a_callback_rows'] = max_lines.callbacks(context[0], context[1], literals)
     if selector in CALLBACK_SELECTORS:
+        resolve_callback = r3_callback_sites if selector == R3_CALLBACK_SELECTOR else callback_sites
+        if selector == MENU_RING_SELECTOR:
+            import menu_ring_initializer as menu_ring
+            resolve_callback = menu_ring.callback_site
+            context[4]['menu_ring'] = menu_ring.manifest(context[0], context[1], context[2], data)
         context[4]['callback'] = dict(
             contract=R3_CALLBACK_CONTRACT if selector == R3_CALLBACK_SELECTOR else CALLBACK_CONTRACT,
-            sites=(r3_callback_sites if selector == R3_CALLBACK_SELECTOR else callback_sites)(
+            sites=resolve_callback(
                 instructions, edges, calls, address, context[7]),
             dependencies=callback_dependencies(context[0], context[1], context[2], selector),
             runtime=match.function_thunk.RUNTIME, abi=match.function_thunk.ABI)
