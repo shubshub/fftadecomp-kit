@@ -126,9 +126,18 @@ DATA_SELECTORS = (*FUNCTION_DATA_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_RE
                   UNSIGNED_DATA_SELECTOR, INTEGER_DATA_SELECTOR, INTEGER_THREE_DATA_SELECTOR,
                   INTEGER_FOUR_DATA_SELECTOR, BUFFER_DATA_SELECTOR, UNSIGNED_BUFFER_DATA_SELECTOR,
                   *COMPILER_SELECTORS, THUNKS_DATA_SELECTOR)
-# The addressed-native-bios-fill-*-data-v1 selectors classify reached untyped
-# hardware-window words as owner_admission_profile numeric hardware words.
-NUMERIC_HARDWARE_SELECTORS = tuple(selector for selector in BIOS_SELECTORS if selector in DATA_SELECTORS)
+# The BIOS fill data selectors classify reached untyped hardware-window words as
+# owner_admission_profile numeric hardware words: the twelve named
+# addressed-native-bios-fill-*-data-v1, the menu ring initializer and the
+# MPlayExtender max-lines selector.  Every member is in both BIOS_SELECTORS and
+# DATA_SELECTORS, but the set is written out: a selector added to both gains
+# this class only when it is also added here.
+NUMERIC_HARDWARE_SELECTORS = (
+    MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR,
+    BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, BIOS_SCALAR_MMIO_DATA_SELECTOR,
+    BIOS_SAVED_SCALAR_MMIO_DATA_SELECTOR, BIOS_SCALAR_MMIO_CODE_IMAGE_SELECTOR, BIOS_READONLY_DATA_SELECTOR,
+    BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR,
+    BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
 CALLBACK_ALIAS = '_call_via_r2'
 CALLBACK_CONTRACT = ('conditional returning typed source callback via canonical r2; '
                      'r0/r1 are caller arguments, r2 is the target, not a third C formal; '

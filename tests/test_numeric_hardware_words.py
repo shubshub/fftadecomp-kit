@@ -1,4 +1,5 @@
 """Untyped fixed hardware addresses stay plain numbers in the BIOS fill selectors only."""
+import ast
 from contextlib import redirect_stdout
 import copy
 import io
@@ -21,6 +22,7 @@ import test_bios_function_literals as function_literals
 import test_bios_mixed_cpuset_fast_fill as cpuset_tests
 import test_bios_mixed_fast_fill_source as mixed_tests
 import test_bios_numeric_mmio_literals as mmio
+import test_bios_ordinary_function_literals as ordinary_function_literals
 import test_bios_saved_scalar_mmio_literals as saved
 import test_bios_scalar_control as scalar
 import test_bios_scalar_function_literals as scalar_function_literals
@@ -447,6 +449,60 @@ class AddressedNumericHardwareWordTests(unittest.TestCase):
                     self.assertFalse(evidence.report_matches(report.replace(row, forged), root, A))
             self.assertFalse(evidence.report_matches(report.replace(
                 owner.NUMERIC_HARDWARE_SCHEMA, 'forged-numeric-literals-v1'), root, A))
+
+
+class AddressedNumericHardwareSelectorSetTests(unittest.TestCase):
+    def setUp(self):
+        self.fill = helper(self, fill.BiosCpuSetFillTests)
+        self.ordinary_function = helper(self, ordinary_function_literals.OrdinaryBiosFunctionLiteralTests)
+
+    def test_every_member_is_a_bios_fill_selector_with_typed_data(self):
+        members = set(profile.NUMERIC_HARDWARE_SELECTORS)
+        self.assertLessEqual(members, set(profile.BIOS_SELECTORS))
+        self.assertLessEqual(members, set(profile.DATA_SELECTORS))
+
+    def test_every_bios_fill_data_selector_has_a_decision(self):
+        both = set(profile.BIOS_SELECTORS) & set(profile.DATA_SELECTORS)
+        undecided = both - set(profile.NUMERIC_HARDWARE_SELECTORS)
+        self.assertEqual(undecided, set(),
+                         'in BIOS_SELECTORS and DATA_SELECTORS but not in NUMERIC_HARDWARE_SELECTORS: either '
+                         'add the selector there with a test that it records a hardware-window word, or make '
+                         'this test name it as a selector that refuses such a word, with a test of the refusal')
+
+    def test_a_selector_added_to_both_parent_sets_does_not_join_the_set(self):
+        # #420 added one selector to BIOS_SELECTORS and to DATA_SELECTORS, and the set, then
+        # derived as their intersection, gained it.  Rebuild the module with one more selector
+        # in both parent sets: the set must not change.
+        new = 'addressed-native-bios-fill-unlisted-data-v1'
+        with open(profile.__file__, encoding='utf-8') as source:
+            tree = ast.parse(source.read())
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and [getattr(target, 'id', None) for target in node.targets] in (
+                    ['BIOS_SELECTORS'], ['DATA_SELECTORS']):
+                node.value = ast.Tuple([ast.Starred(node.value, ast.Load()), ast.Constant(new)], ast.Load())
+        edited = {'__name__': 'edited_addressed_signed_runtime_profile', '__file__': profile.__file__}
+        exec(compile(ast.fix_missing_locations(tree), profile.__file__, 'exec'), edited)
+        self.assertIn(new, edited['BIOS_SELECTORS'])
+        self.assertIn(new, edited['DATA_SELECTORS'])
+        self.assertEqual(set(edited['NUMERIC_HARDWARE_SELECTORS']), set(profile.NUMERIC_HARDWARE_SELECTORS),
+                         'NUMERIC_HARDWARE_SELECTORS follows the parent sets; a selector must join it only by an '
+                         'edit of NUMERIC_HARDWARE_SELECTORS')
+
+    def test_the_set_alone_decides_the_class(self):
+        f, _, _ = numeric_destination(self.fill.fixture(data=True), VRAM)
+        self.assertEqual(f['selector'], profile.BIOS_DATA_SELECTOR)
+        self.assertIn('numeric_hardware_words', profile.verify(**f)[0])
+        with patch.object(profile, 'NUMERIC_HARDWARE_SELECTORS', ()), \
+                self.assertRaisesRegex(ValueError, 'exact typed coverage of reached address words'):
+            profile.verify(**f)
+
+    def test_the_ordinary_function_literal_selector_refuses_a_hardware_word(self):
+        # In FUNCTION_DATA_SELECTORS, so in DATA_SELECTORS, but not a BIOS fill selector.
+        plain = self.ordinary_function.fixture()
+        self.assertEqual(plain['selector'], profile.BIOS_ORDINARY_FUNCTION_DATA_SELECTOR)
+        profile.verify(**plain)
+        with self.assertRaisesRegex(ValueError, 'exact typed coverage of reached address words'):
+            profile.verify(**numeric_destination(plain, VRAM)[0])
 
 
 if __name__ == '__main__':
