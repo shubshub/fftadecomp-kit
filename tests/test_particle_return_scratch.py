@@ -178,5 +178,31 @@ class NativeParticleTests(unittest.TestCase):
             self.assertIn('compiler __modsi3 binding', refused.stderr)
 
 
+class CallerDecodeTests(unittest.TestCase):
+    # Capstone's Thumb mode also decodes Thumb-2 and ARMv5 encodings, which the ARM7TDMI does not execute.
+    def test_refuses_thumb_outside_armv4t(self):
+        cs = particle.decoder()
+        for name, words in [('cbz r0', (0xB100,)), ('cbnz r0', (0xB900,)), ('bkpt #0', (0xBE00,)),
+                            ('Thumb-2 mov.w r1, #0', (0xF04F, 0x0100))]:
+            data = struct.pack(f'<{1+len(words)}H', 0x2000, *words)  # each after an ARMv4T movs r0, #0
+            with self.subTest(name):
+                self.assertEqual(particle.decode(cs, data, particle.ROOT, particle.ROOT).mnemonic, 'movs')
+                # Capstone decodes the item, so only the ARMv4T check can refuse it.
+                self.assertIsNotNone(next(cs.disasm(data[2:], particle.ROOT+2, count=1), None))
+                with self.assertRaisesRegex(ValueError, 'invalid particle caller Thumb instruction'):
+                    particle.decode(cs, data, particle.ROOT, particle.ROOT+2)
+
+    def test_accepts_an_armv4t_sequence(self):
+        cs = particle.decoder()
+        # push {r4, lr}; adds r4, r0, #0; bl (a BL pair); movs r0, #0; pop {r4}; pop {r1}; bx r1
+        data = struct.pack('<8H', 0xB510, 0x1C04, 0xF000, 0xF800, 0x2000, 0xBC10, 0xBC02, 0x4708)
+        pc, mnemonics = particle.ROOT, []
+        while pc < particle.ROOT + len(data):
+            item = particle.decode(cs, data, particle.ROOT, pc)
+            mnemonics.append(item.mnemonic)
+            pc += item.size
+        self.assertEqual(mnemonics, ['push', 'adds', 'bl', 'movs', 'pop', 'pop', 'bx'])
+
+
 if __name__ == '__main__':
     unittest.main()
