@@ -17,8 +17,7 @@ closed set of toolchains a row may name and every check:
   relocatable function (consistency);
 * a unit toolchain is never admitted outside its unit, and no other
   non-default toolchain is admitted at all, except the older explicit
-  fixed-O0 orphan-constant selector, outside every unit or inside an
-  agbcc-O0-v1 unit;
+  fixed-O0 orphan-constant selector inside an agbcc-O0-v1 unit;
 * the proving function is verified with the unit's toolchain and does not
   compile to the same function under the default toolchain (necessity); a
   row whose proof fails either way is reported as stale.
@@ -362,7 +361,7 @@ def gate(root, address, args):
     --unit-toolchain.  May set args.cc and args.flags to the unit's toolchain.
     """
     import match
-    from compiler_orphan_constants_native_profile import SELECTOR as O0_SELECTOR
+    from compiler_orphan_constants_native_profile import SELECTOR as O0_SELECTOR, FLAGS as O0_FLAGS
     defaults = (match.DEFAULT_CC, match.DEFAULT_CPP, match.DEFAULT_AS, match.DEFAULT_OBJCOPY,
                 match.DEFAULT_LD, match.DEFAULT_FLAGS)
     chosen = (args.cc, args.cpp, args.assembler, args.objcopy, args.linker, args.flags)
@@ -398,11 +397,16 @@ def gate(root, address, args):
         return {"unit": unit, "tool": tool}
     if chosen != defaults:
         if getattr(args, "owner_runtime_profile", None) == O0_SELECTOR and \
-                (unit is None or unit.toolchain == O0_TOOLCHAIN):
+                unit is not None and unit.toolchain == O0_TOOLCHAIN:
             return None
         if unit is not None:
             raise Refusal(f"0x{address:08X} lies in library unit {unit.name}: verify it with "
                           f"--unit-toolchain {unit.toolchain} and no other toolchain option")
+        if getattr(args, "owner_runtime_profile", None) == O0_SELECTOR:
+            raise Refusal(f"0x{address:08X} is outside every library unit; the fixed-O0 orphan-constant "
+                          f"selector is admitted only inside an {O0_TOOLCHAIN} unit, with --flags='{O0_FLAGS}' "
+                          f"and without --unit-toolchain, and outside every unit only the default toolchain "
+                          f"verifies")
         if _selectors(args):
             raise Refusal("a non-default toolchain is admitted only through --unit-toolchain inside a library unit")
         return "exploratory"
@@ -605,7 +609,7 @@ def report_admitted(report, root, address):
         if verifications == [f"* verification: `{music.SCHEMA}`"]:
             return False
         if verifications == [f"* verification: `{O0_SCHEMA}`"]:
-            return unit is None or unit.toolchain == O0_TOOLCHAIN
+            return unit is not None and unit.toolchain == O0_TOOLCHAIN
         if compilers not in ([], [f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`"]):
             return False
         return unit is None or consistent(root, address, unit)

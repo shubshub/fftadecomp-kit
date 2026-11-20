@@ -12,6 +12,7 @@ from unittest.mock import patch
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'tools'))
 import match
 import match_evidence
+import library_units as units
 import owner_admission_profile as owner
 import status
 import compiler_orphan_constants_native_profile as native
@@ -47,6 +48,11 @@ class NativeTests(unittest.TestCase):
         (root/'config/data_symbols.json').write_bytes(cls.objects)
         (root/'symbols/functions.txt').write_bytes(cls.index)
         (root/'baserom.bin').write_bytes(cls.rom)
+        # the selector is admitted only inside an agbcc-O0-v1 library unit
+        cls.table=json.dumps({'units':[dict(name='boot',start=f'0x{A:08X}',end=f'0x{B+2:08X}',
+            toolchain='agbcc-O0-v1',proof=f'0x{A:08X}',evidence='synthetic -O0 object for the tests',
+            identity=[dict(address=f'0x{A:08X}',size=len(cls.data),sha256=native.sha(cls.data))])]}).encode()
+        (root/units.TABLE).write_bytes(cls.table)
         cls.env=patch.dict(os.environ,FFTA_ROM=str(root/'baserom.bin'));cls.env.start()
         cls.result=native.build(root,A,capture_dir=root/'capture')
         cls.report=native.render(A,cls.result)
@@ -121,6 +127,20 @@ class NativeTests(unittest.TestCase):
         self.assertEqual(status.matcher_extent(result.stdout),len(self.data))
         self.assertEqual(status.report_extent(self.report),len(self.data))
         self.assertFalse((self.root/'docs/match/08001000.md').exists())
+
+    def test_selector_outside_every_library_unit_is_refused(self):
+        command=[sys.executable,str(Path(match.__file__)),'--root',str(self.root),f'{A:08X}',
+            '--owner-runtime-profile',native.SELECTOR,'--flags='+native.FLAGS,'--no-write']
+        (self.root/units.TABLE).unlink()
+        try:
+            result=match._run_replay_process(command,self.root,120)
+            self.assertEqual(result.returncode,1,result.stdout+result.stderr)
+            self.assertIn('refused: 0x08001000 is outside every library unit; the fixed-O0 orphan-constant '
+                'selector is admitted only inside an agbcc-O0-v1 unit',result.stderr)
+            self.assertNotIn('verdict MATCH - byte identical',result.stdout.splitlines())
+            self.assertFalse(match_evidence.report_matches(self.report,self.root,A))
+        finally:(self.root/units.TABLE).write_bytes(self.table)
+        self.assertTrue(match_evidence.report_matches(self.report,self.root,A))
 
     def test_actual_orphan_export_reference_and_addend_mutations_refuse(self):
         header=struct.unpack_from('<HHIIIIIHHHHHH',self.original,16)
