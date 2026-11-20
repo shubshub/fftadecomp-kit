@@ -574,66 +574,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "864184c36c9d49fec387d42b8b522e4afc05b313968ae5e541dfe0aefd3b2ba6",
-        "acknowledged_cursor": 7031120946,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "864184c36c9d49fec387d42b8b522e4afc05b313968ae5e541dfe0aefd3b2ba6",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CAE2C\",\"who\":\"native-equipment-review\",\"note\":\"Recover slot bounds at the four outstanding inventory callers of 080CB48C\"}",
-          "created_at": "2026-11-20T05:14:24Z",
-          "id": 7031120946,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T05:14:24Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "bf8e3eadc0837498919e221e06a3ef09dfcb739394e9dce3bfa957bbbd35fbc9",
-        "result": {
-          "address": "0x080CAE2C",
-          "claim_id": 7031120946,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 7031120946,
-          "status": "accepted",
-          "who": "native-equipment-review"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0b8e436e5356d1fe99b966961b3c88cecac2af619f52d81694b72afd10c03271",
-        "acknowledged_cursor": 7031364135,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0b8e436e5356d1fe99b966961b3c88cecac2af619f52d81694b72afd10c03271",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080CAE2C\",\"who\":\"native-equipment-review\",\"claim_id\":7031120946,\"reason\":\"Verified slot provenance and bounded copies documented in merged game PR #320, remains Parked\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-20T05:29:41Z",
-          "id": 7031364135,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T05:29:41Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0a63d28968934a8ee04cdb5f98668dd6ff15f7c6243be83f86acbae1eabdb95d",
-        "result": {
-          "address": "0x080CAE2C",
-          "claim_id": 7031120946,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 7031364135,
-          "status": "accepted",
-          "who": "native-equipment-review"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "42eecd755b82233c29956f21141face27dc43e055708cacc542d31386a34dbde",
         "acknowledged_cursor": 7031178418,
         "body_provenance": "acceptance-time",
