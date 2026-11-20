@@ -574,66 +574,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "6e7447414620f6c82fdf418185b56644c5f3550a8c4a7b96dec4d24b6cf35738",
-        "acknowledged_cursor": 7032337715,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "6e7447414620f6c82fdf418185b56644c5f3550a8c4a7b96dec4d24b6cf35738",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08054E14\",\"who\":\"native-long-switch-b\",\"note\":\"Replay parked 3620-byte callback against the upstream fixed same-owner BL switch-frame verifier.\"}",
-          "created_at": "2026-11-20T06:31:23Z",
-          "id": 7032334043,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T06:31:23Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "011f5193fa2fee7a4810f64fac0536c2b456b1da48b5999dd8098e847da9de14",
-        "result": {
-          "address": "0x08054E14",
-          "claim_id": 7032334043,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 7032334043,
-          "status": "accepted",
-          "who": "native-long-switch-b"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "cb3bfcf8ebb7e4206935cf28a39f485e8d758160616e743ce8a83b5aab9f0d86",
-        "acknowledged_cursor": 7032345001,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "cb3bfcf8ebb7e4206935cf28a39f485e8d758160616e743ce8a83b5aab9f0d86",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08054E14\",\"who\":\"native-long-switch-b\",\"claim_id\":7032334043,\"reason\":\"Matching quota reached before replay. Parked source remains available for verification with the merged kit #412 fix.\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-20T06:32:03Z",
-          "id": 7032345001,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T06:32:03Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "362caf746ad3263d5c9a2443c5c6642a032bf87bd90a951438015eb0975811fb",
-        "result": {
-          "address": "0x08054E14",
-          "claim_id": 7032334043,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 7032345001,
-          "status": "accepted",
-          "who": "native-long-switch-b"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "95279c80a6b372c37ae83a7cf6d548065f54390560996a1018458189385d4a0f",
         "acknowledged_cursor": 7032402570,
         "body_provenance": "acceptance-time",
