@@ -6153,7 +6153,11 @@ The owner selectors `bounded-buffer-bios-fill-source-v1`,
 `bounded-buffer-bios-mixed-fast-fill-source-v1`,
 `bounded-buffer-bios-mixed-cpuset-fast-fill-source-v1` and
 `bounded-buffer-bios-mixed-fast-fill-runtime-summaries-v1`, and the addressed
-`addressed-native-bios-fill-*-data-v1` selectors, give each reached PC-loaded
+selectors listed in
+`addressed_signed_runtime_profile.NUMERIC_HARDWARE_SELECTORS` (the twelve
+`addressed-native-bios-fill-*-data-v1` selectors,
+`addressed-native-menu-ring-initializer-v1` and
+`addressed-m4a-extender-bios-fill-max-lines-v1`), give each reached PC-loaded
 pool word the first class that applies:
 
 1. a typed ABS32 object or function literal;
@@ -6193,8 +6197,11 @@ a word is a non-local value. Tracked stack aliases come only from SP
 arithmetic, and no address in the window lies in the stack, so the existing
 buffer, fill-source and frame proofs are unchanged. No typed symbol, pointee
 type, hardware access validity or memory effect is claimed. Every other owner
-and addressed selector is unchanged, including the ordinary-BIOS, runtime,
-callback and native-buffer data selectors.
+and addressed selector is unchanged, including the ordinary-BIOS, runtime and
+native-buffer data selectors and every callback data selector other than the
+menu ring initializer. The addressed list is written out: a selector added to
+the BIOS fill and data selector sets gains this class only when it is also
+added to that list.
 
 The pinned-volatile CpuSet interface builds its premise from the owner
 preflight, and that path is not changed. The preflight still asks for a name
@@ -6202,10 +6209,14 @@ for every reached address word, as it already does for 32-bit fill controls.
 So an owner whose semantic check runs still refuses a numeric hardware word.
 `bounded-buffer-bios-fill-overwritten-control-stores-v1` always runs that check.
 
-`test_numeric_hardware_words.py` covers each selector, the window bounds, typed
-words, controls, mixed loads, numeric MMIO, other selectors and forged
-manifests and reports. `test_numeric_hardware_words_native.py` compiles real
-CpuSet and CpuFastSet owners and replays their reports.
+`test_numeric_hardware_words.py` covers each owner selector and each of the
+twelve `addressed-native-bios-fill-*-data-v1` selectors, the window bounds,
+typed words, controls, mixed loads, numeric MMIO, other selectors, the
+addressed list and forged manifests and reports. The max-lines selector is
+covered by the opt-in native class of `test_m4a_max_lines.py`; no test
+exercises the class under the menu ring initializer, whose pinned function
+reaches no word in the window. `test_numeric_hardware_words_native.py`
+compiles real CpuSet and CpuFastSet owners and replays their reports.
 
 ### Expired root-frame scratch at the root's own return
 
