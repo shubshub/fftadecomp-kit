@@ -1122,14 +1122,18 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if controls & set(literals):
             raise ValueError('BIOS scalar control cannot also be a named object')
         address_words -= controls
+    # A word exempted below is left out of the typed coverage, so neither exemption
+    # takes a ROM word, at wait state 0 or in a mirror: a code or ROM data address
+    # is never comparison-only.
+    rom_words = {row['address']-address for row in proof['partition']['words'] if row['value'] >= match.ROM_BASE}
     if selector == transfer_tree.SELECTOR:
         site = proof['transfer_tree']['compared_address_word']
-        if site in literals or site not in address_words:
+        if site in literals or site not in address_words - rom_words:
             raise ValueError('destruction sentinel must be a comparison-only address')
         address_words.remove(site)
     if selector == dma_fill.SELECTOR and address in dma_fill.ROOTS:
         threshold = proof['dma_fill']['address_limit_word']
-        if threshold in literals or threshold not in address_words:
+        if threshold in literals or threshold not in address_words - rom_words:
             raise ValueError('DMA channel threshold must be a comparison-only scalar')
         address_words.remove(threshold)
     if selector in rom_copy.SELECTORS and rodata:
