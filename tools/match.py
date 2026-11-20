@@ -57,6 +57,7 @@ import dma_fill_profile as dma_fill
 import empty_body_profile as empty_body
 import library_units
 import rom_mirror
+import counted_stack_cursor_loop as counted_cursor
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -3394,6 +3395,7 @@ class BufferCallProof:
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
     _loop_replay_opt_in = True
+    loop_replay = False
     index_policy = None
     # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
     # entries become proved leaf calls; None keeps every runtime refused.
@@ -3468,6 +3470,9 @@ class BufferCallProof:
         self.stack_arguments = stack_arguments
         self.loop_replays = {}
         self.loop_replay_states = 0
+        # (function, loop head) -> counted stack-cursor loop record of the owner walk (counted_stack_cursor_loop);
+        # never written inside a callee check, so a callee check's snapshot need not hold it
+        self.cursor_loops = {}
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Targets of un-inspected calls an inspected callee (transitively) relies on
@@ -4180,6 +4185,7 @@ class BufferCallProof:
                          f"writes {' '.join(f'sp{offset:+d}:{width}' for offset, width in sorted(writes))}; "
                          f"proved {' '.join(proved) or 'none'}; trusted {' '.join(assumed) or 'none'}; "
                          f"pruned edges {len(pruned)}")
+        lines.extend(counted_cursor.report_line(record) for _, record in sorted(self.cursor_loops.items()))
         if self.copy_summaries is not None:
             lines.extend(self.copy_summaries.lines())
         if self.switch_callees is not None:
@@ -4189,6 +4195,13 @@ class BufferCallProof:
         if self.dead_registers is not None:
             lines.extend(self.dead_registers.lines())
         return lines
+
+    def record_cursor_loops(self, records):
+        """Keep the counted stack-cursor loops the owner walk under this proof replayed (one per head)."""
+        for record in records:
+            key = (record["function"], record["head"])
+            if self.cursor_loops.setdefault(key, record) != record:
+                raise ValueError("inconsistent counted stack-cursor loop records for one loop")
 
     def bios_summary_lines(self):
         """The BIOS wrapper summary lines; empty unless a summary was applied."""
@@ -4220,6 +4233,10 @@ class BufferCallProof:
                                  key=lambda item: json.dumps(item))]
                 for address, records in self.loop_replays.items())],
                 separators=(",", ":")).encode())
+        if self.cursor_loops:
+            # Only a replayed counted stack-cursor loop adds this; every other fingerprint is unchanged.
+            digest.update(json.dumps([counted_cursor.SCHEMA, [record for _, record in sorted(self.cursor_loops.items())]],
+                                     sort_keys=True, separators=(",", ":")).encode())
         if self.bios_summaries is not None and self.bios_summaries.observed():
             # Reports without an applied summary keep their earlier fingerprint.
             digest.update(self.bios_summaries.digest().encode())
@@ -4888,6 +4905,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     literal_stack_constants = set()
     if cursor is not None and path_states is not None:
         raise ValueError("owner cursor requires the ordinary joined frame walk")
+    # Refused cursor loop heads are replayed pass by pass, keyed (instruction, pass).
+    cursor_loops = None
+    if path_states is None and counted_cursor.applies(thumb, buffer_proof, bounded_index):
+        cursor_loops = counted_cursor.CursorLoops(loop_replay_transfer, loop_replay_condition,
+                                                  buffer_proof.callee_clobbers, address, instructions, edges)
     while pending:
         iteration = 0
         if path_states is None:
@@ -4896,6 +4918,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             incoming_state = states[state_key]
         else:
             current, incoming_state = pending.pop()
+        revisit = current in edges
         if current % alignment or not address <= current < end:
             raise ValueError("function has no verified return: non-leaf control flow leaves the symbol")
         if current not in instructions:
@@ -5446,6 +5469,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     tuple(sorted(constants.items())), tuple(sorted(pointer_slots.items())), tuple(sorted(result_words.items()))))
         else:
             outgoings = [outgoing]
+        if cursor_loops is not None:
+            cursor_loops.step(state_key if type(state_key) is tuple else None, instruction)
         for successor, outgoing in ((target, state) for target in successors for state in outgoings):
             if path_states is not None:
                 previous_paths = path_states.get(successor, set())
@@ -5459,10 +5484,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     path_state_count += 1
                     pending.append((successor, outgoing))
                 continue
-            state_key = cursor.state_key(current, successor, iteration) if cursor is not None else successor
-            if state_key is None:
+            target_key = cursor.state_key(current, successor, iteration) if cursor is not None else successor
+            if cursor_loops is not None:
+                target_key = cursor_loops.route(current, state_key if type(state_key) is tuple else None,
+                                                successor, instruction)
+            if target_key is None:
                 continue
-            previous = states.get(state_key)
+            previous = states.get(target_key)
             if previous is None:
                 merged = outgoing
             else:
@@ -5496,8 +5524,15 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                         if register not in dead_conflicts)
                     incoming_aliases = tuple((register, offset) for register, offset in incoming_aliases
                                              if register not in dead_conflicts)
-                merged_aliases = (merge_possible_aliases(previous_register_aliases, incoming_aliases)
-                                  if stack_arguments else incoming_aliases)
+                try:
+                    merged_aliases = (merge_possible_aliases(previous_register_aliases, incoming_aliases)
+                                      if stack_arguments else incoming_aliases)
+                except ValueError:
+                    if cursor_loops is None or type(state_key) is tuple or not cursor_loops.engage(
+                            instruction, current, successor, previous, outgoing, previous_register_aliases,
+                            incoming_aliases, revisit, states, pending):
+                        raise
+                    break
                 merged_slots = merge_possible_aliases(previous[4], outgoing[4])
                 merged = (previous[0] & outgoing[0],
                           tuple((saved[0] and incoming[0], saved[1] and incoming[1],
@@ -5507,9 +5542,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                           tuple((register, value) for register, value in previous[3]
                                 if constants.get(register) == value), merged_slots,
                           tuple((slot,value) for slot,value in previous[5] if words.get(slot)==value))
-            if previous != merged:
-                states[state_key] = merged
-                pending.append(state_key)
+            if (cursor_loops is not None and cursor_loops.settle(target_key, merged)) or previous != merged:
+                states[target_key] = merged
+                pending.append(target_key)
+    cursor_records = cursor_loops.finish(address, instructions, edges, states, local_branches, calls) \
+        if cursor_loops is not None else []
     if acyclic_state_budget is not None:
         # Exact states never merge. The complete reached graph must also be a
         # DAG, including cycles whose repeated states needed no new work item.
@@ -5732,6 +5769,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         buffer_proof.bios_summaries.finish(data, address, instructions, edges)
     if dma_fills is not None:
         dma_fills.finish(data, address, instructions, edges, predecessors)
+    if cursor_records:
+        buffer_proof.record_cursor_loops(cursor_records)
     return [instructions[current] for current in sorted(instructions)]
 
 

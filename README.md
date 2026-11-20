@@ -824,7 +824,9 @@ each word must be an allocated local word. Each store applies the scalar store's
 saved-return and pointer-word effects, and the base retains its exact incremented
 offset after writeback. Stored stack pointers, other modes and encodings, and
 out-of-frame or misaligned spans remain rejected. Writeback does not relax
-alias joins: a loop with differing live pointer offsets still fails verification.
+alias joins: a loop with differing live pointer offsets still fails verification,
+except for the counted loops a stack buffer walk replays pass by pass
+(`### Counted stack-cursor loops in stack buffer walks`).
 
 Canonical 16-bit Thumb `cmp r0-r7, #0` may read an already tracked alias into
 a current, definitely allocated local word. Pushed-save slots, entry-SP and
@@ -1204,6 +1206,63 @@ caller with ten allocated bytes from the array (`080BE8E0`, array at `sp+0x14` o
 a 44-byte frame) is admitted, and the bound write set then covers its spilled
 locals at `sp+0x18` and `sp+0x1C`. As stated above, the bounds are allocated
 stack words, not C objects.
+
+### Counted stack-cursor loops in stack buffer walks
+
+An owner loop that walks its own frame through a moving pointer (`adds r5, #2`
+across two calls in `08043DF4`; an R8 cursor copied, advanced and read with
+`ldm r1!, {r0}` in `080B336C`) brings a different live offset back to its loop
+head, and the stack-argument join refuses with `inconsistent possible pointer
+offsets at control-flow join`. `counted_stack_cursor_loop.py` replays such a
+loop instead of joining it. It applies only to the owner's own walk under the
+proofs that replay buffer callees (the previous section's opt-in, with stack
+arguments), whose reports state `* buffer loop replay:` lines and whose report
+checks recompute them; every other walk keeps the refusal, including each
+buffer callee's walk under those proofs. An owner switch whose walk keys its
+states by its own local cursor (`menu_local_cursor.py`, the `mov r4, sp` then
+`stm r4!, {r2}` clear in `080447B4`) keeps that cursor, and this rule stays
+out of it.
+
+It starts only where that join refuses, at the first visit of a 16-bit
+conditional branch back to an earlier head (the latch), when exactly one live
+register differs between the entry and the back edge and pointer-bearing words
+agree. The region from the head to the latch is then walked once per pass with
+a state per instruction and pass. Every instruction of every pass goes through
+the unchanged core transfer, so frame bounds, saved-register and return-address
+words, pointer-bearing words, escapes and calls (buffer callees walked with the
+exact pointer of that pass) are checked at exact offsets. Only the latch is
+decided: by the operand pair of the last `cmp` before it, with the known values
+and flag rules of the callee replay above, so a call forgets every R4-R11 value
+that an inspected callee (or one it inspects) writes on any path. The first
+pass starts from the walk's exact constants at the head, less every value that
+may have crossed or come out of a call on a path into the loop: the walk keeps
+R4-R11 constants across every call, even one whose callee writes them. An entry
+path walked only after the passes is checked again once the walk is complete.
+An undecided latch refuses, and so does a loop that has not exited after 4,096
+passes. The exit is the last pass's state, joined normally after the loop.
+Nothing is widened and no alias is dropped.
+
+After the walk the loop must be entered only at its head, leave only through
+the latch's fall-through, and contain no other back edge, return, local branch,
+multiway branch, push, pop or SP adjustment. Between the head states of the
+passes no stack alias other than the cursor and no pointer-bearing word may
+change, and the cursor moves by one constant nonzero stride. Every access whose
+offset changes between passes must lie in the one run of allocated local words
+that holds the lowest of them (allocated stack words, not C objects). Each loop
+is bound into the buffer proof fingerprint (`counted-stack-cursor-loop-v1`) and
+stated in one line:
+
+```
+* buffer loop replay: `counted-stack-cursor-loop-v1` function 0x08043DF4 head 0x08043E20 latch 0x08043E70: r5 = entry_sp-44 + 2*pass, 5 passes; latch ble on cmp r7, #4 at 0x08043E6E with r7 = 1..5; cursor accesses [entry_sp-44, entry_sp-34) inside allocated locals [entry_sp-44, entry_sp-28); exit r5 = entry_sp-34; calls 0x08043E28:0x080C9540 0x08043E3C:0x080C9540, trusted to preserve r5 r7
+```
+
+Offsets are relative to the entry SP. When the loop calls, the line names each
+call site and target, the cursor, and every callee-saved register whose known
+value a pass carried across one of those calls (`r5 r7` above): the trip count
+and the offsets depend on their survival, which is the ordinary ARM ABI premise
+the walk already uses for calls it does not inspect. A loop without calls ends
+its line with `calls none`. Proofs without such a loop keep their previous
+fingerprint and lines. `Policy.enabled` in the module turns the rule off.
 
 ### Dead stack-address registers at calls
 
