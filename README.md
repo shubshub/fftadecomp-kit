@@ -2443,10 +2443,14 @@ obligations, each with its refusal:
    every return is proved to use the saved LR (a nested callee that may write
    the saved LR word unsaves it). The walk yields the bytes above the entry SP
    the callee may touch, the registers of R0-R3 and R12 it may read before
-   writing, and those it writes on every path (a nested call surely writes only
-   what every return of the inner callee writes). The only BIOS call the walk
-   admits is SWI 6 (`Div`), under a GBATEK premise printed in the report; its
-   handler stores R2 below SP, so R2 counts as read.
+   writing, those it writes on every path (a nested call surely writes only
+   what every return of the inner callee writes), and the registers of R4-R11
+   it may return changed: a register the callee writes counts as restored only
+   when it is popped from the word its entry value was pushed to, with no store
+   of the callee or of anything it calls able to reach that word since, and an
+   inner callee's changed registers are its caller's. The only BIOS call the
+   walk admits is SWI 6 (`Div`), under a GBATEK premise printed in the report;
+   its handler stores R2 below SP, so R2 counts as read.
 2. **Unread argument registers.** A variable stack address left in R0-R3 at a
    call is not an escape when the walk proves the callee never reads that
    register before writing it (080E4EB0 leaves `&x[j]` in R3 across the
@@ -2508,8 +2512,13 @@ obligations, each with its refusal:
     store those in its value hull, a store through a possible stack address its
     candidates, a callee those inside its reach, or every one when it may read a
     register holding a stack address. A call walks the callee while a word is
-    mirrored too, since a mirror held in R4-R11 survives the call. Joins keep a
-    scalar word only where both paths track it.
+    mirrored too: a mirror held in R4-R11 survives the call only when the walk
+    proves that the callee returns that register restored (item 1). Otherwise
+    the mirror ends and the word keeps its range, so a later compare of the
+    register no longer bounds it. The walk sees the callee's stores through SP
+    and the stack addresses handed to it in R0-R3 or R12, nothing else: that it
+    writes no local word through an address held in R4-R11 is trusted, as
+    below. Joins keep a scalar word only where both paths track it.
 11. **No premise on a constant.** No premise is stated on an index with no
     variable in it ("index is the constant N"): it is the same on every run, so
     the premise would be always true or always false. A reloaded constant word
@@ -2522,9 +2531,13 @@ The report adds one line, bound in the fingerprint and re-derived on replay (080
 ```
 
 `stack_index_frame_words_profile.POLICY` is the one switch: disabled, the core
-and the plain analysis refuse exactly as before. The walk trusts what every
-call in the kit already trusts: callees preserve R4-R11 and SP, and neither they
-nor interrupt handlers read a stack word below their entry SP before writing it.
+and the plain analysis refuse exactly as before. Apart from the registers that
+hold a mirror, which the walk proves restored, the analysis trusts what every
+call in the kit already trusts: callees preserve R4-R11 and SP and do not use
+R4-R11 as data, and neither they nor interrupt handlers read a stack word below
+their entry SP before writing it. So a range, a stack address or an element
+identity held in R4-R11 crosses a call on that premise, which the line does not
+print.
 Like the core, the analysis also trusts that a callee it does not walk (other
 than the authenticated ROM table copy helper) returns no address into the
 caller's frame; the report lists every such call.
