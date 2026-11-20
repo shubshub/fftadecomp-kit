@@ -65,6 +65,12 @@ THUNK_SELECTOR = 'bounded-buffer-conditional-thunks-v1'
 THUNK_SCHEMA = 'elf-symbol-thumb-bounded-buffer-conditional-thunks-v1'
 THUNK_CONTROL_FLOW = 'complete named-data owner with typed function words, bounded buffer callees and conditional canonical indirect-call ABI'
 NAME_ENTRY_CONTROL_FLOW = 'conditional name entry with an installed 20-byte clear and bounded BIOS halfword copies'
+def thunk_control_flow(address):
+    if address == 0x08021854:
+        return 'conditional sprite tile selection, installed clearer, sorted tree export and in-place value extraction'
+    return NAME_ENTRY_CONTROL_FLOW if address == 0x0812A878 else THUNK_CONTROL_FLOW
+
+
 THUNK_SCRATCH_SELECTOR = 'bounded-buffer-conditional-thunks-discarded-scratch-v1'
 THUNK_SCRATCH_SCHEMA = 'elf-symbol-thumb-bounded-buffer-conditional-thunks-discarded-scratch-v1'
 THUNK_SCRATCH_CONTROL_FLOW = 'bounded buffer outputs with proven unobserved R2/R3 returns and conditional canonical indirect-call ABI'

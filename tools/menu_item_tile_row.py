@@ -60,12 +60,12 @@ def environment_fingerprint():
     return result
 
 
-def check_archive(archive):
+def check_mode0_archive(archive, length, entry_count, output_bytes):
     """Follow the original mode-0 token loop; count after each token before authorizing any write."""
-    require(len(archive) == ARCHIVE_END - menu.ARCHIVE, 'archive extent')
+    require(len(archive) == length, 'archive extent')
     total, dictionary = struct.unpack_from('>HI', archive, 2)
-    require(total == 522 and 8+4*total < dictionary <= len(archive)-4, 'index or dictionary extent')
-    require(archive[dictionary:dictionary+4] == bytes.fromhex('00050080'), 'mode, shift or output length')
+    require(total == entry_count and 8+4*total < dictionary <= len(archive)-4, 'index or dictionary extent')
+    require(archive[dictionary:dictionary+4] == struct.pack('>BBH', 0, 5, output_bytes), 'mode, shift or output length')
     offsets = struct.unpack_from('>'+str(total)+'I', archive, 8) + (dictionary,)
     require(offsets[0] == 8+4*total, 'first stream overlaps or skips the index')
     for start, end in zip(offsets, offsets[1:]):
@@ -85,9 +85,13 @@ def check_archive(archive):
                 require(dictionary + 4 + entry + count <= len(archive), 'dictionary read outside its object')
                 cursor += 1
             produced += count
-            require(produced <= 128, 'decoder would overwrite the local icon')
-        require(produced == 128, 'incomplete local icon')
-    return dict(entries=total, bytes_per_icon=128, archive_sha256=sha256(archive).hexdigest())
+            require(produced <= output_bytes, 'decoder would overwrite the local icon')
+        require(produced == output_bytes, 'incomplete local icon')
+    return dict(entries=total, bytes_per_icon=output_bytes, archive_sha256=sha256(archive).hexdigest())
+
+
+def check_archive(archive):
+    return check_mode0_archive(archive, ARCHIVE_END - menu.ARCHIVE, 522, 128)
 
 
 def check_items(rom, objects):

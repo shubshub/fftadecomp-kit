@@ -29,7 +29,9 @@ import multiple_switch_native_profile as multiple_native
 import menu_selection_switches as menu_switches
 import menu_runner_switches as menu_runner
 import menu_icon_row
+import item_quantity_row
 import menu_item_tile_row as item_tile_row
+import menu_unit_tile_row as unit_tile_row
 import canonical_integer_native_profile as integer_native
 import canonical_integer_pair_native_profile as integer_pair
 import canonical_integer_three_words_native_profile as integer_three
@@ -509,7 +511,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         raise ValueError('complete-owner text reachable instruction count differs')
     ins, edges, branches, calls, words = graph.graph(data,address,refinement,
         one_object_word_switch=selector == bios_switch.SELECTOR)
-    if selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878:
+    if selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
+        import sprite_tile_selection
+        proof = sprite_tile_selection.prove(data, rom, mapping, index, objects, bindings,
+                                           ins, edges, calls, refinement, words)
+    elif selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878:
         import name_entry_copy
         proof = name_entry_copy.prove(data, rom, mapping, index, objects, bindings, ins, calls, refinement, words)
     elif selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC:
@@ -661,8 +667,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             match.function_address_target(f'func_{destination:08X}', json.loads(mapping),
                                           address, len(data), len(rom))
         # Only the exact named-data-buffer-v1 proof replays loops (loop_replay_manifest below).
-        buffers = item_tile_row.ItemTileRowProof(rom, mapping, index, objects) \
-            if address == item_tile_row.OWNER and selector == named_buffer.SELECTOR else \
+        row = tile_row_profile(address, selector)
+        buffers = row[0](rom, mapping, index, objects) if row else \
             named_buffer.NamedDataBufferProof(rom, mapping, index, objects, loop_replay=True) \
             if selector == named_buffer.SELECTOR else \
                   (runtime_summary.PROOFS[selector] if selector in runtime_summary.SELECTORS else
@@ -722,7 +728,7 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
-        if type(buffers) is item_tile_row.ItemTileRowProof:
+        if row:
             buffers.bind_row(data, address, calls, bindings)
         if selector == named_buffer.SCRATCH_SELECTOR and address == 0x08132208:
             buffers.action_coordinate_root = address
@@ -777,8 +783,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                  'buffers': {'dependency_budget': buffers.dependency_budget if selector in (named_buffer.GUARDED_ALIAS_SELECTOR, *r6_buffer.PROFILES, *local_calls.SELECTORS) else module.MAX_DEPENDENCIES,
                     'owner_byte_budget': named_buffer.MAX_BYTES,
                     'dependencies': [buffers.records[target] for target in sorted(buffers.records)]}}
-        if type(buffers) is item_tile_row.ItemTileRowProof:
-            proof['buffers']['item_tile_row'] = buffers.row_manifest()
+        if row:
+            proof['buffers'][row[1]] = buffers.row_manifest()
         if buffers.loop_replays:
             # Absent unless a callee was replayed, so reports without a replay keep their meaning.
             proof['buffers']['loop_replay'] = buffers.loop_replay_manifest()
@@ -827,6 +833,11 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                 # Unproved premises admit the owner only through a reviewed entry naming them exactly.
                 proof['buffers']['stack_index_preconditions'] = stack_index.accept(
                     buffers.index_policy.evidence, address, stack_index.parse_premises(premises))
+                if selector == stack_index.SELECTOR and address == 0x080D8E00:
+                    from scroll_wave_table_index import producers
+                    proof['environment'] = known_query.environment_fingerprint()
+                    proof['buffers']['scroll_wave_producers'] = producers(
+                        rom, mapping, index, bindings if bindings is not None else (manifest or {}).get('bindings'))
             proof['calls'] = rom_copy.name_calls(proof['calls'], bindings if bindings is not None else (manifest or {}).get('bindings'))
         if selector == direct_output.SELECTOR:
             proof['buffers']['direct_halfword_outputs'] = buffers.direct_manifest()
@@ -1186,10 +1197,14 @@ def preflight(data,address,rom,mapping,index,objects, *, selector=SELECTOR):
     reconstruct the same calls, local tables and typed object/function words.
     """
     import match
+    if selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
+        raise ValueError('sprite selection requires original compiler ELF bindings')
     if selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC:
         raise ValueError('item name rows require the original compiler ELF and private list declarations')
     if selector == named_buffer.SELECTOR and address == 0x0806ED30:
         raise ValueError('shop categories require the original compiler ELF and local category array')
+    if selector == finite_loop.SELECTOR and address == 0x08096CB8:
+        raise ValueError('scene teardown requires the original compiler ELF and typed scene declarations')
     if selector == named_buffer.DATAFREE_SELECTOR and address == 0x080142DC:
         raise ValueError('decimal field requires the actual local array and original compiler ELF')
     if selector in (script_walk.SELECTOR, constructor.SELECTOR, transfer_tree.SELECTOR):
@@ -1339,6 +1354,10 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
            for item in image['symbols']):
         raise ValueError('unresolved owner symbol outside exact binding roles')
     for records in result.values():records.sort()
+    if selector == stack_index.SELECTOR and address == 0x080D8E00:
+        active_shuffle.compiler_symbol_roles(image, targets)
+        if any(row['size'] for row in image['symbols'] if row['name'] in targets):
+            raise ValueError('scroll-wave original symbol has nonzero extent')
     if selector == small_copy_binding.SELECTOR:
         small_copy_binding.check_original(result,targets,image,address,rom,mapping,index,objects)
     if selector == copy_binding.SELECTOR:
@@ -1352,6 +1371,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
     if selector == named_buffer.SELECTOR and address == 0x0806ED30:
         import shop_categories
         shop_categories.check_original(image, result, targets)
+    if selector == finite_loop.SELECTOR and address == 0x08096CB8:
+        import scene_teardown
+        scene_teardown.check_original(image,result,targets)
     if selector == named_buffer.DATAFREE_SELECTOR and address == 0x080142DC:
         import decimal_field
         decimal_field.check_original(image, result, targets)
@@ -1441,6 +1463,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
         local_calls.menu_palette.check_bindings(result)
     if selector == local_calls.menu_palette.SELECTOR or selector == finite_loop.SELECTOR and address == 0x080C68EC:
         active_shuffle.compiler_symbol_roles(image, targets)
+    if selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
+        import sprite_tile_selection
+        sprite_tile_selection.check_original(image, result, targets)
     if selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878:
         import name_entry_copy
         name_entry_copy.check_original(image, result, targets)
@@ -1512,14 +1537,16 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     if bytes(expected)!=linked['text']:
         raise ValueError('linker changed bytes outside exact original relocations')
     name_entry = selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878
-    if (name_entry or selector == dma_fill.SELECTOR and address == boot_dma.OWNER or
-            selector == finite_loop.SELECTOR and address == 0x080C68EC or
+    sprite_selection = selector == named_buffer.THUNK_SELECTOR and address == 0x08021854
+    if (name_entry or sprite_selection or selector == dma_fill.SELECTOR and address == boot_dma.OWNER or
+            selector == finite_loop.SELECTOR and address in (0x080C68EC, 0x08096CB8) or
             selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC or
             selector in (local_calls.menu_palette.SELECTOR, named_buffer.MOVEMENT_TILE_SELECTOR, named_buffer.MOVEMENT_OVERLAY_SELECTOR, named_buffer.MOVEMENT_PATH_SELECTOR, named_buffer.ROSTER_SORT_SELECTOR, named_buffer.ROSTER_FILTER_SELECTOR, named_buffer.EQUIPMENT_SELECTOR, script_walk.SELECTOR, constructor.SELECTOR, transfer_tree.SELECTOR, transfer_task.SELECTOR, small_copy_binding.SELECTOR, installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR)):
         small_copy_binding.check_linked(linked,address,targets)
-    if name_entry or selector in (local_calls.menu_palette.SELECTOR, named_buffer.EQUIPMENT_SELECTOR) or selector == finite_loop.SELECTOR and address == 0x080C68EC:
+    if name_entry or sprite_selection or selector in (local_calls.menu_palette.SELECTOR, named_buffer.EQUIPMENT_SELECTOR) or selector == finite_loop.SELECTOR and address == 0x080C68EC:
         local_calls.menu_palette.check_linked(linked, targets)
-    if (selector, address) in ((named_buffer.DATAFREE_SELECTOR, 0x080142DC), (named_buffer.SELECTOR, 0x0806ED30)):
+    if (selector, address) in ((named_buffer.DATAFREE_SELECTOR, 0x080142DC), (named_buffer.SELECTOR, 0x0806ED30),
+                               (stack_index.SELECTOR, 0x080D8E00)):
         small_copy_binding.check_linked(linked, address, targets)
     return linked['text'][:record['size']],bindings
 
@@ -1544,6 +1571,15 @@ def stack_index_snapshot(root):
         return None
 
 
+def tile_row_profile(address, selector):
+    if selector == named_buffer.SELECTOR:
+        if address == item_tile_row.OWNER:
+            return item_tile_row.ItemTileRowProof, 'item_tile_row', item_tile_row.environment_fingerprint
+        if address == unit_tile_row.OWNER:
+            return unit_tile_row.UnitTileRowProof, 'unit_tile_row', unit_tile_row.environment_fingerprint
+    return None
+
+
 def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     """Fresh fixed-toolchain compilation and complete original-ELF provenance."""
     import match
@@ -1562,6 +1598,7 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         else integer_two.environment_fingerprint if selector == integer_two.SELECTOR
         else integer_words.environment_fingerprint if selector == integer_words.SELECTOR
         else integer_native.environment_fingerprint if selector == integer_native.SELECTOR
+        else item_quantity_row.environment_fingerprint if selector == runtime_summary.SELECTOR and address == item_quantity_row.ADDRESS
         else menu_icon_row.environment_fingerprint if selector == runtime_summary.SELECTOR and address in (menu_icon_row.OWNER, menu_icon_row.CLAMPED)
         else menu_runner.environment_fingerprint if selector == multiple_native.SELECTOR and address == menu_runner.OWNER
         else menu_switches.environment_fingerprint if selector == multiple_native.SELECTOR and address == menu_switches.OWNER
@@ -1572,22 +1609,32 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         else list_query.environment_fingerprint if selector in (spilled_loop.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, nested_query.SELECTOR, query_cont.SELECTOR, list_query.SELECTOR) else None)
     if selector == formal_spill.BIOS_SELECTOR and address == scaled_polygon.OWNER:
         environment_reader = scaled_polygon.environment_fingerprint
+    scroll_wave = selector == stack_index.SELECTOR and address == 0x080D8E00
+    if scroll_wave:
+        environment_reader = known_query.environment_fingerprint
     item_menu = selector == named_buffer.GUARDED_SWITCH_SELECTOR and address == 0x0806FABC
     if item_menu:
         import item_ability_names as item_names
         environment_reader = item_names.environment_fingerprint
     if (selector, address) in ((named_buffer.DATAFREE_SELECTOR, 0x080142DC), (named_buffer.SELECTOR, 0x0806ED30)):
         environment_reader = known_query.environment_fingerprint
+    teardown = selector == finite_loop.SELECTOR and address == 0x08096CB8
+    if teardown:
+        import scene_teardown
+        environment_reader = known_query.environment_fingerprint
     name_entry = selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878
     if name_entry:
         import name_entry_copy
         environment_reader = name_entry_copy.environment_fingerprint
     actor_shadow = selector == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR and address == 0x08097F04
-    if actor_shadow:
+    sprite_selection = selector == named_buffer.THUNK_SELECTOR and address == 0x08021854
+    if sprite_selection:
+        import sprite_tile_selection
+    if actor_shadow or sprite_selection:
         environment_reader = known_query.environment_fingerprint
-    tile_row = selector == named_buffer.SELECTOR and address == item_tile_row.OWNER
+    tile_row = tile_row_profile(address, selector)
     if tile_row:
-        environment_reader = item_tile_row.environment_fingerprint
+        environment_reader = tile_row[2]
     environment=environment_reader() if environment_reader else None
     source=source_fingerprint(root,address);mapping=mapping_snapshot(root);index=index_snapshot(root)
     objects=data_snapshot(root);rom_path=report_rom_path(root);rom=Path(rom_path).read_bytes()
@@ -1600,6 +1647,10 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
         for path in source_paths(root,address):
             destination=capture/path.relative_to(root);destination.parent.mkdir(parents=True,exist_ok=True)
             destination.write_bytes(path.read_bytes())
+        if teardown:
+            scene_teardown.check_source(capture)
+        if sprite_selection:
+            sprite_tile_selection.check_source(capture)
         if name_entry:
             name_entry_copy.check_source(capture)
         if item_menu:
@@ -1670,6 +1721,9 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
                 native = integer_aligned_two if selector == integer_aligned_two.SELECTOR else numeric_switch if selector == numeric_switch.SELECTOR else integer_two if selector == integer_two.SELECTOR else integer_words if selector == integer_words.SELECTOR else integer_data if selector == integer_data.SELECTOR else integer_locals
                 manifest,count=native.verify_original(raw,runner.read_binary(workspace+'/f.elf'),
                     address,rom,mapping,index,bindings,expected,objects=objects)
+            elif selector == runtime_summary.SELECTOR and address == item_quantity_row.ADDRESS:
+                manifest,count=item_quantity_row.verify_original(raw,runner.read_binary(workspace+'/f.elf'),
+                    address,rom,mapping,index,bindings,expected,objects=objects)
             elif selector == runtime_summary.SELECTOR and address in (menu_icon_row.OWNER, menu_icon_row.CLAMPED):
                 manifest,count=menu_icon_row.verify_original(raw,runner.read_binary(workspace+'/f.elf'),
                     address,rom,mapping,index,bindings,expected,objects=objects)
@@ -1716,14 +1770,18 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
             raise ValueError('ordinary overwrite native semantic evidence is stale')
     if actor_shadow and manifest['proof']['environment'] != environment:
         raise ValueError('actor shadow verifier environment changed during compilation')
-    if tile_row and manifest['proof']['buffers']['item_tile_row']['environment'] != environment:
-        raise ValueError('item tile row verifier environment changed during compilation')
+    if tile_row and manifest['proof']['buffers'][tile_row[1]]['environment'] != environment:
+        raise ValueError('tile row verifier environment changed during compilation')
+    if sprite_selection and manifest['proof']['environment'] != environment:
+        raise ValueError('sprite selection verifier environment changed during compilation')
     if name_entry and manifest['proof']['environment'] != environment:
         raise ValueError('name entry verifier environment changed during compilation')
     if item_menu and manifest['proof']['environment'] != environment:
         raise ValueError('item menu verifier environment changed during compilation')
     if selector == named_buffer.MOVEMENT_TILE_SELECTOR and manifest['proof']['environment'] != environment:
         raise ValueError('movement tile verifier environment changed during compilation')
+    if scroll_wave and manifest['proof']['environment'] != environment:
+        raise ValueError('scroll-wave verifier environment changed during compilation')
     if environment is not None and environment != environment_reader():
         raise ValueError('entry admission producers, selected binaries or runtime changed during compilation')
     return data,manifest,source,mapping,index,objects,rom,count,raw
@@ -1776,7 +1834,7 @@ def render(address,result):
         evidence['original_elf_sha256'] = sha(original_elf)
     return '\n'.join([f'# 0x{address:08X}','',f'* verification: `{manifest["profile"]}`',
         f'* owner runtime: {next(key for key, value in runtime_summary.SCHEMAS.items() if value == manifest["profile"]) if manifest["profile"] in runtime_summary.SCHEMAS.values() else named_buffer.BG_AFFINE_TRANSPARENT_SELECTOR if manifest["profile"] == named_buffer.BG_AFFINE_TRANSPARENT_SCHEMA else bios_switch.SELECTOR if manifest["profile"] == bios_switch.SCHEMA else transfer_task.SELECTOR if manifest["profile"] == transfer_task.SCHEMA else small_copy_binding.SELECTOR if manifest["profile"] == small_copy_binding.SCHEMA else named_buffer.BIOS_OVERWRITE_SELECTOR if manifest["profile"] == named_buffer.BIOS_OVERWRITE_SCHEMA else named_buffer.BIOS_LOCAL_FILL_SELECTOR if manifest["profile"] == named_buffer.BIOS_LOCAL_FILL_SCHEMA else next(key for key, value in local_calls.SCHEMAS.items() if value == manifest["profile"]) if manifest["profile"] in local_calls.SCHEMAS.values() else spilled_loop.SELECTOR if manifest["profile"] == spilled_loop.SCHEMA else finite_loop.SELECTOR if manifest["profile"] == finite_loop.SCHEMA else stack_query.DIVISION_SELECTOR if manifest["profile"] == stack_query.DIVISION_SCHEMA else stack_query.SELECTOR if manifest["profile"] == stack_query.SCHEMA else nested_query.SELECTOR if manifest["profile"] == nested_query.SCHEMA else query_cont.SELECTOR if manifest["profile"] == query_cont.SCHEMA else list_query.SELECTOR if manifest["profile"] == list_query.SCHEMA else known_query.SELECTOR if manifest["profile"] == known_query.SCHEMA else tree_callback.SELECTOR if manifest["profile"] == tree_callback.SCHEMA else callback_closure.SELECTOR if manifest["profile"] == callback_closure.SCHEMA else literal_callback.SELECTOR if manifest["profile"] == literal_callback.SCHEMA else numeric_switch.SELECTOR if numeric_switch_selected else integer_data.SELECTOR if integer_data_selected else integer_locals.SELECTOR if integer_locals_selected else integer_aligned_two.SELECTOR if integer_aligned_two_selected else integer_two.SELECTOR if integer_two_selected else integer_words.SELECTOR if integer_words_selected else integer_pair.SELECTOR if integer_pair_selected else integer_three.SELECTOR if integer_three_selected else integer_native.SELECTOR if integer_selected else multiple_native.SELECTOR if multiple_selected else THUNK_SWITCH_SELECTOR if manifest["profile"] == THUNK_SWITCH_SCHEMA else DIRECT_SWITCH_SELECTOR if manifest["profile"] == DIRECT_SWITCH_SCHEMA else ENTRY_DATA_SWITCH_SELECTOR if manifest["profile"] == ENTRY_DATA_SWITCH_SCHEMA else ENTRY_SWITCH_SELECTOR if entry_switch else CYCLIC_SELECTOR if manifest["profile"] == CYCLIC_SCHEMA else ALIGNED_SELECTOR if aligned else mutable_native.SELECTOR if mutable_selected else entry.SELECTOR if recursive else shadow_matrix.SELECTOR if shadow_matrix_selected else dma_fill.SELECTOR if manifest["profile"] == dma_fill.SCHEMA else transfer_mask.SELECTOR if manifest["profile"] == transfer_mask.SCHEMA else rom_table.SELECTOR if rom_table_selected else resident_word.SELECTOR if resident_selected else word_buffer.SELECTOR if word_selected else r6_profile[0] if r6_selected else r7_buffer.SELECTOR if r7_selected else formal_spill.BIOS_SELECTOR if manifest["profile"] == formal_spill.BIOS_SCHEMA else formal_spill.SELECTOR if spilled else cursor.SELECTOR if cursor_value else next(selector for selector,schema in callee_constant.PROFILES.items() if schema == manifest["profile"]) if constant else next(selector for selector, schema in disjunctive.PROFILES.items() if schema == manifest["profile"]) if alternatives else single_store.SELECTOR if store else output_alias.SELECTOR if output else watched_switch.SELECTOR if switch else descriptor.SELECTOR if words else static_buffer.SELECTOR if static else dynamic_div.SELECTOR if manifest["profile"] == dynamic_div.SCHEMA else named_three.SELECTOR if manifest["profile"] == named_three.SCHEMA else three_output.SELECTOR if manifest["profile"] == three_output.SCHEMA else direct_output.SELECTOR if manifest["profile"] == direct_output.SCHEMA else nested_output.SELECTOR_BY_SCHEMA[manifest["profile"]] if manifest["profile"] in nested_output.SELECTOR_BY_SCHEMA else named_buffer.ROOT_SWITCH_SELECTOR if manifest["profile"] == named_buffer.ROOT_SWITCH_SCHEMA else bios_div.SELECTOR if manifest["profile"] == bios_div.SCHEMA else named_buffer.GUARDED_ALIAS_SELECTOR if manifest["profile"] == named_buffer.GUARDED_ALIAS_SCHEMA else named_buffer.GUARDED_SWITCH_SELECTOR if manifest["profile"] == named_buffer.GUARDED_SWITCH_SCHEMA else named_buffer.THUNK_ROOT_SCRATCH_SELECTOR if manifest["profile"] == named_buffer.THUNK_ROOT_SCRATCH_SCHEMA else named_buffer.ROOT_SCRATCH_SELECTOR if manifest["profile"] == named_buffer.ROOT_SCRATCH_SCHEMA else named_buffer.THUNK_PARTIAL_SELECTOR if manifest["profile"] == named_buffer.THUNK_PARTIAL_SCHEMA else named_buffer.THUNK_SCRATCH_SELECTOR if manifest["profile"] == named_buffer.THUNK_SCRATCH_SCHEMA else named_buffer.RESOURCE_SELECTOR if manifest["profile"] == named_buffer.RESOURCE_SCHEMA else named_buffer.THUNK_SELECTOR if manifest["profile"] == named_buffer.THUNK_SCHEMA else named_buffer.BG_AFFINE_SCRATCH_SELECTOR if manifest["profile"] == named_buffer.BG_AFFINE_SCRATCH_SCHEMA else named_buffer.BG_AFFINE_SELECTOR if manifest["profile"] == named_buffer.BG_AFFINE_SCHEMA else named_buffer.MIXED_CPUSET_FAST_FILL_SELECTOR if manifest["profile"] == named_buffer.MIXED_CPUSET_FAST_FILL_SCHEMA else named_buffer.MIXED_FAST_FILL_SELECTOR if manifest["profile"] == named_buffer.MIXED_FAST_FILL_SCHEMA else named_buffer.FAST_FILL_SELECTOR if manifest["profile"] == named_buffer.FAST_FILL_SCHEMA else named_buffer.BIOS_SQRT_SELECTOR if manifest["profile"] == named_buffer.BIOS_SQRT_SCHEMA else named_buffer.SCRATCH_SELECTOR if manifest["profile"] == named_buffer.SCRATCH_SCHEMA else named_buffer.ABILITY_RANGE_SELECTOR if manifest["profile"] == named_buffer.ABILITY_RANGE_SCHEMA else named_buffer.EQUIPMENT_SELECTOR if manifest["profile"] == named_buffer.EQUIPMENT_SCHEMA else named_buffer.ROSTER_FILTER_SELECTOR if manifest["profile"] == named_buffer.ROSTER_FILTER_SCHEMA else named_buffer.MOVEMENT_TILE_SELECTOR if manifest["profile"] == named_buffer.MOVEMENT_TILE_SCHEMA else named_buffer.MOVEMENT_OVERLAY_SELECTOR if manifest["profile"] == named_buffer.MOVEMENT_OVERLAY_SCHEMA else named_buffer.MOVEMENT_PATH_SELECTOR if manifest["profile"] == named_buffer.MOVEMENT_PATH_SCHEMA else named_buffer.ROSTER_SORT_SELECTOR if manifest["profile"] == named_buffer.ROSTER_SORT_SCHEMA else named_buffer.ITEM_LIST_SELECTOR if manifest["profile"] == named_buffer.ITEM_LIST_SCHEMA else named_buffer.UNIT_OUTPUT_SELECTOR if manifest["profile"] == named_buffer.UNIT_OUTPUT_SCHEMA else named_buffer.DATAFREE_SELECTOR if manifest["profile"] == named_buffer.DATAFREE_SCHEMA else query_callee.SELECTOR if manifest["profile"] == query_callee.SCHEMA else dead_argument.SELECTOR if manifest["profile"] == dead_argument.SCHEMA else stack_index.SELECTOR if manifest["profile"] == stack_index.SCHEMA else stack_index.SELECTOR_V2 if manifest["profile"] == stack_index.SCHEMA_V2 else rom_copy.SELECTOR if manifest["profile"] == rom_copy.SCHEMA else copy_binding.SELECTOR if manifest["profile"] == copy_binding.SCHEMA else named_buffer.SELECTOR if buffers else ignored_leaf.SELECTOR if ignored else ACYCLIC_SELECTOR if acyclic else SELECTOR}',
-        f'* control flow: {next(runtime_summary.CONTROL_FLOWS[key] for key, value in runtime_summary.SCHEMAS.items() if value == manifest["profile"]) if manifest["profile"] in runtime_summary.SCHEMAS.values() else bios_switch.CONTROL_FLOW if manifest["profile"] == bios_switch.SCHEMA else transfer_task.CONTROL_FLOW if manifest["profile"] == transfer_task.SCHEMA else small_copy_binding.CONTROL_FLOW if manifest["profile"] == small_copy_binding.SCHEMA else named_buffer.BIOS_LOCAL_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_LOCAL_FILL_SCHEMA else cone_stack.CONTROL_FLOW if manifest["profile"] == cone_stack.SCHEMA else local_calls.menu_palette.CONTROL_FLOW if manifest["profile"] == local_calls.menu_palette.SCHEMA else script_walk.CONTROL_FLOW if manifest["profile"] == script_walk.SCHEMA else constructor.CONTROL_FLOW if manifest["profile"] == constructor.SCHEMA else transfer_tree.CONTROL_FLOW if manifest["profile"] == transfer_tree.SCHEMA else local_calls.CONTROL_FLOW if manifest["profile"] in local_calls.SCHEMAS.values() else spilled_loop.CONTROL_FLOW if manifest["profile"] == spilled_loop.SCHEMA else finite_loop.control_flow(address) if manifest["profile"] == finite_loop.SCHEMA else stack_query.DIVISION_CONTROL_FLOW if manifest["profile"] == stack_query.DIVISION_SCHEMA else stack_query.CONTROL_FLOW if manifest["profile"] == stack_query.SCHEMA else nested_query.CONTROL_FLOW if manifest["profile"] == nested_query.SCHEMA else query_cont.CONTROL_FLOW if manifest["profile"] == query_cont.SCHEMA else list_query.CONTROL_FLOW if manifest["profile"] == list_query.SCHEMA else known_query.CONTROL_FLOW if manifest["profile"] == known_query.SCHEMA else tree_callback.CONTROL_FLOW if manifest["profile"] == tree_callback.SCHEMA else callback_closure.CONTROL_FLOW if manifest["profile"] == callback_closure.SCHEMA else literal_callback.CONTROL_FLOW if manifest["profile"] == literal_callback.SCHEMA else numeric_switch.CONTROL_FLOW if numeric_switch_selected else integer_data.CONTROL_FLOW if integer_data_selected else integer_locals.CONTROL_FLOW if integer_locals_selected else integer_aligned_two.CONTROL_FLOW if integer_aligned_two_selected else integer_two.CONTROL_FLOW if integer_two_selected else integer_words.CONTROL_FLOW if integer_words_selected else integer_pair.CONTROL_FLOW if integer_pair_selected else integer_three.CONTROL_FLOW if integer_three_selected else integer_native.CONTROL_FLOW if integer_selected else multiple_native.CONTROL_FLOW if multiple_selected else THUNK_SWITCH_CONTROL_FLOW if manifest["profile"] == THUNK_SWITCH_SCHEMA else DIRECT_SWITCH_CONTROL_FLOW if manifest["profile"] == DIRECT_SWITCH_SCHEMA else ENTRY_DATA_SWITCH_CONTROL_FLOW if manifest["profile"] == ENTRY_DATA_SWITCH_SCHEMA else ENTRY_SWITCH_CONTROL_FLOW if entry_switch else CYCLIC_CONTROL_FLOW if manifest["profile"] == CYCLIC_SCHEMA else ALIGNED_CONTROL_FLOW if manifest["profile"] == ALIGNED_SCHEMA else mutable_native.CONTROL_FLOW if mutable_selected else entry.CONTROL_FLOW if recursive else shadow_matrix.CONTROL_FLOW if shadow_matrix_selected else (boot_dma.CONTROL_FLOW if address == boot_dma.OWNER else dma_fill.CONTROL_FLOW) if manifest["profile"] == dma_fill.SCHEMA else transfer_mask.CONTROL_FLOW if manifest["profile"] == transfer_mask.SCHEMA else rom_table.CONTROL_FLOW if rom_table_selected else resident_word.CONTROL_FLOW if resident_selected else word_buffer.CONTROL_FLOW if word_selected else r6_profile[1] if r6_selected else r7_buffer.CONTROL_FLOW if r7_selected else formal_spill.BIOS_CONTROL_FLOW if manifest["profile"] == formal_spill.BIOS_SCHEMA else formal_spill.CONTROL_FLOW if spilled else cursor.CONTROL_FLOW if cursor_value else callee_constant.control_flow(next(selector for selector,schema in callee_constant.PROFILES.items() if schema == manifest["profile"])) if constant else disjunctive.CONTROL_FLOW if alternatives else single_store.CONTROL_FLOW if store else output_alias.CONTROL_FLOW if output else watched_switch.CONTROL_FLOW if switch else descriptor.CONTROL_FLOW if words else static_buffer.CONTROL_FLOW if static else dynamic_div.CONTROL_FLOW if manifest["profile"] == dynamic_div.SCHEMA else named_three.CONTROL_FLOW if manifest["profile"] == named_three.SCHEMA else three_output.CONTROL_FLOW if manifest["profile"] == three_output.SCHEMA else direct_output.CONTROL_FLOW if manifest["profile"] == direct_output.SCHEMA else nested_output.CONTROL_FLOWS[nested_output.SELECTOR_BY_SCHEMA[manifest["profile"]]] if manifest["profile"] in nested_output.SELECTOR_BY_SCHEMA else named_buffer.ROOT_SWITCH_CONTROL_FLOW if manifest["profile"] == named_buffer.ROOT_SWITCH_SCHEMA else bios_div.CONTROL_FLOW if manifest["profile"] == bios_div.SCHEMA else named_buffer.GUARDED_ALIAS_CONTROL_FLOW if manifest["profile"] == named_buffer.GUARDED_ALIAS_SCHEMA else named_buffer.GUARDED_SWITCH_CONTROL_FLOW if manifest["profile"] == named_buffer.GUARDED_SWITCH_SCHEMA else named_buffer.THUNK_ROOT_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_ROOT_SCRATCH_SCHEMA else named_buffer.ROOT_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.ROOT_SCRATCH_SCHEMA else named_buffer.THUNK_PARTIAL_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_PARTIAL_SCHEMA else named_buffer.THUNK_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_SCRATCH_SCHEMA else named_buffer.RESOURCE_CONTROL_FLOW if manifest["profile"] == named_buffer.RESOURCE_SCHEMA else (named_buffer.NAME_ENTRY_CONTROL_FLOW if address == 0x0812A878 else named_buffer.THUNK_CONTROL_FLOW) if manifest["profile"] == named_buffer.THUNK_SCHEMA else named_buffer.BG_AFFINE_TRANSPARENT_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_TRANSPARENT_SCHEMA else named_buffer.BG_AFFINE_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_SCRATCH_SCHEMA else named_buffer.BG_AFFINE_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_SCHEMA else named_buffer.MIXED_CPUSET_FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.MIXED_CPUSET_FAST_FILL_SCHEMA else named_buffer.MIXED_FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.MIXED_FAST_FILL_SCHEMA else named_buffer.FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.FAST_FILL_SCHEMA else named_buffer.BIOS_OVERWRITE_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_OVERWRITE_SCHEMA else named_buffer.BIOS_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_FILL_SCHEMA else named_buffer.BIOS_SQRT_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_SQRT_SCHEMA else named_buffer.SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.SCRATCH_SCHEMA else named_buffer.ABILITY_RANGE_CONTROL_FLOW if manifest["profile"] == named_buffer.ABILITY_RANGE_SCHEMA else (named_buffer.BATTLE_DISPATCH_CONTROL_FLOW if address == 0x080C01D0 else named_buffer.EQUIPMENT_CONTROL_FLOW) if manifest["profile"] == named_buffer.EQUIPMENT_SCHEMA else named_buffer.ROSTER_FILTER_CONTROL_FLOW if manifest["profile"] == named_buffer.ROSTER_FILTER_SCHEMA else named_buffer.MOVEMENT_TILE_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_TILE_SCHEMA else named_buffer.MOVEMENT_OVERLAY_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_OVERLAY_SCHEMA else named_buffer.MOVEMENT_PATH_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_PATH_SCHEMA else named_buffer.ROSTER_SORT_CONTROL_FLOW if manifest["profile"] == named_buffer.ROSTER_SORT_SCHEMA else named_buffer.ITEM_LIST_CONTROL_FLOW if manifest["profile"] == named_buffer.ITEM_LIST_SCHEMA else named_buffer.UNIT_OUTPUT_CONTROL_FLOW if manifest["profile"] == named_buffer.UNIT_OUTPUT_SCHEMA else (named_buffer.DECIMAL_FIELD_CONTROL_FLOW if address == 0x080142DC else named_buffer.DATAFREE_CONTROL_FLOW) if manifest["profile"] == named_buffer.DATAFREE_SCHEMA else query_callee.CONTROL_FLOW if manifest["profile"] == query_callee.SCHEMA else dead_argument.CONTROL_FLOW if manifest["profile"] == dead_argument.SCHEMA else stack_index.CONTROL_FLOW if manifest["profile"] == stack_index.SCHEMA else stack_index.CONTROL_FLOW_V2 if manifest["profile"] == stack_index.SCHEMA_V2 else rom_copy.CONTROL_FLOW if manifest["profile"] == rom_copy.SCHEMA else copy_binding.CONTROL_FLOW if manifest["profile"] == copy_binding.SCHEMA else named_buffer.SHOP_CATEGORY_CONTROL_FLOW if manifest["profile"] == named_buffer.SCHEMA and address == 0x0806ED30 else named_buffer.CONTROL_FLOW if buffers else ignored_leaf.CONTROL_FLOW if ignored else ACYCLIC_CONTROL_FLOW if acyclic else CONTROL_FLOW}',
+        f'* control flow: {next(runtime_summary.CONTROL_FLOWS[key] for key, value in runtime_summary.SCHEMAS.items() if value == manifest["profile"]) if manifest["profile"] in runtime_summary.SCHEMAS.values() else bios_switch.CONTROL_FLOW if manifest["profile"] == bios_switch.SCHEMA else transfer_task.CONTROL_FLOW if manifest["profile"] == transfer_task.SCHEMA else small_copy_binding.CONTROL_FLOW if manifest["profile"] == small_copy_binding.SCHEMA else named_buffer.BIOS_LOCAL_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_LOCAL_FILL_SCHEMA else cone_stack.CONTROL_FLOW if manifest["profile"] == cone_stack.SCHEMA else local_calls.menu_palette.CONTROL_FLOW if manifest["profile"] == local_calls.menu_palette.SCHEMA else script_walk.CONTROL_FLOW if manifest["profile"] == script_walk.SCHEMA else constructor.CONTROL_FLOW if manifest["profile"] == constructor.SCHEMA else transfer_tree.CONTROL_FLOW if manifest["profile"] == transfer_tree.SCHEMA else local_calls.CONTROL_FLOW if manifest["profile"] in local_calls.SCHEMAS.values() else spilled_loop.CONTROL_FLOW if manifest["profile"] == spilled_loop.SCHEMA else finite_loop.control_flow(address) if manifest["profile"] == finite_loop.SCHEMA else stack_query.DIVISION_CONTROL_FLOW if manifest["profile"] == stack_query.DIVISION_SCHEMA else stack_query.CONTROL_FLOW if manifest["profile"] == stack_query.SCHEMA else nested_query.CONTROL_FLOW if manifest["profile"] == nested_query.SCHEMA else query_cont.CONTROL_FLOW if manifest["profile"] == query_cont.SCHEMA else list_query.CONTROL_FLOW if manifest["profile"] == list_query.SCHEMA else known_query.CONTROL_FLOW if manifest["profile"] == known_query.SCHEMA else tree_callback.CONTROL_FLOW if manifest["profile"] == tree_callback.SCHEMA else callback_closure.CONTROL_FLOW if manifest["profile"] == callback_closure.SCHEMA else literal_callback.CONTROL_FLOW if manifest["profile"] == literal_callback.SCHEMA else numeric_switch.CONTROL_FLOW if numeric_switch_selected else integer_data.CONTROL_FLOW if integer_data_selected else integer_locals.CONTROL_FLOW if integer_locals_selected else integer_aligned_two.CONTROL_FLOW if integer_aligned_two_selected else integer_two.CONTROL_FLOW if integer_two_selected else integer_words.CONTROL_FLOW if integer_words_selected else integer_pair.CONTROL_FLOW if integer_pair_selected else integer_three.CONTROL_FLOW if integer_three_selected else integer_native.CONTROL_FLOW if integer_selected else multiple_native.CONTROL_FLOW if multiple_selected else THUNK_SWITCH_CONTROL_FLOW if manifest["profile"] == THUNK_SWITCH_SCHEMA else DIRECT_SWITCH_CONTROL_FLOW if manifest["profile"] == DIRECT_SWITCH_SCHEMA else ENTRY_DATA_SWITCH_CONTROL_FLOW if manifest["profile"] == ENTRY_DATA_SWITCH_SCHEMA else ENTRY_SWITCH_CONTROL_FLOW if entry_switch else CYCLIC_CONTROL_FLOW if manifest["profile"] == CYCLIC_SCHEMA else ALIGNED_CONTROL_FLOW if manifest["profile"] == ALIGNED_SCHEMA else mutable_native.CONTROL_FLOW if mutable_selected else entry.CONTROL_FLOW if recursive else shadow_matrix.CONTROL_FLOW if shadow_matrix_selected else (boot_dma.CONTROL_FLOW if address == boot_dma.OWNER else dma_fill.CONTROL_FLOW) if manifest["profile"] == dma_fill.SCHEMA else transfer_mask.CONTROL_FLOW if manifest["profile"] == transfer_mask.SCHEMA else rom_table.CONTROL_FLOW if rom_table_selected else resident_word.CONTROL_FLOW if resident_selected else word_buffer.CONTROL_FLOW if word_selected else r6_profile[1] if r6_selected else r7_buffer.CONTROL_FLOW if r7_selected else formal_spill.BIOS_CONTROL_FLOW if manifest["profile"] == formal_spill.BIOS_SCHEMA else formal_spill.CONTROL_FLOW if spilled else cursor.CONTROL_FLOW if cursor_value else callee_constant.control_flow(next(selector for selector,schema in callee_constant.PROFILES.items() if schema == manifest["profile"])) if constant else disjunctive.CONTROL_FLOW if alternatives else single_store.CONTROL_FLOW if store else output_alias.CONTROL_FLOW if output else watched_switch.CONTROL_FLOW if switch else descriptor.CONTROL_FLOW if words else static_buffer.CONTROL_FLOW if static else dynamic_div.CONTROL_FLOW if manifest["profile"] == dynamic_div.SCHEMA else named_three.CONTROL_FLOW if manifest["profile"] == named_three.SCHEMA else three_output.CONTROL_FLOW if manifest["profile"] == three_output.SCHEMA else direct_output.CONTROL_FLOW if manifest["profile"] == direct_output.SCHEMA else nested_output.CONTROL_FLOWS[nested_output.SELECTOR_BY_SCHEMA[manifest["profile"]]] if manifest["profile"] in nested_output.SELECTOR_BY_SCHEMA else named_buffer.ROOT_SWITCH_CONTROL_FLOW if manifest["profile"] == named_buffer.ROOT_SWITCH_SCHEMA else bios_div.CONTROL_FLOW if manifest["profile"] == bios_div.SCHEMA else named_buffer.GUARDED_ALIAS_CONTROL_FLOW if manifest["profile"] == named_buffer.GUARDED_ALIAS_SCHEMA else named_buffer.GUARDED_SWITCH_CONTROL_FLOW if manifest["profile"] == named_buffer.GUARDED_SWITCH_SCHEMA else named_buffer.THUNK_ROOT_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_ROOT_SCRATCH_SCHEMA else named_buffer.ROOT_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.ROOT_SCRATCH_SCHEMA else named_buffer.THUNK_PARTIAL_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_PARTIAL_SCHEMA else named_buffer.THUNK_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.THUNK_SCRATCH_SCHEMA else named_buffer.RESOURCE_CONTROL_FLOW if manifest["profile"] == named_buffer.RESOURCE_SCHEMA else named_buffer.thunk_control_flow(address) if manifest["profile"] == named_buffer.THUNK_SCHEMA else named_buffer.BG_AFFINE_TRANSPARENT_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_TRANSPARENT_SCHEMA else named_buffer.BG_AFFINE_SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_SCRATCH_SCHEMA else named_buffer.BG_AFFINE_CONTROL_FLOW if manifest["profile"] == named_buffer.BG_AFFINE_SCHEMA else named_buffer.MIXED_CPUSET_FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.MIXED_CPUSET_FAST_FILL_SCHEMA else named_buffer.MIXED_FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.MIXED_FAST_FILL_SCHEMA else named_buffer.FAST_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.FAST_FILL_SCHEMA else named_buffer.BIOS_OVERWRITE_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_OVERWRITE_SCHEMA else named_buffer.BIOS_FILL_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_FILL_SCHEMA else named_buffer.BIOS_SQRT_CONTROL_FLOW if manifest["profile"] == named_buffer.BIOS_SQRT_SCHEMA else named_buffer.SCRATCH_CONTROL_FLOW if manifest["profile"] == named_buffer.SCRATCH_SCHEMA else named_buffer.ABILITY_RANGE_CONTROL_FLOW if manifest["profile"] == named_buffer.ABILITY_RANGE_SCHEMA else (named_buffer.BATTLE_DISPATCH_CONTROL_FLOW if address == 0x080C01D0 else named_buffer.EQUIPMENT_CONTROL_FLOW) if manifest["profile"] == named_buffer.EQUIPMENT_SCHEMA else named_buffer.ROSTER_FILTER_CONTROL_FLOW if manifest["profile"] == named_buffer.ROSTER_FILTER_SCHEMA else named_buffer.MOVEMENT_TILE_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_TILE_SCHEMA else named_buffer.MOVEMENT_OVERLAY_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_OVERLAY_SCHEMA else named_buffer.MOVEMENT_PATH_CONTROL_FLOW if manifest["profile"] == named_buffer.MOVEMENT_PATH_SCHEMA else named_buffer.ROSTER_SORT_CONTROL_FLOW if manifest["profile"] == named_buffer.ROSTER_SORT_SCHEMA else named_buffer.ITEM_LIST_CONTROL_FLOW if manifest["profile"] == named_buffer.ITEM_LIST_SCHEMA else named_buffer.UNIT_OUTPUT_CONTROL_FLOW if manifest["profile"] == named_buffer.UNIT_OUTPUT_SCHEMA else (named_buffer.DECIMAL_FIELD_CONTROL_FLOW if address == 0x080142DC else named_buffer.DATAFREE_CONTROL_FLOW) if manifest["profile"] == named_buffer.DATAFREE_SCHEMA else query_callee.CONTROL_FLOW if manifest["profile"] == query_callee.SCHEMA else dead_argument.CONTROL_FLOW if manifest["profile"] == dead_argument.SCHEMA else stack_index.CONTROL_FLOW if manifest["profile"] == stack_index.SCHEMA else stack_index.CONTROL_FLOW_V2 if manifest["profile"] == stack_index.SCHEMA_V2 else rom_copy.CONTROL_FLOW if manifest["profile"] == rom_copy.SCHEMA else copy_binding.CONTROL_FLOW if manifest["profile"] == copy_binding.SCHEMA else named_buffer.SHOP_CATEGORY_CONTROL_FLOW if manifest["profile"] == named_buffer.SCHEMA and address == 0x0806ED30 else named_buffer.CONTROL_FLOW if buffers else ignored_leaf.CONTROL_FLOW if ignored else ACYCLIC_CONTROL_FLOW if acyclic else CONTROL_FLOW}',
         '* verified extent: complete ELF function symbol, including literal pools',
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         *(stack_index.precondition_lines(manifest['proof']['buffers']['stack_index_preconditions'])
@@ -1899,7 +1957,7 @@ def issue(root,address,args):
         named_buffer.GUARDED_ALIAS_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.GUARDED_ALIAS_SELECTOR else \
         named_buffer.GUARDED_SWITCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.GUARDED_SWITCH_SELECTOR else \
         named_buffer.SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.SCRATCH_SELECTOR else \
-        named_buffer.THUNK_ROOT_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR else named_buffer.ROOT_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.ROOT_SCRATCH_SELECTOR else named_buffer.THUNK_PARTIAL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_PARTIAL_SELECTOR else named_buffer.THUNK_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_SCRATCH_SELECTOR else named_buffer.RESOURCE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.RESOURCE_SELECTOR else (named_buffer.NAME_ENTRY_CONTROL_FLOW if address == 0x0812A878 else named_buffer.THUNK_CONTROL_FLOW) if args.owner_runtime_profile == named_buffer.THUNK_SELECTOR else named_buffer.BG_AFFINE_TRANSPARENT_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_TRANSPARENT_SELECTOR else named_buffer.BG_AFFINE_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_SCRATCH_SELECTOR else named_buffer.BG_AFFINE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_SELECTOR else named_buffer.MIXED_CPUSET_FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.MIXED_CPUSET_FAST_FILL_SELECTOR else named_buffer.MIXED_FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.MIXED_FAST_FILL_SELECTOR else named_buffer.FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.FAST_FILL_SELECTOR else named_buffer.BIOS_OVERWRITE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_OVERWRITE_SELECTOR else named_buffer.BIOS_LOCAL_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_LOCAL_FILL_SELECTOR else named_buffer.BIOS_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_FILL_SELECTOR else (named_buffer.SHOP_CATEGORY_CONTROL_FLOW if address == 0x0806ED30 else named_buffer.CONTROL_FLOW) if args.owner_runtime_profile == named_buffer.SELECTOR else \
+        named_buffer.THUNK_ROOT_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR else named_buffer.ROOT_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.ROOT_SCRATCH_SELECTOR else named_buffer.THUNK_PARTIAL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_PARTIAL_SELECTOR else named_buffer.THUNK_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.THUNK_SCRATCH_SELECTOR else named_buffer.RESOURCE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.RESOURCE_SELECTOR else named_buffer.thunk_control_flow(address) if args.owner_runtime_profile == named_buffer.THUNK_SELECTOR else named_buffer.BG_AFFINE_TRANSPARENT_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_TRANSPARENT_SELECTOR else named_buffer.BG_AFFINE_SCRATCH_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_SCRATCH_SELECTOR else named_buffer.BG_AFFINE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BG_AFFINE_SELECTOR else named_buffer.MIXED_CPUSET_FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.MIXED_CPUSET_FAST_FILL_SELECTOR else named_buffer.MIXED_FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.MIXED_FAST_FILL_SELECTOR else named_buffer.FAST_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.FAST_FILL_SELECTOR else named_buffer.BIOS_OVERWRITE_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_OVERWRITE_SELECTOR else named_buffer.BIOS_LOCAL_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_LOCAL_FILL_SELECTOR else named_buffer.BIOS_FILL_CONTROL_FLOW if args.owner_runtime_profile == named_buffer.BIOS_FILL_SELECTOR else (named_buffer.SHOP_CATEGORY_CONTROL_FLOW if address == 0x0806ED30 else named_buffer.CONTROL_FLOW) if args.owner_runtime_profile == named_buffer.SELECTOR else \
         ignored_leaf.CONTROL_FLOW if args.owner_runtime_profile == ignored_leaf.SELECTOR else \
         ACYCLIC_CONTROL_FLOW if args.owner_runtime_profile == ACYCLIC_SELECTOR else CONTROL_FLOW
     print(f'extent    {len(result[0])} bytes (complete ELF symbol; {control_flow}; no relocations)')

@@ -71,10 +71,15 @@ def seq(rom, start, size, expected):
 
 
 def decode_icon(rom, number):
+    require(number in (393, 394), 'icon outside the menu pair')
+    return _decode_icon(rom, number)
+
+
+def _decode_icon(rom, number):
     """Execute the two reachable mode-0 token forms with the original bounds."""
     table = ARCHIVE - BASE
     total, dictionary = struct.unpack_from('>HI', rom, table+2)
-    require(number in (393, 394) and number < total, 'icon or archive count changed')
+    require(0 <= number < total, 'icon or archive count changed')
     dictionary += table
     require(rom[dictionary:dictionary+4] == bytes.fromhex('00050080'), 'mode, dictionary bits or expected length')
     start, end = struct.unpack_from('>II', rom, table+8+4*number)
@@ -211,19 +216,16 @@ def shared_context(rom):
     require(struct.unpack_from('<II', rom, 0x541c) == (0x03002bb0,0x03002bb8), 'append cursor globals')
 
 
-def verify_original(raw, linked_file, address, rom, mapping, index, bindings, manifest=None, *, objects):
+def verify_objects(raw, linked_file, address, rom, mapping, index, bindings, objects, calls, data, size):
     import match
     import owner_admission_profile as owner
     import runtime_summary_profile as runtime
     import small_local_copy_binding_profile as typed
-    require(address in (OWNER, CLAMPED) and all(type(v) is bytes for v in (raw, linked_file, rom, mapping, index, objects)),
+    require(all(type(v) is bytes for v in (raw, linked_file, rom, mapping, index, objects)),
             'complete original input bytes required')
     original, linked = match.elf_image(raw), match.elf_image(linked_file)
     require(original['type'] == 1 and linked['type'] == 2 and not linked['relocations'], 'ELF roles')
     checked, targets = owner.original_bindings(original,address,rom,mapping,objects,selector=runtime.SELECTOR,index=index)
-    calls = CLAMPED_CALLS if address == CLAMPED else CALLS
-    data = CLAMPED_DATA if address == CLAMPED else DATA
-    size, count, _ = COMPONENTS[address]
     expect = dict(calls=[list(row) for row in calls], data=[[offset,name,0] for offset,name,_ in data],
                   switches=[], functions=[])
     expect_targets = {name: (runtime.ENTRIES[name] if name in runtime.ENTRIES else int(name[5:],16), False)
@@ -251,6 +253,17 @@ def verify_original(raw, linked_file, address, rom, mapping, index, bindings, ma
         require(rebuilt[site:site+4] == bytes(4), 'nonzero object addend')
         struct.pack_into('<I',rebuilt,site,addr)
     require(rebuilt == body, 'mismatch outside original/linked relocations')
+    return targets
+
+
+def verify_original(raw, linked_file, address, rom, mapping, index, bindings, manifest=None, *, objects):
+    import owner_admission_profile as owner
+    import runtime_summary_profile as runtime
+    require(address in (OWNER, CLAMPED), 'unexpected menu row')
+    calls = CLAMPED_CALLS if address == CLAMPED else CALLS
+    data = CLAMPED_DATA if address == CLAMPED else DATA
+    size, count, _ = COMPONENTS[address]
+    targets = verify_objects(raw, linked_file, address, rom, mapping, index, bindings, objects, calls, data, size)
     records = native_parts(rom,mapping,index,address,{address+site: targets[name][0] for site,name in calls})
     (clamped_context if address == CLAMPED else five_rows_context)(rom)
     shared_context(rom)
