@@ -108,7 +108,8 @@ symbolically along every path, and the check requires
      pairing needs it (the stripped compile reloads where paths with
      different values meet) and is otherwise unpaired, which is what
      explains it; only the unpaired ones are listed in the record
-     (paired_counterparts);
+     (paired_counterparts), which then prints the premise the three share
+     (ForwardedRereads.premise);
 4. every access overlapping a pinned member to be exactly that member: its
    offset and its width (Executor.check_address), and every such store to
    carry its own read-modify-write load, except a store of the member's
@@ -2597,6 +2598,21 @@ def read_modify_write_store(records, position, address, width):
     return None
 
 
+class ForwardedRereads:
+    """the three forwarded re-read rules (chained_reread, forwarded_constant_update and
+    ordinary_store_reread) as one policy: enabled = False leaves every forwarded re-read a
+    counterpart the stripped compile must pair, and record() prints premise once for each
+    function that lists such a re-read"""
+
+    enabled = True
+    premise = ("the member is ordinary memory and nothing writes it between the forwarding store "
+               "and its re-read (no interrupt, DMA or other asynchronous write), so the re-read "
+               "returns the stored value, which the stripped compile reuses")
+
+
+FORWARDED_REREADS = ForwardedRereads()
+
+
 def chained_reread(records, position, pinned_width):
     """is this load the re-read of `a = (b = v)` with volatile `b`?
 
@@ -2962,12 +2978,13 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                     continue
                 # A forwarded re-read is an optional counterpart (kit#378): it is explained,
                 # and listed, only where the stripped compile has no load to pair it with.
-                if record.forwarded and chained_reread(records, position, pinned_width):
+                forwarded = record.forwarded and FORWARDED_REREADS.enabled
+                if forwarded and chained_reread(records, position, pinned_width):
                     optional[id(record)] = chained
-                elif record.forwarded and forwarded_constant_update(records, position, pinned_width):
+                elif forwarded and forwarded_constant_update(records, position, pinned_width):
                     optional[id(record)] = updates
                     forwarded_updates = True
-                elif record.forwarded and ordinary_store_reread(
+                elif forwarded and ordinary_store_reread(
                         records, position, pinned_width,
                         lambda address: object_offset(address, symbol, size) is None):
                     optional[id(record)] = ordinary
@@ -3329,6 +3346,9 @@ def record(symbol, results, perturbed=False):
                      (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
                      (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
+                     (f", forwarded re-reads (the chained, same-member constant update and ordinary-store "
+                      f"lists) under premise: {FORWARDED_REREADS.premise}"
+                      if chained or updates or ordinary else "") +
                      (f", tested-update re-reads at {list(n + 1 for n in tested)} "
                       f"({tested_update.NAME}, premise: {tested_update.POLICY.premise})" if tested else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +

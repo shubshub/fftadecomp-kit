@@ -4460,7 +4460,17 @@ symbolically along every path, and the check requires:
     when the pairing needs it. Otherwise it stays unpaired, which is what
     explains it as the qualifier's read, and only then is it listed in the
     report. So the reload cannot pair with a different, unexplained read of
-    the member instead.
+    the member instead. A listed re-read is admitted because the stripped
+    compile reuses the value it has just stored, which is the same read only
+    under a premise the check does not prove: the member is ordinary memory
+    and nothing writes it between the forwarding store and its re-read (no
+    interrupt, DMA or other asynchronous write). The record prints it, as
+    `forwarded re-reads (the chained, same-member constant update and
+    ordinary-store lists) under premise: ...`, once for each function with
+    such a list and for no other.
+    `volatile_semantics.FORWARDED_REREADS.enabled = False` leaves every
+    forwarded re-read a counterpart the stripped compile must pair, the
+    refusal these three rules replace.
   - Where the loads line up by address and width but a pair does not, the
     check refuses with `... and the stripped compile's load there reads a
     different value; the qualifier added a read`, or with `... lies across a
