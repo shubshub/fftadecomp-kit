@@ -42,6 +42,7 @@ from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB, CS_GRP_JUMP, CS_GRP_CALL, C
 from capstone.arm import ARM_CC_AL, ARM_CC_INVALID, ARM_REG_PC, ARM_REG_SP
 
 import armv4t
+import dead_register
 import match
 import named_data_buffer_profile as named
 
@@ -103,17 +104,26 @@ def killing_instruction(data, address, register):
     before any read of it, or None when the prefix does not prove it dead."""
     decoder = Cs(CS_ARCH_ARM, CS_MODE_THUMB)
     decoder.detail = True
-    expected = address
-    for instruction in decoder.disasm(data, address):
-        if instruction.address != expected or not thumb1(instruction):
-            return None
-        expected += instruction.size
+    stream = decoder.disasm(data, address)
+
+    def step(current, live):
+        # One decode from the entry, stopped at the first refused item (armv4t).
+        instruction = next(stream, None)
+        if instruction is None or instruction.address != current or not thumb1(instruction):
+            raise ValueError('dead argument prefix ends before a killing write')
         read, written = instruction.regs_access()
         if register in read:
-            return None
-        if register in written:
-            return instruction.address - address
-    return None
+            raise ValueError('dead argument prefix reads the register')
+        return written, (current + instruction.size,)
+    try:
+        result = dead_register.prove(address, {register}, step,
+                                     end='dead argument prefix ends before a killing write',
+                                     cycle='dead argument prefix ends before a killing write',
+                                     budget='dead argument prefix exceeds its state budget')
+    except ValueError:
+        return None
+    (site, _), = result.kills
+    return site - address
 
 
 class DeadArgumentBufferProof(named.NamedDataBufferProof):

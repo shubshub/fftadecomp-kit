@@ -156,7 +156,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             from map_record_loader import MapRecordProof
             proof = MapRecordProof(data, rom, mapping, index, calls)
         else:
-            proof = match.FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True)
+            proof = match.FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
+                                                  dead_registers=True)
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
         # thunks; the object words are bound like the function-literal path's.
@@ -175,7 +176,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                 raise ValueError("data-buffer call target is not its canonical function")
         thunk.verify_data_bindings(calls, literals, symbols, entries)
         proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
-                                      copy_helper_index=index, switch_callee_index=index)
+                                      copy_helper_index=index, switch_callee_index=index, dead_registers=True)
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
     frame = None
@@ -303,11 +304,11 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee, BIOS premise and DMA fill premise lines may repeat. Anything else, or any
-# indented field, refuses.
+# copy-summary, switch-callee, dead-register, BIOS premise and DMA fill premise lines may repeat.
+# Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
-          "* buffer owner switch", "* mapping SHA-256", "* control flow",
+          "* buffer owner switch", "* buffer dead register", "* mapping SHA-256", "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",

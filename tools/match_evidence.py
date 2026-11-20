@@ -521,7 +521,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
         proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments, loop_replay=True,
                                 bios_wrappers=True,
                                 copy_helper_index=index_snapshot(root) if indexed else None,
-                                switch_callee_index=index_snapshot(root) if indexed else None)
+                                switch_callee_index=index_snapshot(root) if indexed else None,
+                                dead_registers=stack_arguments is True)
         if proof.span(address) != data:
             return False
         verdict = f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"
