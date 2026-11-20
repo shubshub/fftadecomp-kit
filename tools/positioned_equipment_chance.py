@@ -38,10 +38,10 @@ CALLERS = {
 THUMB_BL = re.compile(rb'(?=(.[\xf0-\xf7].[\xf8-\xff]))', re.DOTALL)
 
 
-def direct_sites(rom):
+def direct_sites(rom, target=OWNER):
     found = []
-    first = max(0, OWNER-equipment.BASE-0x400002)
-    last = min(len(rom), OWNER-equipment.BASE+0x400000)
+    first = max(0, target-equipment.BASE-0x400002)
+    last = min(len(rom), target-equipment.BASE+0x400000)
     for pair in THUMB_BL.finditer(rom, first, last):
         offset = pair.start()
         if offset & 1:
@@ -50,7 +50,7 @@ def direct_sites(rom):
         displacement = ((high & 0x3ff) << 12) + ((low & 0x7ff) << 1)
         if high & 0x400:
             displacement -= 0x400000
-        if equipment.BASE + offset + 4 + displacement == OWNER:
+        if equipment.BASE + offset + 4 + displacement == target:
             found.append(equipment.BASE + offset)
     return found
 

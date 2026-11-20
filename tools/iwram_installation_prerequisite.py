@@ -136,6 +136,15 @@ Unreached image bytes remain explicit; no synthetic function-map row is made.
                 installed_memory_identity_proved=False)
 
 
+def plain_copy_units(control, limit_bytes):
+    # Deliberately only the bounded positive copy subset. No fill/reserved bits.
+    count = control & 0x1fffff
+    width = 4 if control & 0x04000000 else 2
+    if control & ~(0x04000000 | 0x1fffff) or not 1 <= count <= limit_bytes // width:
+        raise ValueError('installation control is not a bounded positive CpuSet copy')
+    return count, width
+
+
 def verify(data, address, rom, mapping, index, *, selector, call_site, pointer_address):
     """Bind complete indexed installer, actual SWI wrapper and ROM pointer."""
     if selector != SELECTOR or type(selector) is not str:
@@ -170,11 +179,7 @@ def verify(data, address, rom, mapping, index, *, selector, call_site, pointer_a
     if any(ARM_REG_R0 + n not in arguments for n in range(3)):
         raise ValueError('installation arguments are not exact on every reaching path')
     source, destination, control = (arguments[ARM_REG_R0+n] for n in range(3))
-    # Deliberately only the bounded positive copy subset. No fill/reserved bits.
-    count = control & 0x1fffff
-    width = 4 if control & 0x04000000 else 2
-    if control & ~(0x04000000 | 0x1fffff) or not 1 <= count <= MAX_IMAGE // width:
-        raise ValueError('installation control is not a bounded positive CpuSet copy')
+    count, width = plain_copy_units(control, MAX_IMAGE)
     size = count * width
     if source % width or destination % width or \
             not ROM_BASE <= source < source+size <= ROM_BASE+len(rom) or \

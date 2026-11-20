@@ -1783,6 +1783,15 @@ Valid external heap objects, entries that survive the free, and a writable menu
 destination remain runtime conditions. Set `FFTA_UNIT_OUTPUT_ROOT` to the indexed
 USA game checkout to run `tests/test_unit_entry_output.py`.
 
+The name-entry routine at `0812A878` uses
+`--owner-runtime-profile bounded-buffer-conditional-thunks-v1`. It clears a
+20-byte local buffer, copies the name starting at the first non-space glyph,
+removes trailing spaces and empty cells, then copies ten halfwords to the
+destination. The verifier follows the boot-installed clear routine and
+checks the length and address range of each BIOS copy. The caller provides
+an aligned 20-byte destination. Set `FFTA_NAME_ENTRY_ROOT` to run
+`tests/test_name_entry_copy.py`.
+
 The decimal formatter at `080142DC` uses
 `--owner-runtime-profile bounded-buffer-datafree-caller-v1`. The game formats
 a 16-bit number into six characters and converts them to two-byte glyphs.
@@ -1826,6 +1835,13 @@ evaluator returns a nonzero result and the target's flag is set, it returns
 call retains the same two-item precondition after changes to a unit's
 equipment. Set `FFTA_POSITIONED_CHANCE_ROOT` to run
 `tests/test_positioned_equipment_chance.py`.
+
+The selection-list routine at `0813569C` evaluates entries in order and
+returns the first matching index plus one, or zero if none qualify. It
+passes the first selected item to the effect evaluator. Its two-item stack
+buffer has the same live-loadout requirement. The verifier checks both data
+addresses and all eight arguments to the entry predicate. Set
+`FFTA_EQUIPMENT_SELECTION_ROOT` to run `tests/test_equipment_selection_list.py`.
 
 The equipment profile also covers the 192-byte eligibility predicate at
 `080C48A4`. Its signed halfword temporary receives the collector count
