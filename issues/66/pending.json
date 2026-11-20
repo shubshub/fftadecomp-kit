@@ -983,6 +983,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "ccfb8a5ec7e8f77ae5080b2d33c33c73252a5aee6c2c10b59cb6df1b700d59bf",
+        "acknowledged_cursor": 7030487443,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ccfb8a5ec7e8f77ae5080b2d33c33c73252a5aee6c2c10b59cb6df1b700d59bf",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08004AA4\",\"who\":\"astra-08004aa4\",\"note\":\"Verify the leaf function size and recover normal C\"}",
+          "created_at": "2026-11-20T04:32:50Z",
+          "id": 7030487443,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T04:32:50Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "69362ba7a70ccf9170cc1dd74e135b4d6b635c98ff058613802f950d7a7042d1",
+        "result": {
+          "address": "0x08004AA4",
+          "claim_id": 7030487443,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7030487443,
+          "status": "accepted",
+          "who": "astra-08004aa4"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
