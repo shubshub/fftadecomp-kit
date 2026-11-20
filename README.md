@@ -6005,6 +6005,44 @@ from `tests/`. They include the attack cases: a pointer operand, altered runtime
 bytes or spans, interior targets, wrong call names and a quotient used as an
 index.
 
+### Compiler division names in the addressed BIOS fill selector
+
+`--addressed-signed-runtime-profile addressed-native-bios-fill-buffer-data-v1`
+binds an explicit call of a pinned runtime entry, such as
+`func_08142AB0(a, b)`. For `a / b` and `a % b` agbcc emits the same direct
+Thumb BL against `__udivsi3`, `__umodsi3`, `__divsi3` or `__modsi3`, which this
+selector used to refuse (`function address requires a canonical addressed
+function`). It now binds each of those names to the entry the explicit spelling
+names (0x08142AB0, 0x08142B28, 0x081426B8, 0x08142950), so the two spellings
+get the same calls and bindings: the same pinned runtime identities, the same
+walk (a local pointer in R0-R3 or R12 at a runtime call is refused with
+`division runtime is outside buffer-call proof profiles`, and the
+caller-clobbered registers are dropped after it), the same BIOS fill proof and
+the same typed data checks. The names must be zero-size undefined globals at
+canonical BL relocations. When one is present, the preprocessed C may name none
+of the eight runtime identifiers (`compiler_namespace`), so a source cannot
+declare `__udivsi3` itself or mix the two spellings, and every runtime call
+must be compiler-emitted.
+
+The manifest gains a `compiler_runtime` record, and the report prints it as a
+premise naming each call site, name, entry and pinned identity:
+`* compiler runtime binding: 0x08075B86 __udivsi3 -> func_08142AB0
+(agbcc-thumb-udivsi3-v1), ...; <contract>`. A report of the explicit spelling
+is unchanged. Two reports of one function in the two spellings differ only in
+that line, that record and the source, assembly and ELF digests. agbcc does
+not always compile the two spellings to the same bytes (it may move a load
+across the runtime call that it keeps after an ordinary call); the ROM bytes
+decide which one matches. The other addressed selectors and the default path
+are unchanged; `compiler-signed-runtime-bios-fill-scalar-control-data-v1`, the
+compiler selector for the two signed runtimes beside a CpuSet control loaded
+from a literal pool, keeps its own binding and record.
+`addressed_signed_runtime_profile.COMPILER_BIOS_FILL.enabled = False` restores
+the refusal. `python -m unittest test_compiler_runtime_bios_fill`
+from `tests/` covers both spellings, the report text and replay, the source
+namespace, a runtime one instruction away from its pin, local addresses
+reaching the runtime, operands read outside the frame, and a runtime reached
+through a thunk or a register; its compiled half needs the fixed agbcc.
+
 ### Explicit BIOS word-switch local buffers
 
 `python3 tools/match.py --root <game> --owner-runtime-profile bios-word-switch-local-buffers-v1 <address>`
