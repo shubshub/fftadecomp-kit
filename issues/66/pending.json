@@ -631,6 +631,38 @@
           "who": "astra-0800de70"
         }
       }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e0f9a0807a0c2525ac815a8d5daee344bd7cef50705a35bc08ec2f9057b14dd2",
+        "acknowledged_cursor": 7031584730,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e0f9a0807a0c2525ac815a8d5daee344bd7cef50705a35bc08ec2f9057b14dd2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080AA7AA\",\"who\":\"native-index-audit\",\"note\":\"Remove the false symbols/functions.txt call from the literal pool in matched 080A96B0; no source match claimed\"}",
+          "created_at": "2026-11-20T05:44:03Z",
+          "id": 7031584730,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T05:44:03Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "f2e556480459ca130a15b5f383439fb87c2fde8d8c4bf064ee651c8cb4a20f06",
+        "result": {
+          "address": "0x080AA7AA",
+          "claim_id": 7031584730,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7031584730,
+          "status": "accepted",
+          "who": "native-index-audit"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
