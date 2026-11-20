@@ -6771,3 +6771,21 @@ allocation, separate live buffers and private stack, ordinary BIOS behavior,
 and exclusive ownership during initialization. Set `FFTA_MENU_RING_ROOT` to
 the game tree to run the original boot, dispatch and cleanup tests in
 `tests/test_menu_ring_initializer.py`.
+
+### Sprite nodes, actor shadows, and item lists
+
+The sprite node at `080216F8` calls the renderer that builds an OAM affine
+matrix. The verifier follows the BIOS write into the renderer's frame and
+checks the scratch register through the outer return. The actor visitor at
+`08097F04` uses the scene's occupant search and the installed shadow update.
+Run their original-ROM tests with `FFTA_SPRITE_NODE_ROOT` and
+`FFTA_ACTOR_SHADOW_ROOT` set to the game tree.
+
+The shop routine at `0806ED30` builds a six-byte category list. Its test
+checks all 256 selectors against the regular, supplemental and fallback
+tables. The inventory routine at `0808CBDC` filters 375 item IDs across
+six tabs. The largest tab admits 252 rows. The
+`conditional-inventory-item-list-v1` selector verifies that both local
+arrays and the destination pane can hold the result. Set
+`FFTA_SHOP_CATEGORY_ROOT` and `FFTA_ITEM_LIST_ROOT` to the game tree to
+run the corresponding tests.
