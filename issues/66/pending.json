@@ -1239,6 +1239,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "e74b15297f8f715d2636578f9de05bb7e6ba17ad6f4dae01c0c36e2413183963",
+        "acknowledged_cursor": 7028862996,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "e74b15297f8f715d2636578f9de05bb7e6ba17ad6f4dae01c0c36e2413183963",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0801FEB8\",\"who\":\"astra-0801feb8\",\"note\":\"Recover and validate the indexed 336-byte routine\"}",
+          "created_at": "2026-11-20T02:54:41Z",
+          "id": 7028862996,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:54:41Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "21981633637a848eeb42c3050144442f84403b3af410deeef9eda8de614c2f16",
+        "result": {
+          "address": "0x0801FEB8",
+          "claim_id": 7028862996,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7028862996,
+          "status": "accepted",
+          "who": "astra-0801feb8"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
