@@ -982,7 +982,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "f8edfa23f9075861697e8b9785c8dd8f1e3d11117961828cbe6e386c108a14c2",
+        "acknowledged_cursor": 7028503349,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f8edfa23f9075861697e8b9785c8dd8f1e3d11117961828cbe6e386c108a14c2",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080AA894\",\"who\":\"claude-ffta2\",\"claim_id\":7028278135,\"reason\":\"bytes identical outside match.py, but every fitting profile refuses: signed remainder (__modsi3) beside a jump table has no admission on kit b9f1de580; source kept for a kit issue\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T02:32:08Z",
+          "id": 7028503349,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T02:32:08Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "81d174efb162a22c82372f51cdd16941045aa45578fc5b83de8461b5f38b669d",
+        "result": {
+          "address": "0x080AA894",
+          "claim_id": 7028278135,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7028503349,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
