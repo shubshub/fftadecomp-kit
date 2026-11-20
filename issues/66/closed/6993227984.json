@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "9fbdfe7667b3e3d2eabb81a1bf72d702317965ca84e219eb28a5db4f3b6fc3d1",
+    "acknowledged_cursor": 6993227984,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "9fbdfe7667b3e3d2eabb81a1bf72d702317965ca84e219eb28a5db4f3b6fc3d1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080C01D0\",\"who\":\"astra-roster\",\"note\":\"Original arena action search and bounded equipment collector.\"}",
+      "created_at": "2026-11-18T22:16:40Z",
+      "id": 6993227984,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T22:16:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "9e898b6d5cf916411581671b0a1e1983527b967aed7572e2eefb1ab20492c256",
+    "result": {
+      "address": "0x080C01D0",
+      "claim_id": 6993227984,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6993227984,
+      "status": "accepted",
+      "who": "astra-roster"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "1257d924cd83fdf1ba6ea1e2d9d97760d123a816cf6dac5069a106d1939bc324",
+    "acknowledged_cursor": 7028626107,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "1257d924cd83fdf1ba6ea1e2d9d97760d123a816cf6dac5069a106d1939bc324",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C01D0\",\"who\":\"astra-roster\",\"claim_id\":6993227984,\"reason\":\"Matching C and native report merged in shubshub/fftadecomp#302\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T02:40:12Z",
+      "id": 7028626023,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T02:40:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2b6480f32cece1b305413cc8104fb334e1bdb303c642a6561626aa01fd36a711",
+    "result": {
+      "address": "0x080C01D0",
+      "claim_id": 6993227984,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7028626023,
+      "status": "accepted",
+      "who": "astra-roster"
+    }
+  }
+}

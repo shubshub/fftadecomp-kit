@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "0cbe709c5215853a34d54fea825340fdeca3a0c40b6a4247f819bdb144f6aa0c",
+    "acknowledged_cursor": 6993329232,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "0cbe709c5215853a34d54fea825340fdeca3a0c40b6a4247f819bdb144f6aa0c",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08098A88\",\"who\":\"astra-combat\",\"note\":\"Recover the adjacent original grid-path movement routine and native caller.\"}",
+      "created_at": "2026-11-18T22:21:23Z",
+      "id": 6993329232,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-18T22:21:23Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "12fd450fea0112f967652d5fd23fc6b223be275c75d706b521321d2296089b0a",
+    "result": {
+      "address": "0x08098A88",
+      "claim_id": 6993329232,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 6993329232,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "33fb327083d8804fe047c0451e43f1a5e53be8dc3e84313b168fc5b4a831f1c1",
+    "acknowledged_cursor": 7028626107,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "33fb327083d8804fe047c0451e43f1a5e53be8dc3e84313b168fc5b4a831f1c1",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08098A88\",\"who\":\"astra-combat\",\"claim_id\":6993329232,\"reason\":\"Matching C and native report merged in shubshub/fftadecomp#302\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T02:40:12Z",
+      "id": 7028626000,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T02:40:12Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "2b6480f32cece1b305413cc8104fb334e1bdb303c642a6561626aa01fd36a711",
+    "result": {
+      "address": "0x08098A88",
+      "claim_id": 6993329232,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7028626000,
+      "status": "accepted",
+      "who": "astra-combat"
+    }
+  }
+}
