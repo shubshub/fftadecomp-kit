@@ -162,7 +162,7 @@ depth).
 import contextvars
 import re
 
-from plausible import declaration_tokens
+from plausible import VOLATILE_QUALIFIER, declaration_tokens
 
 MASK = 0xFFFFFFFF
 SP = ("sp",)
@@ -353,9 +353,10 @@ def replace_pinned(preprocessed, declaration, replacement):
 
 
 def strip_pinned_volatile(preprocessed, declaration):
-    """the preprocessed text with `volatile` removed from the pinned declaration only"""
-    return replace_pinned(preprocessed, declaration, lambda text: re.sub(
-        r"\bvolatile\b", lambda match: " " * len(match[0]), text))
+    """the preprocessed text with the qualifier, in every spelling (plausible.VOLATILE),
+    removed from the pinned declaration only"""
+    return replace_pinned(preprocessed, declaration, lambda text: VOLATILE_QUALIFIER.sub(
+        lambda match: " " * len(match[0]), text))
 
 
 def perturb_pinned(preprocessed, declaration):
