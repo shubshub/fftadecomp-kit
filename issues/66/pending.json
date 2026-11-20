@@ -1243,6 +1243,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "b12aa372a41a9e84b9a6f53a89e07c2e3c7d1376082016281361d43f88cbd864",
+        "acknowledged_cursor": 7029087482,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b12aa372a41a9e84b9a6f53a89e07c2e3c7d1376082016281361d43f88cbd864",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08097F04\",\"who\":\"astra-08097f04\",\"note\":\"Recover indexed battle object method and verify original ROM\"}",
+          "created_at": "2026-11-20T03:05:44Z",
+          "id": 7029087482,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T03:05:44Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "61e39c9657b28a16523289609acca560debac1747d475b6171c59ef01b29927b",
+        "result": {
+          "address": "0x08097F04",
+          "claim_id": 7029087482,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7029087482,
+          "status": "accepted",
+          "who": "astra-08097f04"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
