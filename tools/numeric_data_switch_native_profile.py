@@ -23,7 +23,8 @@ def environment_fingerprint():
     result['numeric_switch_producers'] = {Path(module.__file__).name:
         hashlib.sha256(Path(module.__file__).read_bytes()).hexdigest()
         for module in (inventory, inventory.analyze, inventory.ordinary, inventory.thunks,
-                       inventory.frame, inventory.graph, inventory.graph.armv4t, inventory.operations)}
+                       inventory.frame, inventory.graph, inventory.graph.armv4t, inventory.operations,
+                       rom_mirror)}
     result['numeric_switch_producers'][Path(__file__).name] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     return result
 
@@ -68,8 +69,7 @@ def verify_structure(data, address, rom, mapping, index, bindings,
     data_sites = {address + site for site, _, _ in bindings['data']}
     for word in partition['words']:
         value = word['value']
-        if reserved(value) or (not word['switch_word'] and any(
-                int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries)):
+        if reserved(value) or (not word['switch_word'] and rom_mirror.names_entry(value, entries)):
             raise ValueError('numeric-data switch cannot materialize runtime or function addresses')
         if not word['switch_word'] and word['address'] not in data_sites and not 0 <= value <= 0xffff:
             raise ValueError('numeric-data switch scalar literals require bounded u16 category')

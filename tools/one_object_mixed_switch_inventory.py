@@ -120,7 +120,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         if value in match.RUNTIME_HELPERS.values() or match.is_udivsi3_address(value) or any(
                 module.reserved(value) for module in (thunks, quotient, match.modsi3,
                     match.umodsi3, match.ashldi3, canonical, native)) or \
-                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries):
+                not word['switch_word'] and rom_mirror.names_entry(value, entries):
             raise ValueError('one-object mixed switch cannot materialize a runtime/thunk/function address')
     div = canonical.prove_division_closure(rom, mapping, index)
     udiv = unsigned.prove_quotient_closure(rom, mapping, index)
@@ -133,7 +133,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     # No buffer, entry-word, alias-slot or call-preservation permission is added.
     restored = frame.prove_frame(instructions, edges, address, {}, calls, stack_aliases=True)
     ordinary_sites = {site: name for site, name in bindings.items() if name not in OPERATIONS}
-    modules = (analyze, quotient, thunks, frame, match, match.armv4t, owner, graph, operations, canonical, native, unsigned)
+    modules = (analyze, quotient, thunks, frame, match, match.armv4t, owner, graph, operations, canonical, native, unsigned, rom_mirror)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,

@@ -102,7 +102,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
         if value in match.RUNTIME_HELPERS.values() or match.is_udivsi3_address(value) or any(
                 module.reserved(value) for module in (thunks, object_policy.quotient, match.modsi3,
                     match.umodsi3, match.ashldi3, object_policy.canonical, object_policy.native)) or \
-                not word['switch_word'] and any(int(row['rom'], 16) & ~1 == rom_mirror.canonical(value) & ~1 for row in entries):
+                not word['switch_word'] and rom_mirror.names_entry(value, entries):
             raise ValueError('thunk switch cannot materialize a runtime/thunk/function address')
     operations.verify_operations(instructions, edges, address, branches, calls, refinement)
     for instruction in instructions.values():
@@ -122,7 +122,7 @@ def verify(data, address, rom, mapping, index, calls, bindings, *, selector, man
     restored = frame.prove_frame(instructions, edges, address, branches, calls,
         runtime_calls=runtime)
     modules = (analyze, thunks, frame, match, match.armv4t, owner, graph, operations, zero, object_policy,
-        object_policy.quotient, object_policy.canonical, object_policy.native, guard_policy, guard_policy.ordinary)
+        object_policy.quotient, object_policy.canonical, object_policy.native, guard_policy, guard_policy.ordinary, rom_mirror)
     pins = {Path(module.__file__).name: sha(Path(module.__file__).read_bytes()) for module in modules}
     pins[Path(__file__).name] = sha(Path(__file__).read_bytes())
     observed = {'schema': SCHEMA, 'selector': SELECTOR, 'inventory_only': True,
