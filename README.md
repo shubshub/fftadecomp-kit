@@ -3668,8 +3668,14 @@ and reads there return the prefetched opcode rather than mirroring a lower
 region, so such a word is not itself a mapped address. One residual is a
 stated premise: agbcc folds `sym + 0x80000000` (or `&arr[-0x10000000]`) into
 one such literal word, so a source that hard-codes that linked value would be
-admitted while its symbolic form is refused. The premise line says such an
-offset is assumed absent.
+admitted while its symbolic form is refused. The premise is wider than those
+two forms: the rule takes every word of at least `0x10000000`, so a smaller
+constant is enough on a high address, and a ROM object plus `0x08000000` is
+such a word. For a typed object that sum's symbolic form is not refused: it
+links as the object with the addend recorded under `data`, and only the
+hard-coded number falls under the premise. The premise line says the
+hard-coded value of any address plus or minus a constant whose 32-bit sum is
+`0x10000000` or more is assumed absent.
 Each word is recorded exactly, apart from the u16 words, as
 `"wide_scalars": [[offset, value], ...]` under
 `"wide_scalar_policy": "unmapped-bus-scalar-words-v1"`, and only when one

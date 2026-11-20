@@ -13,7 +13,12 @@ says an access there returns the recently prefetched opcode, not a mirror of
 a lower region. So the word is not itself an object, I/O or code address. One residual is
 a premise, not a proof: agbcc folds `sym + 0x80000000` (or `&arr[-0x10000000]`) into one
 literal word, and a source that hard-codes that linked value would be admitted here while
-its symbolic form is refused (the binding value wraps). Such an offset is assumed absent.
+its symbolic form is refused (the binding value wraps). The premise is wider than those two
+forms: the rule takes every word of at least 0x10000000, so a smaller constant is enough on a
+high address, and a ROM object plus 0x08000000 is such a word. For a typed object that sum's
+symbolic form is not refused: it links as the object with the addend recorded under `data`,
+and only the hard-coded number falls under the premise. The hard-coded value of an address
+plus or minus a constant is assumed absent whenever its 32-bit sum is 0x10000000 or more.
 Nothing beyond the exact value is claimed. Each word is recorded as
 `[offset, value]` under `wide_scalars`, kept apart from the u16 `scalars`, and
 replay compares it with the linked bytes. Words below 0x10000000 that exceed
@@ -24,8 +29,10 @@ POLICY = 'unmapped-bus-scalar-words-v1'
 LOW = 0x10000000
 PREMISE = ('each `wide_scalars` word is an exact number of at least 0x10000000; GBATEK lists '
            '10000000-FFFFFFFF as unused memory whose reads return the prefetched opcode, so the '
-           'word is no mapped address; an object address offset by 0x10000000 or more, which '
-           'agbcc would fold into one such word, is assumed absent from the source')
+           'word is no mapped address; the hard-coded value of an address plus or minus a '
+           'constant whose 32-bit sum is 0x10000000 or more (a ROM object plus 0x08000000 is '
+           'one), an expression agbcc would fold into one such word, is assumed absent from the '
+           'source')
 REPORT_PREFIX = '* switch wide scalar premise: '
 FIELDS = frozenset(('wide_scalar_policy', 'wide_scalars'))
 
