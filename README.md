@@ -4620,6 +4620,13 @@ same partition. Any other `mov pc` or `bx` source, an unguarded or
 differently guarded index, a pointer word outside that pool or misaligned
 in it, a table that is not adjacent, not local or of another size, and
 entering the dispatch past its shift still fail closed.
+A label stands for the instruction after it only when that instruction
+follows it directly (kit#368): a branch, or a table entry, that names a label
+in front of a literal word or of a directive fails closed, because the
+hardware may run or jump into the pool, table or padding that the model
+steps over. A table is read as written only on a word boundary, which GAS
+does not give `.word`: its words must follow `.align 2, 0` with nothing but
+labels and literal words between, or the dispatch fails closed.
 The path and decision bounds are cost bounds (kit#137): every path is
 checked in full and a function they cut short is refused, never accepted on
 the paths seen. The path bound was 256; holding 1024 paths, measured on

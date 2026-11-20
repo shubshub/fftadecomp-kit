@@ -111,7 +111,7 @@ class JumpTableTests(unittest.TestCase):
         self.refused("not bounded by `cmp r0, #1`", assembly(table=TABLE[:2]))
         # the table, or its pointer, elsewhere
         self.refused("does not immediately follow", assembly(
-            pool=POOL[:-1], table=(), cases=CASES[:-1] + (".align\t2, 0", ".L11:") + TABLE + ("bx\tlr",)))
+            pool=POOL[:-1], table=(), cases=CASES + (".align\t2, 0", ".L11:") + TABLE))
         self.refused("pointer is not a local label word", assembly(
             pool=(".L13:", ".align\t2, 0", ".L11:"),
             cases=CASES + (".L14:", ".align\t2, 0", ".L12:", ".word\t.L11")))
@@ -187,7 +187,7 @@ class JumpTableTests(unittest.TestCase):
             dispatch=dispatch,
             pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".align\t2, 0",
                   ".L14:"),
-            table=(), cases=CASES[:-1] + (".align\t2, 0", ".L11:") + TABLE + ("bx\tlr",)))
+            table=(), cases=CASES + (".align\t2, 0", ".L11:") + TABLE))
 
     def test_a_leading_zero_offset_is_refused(self):
         # GAS reads `.L12+020` as octal 16: word 4, the table .L31, where a
@@ -238,6 +238,110 @@ class JumpTableTests(unittest.TestCase):
             self.refused("has more than 2 paths; the semantic check is bounded", assembly())
         with mock.patch.object(semantics, "MAX_PATHS", 3):
             self.assertEqual(compare(assembly())[0][1], 3)
+
+
+class DataLabelTargetTests(unittest.TestCase):
+    """kit#368: a label is where the model resumes only when an instruction
+    follows it directly, and a table is read as written only on a word boundary"""
+
+    NAME = "func_08028C34"
+    SHARED = DISPATCH[:1] + ("ldr\tr2, .L12+4",) + DISPATCH[2:]
+    # an `.align` between the default label and its instruction: any padding
+    # there runs as `lsl r0, r0, #0`, which the instruction stream does not hold
+    PADDED = CASES[:-1] + (".align\t2, 0", "bx\tlr")
+
+    def refused(self, reason, real):
+        with self.assertRaises(semantics.SemanticError) as caught:
+            compare(real)
+        self.assertIn(reason, str(caught.exception))
+
+    def test_the_parser_tells_code_labels_and_aligned_words_apart(self):
+        import json
+        labels = semantics.parse_assembly(assembly())[0][self.NAME][1]
+        # the barriers .L13 and .L4, the pools and the table precede data
+        self.assertEqual(labels.code, {".L5", ".L6", ".L20"})
+        self.assertEqual(labels.aligned, {".L12", ".L11", ".L3"})
+        # the map other tools read and pin is the plain one it was
+        self.assertEqual(dict(labels), {".L13": 8, ".L12": 8, ".L11": 8, ".L5": 8, ".L6": 13, ".L20": 17,
+                                        ".L4": 18, ".L3": 18, ".Lfe1": 18})
+        self.assertEqual(json.dumps(labels, sort_keys=True), json.dumps(dict(labels), sort_keys=True))
+        labels = semantics.parse_assembly(assembly(cases=self.PADDED))[0][self.NAME][1]
+        self.assertEqual(labels.code, {".L5", ".L6"})
+        # a table label inside an aligned run is aligned; one after a bare
+        # label, or after an instruction that follows an aligned pool, is not
+        run = assembly(dispatch=self.SHARED, pool=(".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}",
+                                                   ".word\t.L11", ".L11:"))
+        self.assertLessEqual({".L12", ".L11"}, semantics.parse_assembly(run)[0][self.NAME][1].aligned)
+        bare = assembly(pool=(".L13:", ".L11:"), table=TABLE + (".align\t2, 0", ".L12:", ".word\t.L11"))
+        self.assertEqual(semantics.parse_assembly(bare)[0][self.NAME][1].aligned, {".L12", ".L3"})
+
+    def test_a_branch_to_a_label_that_data_follows_is_refused(self):
+        # the model would resume at .L5, past the words the hardware runs
+        for label in (".L11", ".L12", ".L13"):
+            with self.subTest(label=label):
+                self.refused(f"branch to `{label}`, a label that no instruction follows directly",
+                             assembly(guard=("cmp\tr0, #2", f"bhi\t{label}")))
+        self.refused("branch to `.L20`, a label that no instruction follows directly",
+                     assembly(cases=self.PADDED))
+        # a table between the default label and its instruction (the fixture
+        # two tests above used for a table that is not at the jump)
+        self.refused("branch to `.L20`, a label that no instruction follows directly", assembly(
+            pool=POOL[:-1], table=(), cases=CASES[:-1] + (".align\t2, 0", ".L11:") + TABLE + ("bx\tlr",)))
+        # an unconditional branch resolves its label the same way
+        self.refused("branch to `.L13`, a label that no instruction follows directly",
+                     assembly(guard=("b\t.L13",)))
+        # the first case label follows the table directly and is code
+        self.assertEqual(compare(assembly(guard=("cmp\tr0, #2", "bhi\t.L5")))[0][1], 3)
+        self.assertEqual(compare(assembly(guard=("b\t.L5",)))[0][1], 1)
+
+    def test_a_table_entry_must_be_a_label_an_instruction_follows(self):
+        reason = "a jump-table entry is not a local code label of this function"
+        # .L13 is the barrier before the pool's alignment: the hardware would
+        # jump into the pool, where the model resumes at .L5
+        self.refused(reason, assembly(table=TABLE[:2] + (".word\t.L13",)))
+        # a label with alignment between it and the instruction it indexes
+        self.refused(reason, assembly(table=TABLE[:2] + (".word\t.L21",),
+                                      cases=CASES[:-2] + (".L21:", ".align\t2, 0") + CASES[-2:]))
+        # the barrier and the pool at the end, which index no instruction
+        for entry in (".L4", ".L3"):
+            with self.subTest(entry=entry):
+                self.refused(reason, assembly(table=TABLE[:2] + (f".word\t{entry}",)))
+        # the label after the table, and the last label of the function, are code
+        self.assertEqual(compare(assembly(table=TABLE[:2] + (".word\t.L20",)))[0][1], 4)
+        self.assertEqual(compare(assembly(table=(".word\t.L5",) * 3))[0][1], 2)
+
+    def test_a_table_not_known_to_be_word_aligned_is_refused(self):
+        reason = "the jump table is not known to start on a word boundary"
+        after = (".align\t2, 0", ".L12:", ".word\t.L11")
+        # nine instructions, then the table at 0x12 with its pointer after it:
+        # `ldr r0, [r0]` there loads rotated halves of two entries
+        nine = ("add\tr3, r3, #0",) + GUARD
+        self.refused(reason, assembly(guard=nine, pool=(".L13:", ".L11:"), table=TABLE + after))
+        # at 0x10 by count only: nothing in the text says so
+        self.refused(reason, assembly(pool=(".L13:", ".L11:"), table=TABLE + after))
+        # only agbcc's own `.align 2, 0` is read as an alignment: not one to
+        # two bytes, one with no fill value, one that `.pool` follows, or one
+        # with a limit on the bytes it may skip
+        for before in ((".align\t1, 0",), (".align\t2",), (".align\t2, 0", ".pool"), (".align\t2, 0, 1",)):
+            with self.subTest(before=before):
+                self.refused(reason, assembly(pool=(".L13:",) + before + (".L11:",), table=TABLE + after))
+        # `.align 2, 0, 1` skips at most one byte, so after nine instructions
+        # the table stays at 0x12
+        self.refused(reason, assembly(guard=nine, pool=(".L13:", ".align\t2, 0, 1", ".L11:"), table=TABLE + after))
+        # a table that continues a literal run no `.align 2, 0` started is not
+        # aligned: here the run starts at 0x12 and the table at 0x16
+        self.refused(reason, assembly(guard=nine, pool=(".L13:", ".L40:", ".word\t0", ".L11:"),
+                                      table=TABLE + after))
+        # an aligned pool earlier in the function does not carry over the
+        # instructions after it
+        early = ("b\t.L50", ".L51:", ".align\t2, 0", ".L52:", ".word\t0", ".L50:")
+        self.refused(reason, assembly(guard=early + GUARD, pool=(".L13:", ".L11:"), table=TABLE + after))
+        # the same table after its own alignment, and one that continues the
+        # aligned run of its pointer with no alignment between
+        self.assertEqual(compare(assembly(guard=early + GUARD))[0][1], 3)
+        self.assertEqual(compare(assembly(pool=(".L13:", ".align\t2, 0", ".L11:"), table=TABLE + after))[0][1], 3)
+        self.assertEqual(compare(assembly(dispatch=self.SHARED, pool=(
+            ".L13:", ".align\t2, 0", ".L12:", f".word\t{SYMBOL}", ".word\t.L11", ".L11:")))[0][1], 3)
 
 
 if __name__ == "__main__":
