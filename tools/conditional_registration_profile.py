@@ -699,11 +699,16 @@ class Acquisition:
             if part == "..":
                 resolved = resolved.parent
                 continue
-            parent = self._directory(resolved)
+            # A resolution ancestor binds namespace identity only: the tool
+            # runs from its held descriptor (_run), so its path matters at
+            # rechecks only. A link's parent binds membership here; acquire()
+            # binds the tool's parent.
+            parent = self._directory(resolved, False)
             candidate = resolved / part
             try:
                 info = os.stat(part, dir_fd=parent, follow_symlinks=False)
                 if stat.S_ISLNK(info.st_mode):
+                    self._directory(resolved)
                     require(len(chain) < 40, "fixed-tool symlink depth limit", "unsupported")
                     target = os.readlink(part, dir_fd=parent)
                     validate(target, "Text")
@@ -1535,13 +1540,17 @@ def _dependencies(data, source, sources, root):
     require(str(root / source) in observed, "preprocessor lacks addressed source marker")
 
 
-def _run(command, root, temporary):
+def _run(command, root, temporary, descriptor=None):
     # Same process-group/timeout discipline as match._run_replay_process;
     # this small variant supplies a private TMPDIR without mutating os.environ.
+    # A fixed tool runs from its held descriptor, so what its path names
+    # while it runs cannot change what runs; argv[0] stays the resolved path.
     environment = dict(os.environ, TMPDIR=str(temporary), PYTHONDONTWRITEBYTECODE="1")
+    executable, passed = (None, ()) if descriptor is None else (f"/proc/self/fd/{descriptor}", (descriptor,))
     try:
         with subprocess.Popen(command, cwd=root, env=environment, stdout=subprocess.PIPE,
-                              stderr=subprocess.PIPE, text=True, start_new_session=True) as process:
+                              stderr=subprocess.PIPE, text=True, start_new_session=True,
+                              executable=executable, pass_fds=passed) as process:
             try:
                 stdout, stderr = process.communicate(timeout=CAPTURE_TIMEOUT)
             except BaseException:
@@ -1639,7 +1648,8 @@ def _capture_caller(acquisition, address, workspace):
 
             def run(role, arguments):
                 recheck()
-                commands.append(_run([tools[role], *map(str, arguments)], stages["source"], stages["temporary"]))
+                commands.append(_run([tools[role], *map(str, arguments)], stages["source"], stages["temporary"],
+                                     acquisition.files[Path(tools[role])][0]))
                 recheck()
 
             def take(label, path):

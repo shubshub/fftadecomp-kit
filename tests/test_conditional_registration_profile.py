@@ -2750,10 +2750,10 @@ class FreshCaptureTests(unittest.TestCase):
         saved = source.read_bytes()
         for attack in ("failure", "fifo", "input-drift", "tail", "original-replacement", "linked-replacement"):
             with self.subTest(attack=attack):
-                def hostile(command, root, temporary):
+                def hostile(command, root, temporary, *rest):
                     if attack == "failure":
                         raise profile.Failure("identity", "injected fixed tool failure")
-                    completed = original_run(command, root, temporary)
+                    completed = original_run(command, root, temporary, *rest)
                     output = Path(command[-1])
                     if attack == "fifo" and output.name == "caller.i":
                         output.unlink()
@@ -2906,8 +2906,8 @@ class FreshCaptureTests(unittest.TestCase):
             with self.subTest(reason=reason):
                 observed, commands = [], []
 
-                def record(command, root, temporary):
-                    result = real_run(command, root, temporary)
+                def record(command, root, temporary, *rest):
+                    result = real_run(command, root, temporary, *rest)
                     commands.append(command)
                     output = Path(command[-1])
                     if output.parent.name == "original-binary":
@@ -2976,8 +2976,8 @@ class FreshCaptureTests(unittest.TestCase):
             with self.subTest(stage=stage):
                 shifts, observed = [], []
 
-                def shift(command, root, temporary):
-                    result = original_run(command, root, temporary)
+                def shift(command, root, temporary, *rest):
+                    result = original_run(command, root, temporary, *rest)
                     output = Path(command[-1])
                     if output.parent.name == stage:
                         data = bytearray(output.read_bytes())
@@ -3026,6 +3026,223 @@ class FreshCaptureTests(unittest.TestCase):
                     with self.subTest(case=case[:2], stage=stage, value=value), self.assertRaisesRegex(profile.Failure, "mapping intervals"):
                         profile._symbol_ownership(profile._elf(data), captured.fixed.address, size,
                                                   result["placement"]["bindings"], records, stage=stage)
+
+
+class FixedToolDirectoryBindingTests(unittest.TestCase):
+    """Resolution ancestors bind namespace identity; a tool's or link's own directory binds membership."""
+
+    def setUp(self):
+        SCRATCH.mkdir(parents=True, exist_ok=True)
+        self.directory = tempfile.TemporaryDirectory(prefix="tool-binding-", dir=SCRATCH)
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.game, self.kit, self.home = self.root / "game", self.root / "kit", self.root / "home"
+        self.game.mkdir()
+        self.kit.mkdir()
+        (self.home / "agbcc" / "gcc").mkdir(parents=True)
+        for name in ("real", "bin", "absolute", "chain", "middle"):
+            (self.home / name).mkdir()
+        self.executable(self.home / "agbcc" / "gcc" / "agbcc")
+        self.executable(self.home / "real" / "cpp")
+        (self.home / "bin" / "cpp").symlink_to("../real/cpp")
+        (self.home / "absolute" / "cpp").symlink_to(self.home / "real" / "cpp")
+        (self.home / "chain" / "cpp").symlink_to("../middle/cpp")
+        (self.home / "middle" / "cpp").symlink_to("../real/cpp")
+
+    @staticmethod
+    def executable(path, output="pinned"):
+        path.write_text(f"#!/bin/sh\necho {output}\n")
+        path.chmod(0o755)
+
+    def acquired(self, search=None):
+        """Both fixed tools resolved below the home directory, rechecked once."""
+        environment = patch.dict(os.environ, {"HOME": str(self.home), "PATH": search or str(self.home / "bin")})
+        environment.start()
+        self.addCleanup(environment.stop)
+        acquisition = profile.Acquisition(game_root=self.game, kit_root=self.kit)
+        self.addCleanup(acquisition.close)
+        self.assertEqual(acquisition.tool("cc")["resolved"], str(self.home / "agbcc" / "gcc" / "agbcc"))
+        self.assertEqual(acquisition.tool("cpp")["resolved"], str(self.home / "real" / "cpp"))
+        acquisition.recheck()
+        return acquisition
+
+    def test_unrelated_entry_in_a_resolution_ancestor_keeps_the_capture(self):
+        acquisition = self.acquired()
+        for ancestor in (self.home, self.home / "agbcc", self.root):
+            (ancestor / "unrelated").write_text("another program's file\n")
+            acquisition.recheck()
+            (ancestor / "unrelated").unlink()
+            acquisition.recheck()
+
+    def test_entry_in_the_directory_of_a_tool_or_link_is_drift(self):
+        for directory in ("agbcc/gcc", "real", "bin"):
+            with self.subTest(directory=directory):
+                acquisition = self.acquired()
+                (self.home / directory / "unrelated").write_text("another program's file\n")
+                with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+                    acquisition.recheck()
+                (self.home / directory / "unrelated").unlink()
+
+    def test_resolution_ancestor_identity_change_is_drift(self):
+        acquisition = self.acquired()
+        self.home.chmod(0o700)
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            acquisition.recheck()
+
+    def test_ancestor_replaced_by_a_copy_is_drift(self):
+        acquisition = self.acquired()
+        os.rename(self.home / "agbcc", self.root / "agbcc.old")
+        shutil.copytree(self.root / "agbcc.old", self.home / "agbcc", symlinks=True)
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            acquisition.recheck()
+
+    def test_ancestor_replaced_by_a_link_to_the_same_tree_is_drift(self):
+        # The tool's inode stays reachable through the link; only the named ancestor differs.
+        acquisition = self.acquired()
+        os.rename(self.home / "agbcc", self.home / "agbcc.old")
+        (self.home / "agbcc").symlink_to("agbcc.old")
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            acquisition.recheck()
+
+    def test_entry_in_the_directory_of_an_absolute_link_is_drift(self):
+        acquisition = self.acquired(str(self.home / "absolute"))
+        (self.home / "absolute" / "unrelated").write_text("another program's file\n")
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            acquisition.recheck()
+
+    def test_entry_in_the_directory_of_the_second_link_of_a_chain_is_drift(self):
+        # chain/cpp -> ../middle/cpp -> ../real/cpp
+        acquisition = self.acquired(str(self.home / "chain"))
+        (self.home / "middle" / "unrelated").write_text("another program's file\n")
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            acquisition.recheck()
+
+    def test_tool_runs_from_its_held_descriptor_while_an_ancestor_is_swapped(self):
+        acquisition = self.acquired()
+        compiler = self.home / "agbcc" / "gcc" / "agbcc"
+        (self.root / "swapped" / "gcc").mkdir(parents=True)
+        self.executable(self.root / "swapped" / "gcc" / "agbcc", "swapped")
+        os.rename(self.home / "agbcc", self.root / "away")
+        os.rename(self.root / "swapped", self.home / "agbcc")
+        try:
+            held = profile._run([str(compiler)], self.root, self.root, acquisition.files[compiler][0])
+            by_path = profile._run([str(compiler)], self.root, self.root)
+        finally:
+            os.rename(self.home / "agbcc", self.root / "swapped")
+            os.rename(self.root / "away", self.home / "agbcc")
+        self.assertEqual(held, ((str(compiler),), 0, "pinned\n", ""))
+        self.assertEqual(by_path[2], "swapped\n")
+        # The swap is undone, so the rechecks admit; the program that ran is the pinned one.
+        acquisition.recheck()
+
+    def test_tool_appearing_earlier_on_the_search_path_is_selection_drift(self):
+        # The earlier search directory is once an ancestor of the selected tool and once unrelated to it.
+        early = self.root / "early"
+        early.mkdir()
+        for first in (self.home, early):
+            with self.subTest(first=first.name):
+                acquisition = self.acquired(os.pathsep.join((str(first), str(self.home / "bin"))))
+                shadow = first / "cpp"
+                shadow.write_text("#!/bin/sh\nexit 0\n")
+                # Not executable yet: the search still selects the acquired tool.
+                acquisition.recheck()
+                shadow.chmod(0o755)
+                with self.assertRaisesRegex(profile.Failure, "fixed-tool selection drift"):
+                    acquisition.recheck()
+                shadow.unlink()
+
+
+class FixedToolDirectoryCaptureTests(unittest.TestCase):
+    """A complete seven-command capture while another writer creates a file as the compiler exits."""
+
+    @classmethod
+    def setUpClass(cls):
+        FreshCaptureTests.setUpClass.__func__(cls)
+        try:
+            cls.home = cls.root / "home"
+            cls.compiler = cls.home / "agbcc" / "gcc" / "agbcc"
+            cls.compiler.parent.mkdir(parents=True)
+            shutil.copy2(os.path.expandvars(dict(profile.TOOL_SPELLINGS)["cc"]), cls.compiler)
+        except BaseException:
+            cls.temporary.cleanup()
+            raise
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def capture_with_write(self, written):
+        original_run = profile._run
+        self.writes = 0
+
+        def run(command, root, temporary, *rest):
+            completed = original_run(command, root, temporary, *rest)
+            if command[0] == str(self.compiler):
+                written.write_text("another program's file\n")
+                self.writes += 1
+            return completed
+
+        self.addCleanup(written.unlink, missing_ok=True)
+        with patch.dict(os.environ, {"HOME": str(self.home)}), patch.object(profile, "_run", run):
+            return FreshCaptureTests.capture(self)
+
+    def test_entry_created_in_the_home_directory_during_a_capture_keeps_it(self):
+        capture = self.capture_with_write(self.home / "unrelated")
+        self.assertEqual(self.writes, 1)
+        self.assertEqual(len(capture.commands), 7)
+        self.assertEqual(capture.fixed.to_dict()["tools"][0]["resolved"], str(self.compiler))
+        _, address, size, _, rom = self.cases[0]
+        body = dict(capture.artifacts)["linked_binary"][address % 4:address % 4 + size]
+        self.assertEqual(body, rom[address - profile.ROM_BASE:address - profile.ROM_BASE + size])
+        self.assertEqual(list(self.workspace.iterdir()), [])
+
+    def test_entry_created_in_the_compiler_directory_during_a_capture_refuses(self):
+        with self.assertRaisesRegex(profile.Failure, "parent directory identity drift"):
+            self.capture_with_write(self.compiler.parent / "unrelated")
+        self.assertEqual(self.writes, 1)
+        self.assertEqual(list(self.workspace.iterdir()), [])
+
+    def test_ancestor_swapped_while_the_compiler_runs_does_not_change_what_runs(self):
+        # For the compiler command only, home/agbcc names a tree whose gcc/agbcc is a wrapper that
+        # records that it ran; the original tree is back before the capture's next recheck.
+        swapped, away, marker = self.root / "swapped-agbcc", self.root / "agbcc-away", self.root / "wrapper-ran"
+        real = self.root / "compiler-copy"
+        self.addCleanup(shutil.rmtree, swapped, ignore_errors=True)
+        self.addCleanup(real.unlink, missing_ok=True)
+        self.addCleanup(marker.unlink, missing_ok=True)
+        (swapped / "gcc").mkdir(parents=True)
+        shutil.copy2(self.compiler, real)
+        wrapper = swapped / "gcc" / "agbcc"
+        wrapper.write_text(f'#!/bin/sh\necho "$0" >> "{marker}"\nexec "{real}" "$@"\n')
+        wrapper.chmod(0o755)
+        original_run = profile._run
+        swaps = []
+
+        def run(command, root, temporary, *rest):
+            if command[0] != str(self.compiler):
+                return original_run(command, root, temporary, *rest)
+            os.rename(self.home / "agbcc", away)
+            os.rename(swapped, self.home / "agbcc")
+            try:
+                return original_run(command, root, temporary, *rest)
+            finally:
+                os.rename(self.home / "agbcc", swapped)
+                os.rename(away, self.home / "agbcc")
+                swaps.append(command[0])
+
+        with patch.dict(os.environ, {"HOME": str(self.home)}), patch.object(profile, "_run", run):
+            capture = FreshCaptureTests.capture(self)
+        self.assertEqual(swaps, [str(self.compiler)])
+        self.assertFalse(marker.exists())
+        tool = capture.fixed.to_dict()["tools"][0]
+        self.assertEqual(tool["resolved"], str(self.compiler))
+        self.assertEqual(tool["pin"]["sha256"], hashlib.sha256(self.compiler.read_bytes()).hexdigest())
+        self.assertNotEqual(tool["pin"]["sha256"], hashlib.sha256(wrapper.read_bytes()).hexdigest())
+        self.assertEqual(len(capture.commands), 7)
+        _, address, size, _, rom = self.cases[0]
+        body = dict(capture.artifacts)["linked_binary"][address % 4:address % 4 + size]
+        self.assertEqual(body, rom[address - profile.ROM_BASE:address - profile.ROM_BASE + size])
+        self.assertEqual(list(self.workspace.iterdir()), [])
 
 
 if __name__ == "__main__":
