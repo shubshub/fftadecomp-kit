@@ -53,6 +53,13 @@ class SwitchCallees:
                 'switch callees require immutable ROM, mapping and index snapshots')
         self.rom, self.mapping, self.index = rom, mapping, index
         self.records = {}
+        self._entries = None
+
+    def entries(self):
+        """The decoded mapping, decoded once: `analyze.refine_function` only reads it."""
+        if self._entries is None:
+            self._entries = json.loads(self.mapping)
+        return self._entries
 
     def inspect(self, proof, address, data):
         """The delegated inspection of a jump-table callee, or None for any other callee."""
@@ -60,7 +67,7 @@ class SwitchCallees:
         import named_data_buffer_profile as named
         require(proof.switch_callees is self and proof.stack_arguments,
                 'switch callees require their plain stack-argument buffer proof')
-        refinement = analyze.refine_function(data, address, json.loads(self.mapping),
+        refinement = analyze.refine_function(data, address, self.entries(),
             max_bytes=len(data), max_instructions=len(data) // 2, rom_end=0x09000000,
             same_owner_long_branches=True, two_constant_word_switch=True)
         if not refinement['word_switches']:
