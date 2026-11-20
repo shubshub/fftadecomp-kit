@@ -1289,6 +1289,9 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x0800D3BC:
         import bg_affine_rows
         records.append(bg_affine_rows.record(root))
+    if address == 0x0800DE70:
+        import scanline_pair
+        records.append(scanline_pair.record(root))
     if address == 0x0800C720:
         import scanline_wave
         records.append(scanline_wave.record(root))
@@ -1541,6 +1544,12 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         import bg_affine_rows
         try:
             hardware_qualifiers.update(bg_affine_rows.qualifier_offsets(text, tree, project, closure))
+        except (OSError, ValueError, ImportError, SystemExit):
+            pass
+    if relpath == 'src/0800DE70.c' and tree is not None and project is not None:
+        import scanline_pair
+        try:
+            hardware_qualifiers.update(scanline_pair.qualifier_offsets(text, tree, project, closure))
         except (OSError, ValueError, ImportError, SystemExit):
             pass
     if relpath == 'src/0800C720.c' and tree is not None and project is not None:
