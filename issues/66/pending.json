@@ -1435,6 +1435,102 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "f4a5e5508578e2b130db3281f4bcdc858da4d01e5c2eaef609e4db5be4154200",
+        "acknowledged_cursor": 7029351736,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "f4a5e5508578e2b130db3281f4bcdc858da4d01e5c2eaef609e4db5be4154200",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0808CBDC\",\"who\":\"astra-0808cbdc\",\"note\":\"Recover complete larger referenced game owner and verify against the original ROM\"}",
+          "created_at": "2026-11-20T03:22:34Z",
+          "id": 7029351366,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T03:22:34Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "38d74897e08190683ca34ea89cbfc0b55bc99c4209db12860f9f1229d9864076",
+        "result": {
+          "address": "0x0808CBDC",
+          "claim_id": 7029351366,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7029351366,
+          "status": "accepted",
+          "who": "astra-0808cbdc"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "7a8e843ec59f522d06d06c8c6fd7b6baa2a20344f8a3a10081f6f3b4223d7ba1",
+        "acknowledged_cursor": 7029351736,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "7a8e843ec59f522d06d06c8c6fd7b6baa2a20344f8a3a10081f6f3b4223d7ba1",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080018A0\",\"who\":\"astra-080018a0\",\"note\":\"Recover complete larger referenced game owner and verify against the original ROM\"}",
+          "created_at": "2026-11-20T03:22:35Z",
+          "id": 7029351558,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T03:22:35Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "38d74897e08190683ca34ea89cbfc0b55bc99c4209db12860f9f1229d9864076",
+        "result": {
+          "address": "0x080018A0",
+          "claim_id": 7029351558,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7029351558,
+          "status": "accepted",
+          "who": "astra-080018a0"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "aac93bfc7252f873d4c7b38a273f21436c42ad74264844cc7115337e0bcef099",
+        "acknowledged_cursor": 7029351736,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "aac93bfc7252f873d4c7b38a273f21436c42ad74264844cc7115337e0bcef099",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080799C0\",\"who\":\"astra-080799c0\",\"note\":\"Recover complete larger referenced game owner and verify against the original ROM\"}",
+          "created_at": "2026-11-20T03:22:36Z",
+          "id": 7029351736,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T03:22:36Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "38d74897e08190683ca34ea89cbfc0b55bc99c4209db12860f9f1229d9864076",
+        "result": {
+          "address": "0x080799C0",
+          "claim_id": 7029351736,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7029351736,
+          "status": "accepted",
+          "who": "astra-080799c0"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
