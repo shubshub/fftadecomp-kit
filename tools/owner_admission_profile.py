@@ -29,6 +29,7 @@ import multiple_switch_native_profile as multiple_native
 import menu_selection_switches as menu_switches
 import menu_runner_switches as menu_runner
 import menu_icon_row
+import menu_item_tile_row as item_tile_row
 import canonical_integer_native_profile as integer_native
 import canonical_integer_pair_native_profile as integer_pair
 import canonical_integer_three_words_native_profile as integer_three
@@ -660,7 +661,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             match.function_address_target(f'func_{destination:08X}', json.loads(mapping),
                                           address, len(data), len(rom))
         # Only the exact named-data-buffer-v1 proof replays loops (loop_replay_manifest below).
-        buffers = named_buffer.NamedDataBufferProof(rom, mapping, index, objects, loop_replay=True) \
+        buffers = item_tile_row.ItemTileRowProof(rom, mapping, index, objects) \
+            if address == item_tile_row.OWNER and selector == named_buffer.SELECTOR else \
+            named_buffer.NamedDataBufferProof(rom, mapping, index, objects, loop_replay=True) \
             if selector == named_buffer.SELECTOR else \
                   (runtime_summary.PROOFS[selector] if selector in runtime_summary.SELECTORS else
                    bios_switch.BiosWordSwitchBufferProof if selector == bios_switch.SELECTOR else
@@ -719,6 +722,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
+        if type(buffers) is item_tile_row.ItemTileRowProof:
+            buffers.bind_row(data, address, calls, bindings)
         if selector == named_buffer.SCRATCH_SELECTOR and address == 0x08132208:
             buffers.action_coordinate_root = address
         if type(buffers) is scaled_polygon.PolygonProof:
@@ -772,6 +777,8 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                  'buffers': {'dependency_budget': buffers.dependency_budget if selector in (named_buffer.GUARDED_ALIAS_SELECTOR, *r6_buffer.PROFILES, *local_calls.SELECTORS) else module.MAX_DEPENDENCIES,
                     'owner_byte_budget': named_buffer.MAX_BYTES,
                     'dependencies': [buffers.records[target] for target in sorted(buffers.records)]}}
+        if type(buffers) is item_tile_row.ItemTileRowProof:
+            proof['buffers']['item_tile_row'] = buffers.row_manifest()
         if buffers.loop_replays:
             # Absent unless a callee was replayed, so reports without a replay keep their meaning.
             proof['buffers']['loop_replay'] = buffers.loop_replay_manifest()
@@ -1578,6 +1585,9 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     actor_shadow = selector == named_buffer.THUNK_ROOT_SCRATCH_SELECTOR and address == 0x08097F04
     if actor_shadow:
         environment_reader = known_query.environment_fingerprint
+    tile_row = selector == named_buffer.SELECTOR and address == item_tile_row.OWNER
+    if tile_row:
+        environment_reader = item_tile_row.environment_fingerprint
     environment=environment_reader() if environment_reader else None
     source=source_fingerprint(root,address);mapping=mapping_snapshot(root);index=index_snapshot(root)
     objects=data_snapshot(root);rom_path=report_rom_path(root);rom=Path(rom_path).read_bytes()
@@ -1706,6 +1716,8 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
             raise ValueError('ordinary overwrite native semantic evidence is stale')
     if actor_shadow and manifest['proof']['environment'] != environment:
         raise ValueError('actor shadow verifier environment changed during compilation')
+    if tile_row and manifest['proof']['buffers']['item_tile_row']['environment'] != environment:
+        raise ValueError('item tile row verifier environment changed during compilation')
     if name_entry and manifest['proof']['environment'] != environment:
         raise ValueError('name entry verifier environment changed during compilation')
     if item_menu and manifest['proof']['environment'] != environment:
