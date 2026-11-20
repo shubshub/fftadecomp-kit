@@ -2479,8 +2479,11 @@ obligations, each with its refusal:
    pointer-bearing local word"). So does a callee that may read a register
    holding a stack address ("receives a stack address"), since the core bounds
    its writes against slots it does not have.
-7. **Release.** After `add sp`/`pop` releases a pointer word, a call or any SP
+7. **Release.** After `add sp` releases a pointer word, a call or any SP
    move down refuses, so no released address is read back while the owner runs.
+   A `pop` that reads a word that may be pointer-bearing refuses ("pop of the
+   pointer-bearing local word"), as the core refuses a pop of its own pointer
+   slots: the popped register, PC included, would hold an address no check sees.
 8. **Possible stack addresses.** The core keeps some registers as exact stack
    aliases that the analysis cannot pin to one value: the aliases a walked
    callee returns (on some return paths, in any alternative), which the core

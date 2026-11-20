@@ -44,8 +44,10 @@ F6. At a call while a word is pointer-bearing, a pointer-bearing word inside the
     A call this analysis does not walk, other than a proved ROM table copy, is trusted, as the
     core trusts every callee it does not walk, to return no address into the caller's frame;
     the report lists those calls.
-F7. Releasing SP over a pointer-bearing word (pop, `add sp`) forbids any later call or SP move
-    down, so no released stack address is read back while the owner runs.
+F7. Releasing SP over a pointer-bearing word (`add sp`) forbids any later call or SP move
+    down, so no released stack address is read back while the owner runs.  A pop that reads a
+    word which may be pointer-bearing refuses, as the core refuses one over its own pointer
+    slots: the register, PC included, would hold a stack address no check here could see.
 F8. A *possible* stack address is a register the core may hold as an exact stack alias that
     this analysis cannot pin to one value: a stack alias the core keeps from a call's result
     (``Policy.note_returned``, every alternative included) or a join of an exact alias with a
@@ -659,6 +661,12 @@ class FrameWordsAnalysis(sip.Analysis):
                 if len(pointer) > 1 and not (raw & 0x800 and raw & (1 << base)):
                     # Written back past the words, as the core moves its exact alias.
                     moved = (base, possible(offset + 4 * count for offset in pointer[1]))
+        if raw & 0xFE00 == 0xBC00:
+            floor = -4 * sip.depth(state)
+            word = self.pointer_overlap(state, floor, floor + 4 * bin(raw & 0x1FF).count("1"))
+            if word is not None:
+                # The core pops into TOP: the register would hold a stack address unseen (F7).
+                self.fail(f"pop of the pointer-bearing local word at entry-SP{word:+d}")
         if state.released and sip.moves_sp_down(raw):
             self.fail("the owner moves SP down after releasing a pointer-bearing local word")
         before = sip.depth(state)

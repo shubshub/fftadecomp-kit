@@ -926,5 +926,66 @@ class ShadowedRefusalTests(unittest.TestCase):
         self.assertEqual(copy(0x9000, -12, 4)['pointer_words'], [-16])
 
 
+class PoppedPointerWordTests(unittest.TestCase):
+    """F7: a pop never reads a word that may be pointer-bearing."""
+
+    def test_a_pop_of_a_pointer_word_refuses(self):
+        # The core pops into an unknown scalar, so a popped pointer word would be a stack address
+        # no check sees.  <release>; movs r2,#0; <use>; pop {r4-r7}; pop {r1}; bx r1, where
+        # add sp,#12; pop {r1} reads the pointer word at sp+12 (entry_SP-24).
+        spill = (0x4668, 0x9003) + ACCESS
+
+        def popped(*use, body=spill, release=(0xb003, 0xbc02), index=MASKED):
+            return frame_owner(body, tail=release + (0x2200,) + use + (0xbcf0, 0xbc02, 0x4708),
+                               index=index)
+        walked = callee(0x4770)
+        cases = {
+            'str over the saved r4': (popped(0x610A), {}),                 # str r2,[r1,#16]
+            'str over the saved lr': (popped(0x620A), {}),                 # str r2,[r1,#32]
+            'strb': (popped(0x740A), {}),
+            'strh': (popped(0x820A), {}),
+            'register offset': (popped(0x2310, 0x50CA), {}),               # movs r3,#16; str r2,[r1,r3]
+            'stmia': (popped(0xC104), {}),                                 # stmia r1!,{r2}
+            'a copy': (popped(0x1C0B, 0x611A), {}),                        # adds r3,r1,#0; str r2,[r3,#16]
+            'a load of the saved lr': (popped(0x6A0A), {}),                # ldr r2,[r1,#32]
+            'never used': (popped(), {}),
+            'the last of four': (popped(0x611A, release=(0xbc0f,)), {}),   # pop {r0-r3}; str r2,[r3,#16]
+            'one word at a time': (popped(0x610A, release=(0xbc01, 0xbc01, 0xbc01, 0xbc02)), {}),
+            'into r4': (popped(0x6122, release=(0xb003, 0xbc10)), {}),     # str r2,[r4,#16]
+            'after a push and pop': (popped(0x610A, release=(0xb401, 0xbc01, 0xb003, 0xbc02)), {}),
+            # str r0,[sp,#8] too: add sp,#12 releases that pointer word first (released frame)
+            'after a release': (popped(0x610A, body=(0x4668, 0x9003, 0x9002) + ACCESS), {}),
+            # add sp,#12; pop {r0,r4-r7}; pop {r1}; bx r1: the address is returned in R0
+            'the first of five': (frame_owner(spill, tail=(0xb003, 0xbcf1, 0xbc02, 0x4708)), {}),
+            # cmp r4,#0; beq; mov r0,sp; str r0,[sp,#12]: pointer-bearing on one path only
+            'a maybe pointer word': (popped(0x610A, body=(0x2C00, 0xD001, 0x4668, 0x9003) + ACCESS), {}),
+            'a call before': (popped(0x610A, body=(0x4668, 0x9003, CALLEE) + ACCESS), walked),
+            # mov r0,sp; bl callee; str r0,[sp,#12]: the core's returned alias, spilled
+            'a returned alias': (popped(0x610A, body=(0x4668, CALLEE, 0x9003) + ACCESS), walked),
+        }
+        for selector in sip.SELECTORS:
+            for name, (code, extra) in cases.items():
+                with self.subTest(selector=selector, case=name):
+                    with self.assertRaisesRegex(sip.Refusal, 'pop of the pointer-bearing local word at '
+                                                'entry-SP-24'):
+                        admit(code, selector=selector, **extra)
+            with self.subTest(selector=selector, case='a ranged spill'):
+                # mov r1,sp; adds r1,r1,r4; str r1,[sp,#12]; movs r0,#7; strb r0,[r1] (twice);
+                # ldr r2,[sp,#12]; ldrb r0,[r2]: both analyses refuse, so the plain refusal is the
+                # one reported.
+                body = (0x4669, 0x1909, 0x9103, 0x2007, 0x7008, 0x7008, 0x9A03, 0x7810)
+                with self.assertRaisesRegex(sip.Refusal, 'ranged stack address escapes to memory'):
+                    admit(popped(0x610A, body=body, index=RANGED), selector=selector)
+        # Popped into PC: push {lr}; sub sp,#4; mov r0,sp; str r0,[sp,#0]; pop {pc}
+        data = assemble(OWNER, (0xB500, 0xB081, 0x4668, 0x9000, 0xBD00))
+        with self.assertRaisesRegex(sip.Refusal, 'pop of the pointer-bearing local word at entry-SP-8'):
+            fw.FrameWordsAnalysis(data, OWNER, frozenset(), frozenset(), {}, spills={OWNER + 6}).run()
+        # Popping a scalar word, or any word beside a live pointer word, is no pop of one; and
+        # add sp releases a pointer word without reading it.
+        admit(popped(0x610A, body=(0x2000, 0x9003) + ACCESS))             # movs r0,#0; str r0,[sp,#12]
+        admit(frame_owner(spill + (0xB401, 0xBC01)))                       # push {r0}; pop {r0}
+        admit(frame_owner(spill))
+
+
 if __name__ == '__main__':
     unittest.main()
