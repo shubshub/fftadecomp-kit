@@ -98,7 +98,7 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             udivsi3_schema, udivsi3_fingerprint, udivsi3_manifest,
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
                             function_address_fingerprint, function_address_manifest,
-                            mapping_snapshot, source_fingerprint, source_paths, report_rom_path,
+                            mapping_snapshot, source_fingerprint, source_paths, report_rom_path, report_source,
                             verify_dependencies, carry_volatile_records)
 
 try:
@@ -1658,9 +1658,11 @@ def verify_addressed_modsi3_source(root, address, data, rom, mapping, source_dig
                                      f"0x{address:08X}", "--json"] +
                                     [str(path) for path in source_paths(captured, address)],
                                     capture_output=True, text=True)
-            findings, _ = plausibility_result(result, address)
-            if findings or source_fingerprint(captured, address) != source_digest:
-                raise ValueError("addressed-runtime snapshot changed or source is implausible")
+            # the report this replays says `hand-asm allow list: not listed`, so the
+            # fresh checker must find no allow entry as well as no findings
+            findings, allowed = plausibility_result(result, address)
+            if findings or allowed is not None or source_fingerprint(captured, address) != source_digest:
+                raise ValueError("addressed-runtime snapshot changed or source is implausible or allow-listed")
         if source_fingerprint(root, address) != source_digest or \
                 mapping_snapshot(root) != mapping or report_rom_path(root) != selected_rom or \
                 Path(selected_rom).read_bytes() != rom:
@@ -1772,9 +1774,11 @@ def verify_divsi3_source(root, address, data, rom, mapping, source_digest, manif
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
                 [str(path) for path in source_paths(captured, address)], captured, SIGNED_REPLAY_TIMEOUT)
-            findings, _ = plausibility_result(result, address)
-            if findings or source_fingerprint(captured, address) != source_digest:
-                raise ValueError("signed quotient captured source changed or is implausible")
+            # the report this replays says `hand-asm allow list: not listed`, so the
+            # fresh checker must find no allow entry as well as no findings
+            findings, allowed = plausibility_result(result, address)
+            if findings or allowed is not None or source_fingerprint(captured, address) != source_digest:
+                raise ValueError("signed quotient captured source changed, is implausible or is allow-listed")
         if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
                 report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
             raise ValueError("signed quotient replay inputs changed")
@@ -1829,9 +1833,11 @@ def verify_udivsi3_source(root, address, data, rom, mapping, source_digest, mani
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
                 [str(path) for path in source_paths(captured, address)], captured, SIGNED_REPLAY_TIMEOUT)
-            findings, _ = plausibility_result(result, address)
-            if findings or source_fingerprint(captured, address) != source_digest:
-                raise ValueError("unsigned quotient captured source changed or is implausible")
+            # the report this replays says `hand-asm allow list: not listed`, so the
+            # fresh checker must find no allow entry as well as no findings
+            findings, allowed = plausibility_result(result, address)
+            if findings or allowed is not None or source_fingerprint(captured, address) != source_digest:
+                raise ValueError("unsigned quotient captured source changed, is implausible or is allow-listed")
         if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
                 report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
             raise ValueError("unsigned quotient replay inputs changed")
@@ -1889,9 +1895,11 @@ def verify_umodsi3_source(root, address, data, rom, mapping, data_mapping, sourc
             result = _run_replay_process(
                 [sys.executable, str(checker), "--quiet", "--addr", f"0x{address:08X}", "--json"] +
                 [str(path) for path in source_paths(captured, address)], captured, SIGNED_REPLAY_TIMEOUT)
-            findings, _ = plausibility_result(result, address)
-            if findings or source_fingerprint(captured, address) != source_digest:
-                raise ValueError("unsigned remainder captured source changed or is implausible")
+            # the report this replays says `hand-asm allow list: not listed`, so the
+            # fresh checker must find no allow entry as well as no findings
+            findings, allowed = plausibility_result(result, address)
+            if findings or allowed is not None or source_fingerprint(captured, address) != source_digest:
+                raise ValueError("unsigned remainder captured source changed, is implausible or is allow-listed")
         if source_fingerprint(root, address) != source_digest or mapping_snapshot(root) != mapping or \
                 data_snapshot(root) != data_mapping or \
                 report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
@@ -5641,6 +5649,9 @@ def verify_leaf(data, address, thumb):
 
 def lcs_align(a, b):
     """align two sequences, reporting which elements are shared"""
+    if a == b:
+        # what the table below yields for equal sequences, without its n*m cost
+        return [("same", x, x) for x in a]
     n, m = len(a), len(b)
     dp = [[0] * (m + 1) for _ in range(n + 1)]
     for i in range(n - 1, -1, -1):
@@ -5741,6 +5752,241 @@ def switch_u16_scalar_configuration(args):
         raise ValueError("u16 switch-data requires its isolated explicit selector and fixed Thumb toolchain")
 
 
+REPORT_LISTING_WIDTH = 40
+
+
+def report_listing(instructions, want, addr, span, thumb):
+    """The compiled-against-ROM rows of a report's listing.
+
+    Returns (rows, identical instructions, ROM instructions).  match.py prints
+    the rows and writes them, right-stripped, into the report; a replay
+    re-renders them from its own verified instructions.
+    """
+    ga = [(instruction.address, instruction.size,
+           f"{instruction.mnemonic} {instruction.op_str}".strip())
+          for instruction in instructions]
+    wa = [row for address, size, _ in ga
+          for row in disasm(want[address - addr:address - addr + size], address, thumb)]
+    gbytes = [t for _, _, t in ga]
+    wbytes = [t for _, _, t in wa]
+    past_end = {i for i, (a, _, _) in enumerate(ga) if a >= addr + span}
+    rows = lcs_align(gbytes, wbytes)
+
+    width = REPORT_LISTING_WIDTH
+    lines, gi, wi = [], 0, 0
+    for kind, _, _ in rows:
+        g = gbytes[gi] if gi < len(gbytes) else ""
+        w = wbytes[wi] if wi < len(wbytes) else ""
+        if kind == "same":
+            lines.append(f"{g:<{width}}{w}")
+        elif kind == "got":
+            over = "  (past the ROM function)" if gi in past_end else ""
+            lines.append(f"{g:<{width}}{'':<{width}}  <- extra in compiled{over}")
+        else:
+            lines.append(f"{'':<{width}}{w:<{width}}  <- missing from compiled")
+        gi += 1 if kind != "want" else 0
+        wi += 1 if kind != "got" else 0
+    return lines, sum(1 for k, _, _ in rows if k == "same"), len(wbytes)
+
+
+def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, got_body, verdict,
+                  same_bytes, listing, label=None, plausible=True, volatile_records=(),
+                  hand_asm_allowed=None, findings=(), flash_evidence=None, empty_profile=False,
+                  mapping=None, empty_index=None, control_flow=None, framed_profile=False,
+                  buffer_proof=None, mapped=False, self_sites=frozenset(), data_profile=False,
+                  data_mapping=None, data_buffer_evidence=None, address_manifest=None,
+                  switches=False, switch_evidence=None, preloaded_profile=False,
+                  thunk_switch_selector=None, float_evidence=None, rom=None, shift_evidence=None,
+                  shift_profile=None, shift_options=None, unsigned_remainder_evidence=None,
+                  udivsi3_bindings=False, division_evidence=None, unsigned_quotient_profile=None,
+                  remainder_evidence=None, quotient_evidence=None, signed_quotient_profile=None,
+                  spin_profile=False, spin_evidence=None, function_index=None, double_profile=False,
+                  double_evidence=None, thunk_profile=False, function_address_profile=None,
+                  thunk_evidence=None, unit_context=None, unit_orphan=None):
+    """The complete text of a match report.
+
+    match.py writes exactly this (or, with --check-report, compares it with
+    the saved report), and the cached replays in match_evidence and the
+    profiles re-render it from the evidence they re-verified and compare the
+    whole text (match_evidence.closed_report says which two compile-derived
+    choices a replay that does not compile takes from the report).  The
+    keyword names are main()'s; `mapped` and `switches` are the conditions
+    main() tests for the mapping and switch blocks.
+    """
+    out = []
+    out.append(f"# match report - 0x{addr:08X}"
+               f"{' (' + label + ')' if label else ''}\n\n")
+    out.append(f"* source: `{src_rel}`\n")
+    out.append(f"* verification: `{schema}`\n")
+    if flash_evidence is not None:
+        flash_label = {0x081418C0:"ID reader", 0x08141EB8:"chip reader", 0x08141F2C:"sector reader",
+                       0x08142160:"sector programmer", 0x08142000:"retry sector programmer"}[addr]
+        out.append(f"* flash {flash_label}: `{library_units.canonical(flash_evidence)}`\n")
+    out.append(f"* source SHA-256: `{fingerprint}`\n")
+    if empty_profile:
+        out.append(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+        out.append(f"* control flow: {control_flow}\n")
+        out.append(f"* empty body: {empty_body.SUMMARY}\n")
+    if framed_profile:
+        out.append(f"* stack frame: {STACK_SUMMARY}\n")
+    if buffer_proof is not None and buffer_proof.dependencies:
+        summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
+        out.append(f"* buffer calls: {summary}\n")
+        out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
+        for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
+            out.append(line + "\n")
+    if mapped:
+        out.append(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
+        out.append(f"* control flow: {control_flow}\n")
+        if self_sites:
+            out.append(f"* self calls: {SELF_CALL_SUMMARY}\n")
+            out.append(f"* self call sites: `{self_call_sites_text(self_sites, addr)}`\n")
+    if data_profile:
+        out.append(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
+    if data_buffer_evidence is not None:
+        for line in data_buffer.report_lines(schema, addr, got_body, data_buffer_evidence, fingerprint,
+                                             mapping, data_mapping, buffer_proof.fingerprint()):
+            out.append(line + "\n")
+    elif address_manifest is not None:
+        encoded_manifest = function_address_manifest(address_manifest)
+        out.append(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
+        out.append(f"* function address manifest: `{encoded_manifest}`\n")
+        proof_digest = function_address_fingerprint(
+            addr, got_body, address_manifest,
+            framed=schema == FRAMED_FUNCTION_ADDRESS_SCHEMA)
+        out.append(f"* function address proof SHA-256: `{proof_digest}`\n")
+        if schema == FUNCTION_BUFFER_SCHEMA:
+            proof_digest = function_buffer_fingerprint(
+                addr, got_body, address_manifest, fingerprint, mapping,
+                buffer_proof.fingerprint())
+            out.append(f"* function buffer proof SHA-256: `{proof_digest}`\n")
+    if switches:
+        summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
+                   switch_data_thunks.SUMMARIES[thunk_switch_selector] if "thunk_policy" in switch_evidence else
+                   typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else
+                   (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
+                    SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY)
+                   if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
+                   pool_switch_frame.summary(switch_evidence) if "stack_policy" in switch_evidence else
+                   (SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
+                    SWITCH_FUNCTION_U16_SCALAR_SUMMARY) if "function_policy" in switch_evidence else
+                   SWITCH_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
+                   SWITCH_U16_SCALAR_SUMMARY if "scalar_policy" in switch_evidence else
+                   SWITCH_MULTIPLE_DATA_SUMMARY if "data_policy" in switch_evidence else
+                   SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
+        out.append(f"* switches: {summary}\n")
+        out.append(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
+        if "wide_scalar_policy" in switch_evidence:
+            out.append(f"{wide_scalars.report_line()}\n")
+        if "thunk_policy" in switch_evidence:
+            # kit #393: each load-bearing thunk store premise, as the manifest derives it
+            for line in switch_data_thunks.premise_lines(addr, switch_evidence):
+                out.append(f"{line}\n")
+        fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
+                              switch_data_thunks.fingerprint if "thunk_policy" in switch_evidence else
+                              typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else
+                              switch_function_u16_scalar_fingerprint if "function_policy" in switch_evidence else
+                              pool_switch_frame.fingerprint if "stack_policy" in switch_evidence else
+                              switch_pool_u16_scalar_fingerprint if "pool_policy" in switch_evidence else
+                              switch_u16_scalar_fingerprint if "scalar_policy" in switch_evidence else
+                              switch_multiple_data_fingerprint if "data_policy" in switch_evidence else
+                              switch_data_fingerprint if data_profile else switch_fingerprint)
+        proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
+        out.append(f"* switch proof SHA-256: `{proof_digest}`\n")
+    if float_evidence is not None:
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+        out.append(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+        out.append(f"* software float: {software_float.SUMMARY}\n")
+        out.append(f"* software float manifest: `{software_float.manifest_text(float_evidence)}`\n")
+        proof_digest = software_float.fingerprint(addr, got_body, float_evidence, fingerprint,
+                                                  mapping, empty_index, data_mapping, rom)
+        out.append(f"* software float proof SHA-256: `{proof_digest}`\n")
+    if shift_evidence is not None:
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
+        out.append(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+        out.append(f"* {shift_profile.NAME}: {shift_profile.SUMMARY}\n")
+        out.append(f"* {shift_profile.NAME} manifest: `{shift_profile.manifest_text(shift_evidence)}`\n")
+        proof_digest = shift_profile.fingerprint(addr, got_body, shift_evidence, fingerprint,
+                                                 mapping, empty_index, data_mapping, rom, **shift_options)
+        out.append(f"* {shift_profile.NAME} proof SHA-256: `{proof_digest}`\n")
+    if unsigned_remainder_evidence is not None:
+        out.append(f"* unsigned remainder: {umodsi3.SUMMARY}\n")
+        out.append(f"* unsigned remainder manifest: `{umodsi3.manifest_text(unsigned_remainder_evidence)}`\n")
+        proof_digest = umodsi3.fingerprint(addr, got_body, unsigned_remainder_evidence)
+        out.append(f"* unsigned remainder proof SHA-256: `{proof_digest}`\n")
+    if udivsi3_bindings:
+        summary = UDIVSI3_FRAMED_SUMMARY if unsigned_quotient_profile else UDIVSI3_SUMMARY
+        out.append(f"* unsigned division: {summary}\n")
+        out.append(f"* unsigned division manifest: `{udivsi3_manifest(division_evidence)}`\n")
+        proof_digest = udivsi3_fingerprint(addr, got_body, division_evidence,
+                                         selector=unsigned_quotient_profile)
+        out.append(f"* unsigned division proof SHA-256: `{proof_digest}`\n")
+    if remainder_evidence is not None:
+        out.append(f"* signed remainder: {modsi3.SUMMARY}\n")
+        out.append(f"* signed remainder manifest: `{modsi3.manifest_text(remainder_evidence)}`\n")
+        proof_digest = modsi3.fingerprint(addr, got_body, remainder_evidence)
+        out.append(f"* signed remainder proof SHA-256: `{proof_digest}`\n")
+    if quotient_evidence is not None:
+        summary = divsi3.summary(signed_quotient_profile, "switch" in quotient_evidence)
+        out.append(f"* signed quotient: {summary}\n")
+        out.append(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
+        proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence,
+                                           selector=signed_quotient_profile)
+        out.append(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
+    if spin_profile:
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+        out.append(f"* inert spins: {inert_spin.summary(spin_evidence)}\n")
+        out.append(f"* inert spin manifest: `{inert_spin.manifest_text(spin_evidence)}`\n")
+        proof_digest = inert_spin.fingerprint(addr, got_body, spin_evidence, fingerprint,
+                                              mapping, function_index, data_mapping=data_mapping)
+        out.append(f"* inert spin proof SHA-256: `{proof_digest}`\n")
+    if double_profile:
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+        out.append(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+        out.append(f"* software double: {software_double.summary(double_evidence)}\n")
+        out.append(f"* software double ABI: `{software_double.ABI}`\n")
+        out.append(f"* software double runtime: `{software_double.RUNTIME}`\n")
+        out.append(f"* software double semantics: `{software_double.SEMANTICS}`\n")
+        out.append(f"* software double manifest: `{software_double.manifest_text(double_evidence)}`\n")
+        proof_digest = software_double.fingerprint(addr, got_body, double_evidence, fingerprint,
+                                                   mapping, function_index, rom, data_mapping=data_mapping)
+        out.append(f"* software double proof SHA-256: `{proof_digest}`\n")
+    if thunk_profile:
+        out.append(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
+        out.append(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
+        out.append(f"* function-address thunks: {function_address_profile}\n")
+        out.append(f"* function-address-thunk manifest: `{function_thunk.manifest_text(thunk_evidence)}`\n")
+        proof_digest = function_thunk.fingerprint(addr, got_body, thunk_evidence, fingerprint,
+                                                  mapping, function_index, data_mapping, rom)
+        out.append(f"* function-address-thunk sha256: `{proof_digest}`\n")
+    if unit_context is not None:
+        for line in library_units.report_lines(unit_context, unit_orphan):
+            out.append(line + "\n")
+    out.append(f"* compiler: `{compiler}`\n")
+    out.append(f"* verified extent: complete ELF function symbol, including literal pools\n")
+    out.append(f"* relocations: none\n")
+    out.append(f"* ROM bytes: `{want.hex()}` ({span} bytes)\n")
+    out.append(f"* compiled : `{got_body.hex()}`\n")
+    out.append(f"* source plausibility: "
+               f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n")
+    for record in volatile_records:
+        out.append(f"{record}\n")
+    out.append(f"* hand-asm allow list: "
+               f"{'listed (' + str(hand_asm_allowed.get('reason', 'no reason recorded')) + ')' if hand_asm_allowed else 'not listed'}\n\n")
+    out.append(f"**{verdict}** - {same_bytes}/{len(want)} bytes\n")
+    if findings:
+        out.append("\nplausibility findings:\n\n")
+        for line in findings:
+            out.append(f"- {line.strip()}\n")
+    out.append("\n```\n")
+    out.append(f"{'compiled':<{REPORT_LISTING_WIDTH}}rom\n")
+    for line in listing:
+        out.append(line.rstrip() + "\n")
+    out.append("```\n")
+    return "".join(out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("addr")
@@ -5776,6 +6022,9 @@ def main():
                                                          DEFAULT_WSL_PATH))
     ap.add_argument("--label", default="")
     ap.add_argument("--no-write", action="store_true")
+    ap.add_argument("--check-report", action="store_true",
+                    help="render the report and require it to equal the saved docs/match report "
+                         "instead of writing it (implies --no-write)")
     ap.add_argument("--emit", help="write verified symbol bytes to a new file under the decomp build/")
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"),
                     help="decomp repo (default: current directory)")
@@ -5865,6 +6114,8 @@ def main():
                                                       "descriptor-cursor-value-v1",
                                                       "private-float-unpack-pack-v1", "private-float-extension-v1", "private-float-comparison-v1", "private-double-comparison-v1", "private-float-scalar-conversion-v1", "private-double-scalar-conversion-v1", "private-double-unpack-pack-v1", "private-double-truncation-v1", "private-double-scalar-pack-v1", "private-scalar-division-byte-locals-v1", "private-float-selected-record-v1", "private-double-inline-division-v1", "private-double-selected-record-v1", "private-float-inline-division-v1", "libgcc-divdi3-v1", "private-float-unsigned-conversion-v1"))
     args = ap.parse_args()
+    if args.check_report:
+        args.no_write = True
     isolated_signed = {signed_divmod.odd_remainder.SELECTOR: 'bounded odd remainder',
                        signed_divmod.shuffle.SELECTOR: 'installed action shuffle',
                        signed_divmod.active_selection.SELECTOR: 'active template selection',
@@ -5994,13 +6245,10 @@ def main():
     # one file per function, grouped into folders by module - the folder is
     # evidence, not decoration, so look for the source rather than assuming it
     # sits at the top of src/
-    candidates = [os.path.join(ROOT, "src", f"{addr:08X}.c")]
-    for path in sorted(Path(ROOT, "src").rglob(f"{addr:08X}.c")):
-        candidates.append(str(path))
-    src_abs = next((c for c in candidates if os.path.exists(c)), None)
-    if not src_abs:
-        sys.exit(f"no source for 0x{addr:08X} under src/")
-    src_rel = os.path.relpath(src_abs, ROOT).replace(os.sep, "/")
+    try:
+        src_rel = report_source(ROOT, addr)
+    except ValueError as error:
+        sys.exit(str(error))
     fingerprint = source_fingerprint(ROOT, addr)
     mapping = mapping_snapshot(ROOT)
     data_mapping = data_snapshot(ROOT)
@@ -6700,218 +6948,61 @@ def main():
         print(f"\nhand-asm allow entry for 0x{addr:08X}: "
               f"{hand_asm_allowed.get('reason', 'no reason recorded')}")
 
-    ga = [(instruction.address, instruction.size,
-           f"{instruction.mnemonic} {instruction.op_str}".strip())
-          for instruction in verified_instructions]
-    wa = [row for address, size, _ in ga
-          for row in disasm(want[address - addr:address - addr + size], address, thumb)]
-    gbytes = [t for _, _, t in ga]
-    wbytes = [t for _, _, t in wa]
-    past_end = {i for i, (a, _, _) in enumerate(ga) if a >= addr + span}
-    rows = lcs_align(gbytes, wbytes)
-
-    width = 40
-    lines, gi, wi = [], 0, 0
-    for kind, _, _ in rows:
-        g = gbytes[gi] if gi < len(gbytes) else ""
-        w = wbytes[wi] if wi < len(wbytes) else ""
-        if kind == "same":
-            lines.append(f"{g:<{width}}{w}")
-        elif kind == "got":
-            over = "  (past the ROM function)" if gi in past_end else ""
-            lines.append(f"{g:<{width}}{'':<{width}}  <- extra in compiled{over}")
-        else:
-            lines.append(f"{'':<{width}}{w:<{width}}  <- missing from compiled")
-        gi += 1 if kind != "want" else 0
-        wi += 1 if kind != "got" else 0
-
+    lines, same_instr, want_instr = report_listing(verified_instructions, want, addr, span, thumb)
+    width = REPORT_LISTING_WIDTH
     print(f"{'compiled':<{width}}rom")
     print(f"{'-' * width}{'-' * 40}")
     for line in lines:
         print(line)
 
     same_bytes = sum(1 for k, _, _ in byte_rows if k == "same")
-    same_instr = sum(1 for k, _, _ in rows if k == "same")
-    print(f"\n{same_instr}/{len(wbytes)} instructions identical "
+    print(f"\n{same_instr}/{want_instr} instructions identical "
           f"({same_bytes}/{len(want)} bytes)")
 
     if exploratory:
         print("\nno report written: exploration with a non-default toolchain")
-    elif not args.no_write:
+    elif not args.no_write or args.check_report and exact:
         label = f".{args.label}" if args.label else ""
         out = os.path.join(ROOT, "docs", "match", f"{addr:08X}{label}.md")
-        os.makedirs(os.path.dirname(out), exist_ok=True)
-        with open(out, "w", encoding="utf-8", newline="\n") as f:
-            f.write(f"# match report - 0x{addr:08X}"
-                    f"{' (' + args.label + ')' if args.label else ''}\n\n")
-            f.write(f"* source: `{src_rel}`\n")
-            f.write(f"* verification: `{schema}`\n")
-            if flash_evidence is not None:
-                label = {0x081418C0:"ID reader", 0x08141EB8:"chip reader", 0x08141F2C:"sector reader", 0x08142160:"sector programmer",
-                         0x08142000:"retry sector programmer"}[addr]
-                f.write(f"* flash {label}: `{library_units.canonical(flash_evidence)}`\n")
-            f.write(f"* source SHA-256: `{fingerprint}`\n")
-            if empty_profile:
-                f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
-                f.write(f"* control flow: {control_flow}\n")
-                f.write(f"* empty body: {empty_body.SUMMARY}\n")
-            if framed_profile:
-                f.write(f"* stack frame: {STACK_SUMMARY}\n")
-            if buffer_proof.dependencies:
-                summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
-                f.write(f"* buffer calls: {summary}\n")
-                f.write(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-                for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
-                    f.write(line + "\n")
-            if linked_profile or data_profile or function_relocations or switch_relocations or spin_profile:
-                f.write(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
-                f.write(f"* control flow: {control_flow}\n")
-                if self_sites:
-                    f.write(f"* self calls: {SELF_CALL_SUMMARY}\n")
-                    f.write(f"* self call sites: `{self_call_sites_text(self_sites, addr)}`\n")
-            if data_profile:
-                f.write(f"* data symbols SHA-256: `{mapping_fingerprint(data_mapping)}`\n")
-            if data_buffer_evidence is not None:
-                for line in data_buffer.report_lines(schema, addr, got_body, data_buffer_evidence, fingerprint,
-                                                     mapping, data_mapping, buffer_proof.fingerprint()):
-                    f.write(line + "\n")
-            elif address_manifest is not None:
-                encoded_manifest = function_address_manifest(address_manifest)
-                f.write(f"* function addresses: {FUNCTION_ADDRESS_SUMMARY}\n")
-                f.write(f"* function address manifest: `{encoded_manifest}`\n")
-                proof_digest = function_address_fingerprint(
-                    addr, got_body, address_manifest,
-                    framed=schema == FRAMED_FUNCTION_ADDRESS_SCHEMA)
-                f.write(f"* function address proof SHA-256: `{proof_digest}`\n")
-                if schema == FUNCTION_BUFFER_SCHEMA:
-                    proof_digest = function_buffer_fingerprint(
-                        addr, got_body, address_manifest, fingerprint, mapping,
-                        buffer_proof.fingerprint())
-                    f.write(f"* function buffer proof SHA-256: `{proof_digest}`\n")
-            if switch_relocations and quotient_evidence is None and buffer_proof.owner_switch is None:
-                summary = (PRELOADED_SWITCH_SUMMARY if preloaded_profile else
-                           switch_data_thunks.SUMMARIES[thunk_switch_selector] if "thunk_policy" in switch_evidence else
-                           typed_switch_frame.SUMMARY if "frame_policy" in switch_evidence else
-                           (SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
-                            SWITCH_FUNCTION_FRAME_U16_SCALAR_SUMMARY)
-                           if "stack_policy" in switch_evidence and "function_policy" in switch_evidence else
-                           pool_switch_frame.summary(switch_evidence) if "stack_policy" in switch_evidence else
-                           (SWITCH_FUNCTION_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
-                            SWITCH_FUNCTION_U16_SCALAR_SUMMARY) if "function_policy" in switch_evidence else
-                           SWITCH_POOL_U16_SCALAR_SUMMARY if "pool_policy" in switch_evidence else
-                           SWITCH_U16_SCALAR_SUMMARY if "scalar_policy" in switch_evidence else
-                           SWITCH_MULTIPLE_DATA_SUMMARY if "data_policy" in switch_evidence else
-                           SWITCH_DATA_SUMMARY if data_profile else SWITCH_SUMMARY)
-                f.write(f"* switches: {summary}\n")
-                f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
-                if "wide_scalar_policy" in switch_evidence:
-                    f.write(f"{wide_scalars.report_line()}\n")
-                if "thunk_policy" in switch_evidence:
-                    for line in switch_data_thunks.premise_lines(addr, switch_evidence):
-                        f.write(f"{line}\n")
-                fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
-                                      switch_data_thunks.fingerprint if "thunk_policy" in switch_evidence else
-                                      typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else
-                                      switch_function_u16_scalar_fingerprint if "function_policy" in switch_evidence else
-                                      pool_switch_frame.fingerprint if "stack_policy" in switch_evidence else
-                                      switch_pool_u16_scalar_fingerprint if "pool_policy" in switch_evidence else
-                                      switch_u16_scalar_fingerprint if "scalar_policy" in switch_evidence else
-                                      switch_multiple_data_fingerprint if "data_policy" in switch_evidence else
-                                      switch_data_fingerprint if data_profile else switch_fingerprint)
-                proof_digest = fingerprint_switch(addr, got_body, switch_evidence)
-                f.write(f"* switch proof SHA-256: `{proof_digest}`\n")
-            if float_evidence is not None:
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
-                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* software float: {software_float.SUMMARY}\n")
-                f.write(f"* software float manifest: `{software_float.manifest_text(float_evidence)}`\n")
-                proof_digest = software_float.fingerprint(addr, got_body, float_evidence, fingerprint,
-                                                          mapping, empty_index, data_mapping, rom)
-                f.write(f"* software float proof SHA-256: `{proof_digest}`\n")
-            if shift_evidence is not None:
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(empty_index)}`\n")
-                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* {shift_profile.NAME}: {shift_profile.SUMMARY}\n")
-                f.write(f"* {shift_profile.NAME} manifest: `{shift_profile.manifest_text(shift_evidence)}`\n")
-                proof_digest = shift_profile.fingerprint(addr, got_body, shift_evidence, fingerprint,
-                                                         mapping, empty_index, data_mapping, rom, **shift_options)
-                f.write(f"* {shift_profile.NAME} proof SHA-256: `{proof_digest}`\n")
-            if unsigned_remainder_evidence is not None:
-                f.write(f"* unsigned remainder: {umodsi3.SUMMARY}\n")
-                f.write(f"* unsigned remainder manifest: `{umodsi3.manifest_text(unsigned_remainder_evidence)}`\n")
-                proof_digest = umodsi3.fingerprint(addr, got_body, unsigned_remainder_evidence)
-                f.write(f"* unsigned remainder proof SHA-256: `{proof_digest}`\n")
-            if udivsi3_bindings:
-                summary = UDIVSI3_FRAMED_SUMMARY if args.unsigned_quotient_profile else UDIVSI3_SUMMARY
-                f.write(f"* unsigned division: {summary}\n")
-                f.write(f"* unsigned division manifest: `{udivsi3_manifest(division_evidence)}`\n")
-                proof_digest = udivsi3_fingerprint(addr, got_body, division_evidence,
-                                                 selector=args.unsigned_quotient_profile)
-                f.write(f"* unsigned division proof SHA-256: `{proof_digest}`\n")
-            if remainder_evidence is not None:
-                f.write(f"* signed remainder: {modsi3.SUMMARY}\n")
-                f.write(f"* signed remainder manifest: `{modsi3.manifest_text(remainder_evidence)}`\n")
-                proof_digest = modsi3.fingerprint(addr, got_body, remainder_evidence)
-                f.write(f"* signed remainder proof SHA-256: `{proof_digest}`\n")
-            if quotient_evidence is not None:
-                summary = divsi3.summary(args.signed_quotient_profile, "switch" in quotient_evidence)
-                f.write(f"* signed quotient: {summary}\n")
-                f.write(f"* signed quotient manifest: `{divsi3.manifest_text(quotient_evidence)}`\n")
-                proof_digest = divsi3.fingerprint(addr, got_body, quotient_evidence,
-                                                   selector=args.signed_quotient_profile)
-                f.write(f"* signed quotient proof SHA-256: `{proof_digest}`\n")
-            if spin_profile:
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
-                f.write(f"* inert spins: {inert_spin.summary(spin_evidence)}\n")
-                f.write(f"* inert spin manifest: `{inert_spin.manifest_text(spin_evidence)}`\n")
-                proof_digest = inert_spin.fingerprint(addr, got_body, spin_evidence, fingerprint,
-                                                      mapping, function_index, data_mapping=data_mapping)
-                f.write(f"* inert spin proof SHA-256: `{proof_digest}`\n")
-            if double_profile:
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
-                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* software double: {software_double.summary(double_evidence)}\n")
-                f.write(f"* software double ABI: `{software_double.ABI}`\n")
-                f.write(f"* software double runtime: `{software_double.RUNTIME}`\n")
-                f.write(f"* software double semantics: `{software_double.SEMANTICS}`\n")
-                f.write(f"* software double manifest: `{software_double.manifest_text(double_evidence)}`\n")
-                proof_digest = software_double.fingerprint(addr, got_body, double_evidence, fingerprint,
-                                                           mapping, function_index, rom, data_mapping=data_mapping)
-                f.write(f"* software double proof SHA-256: `{proof_digest}`\n")
-            if thunk_profile:
-                f.write(f"* function index SHA-256: `{mapping_fingerprint(function_index)}`\n")
-                f.write(f"* ROM SHA-256: `{hashlib.sha256(rom).hexdigest()}`\n")
-                f.write(f"* function-address thunks: {args.function_address_profile}\n")
-                f.write(f"* function-address-thunk manifest: `{function_thunk.manifest_text(thunk_evidence)}`\n")
-                proof_digest = function_thunk.fingerprint(addr, got_body, thunk_evidence, fingerprint,
-                                                          mapping, function_index, data_mapping, rom)
-                f.write(f"* function-address-thunk sha256: `{proof_digest}`\n")
-            if unit_context is not None:
-                for line in library_units.report_lines(unit_context, unit_orphan):
-                    f.write(line + "\n")
-            f.write(f"* compiler: `{args.cc} {args.flags}`\n")
-            f.write(f"* verified extent: complete ELF function symbol, including literal pools\n")
-            f.write(f"* relocations: none\n")
-            f.write(f"* ROM bytes: `{want.hex()}` ({span} bytes)\n")
-            f.write(f"* compiled : `{got_body.hex()}`\n")
-            f.write(f"* source plausibility: "
-                    f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n")
-            for record in volatile_records:
-                f.write(f"{record}\n")
-            f.write(f"* hand-asm allow list: "
-                    f"{'listed (' + str(hand_asm_allowed.get('reason', 'no reason recorded')) + ')' if hand_asm_allowed else 'not listed'}\n\n")
-            f.write(f"**{verdict}** - {same_bytes}/{len(want)} bytes\n")
-            if findings:
-                f.write("\nplausibility findings:\n\n")
-                for line in findings:
-                    f.write(f"- {line.strip()}\n")
-            f.write("\n```\n")
-            f.write(f"{'compiled':<{width}}rom\n")
-            for line in lines:
-                f.write(line.rstrip() + "\n")
-            f.write("```\n")
-        print(f"\nwrote {os.path.relpath(out, ROOT)}")
+        report_text = render_report(
+            addr=addr, label=args.label, src_rel=src_rel, schema=schema, fingerprint=fingerprint,
+            compiler=f"{args.cc} {args.flags}", want=want, span=span, got_body=got_body, verdict=verdict,
+            same_bytes=same_bytes, listing=lines, plausible=plausible, volatile_records=volatile_records,
+            hand_asm_allowed=hand_asm_allowed, findings=findings, flash_evidence=flash_evidence,
+            empty_profile=empty_profile, mapping=mapping, empty_index=empty_index, control_flow=control_flow,
+            framed_profile=framed_profile, buffer_proof=buffer_proof,
+            mapped=bool(linked_profile or data_profile or function_relocations or switch_relocations or spin_profile),
+            self_sites=self_sites, data_profile=data_profile, data_mapping=data_mapping,
+            data_buffer_evidence=data_buffer_evidence, address_manifest=address_manifest,
+            switches=bool(switch_relocations) and quotient_evidence is None and buffer_proof.owner_switch is None,
+            switch_evidence=switch_evidence,
+            preloaded_profile=preloaded_profile, thunk_switch_selector=thunk_switch_selector,
+            float_evidence=float_evidence, rom=rom, shift_evidence=shift_evidence, shift_profile=shift_profile,
+            shift_options=shift_options, unsigned_remainder_evidence=unsigned_remainder_evidence,
+            udivsi3_bindings=bool(udivsi3_bindings), division_evidence=division_evidence,
+            unsigned_quotient_profile=args.unsigned_quotient_profile, remainder_evidence=remainder_evidence,
+            quotient_evidence=quotient_evidence, signed_quotient_profile=args.signed_quotient_profile,
+            spin_profile=spin_profile, spin_evidence=spin_evidence, function_index=function_index,
+            double_profile=double_profile, double_evidence=double_evidence, thunk_profile=thunk_profile,
+            function_address_profile=args.function_address_profile, thunk_evidence=thunk_evidence,
+            unit_context=unit_context, unit_orphan=unit_orphan)
+        if args.check_report:
+            # what status.py --verify requires of a MATCH: the saved report is exactly the one this run
+            # would write (a source that does not match keeps its verdict and compares nothing)
+            try:
+                with open(out, "rb") as f:
+                    saved = f.read()
+            except OSError:
+                saved = None
+            if saved != report_text.encode("utf-8"):
+                print(f"\nreport  DIFFERS from the saved {os.path.relpath(out, ROOT)}")
+                return 1
+            print(f"\nreport  identical to the saved {os.path.relpath(out, ROOT)}")
+        else:
+            os.makedirs(os.path.dirname(out), exist_ok=True)
+            with open(out, "w", encoding="utf-8", newline="\n") as f:
+                f.write(report_text)
+            print(f"\nwrote {os.path.relpath(out, ROOT)}")
     if exact and emit:
         os.makedirs(os.path.dirname(emit), exist_ok=True)
         created = False

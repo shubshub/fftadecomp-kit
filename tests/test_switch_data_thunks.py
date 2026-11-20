@@ -20,6 +20,7 @@ if os.environ.get('FFTA_TEST_TOOLS_FALLBACK'):
     sys.path.append(os.environ['FFTA_TEST_TOOLS_FALLBACK'])
 import match
 import match_evidence as evidence
+import report_fixtures
 import function_thunk_profile as function_thunk
 import switch_data_thunks as thunks
 import switch_pool_outgoing_frame as pool_switch_frame
@@ -1279,8 +1280,17 @@ class ReportTests(unittest.TestCase):
                     good = self.lines(f, selector)
                     self.assertTrue(valid(good))
                     self.assertEqual(thunks.selector_for_report('\n'.join(good)), selector)
-                    self.assertEqual(rebuild.saved_profile_arguments('\n'.join(good), directory, BASE),
+                    instructions, control_flow = match.verify_switches(
+                        bytes(body), BASE, rom_image(body), entries, manifest, data_mapping=self.objects)
+                    report_fixtures.source_at(self, f'src/{BASE:08X}.c')
+                    complete = report_fixtures.complete(
+                        directory, BASE, body, thunks.SCHEMAS[selector], instructions, mapped=True,
+                        control_flow=control_flow, data_profile=True, switches=True, switch_evidence=manifest,
+                        thunk_switch_selector=selector)
+                    self.assertEqual(rebuild.saved_profile_arguments(complete, directory, BASE),
                                      ['--switch-data-profile', selector])
+                    with self.assertRaisesRegex(ValueError, 'invalid saved profile report'):
+                        rebuild.saved_profile_arguments('\n'.join(good), directory, BASE)
                     # Replay refuses a manifest stripped of the marker, even re-signed.
                     bad = copy.deepcopy(manifest); bad.pop('thunk_policy')
                     self.assertFalse(valid(self.lines(f, selector, manifest=bad)))

@@ -17,6 +17,7 @@ from unittest.mock import patch
 
 import match
 import match_evidence as evidence
+import report_fixtures
 import entry_recursive_ordinary_call_profile as entry
 from synthetic_entry_owner import ADDRESS as A, HELPER as H, body, bl, snapshots
 import test_entry_native as native
@@ -174,20 +175,15 @@ class SelfCallReportTests(unittest.TestCase):
         (self.root / f'src/{A:08X}.c').write_text(f'int {NAME}(int x) {{ return x + 1; }}\n')
 
     def report(self, data=None, *, sites='[8]', lines=True, schema=evidence.LINKED_SCHEMA):
+        """The complete report match.py writes for `data`, with or without the self-call lines."""
         data = body() if data is None else data
-        out = [f'* source: `src/{A:08X}.c`', f'* verification: `{schema}`',
-               f'* source SHA-256: `{evidence.source_fingerprint(self.root, A)}`',
-               f'* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`',
-               f'* control flow: {evidence.CALL_SUMMARY}']
-        if lines:
-            out += [f'* self calls: {evidence.SELF_CALL_SUMMARY}', f'* self call sites: `{sites}`']
-        out += [f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`',
-                '* verified extent: complete ELF function symbol, including literal pools',
-                '* relocations: none', f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)',
-                f'* compiled : `{data.hex()}`', '* source plausibility: plausible',
-                '* hand-asm allow list: not listed',
-                f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes']
-        return '\n'.join(out)
+        own = frozenset(item.address for item in report_fixtures.decode(data, A)
+                        if item.mnemonic == 'bl' and item.operands[0].imm == A) or None
+        instructions = match.verify_leaf_instructions(data, A, True, call_resolver=lambda target: None,
+                                                      self_calls=own, incoming_narrow_reads=own is None)
+        return report_fixtures.complete(
+            self.root, A, data, schema, instructions, mapped=True, control_flow=evidence.CALL_SUMMARY,
+            self_sites=frozenset(A + offset for offset in json.loads(sites)) if lines else frozenset())
 
     def test_canonical_report_is_accepted(self):
         self.assertEqual(evidence.self_call_sites_text([A + 8], A), '[8]')

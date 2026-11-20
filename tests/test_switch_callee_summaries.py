@@ -181,7 +181,8 @@ class SwitchCalleeTests(unittest.TestCase):
 
     def test_a_report_without_a_switch_callee_replays_without_an_index(self):
         # Without a function index no callee is delegated, so a report that needed none still replays.
-        f = self.fixture(callee='str r0, [r3]\nmovs r3, #0\nbx lr')
+        # (The register-indexed store needs the version-2 proof, which this report is.)
+        f = self.fixture(callee='movs r2, #0\nstr r0, [r3, r2]\nmovs r3, #0\nbx lr')
         proof = self.prove(f)
         root = self.root / 'unindexed'
         (root / 'symbols').mkdir(parents=True)

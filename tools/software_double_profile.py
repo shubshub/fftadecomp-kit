@@ -1188,8 +1188,16 @@ def report_matches(report, root, address):
                 unquote("* software double proof SHA-256: ") != \
                 fingerprint(address, data, manifest, source_digest, mapping, index, rom, data_mapping=objects):
             return False
-        verify_source(root, address, data, rom, mapping, index, source_digest, manifest, data_mapping=objects)
-        return report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom
+        instructions = verify_source(root, address, data, rom, mapping, index, source_digest, manifest,
+                                     data_mapping=objects)
+        if report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
+            return False
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=SCHEMA, data=data, instructions=instructions, mapped=True,
+            control_flow=SPIN_CONTROL_FLOW if "inert_spin" in manifest else CALL_SUMMARY,
+            data_profile=bool(manifest.get("data")), data_mapping=objects, function_index=index, rom=rom,
+            double_profile=True, double_evidence=manifest))
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False

@@ -165,7 +165,11 @@ def report_matches(report, root, address):
                 "**MATCH - byte identical** - 2/2 bytes" not in lines:
             return False
         verify_source(root, address, source_digest, mapping, index)
-        return True
+        from match import verify_leaf_instructions
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=SCHEMA, data=BODY, instructions=verify_leaf_instructions(BODY, address, True),
+            empty_profile=True, mapping=mapping, empty_index=index, control_flow="closed leaf CFG"))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False

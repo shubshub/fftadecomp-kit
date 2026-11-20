@@ -37,7 +37,7 @@ import re
 import subprocess
 import sys
 from threading import Lock, active_count
-from match_evidence import (report_matches, compiler_flags,
+from match_evidence import (report_matches, saved_selectors,
                             SWITCH_U16_SCALAR_SCHEMA, SWITCH_U16_SCALAR_SELECTOR,
                             SWITCH_POOL_U16_SCALAR_SCHEMA, SWITCH_POOL_U16_SCALAR_SELECTOR,
                             SWITCH_FUNCTION_U16_SCALAR_SCHEMA, SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
@@ -268,14 +268,9 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         ok = False
         report = None
         rep = os.path.join(root, "docs", "match", f"{addr}.md")
-        saved_flags = None
-        unit_toolchain = None
-        spin_profile = False
-        double_profile = False
         target_remainder_profile = False
         thunk_profile = False
         owner_profile = False
-        constants_profile = False
         typed_outgoing_profile = False
         u16_switch_profile = False
         unsigned_quotient_frame = False
@@ -283,63 +278,27 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
         signed_runtime_profile = False
         unsigned_runtime_profile = False
         addressed_runtime_profile = False
-        private_float_profile = False
-        palette_source_profile = False
+        saved_arguments = []
+        compared = False
         if os.path.exists(rep):
             with open(rep, encoding="utf-8") as report_file:
                 saved_report = report_file.read()
             try:
-                import unsigned_divmod_profile
-                unsigned_runtime_profile = unsigned_divmod_profile.selector_for_report(saved_report)
-                import palette_source_admission_profile
-                palette_source_profile = palette_source_admission_profile.selector_for_report(saved_report)
-                import private_float_pack_admission_profile
-                private_float_profile = private_float_pack_admission_profile.selector_for_report(saved_report)
-                import addressed_signed_runtime_profile
-                addressed_runtime_profile = addressed_signed_runtime_profile.selector_for_report(saved_report)
-                import signed_divmod_profile
-                signed_runtime_profile = signed_divmod_profile.selector_for_report(saved_report)
-                import owner_admission_profile
-                import libgcc_divdi3
-                if owner_admission_profile.selected(saved_report):
-                    owner_profile = owner_admission_profile.selector_for_report(saved_report)
-                elif f"* verification: `{libgcc_divdi3.SCHEMA}`" in saved_report.splitlines():
-                    owner_profile = libgcc_divdi3.SELECTOR
-                constants_profile = switch_constants.selected_policy(saved_report)
-                typed_outgoing_profile = typed_switch_frame.selector_for_report(saved_report)
-                u16_switch_profile = (
-                    SWITCH_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    SWITCH_POOL_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    pool_switch_frame.SELECTOR
-                    if f"* verification: `{pool_switch_frame.SCHEMA}`" in saved_report.splitlines() else
-                    pool_switch_frame.FIXED_SELECTOR
-                    if f"* verification: `{pool_switch_frame.FIXED_SCHEMA}`" in saved_report.splitlines() else
-                    SWITCH_FUNCTION_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_FUNCTION_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR
-                    if f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`" in saved_report.splitlines() else
-                    switch_data_thunks.selector_for_report(saved_report) or
-                    False)
-                double_profile = software_double.selected(saved_report)
-                if double_profile:
-                    target_remainder_profile = software_double.target_remainder_selected(saved_report)
-                thunk_profile = function_thunk.selector_for_report(saved_report)
-                spin_profile = inert_spin.selected(saved_report)
-                from match_evidence import UDIVSI3_FRAMED_SCHEMA
-                unsigned_quotient_frame = f"* verification: `{UDIVSI3_FRAMED_SCHEMA}`" in saved_report.splitlines()
-                quotient_frame = any(f"* verification: `{schema}`" in saved_report.splitlines()
-                                     for schema in (divsi3.FRAMED_SCHEMA, divsi3.FRAMED_SWITCH_SCHEMA))
-                saved_flags = compiler_flags(saved_report)
-                unit_toolchain = library_units.report_toolchain(saved_report)
+                selectors = saved_selectors(saved_report)
             except ValueError as error:
                 problems.append(f"{addr}: {error}")
                 return 0, 0, problems, []
+            unsigned_runtime_profile = selectors.unsigned_runtime
+            addressed_runtime_profile = selectors.addressed_runtime
+            signed_runtime_profile = selectors.signed_runtime
+            owner_profile = selectors.owner
+            typed_outgoing_profile = selectors.typed_outgoing
+            u16_switch_profile = selectors.u16_switch
+            target_remainder_profile = selectors.target_remainder
+            thunk_profile = selectors.thunk
+            unsigned_quotient_frame = selectors.unsigned_quotient_frame
+            quotient_frame = selectors.quotient_frame
+            saved_arguments = selectors.arguments
         if verify:
             if u16_switch_profile and not report_matches(saved_report, root, int(addr, 16)):
                 problems.append(f"{addr}: invalid saved u16 scalar switch report")
@@ -375,46 +334,22 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             command = [sys.executable, os.path.join(here, "match.py"), "--root", root, addr]
             if late:
                 command += ["--mode", mode]
-            if spin_profile:
-                command += ["--control-flow-profile", inert_spin.SELECTOR]
-            if double_profile:
-                command += ["--software-double-profile", software_double.SELECTOR]
-                if target_remainder_profile:
-                    command += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
-            if thunk_profile:
-                command += ["--function-address-profile", thunk_profile]
-            if owner_profile:
-                command += ["--owner-runtime-profile", owner_profile]
-            if palette_source_profile:
-                command += ["--owner-runtime-profile", palette_source_profile]
-            if private_float_profile:
-                command += ["--owner-runtime-profile", private_float_profile]
-            if constants_profile:
-                command += ["--switch-profile", constants_profile.selector]
-            if typed_outgoing_profile:
-                command += ["--switch-data-profile", typed_outgoing_profile]
-            if u16_switch_profile:
-                command += ["--switch-data-profile", u16_switch_profile]
-            if unsigned_runtime_profile:
-                command += ["--unsigned-runtime-profile", unsigned_runtime_profile]
-            if signed_runtime_profile:
-                command += ["--signed-runtime-profile", signed_runtime_profile]
-            if addressed_runtime_profile:
-                command += ["--addressed-signed-runtime-profile", addressed_runtime_profile]
-            if unsigned_quotient_frame:
-                from match_evidence import UDIVSI3_FRAMED_SELECTOR
-                command += ["--unsigned-quotient-profile", UDIVSI3_FRAMED_SELECTOR]
-            if quotient_frame:
-                command += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
-            if unit_toolchain is not None:
-                command += ["--unit-toolchain", unit_toolchain]
-            elif saved_flags is not None:
-                command += ["--flags", saved_flags]
+            command += saved_arguments
             if not write_reports:
-                command.append("--no-write")
+                # The saved report must be exactly the one this compile would write.
+                command += ["--check-report", "--no-write"]
             result = subprocess.run(command, capture_output=True, text=True)
-            ok = result.returncode == 0 and "verdict MATCH - byte identical" in result.stdout.splitlines()
-        if not verify or (write_reports or addr == "08001244" or spin_profile or double_profile or thunk_profile or constants_profile or typed_outgoing_profile or u16_switch_profile or owner_profile or quotient_frame or unsigned_quotient_frame or signed_runtime_profile or unsigned_runtime_profile or addressed_runtime_profile or private_float_profile or palette_source_profile) and ok:
+            output = result.stdout.splitlines()
+            ok = result.returncode == 0 and "verdict MATCH - byte identical" in output
+            compared = any(line.startswith("report  identical to the saved ") for line in output)
+            if not write_reports and "verdict MATCH - byte identical" in output and \
+                    any(line.startswith("report  DIFFERS from the saved ") for line in output):
+                problems.append(f"{addr}: the saved report differs from the one match.py writes now; "
+                                "re-run match.py")
+                return 0, 0, problems, []
+        # match.py compares the report its own writer renders; a selector that
+        # writes its own report is held by its replay, which rebuilds it.
+        if not verify or (write_reports or not compared) and ok:
             if os.path.exists(rep):
                 with open(rep, encoding="utf-8") as report_file:
                     report = report_file.read()
@@ -641,7 +576,8 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--root", default=os.environ.get("FFTA_ROOT"))
     ap.add_argument("--verify", action="store_true",
-                    help="recompile every src/*.c instead of trusting the reports")
+                    help="recompile every src/*.c instead of trusting the reports, and require each saved "
+                         "report to be the one match.py writes now")
     ap.add_argument("--jobs", type=int, choices=range(1, 65), default=1, metavar="N",
                     help="verify up to N sources concurrently (1..64; default: 1)")
     ap.add_argument("--worker-processes", type=int, choices=range(1, 65), metavar="N",

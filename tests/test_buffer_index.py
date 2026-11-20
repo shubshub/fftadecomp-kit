@@ -13,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 
 BASE = match.ROM_BASE
 CALLER = ("push {r4, lr}\nsub sp, #8\nmov r1, sp\nmovs r0, #0\n"
@@ -231,23 +232,10 @@ class BufferIndexTests(unittest.TestCase):
             for entry in self.entries))
         proof = match.BufferCallProof(self.rom, json.dumps(self.entries).encode(),
                                       stack_arguments=True, loop_replay=True)
-        match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=proof,
-                                       call_resolver=proof.target)
-        report = "\n".join((
-            f"* source: `src/{BASE:08X}.c`", f"* verification: `{evidence.STACK_BUFFER_SCHEMA}`",
-            f"* source SHA-256: `{evidence.source_fingerprint(self.root, BASE)}`",
-            f"* stack frame: {evidence.STACK_SUMMARY}",
-            f"* buffer calls: {evidence.STACK_BUFFER_SUMMARY}",
-            f"* buffer proof SHA-256: `{proof.fingerprint()}`",
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(evidence.mapping_snapshot(self.root))}`",
-            f"* control flow: {evidence.CALL_SUMMARY}",
-            f"* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`",
-            "* verified extent: complete ELF function symbol, including literal pools", "* relocations: none",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"* compiled : `{self.body.hex()}`", "* source plausibility: plausible",
-            "* hand-asm allow list: not listed",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes",
-        ))
+        instructions = match.verify_leaf_instructions(self.body, BASE, True, buffer_proof=proof,
+                                                      call_resolver=proof.target)
+        report = report_fixtures.complete(self.root, BASE, self.body, evidence.STACK_BUFFER_SCHEMA, instructions,
+                                          buffer_proof=proof, mapped=True, control_flow=evidence.CALL_SUMMARY)
         self.assertTrue(evidence.report_matches(report, self.root, BASE))
         old_report = report.replace(evidence.STACK_BUFFER_SCHEMA, evidence.BUFFER_SCHEMA).replace(
             evidence.STACK_BUFFER_SUMMARY, evidence.BUFFER_SUMMARY)

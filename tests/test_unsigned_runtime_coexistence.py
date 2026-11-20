@@ -114,11 +114,14 @@ class UnsignedRuntimeCoexistenceTests(unittest.TestCase):
                                                 thunks.UNSIGNED_FRAME_SELECTOR, thunks.UNSIGNED_CHOICES_SELECTOR})
         self.assertEqual(thunks.schema_for(thunks.SELECTOR), thunks.SCHEMA)
         self.assertEqual(thunks.schema_for(thunks.ZERO_SELECTOR), thunks.ZERO_SCHEMA)
-        # Both forwarding paths remain in actual integrated lifecycle sources.
+        # Both forwarding paths remain in actual integrated lifecycle sources: status.py and
+        # rebuild.py forward what match_evidence.saved_selectors recovers.
         status_source = Path(HERE/'tools/status.py').read_text()
-        self.assertIn('command += ["--unsigned-runtime-profile", unsigned_runtime_profile]', status_source)
-        self.assertIn('command += ["--function-address-profile", thunk_profile]', status_source)
+        self.assertIn('selectors = saved_selectors(saved_report)', status_source)
+        self.assertIn('command += saved_arguments', status_source)
         evidence_source = Path(HERE/'tools/match_evidence.py').read_text()
+        self.assertIn('arguments += ["--unsigned-runtime-profile", found.unsigned_runtime]', evidence_source)
+        self.assertIn('arguments += ["--function-address-profile", found.thunk]', evidence_source)
         self.assertIn('unsigned_divmod_profile.report_matches(report, root, address)', evidence_source)
         self.assertIn('function_thunk.report_matches(report, root, address)', evidence_source)
 

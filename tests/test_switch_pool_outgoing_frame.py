@@ -23,6 +23,7 @@ if os.environ.get("FFTA_TEST_SUPPORT_TOOLS"):
 sys.path.insert(0, str(TASK / "tools"))
 import match
 import match_evidence as evidence
+import report_fixtures
 import switch_pool_outgoing_frame as frame
 import typed_switch_outgoing_frame as typed_frame
 
@@ -421,25 +422,10 @@ class ReportTests(unittest.TestCase):
                stack=True):
         manifest = self.manifest if manifest is None else manifest
         summary = frame.SUMMARY if summary is None else summary
-        fingerprint = fingerprint or frame.fingerprint(BASE, self.body, manifest)
-        lines = [f"* verification: `{schema}`",
-                 f"* source SHA-256: `{self.source}`"]
-        if stack:
-            lines.append(f"* stack frame: {evidence.STACK_SUMMARY}")
-        lines += [
-            f"* mapping SHA-256: `{evidence.mapping_fingerprint(self.functions)}`",
-            f"* control flow: {match.CALL_SUMMARY}",
-            f"* data symbols SHA-256: `{evidence.mapping_fingerprint(self.objects)}`",
-            f"* switches: {summary}",
-            f"* switch manifest: `{evidence.switch_manifest(manifest)}`",
-            f"* switch proof SHA-256: `{fingerprint}`",
-            "* verified extent: complete ELF function symbol, including literal pools",
-            "* relocations: none",
-            f"* ROM bytes: `{self.body.hex()}` ({len(self.body)} bytes)",
-            f"* compiled : `{self.body.hex()}`",
-            "* source plausibility: plausible",
-            f"**MATCH - byte identical** - {len(self.body)}/{len(self.body)} bytes"]
-        return "\n".join(lines)
+        report = report_fixtures.switch_report(
+            self.root, BASE, self.body, schema, manifest, summary=summary,
+            fingerprint=fingerprint or frame.fingerprint(BASE, self.body, manifest), control_flow=match.CALL_SUMMARY)
+        return report if stack else report.replace(f"* stack frame: {evidence.STACK_SUMMARY}\n", "")
 
     def valid(self, report):
         return evidence.switch_report_matches(report.splitlines(), self.root, BASE, data_profile=True)

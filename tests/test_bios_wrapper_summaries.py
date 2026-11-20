@@ -618,6 +618,7 @@ class BiosWrapperSummaryTests(unittest.TestCase):
             ("data_buffer_profile.py", "prove", "BufferCallProof", True),
             ("function_thunk_profile.py", "verify_source", "BufferCallProof", True),
             ("match.py", "main", "BufferCallProof", True), ("match.py", "main", "BufferCallProof", True),
+            ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True),
             ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True)])
 
 

@@ -122,7 +122,7 @@ def udivsi3_fingerprint(address, data, manifest, *, selector=None):
     return digest.hexdigest()
 
 
-def udivsi3_report_matches(lines, root, address):
+def udivsi3_report_matches(lines, root, address, parts=None):
     from match import DEFAULT_CC, DEFAULT_FLAGS, verify_udivsi3, verify_udivsi3_source
 
     def single(prefix):
@@ -188,17 +188,113 @@ def udivsi3_report_matches(lines, root, address):
             return False
         rom = Path(report_rom_path(root)).read_bytes()
         if framed:
-            verify_udivsi3_source(root, address, data, rom, mapping, source_digest,
-                                 manifest, selector=selector)
+            instructions = verify_udivsi3_source(root, address, data, rom, mapping, source_digest,
+                                                 manifest, selector=selector)
         else:
-            verify_udivsi3(data, address, rom, mapping, manifest)
-        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+            instructions = verify_udivsi3(data, address, rom, mapping, manifest)
+        if not (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* unsigned division proof SHA-256: ") ==
-                udivsi3_fingerprint(address, data, manifest, selector=selector))
+                udivsi3_fingerprint(address, data, manifest, selector=selector)):
+            return False
+        if parts is not None:
+            parts.update(schema=udivsi3_schema(selector), data=data, instructions=instructions, mapped=True,
+                         control_flow=CALL_SUMMARY, udivsi3_bindings=True, division_evidence=manifest,
+                         unsigned_quotient_profile=selector)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False
+
+
+def saved_selectors(report):
+    """The match.py selectors a saved report was issued under.
+
+    status.py (`--verify`) and rebuild.py (`--compiled`) both re-run
+    match.py for a source with a saved report, and both recover the selectors
+    from that report here, so they re-issue every schema family the same
+    way.  Returns a namespace of the recovered selectors, False or None when
+    absent, and `arguments`, the match.py arguments in a fixed order.  A
+    malformed or mixed profile report raises ValueError.
+
+    The compiler flags are forwarded only when they differ from match.py's
+    default; outside a library unit the replay admits only the default.
+    """
+    import types
+    import addressed_signed_runtime_profile
+    import libgcc_divdi3
+    import library_units
+    import owner_admission_profile
+    import palette_source_admission_profile
+    import private_float_pack_admission_profile
+    import signed_divmod_profile
+    import unsigned_divmod_profile
+    from match import DEFAULT_FLAGS
+    lines = report.splitlines()
+    found = types.SimpleNamespace()
+    found.unsigned_runtime = unsigned_divmod_profile.selector_for_report(report)
+    found.palette_source = palette_source_admission_profile.selector_for_report(report)
+    found.private_float = private_float_pack_admission_profile.selector_for_report(report)
+    found.addressed_runtime = addressed_signed_runtime_profile.selector_for_report(report)
+    found.signed_runtime = signed_divmod_profile.selector_for_report(report)
+    found.owner = (owner_admission_profile.selector_for_report(report) if owner_admission_profile.selected(report)
+                   else libgcc_divdi3.SELECTOR if f"* verification: `{libgcc_divdi3.SCHEMA}`" in lines else False)
+    found.constants = switch_constants.selected_policy(report)
+    found.typed_outgoing = typed_switch_frame.selector_for_report(report)
+    u16 = {SWITCH_U16_SCALAR_SCHEMA: SWITCH_U16_SCALAR_SELECTOR,
+           SWITCH_POOL_U16_SCALAR_SCHEMA: SWITCH_POOL_U16_SCALAR_SELECTOR,
+           pool_switch_frame.SCHEMA: pool_switch_frame.SELECTOR,
+           pool_switch_frame.FIXED_SCHEMA: pool_switch_frame.FIXED_SELECTOR,
+           SWITCH_FUNCTION_U16_SCALAR_SCHEMA: SWITCH_FUNCTION_U16_SCALAR_SELECTOR,
+           SWITCH_FUNCTION_POOL_U16_SCALAR_SCHEMA: SWITCH_FUNCTION_POOL_U16_SCALAR_SELECTOR,
+           SWITCH_FUNCTION_FRAME_U16_SCALAR_SCHEMA: SWITCH_FUNCTION_FRAME_U16_SCALAR_SELECTOR,
+           SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA: SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SELECTOR}
+    found.u16_switch = next((selector for schema, selector in u16.items()
+                             if f"* verification: `{schema}`" in lines), None) or \
+        switch_data_thunks.selector_for_report(report) or False
+    found.double = software_double.selected(report)
+    found.target_remainder = found.double and software_double.target_remainder_selected(report)
+    found.thunk = function_thunk.selector_for_report(report)
+    found.spin = inert_spin.selected(report)
+    found.unsigned_quotient_frame = f"* verification: `{UDIVSI3_FRAMED_SCHEMA}`" in lines
+    found.quotient_frame = any(f"* verification: `{schema}`" in lines
+                               for schema in (divsi3.FRAMED_SCHEMA, divsi3.FRAMED_SWITCH_SCHEMA))
+    found.flags = compiler_flags(report)
+    found.unit_toolchain = library_units.report_toolchain(report)
+    arguments = []
+    if found.spin:
+        arguments += ["--control-flow-profile", inert_spin.SELECTOR]
+    if found.double:
+        arguments += ["--software-double-profile", software_double.SELECTOR]
+        if found.target_remainder:
+            arguments += ["--software-double-remainder-profile", software_double.REMAINDER_TARGET_SELECTOR]
+    if found.thunk:
+        arguments += ["--function-address-profile", found.thunk]
+    for owner in (found.owner, found.palette_source, found.private_float):
+        if owner:
+            arguments += ["--owner-runtime-profile", owner]
+    if found.constants:
+        arguments += ["--switch-profile", found.constants.selector]
+    if found.typed_outgoing:
+        arguments += ["--switch-data-profile", found.typed_outgoing]
+    if found.u16_switch:
+        arguments += ["--switch-data-profile", found.u16_switch]
+    if found.unsigned_runtime:
+        arguments += ["--unsigned-runtime-profile", found.unsigned_runtime]
+    if found.signed_runtime:
+        arguments += ["--signed-runtime-profile", found.signed_runtime]
+    if found.addressed_runtime:
+        arguments += ["--addressed-signed-runtime-profile", found.addressed_runtime]
+    if found.unsigned_quotient_frame:
+        arguments += ["--unsigned-quotient-profile", UDIVSI3_FRAMED_SELECTOR]
+    if found.quotient_frame:
+        arguments += ["--signed-quotient-profile", divsi3.FRAMED_SELECTOR]
+    if found.unit_toolchain is not None:
+        arguments += ["--unit-toolchain", found.unit_toolchain]
+    elif found.flags is not None and found.flags != DEFAULT_FLAGS:
+        arguments += ["--flags", found.flags]
+    found.arguments = arguments
+    return found
 
 
 def mapping_snapshot(root):
@@ -284,6 +380,88 @@ def source_fingerprint(root, address):
     return digest.hexdigest()
 
 
+def report_source(root, address):
+    """The source path match.py names in a report: src/<addr>.c, else the first folder copy."""
+    import os
+
+    root = Path(root)
+    candidates = [root / "src" / f"{address:08X}.c", *sorted((root / "src").rglob(f"{address:08X}.c"))]
+    chosen = next((path for path in candidates if os.path.exists(path)), None)
+    if chosen is None:
+        raise ValueError(f"no source for 0x{address:08X} under src/")
+    return os.path.relpath(chosen, root).replace(os.sep, "/")
+
+
+def report_unit(report, root, address):
+    """(unit context, orphan constants, compiler) as match.py renders a saved report's unit lines.
+
+    A report without unit lines is a default-toolchain report; one with them
+    must name the unit that contains the address and its toolchain, which
+    library_units.report_admitted has already held to the current row.  The
+    orphan-constant exclusion is the report's own: match.py records it from
+    the compile (see closed_report).
+    """
+    import library_units
+    from match import DEFAULT_CC, DEFAULT_FLAGS
+    bound = library_units.binding(report)
+    if bound is None:
+        return None, None, f"{DEFAULT_CC} {DEFAULT_FLAGS}"
+    row, toolchain, _, orphan = bound
+    unit = library_units.containing(library_units.load(root), address)
+    if unit is None or unit.text != row or unit.toolchain != toolchain:
+        raise ValueError("report unit lines do not name the containing library unit")
+    tool = library_units.resolve(toolchain)
+    return ({"unit": unit, "tool": tool}, None if orphan is None else json.loads(orphan),
+            f"{tool['cc']} {tool['flags']}")
+
+
+def closed_report(report, root, address, parts):
+    """Whether `report` is exactly the report match.py writes for re-verified evidence.
+
+    `parts` is what a cached replay re-verified: the compiled body (`data`),
+    its verified instructions, the schema and the schema's evidence blocks,
+    named as render_report names them.  Everything else is re-derived here -
+    the source path and digest, the mapping and data-symbol digests, the
+    stack-frame line, the unit and compiler lines, the ROM bytes, the
+    hand-asm line and the listing - and the whole text is compared, so no
+    line can be added, dropped, reordered or edited on its own.
+
+    Two choices match.py makes from the compiled object are not visible to a
+    replay that does not compile, so they come from the report: whether the
+    function links a data relocation (the data schemas, the data-symbol line
+    and the manifests' "data" entries) and a library unit's orphan-constant
+    exclusion.  A consistent relabel of either still replays here; only a
+    compile re-derives them, and status.py --verify requires the saved report
+    to equal the one match.py writes (match.py --check-report).
+
+    A MATCH report has plausible source, and plausible.py consults the
+    hand-asm allow list only for implausible source, so its hand-asm line is
+    always `not listed`; the replays that re-run the checker refuse an allow
+    entry outright.
+    """
+    from match import ROM_BASE, render_report, report_listing, uses_stack_frame
+    try:
+        parts = dict(parts)
+        data, instructions = parts.pop("data"), parts.pop("instructions")
+        thumb = parts.pop("thumb", True)
+        rom = Path(report_rom_path(root)).read_bytes()
+        want = rom[address - ROM_BASE:address - ROM_BASE + len(data)]
+        if not data or want != data:
+            return False
+        unit_context, unit_orphan, compiler = report_unit(report, root, address)
+        listing, _, _ = report_listing(instructions, want, address, len(data), thumb)
+        parts.setdefault("mapping", mapping_snapshot(root))
+        parts.setdefault("data_mapping", data_snapshot(root))
+        return render_report(
+            addr=address, src_rel=report_source(root, address), fingerprint=source_fingerprint(root, address),
+            compiler=compiler, want=want, span=len(data), got_body=data, verdict="MATCH - byte identical",
+            same_bytes=len(data), listing=listing, framed_profile=thumb and uses_stack_frame(instructions),
+            unit_context=unit_context, unit_orphan=unit_orphan, **parts) == report
+    except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
+            RuntimeError, subprocess.SubprocessError):
+        return False
+
+
 def verify_dependencies(preprocessed, root, address):
     allowed = {path.resolve() for path in source_paths(root, address)}
     observed = set()
@@ -300,7 +478,7 @@ def verify_dependencies(preprocessed, root, address):
         raise ValueError("preprocessor output lacks source dependency markers; do not use -P")
 
 
-def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
+def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, parts=None):
     from match import BufferCallProof, verify_leaf_instructions
 
     compiled = [line for line in lines if line.startswith("* compiled :")]
@@ -328,13 +506,27 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False):
         verdict = f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"
         if verdict not in lines:
             return False
-        verify_leaf_instructions(data, address, True, buffer_proof=proof,
-                                 call_resolver=proof.target, incoming_narrow_reads=True)
-        return bool(proof.dependencies) and \
-            fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and \
-            [line for line in lines if line.lstrip().startswith("* buffer")
-             and not line.startswith(("* buffer calls:", "* buffer proof SHA-256:"))] == \
-            proof.loop_replay_lines() + proof.bios_summary_lines()
+        instructions = verify_leaf_instructions(data, address, True, buffer_proof=proof,
+                                                call_resolver=proof.target, incoming_narrow_reads=True)
+        if stack_arguments:
+            # match.py tries the version-1 proof first and writes version 2 only when it is refused.
+            first = BufferCallProof(rom, mapping, loop_replay=True, bios_wrappers=True)
+            try:
+                verify_leaf_instructions(data, address, True, buffer_proof=first, call_resolver=first.target,
+                                         incoming_narrow_reads=True)
+            except ValueError:
+                pass
+            else:
+                return False
+        if not (bool(proof.dependencies) and
+                fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and
+                [line for line in lines if line.lstrip().startswith("* buffer")
+                 and not line.startswith(("* buffer calls:", "* buffer proof SHA-256:"))] ==
+                proof.loop_replay_lines() + proof.bios_summary_lines()):
+            return False
+        if parts is not None:
+            parts.update(instructions=instructions, buffer_proof=proof)
+        return True
     except (OSError, ValueError, KeyError, TypeError, RecursionError):
         return False
 
@@ -364,7 +556,7 @@ def function_buffer_fingerprint(address, data, manifest, source_digest, mapping,
     return digest.hexdigest()
 
 
-def function_address_report_matches(lines, root, address, buffer_profile=False):
+def function_address_report_matches(lines, root, address, buffer_profile=False, parts=None):
     from match import verify_function_addresses, verify_function_buffers, uses_stack_frame
 
     def single(prefix):
@@ -437,7 +629,9 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                     [line for line in lines if line.lstrip().startswith("* buffer BIOS")] != proof.bios_summary_lines():
                 return False
             control_flow = CALL_SUMMARY
+            schema = FUNCTION_BUFFER_SCHEMA
         else:
+            proof = None
             instructions, control_flow = verify_function_addresses(
                 data, address, rom, functions, objects, manifest)
             schema = FRAMED_FUNCTION_ADDRESS_SCHEMA if uses_stack_frame(instructions) else FUNCTION_ADDRESS_SCHEMA
@@ -449,7 +643,7 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                 return False
         elif any(line.lstrip().startswith("* stack frame") for line in lines):
             return False
-        return (single("* control flow: ") == control_flow and
+        if not (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* function address proof SHA-256: ") ==
@@ -457,7 +651,13 @@ def function_address_report_matches(lines, root, address, buffer_profile=False):
                                              framed=framed and not buffer_profile) and
                 (not buffer_profile or (source_fingerprint(root, address) == source_digest and
                  mapping_snapshot(root) == functions and report_rom_path(root) == selected_rom and
-                 Path(selected_rom).read_bytes() == rom)))
+                 Path(selected_rom).read_bytes() == rom))):
+            return False
+        if parts is not None:
+            parts.update(schema=schema, data=data, instructions=instructions, buffer_proof=proof, mapped=True,
+                         control_flow=control_flow, data_profile=bool(manifest.get("data")),
+                         address_manifest=manifest)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
         return False
 
@@ -534,7 +734,7 @@ def preloaded_switch_fingerprint(address, data, manifest):
     return digest.hexdigest()
 
 
-def preloaded_switch_report_matches(lines, root, address):
+def preloaded_switch_report_matches(lines, root, address, parts=None):
     from match import verify_preloaded_switches
 
     def single(prefix):
@@ -585,17 +785,23 @@ def preloaded_switch_report_matches(lines, root, address):
         if switch_manifest(manifest) != encoded_manifest:
             return False
         rom = Path(report_rom_path(root)).read_bytes()
-        _, control_flow = verify_preloaded_switches(data, address, rom, mapping, objects, manifest)
-        return (single("* control flow: ") == control_flow and
+        instructions, control_flow = verify_preloaded_switches(data, address, rom, mapping, objects, manifest)
+        if not (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* switch proof SHA-256: ") ==
-                preloaded_switch_fingerprint(address, data, manifest))
+                preloaded_switch_fingerprint(address, data, manifest)):
+            return False
+        if parts is not None:
+            parts.update(schema=PRELOADED_SWITCH_SCHEMA, data=data, instructions=instructions, mapped=True,
+                         control_flow=control_flow, data_profile=True, switches=True, switch_evidence=manifest,
+                         preloaded_profile=True)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
         return False
 
 
-def switch_report_matches(lines, root, address, *, data_profile=False):
+def switch_report_matches(lines, root, address, *, data_profile=False, parts=None):
     from match import verify_switches
 
     def single(prefix):
@@ -704,6 +910,12 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                 isinstance(manifest, dict) and
                 manifest.get("data_policy") == SWITCH_MULTIPLE_DATA_POLICY):
             return False
+        # Without a selector, match.py writes the version-2 data policy exactly
+        # when the switch links more than one data relocation and is not preloaded.
+        if data_profile and not (outgoing_frame or scalar_data or thunk_selector is not None) and \
+                multiple_data != (len(manifest.get("data") or ()) > 1 and
+                                  "preload" not in (manifest.get("switch") or {})):
+            return False
         if outgoing_frame != (isinstance(manifest, dict) and
                               manifest.get("frame_policy") == typed_switch_frame.SELECTOR):
             return False
@@ -727,8 +939,8 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                 "wide_scalar_policy" in manifest else []):
             return False
         rom = Path(report_rom_path(root)).read_bytes()
-        _, control_flow = verify_switches(data, address, rom, mapping, manifest,
-                                         data_mapping=objects)
+        instructions, control_flow = verify_switches(data, address, rom, mapping, manifest,
+                                                    data_mapping=objects)
         if thunk_selector is not None and switch_data_thunks.selector_for_manifest(manifest) != thunk_selector:
             return False
         fingerprint = (switch_data_thunks.fingerprint if thunk_selector is not None else
@@ -745,15 +957,21 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
         if [line for line in lines if line.lstrip().startswith(f"* {switch_data_thunks.PREMISE}")] != \
                 (switch_data_thunks.premise_lines(address, manifest) if thunk_selector is not None else []):
             return False
-        return (single("* control flow: ") == control_flow and
+        if not (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
-                unquote("* switch proof SHA-256: ") == fingerprint(address, data, manifest))
+                unquote("* switch proof SHA-256: ") == fingerprint(address, data, manifest)):
+            return False
+        if parts is not None:
+            parts.update(schema=schema if data_profile else SWITCH_SCHEMA, data=data, instructions=instructions,
+                         mapped=True, control_flow=control_flow, data_profile=data_profile, switches=True,
+                         switch_evidence=manifest, thunk_switch_selector=thunk_selector)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
         return False
 
 
-def modsi3_report_matches(lines, root, address):
+def modsi3_report_matches(lines, root, address, parts=None):
     from match import verify_modsi3
 
     def single(prefix):
@@ -814,20 +1032,25 @@ def modsi3_report_matches(lines, root, address):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
-        verify_modsi3(data, address, rom, mapping, objects, manifest)
-        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+        instructions = verify_modsi3(data, address, rom, mapping, objects, manifest)
+        if not (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* signed remainder proof SHA-256: ") ==
                 modsi3.fingerprint(address, data, manifest) and
                 source_fingerprint(root, address) == source_digest and
                 mapping_snapshot(root) == mapping and
                 (objects is None or data_snapshot(root) == objects) and
-                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom):
+            return False
+        if parts is not None:
+            parts.update(schema=modsi3.SCHEMA, data=data, instructions=instructions, mapped=True,
+                         control_flow=CALL_SUMMARY, data_profile=objects is not None, remainder_evidence=manifest)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError):
         return False
 
 
-def umodsi3_report_matches(lines, root, address):
+def umodsi3_report_matches(lines, root, address, parts=None):
     from match import DEFAULT_CC, DEFAULT_FLAGS, verify_umodsi3_source, uses_stack_frame
 
     def single(prefix):
@@ -897,20 +1120,26 @@ def umodsi3_report_matches(lines, root, address):
                 return False
         elif any(line.lstrip().startswith("* stack frame") for line in lines):
             return False
-        return (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
+        if not (single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
                 unquote("* unsigned remainder proof SHA-256: ") ==
                 umodsi3.fingerprint(address, data, manifest) and
                 source_fingerprint(root, address) == source_digest and
                 mapping_snapshot(root) == mapping and
                 (objects is None or data_snapshot(root) == objects) and
-                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom):
+            return False
+        if parts is not None:
+            parts.update(schema=umodsi3.SCHEMA, data=data, instructions=instructions, mapped=True,
+                         control_flow=CALL_SUMMARY, data_profile=objects is not None,
+                         unsigned_remainder_evidence=manifest)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False
 
 
-def divsi3_report_matches(lines, root, address):
+def divsi3_report_matches(lines, root, address, parts=None):
     from match import DEFAULT_CC, DEFAULT_FLAGS, verify_divsi3_source
 
     def single(prefix):
@@ -977,15 +1206,21 @@ def divsi3_report_matches(lines, root, address):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
-        verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest, selector=selector)
-        return (source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == mapping and
-                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom)
+        instructions = verify_divsi3_source(root, address, data, rom, mapping, source_digest, manifest,
+                                            selector=selector)
+        if not (source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == mapping and
+                report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom):
+            return False
+        if parts is not None:
+            parts.update(schema=divsi3.schema(selector, switched), data=data, instructions=instructions, mapped=True,
+                         control_flow=CALL_SUMMARY, quotient_evidence=manifest, signed_quotient_profile=selector)
+        return True
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False
 
 
-def legacy_report_control_flow(lines, root, address, profile):
+def legacy_report_control_flow(lines, root, address, profile, parts=None):
     from match import (ROM_BASE, RUNTIME_HELPERS, function_address_target,
                        thunk_is_call_via, verify_leaf_instructions, verify_addressed_modsi3_source)
 
@@ -1024,6 +1259,8 @@ def legacy_report_control_flow(lines, root, address, profile):
         if not ROM_BASE <= address < address + len(data) <= ROM_BASE + len(rom) or \
                 data != rom[address - ROM_BASE:address - ROM_BASE + len(data)]:
             return False
+        if parts is not None:
+            parts.update(data=data, thumb=thumb)
         if profile in (BUFFER_SCHEMA, STACK_BUFFER_SCHEMA):
             return function_thunk.legacy_absence(root, address, data, rom, mapping,
                                                 buffer_stack_arguments=profile == STACK_BUFFER_SCHEMA)
@@ -1068,9 +1305,11 @@ def legacy_report_control_flow(lines, root, address, profile):
         except modsi3.AddressedRemainderRequired:
             if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None:
                 return False
-            verify_addressed_modsi3_source(
+            reached = verify_addressed_modsi3_source(
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
                 profile == FRAMED_LINKED_SCHEMA)
+        if parts is not None:
+            parts.update(instructions=reached, self_sites=self_sites or frozenset())
         if thunk_calls:
             # a library unit report replays with its unit's toolchain
             import library_units
@@ -1343,30 +1582,36 @@ def report_matches(report, root, address):
         return False
     lines = report.splitlines()
     profiles = [line for line in lines if line.startswith("* verification:")]
+    # Each built-in replay re-verifies the evidence its schema binds and hands
+    # it back in `parts`; closed_report then re-renders the whole report from
+    # it and compares the text.
+    parts = {}
     if profiles == [f"* verification: `{umodsi3.SCHEMA}`"]:
-        return umodsi3_report_matches(lines, root, address)
+        return umodsi3_report_matches(lines, root, address, parts) and closed_report(report, root, address, parts)
     if any(line.lstrip().startswith("* unsigned remainder") for line in lines):
         return False
     if profiles in ([f"* verification: `{divsi3.SCHEMA}`"],
                      [f"* verification: `{divsi3.FRAMED_SCHEMA}`"],
                      [f"* verification: `{divsi3.SWITCH_SCHEMA}`"],
                      [f"* verification: `{divsi3.FRAMED_SWITCH_SCHEMA}`"]):
-        return divsi3_report_matches(lines, root, address)
+        return divsi3_report_matches(lines, root, address, parts) and closed_report(report, root, address, parts)
     if any(line.lstrip().startswith("* signed quotient") for line in lines):
         return False
     if profiles == [f"* verification: `{FUNCTION_BUFFER_SCHEMA}`"]:
-        return function_address_report_matches(lines, root, address, buffer_profile=True)
+        return function_address_report_matches(lines, root, address, buffer_profile=True, parts=parts) and \
+            closed_report(report, root, address, parts)
     if any(line.lstrip().startswith("* function buffer") for line in lines):
         return False
     if profiles == [f"* verification: `{modsi3.SCHEMA}`"]:
-        return modsi3_report_matches(lines, root, address)
+        return modsi3_report_matches(lines, root, address, parts) and closed_report(report, root, address, parts)
     if any(line.lstrip().startswith("* signed remainder") for line in lines):
         return False
     if profiles == [f"* verification: `{PRELOADED_SWITCH_SCHEMA}`"]:
-        return preloaded_switch_report_matches(lines, root, address)
+        return preloaded_switch_report_matches(lines, root, address, parts) and \
+            closed_report(report, root, address, parts)
     if profiles in ([f"* verification: `{UDIVSI3_SCHEMA}`"],
                     [f"* verification: `{UDIVSI3_FRAMED_SCHEMA}`"]):
-        return udivsi3_report_matches(lines, root, address)
+        return udivsi3_report_matches(lines, root, address, parts) and closed_report(report, root, address, parts)
     if any(line.startswith(("* unsigned division:", "* unsigned division manifest:",
                             "* unsigned division proof SHA-256:")) for line in lines):
         return False
@@ -1382,15 +1627,17 @@ def report_matches(report, root, address):
                     [f"* verification: `{SWITCH_FUNCTION_FRAME_POOL_U16_SCALAR_SCHEMA}`"],
                     [f"* verification: `{typed_switch_frame.SCHEMA}`"],
                     *([f"* verification: `{schema}`"] for schema in switch_data_thunks.SCHEMAS.values())):
-        return switch_report_matches(lines, root, address, data_profile=True)
+        return switch_report_matches(lines, root, address, data_profile=True, parts=parts) and \
+            closed_report(report, root, address, parts)
     if profiles == [f"* verification: `{SWITCH_SCHEMA}`"]:
-        return switch_report_matches(lines, root, address)
+        return switch_report_matches(lines, root, address, parts=parts) and closed_report(report, root, address, parts)
     if any(line.startswith(("* switches:", "* switch manifest:", "* switch proof SHA-256:"))
            for line in lines):
         return False
     if profiles in ([f"* verification: `{FUNCTION_ADDRESS_SCHEMA}`"],
                     [f"* verification: `{FRAMED_FUNCTION_ADDRESS_SCHEMA}`"]):
-        return function_address_report_matches(lines, root, address)
+        return function_address_report_matches(lines, root, address, parts=parts) and \
+            closed_report(report, root, address, parts)
     if any(line.startswith(("* function addresses:", "* function address manifest:",
                             "* function address proof SHA-256:")) for line in lines):
         return False
@@ -1414,7 +1661,7 @@ def report_matches(report, root, address):
                         [f"* verification: `{STACK_BUFFER_SCHEMA}`"]):
             profile_valid = profile_valid and buffer_report_matches(
                 lines, root, address, snapshot,
-                stack_arguments=profiles == [f"* verification: `{STACK_BUFFER_SCHEMA}`"])
+                stack_arguments=profiles == [f"* verification: `{STACK_BUFFER_SCHEMA}`"], parts=parts)
     if profiles in ([f"* verification: `{DATA_SCHEMA}`"],
                     [f"* verification: `{FRAMED_DATA_SCHEMA}`"]):
         functions = mapping_snapshot(root)
@@ -1433,9 +1680,36 @@ def report_matches(report, root, address):
         profile_valid = profile_valid and f"* stack frame: {STACK_SUMMARY}" in lines
     verdict = re.search(r"^\*\*MATCH - byte identical\*\* - ([0-9]+)/([0-9]+) bytes$",
                         report, re.MULTILINE)
-    return (profile_valid and legacy_report_control_flow(
-                lines, root, address, profiles[0].removeprefix("* verification: `").removesuffix("`")) and
+    if not (profile_valid and legacy_report_control_flow(
+                lines, root, address, profiles[0].removeprefix("* verification: `").removesuffix("`"), parts) and
             f"* source SHA-256: `{source_fingerprint(root, address)}`" in lines and
             "* source plausibility: plausible" in lines and
             "* relocations: none" in lines and verdict is not None and
-            int(verdict[1]) > 0 and verdict[1] == verdict[2])
+            int(verdict[1]) > 0 and verdict[1] == verdict[2]):
+        return False
+    return legacy_report_closed(report, root, address, profiles[0][len("* verification: `"):-1], parts)
+
+
+def legacy_report_closed(report, root, address, profile, parts):
+    """closed_report for the plain, call, data and buffer profiles.
+
+    The labels in the schema name are already held to the walk:
+    plain_report_fields.check_labels (or, on the addressed-remainder path,
+    verify_addressed_modsi3_source) holds the frame and call labels,
+    buffer_report_matches the buffer version, in match.py's version-1-first
+    order.  The mapping and control-flow lines follow from the walk the way
+    match.py writes them: a call is a reached BL that leaves the function or
+    re-enters its entry.  The data choice is the report's: whether the compiled
+    object links a data relocation is known only to a compile (see
+    closed_report).
+    """
+    try:
+        instructions, data = parts["instructions"], parts["data"]
+        called = any(item.mnemonic == "bl" and item.operands and
+                     not address < item.operands[0].imm < address + len(data) for item in instructions)
+    except (KeyError, TypeError, AttributeError):
+        return False
+    linked_data = profile in (DATA_SCHEMA, FRAMED_DATA_SCHEMA)
+    return closed_report(report, root, address, dict(
+        parts, schema=profile, mapped=called or linked_data,
+        control_flow=CALL_SUMMARY if called else "closed leaf CFG", data_profile=linked_data))

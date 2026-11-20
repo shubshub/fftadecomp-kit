@@ -490,8 +490,15 @@ def report_matches(report, root, address):
             return False
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
-        verify_source(root, address, data, rom, mapping, index, source_digest, manifest, data_mapping=objects)
-        return report_rom_path(root) == selected_rom and Path(selected_rom).read_bytes() == rom
+        instructions = verify_source(root, address, data, rom, mapping, index, source_digest, manifest,
+                                     data_mapping=objects)
+        if report_rom_path(root) != selected_rom or Path(selected_rom).read_bytes() != rom:
+            return False
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=SCHEMA, data=data, instructions=instructions, mapped=True, control_flow=control_flow(manifest),
+            data_profile=objects is not None, data_mapping=objects, function_index=index, spin_profile=True,
+            spin_evidence=manifest))
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False

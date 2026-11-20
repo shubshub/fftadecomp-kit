@@ -26,6 +26,7 @@ R0, R1, R2, R3, R12, LR = (match.ARM_REG_R0, match.ARM_REG_R0 + 1, match.ARM_REG
                            match.ARM_REG_R0 + 3, match.ARM_REG_R12, match.ARM_REG_LR)
 HELPER = summary.HELPER
 OWNER, MID, LOCAL, LEAK, READ, FAKE = 0x08010000, 0x08011000, 0x08011800, 0x08012000, 0x08012800, 0x08013000
+INDEXED = 0x08013800
 RET3 = 0x08013800                      # an ordinary callee returning R1 + 4 in R3 (patched in per test)
 ROM_SIZE = 0x150000
 # The canonical 98-byte copy helper (49 halfwords), as in test_local_shadow_halfword_matrix.
@@ -65,6 +66,9 @@ CALLEES = {
     LOCAL: [0xb500, 0xb082, 0x4668, 0x2100, 0x2204, HELPER, 0xb002, 0xbc01, 0x4700],
     LEAK: [0x6008, 0x4770],             # str r0, [r1]; bx lr: stores the pointer
     READ: [0x7800, 0x4770],             # ldrb r0, [r0]; bx lr: a bounded read
+    # movs r1, #0; ldrb r0, [r0, r1]; bx lr: a bounded read through a register index, which only the
+    # version-2 proof admits
+    INDEXED: [0x2100, 0x5c40, 0x4770],
 }
 
 
@@ -704,16 +708,22 @@ class ReplayTests(unittest.TestCase):
                 self.root, OWNER, env['mapping'], stack_arguments=False))
 
     def test_reports_without_a_summary_replay_unchanged(self):
-        # mov r0, sp; bl READ: an ordinary bounded callee, in both versions.
+        # mov r0, sp; bl READ: an ordinary bounded callee, which the version-1 proof admits; bl INDEXED
+        # needs version 2.  match.py tries version 1 first, so each body has the one report it writes.
         code = [0xb510, 0xb082, 0x4668, READ, 0xb002, 0xbc10, 0xbc02, 0x4708]
-        for stack_arguments in (False, True):
+        indexed = [0xb510, 0xb082, 0x4668, INDEXED, 0xb002, 0xbc10, 0xbc02, 0x4708]
+        for body, stack_arguments in ((code, False), (indexed, True)):
             with self.subTest(stack_arguments=stack_arguments):
-                lines, env = self.report(code, stack_arguments=stack_arguments)
+                lines, env = self.report(body, stack_arguments=stack_arguments)
                 self.assertFalse(any(line.startswith('* buffer copy summary') for line in lines))
                 self.assertTrue(evidence.buffer_report_matches(lines, self.root, OWNER, env['mapping'],
                                                                stack_arguments=stack_arguments))
+        with self.subTest(version_2_of_a_version_1_body=True):
+            lines, env = self.report(code, stack_arguments=True)
+            self.assertFalse(evidence.buffer_report_matches(lines, self.root, OWNER, env['mapping'],
+                                                            stack_arguments=True))
         # Without a function index nothing is summarised, so such a report still replays.
-        lines, env = self.report(code, write_index=False)
+        lines, env = self.report(indexed, write_index=False)
         (self.root / 'symbols/functions.txt').unlink(missing_ok=True)
         self.assertTrue(self.accepted(lines, env))
 

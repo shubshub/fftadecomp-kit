@@ -314,8 +314,12 @@ def report_matches(report, root, address):
                 unquote("* ashldi3 proof SHA-256: ") != \
                 fingerprint(address, data, manifest, source_digest, mapping, index, objects, rom):
             return False
-        verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest)
-        return True
+        instructions = verify_source(root, address, data, rom, mapping, index, objects, source_digest, manifest)
+        from match_evidence import closed_report
+        return closed_report(report, root, address, dict(
+            schema=SCHEMA, data=data, instructions=instructions, mapped=True, control_flow=CALL_SUMMARY,
+            data_profile=bool(manifest.get("data")), data_mapping=objects, empty_index=index, rom=rom,
+            shift_evidence=manifest, shift_profile=sys.modules[__name__], shift_options={}))
     except (OSError, ValueError, KeyError, IndexError, TypeError, AttributeError, OverflowError,
             RecursionError, RuntimeError, subprocess.SubprocessError):
         return False
