@@ -27,7 +27,7 @@ BOOT = (
 require = scheduler.require
 
 
-def initializer(rom, mapping, index):
+def initializer_plan(rom, mapping, index):
     for start, end, digest in BOOT:
         require(hashlib.sha256(rom[start-install.ROM_BASE:end-install.ROM_BASE]).hexdigest() == digest,
                 'expected boot to call the reviewed CpuSet code installer through 08002710')
@@ -38,6 +38,11 @@ def initializer(rom, mapping, index):
             plan['entry']['pointer_word'] == (DESTINATION | 1) and
             plan['source_image']['sha256'] == IMAGE_SHA256,
             'expected the canonical 88-halfword image and its first Thumb entry')
+    return plan
+
+
+def initializer(rom, mapping, index):
+    plan = initializer_plan(rom, mapping, index)
     effects = zero.verify_conditional(bytes.fromhex(plan['source_image']['bytes']), DESTINATION,
                                       DESTINATION, SIZE, selector=zero.SELECTOR)
     case = effects['cases'][0]  # The owner frame proves alignment zero modulo four.

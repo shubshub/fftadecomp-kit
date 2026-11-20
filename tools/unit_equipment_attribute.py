@@ -50,19 +50,23 @@ def check_original(image, address, original, targets):
     from active_entry_shuffle_profile import compiler_symbol_roles
     import battle_action_value as battle
     import positioned_equipment_chance as chance
+    import equipment_selection_list as selection
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     if address == dispatch.OWNER:
         dispatch.check_original(image, original, targets)
         return
     calls = {OWNER: CALLS, battle.OWNER: battle.CALLS, guard.OWNER: guard.CALLS,
-             chance.OWNER: chance.CALLS}.get(address)
+             chance.OWNER: chance.CALLS, selection.OWNER: selection.CALLS}.get(address)
     require(calls is not None, 'unexpected equipment owner')
     expected = bindings(calls)
     expected_targets = {f'func_{target:08X}': (target, False) for target in calls.values()}
     if address == guard.OWNER:
         expected['data'] = guard.DATA
         expected_targets[guard.STATE_NAME] = (guard.STATE, True)
+    if address == selection.OWNER:
+        expected['data'] = selection.DATA
+        expected_targets.update({name: (value, True) for name, value in selection.OBJECTS.items()})
     require(original == expected and targets == expected_targets,
             'equipment owner original call roles differ')
     compiler_symbol_roles(image, targets)
@@ -75,6 +79,7 @@ def check_source(root, address):
     root = Path(root)
     import battle_action_value as battle
     import positioned_equipment_chance as chance
+    import equipment_selection_list as selection
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     name = f'func_{address:08X}'
@@ -100,7 +105,10 @@ def check_source(root, address):
         require(sha256(tokens.encode()).hexdigest() == chance.HEADER_HASH,
                 'positioned equipment unit fields or helper declarations differ')
         reserved += ('Unit', 'positioned_chance', 'func_0812EF94', *(f'func_{target:08X}' for target in chance.CALLS.values()))
-    require(address in (OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER) and plausible.include_closure(root, source) ==
+    if address == selection.OWNER:
+        reserved += ('SelectionState', 'SelectionEntry', 'Actor080C2618', *selection.OBJECTS,
+                     *(f'func_{target:08X}' for target in selection.CALLS.values()))
+    require(address in (OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER, selection.OWNER) and plausible.include_closure(root, source) ==
             (headers, []) and
             base_header((root/'include/ffta.h').read_bytes(), reserved) and
             not any(s in text for s in (chr(92), '??', '%:', chr(0))),
@@ -108,7 +116,8 @@ def check_source(root, address):
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
     expected = {OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
                 battle.OWNER: battle.SOURCE_HASH, guard.OWNER: guard.SOURCE_HASH,
-                dispatch.OWNER: dispatch.SOURCE_HASH, chance.OWNER: chance.SOURCE_HASH}[address]
+                dispatch.OWNER: dispatch.SOURCE_HASH, chance.OWNER: chance.SOURCE_HASH,
+                selection.OWNER: selection.SOURCE_HASH}[address]
     require(sha256(tokens.encode()).hexdigest() == expected,
             'equipment declarations, local array, or reviewed arithmetic differ')
 
@@ -270,8 +279,11 @@ def prove(data, address, rom, mapping, index, objects, original, ins, calls, ref
     from software_float_profile import ROM_SHA256
     import battle_action_value as battle
     import positioned_equipment_chance as chance
+    import equipment_selection_list as selection
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
+    if address == selection.OWNER:
+        return selection.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == chance.OWNER:
         return chance.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == dispatch.OWNER:
