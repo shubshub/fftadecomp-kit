@@ -8,17 +8,29 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-import time
+import threading
 import unittest
 from unittest.mock import patch
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
+from event_waits import arrive, await_set
 import push
 import match_evidence as evidence
 import status
 import test_status_parallel as fixtures
+
+
+CHECK_GROUP = status._check_process_group
+GROUP_LOG = None  # set before the workers fork
+
+
+def recording_group(group):
+    """status._check_process_group, recording which sources each worker call checks."""
+    log = Path(GROUP_LOG) / f'group-{os.getpid()}-{group[0][0]}.json'
+    log.write_text(json.dumps(sorted(str(path) for _, path in group)))
+    return CHECK_GROUP(group)
 
 
 class ProcessVerificationTests(unittest.TestCase):
@@ -32,7 +44,8 @@ class ProcessVerificationTests(unittest.TestCase):
         self.fixture([0x08000000 + i * 16 for i in range(32)])
         ctx = multiprocessing.get_context('fork')
         count, active, peak = [ctx.Value('i', 0) for _ in range(3)]
-        lock, barrier = ctx.Lock(), ctx.Barrier(8)
+        lock, barrier, last_failure_done, done = ctx.Lock(), ctx.Barrier(8), ctx.Event(), ctx.Value('i', 0)
+        sizes = []
         original_cwd, original_env = os.getcwd(), dict(os.environ)
         def invoke(command, **kwargs):
             self.assertEqual(kwargs, dict(capture_output=True, text=True))
@@ -44,22 +57,32 @@ class ProcessVerificationTests(unittest.TestCase):
                 active.value += 1
                 peak.value = max(peak.value, active.value)
             if first:
-                barrier.wait(timeout=10)
-            if address == '08000000':
-                time.sleep(.03)
+                arrive(barrier, 'all 8 first-batch checks running in their processes at once')
+            if address == '08000010':
+                # The first failure finishes only after the last one's check has completed,
+                # so completion order reverses the two reported failures.
+                await_set(last_failure_done, "the check of 080001F0 completing before 08000010's")
+            with lock:
+                done.value += 1
+                sequence = done.value
             with (self.root / (address + '.invocation')).open('x') as stream:
-                json.dump(dict(pid=os.getpid(), command=command), stream)
+                json.dump(dict(pid=os.getpid(), command=command, completed=sequence), stream)
             with lock:
                 active.value -= 1
             return subprocess.CompletedProcess(command, int(address in ('08000010', '080001F0')),
                                                fixtures.matched_output(), '')
-        with patch.object(status.subprocess, 'run', side_effect=invoke):
+        with patch.object(status, 'ProcessPoolExecutor',
+                          fixtures.signalling_executor(status.ProcessPoolExecutor, sizes, last_failure_done, '080001F0')), \
+                patch.object(status.subprocess, 'run', side_effect=invoke):
             self.assertEqual(self.collect(8), (32, 30, 256, 240,
                 ['08000010: DOES NOT MATCH', '080001F0: DOES NOT MATCH'], 0, 0))
         records = [json.loads(p.read_text()) for p in self.root.glob('*.invocation')]
         self.assertEqual(len(records), 32)
+        completed = {record['command'][4]: record['completed'] for record in records}
+        self.assertGreater(completed['08000010'], completed['080001F0'])
         self.assertEqual(len({x['pid'] for x in records}), 8)
         self.assertNotIn(os.getpid(), {x['pid'] for x in records})
+        self.assertEqual(sizes, [8])
         self.assertEqual(peak.value, 8)
         self.assertEqual(count.value, 32)
         self.assertEqual((os.getcwd(), dict(os.environ)), (original_cwd, original_env))
@@ -69,24 +92,33 @@ class ProcessVerificationTests(unittest.TestCase):
         (self.root / 'src/nested').mkdir()
         (self.root / 'src/nested/08000000.c').write_text('void duplicate(void) {}\n')
         ctx = multiprocessing.get_context('fork')
-        active, peak, count = [ctx.Value('i', 0) for _ in range(3)]
-        lock = ctx.Lock()
+        count, lock = ctx.Value('i', 0), ctx.Lock()
         def invoke(command, **kwargs):
             self.assertNotIn('--no-write', command)
             if command[4] == '08000000':
                 with lock:
-                    active.value += 1
-                    peak.value = max(peak.value, active.value)
                     count.value += 1
-                time.sleep(.02)
-                with lock:
-                    active.value -= 1
+                    check = count.value
+                (self.root / f'shared-{check}.json').write_text(json.dumps(
+                    [os.getpid(), threading.current_thread() is threading.main_thread()]))
             return subprocess.CompletedProcess(command, 1, '', '')
-        with patch.object(status.subprocess, 'run', side_effect=invoke):
+        global GROUP_LOG
+        GROUP_LOG = self.root
+        # Both sources of the shared report path are checked by one worker call.
+        with patch.object(status, '_check_process_group', recording_group), \
+                patch.object(status.subprocess, 'run', side_effect=invoke):
             self.assertEqual(self.collect(write_reports=True)[4], [
                 '08000000: DOES NOT MATCH', '08000010: DOES NOT MATCH',
                 '08000000: DOES NOT MATCH'])
-        self.assertEqual((count.value, peak.value), (2, 1))
+        groups = sorted(json.loads(p.read_text()) for p in self.root.glob('group-*.json'))
+        self.assertEqual(groups, sorted([[str(self.root / 'src/08000000.c'), str(self.root / 'src/nested/08000000.c')],
+                                         [str(self.root / 'src/08000010.c')]]))
+        # The main thread of one worker process ran both checks, so they cannot have overlapped.
+        self.assertEqual(count.value, 2)
+        first, second = (json.loads((self.root / f'shared-{check}.json').read_text()) for check in (1, 2))
+        self.assertEqual(first, second)
+        self.assertNotEqual(first[0], os.getpid())
+        self.assertTrue(first[1])
 
     def test_saved_owner_validation_replay_and_flags_remain_required(self):
         self.fixture([0x08000000, 0x08000010, 0x08000020])
@@ -230,11 +262,11 @@ class OfflineProcessReplayTests(unittest.TestCase):
         addresses = [0x08000000 + i * 16 for i in range(12)]
         self.fixture(addresses)
         for address in addresses[:-1]:
-            self.report(address, valid=address != addresses[3])
+            self.report(address, valid=address not in (addresses[3], addresses[9]))
         snapshot = {p: p.read_bytes() for p in self.root.rglob('*.md')}
         ctx = multiprocessing.get_context('fork')
         count, active, peak = [ctx.Value('i', 0) for _ in range(3)]
-        lock, barrier = ctx.Lock(), ctx.Barrier(4)
+        lock, barrier, last_failure_done, sizes = ctx.Lock(), ctx.Barrier(4), ctx.Event(), []
         workers = 0
         def replay(report, root, address):
             with lock:
@@ -243,9 +275,11 @@ class OfflineProcessReplayTests(unittest.TestCase):
                 active.value += 1
                 peak.value = max(peak.value, active.value)
             if workers and first:
-                barrier.wait(timeout=10)
-            if address == addresses[0]:
-                time.sleep(.03)
+                arrive(barrier, 'all 4 first-batch replays running in their processes at once')
+            if workers and address == addresses[3]:
+                # The first stale report finishes only after the last one's check has completed,
+                # so completion order reverses the two reported failures.
+                await_set(last_failure_done, "the check of 08000090 completing before 08000030's")
             with (self.root / f'{address:08X}.replay').open('a') as stream:
                 stream.write(str(os.getpid()) + '\n')
             with lock:
@@ -253,19 +287,25 @@ class OfflineProcessReplayTests(unittest.TestCase):
             return 'stale' not in report
         results, progresses = [], []
         with patch.object(status, 'report_matches', side_effect=replay), \
+                patch.object(status, 'ProcessPoolExecutor',
+                             fixtures.signalling_executor(status.ProcessPoolExecutor, sizes, last_failure_done, '08000090')), \
                 patch.object(status.subprocess, 'run', side_effect=AssertionError('offline compiled')):
             for workers in (0, 4):
                 count.value = active.value = peak.value = 0
+                last_failure_done.clear()
                 progress = {}
                 results.append(status.collect(str(self.root), False,
                     worker_processes=workers, progress=progress, write_reports=True))
                 progresses.append(progress)
                 self.assertEqual(count.value, 11)
+                self.assertEqual(sizes, [4] if workers else [])
+                sizes.clear()
                 self.assertEqual(peak.value, 4 if workers else 1)
         self.assertEqual(results[0], results[1])
-        self.assertEqual(results[0][:4], (12, 10, 96, 80))
+        self.assertEqual(results[0][:4], (12, 9, 96, 72))
         self.assertEqual(results[0][4], [
             '08000030: no current, source-bound MATCH report; re-run match.py',
+            '08000090: no current, source-bound MATCH report; re-run match.py',
             '080000B0: no match report in docs/match/',
             '080000B0: no current, source-bound MATCH report; re-run match.py'])
         self.assertEqual(progresses[0], progresses[1])

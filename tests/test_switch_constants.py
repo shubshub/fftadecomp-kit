@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import switch_constants_profile as profile
+from event_waits import HANG_GUARD
 import match
 import match_evidence
 import rebuild
@@ -129,6 +130,15 @@ movs r0, #0
 {tail}
 .size func_08000000, . - func_08000000
 """
+
+
+def pidfd_supported():
+    """os.pidfd_open exists and works: kernels before Linux 5.3 raise ENOSYS."""
+    try:
+        os.close(os.pidfd_open(os.getpid()))
+    except (AttributeError, OSError):
+        return False
+    return True
 
 
 class RealSourceTests(unittest.TestCase):
@@ -426,12 +436,12 @@ class RealSourceTests(unittest.TestCase):
                     match.main()
             self.assertFalse((self.root / "docs/match/08000000.md").exists())
 
-    @unittest.skipUnless(hasattr(os, "pidfd_open"), "observing the grandchild's exit needs pidfd_open")
+    @unittest.skipUnless(pidfd_supported(), "observing the grandchild's exit needs pidfd_open (Linux 5.3+)")
     def test_timeout_kills_the_owned_child_group(self):
         # Every step waits on an event, never on the host's speed: the timeout
         # is raised only once the grandchild exists, and its exit is read from
         # a pidfd. CEILING bounds a hang; reaching it fails the test.
-        CEILING = 60
+        CEILING = HANG_GUARD
         REPLAY_TIMEOUT = 7.25  # arbitrary; it must reach communicate() unchanged
         channel = self.root / "grandchild.pid"
         os.mkfifo(channel)
@@ -464,9 +474,19 @@ class RealSourceTests(unittest.TestCase):
                     self.fail("the killed group kept the child's pipes open")
             forwarded.append(kwargs.get("timeout", args[1] if len(args) > 1 else None))
             grandchild.append(None)
+            # The child's own exit is an event too: it fails the wait at once.
+            child = os.pidfd_open(process.pid)
+            self.addCleanup(os.close, child)
             data = b""
             while True:
-                wait_readable(reader, "the child reporting its grandchild's pid")
+                waiter = select.poll()
+                waiter.register(reader, select.POLLIN)
+                waiter.register(child, select.POLLIN)
+                ready = dict(waiter.poll(CEILING * 1000))
+                if not ready:
+                    self.fail(f"the child reporting its grandchild's pid did not happen within {CEILING} s")
+                if reader not in ready:
+                    self.fail("the child exited before reporting its grandchild's pid")
                 chunk = os.read(reader, 64)
                 if not chunk:
                     break

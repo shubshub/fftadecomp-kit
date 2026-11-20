@@ -9,8 +9,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
-from threading import Barrier, Lock
-import time
+from threading import Barrier, Event, Lock
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
@@ -19,6 +18,7 @@ import warnings
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
+from event_waits import arrive, await_set
 import push
 import status
 
@@ -28,6 +28,75 @@ def matched_output(size=8, compared=True):
     return (f"extent    {size} bytes (complete ELF symbol; closed CFG; no relocations)\n"
             "verdict MATCH - byte identical\n" +
             ("\nreport  identical to the saved docs/match/fixture.md\n" if compared else ""))
+
+
+def signalling_executor(base, sizes, flag=None, source=None):
+    """base, recording each pool's max_workers in sizes; and, given flag and source, the
+    future of the check for source sets flag once it is done.
+
+    A check that waits on flag therefore finishes only after that source's check has
+    completed (its future is done), whatever order the workers run in."""
+    class Executor(base):
+        def __init__(self, max_workers=None, *args, **kwargs):
+            sizes.append(max_workers)
+            super().__init__(max_workers, *args, **kwargs)
+
+        def submit(self, fn, /, *args, **kwargs):
+            future = super().submit(fn, *args, **kwargs)
+            if flag is not None and f"{source}.c" in repr(args):
+                future.add_done_callback(lambda _: flag.set())
+            return future
+    return Executor
+
+
+class SignallingLock:
+    """A report lock whose contended acquire sets waiting: another check is now blocked on it."""
+
+    def __init__(self, waiting):
+        self.lock, self.waiting = Lock(), waiting
+
+    def __enter__(self):
+        if not self.lock.acquire(blocking=False):
+            self.waiting.set()
+            self.lock.acquire()
+        return self
+
+    def __exit__(self, *exc):
+        self.lock.release()
+
+
+def duplicate_checks_wait_for_each_other(test, jobs):
+    """Check two sources sharing one report path: the first check proceeds only once the
+    second has either started (a concurrent run) or blocked on the shared report lock."""
+    lock, other, built = Lock(), Event(), []
+    active, peak, calls = 0, 0, 0
+
+    def invoke(command, **_):
+        nonlocal active, peak, calls
+        with lock:
+            calls += 1
+            first = calls == 1
+            active += 1
+            peak = max(peak, active)
+        if first:
+            await_set(other, "the second check of the shared report path starting or waiting on its lock")
+        else:
+            other.set()
+        with lock:
+            active -= 1
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    def report_lock():
+        built.append(SignallingLock(other))
+        return built[-1]
+
+    with patch.object(status, "Lock", report_lock), \
+            patch.object(status.subprocess, "run", side_effect=invoke):
+        test.assertEqual(test.collect(jobs, write_reports=True)[4], ["08000000: DOES NOT MATCH"] * 2)
+    # Only the shared path's report lock may signal: any other lock contending would open the gate early.
+    test.assertEqual(len(built), 1)
+    test.assertEqual(calls, 2)
+    test.assertEqual(peak, 1)
 
 
 class StatusParallelTests(unittest.TestCase):
@@ -63,7 +132,7 @@ class StatusParallelTests(unittest.TestCase):
         cwd, environment = os.getcwd(), dict(os.environ)
         for jobs in (1, 2, 6):
             with self.subTest(jobs=jobs):
-                lock, barrier = Lock(), Barrier(jobs)
+                lock, barrier, other_done, sizes = Lock(), Barrier(jobs), Event(), []
                 active, peak, started, completed = 0, 0, [], []
 
                 def invoke(command, **kwargs):
@@ -78,9 +147,11 @@ class StatusParallelTests(unittest.TestCase):
                         active += 1
                         peak = max(peak, active)
                     if first_batch:
-                        barrier.wait(timeout=5)
-                    if address == "08000000":
-                        time.sleep(0.04)
+                        arrive(barrier, f"all {jobs} first-batch checks running at once")
+                    if jobs > 1 and address == "08000010":
+                        # The first failure finishes only after the last one's check has completed,
+                        # so completion order reverses the two reported failures.
+                        await_set(other_done, "the check of 08000060 completing before 08000010's")
                     with lock:
                         active -= 1
                         completed.append(address)
@@ -88,12 +159,15 @@ class StatusParallelTests(unittest.TestCase):
                     output = "no verdict\n" if address == "08000030" else matched_output()
                     return subprocess.CompletedProcess(command, code, output, "diagnostic")
 
-                with patch.object(status.subprocess, "run", side_effect=invoke):
+                with patch.object(status, "ThreadPoolExecutor",
+                                  signalling_executor(status.ThreadPoolExecutor, sizes, other_done, "08000060")), \
+                        patch.object(status.subprocess, "run", side_effect=invoke):
                     self.assertEqual(self.collect(jobs), expected)
+                self.assertEqual(sizes, [jobs] if jobs > 1 else [])
                 self.assertEqual(peak, jobs)
                 self.assertEqual(len(started), 8)
                 if jobs > 1:
-                    self.assertNotEqual(completed, sorted(completed))
+                    self.assertGreater(completed.index("08000010"), completed.index("08000060"))
         self.assertEqual(os.getcwd(), cwd)
         self.assertEqual(dict(os.environ), environment)
 
@@ -168,23 +242,7 @@ class StatusParallelTests(unittest.TestCase):
         self.fixture([0x08000000])
         (self.root / "src/nested").mkdir()
         (self.root / "src/nested/08000000.c").write_text("void duplicate(void) {}\n")
-        lock, active, peak = Lock(), 0, 0
-
-        def invoke(command, **_):
-            nonlocal active, peak
-            with lock:
-                active += 1
-                peak = max(peak, active)
-            time.sleep(0.01)
-            with lock:
-                active -= 1
-            return subprocess.CompletedProcess(command, 1, "", "")
-
-        with patch.object(status.subprocess, "run", side_effect=invoke) as invocation:
-            self.assertEqual(self.collect(6, write_reports=True)[4],
-                             ["08000000: DOES NOT MATCH"] * 2)
-        self.assertEqual(invocation.call_count, 2)
-        self.assertEqual(peak, 1)
+        duplicate_checks_wait_for_each_other(self, 6)
 
     def test_default_and_offline_paths_do_not_create_workers(self):
         self.fixture([0x08000000])
@@ -202,7 +260,7 @@ class StatusParallelTests(unittest.TestCase):
 
     def test_twenty_four_workers_preserve_serial_counts_and_failures(self):
         self.fixture([0x08000000 + i * 16 for i in range(32)])
-        lock, barrier = Lock(), Barrier(24)
+        lock, barrier, sizes = Lock(), Barrier(24), []
         active, peak, started = 0, 0, 0
 
         def response(command):
@@ -220,17 +278,21 @@ class StatusParallelTests(unittest.TestCase):
                 active += 1
                 peak = max(peak, active)
             if first_batch:
-                barrier.wait(timeout=5)
+                arrive(barrier, "all 24 first-batch checks running at once")
             try:
                 return response(command)
             finally:
                 with lock:
                     active -= 1
 
-        with patch.object(status.subprocess, "run", side_effect=invoke) as invocation:
+        with patch.object(status, "ThreadPoolExecutor", signalling_executor(status.ThreadPoolExecutor, sizes)), \
+                patch.object(status.subprocess, "run", side_effect=invoke):
             self.assertEqual(self.collect(24), serial)
         self.assertEqual(serial, (32, 31, 256, 248, ["080001F0: DOES NOT MATCH"], 0, 0))
-        self.assertEqual(invocation.call_count, 32)
+        self.assertEqual(sizes, [24])
+        # Counted under the test's lock: Mock.call_count is updated without a lock on
+        # Python 3.12 and early 3.13/3.14 releases (fixed by gh-142651).
+        self.assertEqual(started, 32)
         self.assertEqual(peak, 24)
 
     def test_status_cli_passes_jobs_and_preserves_check_no_write(self):
