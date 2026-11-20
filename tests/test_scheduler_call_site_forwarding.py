@@ -17,6 +17,7 @@ import stack_index_precondition_profile as stack_index
 from test_scheduler_predicates import half, fixture, A, B, C, R0
 from test_scheduler_call_site_summaries import (Owner, scheduler_call, epilogue, two_sites, BODIES,
                                                 CALLBACK)
+from test_scheduler_call_site_summaries import admitted, REFUSAL
 
 V1, V2 = profile.SELECTOR, profile.SELECTOR_V2
 S = profile.SCHEDULER
@@ -382,6 +383,17 @@ class ForwardedCallSiteTests(unittest.TestCase):
                               V2, '--help'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stderr)
 
+
+
+class ForwardedOwnerAdmissionBindingTests(unittest.TestCase):
+    """check_bindings as owner.verify applies it under the v2 selector."""
+
+    def test_call_site_v2_selector_refuses_a_callback_bound_as_data(self):
+        manifest, _ = admitted(owner_program(), selector=V2, bodies=bodies())
+        self.assertEqual(manifest['profile'], profile.SCHEMA_V2)
+        self.assertEqual([name for _, name in manifest['bindings']['functions']], ['func_08001600'])
+        with self.assertRaisesRegex(ValueError, REFUSAL):
+            admitted(owner_program(), selector=V2, bodies=bodies(), as_data=(CALLBACK,))
 
 
 if __name__ == '__main__':

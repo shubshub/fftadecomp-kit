@@ -1,5 +1,7 @@
 """Per-site scheduler descriptor summaries in the ordinary named-data owner walk."""
 import hashlib
+import json
+import os
 from pathlib import Path
 import struct
 import subprocess
@@ -676,6 +678,137 @@ class CallSiteSummaryTests(unittest.TestCase):
         run = subprocess.run([sys.executable, '-B', str(Path(match.__file__)), '--owner-runtime-profile',
                               SELECTOR, '--help'], capture_output=True, text=True)
         self.assertEqual(run.returncode, 0, run.stderr)
+
+
+def admitted(owner_program, *, selector=SELECTOR, bodies=None, as_data=()):
+    """owner.verify over a synthetic ROM, with the bindings an original build gives: every call
+    named and every callback literal a function word. A literal value in `as_data` is bound to a
+    zero-addend named data symbol at the same address instead."""
+    data, calls = owner_program.build()
+    base = owner_program.base
+    image = fixture({base: data, CALLBACK - 1: half(0x4770), OTHER_CALLBACK - 1: half(0x4770),
+                     **BODIES, **(bodies or {})})
+    literals = sorted(owner_program.literals.items(), key=lambda item: item[1])
+    bindings = dict(calls=sorted([site - base, f'func_{target:08X}'] for site, target in calls.items()),
+                    data=[[offset, f'data_{value:08X}', 0] for value, offset in literals if value in as_data],
+                    functions=[[offset, f'func_{value - 1:08X}'] for value, offset in literals
+                               if value in (CALLBACK, OTHER_CALLBACK) and value not in as_data], switches=[])
+    objects = json.dumps({f'data_{value:08X}': f'0x{value:08X}' for value in as_data}).encode()
+    proof = local.ConditionalLocalBufferProof
+    span, runtimes = proof.span, set(match.function_thunk.ALIASES.values())
+    pins = {a: (len(b), hashlib.sha256(b).hexdigest()) for a, b in BODIES.items()}
+    with mock.patch.dict(local.DEPENDENCIES, pins), \
+            mock.patch.object(local.thunk, 'dependencies', return_value=[]), \
+            mock.patch.object(proof, 'span', lambda p, a: half(0x4710) if a in runtimes else span(p, a)):
+        return owner.verify(data, base, image.rom, image.mapping, image.index, objects,
+                            bindings=bindings, selector=selector)
+
+
+def scene_fill_owner(address):
+    """A scene palette-fill owner: the fill word at its SP offset, the descriptor above it, and
+    the CpuSet call and the scheduler site on separate arms."""
+    size, site, destination, offset = local.scene_fill.OWNERS[address]
+    frame, word = (offset + 32) // 4, offset // 4
+    p = Owner(address)
+    p.emit(0xB500, 0xB080 | frame, 0x2800)          # push {lr}; sub sp; cmp r0,#0
+    p.branch(0xD000, 'scheduler')                   # beq scheduler
+    p.emit(*[0] * ((site - 14 - p.here()) // 2))    # movs r0,r0 up to the fixed fill sequence
+    p.emit(0xA900 | word if offset else 0x4669)     # add r1,sp,#offset or mov r1,sp
+    p.load(2, local.scene_fill.WHITE)
+    p.emit(0x1C10, 0x8008)                          # adds r0,r2,#0; strh r0,[r1]
+    p.load(1, destination)
+    p.load(2, local.scene_fill.CONTROL)
+    p.emit(0xA800 | word if offset else 0x4668)     # add r0,sp,#offset or mov r0,sp
+    p.call(local.scene_fill.bios.ADDRESS)
+    p.branch(0xE000, 'exit')                        # b exit
+    p.label('scheduler')
+    p.emit(*[0] * ((address + size - 36 - p.here()) // 2))  # the owner's size is fixed
+    scheduler_call(p, descriptor=0xAA00 | (word + 1))  # add r2,sp,#offset+4
+    p.label('exit')
+    p.emit(0xB000 | frame, 0xBC02, 0x4708)          # add sp; pop {r1}; bx r1
+    return p
+
+
+def fixed_owner(variable, address):
+    """A fixed owner of the USA ROM from the game tree `variable` names: the owner.verify
+    arguments before the data symbols, the data symbols, and the bindings of its saved report."""
+    root = Path(os.environ[variable]).resolve()
+    rom = Path(match.rom_path(str(root))).read_bytes()
+    lines = (root / f'docs/match/{address:08X}.md').read_text().splitlines()
+    saved = {key: next(line.split('`')[1] for line in lines if line.startswith(f'* {key}:'))
+             for key in ('ROM bytes', 'owner runtime evidence')}
+    start = address - match.ROM_BASE
+    return ((rom[start:start + len(saved['ROM bytes']) // 2], address, rom, match.mapping_snapshot(root),
+             owner.index_snapshot(root)), json.loads(match.data_snapshot(root)),
+            json.loads(saved['owner runtime evidence'])['manifest']['bindings'])
+
+
+REFUSAL = 'scheduler callback register requires a typed function literal'
+
+
+class OwnerAdmissionBindingTests(unittest.TestCase):
+    """check_bindings as owner.verify applies it, not called directly: one test for each selector
+    in CALL_SITE_POLICIES but v2, which test_scheduler_call_site_forwarding covers."""
+
+    def test_call_site_v1_selector_refuses_a_callback_bound_as_data(self):
+        manifest, _ = admitted(two_sites())
+        self.assertEqual(manifest['profile'], profile.SCHEMA)
+        self.assertEqual([name for _, name in manifest['bindings']['functions']],
+                         ['func_08001600', 'func_08001700'])
+        for callback in (CALLBACK, OTHER_CALLBACK):
+            with self.subTest(callback=hex(callback)), self.assertRaisesRegex(ValueError, REFUSAL):
+                admitted(two_sites(), as_data=(callback,))
+
+    def test_scene_fill_selector_refuses_a_callback_bound_as_data(self):
+        scene = local.scene_fill
+        found = dict(selector=scene.SELECTOR, bodies={scene.bios.ADDRESS: scene.bios.WRAPPER})
+        for address, (_, _, destination, _) in scene.OWNERS.items():
+            with self.subTest(owner=hex(address)):
+                manifest, _ = admitted(scene_fill_owner(address), as_data=(destination,), **found)
+                self.assertEqual(manifest['profile'], scene.SCHEMA)
+                self.assertEqual([name for _, name in manifest['bindings']['functions']], ['func_08001600'])
+                with self.assertRaisesRegex(ValueError, REFUSAL):
+                    admitted(scene_fill_owner(address), as_data=(destination, CALLBACK), **found)
+
+    def fixed_owner_refuses(self, module, variable, own_refusal):
+        """Owner admission hands the admitted owner's sites and bindings to the call-site rule, as a
+        spy on it records; a callback bound as data is refused by the selector's own exact-binding
+        rule, which comes first, and would be refused by the call-site rule too. No rule is patched."""
+        arguments, symbols, bindings = fixed_owner(variable, module.OWNER)
+        verify = lambda bound, names=symbols: owner.verify(
+            *arguments, json.dumps(names).encode(), bindings=bound, selector=module.SELECTOR)
+        with mock.patch.object(profile, 'check_bindings', wraps=profile.check_bindings) as call_site_rule:
+            manifest, _ = verify(bindings)
+        self.assertEqual(manifest['profile'], module.SCHEMA)
+        calls = manifest['proof']['buffers']['conditional_local_calls']
+        call_site_rule.assert_called_once_with(calls, bindings)
+        for offset in sorted({offset for site in calls['call_sites']['sites']
+                              for offset in site['callback_literal_offsets']}):
+            value = struct.unpack_from('<I', arguments[0], offset)[0]
+            name = f'data_{value:08X}'
+            bound = dict(bindings, functions=[row for row in bindings['functions'] if row[0] != offset],
+                         data=sorted(bindings['data'] + [[offset, name, 0]]))
+            with self.subTest(offset=offset):
+                self.assertNotEqual(bound['functions'], bindings['functions'])
+                with self.assertRaisesRegex(ValueError, own_refusal):
+                    verify(bound, {**symbols, name: f'0x{value:08X}'})
+                with self.assertRaisesRegex(ValueError, REFUSAL):
+                    profile.check_bindings(calls, bound)
+
+    @unittest.skipUnless(os.environ.get('FFTA_EFFECT_INITIALIZER_ROOT'), 'needs the indexed USA ROM and its reports')
+    def test_effect_initializer_selector_refuses_a_callback_bound_as_data(self):
+        self.fixed_owner_refuses(local.effect_init, 'FFTA_EFFECT_INITIALIZER_ROOT',
+                                 'genuine initializer, child and resource bindings')
+
+    @unittest.skipUnless(os.environ.get('FFTA_MENU_PALETTE_ROOT'), 'needs the indexed USA ROM and its reports')
+    def test_menu_palette_selector_refuses_a_callback_bound_as_data(self):
+        self.fixed_owner_refuses(local.menu_palette, 'FFTA_MENU_PALETTE_ROOT',
+                                 'wrong call, object, addend or callback relocation')
+
+    @unittest.skipUnless(os.environ.get('FFTA_EFFECT_REGISTRY_ROOT'), 'needs the indexed USA ROM and its reports')
+    def test_effect_registry_selector_refuses_a_callback_bound_as_data(self):
+        self.fixed_owner_refuses(local.effect_registry, 'FFTA_EFFECT_REGISTRY_ROOT',
+                                 'exact callback, named tables and scheduler relocations')
 
 
 if __name__ == '__main__':
