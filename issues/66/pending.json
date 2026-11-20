@@ -954,6 +954,98 @@
           "who": "astra-08004aa4"
         }
       },
+      "release": {
+        "acceptance_body_sha256": "d9dbb1f10e09b979e03063b7f1c19b49900d9044f8db3903d787cf7e267f3b47",
+        "acknowledged_cursor": 7030508576,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "d9dbb1f10e09b979e03063b7f1c19b49900d9044f8db3903d787cf7e267f3b47",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08004AA4\",\"who\":\"astra-08004aa4\",\"claim_id\":7030487443,\"reason\":\"Already indexed inside 08003F10: the 18-byte tail restores that frame and returns one\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T04:34:12Z",
+          "id": 7030508576,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T04:34:12Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2668b377758a7f54427eb0e1e450dbe7abf2ee73b15c68cb6ddb05585ad67cb8",
+        "result": {
+          "address": "0x08004AA4",
+          "claim_id": 7030487443,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7030508576,
+          "status": "accepted",
+          "who": "astra-08004aa4"
+        }
+      }
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "c8d4d55ca958e4e12f523a82be9d77c08831377ce172d52ba935b0ee5f822e73",
+        "acknowledged_cursor": 7030508576,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "c8d4d55ca958e4e12f523a82be9d77c08831377ce172d52ba935b0ee5f822e73",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080CAE2C\",\"who\":\"astra-080cae2c\",\"note\":\"Native USA C matching with caller and ROM evidence\"}",
+          "created_at": "2026-11-20T04:33:42Z",
+          "id": 7030500811,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T04:33:42Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2668b377758a7f54427eb0e1e450dbe7abf2ee73b15c68cb6ddb05585ad67cb8",
+        "result": {
+          "address": "0x080CAE2C",
+          "claim_id": 7030500811,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7030500811,
+          "status": "accepted",
+          "who": "astra-080cae2c"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "bb782f4e1aa44f6080a69a7c93f7cc1b37d787eae50fe93c3737628001681aef",
+        "acknowledged_cursor": 7030508576,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "bb782f4e1aa44f6080a69a7c93f7cc1b37d787eae50fe93c3737628001681aef",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080F9524\",\"who\":\"astra-080f9524\",\"note\":\"Native USA C matching with caller and ROM evidence\"}",
+          "created_at": "2026-11-20T04:33:45Z",
+          "id": 7030501644,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T04:33:45Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "2668b377758a7f54427eb0e1e450dbe7abf2ee73b15c68cb6ddb05585ad67cb8",
+        "result": {
+          "address": "0x080F9524",
+          "claim_id": 7030501644,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7030501644,
+          "status": "accepted",
+          "who": "astra-080f9524"
+        }
+      },
       "release": null
     }
   ],
