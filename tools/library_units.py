@@ -61,6 +61,12 @@ UNIT_LINE = "* library unit: "
 TOOLCHAIN_LINE = "* unit toolchain: "
 COMPILER_LINE = "* unit compiler SHA-256: "
 ORPHAN_LINE = "* unit orphan constants: "
+# what the unit build adds to the prerequisite's record, which it carries unchanged
+ORPHAN_CONTRACT = ("The prerequisite record is as the prerequisite issued it for the original object, before "
+                   "any exclusion: its section_exclusion_performed and its contract describe the prerequisite "
+                   "alone. The unit build then removed excluded_sections with objcopy and required the .text, "
+                   "its relocations and the function symbol to be unchanged. The excluded bytes earn no ROM "
+                   "credit.")
 MARKERS = ("* library unit", "* unit ")
 
 
@@ -530,12 +536,21 @@ def exclude_orphan_constants(runner, workspace, args, original_elf, address, rom
     if signature(result, address) != signature(image, address) or \
             ".rodata" in result["section_names"] or ".rel.rodata" in result["section_names"]:
         raise Refusal("orphan exclusion changed the function or kept the orphan section")
-    # the prerequisite itself never excludes; this wrapper just did
-    inventory = dict(inventory, section_exclusion_performed=True)
     return stripped, result["text"], result, {
-        "prerequisite": inventory, "excluded_sections": [".rodata", ".rel.rodata"],
+        "prerequisite": inventory, "contract": ORPHAN_CONTRACT, "excluded_sections": [".rodata", ".rel.rodata"],
         "section_exclusion_performed": True, "original_elf_sha256": sha(original_elf),
         "excluded_elf_sha256": sha(stripped), "excluded_ROM_credit": 0}
+
+
+def orphan_record_as_issued(record):
+    """Whether a saved record states the exclusion as exclude_orphan_constants writes it.
+
+    The prerequisite's record says it excluded nothing; the unit's statement
+    beside it says the unit build did.  A nested record that claims the
+    exclusion is not one the prerequisite issued.
+    """
+    return (record["prerequisite"]["section_exclusion_performed"] is False and
+            record["section_exclusion_performed"] is True and record["contract"] == ORPHAN_CONTRACT)
 
 
 def report_lines(context, orphan):
@@ -599,8 +614,8 @@ def report_admitted(report, root, address):
         verifications = [line for line in lines if line.startswith("* verification: ")]
         if bound is not None:
             row, toolchain, digest, orphan = bound
-            if orphan is not None:
-                json.loads(orphan)
+            if orphan is not None and not orphan_record_as_issued(json.loads(orphan)):
+                return False
             tool = resolve(toolchain)
             return (unit is not None and row == unit.text and toolchain == unit.toolchain and
                     digest == tool["sha256"] and compilers == [f"* compiler: `{tool['cc']} {tool['flags']}`"] and

@@ -2911,6 +2911,18 @@ nothing refers to it. Such a section is first authenticated with the
 existing compiler-orphan prerequisite, then removed; the remaining `.text`,
 its relocations and the function symbol must be unchanged. The excluded
 bytes earn no ROM credit, and the report records the authentication.
+The `* unit orphan constants:` line carries the prerequisite's record as the
+prerequisite issued it. That record describes the original object, so its
+`section_exclusion_performed` is `false` and its contract lists exclusion as
+still required. The removal is the unit build's own statement beside it:
+`contract`, `excluded_sections`, `section_exclusion_performed: true` and the
+digests of the object before and after. The library unit rule of the
+saved-report check (`report_matches`) refuses the line when the nested flag
+is not `false`, when the unit flag is not `true`, or when `contract` is
+missing or is not the fixed sentence `library_units.ORPHAN_CONTRACT`. That
+rule reads nothing else in the line: `excluded_sections`, the digests and the
+rest of the nested record are compared only against a fresh compile, which
+`match.py --check-report` runs over the whole report.
 
 The prerequisite admits two shapes of unit objects, and records each in its
 inventory:
