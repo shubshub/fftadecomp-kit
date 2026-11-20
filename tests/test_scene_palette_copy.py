@@ -9,6 +9,22 @@ import scene_palette_copy as scene
 import volatile_semantics as semantics
 
 
+class SavedSelector(unittest.TestCase):
+    def test_palette_copy_replays_with_its_own_selector(self):
+        from match_evidence import saved_selectors
+        fields = [f'# 0x{scene.OWNER:08X}', f'* verification: `{scene.SCHEMA}`',
+                  f'* owner runtime: {scene.SCHEDULER}']
+        marker = scene.RECORD + f'`{scene.SELECTOR}`, native copy contract'
+        def arguments(lines):
+            return saved_selectors('\n'.join(lines)).arguments
+        self.assertEqual(arguments(fields), ['--owner-runtime-profile', scene.SCHEDULER])
+        self.assertEqual(arguments(fields + [marker]), ['--owner-runtime-profile', scene.SELECTOR])
+        for invalid in ([*fields, marker, marker], [*fields, marker.replace(scene.SELECTOR, 'other')],
+                        ['# 0x08000000', *fields[1:], marker]):
+            with self.assertRaises(ValueError):
+                arguments(invalid)
+
+
 class NativeInputs(unittest.TestCase):
     def fixture(self):
         start, end = scene.OWNER, scene.END
