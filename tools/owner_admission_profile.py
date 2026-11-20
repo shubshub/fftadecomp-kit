@@ -515,6 +515,12 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         import sprite_tile_selection
         proof = sprite_tile_selection.prove(data, rom, mapping, index, objects, bindings,
                                            ins, edges, calls, refinement, words)
+    elif selector == runtime_summary.SELECTOR and address == 0x08136A10:
+        import title_menu_style
+        proof = title_menu_style.owner_proof(
+            data, rom, mapping, index, objects,
+            bindings if bindings is not None else (manifest or {}).get('bindings'),
+            ins, calls, refinement, words, premises)
     elif selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878:
         import name_entry_copy
         proof = name_entry_copy.prove(data, rom, mapping, index, objects, bindings, ins, calls, refinement, words)
@@ -1466,6 +1472,8 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
     if selector == named_buffer.THUNK_SELECTOR and address == 0x08021854:
         import sprite_tile_selection
         sprite_tile_selection.check_original(image, result, targets)
+    if selector == runtime_summary.SELECTOR and address == 0x08136A10:
+        active_shuffle.compiler_symbol_roles(image, targets)
     if selector == named_buffer.THUNK_SELECTOR and address == 0x0812A878:
         import name_entry_copy
         name_entry_copy.check_original(image, result, targets)
@@ -1638,7 +1646,9 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     environment=environment_reader() if environment_reader else None
     source=source_fingerprint(root,address);mapping=mapping_snapshot(root);index=index_snapshot(root)
     objects=data_snapshot(root);rom_path=report_rom_path(root);rom=Path(rom_path).read_bytes()
-    premises=stack_index_snapshot(root) if selector in stack_index.SELECTORS else None
+    uses_index_premises = selector in stack_index.SELECTORS or (
+        selector == runtime_summary.SELECTOR and address == 0x08136A10)
+    premises=stack_index_snapshot(root) if uses_index_premises else None
     candidates=list((root/'src').rglob(f'{address:08X}.c'))
     if len(candidates)!=1:raise ValueError('owner requires one unique source')
     (root/'build').mkdir(exist_ok=True)
@@ -1753,7 +1763,7 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     if source_fingerprint(root,address)!=source or mapping_snapshot(root)!=mapping or \
             index_snapshot(root)!=index or data_snapshot(root)!=objects or \
             report_rom_path(root)!=rom_path or Path(rom_path).read_bytes()!=rom or \
-            selector in stack_index.SELECTORS and stack_index_snapshot(root)!=premises:
+            uses_index_premises and stack_index_snapshot(root)!=premises:
         raise ValueError('owner source, maps, headers or ROM changed during native verification')
     if selector == named_buffer.BIOS_OVERWRITE_SELECTOR:
         semantic_records = match.allowlisted_volatile_semantics(root,address,
@@ -1838,7 +1848,8 @@ def render(address,result):
         '* verified extent: complete ELF function symbol, including literal pools',
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         *(stack_index.precondition_lines(manifest['proof']['buffers']['stack_index_preconditions'])
-          if manifest['profile'] in stack_index.SCHEMAS.values() else []),
+          if (manifest['profile'] in stack_index.SCHEMAS.values() or
+              manifest['profile'] == runtime_summary.SCHEMA and address == 0x08136A10) else []),
         *(stack_index.forwarded_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if manifest['profile'] == stack_index.SCHEMA_V2 else []),
         *(stack_index.forwarded_lines(manifest['proof']['buffers']['conditional_local_calls'])

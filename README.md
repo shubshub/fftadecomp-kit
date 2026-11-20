@@ -6829,3 +6829,13 @@ test follows the original row and callers for both font modes and checks
 all fourteen icon streams. The clear count depends on the rendered width.
 The report preserves the zero and wrapped counts possible with a fixed-width
 font. Set `FFTA_ITEM_QUANTITY_ROW_ROOT` to run the item-quantity tests.
+
+### Title menu selection
+
+The title task calls `08136A10` during phase seven to update the selections
+and draw the labels and cursor. The runtime-summary proof follows both
+unsigned arithmetic routines and checks that each local style byte is
+initialized before use. Its two indexed writes require the corresponding
+menu selection to be in the range zero through two. Both bounds are recorded
+in the game tree. Set `FFTA_TITLE_MENU_ROOT` to run the original-ROM tests
+in `tests/test_title_menu_style.py`.
