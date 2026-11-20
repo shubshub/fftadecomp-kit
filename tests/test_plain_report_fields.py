@@ -594,18 +594,20 @@ class SavedReportTests(unittest.TestCase):
 
 @unittest.skipUnless(os.path.exists(os.path.expandvars(match.DEFAULT_CC)), "fixed compiler required")
 class SourcePathAgreementTests(unittest.TestCase):
-    """source_path mirrors match.py's own source resolution; run both on the same trees.
+    """match.py compiles and names the source `match_evidence.report_source` resolves.
 
-    match.py resolves the source inline (src/<ADDR>.c, else the first sorted <ADDR>.c under src/) and
-    prints it as `source    <path>` before compiling, so each layout is compared with what match.py
+    match.py calls report_source (src/<ADDR>.c, else the first sorted <ADDR>.c under src/) and prints
+    the result as `source    <path>` before compiling, so each layout is compared with what match.py
     itself chose (`source    <path>`; the plausibility line is `source  plausible`), and with the
-    `* source:` line when it writes a report.
+    `* source:` line when it writes a report. The expected path of each layout is written out here,
+    so the comparison does not depend on the function under test.
     """
-    LAYOUTS = (("top level", ("src/08000200.c",)),
-               ("module folder", ("src/20101/08000200.c",)),
-               ("top level and a folder that sorts first", ("src/08000200.c", "src/0000/08000200.c")),
-               ("two folders", ("src/20101/08000200.c", "src/0000/08000200.c")),
-               ("missing", ()))
+    LAYOUTS = (("top level", ("src/08000200.c",), "src/08000200.c"),
+               ("module folder", ("src/20101/08000200.c",), "src/20101/08000200.c"),
+               ("top level and a folder that sorts first", ("src/08000200.c", "src/0000/08000200.c"),
+                "src/08000200.c"),
+               ("two folders", ("src/20101/08000200.c", "src/0000/08000200.c"), "src/0000/08000200.c"),
+               ("missing", (), None))
 
     def test_match_py_and_replay_name_the_same_source(self):
         import test_data_buffer_calls as data_calls
@@ -616,7 +618,7 @@ class SourcePathAgreementTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="plain_report_source_", dir=scratch) as directory:
             root = data_calls.build(Path(directory), SOURCES["calls"], [("func_08000400", data_calls.STORES)])
             source = (root / "src/08000200.c").read_text()
-            for name, paths in self.LAYOUTS:
+            for name, paths, expected in self.LAYOUTS:
                 with self.subTest(layout=name):
                     for path in (root / "src").rglob("08000200.c"):
                         path.unlink()
@@ -625,7 +627,6 @@ class SourcePathAgreementTests(unittest.TestCase):
                         (root / path).write_text(source)
                     code, output, report = data_calls.run(root)
                     chosen = re.findall(r"^source {4}(\S+)$", output, re.MULTILINE)
-                    expected = fields.source_path(root, ADDRESS)
                     if expected is None:
                         self.assertNotEqual(code, 0)
                         self.assertIn("no source for 0x08000200 under src/", output)
@@ -634,7 +635,60 @@ class SourcePathAgreementTests(unittest.TestCase):
                     self.assertEqual(chosen, [expected], output)
                     if report is not None:
                         self.assertIn(f"* source: `{expected}`", report.splitlines())
-            self.assertEqual(fields.source_path(root, ADDRESS), None)
+            with self.assertRaisesRegex(ValueError, "no source for 0x08000200 under src/"):
+                evidence.report_source(root, ADDRESS)
+
+
+class OneSourceResolutionTests(unittest.TestCase):
+    """`check` has no source resolution of its own: it names what `match_evidence.report_source` names.
+
+    These run without the compiler. The layouts and their expected paths are the ones
+    SourcePathAgreementTests holds match.py to.
+    """
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory(prefix="plain_report_source_")
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        (self.root / "src").mkdir()
+
+    def admitted(self, path):
+        lines = [f"* source: `{path}`" if line.startswith("* source: ") else line
+                 for line in report_lines(evidence.SCHEMA)]
+        try:
+            fields.check(lines, evidence.SCHEMA, ADDRESS, self.root)
+        except ValueError as error:
+            self.assertEqual(str(error), "plain report source line does not name the source match.py compiles")
+            return False
+        return True
+
+    def test_check_names_what_report_source_resolves(self):
+        # The file on disk is src/08000200.c; check follows the resolver, not the tree.
+        (self.root / "src/08000200.c").write_text("/* fixture */\n")
+        self.assertTrue(self.admitted("src/08000200.c"))
+        with patch.object(evidence, "report_source", return_value="src/chosen/08000200.c") as resolver:
+            self.assertTrue(self.admitted("src/chosen/08000200.c"))
+            self.assertFalse(self.admitted("src/08000200.c"))
+            self.assertEqual([call.args for call in resolver.call_args_list], [(self.root, ADDRESS)] * 2)
+        with patch.object(evidence, "report_source", side_effect=ValueError("no source")):
+            self.assertFalse(self.admitted("src/08000200.c"))
+            self.assertFalse(self.admitted("None"))
+
+    def test_each_layout_names_one_fixed_path(self):
+        every = sorted({path for _, paths, _ in SourcePathAgreementTests.LAYOUTS for path in paths})
+        for name, paths, expected in SourcePathAgreementTests.LAYOUTS:
+            with self.subTest(layout=name):
+                for path in (self.root / "src").rglob("08000200.c"):
+                    path.unlink()
+                for path in paths:
+                    (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+                    (self.root / path).write_text("/* fixture */\n")
+                if expected is None:
+                    with self.assertRaisesRegex(ValueError, "no source for 0x08000200 under src/"):
+                        evidence.report_source(self.root, ADDRESS)
+                else:
+                    self.assertEqual(evidence.report_source(self.root, ADDRESS), expected)
+                self.assertEqual([path for path in every if self.admitted(path)],
+                                 [] if expected is None else [expected])
 
 
 if __name__ == "__main__":

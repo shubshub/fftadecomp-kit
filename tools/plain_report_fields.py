@@ -19,8 +19,9 @@ admits exactly the lines the writer produces for the claimed schema:
    without buffer calls, the `* DMA fill` lines may repeat:
    `dma_fill_profile.check_report` requires them to equal the recomputed
    block exactly, right after the stack-frame line;
-3. `* source:` names the file match.py compiles for the address (`source_path`:
-   `src/<ADDR>.c`, else the first `<ADDR>.c` under `src/` in sorted order), and
+3. `* source:` names the file match.py compiles for the address
+   (`match_evidence.report_source`, which match.py itself calls: `src/<ADDR>.c`,
+   else the first `<ADDR>.c` under `src/` in sorted order), and
    `* hand-asm allow list:` is `not listed` or `listed (...)`. The source
    fingerprint already binds that path, so a module move needs regeneration
    either way; this line must then name the new folder;
@@ -42,8 +43,6 @@ Library-unit lines are admitted at most once each; `library_units` validates the
    it (`data_literal`). The converse cannot be checked from the bytes: a
    literal outside the function may be a raw constant.
 """
-import os
-from pathlib import Path
 import re
 
 from dma_fill_profile import MARKER as DMA_FILL_LINES  # its summary, premise and manifest lines
@@ -91,13 +90,6 @@ def layout(schema):
     return required, optional, ((PROOF_LINES,) if buffer else ()) + ((DMA_FILL_LINES,) if framed and not buffer else ())
 
 
-def source_path(root, address):
-    """The source match.py compiles and names in `* source:`, relative to root; None if there is none."""
-    candidates = [Path(root, "src", f"{address:08X}.c")] + sorted(Path(root, "src").rglob(f"{address:08X}.c"))
-    found = next((candidate for candidate in candidates if os.path.exists(candidate)), None)
-    return None if found is None else os.path.relpath(found, root).replace(os.sep, "/")
-
-
 def check(lines, schema, address, root):
     """Raise ValueError unless the field lines are exactly those `match.py` writes for `schema`."""
     shape = layout(schema)
@@ -133,7 +125,11 @@ def check(lines, schema, address, root):
         raise ValueError("plain report field follows the verdict")
     value = {prefix: line[len(prefix):] for line in lines for prefix in ("* source: ", "* hand-asm allow list: ")
              if line.startswith(prefix)}
-    source = source_path(root, address)
+    import match_evidence as evidence
+    try:
+        source = evidence.report_source(root, address)  # the resolution match.py compiles from
+    except ValueError:
+        source = None
     if source is None or value["* source: "] != f"`{source}`":
         raise ValueError("plain report source line does not name the source match.py compiles")
     if HAND_ASM.fullmatch(value["* hand-asm allow list: "]) is None:
