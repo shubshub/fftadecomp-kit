@@ -207,6 +207,33 @@ NAMED = SOURCE.replace(
     'extern unsigned char func_08000410(void);\n'
     'extern void func_0814224C(void *destination, unsigned size, Initializer target);').replace(
     'data_02000200[0](data_02000100, 44);', 'func_0814224C(data_02000100, 44, data_02000200[0]);')
+# kit #393: case 1 stores the constant 0x808 into a halfword object, then reads a halfword
+# through a pointer loaded from memory and stores it shifted left by 16. If that pointer named
+# the object, the stored word would be 0x08080000, inside the ROM: the sound walk refuses it,
+# and only the load-bearing store premise at the pointer load admits it.
+PREMISED = SOURCE.replace(
+    'extern unsigned char func_08000410(void);',
+    'extern unsigned char func_08000410(void);\n'
+    'extern unsigned short data_02000300;\nextern unsigned short *data_02000304;\n'
+    'extern unsigned data_02000308;').replace(
+    '        data_02000100 = 0;\n',
+    '        data_02000100 = 0;\n        data_02000300 = 0x808;\n'
+    '        data_02000308 = *data_02000304 << 16;\n')
+
+
+def with_object(address, tail):
+    """verify_switches on build(tail=...) after ``ldr r1, =object``, the data object placed at ``address``."""
+    body, labels, manifest = build(tail=(('ldr', 1, 'object'), *tail))
+    struct.pack_into('<I', body, labels['object'], address)
+    return match.verify_switches(bytes(body), BASE, rom_image(body), mapping(body), manifest,
+                                 data_mapping=json.dumps({'g_right': f'0x{address:08X}'}).encode())
+
+
+def premises(fixture, **options):
+    """The store premises the CFG walk derives for a fixture (match.main's derive mode)."""
+    record = thunks.StorePremises()
+    leaf(fixture, switch_thunks=PLAIN, switch_thunk_premises=record, **options)
+    return record.derived
 
 
 class ProofTests(unittest.TestCase):
@@ -471,18 +498,22 @@ class ProofTests(unittest.TestCase):
             return dict(post=(('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x04C9), *first, *between,
                               ('h', 0x3131), ('h', 0x6059), *reload,
                               ('h', 0x6822), ('h', 0x6860), ('h', 0x1812)))
+        # The stored words are exact at the object's address, so the sum is the ROM address itself
+        # (kit #393). The writeback store moves r3 on by 4 first, so the second word lands at r3 + 8
+        # and the reload of r3 + 4 holds no stored constant: constant-derived, but no exact value.
+        rom, derived = 'can hold a local code address', 'holds a constant-derived value'
         variants = {
-            'fresh literal reload': parts(),
-            'rewrite of the base to itself': parts(between=(('h', 0x3300),)),
-            'writeback store': parts(first=(('h', 0xC302),), reload=(('ldr', 4, 'object'),)),
-            'copy of the base': parts(reload=(('h', 0x1C1C),)),
+            'fresh literal reload': (parts(), rom),
+            'rewrite of the base to itself': (parts(between=(('h', 0x3300),)), rom),
+            'writeback store': (parts(first=(('h', 0xC302),), reload=(('ldr', 4, 'object'),)), derived),
+            'copy of the base': (parts(reload=(('h', 0x1C1C),)), rom),
         }
-        for label, fixture in variants.items():
-            with self.subTest(label), self.assertRaisesRegex(ValueError, 'constant-derived'):
+        for label, (fixture, message) in variants.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, message):
                 leaf(build(**fixture), switch_thunks=PLAIN)
         # The dirty flag survives a call, which could copy the memory.
         bl = (('bl', CALLEE),)
-        with self.assertRaisesRegex(ValueError, 'constant-derived'):
+        with self.assertRaisesRegex(ValueError, 'holds a constant-derived value'):
             leaf(build(**parts(between=bl)), switch_thunks=PLAIN)
         # Storing only loaded values leaves later loads ordinary.
         verify(build(post=(('ldr', 3, 'object'), ('h', 0x6819), ('h', 0x6019), ('h', 0x6059),
@@ -501,9 +532,9 @@ class ProofTests(unittest.TestCase):
                 'loaded value plus constant, shifted': (
                     dict(post=(('ldr', 3, 'object'), ('h', 0x6818), ('h', 0x3031), ('h', 0x0502))),
                     'constant-derived'),
-                'constant stored and loaded back': (
+                'constant stored and loaded back': (  # exact at the object: 0x80 << 20 (kit #393)
                     dict(post=(('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x6019), ('h', 0x681A), ('h', 0x0512))),
-                    'constant-derived'),
+                    'can hold a local code address'),
                 'counting loop is widened': (
                     dict(post=(('ldr', 3, 'object'), ('h', 0x2100), ('label', 'again'), ('h', 0x3101),
                                ('h', 0x2905), ('bhi', 'again'), ('h', 0x6019),
@@ -635,6 +666,317 @@ class ProofTests(unittest.TestCase):
             self.assertEqual(thunks.join(value, mixed), value)
         self.assertEqual(thunks.join(low, high), (4, 0x90))
         self.assertEqual(thunks.join(high, low), (4, 0x90))
+
+    def test_a_constant_reloaded_from_memory_keeps_its_rom_check(self):
+        # kit #393: r3 = &g_right; each tail stores 0x08000015, an address inside this caller,
+        # built from constants that went through memory at the object's exact address.
+        obj, inside = ('ldr', 3, 'object'), (('h', 0x0524), ('h', 0x3415), ('h', 0x601C))  # lsls #20; adds; str
+        for label, tail in {
+                'word reload': (obj, ('h', 0x2180), ('h', 0x6019), ('h', 0x681C), *inside),
+                'halfword reload': (obj, ('h', 0x2180), ('h', 0x8019), ('h', 0x881C), *inside),
+                # three small stores assemble the word in memory; it is loaded and stored on
+                'byte assembly': (obj, ('h', 0x2108), ('h', 0x70D9), ('h', 0x2100), ('h', 0x7099),
+                                  ('h', 0x2115), ('h', 0x8019), ('h', 0x681C), ('h', 0x605C))}.items():
+            f = build(tail=tail)
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                verify(f)
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                leaf(f, switch_thunks=PLAIN, switch_thunk_premises=thunks.StorePremises())
+        # A callback loaded after a constant store is still refused.
+        with self.assertRaisesRegex(ValueError, 'constant-derived'):
+            verify(build(post=(obj, ('h', 0x2180), ('h', 0x6019), ('ldr', 2, 'object'), ('h', 0x6812))))
+        # A store of a loaded value at the same exact address replaces the constant there.
+        verify(build(tail=(obj, ('h', 0x2180), ('h', 0x6019), ('h', 0x6859), ('h', 0x6019),  # [r3] = [r3 + 4]
+                           ('h', 0x681C), *inside)))
+        # A join keeps the constant one path left, as kit #367 keeps a register's.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x6859), ('h', 0x2A00), ('bhi', 'skip'), ('h', 0x2180),
+                               ('label', 'skip'), ('h', 0x6019), ('h', 0x681C), *inside)))
+        # One byte stored anywhere cannot fill a word: a word reloaded from the object stays MIXED.
+        verify(build(tail=(obj, ('h', 0x6818), ('h', 0x2108), ('h', 0x7001),  # strb #8 through a loaded r0
+                           ('h', 0x681C), ('h', 0x601C))))
+        # An address exact on only one path is not exact: r2 is &g_right on the fall-through and a
+        # loaded word on the taken edge, so storing a loaded r6 through it cannot erase the 0x80.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x2180), ('h', 0x6019), ('h', 0x685A), ('h', 0x2800), ('bhi', 'skip'),
+                               ('h', 0x1C1A), ('label', 'skip'), ('h', 0x1C12), ('h', 0x68DE), ('h', 0x6016),
+                               ('h', 0x681C), *inside)))
+        # Byte ranges cover every value: byte 3 is 7 or 8, so the reloaded word may be 0x08000000.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x2107), ('h', 0x2800), ('bhi', 'skip'), ('h', 0x2108), ('label', 'skip'),
+                               ('h', 0x70D9), ('h', 0x2200), ('h', 0x709A), ('h', 0x801A),  # [r3+3]; [r3+2]; [r3]
+                               ('h', 0x681C), ('h', 0x605C))))
+        # A reloaded 0 minus 1 is exactly 0xFFFFFFFF (an interval that wraps whole), not a code address.
+        verify(build(tail=(obj, ('h', 0x2100), ('h', 0x6019), ('h', 0x681C), ('h', 0x3C01), ('h', 0x601C))))
+        # Both paths store at the object, so the join keeps both bytes: 0x80 is not lost behind 0x04.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x2180), ('h', 0x2800), ('bhi', 'skip'), ('h', 0x2104), ('label', 'skip'),
+                               ('h', 0x7019), ('h', 0x781C), *inside)))  # strb r1, [r3]; ldrb r4, [r3]
+        # Four bytes stored through a loaded pointer may assemble 0x08000015 at [r3 + 4]: the wild
+        # hull covers every one of them.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x6818), ('h', 0x2115), ('h', 0x7001), ('h', 0x2100), ('h', 0x7041),
+                               ('h', 0x7081), ('h', 0x2108), ('h', 0x70C1),  # [r0] = 0x15, 0, 0, 8
+                               ('h', 0x685C), ('h', 0x601C))))  # ldr r4, [r3, #4]; str r4, [r3]
+        # A signed reload extends the sign: 0x8000 reloaded by ldrsh is 0xFFFF8000, and << 12 stays
+        # outside the ROM (as an unsigned 0x8000 it would be 0x08000000).
+        verify(build(tail=(obj, ('h', 0x2180), ('h', 0x0209), ('h', 0x8019), ('h', 0x2200),  # r1 = 0x8000; strh
+                           ('h', 0x5E9C), ('h', 0x0324), ('h', 0x605C))))  # ldrsh r4, [r3, r2]; lsls #12; str
+        # A signed reload of 0x7F or 0x80 is 0x7F or 0xFFFFFF80, not [0x7F, 0x80]: plus 0x0E000000
+        # the second is 0x0DFFFF80, inside the ROM.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            verify(build(tail=(obj, ('h', 0x2180), ('h', 0x2800), ('bhi', 'skip'), ('h', 0x217F), ('label', 'skip'),
+                               ('h', 0x7019), ('h', 0x2200), ('h', 0x569C),  # strb; ldrsb r4, [r3, r2]
+                               ('h', 0x22E0), ('h', 0x0512), ('h', 0x18A4), ('h', 0x605C))))  # + (0xE0 << 20)
+
+    def test_the_store_map_follows_the_arm7tdmi_memory_map(self):
+        obj, inside = ('ldr', 3, 'object'), (('h', 0x0524), ('h', 0x3415))  # lsls r4, r4, #20; adds r4, #0x15
+        stored = 'a local code address cannot be stored'
+        for label, tail in {
+                # Addresses are taken mod 2**32: r3 + (0 - 4) is the byte r3 - 4 names.
+                'address sum mod 2**32': (obj, ('h', 0x2500), ('h', 0x3D04), ('h', 0x2180), ('h', 0x5159),
+                                          ('h', 0x1F1E), ('h', 0x6834), *inside, ('h', 0x601C)),
+                # EWRAM repeats every 256 KiB: r3 + (1 << 18) is the byte at r3.
+                'EWRAM mirror': (obj, ('h', 0x2180), ('h', 0x6019), ('h', 0x2501), ('h', 0x04AD), ('h', 0x595C),
+                                 *inside, ('h', 0x605C)),
+                # STMIA writes back: after stmia r0!, {r2} the next store through r0 lands at r3 + 4.
+                'stmia writeback': (obj, ('h', 0x1C18), ('h', 0x2200), ('h', 0x2180), ('h', 0xC004), ('h', 0x6001),
+                                    ('h', 0x685C), *inside, ('h', 0x601C)),
+                # ... and the base's own constant moves with it: r0 = 0x07FFFFF9, and six words later
+                # it is 0x08000011, inside the ROM, stored as it is.
+                'stmia base constant': (obj, ('h', 0x20FF), ('h', 0x04C0), ('h', 0x21FF), ('h', 0x02C9),
+                                        ('h', 0x1840), *[('h', 0x30FF)] * 8, ('h', 0x3001), ('h', 0xC0F6),
+                                        ('h', 0x6018)),  # stmia r0!, {r1, r2, r4-r7}; str r0, [r3]
+                'ldmia base constant': (obj, ('h', 0x20FF), ('h', 0x04C0), ('h', 0x21FF), ('h', 0x02C9),
+                                        ('h', 0x1840), *[('h', 0x30FF)] * 8, ('h', 0x3001), ('h', 0xC8F6),
+                                        ('h', 0x6018)),  # ldmia r0!, {r1, r2, r4-r7}; str r0, [r3]
+                # STR forces word alignment: str r1, [r3, #1 (r2)] writes the word at r3.
+                'misaligned str': (obj, ('h', 0x2180), ('h', 0x2201), ('h', 0x5099), ('h', 0x681C), *inside,
+                                   ('h', 0x601C)),
+                # LDRH [odd] is the halfword at odd - 1 rotated right by 8: bytes 8, 0x15 read as 0x08000015.
+                'misaligned ldrh': (obj, ('h', 0x2108), ('h', 0x7019), ('h', 0x2115), ('h', 0x7059), ('h', 0x2201),
+                                    ('h', 0x5A9C), ('h', 0x605C)),
+                # Through a loaded pointer the alignment is unknown, so the rotated form is possible too;
+                # and the reload through the same unchanged register is no premise case.
+                'misaligned ldrh through a pointer': (obj, ('h', 0x689D), ('h', 0x2108), ('h', 0x7029), ('h', 0x2115),
+                                                      ('h', 0x7069), ('h', 0x886C), ('h', 0x605C)),
+                # LDRSH [odd] is LDRSB: 0x80 reads as 0xFFFFFF80, and minus 0xF7FFFF6B that is 0x08000015.
+                'misaligned ldrsh': (obj, ('h', 0x2180), ('h', 0x7019), ('h', 0x7059), ('h', 0x2201), ('h', 0x5E9C),
+                                     ('h', 0x25F8), ('h', 0x062D), ('h', 0x3D95), ('h', 0x1B64), ('h', 0x605C)),
+                # LDR [r3 + 1] rotates the stored word 8 to 0x08000000: exact, so never a premise case.
+                'misaligned ldr': (obj, ('h', 0x2108), ('h', 0x6019), ('h', 0x2201), ('h', 0x589C), ('h', 0x3415),
+                                   ('h', 0x605C)),
+                # A reload through the same unchanged loaded pointer reads the store back: no premise,
+                # nor through a copy of that pointer (adds r5, r0, #0).
+                'same-pointer reload': (obj, ('h', 0x685D), ('h', 0x2180), ('h', 0x6029), ('h', 0x682C), *inside,
+                                        ('h', 0x609C)),
+                'reload through a copy': (obj, ('h', 0x6858), ('h', 0x689E), ('h', 0x2180), ('h', 0x6001),
+                                          ('h', 0x1C05), ('h', 0x682C), *inside, ('h', 0x6034)),
+                # IWRAM repeats every 32 KiB.
+                'IWRAM mirror': (obj, ('h', 0x2503), ('h', 0x062D), ('h', 0x2601), ('h', 0x03F6), ('h', 0x1976),
+                                 ('h', 0x2180), ('h', 0x6029), ('h', 0x6834), *inside, ('h', 0x601C)),
+                # SRAM has an 8-bit bus: a word read repeats the byte, so a stored 8 reads as 0x08080808.
+                'SRAM word read': (obj, ('h', 0x25E0), ('h', 0x052D), ('h', 0x2108), ('h', 0x7029), ('h', 0x682C),
+                                   ('h', 0x601C)),
+                # ... and the CPU rotates an odd halfword read on top (mGBA's GBALoad16): 8 stored at
+                # 0x0E000001 reads back through ldrh [r5, r2] as 0x08000008, ...
+                'SRAM odd ldrh': (obj, ('h', 0x25E0), ('h', 0x052D), ('h', 0x2108), ('h', 0x7069), ('h', 0x2201),
+                                  ('h', 0x5AAC), ('h', 0x601C)),
+                # ... and an odd ldrsh is ldrsb: 0x80 reads as 0xFFFFFF80, minus 0xF7FFFF6B is 0x08000015.
+                'SRAM odd ldrsh': (obj, ('h', 0x25E0), ('h', 0x052D), ('h', 0x2180), ('h', 0x7069), ('h', 0x2201),
+                                   ('h', 0x5EAC), ('h', 0x26F8), ('h', 0x0636), ('h', 0x3E95), ('h', 0x1BA4),
+                                   ('h', 0x601C)),
+                # An 8-bit store to palette RAM or BG VRAM fills both halves of the halfword: 0x0808 << 16.
+                'palette byte store': (obj, ('h', 0x2505), ('h', 0x062D), ('h', 0x2108), ('h', 0x7029),
+                                       ('h', 0x882C), ('h', 0x0424), ('h', 0x601C)),
+                'BG VRAM byte store': (obj, ('h', 0x2506), ('h', 0x062D), ('h', 0x2108), ('h', 0x7069),
+                                       ('h', 0x882C), ('h', 0x0424), ('h', 0x601C)),
+                # ... so one byte stored through a loaded pointer may fill both halves read at 0x05000000.
+                'wild byte store fills two lanes': (obj, ('h', 0x6858), ('h', 0x2108), ('h', 0x7001), ('h', 0x2505),
+                                                    ('h', 0x062D), ('h', 0x882C), ('h', 0x0424), ('h', 0x601C)),
+                # An 8-bit store to OAM is ignored, so the word stored there before is still there.
+                'OAM byte store ignored': (obj, ('h', 0x2507), ('h', 0x062D), ('h', 0x2180), ('h', 0x6029),
+                                           ('h', 0x689A), ('h', 0x702A), ('h', 0x682C), *inside, ('h', 0x601C)),
+                # At 0x06010000 an 8-bit store may be a BG or an OBJ store (the display mode decides), so
+                # the word stored there before may still be there.
+                'VRAM byte store either way': (obj, ('h', 0x2560), ('h', 0x012D), ('h', 0x3501), ('h', 0x042D),
+                                               ('h', 0x2180), ('h', 0x6029), ('h', 0x689A), ('h', 0x702A),
+                                               ('h', 0x682C), *inside, ('h', 0x601C)),
+                # A word read through the pointer an SRAM byte was stored through may repeat that byte.
+                'SRAM word read through a pointer': (obj, ('h', 0x685D), ('h', 0x2108), ('h', 0x7029), ('h', 0x682C),
+                                                     ('h', 0x601C)),
+                # After stmia r0!, r0 may alias the store it just made from anywhere (here r0 - 4).
+                'reload after writeback': (obj, ('h', 0x6858), ('h', 0x2180), ('h', 0xC002), ('h', 0x2200),
+                                           ('h', 0x3A04), ('h', 0x5884), *inside, ('h', 0x601C))}.items():
+            f = build(tail=tail)
+            with self.subTest(label), self.assertRaisesRegex(ValueError, stored):
+                verify(f)
+            with self.subTest(label), self.assertRaisesRegex(ValueError, stored):
+                premises(f)
+        # The +4 control of the first case is refused the same way.
+        with self.assertRaisesRegex(ValueError, stored):
+            verify(build(tail=(obj, ('h', 0x2504), ('h', 0x2180), ('h', 0x5159), ('h', 0x1D1E), ('h', 0x6834),
+                               *inside, ('h', 0x601C))))
+        # The cartridge ROM ignores writes, so a load from a ROM object reads no stored byte: neither a
+        # wild store nor its own stores reach it. The GPIO port and the 0x0D window (where an EEPROM
+        # may answer) are no fixed byte, so bytes stored there may be read back.
+        reload = (('h', 0x680C), ('h', 0x1C03), ('h', 0x601C))  # ldr r4, [r1]; movs r3, r0; str r4, [r3]
+        assemble = (('h', 0x2215), ('h', 0x700A), ('h', 0x2200), ('h', 0x704A), ('h', 0x708A), ('h', 0x2208),
+                    ('h', 0x70CA))  # [r1] = 0x15, 0, 0, 8
+        with_object(0x08400000, (('ldr', 3, 'object'), ('h', 0x6858), ('h', 0x2208), ('h', 0x6002), *reload))
+        with_object(0x08400000, (*assemble, *reload))
+        # ... nor does a load through a pointer read from it: no stored byte exists to be read back.
+        with_object(0x08400000, (*assemble, ('ldr', 3, 'object'), ('h', 0x689D), ('h', 0x682C), ('h', 0x6004)))
+        with self.subTest('GPIO port'), self.assertRaisesRegex(ValueError, stored):
+            with_object(0x080000C4, (*assemble, *reload))
+        # The same bytes at 0x0D000000, reached as the ROM object plus an exact index (r2 = 0x04C00000)
+        # rather than through a data symbol in that window (kit #406 refuses one there).
+        index = (('h', 0x224C), ('h', 0x0512), ('h', 0x2515), ('h', 0x548D), ('h', 0x3201), ('h', 0x2500),
+                 ('h', 0x548D), ('h', 0x3201), ('h', 0x548D), ('h', 0x3201), ('h', 0x2508), ('h', 0x548D),
+                 ('h', 0x3A03))  # r2 = 0x4C << 20; [r1 + r2 + 0..3] = 0x15, 0, 0, 8; r2 -= 3
+        with self.subTest('0x0D window'), self.assertRaisesRegex(ValueError, stored):
+            with_object(0x08400000, (*index, ('h', 0x588C), ('h', 0x1C03), ('h', 0x601C)))  # ldr r4, [r1, r2]
+        # Mirrors fold to one byte; SRAM and the unused regions are no fixed byte.
+        self.assertIsNone(thunks.canonical(0x0A0000C9))
+        self.assertEqual(thunks.canonical(0x0A0000CA), 0x080000CA)
+        self.assertIsNone(thunks.canonical(0x0D000000))
+        self.assertTrue(thunks.rom(0x09FFFFFF))
+        self.assertFalse(thunks.rom(0x0A000000) or thunks.rom(None))
+        self.assertEqual(thunks.canonical(0x02042000), 0x02002000)
+        self.assertEqual(thunks.canonical(0x1_02001FFC), 0x02001FFC)
+        self.assertEqual(thunks.canonical(0x03FF8004), 0x03000004)
+        self.assertEqual(thunks.canonical(0x0601C000), 0x06014000)
+        self.assertEqual(thunks.canonical(0x0C000010), 0x08000010)
+        self.assertEqual(thunks.canonical(0x0412_0802), 0x04000802)
+        self.assertIsNone(thunks.canonical(0x0E000000))
+        self.assertIsNone(thunks.canonical(0x01000000))
+        # Two accesses through one unknown register overlap by alignment: strh [r+8] and ldrh [r+10]
+        # never share a byte, ldr [r+2] and strb [r+0] may (an aligned word at r + 2 - 2).
+        self.assertFalse(thunks.may_overlap((8, 2), (10, 2)))
+        self.assertTrue(thunks.may_overlap((0, 1), (2, 4)))
+        self.assertTrue(thunks.may_overlap((1, 2), (0, 1)))
+        # When no premise helps, the sound walk's reason is reported: the bound of the reload through
+        # r5 reaches the ROM, and relaxed it is still a constant-derived thunk register.
+        with self.assertRaisesRegex(ValueError, 'thunk target register can hold a local code address'):
+            premises(build(post=(obj, ('h', 0x681D), ('h', 0x2180), ('h', 0x6019), ('h', 0x682A))))
+        # STMIA stores a listed base: its constant makes every later load constant-derived.
+        with self.assertRaisesRegex(ValueError, 'holds a constant-derived value'):
+            verify(build(post=(('ldr', 0, 'object'), ('h', 0xC001), ('ldr', 2, 'object'), ('h', 0x6812))))
+
+    def test_writeback_loops_end_and_calls_clear_aliases(self):
+        # A zero fill through a loaded pointer with stmia writeback in a loop (agbcc's *p++ = 0)
+        # reaches a fixed point: the base's alias entries collapse once it moves.
+        fill = (('h', 0x2100), ('h', 0x2208), ('label', 'again'), ('h', 0xC002), ('h', 0x3A01), ('h', 0x2A00),
+                ('bhi', 'again'))  # movs r1, #0; movs r2, #8; again: stmia r0!, {r1}; subs; cmp; bhi
+        joins = []
+
+        def bounded(old, new):  # fails fast where a walk would never reach its fixed point
+            joins.append(1)
+            self.assertLess(len(joins), 2000, 'the walk keeps finding new memory states')
+            return join_memory(old, new)
+        join_memory = thunks.join_memory
+        with patch.object(thunks, 'join_memory', bounded):
+            verify(build(tail=(('ldr', 3, 'object'), ('h', 0x6858), *fill)))  # r0 = [r3 + 4]
+            self.assertEqual(premises(build(tail=(('ldr', 3, 'object'), ('h', 0x6858), *fill))), ())
+        # Through a constant base the pointer keeps changing, so the widening taints it, as it does for
+        # the same loop written with str and adds.
+        for label, step in {'stmia': (('h', 0xC002),), 'str and adds': (('h', 0x6001), ('h', 0x3004))}.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+                verify(build(tail=(('ldr', 0, 'object'), ('h', 0x2100), ('h', 0x2208), ('label', 'again'), *step,
+                                   ('h', 0x3A01), ('h', 0x2A00), ('bhi', 'again'))))
+        # A call replaces r0, so a store through the old r0 does not exclude the load through the new
+        # one: the premise is offered and recorded.
+        after_call = build(tail=(('ldr', 3, 'object'), ('h', 0x6858), ('h', 0x689E), ('h', 0x2180), ('label', 'store'),
+                                 ('h', 0x6001), ('bl', CALLEE), ('label', 'reload'), ('h', 0x6804), ('h', 0x0524),
+                                 ('h', 0x3415), ('h', 0x6034)))
+        self.assertEqual(premises(after_call), ((after_call[1]['reload'], (after_call[1]['store'],)),))
+        # A copy from a ROM table in two ldmia: after the first writeback the base is a ROM address,
+        # tainted as kit main taints adds r1, #4 on it, so the second load cannot be stored. One ldmia
+        # of both words, or an offset load, keeps the base and is admitted.
+        copy_out = (('h', 0x1C03), ('h', 0xC314))  # movs r3, r0; stmia r3!, {r2, r4}
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            with_object(0x08400000, (('h', 0xC904), ('h', 0xC910), *copy_out))  # ldmia r1!, {r2}; ldmia r1!, {r4}
+        with_object(0x08400000, (('h', 0xC914), *copy_out))  # ldmia r1!, {r2, r4}
+        with_object(0x08400000, (('h', 0x680A), ('h', 0x684C), *copy_out))  # ldr r2, [r1]; ldr r4, [r1, #4]
+        # An 8-bit store to OAM leaves no byte, so the premise does not name it.
+        with_oam = build(tail=(('ldr', 3, 'object'), ('h', 0x6858), ('h', 0x689E), ('h', 0x2180), ('label', 'store'),
+                               ('h', 0x6001), ('h', 0x2507), ('h', 0x062D), ('h', 0x7029), ('bl', CALLEE),
+                               ('label', 'reload'), ('h', 0x6804), ('h', 0x0524), ('h', 0x3415), ('h', 0x6034)))
+        self.assertEqual(premises(with_oam), ((with_oam[1]['reload'], (with_oam[1]['store'],)),))
+
+    def test_constant_bytes_cover_every_value(self):
+        self.assertEqual(thunks.byte_range((7, 8), 0), (7, 8))
+        self.assertEqual(thunks.byte_range((0x0700, 0x08FF), 1), (7, 8))
+        self.assertEqual(thunks.byte_range((0x07FF, 0x0800), 0), (0, 0xFF))
+        self.assertEqual(thunks.byte_range((0x12345678, 0x12345678), 2), (0x34, 0x34))
+        self.assertEqual(thunks.byte_range((0, 0xFFFFFFFF), 3), (0, 0xFF))
+        old = (((0x100, (4, 4)), (0x101, (0, 0))), (1, 1), 1, frozenset({2}), frozenset({(1, 0, 0, 4)}))
+        new = (((0x100, (0x80, 0x80)), (0x102, (9, 9))), None, 0, frozenset({4}), frozenset({(2, 0, 4, 1)}))
+        joined = (((0x100, (4, 0x80)), (0x101, (0, 0)), (0x102, (9, 9))), (1, 1), 1, frozenset({2, 4}),
+                  frozenset({(1, 0, 0, 4), (2, 0, 4, 1)}))
+        self.assertEqual(thunks.join_memory(old, new), joined)
+        self.assertEqual(thunks.join_memory(new, old), joined)
+        self.assertEqual(thunks.join_memory(thunks.CLEAN, old), old)
+
+    def test_a_reload_through_a_loaded_pointer_needs_its_load_bearing_premise(self):
+        # r5 = [&g_right] is a loaded pointer; the constant 0x80 is stored at the object, then a word
+        # is read through r5, shifted into the ROM and stored. Only the premise that the load at
+        # `reload` reads back no byte stored as a constant (at `store`) admits it.
+        def shape(value, *after):
+            return build(tail=(('ldr', 3, 'object'), ('h', 0x681D), ('h', 0x2100 | value), ('label', 'store'),
+                               ('h', 0x6019), ('label', 'reload'), ('h', 0x682C), *after))
+        f = shape(0x80, ('h', 0x0524), ('h', 0x3415), ('h', 0x601C))
+        body, labels, manifest = f
+        record = ((labels['reload'], (labels['store'],)),)
+        self.assertEqual(premises(f), record)
+        # Bytes 8 and 0x15 stored at exact addresses may be read back through a pointer of unknown
+        # alignment as a rotated halfword, 0x08000008 or more, so that load needs its premise too.
+        rotated = build(tail=(('ldr', 3, 'object'), ('h', 0x2108), ('label', 'first'), ('h', 0x7019), ('h', 0x2115),
+                              ('label', 'second'), ('h', 0x7059), ('h', 0x689D), ('label', 'reload'), ('h', 0x882C),
+                              ('h', 0x605C)))  # strb 8, [r3]; strb 0x15, [r3, #1]; ldrh r4, [[r3 + 8]]
+        self.assertEqual(premises(rotated), ((rotated[1]['reload'], (rotated[1]['first'], rotated[1]['second'])),))
+        with self.assertRaisesRegex(ValueError, 'a thunk store premise is required: \\* thunk store premise: '
+                                    f'the load at 0x{BASE + labels["reload"]:08X} through a non-exact address'):
+            verify(f)
+        with self.assertRaisesRegex(ValueError, 'a thunk store premise is required'):
+            leaf(f, switch_thunks=PLAIN)
+        premised = dict(manifest, store_premises=thunks.premise_manifest(record))
+        verify(f, premised)
+        self.assertEqual(thunks.premise_lines(BASE, premised), [
+            f'* thunk store premise: the load at 0x{BASE + labels["reload"]:08X} through a non-exact address '
+            f'reads back no byte this function stored as a constant (stores at 0x{BASE + labels["store"]:08X})'])
+        # A different or extra record, or a malformed one, is refused.
+        for label, records in {'other load': [[labels['reload'] + 2, [labels['store']]]],
+                               'other store': [[labels['reload'], [labels['store'] + 2]]],
+                               'extra record': [[labels['reload'], [labels['store']]],
+                                                [labels['reload'] + 2, [labels['store']]]]}.items():
+            with self.subTest(label), self.assertRaisesRegex(ValueError, 'premises differ'):
+                verify(f, dict(manifest, store_premises=records))
+        for records in ([], [[labels['reload'], []]], [[labels['reload'], [labels['store']] * 2]],
+                        [[labels['reload'] + 1, [labels['store']]]], [[labels['reload'], labels['store']]],
+                        [[float(labels['reload']), [labels['store']]]], {}):
+            with self.subTest(records=records), self.assertRaisesRegex(ValueError, 'invalid thunk store premises'):
+                verify(f, dict(manifest, store_premises=records))
+        # Not load-bearing: the same reload of a small constant is admitted by the sound walk,
+        # so it records no premise, and a manifest that claims one is refused.
+        small = shape(0x04, ('h', 0x601C))
+        self.assertEqual(premises(small), ())
+        verify(small)
+        with self.assertRaisesRegex(ValueError, 'premises differ'):
+            verify(small, dict(small[2], store_premises=[[small[1]['reload'], [small[1]['store']]]]))
+        # Only the loads the verdict needs: an earlier reload through r5 into a register that is
+        # never used again could also hold the ROM word, but the verdict does not depend on it.
+        both = build(tail=(('ldr', 3, 'object'), ('h', 0x681D), ('h', 0x2180), ('label', 'store'), ('h', 0x6019),
+                           ('label', 'unused'), ('h', 0x682E), ('label', 'reload'), ('h', 0x682C),
+                           ('h', 0x0524), ('h', 0x3415), ('h', 0x601C)))  # ldr r6, [r5] is never read
+        self.assertEqual(premises(both), ((both[1]['reload'], (both[1]['store'],)),))
+        # A premise never admits what the sound walk refuses at an exact address.
+        with self.assertRaisesRegex(ValueError, 'a local code address cannot be stored'):
+            premises(build(tail=(('ldr', 3, 'object'), ('h', 0x2180), ('h', 0x6019), ('h', 0x681C),
+                                 ('h', 0x0524), ('h', 0x601C))))
+        # The premise option is only for the thunk selectors.
+        with self.assertRaisesRegex(ValueError, 'premises require their switch thunk selector'):
+            match.verify_leaf_instructions(bytes(body), BASE, True, {}, switch_thunk_premises=thunks.StorePremises())
 
     def test_identity_operations_are_moves(self):
         # A call result copied with adds rd, rs, #0, stored, then a callback loaded: no constant contributes.
@@ -818,6 +1160,59 @@ class EndToEndTests(unittest.TestCase):
             self.assertFalse(evidence.report_matches(report, str(root), BASE))
 
 
+    def test_a_load_bearing_store_premise_is_written_and_replayed(self):
+        # kit #393: match.py derives the premise, records it in the manifest and states it once.
+        scratch = Path(os.environ.get('FFTA_TEST_SCRATCH', ROOT / 'build'))
+        scratch.mkdir(parents=True, exist_ok=True)
+        directory = tempfile.TemporaryDirectory(prefix='switch_thunks_premise_', dir=scratch)
+        self.addCleanup(directory.cleanup)
+        root = Path(directory.name)
+        for name in ('src', 'include', 'config', 'symbols'):
+            (root / name).mkdir()
+        environment = {key: value for key, value in os.environ.items() if key != 'FFTA_ROM'}
+        environment.update(TMPDIR=str(root), PYTHONDONTWRITEBYTECODE='1')
+        with patch.dict(os.environ, environment, clear=True):
+            (root / 'src/08000000.c').write_text(PREMISED)
+            objects = json.dumps({f'data_{value:08X}': f'0x{value:08X}' for value in
+                                  (0x02000100, 0x02000200, 0x02000300, 0x02000304, 0x02000308)}).encode()
+            (root / 'config/data_symbols.json').write_bytes(objects)
+            rom = bytearray(ROM_SIZE)
+            struct.pack_into('<HH', rom, THUNK_R2 - BASE, 0x4710, 0x46C0)
+            args = argparse.Namespace(cc=match.DEFAULT_CC, cpp=match.DEFAULT_CPP, assembler=match.DEFAULT_AS,
+                                      objcopy=match.DEFAULT_OBJCOPY, linker=match.DEFAULT_LD,
+                                      flags=match.DEFAULT_FLAGS)
+            runner = match.Runner(match.DEFAULT_CC, root=root, timeout=120)
+            with runner.workspace() as workspace:
+                _, _, original = match.compile_object(runner, workspace, args, root, BASE, 'src/08000000.c')
+                symbol, _ = match.function_record(original, 'func_08000000', BASE, True)
+                entries = [(BASE, symbol['size']), (BASE + 0x400, 2), (BASE + 0x410, 2)]
+                functions = json.dumps([{'rom': f'0x{start:08X}', 'end': f'0x{start + size:08X}',
+                                         'mode': 'thumb'} for start, size in entries]).encode()
+                (root / 'config/functions.json').write_bytes(functions)
+                (root / 'symbols/functions.txt').write_text(''.join(
+                    f'{start:08X} {start + size:08X} {size} 1 return\n' for start, size in entries))
+                body, _, _ = match.link_calls(runner, workspace, args, original, BASE, functions, len(rom),
+                                              bytes(rom), objects, {}, {}, allow_switch_data=True,
+                                              switch_thunks=PLAIN)
+            rom[:len(body)] = body
+            (root / 'baserom.bin').write_bytes(rom)
+            output = io.StringIO()
+            with patch.object(sys, 'argv', ['match.py', '--root', str(root), '0x08000000',
+                                            '--switch-data-profile', PLAIN]), \
+                    patch.object(match, 'ROOT', match.ROOT), contextlib.redirect_stdout(output):
+                match.main()
+            self.assertIn('verdict MATCH - byte identical', output.getvalue().splitlines())
+            report = (root / 'docs/match/08000000.md').read_text()
+            stated = [line for line in report.splitlines() if line.startswith('* thunk store premise:')]
+            self.assertEqual(len(stated), 1, report)
+            self.assertRegex(stated[0], r'^\* thunk store premise: the load at 0x080000[0-9A-F]{2} through a '
+                                        r'non-exact address reads back no byte this function stored as a '
+                                        r'constant \(stores at 0x080000[0-9A-F]{2}(, 0x080000[0-9A-F]{2})*\)$')
+            self.assertIn('"store_premises":', report)
+            self.assertTrue(evidence.report_matches(report, str(root), BASE))
+            self.assertFalse(evidence.report_matches(report.replace(stated[0] + '\n', ''), str(root), BASE))
+
+
 class ReportTests(unittest.TestCase):
     def lines(self, fixture, selector, *, manifest=None, schema=None, extra=()):
         body, _, expected = fixture
@@ -884,6 +1279,41 @@ class ReportTests(unittest.TestCase):
                                            good + [f'* stack frame: {evidence.STACK_SUMMARY}']))
                     fingerprint.return_value = 'b' * 64
                     self.assertFalse(valid(good))
+                # kit #393: a load-bearing store premise is stated once, as the manifest records it.
+                premised = build(tail=(('ldr', 3, 'object'), ('h', 0x681D), ('h', 0x2180), ('label', 'store'),
+                                       ('h', 0x6019), ('label', 'reload'), ('h', 0x682C), ('h', 0x0524),
+                                       ('h', 0x3415), ('h', 0x601C)), scalar='scalar_policy' in manifest,
+                                 frame=selector == FRAMED)
+                if selector == PLAIN and 'scalar_policy' not in manifest:
+                    p_body, p_labels, p_manifest = premised
+                    with patch.object(evidence, 'mapping_snapshot', return_value=entries), \
+                            patch.object(evidence, 'data_snapshot', return_value=self.objects), \
+                            patch.object(evidence, 'source_fingerprint', return_value=self.source), \
+                            patch.object(evidence, 'report_rom_path', return_value=str(rom)):
+                        # A premise line in a report whose manifest needs none fails.
+                        line = thunks.premise_lines(BASE, {'store_premises': [[p_labels['reload'],
+                                                                               [p_labels['store']]]]})[0]
+                        self.assertTrue(evidence.switch_report_matches(good, directory, BASE, data_profile=True))
+                        self.assertFalse(evidence.switch_report_matches(good + [line], directory, BASE,
+                                                                        data_profile=True))
+                    p_manifest = dict(p_manifest, store_premises=thunks.premise_manifest(
+                        ((p_labels['reload'], (p_labels['store'],)),)))
+                    line = thunks.premise_lines(BASE, p_manifest)[0]
+                    rom.write_bytes(rom_image(p_body))
+                    with patch.object(evidence, 'mapping_snapshot', return_value=mapping(p_body)), \
+                            patch.object(evidence, 'data_snapshot', return_value=self.objects), \
+                            patch.object(evidence, 'source_fingerprint', return_value=self.source), \
+                            patch.object(evidence, 'report_rom_path', return_value=str(rom)):
+                        def replays(lines):
+                            return evidence.switch_report_matches(lines, directory, BASE, data_profile=True)
+                        stated = self.lines(premised, selector, manifest=p_manifest, extra=[line])
+                        self.assertTrue(replays(stated))
+                        self.assertFalse(replays(self.lines(premised, selector, manifest=p_manifest)))  # missing
+                        self.assertFalse(replays(stated + [line]))  # twice
+                        self.assertFalse(replays(self.lines(premised, selector, manifest=p_manifest,
+                                                            extra=[line.replace('0x08', '0x09', 1)])))
+                        self.assertFalse(replays(self.lines(premised, selector, extra=[line])))  # unrecorded
+                        self.assertFalse(replays(self.lines(premised, selector)))  # neither: the walk refuses
                 # Thunk-free reports never recover a thunk selector.
                 self.assertIsNone(thunks.selector_for_report(
                     f'* verification: `{evidence.SWITCH_U16_SCALAR_SCHEMA}`'))

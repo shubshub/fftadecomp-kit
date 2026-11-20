@@ -2617,6 +2617,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.update(("function_policy", "functions"))
     if thunk_selector:
         fields.update(switch_data_thunks.FIELDS)
+        if "store_premises" in manifest:
+            fields.add("store_premises")
         if thunk_selector == music.SELECTOR:
             fields.add("engine_tracks")
             if not switch_data_thunks.exact(manifest["engine_tracks"], music.entry_contract(rom, address, data)) or \
@@ -2800,7 +2802,10 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                             if pool_frame else None,
                                             switch_outgoing_stack_fixed_pool=pool_frame and not pool_data,
                                             switch_thunks=thunk_selector,
-                                            engine_track_rom=rom if thunk_selector == music.SELECTOR else None)
+                                            engine_track_rom=rom if thunk_selector == music.SELECTOR else None,
+                                            switch_thunk_premises=switch_data_thunks.StorePremises(
+                                                switch_data_thunks.premise_records(manifest))
+                                            if thunk_selector else None)
     if thunk_selector:
         # The thunk binding's own literal rules: no object or literal may name a
         # code entry or a reserved thunk, so no data word can become a call target.
@@ -4219,7 +4224,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              backward_switch_cases=False, runtime_summaries=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
-                             incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None):
+                             incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
+                             switch_thunk_premises=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4299,6 +4305,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("outgoing-argument switch frame requires the interposed switch pool")
     if (engine_track_rom is not None) != (switch_thunks == music.SELECTOR):
         raise ValueError("engine track ROM requires its exclusive switch selector")
+    if switch_thunk_premises is not None and (
+            switch_thunks is None or type(switch_thunk_premises) is not switch_data_thunks.StorePremises):
+        raise ValueError("thunk store premises require their switch thunk selector")
     if switch_thunks is not None:
         framed = switch_data_thunks.framed(switch_thunks)
         if not thumb or not backward_switch_cases or not validated_calls or \
@@ -5463,7 +5472,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("switch thunks require their verified local switch and exact calls")
         switch_data_thunks.verify_thunk_targets(instructions, edges, address, calls,
                                                 address + switch["literal"], data, engine_rom=engine_track_rom,
-                                                objects=switch_data_relocations)
+                                                objects=switch_data_relocations, premises=switch_thunk_premises)
     reaching_return = set(returns)
     pending = list(returns)
     while pending:
@@ -6297,6 +6306,7 @@ def main():
                 elif args.switch_data_profile:
                     if preloaded_profile:
                         raise ValueError("u16 switch-data excludes preloaded switches")
+                    thunk_premises = switch_data_thunks.StorePremises() if thunk_switch_selector else None
                     scalar_instructions = verify_leaf_instructions(
                         got, addr, True, calls, switch_relocations=switch_relocations,
                         switch_data_relocations=data_relocations, backward_switch_cases=True,
@@ -6304,7 +6314,8 @@ def main():
                         switch_outgoing_stack=pool_switch_frame.STACK_POLICY if pool_frame_profile else None,
                         switch_outgoing_stack_fixed_pool=pool_frame_profile and not pool_switch_profile,
                         switch_thunks=thunk_switch_selector,
-                        engine_track_rom=rom if thunk_switch_selector == music.SELECTOR else None)
+                        engine_track_rom=rom if thunk_switch_selector == music.SELECTOR else None,
+                        switch_thunk_premises=thunk_premises)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
                     scalar_records, wide_records = switch_scalar_words(
                         got, addr, scalar_instructions, switch_evidence["switch"], data_relocations,
@@ -6324,6 +6335,9 @@ def main():
                                                      if target in thunk_names]
                         switch_evidence["dependencies"] = function_thunk.dependencies(
                             [record[1] for record in switch_evidence["thunks"]], rom)
+                        if thunk_premises.derived:
+                            switch_evidence["store_premises"] = switch_data_thunks.premise_manifest(
+                                thunk_premises.derived)
                     if pool_switch_profile:
                         switch_evidence["pool_policy"] = SWITCH_POOL_POLICY
                     if pool_frame_profile:
@@ -6755,6 +6769,9 @@ def main():
                 f.write(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
                 if "wide_scalar_policy" in switch_evidence:
                     f.write(f"{wide_scalars.report_line()}\n")
+                if "thunk_policy" in switch_evidence:
+                    for line in switch_data_thunks.premise_lines(addr, switch_evidence):
+                        f.write(f"{line}\n")
                 fingerprint_switch = (preloaded_switch_fingerprint if preloaded_profile else
                                       switch_data_thunks.fingerprint if "thunk_policy" in switch_evidence else
                                       typed_switch_frame.fingerprint if "frame_policy" in switch_evidence else

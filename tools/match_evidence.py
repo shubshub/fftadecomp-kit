@@ -740,6 +740,10 @@ def switch_report_matches(lines, root, address, *, data_profile=False):
                        switch_data_fingerprint if data_profile else switch_fingerprint)
         if thunk_selector == music.SELECTOR and not music.replay(root, "\n".join(lines), data):
             return False
+        # Each load-bearing thunk store premise (kit #393) is stated once, as the manifest derives it.
+        if [line for line in lines if line.lstrip().startswith(f"* {switch_data_thunks.PREMISE}")] != \
+                (switch_data_thunks.premise_lines(address, manifest) if thunk_selector is not None else []):
+            return False
         return (single("* control flow: ") == control_flow and
                 single("* ROM bytes: ") == f"`{data.hex()}` ({len(data)} bytes)" and
                 single("**MATCH - byte identical** - ") == f"{len(data)}/{len(data)} bytes" and
