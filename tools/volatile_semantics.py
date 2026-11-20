@@ -1060,11 +1060,26 @@ def parse_word(text):
     return make_linear(offset, {("sym", found[1]): 1})
 
 
+class Labels(dict):
+    """label -> index of the next instruction, for every label of a function.
+
+    That index is where the label is only when an instruction follows it
+    directly (other labels aside): `code` holds those labels.  A label in
+    front of a literal word, or of a directive, names data or padding that
+    the instruction stream does not hold.  `aligned` holds the labels of
+    literal words known to start on a word boundary: nothing but labels and
+    literal words since an `.align 2, 0`.  GAS does not align `.word`."""
+
+    def __init__(self):
+        super().__init__()
+        self.code, self.aligned = set(), set()
+
+
 def parse_assembly(text):
     """({function name: (instructions, labels, pools)}, lines outside functions)
 
-    instructions are (mnemonic, operands, text); labels map a code label to
-    the index of the next instruction; pools map a label to the `.word`
+    instructions are (mnemonic, operands, text); labels (Labels) map a label
+    to the index of the next instruction; pools map a label to the `.word`
     values from it to the next instruction or directive.
     """
     functions, outside, current, thumb_func, name = {}, [], None, False, None
@@ -1079,8 +1094,8 @@ def parse_assembly(text):
             if label and thumb_func:
                 if label[1] in functions:
                     raise SemanticError(f"function {label[1]} is defined twice")
-                name, thumb_func, pending, owners = label[1], False, [], []
-                current = functions[name] = ([], {}, {})
+                name, thumb_func, pending, owners, aligned = label[1], False, [], [], False
+                current = functions[name] = ([], Labels(), {})
                 continue
             if line == ".thumb_func":
                 thumb_func = True
@@ -1098,6 +1113,8 @@ def parse_assembly(text):
         if line.startswith(".word"):
             for owner in pending:
                 pools[owner] = []
+                if aligned:
+                    labels.aligned.add(owner)
             owners, pending = owners + pending, []
             if not owners:
                 raise SemanticError("literal word without a label")
@@ -1105,11 +1122,14 @@ def parse_assembly(text):
             for owner in owners:
                 pools[owner].append(word)
             continue
-        pending, owners = [], []
+        aligned = re.fullmatch(r"\.align\s+2\s*,\s*0", line) is not None
         if line.startswith("."):
+            pending, owners = [], []
             if not re.match(r"\.(?:align|pool|ltorg)\b", line):
                 raise SemanticError(f"unsupported directive inside a function: `{line}`")
             continue
+        labels.code.update(pending)
+        pending, owners = [], []
         mnemonic, _, operands = re.sub(r"\s+", " ", line).partition(" ")
         instructions.append((mnemonic.lower(), split_operands(operands), line))
     if current is not None:
@@ -1339,6 +1359,8 @@ class Executor:
     def target(self, operand, text):
         if operand not in self.labels:
             self.fail(text, f"branch to unknown label `{operand}`")
+        if operand not in self.labels.code:
+            self.fail(text, f"branch to `{operand}`, a label that no instruction follows directly")
         return self.labels[operand]
 
     def run(self, decisions, *, _capture_load_provenance=False):
@@ -2106,7 +2128,8 @@ class Executor:
         literal words between), the pointer is a word-aligned word of that
         pool, possibly shared with the function's other literals, that is
         exactly the table's label, and every entry is exactly a local code
-        label.  The index must be
+        label (Labels.code); the table's words are known to start on a word
+        boundary (Labels.aligned).  The index must be
         bounded by the table: with N+1 entries, either a known constant at
         most N or a `cmp index, #N` whose `hi` branch was not taken on this
         path, so the loaded word is one of the entries.  Each distinct label
@@ -2129,11 +2152,13 @@ class Executor:
         entries = self.pools.get(label)
         if entries is None or self.labels.get(label) != after:
             self.fail(text, "the jump table does not immediately follow the jump")
+        if label not in self.labels.aligned:
+            self.fail(text, "the jump table is not known to start on a word boundary: its words do not "
+                      "follow `.align 2, 0`")
         targets = []
         for entry in entries:
             if not (isinstance(entry, tuple) and len(entry) == 2 and entry[0] == "code") or \
-                    entry[1] not in self.labels or entry[1] in self.pools or \
-                    self.labels[entry[1]] >= len(self.instructions):
+                    entry[1] not in self.labels.code:
                 self.fail(text, "a jump-table entry is not a local code label of this function")
             targets.append(self.labels[entry[1]])
         bound = len(entries) - 1
