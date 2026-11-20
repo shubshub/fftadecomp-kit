@@ -621,5 +621,50 @@ class PlacementTests(CensusTree, unittest.TestCase):
         self.assertTrue(plausible.census_placement("__mkhhhh u8 gFlag;\n", markers, {}))
 
 
+class CommaWalkTests(unittest.TestCase):
+    """At a comma, `?` or `:` the walk steps outward only through a parenthesis.
+
+    Inside braces or a subscript the access is a value, whatever stands before
+    them: `&` in front of a compound literal takes the address of the literal,
+    a copy, not of the register one of its initializers reads.  A parenthesis
+    the walk leaves this way is a group, so a call's name or a control header
+    before it ends the walk, as it does for a parenthesis around the access.
+    """
+
+    def test_an_initializer_of_an_address_taken_literal_is_a_value(self):
+        for expression in ("p = &(Pair){ 1, *(volatile u16 *)0x04000000, 2 };",
+                           "p = &(struct Pair){ 1, *(volatile u16 *)0x04000000, 2 };",
+                           "p = &(Pair){ c ? 1 : *(volatile u16 *)0x04000000, 2 };",
+                           "g(&(Pair){ 1, *(volatile u16 *)0x04000000, 2 });",
+                           "(&(Pair){ 1, *(volatile u16 *)0x04000000, 2 })->a = 3;",
+                           "return &(Pair){ 1, *(volatile u16 *)0x04000000, 2 };"):
+            with self.subTest(expression=expression):
+                self.assertEqual(rules(COMMENT + expression + "\n"), [])
+
+    def test_a_comma_inside_a_subscript_is_a_value(self):
+        for expression in ("x = table[i, *(volatile u16 *)0x04000000, 0];",
+                           "p = &table[i, *(volatile u16 *)0x04000000, 0];",
+                           "x = 1[p, *(volatile u16 *)0x04000000, 0];",
+                           "x = \"s\"[0, *(volatile u16 *)0x04000000, 0];"):
+            with self.subTest(expression=expression):
+                self.assertEqual(rules(COMMENT + expression + "\n"), [])
+
+    def test_a_comma_inside_a_call_or_a_control_header_is_a_value(self):
+        for expression in ("x = f(a, *(volatile u16 *)0x04000000);", "f(a, *(volatile u16 *)0x04000000, b);",
+                           "x = f(c ? 1 : *(volatile u16 *)0x04000000);",
+                           "if (a, *(volatile u16 *)0x04000000) x = 1;",
+                           "while (n--, *(volatile u16 *)0x04000000) ;"):
+            with self.subTest(expression=expression):
+                self.assertEqual(rules(COMMENT + expression + "\n"), [])
+
+    def test_a_comma_group_is_still_walked_outward(self):
+        # through a parenthesis the walk goes on, and `&` before the group reaches the register
+        for expression in ("(&((Pair){ 1, 2 }, *(volatile u16 *)0x04000000))[-0x1000000] = 1;",
+                           "(&(f(a, b), *(volatile u16 *)0x04000000))[-0x1000000] = 1;",
+                           "(&(a ? b : 0, *(volatile u16 *)0x04000000))[-0x1000000] = 1;"):
+            with self.subTest(expression=expression):
+                self.assertEqual(rules(COMMENT + expression + "\n"), ["volatile"])
+
+
 if __name__ == "__main__":
     unittest.main()
