@@ -606,5 +606,68 @@ class SwitchCalleeEdgeTests(unittest.TestCase):
         self.assertFalse(accepted(lines[:3] + [forged] + lines[3:]))
 
 
+class MappingParseTests(unittest.TestCase):
+    """The delegation decodes its mapping snapshot once per proof, however many callees it inspects."""
+    setUp = scratch_fixture.DiscardedReturnScratchTests.setUp
+    build = SwitchCalleeEdgeTests.build
+
+    def walk(self, f):
+        """Prove `f` with the module's `json.loads` and `inspect` counted."""
+        decoded, inspected, real = [], [], switch_callees.SwitchCallees.inspect
+
+        def loads(text):
+            decoded.append(text)
+            return json.loads(text)
+
+        def inspect(profile, proof, address, data):
+            inspected.append(address)
+            return real(profile, proof, address, data)
+
+        proof = match.BufferCallProof(f['rom'], f['mapping'], stack_arguments=True, loop_replay=True,
+                                      switch_callee_index=f['index'])
+        with patch.object(switch_callees, 'json', unittest.mock.Mock(loads=loads)), \
+                patch.object(switch_callees.SwitchCallees, 'inspect', inspect):
+            match.verify_leaf_instructions(f['data'], A, True, buffer_proof=proof,
+                                           call_resolver=proof.target, incoming_narrow_reads=True)
+        return proof, decoded, inspected
+
+    def fixtures(self):
+        # Two callers, each reaching a jump-table callee and an ordinary one; the second
+        # mapping has one ARM row more, so the two snapshots differ in a row a Thumb-only list would drop.
+        caller = ('push {r4, lr}\nsub sp, #8\nmov r3, sp\nbl child\nmov r3, sp\nbl callee\n'
+                  'add sp, #8\npop {r4}\npop {r0}\nbx r0')
+        f = self.build(table_callee([GOOD, GOOD]), child='str r0, [r3]\nmovs r3, #0\nbx lr', caller=caller)
+        rows = json.loads(f['mapping'])
+        extra = dict(rom='0x08010400', end='0x08010404', mode='arm', instrs=0)
+        return f, dict(f, mapping=json.dumps(rows + [extra]).encode())
+
+    def test_several_callees_decode_the_mapping_once(self):
+        f, _ = self.fixtures()
+        proof, decoded, inspected = self.walk(f)
+        self.assertGreaterEqual(len(set(inspected)), 2)
+        self.assertGreaterEqual(len(inspected), 2)
+        self.assertEqual(decoded, [f['mapping']])
+        self.assertEqual(sorted(proof.switch_callees.records), [B])
+
+    def test_each_proof_decodes_its_own_mapping(self):
+        first, second = self.fixtures()
+        self.assertNotEqual(first['mapping'], second['mapping'])
+        one, decoded_one, _ = self.walk(first)
+        two, decoded_two, _ = self.walk(second)
+        self.assertEqual((decoded_one, decoded_two), ([first['mapping']], [second['mapping']]))
+        self.assertEqual(one.switch_callees.entries(), json.loads(first['mapping']))
+        self.assertEqual(two.switch_callees.entries(), json.loads(second['mapping']))
+
+    def test_one_decode_gives_the_evidence_of_a_decode_per_callee(self):
+        f, _ = self.fixtures()
+        cached, _, _ = self.walk(f)
+        with patch.object(switch_callees.SwitchCallees, 'entries',
+                          lambda profile: json.loads(profile.mapping)):
+            fresh, _, _ = self.walk(f)
+        self.assertEqual(cached.switch_callees.records, fresh.switch_callees.records)
+        self.assertEqual(cached.fingerprint(), fresh.fingerprint())
+        self.assertEqual(cached.loop_replay_lines(), fresh.loop_replay_lines())
+
+
 if __name__ == '__main__':
     unittest.main()
