@@ -459,7 +459,8 @@ class O0UnitTests(unittest.TestCase):
         cls.root = Root([(F, SUM, match.DEFAULT_CC, '-mthumb-interwork -O0'),
                          (G, IDENTITY_O0, match.DEFAULT_CC, '-mthumb-interwork -O0'),
                          (A, COUNTDOWN, match.DEFAULT_CC, '-mthumb-interwork -O1'),
-                         (B, LOOP.format(address=B), match.DEFAULT_CC, match.DEFAULT_FLAGS)], [])
+                         (B, LOOP.format(address=B), match.DEFAULT_CC, match.DEFAULT_FLAGS),
+                         (C, OUTSIDE, match.DEFAULT_CC, match.DEFAULT_FLAGS)], [])
         rom = (cls.root.path / 'baserom.bin').read_bytes()
         boot = [{'address': f'0x{F:08X}', 'size': cls.root.end(G) - F,
                  'sha256': hashlib.sha256(rom[F - match.ROM_BASE:cls.root.end(G) - match.ROM_BASE]).hexdigest()}]
@@ -492,13 +493,42 @@ class O0UnitTests(unittest.TestCase):
 
     def test_fixed_o0_selector_scope(self):
         from compiler_orphan_constants_native_profile import SELECTOR, FLAGS
-        self.assertIsNone(units.gate(self.root.path, F, self.arguments(owner_runtime_profile=SELECTOR,
-                                                                         flags=FLAGS)))
+        selected = self.arguments(owner_runtime_profile=SELECTOR, flags=FLAGS)
+        self.assertIsNone(units.gate(self.root.path, F, selected))
         with self.assertRaisesRegex(units.Refusal, 'verify it with --unit-toolchain agbcc-O1-v1'):
-            units.gate(self.root.path, A, self.arguments(owner_runtime_profile=SELECTOR, flags=FLAGS))
+            units.gate(self.root.path, A, selected)
         self.assertEqual(units.gate(self.root.path, C, self.arguments(flags=FLAGS)), 'exploratory')
-        self.assertIsNone(units.gate(self.root.path, C, self.arguments(owner_runtime_profile=SELECTOR,
-                                                                         flags=FLAGS)))
+        with self.assertRaisesRegex(units.Refusal, 'is outside every library unit; the fixed-O0 orphan-constant '
+                                    'selector is admitted only inside an agbcc-O0-v1 unit, with '
+                                    "--flags='-mthumb-interwork -O0' and without --unit-toolchain, and outside "
+                                    'every unit only the default toolchain verifies'):
+            units.gate(self.root.path, C, selected)
+
+    def test_fixed_o0_selector_needs_its_unit_row(self):
+        from compiler_orphan_constants_native_profile import SELECTOR, FLAGS, SCHEMA
+        selected = self.arguments(owner_runtime_profile=SELECTOR, flags=FLAGS)
+        report = f'* verification: `{SCHEMA}`\n* compiler: `{match.DEFAULT_CC} {FLAGS}`\n'
+        default = f'* verification: `{match_evidence.LINKED_SCHEMA}`\n' \
+                  f'* compiler: `{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`\n'
+        self.assertTrue(units.report_admitted(report, self.root.path, F))
+        self.assertFalse(units.report_admitted(report, self.root.path, A))
+        self.assertFalse(units.report_admitted(report, self.root.path, C))
+        self.assertTrue(units.report_admitted(default, self.root.path, C))
+        self.assertIsNone(units.gate(self.root.path, C, self.arguments()))
+        table = self.root.path / units.TABLE
+        rows = table.read_bytes()
+        table.unlink()
+        try:
+            with self.assertRaisesRegex(units.Refusal, 'is outside every library unit; the fixed-O0 orphan-constant '
+                                        'selector is admitted only inside an agbcc-O0-v1 unit'):
+                units.gate(self.root.path, F, selected)
+            self.assertFalse(units.report_admitted(report, self.root.path, F))
+            self.assertIsNone(units.gate(self.root.path, C, self.arguments()))
+            self.assertTrue(units.report_admitted(default, self.root.path, C))
+        finally:
+            table.write_bytes(rows)
+        self.assertIsNone(units.gate(self.root.path, F, selected))
+        self.assertTrue(units.report_admitted(report, self.root.path, F))
 
 
 class OldCompilerProbeTests(unittest.TestCase):

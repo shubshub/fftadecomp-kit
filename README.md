@@ -2942,8 +2942,9 @@ toolchain or flags are exploration: `match.py` prints the diff when the
 object compiles and links, writes no report, and the verdict is
 `NOT VERIFIED`, never a match; a saved report whose
 `* compiler:` line names other flags is refused. The explicit fixed-O0
-orphan-constant selector keeps its existing evidence scope outside units and
-is also admitted inside an `agbcc-O0-v1` unit, never inside another one.
+orphan-constant selector is admitted only inside an `agbcc-O0-v1` unit: a
+run or a saved report of it outside every unit, or inside a unit built with
+another toolchain, is refused.
 
 A unit report adds `* library unit:` (the canonical row), `* unit toolchain:`
 and `* unit compiler SHA-256:`, and `* unit orphan constants:` when a
@@ -2956,7 +2957,7 @@ saved-report check recompiles a function that calls through `_call_via_rN`;
 for a unit report it compiles with the report's unit toolchain and removes
 the authenticated orphan constants first, as `match.py` does, and every
 other report keeps the default toolchain. Without a
-table, only the default toolchain and the fixed-O0 selector verify.
+table, only the default toolchain verifies.
 
 `old_agbcc` must be pret/agbcc's `-DOLD_COMPILER` build: the tool refuses a
 binary that accepts `-fprologue-bugfix`, which only the new compiler has.
