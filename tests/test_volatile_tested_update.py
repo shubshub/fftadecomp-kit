@@ -475,7 +475,8 @@ class TestedUpdateClassifierTests(unittest.TestCase):
 
 
 class AlignmentTests(unittest.TestCase):
-    """explained: candidates are skipped only where the stripped compile has no load for them"""
+    """the second pairing (volatile_semantics.paired_counterparts, kit#378): candidates are
+    skipped only where the stripped compile has no load for them"""
 
     @staticmethod
     def entries(*loads):
@@ -490,11 +491,18 @@ class AlignmentTests(unittest.TestCase):
 
     @staticmethod
     def pair(counterparts, loads, candidates):
-        """explained, given the stripped compile's records, as compare_function calls it"""
-        return tested_update.explained(counterparts, [(r.width, r.signed, r.address) for r in loads],
-                                       [getattr(r, "value", None) for r in loads], candidates)
+        """the ids of the candidates left unpaired, given the stripped compile's records, keyed as
+        compare_function keys them; None if the loads do not pair up"""
+        def placed(record):
+            return getattr(record, "value", None), getattr(record, "event", None)
+        mine = [entry[:3] + placed(entry[3]) for entry in counterparts]
+        theirs = [(semantics.LOOP_CUT if r.kind == "loop" else (r.width, r.signed, r.address)) + placed(r)
+                  for r in loads]
+        skipped = semantics.paired_counterparts(mine, theirs,
+                                                [id(entry[3]) in candidates for entry in counterparts])
+        return None if skipped is None else {id(counterparts[i][3]) for i in skipped}
 
-    def explained(self, counterparts, theirs, candidates):
+    def skipped(self, counterparts, theirs, candidates):
         return self.pair(counterparts, self.stripped(*theirs), candidates)
 
     def test_alignment(self):
@@ -504,7 +512,7 @@ class AlignmentTests(unittest.TestCase):
         for counterparts, theirs, candidates, expected in (
                 ([a, b, c], [x, y], ids(b), ids(b)),
                 ([a, b, c], [x, y], ids(a), ids(a)),
-                ([a, b, c], [x, y], ids(a, b), ids(b)),      # the later one when either will do
+                ([a, b, c], [x, y], ids(a, b), ids(a)),      # the earlier one when either will do
                 ([a, b], [x], ids(a), ids(a)),
                 ([a, b, c], [x, y], set(), None),
                 ([a, b, c], [x, y], ids(c), None),
@@ -517,7 +525,7 @@ class AlignmentTests(unittest.TestCase):
                 ([b, c], [x, y, z], ids(b), None),
                 ([], [], set(), set())):
             with self.subTest(counterparts=[e[2] for e in counterparts], theirs=theirs):
-                self.assertEqual(self.explained(counterparts, theirs, candidates), expected)
+                self.assertEqual(self.skipped(counterparts, theirs, candidates), expected)
 
     def test_a_pair_needs_the_same_value(self):
         # review finding 1: a second test read (value 1) may not stand in for the stripped
@@ -525,11 +533,11 @@ class AlignmentTests(unittest.TestCase):
         x, later = ("x", 1), ("x", 7)
         test, second, update = self.entries(x, x, x)
         ids = lambda *entries: {id(entry[3]) for entry in entries}
-        self.assertIsNone(self.explained([test, second, update], [x, later], ids(update)))
-        self.assertEqual(self.explained([test, second, update], [x, x], ids(update)), ids(update))
+        self.assertIsNone(self.skipped([test, second, update], [x, later], ids(update)))
+        self.assertEqual(self.skipped([test, second, update], [x, x], ids(update)), ids(update))
         # signedness and width count too
         signed = [(1, True, "x", semantics.Record(5, "x", "load", address="x", width=1, value=1))]
-        self.assertIsNone(self.explained(signed, [x], set()))
+        self.assertIsNone(self.skipped(signed, [x], set()))
         self.assertEqual(self.pair(signed, [semantics.Record(
             9, "x", "load", address="x", width=1, value=1, signed=True)], set()), set())
         self.assertIsNone(self.pair([test], [semantics.Record(9, "x", "load", address="x", width=2, value=1)],
@@ -545,11 +553,11 @@ class AlignmentTests(unittest.TestCase):
         real_cut = cut + (semantics.Record(40, "cut", "loop"),)
         self.assertFalse(hasattr(real_cut[3], "value"))
         ids = lambda *entries: {id(entry[3]) for entry in entries}
-        stripped = self.stripped(x)
-        self.assertEqual(tested_update.explained(
-            [test, real_cut, update], [(1, False, "x"), cut], [stripped[0].value, None], ids(update)), ids(update))
-        self.assertIsNone(tested_update.explained(
-            [test, real_cut, update], [(1, False, "x")], [stripped[0].value], ids(update)))
+        stripped_cut = semantics.Record(41, "cut", "loop")
+        self.assertEqual(self.pair([test, real_cut, update], self.stripped(x) + [stripped_cut], ids(update)),
+                         ids(update))
+        self.assertIsNone(self.pair([test, real_cut, update], self.stripped(x), ids(update)))
+        self.assertIsNone(self.pair([test, real_cut, update], [stripped_cut] + self.stripped(x), ids(update)))
 
 
 HEADER = fixtures.HEADER

@@ -82,7 +82,19 @@ symbolically along every path, and the check requires
      one immediate `add`/`sub` stored back to it (volatile_tested_update,
      which prints its premise in the record);
    * a counterpart of the stripped compile's loads of the object, matched
-     in order with the same address and width;
+     in order with the same address, width, signedness and executor value,
+     and after the same number of trace events (every observable event the
+     traces compare: stores, calls, escapes, returns and loop markers), so
+     that the two loads of a pair are the same read: they read the same
+     value in ordinary memory, and neither crosses such an event to reach
+     the other (kit#378).  Under a caller's trace pairing (the overwritten-
+     store composition) the events are renumbered through its map of the
+     surviving events first.  The three forwarded re-reads above are
+     optional counterparts: each pairs with a stripped load where the
+     pairing needs it (the stripped compile reloads where paths with
+     different values meet) and is otherwise unpaired, which is what
+     explains it; only the unpaired ones are listed in the record
+     (paired_counterparts);
 4. every access overlapping a pinned member to be exactly that member: its
    offset and its width (Executor.check_address), and every such store to
    carry its own read-modify-write load, except a store of the member's
@@ -130,9 +142,10 @@ effect): reading a pinned member twice where an ordinary declaration would
 reuse the first value (`if (x) ...; if (x) ...`) is refused, except for the
 tested update above.  So are loops whose exit depends on unknown values that
 the induction cannot prove, stripped compiles that legally reorder accesses
-around a pinned one, and equivalent code that the expression normaliser
-cannot prove equal.  For halfword members that includes a narrow read
-(`(u8)sym.h`, `sym.h & 0xFF`), which the stripped compile narrows to an
+around a pinned one or move a load of the object across a store or call, and
+equivalent code that the expression normaliser cannot prove equal.  For
+halfword members that includes a narrow read (`(u8)sym.h`, `sym.h & 0xFF`),
+which the stripped compile narrows to an
 `ldrb` of the low byte that the overlap rule refuses; a signed read
 (`(s16)sym.h`), whose `lsl`/`asr` the normaliser does not equate with the
 other compile's sign extension; and the mixed chain `sym.h = (sym.b = a)`,
@@ -1791,6 +1804,7 @@ class Executor:
                 record.signed = mnemonic in ("ldrsb", "ldrsh")
                 regs[subject], record.forwarded = self.load(width, record.signed, address, text)
                 record.value = regs[subject]
+                record.event = len(self.trace)      # the observable events before it (kit#378)
                 if derived or not self.load_clean or record.signed:
                     self.derived.add(subject)
                 else:
@@ -2632,6 +2646,60 @@ def forwarded_constant_update(records, position, pinned_width):
             between.append(step)
     return stored
 
+def paired_counterparts(mine, theirs, optional):
+    """the positions in mine of the optional entries left unpaired when mine pairs up, in order,
+    with theirs; None if it does not.
+
+    mine and theirs are compare_function's pairing keys for the real compile's counterparts and
+    the stripped compile's loads (kit#378), and optional[i] says whether mine[i] is a forwarded
+    re-read.  Two entries pair only if their keys are equal.  Every other entry and every
+    stripped load must be paired; an optional one may pair or stay unpaired, and stays
+    unpaired where both are possible, as before the alignment.
+    """
+    rows, columns = len(mine), len(theirs)
+    # able[i][j]: mine[i:] pairs up with theirs[j:]
+    able = [[False] * (columns + 1) for _ in range(rows + 1)]
+    able[rows][columns] = True
+    for i in range(rows - 1, -1, -1):
+        for j in range(columns, -1, -1):
+            able[i][j] = (optional[i] and able[i + 1][j]) or \
+                (j < columns and mine[i] == theirs[j] and able[i + 1][j + 1])
+    if not able[0][0]:
+        return None
+    skipped, j = set(), 0
+    for i in range(rows):
+        if optional[i] and able[i + 1][j]:
+            skipped.add(i)
+        else:
+            j += 1
+    return skipped
+
+
+def canonical_versions(value, events):
+    """value with each event it names (a memory version or a call's result) renumbered through
+    events, a caller's map from this compile's trace positions to the positions of the trace it
+    compared; a SemanticError if it names an event the map drops"""
+    if not isinstance(value, tuple) or not value:
+        return value
+    def renumber(index):
+        if index not in events:
+            raise SemanticError("a load reads a version from an event its caller's trace pairing removed")
+        return events[index]
+    if value[0] == "load" and len(value) == 4:
+        version = value[3]
+        if version != "entry":
+            if not (isinstance(version, tuple) and len(version) == 2 and type(version[1]) is int):
+                raise SemanticError("a load reads a memory version its caller's trace pairing cannot renumber")
+            version = (version[0], renumber(version[1]))
+        return ("load", value[1], canonical_versions(value[2], events), version)
+    if value[0] in ("ret", "clobber") and len(value) >= 2:
+        if type(value[1]) is not int:
+            raise SemanticError("a load depends on a raw call result its caller's trace pairing "
+                                "cannot renumber")
+        return (value[0], renumber(value[1])) + value[2:]
+    return tuple(canonical_versions(part, events) for part in value)
+
+
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
                      interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None,
                      _capture_load_provenance=False):
@@ -2650,6 +2718,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                     _capture_load_provenance=_capture_load_provenance)
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional, indirect = \
         (set() for _ in range(8))
+    forwarded_updates = False        # a forwarded constant update was classified on some path so far
     for number, path in enumerate(paths, 1):
         records = path.records
         for call in records:
@@ -2665,6 +2734,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 2. classify every load of the object in the real compile
         counterparts, explained_stores = [], set()
         classified_dead_reads = set()
+        optional = {}       # id(forwarded re-read) -> the set that lists it if the pairing skips it
         candidates = set()      # volatile_tested_update: skipped only where the stripped compile lacks them
         for position, record in enumerate(records):
             if record.kind == "loop":
@@ -2716,20 +2786,20 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                     read_modify_write.add(record.index)
                     classified_dead_reads.add(record.index)
                     continue
+                # A forwarded re-read is an optional counterpart (kit#378): it is explained,
+                # and listed, only where the stripped compile has no load to pair it with.
                 if record.forwarded and chained_reread(records, position, pinned_width):
-                    chained.add(record.index)
-                    continue
-                if record.forwarded and forwarded_constant_update(records, position, pinned_width):
-                    updates.add(record.index)
-                    continue
-                if record.forwarded and ordinary_store_reread(
+                    optional[id(record)] = chained
+                elif record.forwarded and forwarded_constant_update(records, position, pinned_width):
+                    optional[id(record)] = updates
+                    forwarded_updates = True
+                elif record.forwarded and ordinary_store_reread(
                         records, position, pinned_width,
                         lambda address: object_offset(address, symbol, size) is None):
-                    ordinary.add(record.index)
-                    continue
+                    optional[id(record)] = ordinary
                 # not under a caller's own trace pairing (the overwritten-store composition),
                 # whose record would not print the rule's premise
-                if _ordered_trace_check is None and \
+                elif _ordered_trace_check is None and \
                         tested_update.tested_update_reread(records, position, pinned_width):
                     candidates.add(id(record))
             counterparts.append((record.width, record.signed, where(record.address), record))
@@ -2756,7 +2826,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 1. the stripped compile behaves the same on this path
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
                        interfaces, _capture_load_provenance=_capture_load_provenance)
-        if updates:
+        if forwarded_updates:
             # Ordinary reads crossed by the distinct forwarding proof are not
             # discarded: require their complete ordered provenance in both
             # compiles, even when their destinations would otherwise be dead.
@@ -2770,8 +2840,15 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the real and stripped compiles branch on different "
                                 f"conditions (path {number})")
         mine_trace, other_trace = path.trace, other.trace
+        events = None, None     # each compile's map from its trace positions to the compared trace's
         if _ordered_trace_check is not None:
-            mine_trace, other_trace = _ordered_trace_check(path, other, classified_dead_reads)
+            checked = _ordered_trace_check(path, other, classified_dead_reads)
+            mine_trace, other_trace = checked[:2]
+            if len(checked) > 2:
+                events = tuple(checked[2:4])
+            elif (list(mine_trace), list(other_trace)) != (list(path.trace), list(other.trace)):
+                raise SemanticError(f"{name}: a caller's trace pairing changed the traces without "
+                                    f"mapping their events (path {number})")
         if other_trace != mine_trace:
             for index, (mine, theirs) in enumerate(zip(mine_trace + [None] * len(other_trace),
                                                        other_trace + [None] * len(mine_trace))):
@@ -2783,14 +2860,54 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         loads = [r for r in other.records
                  if r.kind == "loop" or r.kind == "load" and object_offset(r.address, symbol, size) is not None]
         theirs = [LOOP_CUT if r.kind == "loop" else (r.width, r.signed, where(r.address)) for r in loads]
-        mine = [entry[:3] for entry in counterparts]
-        skipped = None
-        if mine != theirs:
-            skipped = tested_update.explained(counterparts, theirs, [getattr(r, "value", None) for r in loads],
-                                              candidates)
-        if skipped:
-            tested |= {entry[3].index for entry in counterparts if id(entry[3]) in skipped}
-            mine = [entry[:3] for entry in counterparts if id(entry[3]) not in skipped]
+
+        def placed(record, renumbered):
+            # what a pair must agree on beyond address and width (kit#378): the executor value,
+            # so both loads read the same value in ordinary memory, and the number of trace events
+            # (stores, calls, escapes, returns, loop markers) before the load, so neither crosses
+            # one to reach the other
+            value, event = getattr(record, "value", None), getattr(record, "event", None)
+            if renumbered is None or event is None:
+                return value, event
+            try:
+                value = canonical_versions(value, renumbered)
+            except SemanticError as error:
+                raise SemanticError(f"{name}: {describe(record)}: {error} (path {number})") from None
+            return value, sum(1 for position in renumbered if position < event)
+
+        mine_keys = [entry[:3] + placed(entry[3], events[0]) for entry in counterparts]
+        their_keys = [entry + placed(load, events[1]) for entry, load in zip(theirs, loads)]
+        skipped = paired_counterparts(mine_keys, their_keys,
+                                      [id(entry[3]) in optional for entry in counterparts])
+        if skipped is None and candidates:
+            # volatile_tested_update, only where the pairing above fails: its candidates
+            # become optional counterparts too, listed as tested-update re-reads
+            widened = {**optional, **{key: tested for key in candidates}}
+            skipped = paired_counterparts(mine_keys, their_keys,
+                                          [id(entry[3]) in widened for entry in counterparts])
+            if skipped is not None:
+                optional = widened
+        if skipped is not None:
+            for position in skipped:
+                optional[id(counterparts[position][3])].add(counterparts[position][3].index)
+            continue
+        kept = [position for position, entry in enumerate(counterparts) if id(entry[3]) not in optional]
+        mine = [counterparts[position][:3] for position in kept]
+        if mine == theirs:
+            # every load lines up by address and width, but a pair differs in value or position
+            for position, key in zip(kept, their_keys):
+                record = counterparts[position][3]
+                if mine_keys[position][3] != key[3]:
+                    raise SemanticError(f"{name}: {describe(record)} loads {counterparts[position][2]}, and the "
+                                        "stripped compile's load there reads a different value; the qualifier "
+                                        "added a read")
+                if mine_keys[position][4] != key[4]:
+                    raise SemanticError(f"{name}: {describe(record)} loads {counterparts[position][2]}, and the "
+                                        "stripped compile's load there lies across a store or call from it; the "
+                                        "qualifier added a read")
+            raise SemanticError(f"{name}: the real and stripped compiles' loads of {symbol} do not pair up "
+                                f"(path {number})")
+        counterparts = [counterparts[position] for position in kept]
         if mine != theirs:
             index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b), min(len(mine), len(theirs)))
             if index < len(mine) and mine[index] == LOOP_CUT and \

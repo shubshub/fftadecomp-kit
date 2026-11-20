@@ -50,16 +50,19 @@ leaves the load a counterpart and keeps main's "the qualifier added a read"):
    the stored value;
 6. after the store, neither value nor the flags the update set reaches a use
    on the path;
-7. the stripped compile has no load for it (explained): re-reads that pass
-   1-6 are skipped only where the real compile's other loads of the object
-   then pair up in order with the stripped compile's, each pair agreeing in
-   width, signedness, address and executor value, so that both loads of a
-   pair read the same value in ordinary memory.  This runs only where main's pairing
-   (without the value) already fails, so a function that passes on main
-   keeps its verdict and its record, and one that no skip can pair up keeps
-   main's refusal and its message.  Not under a caller's own trace pairing
-   (the overwritten-store composition, whose record would not print the
-   premise): there no load is a candidate.
+7. the stripped compile has no load for it: compare_function first pairs the
+   counterparts without the rule (volatile_semantics.paired_counterparts, the
+   forwarded re-reads optional).  Only where that fails does it pair again
+   with the candidates optional too, and a candidate left unpaired is a
+   tested update re-read.  A pair agrees in width, signedness, address,
+   executor value and the observable events before it (kit#378), so both
+   loads of a pair are the same read, and a test read from before a write
+   cannot stand in for a load after it.  One tie-break for every optional
+   entry: it is skipped wherever the rest still pairs up.  A function that
+   passes without the rule keeps its verdict and its record, and one that no
+   skip can pair up keeps that refusal and its message.  Not under a caller's
+   own trace pairing (the overwritten-store composition, whose record would
+   not print the premise): there no load is a candidate.
 
 The equal values in (2) say that, in ordinary memory, the re-read returns the
 tested value, so the stripped compile's reuse of it computes the same update.
@@ -190,41 +193,3 @@ def tested_update_reread(records, position, pinned_width):
         if not stored:
             between.append(step)
     return stored
-
-
-def explained(counterparts, theirs, values, candidates):
-    """the ids of the candidate re-reads whose absence pairs the real compile's counterpart loads
-    up, in order, with the stripped compile's loads; None if no such choice does.
-
-    counterparts are compare_function's (width, signed, where, record) entries in path order,
-    theirs the stripped compile's entries as compare_function pairs them, values their
-    executor values, and candidates the ids of the records tested_update_reread admitted.
-    Two entries pair only if they agree in width, signedness, address and executor value, so
-    the two loads of a pair read the same value in ordinary memory: a read from before a
-    write cannot stand in for one after it.  An entry that is not a load (a loop cut) has no
-    value on either side and pairs as before.  (Main pairs by the first three alone; it never
-    gets here when they already line up, so it keeps its verdict and record, and where no
-    choice pairs the loads up, main's refusal and message stand.)  Every pairing skips the
-    same number of loads, so where several do, the earliest loads are paired and later ones
-    skipped.
-    """
-    mine = [entry[:3] + (getattr(entry[3], "value", None),) for entry in counterparts]
-    theirs = [tuple(entry) + (value,) for entry, value in zip(theirs, values)]
-    skippable = [id(entry[3]) in candidates for entry in counterparts]
-    rows, columns = len(mine), len(theirs)
-    # able[i][j]: mine[i:] pairs up with theirs[j:], skipping candidates only
-    able = [[False] * (columns + 1) for _ in range(rows + 1)]
-    able[rows][columns] = True
-    for i in range(rows - 1, -1, -1):
-        for j in range(columns, -1, -1):
-            able[i][j] = (j < columns and mine[i] == theirs[j] and able[i + 1][j + 1]) or \
-                (skippable[i] and able[i + 1][j])
-    if not able[0][0]:
-        return None
-    skipped, j = set(), 0
-    for i in range(rows):
-        if j < columns and mine[i] == theirs[j] and able[i + 1][j + 1]:
-            j += 1
-        else:
-            skipped.add(id(counterparts[i][3]))
-    return skipped
