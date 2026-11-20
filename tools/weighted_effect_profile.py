@@ -3,6 +3,8 @@
 import hashlib
 import struct
 
+import weighted_effect_fallback as fallback
+
 BASE = 0x08000000
 ADDRESS = 0x081323D0
 PICKER = 0x0812D660
@@ -51,10 +53,17 @@ def sha(raw):
 
 
 def check_bindings(address, bindings, targets=None):
+    if address == fallback.ADDRESS:
+        calls, data = fallback.CALLS, fallback.DATA
+        expected = dict(TARGETS)
+        del expected["func_0812D660"]
+        expected["func_0812D7FC"] = (fallback.PICKER, False)
+    else:
+        require(address == ADDRESS, "unreviewed effect owner")
+        calls, data, expected = CALLS, DATA, TARGETS
     require(
-        address == ADDRESS
-        and bindings == dict(calls=CALLS, data=DATA, functions=[], switches=[])
-        and (targets is None or targets == TARGETS),
+        bindings == dict(calls=calls, data=data, functions=[], switches=[])
+        and (targets is None or targets == expected),
         "original ELF call/data roles or complete owner differ",
     )
 
@@ -70,11 +79,11 @@ def thumb16(instructions, start, expected):
         )
 
 
-def weighted_rolls(rom):
+def weighted_rolls(rom, *, weights=WEIGHTS, choices=CHOICES, has_fallback=False):
     result = []
-    for i, (weight, kind, target) in enumerate(CHOICES):
+    for i, (weight, kind, target) in enumerate(choices):
         require(
-            struct.unpack_from("<HH", rom, WEIGHTS - BASE + 4 * i) == (weight, kind),
+            struct.unpack_from("<HH", rom, weights - BASE + 4 * i) == (weight, kind),
             "weighted ROM record differs",
         )
         pointer = struct.unpack_from("<I", rom, TABLE - BASE + 12 * kind)[0]
@@ -94,6 +103,7 @@ def weighted_rolls(rom):
         )
     # The second and subsequent rows are fetched only on a signed positive remainder.
     # This exhausts every result of the checked nonnegative PRNG value modulo 101.
+    unselected = []
     for roll in range(101):
         residual = roll
         for record in result:
@@ -104,7 +114,11 @@ def weighted_rolls(rom):
                 record["last"] = roll
                 break
         else:
-            raise ValueError("weighted effect: roll escapes the four real records")
+            require(has_fallback, "roll escapes the four real records")
+            unselected.append(roll)
+    if has_fallback:
+        require(unselected == list(range(96, 101)), "equipment fallback interval differs")
+        result.append(dict(kind=-1, target=None, first=96, last=100))
     require(
         all(record["first"] is not None for record in result),
         "an intended descriptor is unreachable",
@@ -206,9 +220,15 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     import software_double_profile as canonical
 
     check_bindings(address, bindings)
+    sentinel = address == fallback.ADDRESS
+    picker = fallback.PICKER if sentinel else PICKER
+    weights = fallback.WEIGHTS if sentinel else WEIGHTS
+    slot = 29 if sentinel else 30
+    owner_mod = 0x0813237A if sentinel else 0x08132404
+    picker_mod = 0x0812D90E if sentinel else 0x0812D772
     names = match.parse_data_symbols(objects)
     for name, expected in (
-        ("data_083A8484", WEIGHTS),
+        (f"data_{weights:08X}", weights),
         ("data_083A87B0", TABLE),
         ("data_0200F3F0", 0x0200F3F0),
         ("g_state_030034B0", 0x030034B0),
@@ -244,19 +264,19 @@ def prove(data, address, rom, mapping, index, objects, bindings):
             },
         )
 
-    raw, ins, edges, calls, partition = native(ADDRESS)
+    raw, ins, edges, calls, partition = native(address)
     require(data == raw, "linked ELF bytes differ from original ROM")
-    caller_shape(raw, ins, calls, partition)
-    helper = native(PICKER)
-    picker_shape(helper[0], helper[1], helper[3], helper[4])
-    helper_frame = restoring(PICKER, helper)
+    (fallback.caller_shape if sentinel else caller_shape)(raw, ins, calls, partition)
+    helper = native(picker)
+    (fallback.picker_shape if sentinel else picker_shape)(helper[0], helper[1], helper[3], helper[4])
+    helper_frame = restoring(picker, helper)
     require(
         helper_frame["maximum_frame_bytes"] == 56,
         "picker frame size or restoration differs",
     )
     for start, span, owner_calls, site in (
-        (ADDRESS, raw, calls, 0x08132404),
-        (PICKER, helper[0], helper[3], 0x0812D772),
+        (address, raw, calls, owner_mod),
+        (picker, helper[0], helper[3], picker_mod),
     ):
         require(
             remainder.verify_context(
@@ -277,12 +297,13 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     require(
         sha(dispatch)
         == "b1a2ee4c8cefef5b7581b6599971145c0e7a1a78a4e47f2b1c344ca282824d5c"
-        and struct.unpack_from("<I", rom, TABLE - BASE + 30 * 12)[0] == ADDRESS | 1
+        and struct.unpack_from("<I", rom, TABLE - BASE + slot * 12)[0] == address | 1
         and canonical.span_record(THUNK, THUNK + 2, entries, rows, rom)["instrs"] == 1
         and rom[THUNK - BASE : THUNK - BASE + 2] == bytes.fromhex("0847"),
         "dispatcher, own descriptor or BX R1 differs",
     )
-    choices = weighted_rolls(rom)
+    choices = weighted_rolls(rom, weights=weights, choices=fallback.CHOICES if sentinel else CHOICES,
+                             has_fallback=sentinel)
 
     score = native(SCORER)
     require(
@@ -323,7 +344,8 @@ def prove(data, address, rom, mapping, index, objects, bindings):
             callback(target)
 
     for record in choices:
-        callback(record["target"])
+        if record["target"] is not None:
+            callback(record["target"])
     from signed_divmod_profile import text
 
     closure_digest = sha(
@@ -331,35 +353,36 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     )
     require(
         closure_digest
-        == "54ef182ace58b36a810fa5d3b30d99f754fb5d7eb22d7f7655e6ffc8cdfbd605",
+        == ("2d7b73dbc0218a45a0100421fe40511aeb853e1c54f3cd6fab2cbfbb288208b0" if sentinel else
+            "54ef182ace58b36a810fa5d3b30d99f754fb5d7eb22d7f7655e6ffc8cdfbd605"),
         "selected callback or transitive status leaf differs",
     )
-    return dict(
+    manifest = dict(
         schema=SCHEMA,
         bindings=bindings,
         partition=partition,
-        dispatcher=[0x081338BA, THUNK, 30],
+        dispatcher=[0x081338BA, THUNK, slot],
         picker=dict(
-            address=PICKER,
+            address=picker,
             sha256=sha(helper[0]),
             frame=helper_frame,
             mode=0,
-            table=WEIGHTS,
+            table=weights,
             choices=choices,
             output=dict(
                 register="r3",
-                write=0x0812D7B6,
-                read=0x0812D7BA,
+                write=0x0812D930 if sentinel else 0x0812D7B6,
+                read=0x0812D934 if sentinel else 0x0812D7BA,
                 bytes=2,
                 owner_local=[-16, -12],
                 written=[-16, -14],
-                caller_read=0x08132416,
+                caller_read=0x0813238A if sentinel else 0x08132416,
             ),
         ),
         runtime=dict(
             rng=RNG,
             rng_range=[0, 32767],
-            exact_divisors=[[0x0812D772, 101], [0x08132404, 1001]],
+            exact_divisors=[[picker_mod, 101], [owner_mod, 1001]],
             closure_frames=mod_frames,
             residual_r3_at_picker_rng="PRNG does not read R3; MOD uses only its own frame",
         ),
@@ -386,17 +409,22 @@ def prove(data, address, rom, mapping, index, objects, bindings):
             numeric_return="arbitrary low signed halfword",
         ),
         callback=dict(
-            site=0x08132424,
+            site=0x081323B0 if sentinel else 0x08132424,
             register="r1",
             argument="r0=original action",
             thunk=THUNK,
             selected_closure=[[a, records[a]] for a in sorted(records)],
         ),
-        owner_frame=dict(local=[-16, -12], saved=[-12, 0], return_site=0x0813244E),
+        owner_frame=dict(local=[-16, -12], saved=[-12, 0], return_site=0x081323CE if sentinel else 0x0813244E),
         premises=[
             "Word-aligned accessible private stack, stable code/ROM, and accessible ordinary little-endian game objects.",
             "Action state, unit storage, RNG state and external writes remain disjoint from protected stack storage.",
             "Other ordinary scorer calls return under the existing ABI, preserving R4-R11, SP and caller storage.",
             "No asynchronous change to the live stack, code, weighted records or descriptor pointers during the call.",
         ],
-    ), ins
+    )
+    if sentinel:
+        manifest["equipment_fallback"] = fallback.equipment_path(rom, mapping, index, objects, native)
+        manifest["picker"]["output"]["positive_descriptor_read"] = 0x081323A2
+        manifest["premises"].extend(manifest["equipment_fallback"]["equipment_premises"])
+    return manifest, ins

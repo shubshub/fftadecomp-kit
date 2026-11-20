@@ -34,6 +34,7 @@ READONLY_TWO_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-wo
 DATA_SELECTOR = 'addressed-signed-runtime-data-v1'
 DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-data-v1'
 COMPILER_DATA_SELECTOR = 'compiler-signed-runtime-data-v1'
+COMPILER_BIOS_SCALAR_DATA_SELECTOR = 'compiler-signed-runtime-bios-fill-scalar-control-data-v1'
 COMPILER_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-data-v1'
 COMPILER_TWO_DATA_SELECTOR = 'compiler-signed-runtime-readonly-two-words-data-v1'
 COMPILER_TWO_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-readonly-two-words-data-v1'
@@ -47,7 +48,7 @@ COMPILER_MMIO_SELECTORS = (COMPILER_MMIO_DATA_SELECTOR, COMPILER_MMIO_FOUR_DATA_
 # Compiler-emitted __divsi3/__modsi3 names beside canonical _call_via_rN thunks.
 COMPILER_THUNKS_DATA_SELECTOR = 'compiler-signed-runtime-thunks-data-v1'
 COMPILER_THUNKS_DATA_SCHEMA = 'elf-symbol-thumb-compiler-signed-runtime-thunks-data-v1'
-COMPILER_SELECTORS = (COMPILER_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR, COMPILER_THREE_DATA_SELECTOR,
+COMPILER_SELECTORS = (COMPILER_BIOS_SCALAR_DATA_SELECTOR, COMPILER_DATA_SELECTOR, COMPILER_TWO_DATA_SELECTOR, COMPILER_THREE_DATA_SELECTOR,
                       *COMPILER_MMIO_SELECTORS, COMPILER_THUNKS_DATA_SELECTOR)
 READONLY_TWO_DATA_SELECTOR = 'addressed-signed-runtime-readonly-two-words-data-v1'
 READONLY_TWO_DATA_SCHEMA = 'elf-symbol-thumb-addressed-signed-runtime-readonly-two-words-data-v1'
@@ -93,11 +94,11 @@ MENU_RING_SELECTOR = 'addressed-native-menu-ring-initializer-v1'
 BIOS_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-function-literals-data-v1'
 BIOS_SCALAR_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-fill-scalar-control-function-literals-data-v1'
 BIOS_ORDINARY_FUNCTION_DATA_SELECTOR = 'addressed-native-bios-ordinary-function-literals-data-v1'
-SCALAR_CONTROL_SELECTORS = (max_lines.SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
+SCALAR_CONTROL_SELECTORS = (COMPILER_BIOS_SCALAR_DATA_SELECTOR, max_lines.SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                             BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS)
 FUNCTION_DATA_SELECTORS = (MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR,
                            BIOS_ORDINARY_FUNCTION_DATA_SELECTOR)
-BIOS_SELECTORS = (MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
+BIOS_SELECTORS = (COMPILER_BIOS_SCALAR_DATA_SELECTOR, MENU_RING_SELECTOR, max_lines.SELECTOR, BIOS_SELECTOR, BIOS_READONLY_TWO_SELECTOR, BIOS_DATA_SELECTOR, BIOS_ZERO_EXTENDED_DATA_SELECTOR, BIOS_SCALAR_DATA_SELECTOR, BIOS_SCALAR_CODE_IMAGE_SELECTOR, *NUMERIC_MMIO_SELECTORS, BIOS_READONLY_DATA_SELECTOR, BIOS_READONLY_THREE_DATA_SELECTOR, BIOS_READONLY_FOUR_DATA_SELECTOR, BIOS_FUNCTION_DATA_SELECTOR, BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
 BIOS_ORDINARY_SELECTOR = 'addressed-native-bios-ordinary-v1'
 BIOS_ORDINARY_DATA_SELECTOR = 'addressed-native-bios-ordinary-data-v1'
 BIOS_ORDINARY_READONLY_TWO_DATA_SELECTOR = 'addressed-native-bios-ordinary-readonly-two-words-data-v1'
@@ -174,6 +175,7 @@ SCHEMAS = {MENU_RING_SELECTOR: 'elf-symbol-thumb-' + MENU_RING_SELECTOR, max_lin
             BIOS_READONLY_DATA_SELECTOR:'elf-symbol-thumb-addressed-native-bios-fill-readonly-word0-data-v1',
             BIOS_ORDINARY_SELECTOR:'elf-symbol-thumb-addressed-native-bios-ordinary-v1',
             BIOS_ORDINARY_DATA_SELECTOR:'elf-symbol-thumb-addressed-native-bios-ordinary-data-v1',
+            COMPILER_BIOS_SCALAR_DATA_SELECTOR: 'elf-symbol-thumb-' + COMPILER_BIOS_SCALAR_DATA_SELECTOR,
             BIOS_SCALAR_DATA_SELECTOR:'elf-symbol-thumb-addressed-native-bios-fill-scalar-control-data-v1',
             BIOS_SELECTOR:'elf-symbol-thumb-addressed-native-bios-fill-buffer-v1',
             BIOS_DATA_SELECTOR:'elf-symbol-thumb-addressed-native-bios-fill-buffer-data-v1',
@@ -281,6 +283,8 @@ def context_selector(context):
 def operations(selector):
     if selector in (*BIOS_SELECTORS, *BIOS_ORDINARY_SELECTORS):
         from bios_cpuset_fill_profile import NAME, ADDRESS
+        if selector == COMPILER_BIOS_SCALAR_DATA_SELECTOR:
+            return dict(OPERATIONS, **{NAME: ADDRESS})
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS, **{NAME:ADDRESS})
     if selector in (*INTEGER_SELECTORS, COMPILER_THUNKS_DATA_SELECTOR):
         return dict(OPERATIONS, **UNSIGNED_OPERATIONS)
@@ -702,6 +706,8 @@ def prepare(data, address, calls, context):
             set(bindings.values()) & set(OPERATIONS) and
             set(bindings.values()) & set(UNSIGNED_OPERATIONS)):
         raise ValueError('mixed integer selector requires actual signed and unsigned calls')
+    if selector == COMPILER_BIOS_SCALAR_DATA_SELECTOR and not set(bindings.values()) & set(OPERATIONS):
+        raise ValueError('compiler BIOS selector requires an actual signed runtime call')
     if selector == COMPILER_THUNKS_DATA_SELECTOR and not set(bindings.values()) & set(OPERATIONS):
         raise ValueError('compiler runtime thunks require an actual signed runtime call')
     selected = []
@@ -887,7 +893,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
         context[4]['compiler_runtime'] = dict(
             contract=COMPILER_THUNKS_CONTRACT if selector == COMPILER_THUNKS_DATA_SELECTOR else COMPILER_CONTRACT,
             calls=[[site-address, aliases[name], name]
-                   for site, name in sorted(context[3].items())])
+                   for site, name in sorted(context[3].items()) if name in aliases])
     if selector in BIOS_ORDINARY_SELECTORS:
         context[4]['bios_ordinary'] = dict(contract=BIOS_ORDINARY_CONTRACT,
             calls=[site-address for site,target in sorted(calls.items())
@@ -1096,7 +1102,7 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
             canonical = compiler_aliases(selector).get(name) if selector in COMPILER_SELECTORS else None
             if canonical is not None and target_symbol['size'] != 0:
                 raise ValueError('compiler runtime symbols require zero original size')
-            if selector in COMPILER_SELECTORS and name in operations(selector):
+            if selector in COMPILER_SELECTORS and name in compiler_aliases(selector).values():
                 raise ValueError('compiler runtime linking requires original compiler-emitted names')
             target = operations(selector).get(canonical or name)
             if target is None:
@@ -1118,6 +1124,8 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
             calls[address+offset] = target
             targets[name] = target
             occupied.update(range(offset,offset+4))
+    if selector == COMPILER_BIOS_SCALAR_DATA_SELECTOR and not set(targets) & set(COMPILER_ALIASES):
+        raise ValueError('compiler BIOS ELF requires an actual compiler-emitted signed runtime call')
     if selector == COMPILER_THUNKS_DATA_SELECTOR and bindings and not data_relocations:
         # The data-free shape (a callback read from an incoming object) is not admitted here.
         raise ValueError('compiler runtime thunks require actual typed data')
@@ -1370,7 +1378,7 @@ def render(result):
         premise.append(f'* mapped {register} callback ABI: ' + result['manifest']['callback']['contract'])
     if selector in THUNK_SELECTORS:
         premise.append('* canonical thunk callee ABI: ' + result['manifest']['thunks']['contract'])
-    if selector == COMPILER_THUNKS_DATA_SELECTOR:
+    if selector in (COMPILER_BIOS_SCALAR_DATA_SELECTOR, COMPILER_THUNKS_DATA_SELECTOR):
         premise.append('* compiler runtime binding: ' + result['manifest']['compiler_runtime']['contract'])
     evidence = {key:value for key,value in result.items() if key not in
                 ('body','original_elf','assembly','linked_elf')}

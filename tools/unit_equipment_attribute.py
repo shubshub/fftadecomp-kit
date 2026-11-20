@@ -51,13 +51,20 @@ def check_original(image, address, original, targets):
     import battle_action_value as battle
     import positioned_equipment_chance as chance
     import equipment_selection_list as selection
+    import equipment_removal_effect as removal
+    import target_equipment_chance as target_chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     if address == dispatch.OWNER:
         dispatch.check_original(image, original, targets)
         return
+    import random_equipment_removal as random_removal
+    if address == random_removal.OWNER:
+        random_removal.check_original(image, original, targets)
+        return
     calls = {OWNER: CALLS, battle.OWNER: battle.CALLS, guard.OWNER: guard.CALLS,
-             chance.OWNER: chance.CALLS, selection.OWNER: selection.CALLS}.get(address)
+             chance.OWNER: chance.CALLS, selection.OWNER: selection.CALLS,
+             removal.OWNER: removal.CALLS, target_chance.OWNER: target_chance.CALLS}.get(address)
     require(calls is not None, 'unexpected equipment owner')
     expected = bindings(calls)
     expected_targets = {f'func_{target:08X}': (target, False) for target in calls.values()}
@@ -80,6 +87,8 @@ def check_source(root, address):
     import battle_action_value as battle
     import positioned_equipment_chance as chance
     import equipment_selection_list as selection
+    import equipment_removal_effect as removal
+    import target_equipment_chance as target_chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
     name = f'func_{address:08X}'
@@ -95,7 +104,10 @@ def check_source(root, address):
         tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(header)))
         require(sha256(tokens.encode()).hexdigest() == dispatch.HEADER_HASH,
                 'battle dispatch callback declarations or state layout differ')
+    import random_equipment_removal as random_removal
     reserved = (name,)
+    if address == random_removal.OWNER:
+        reserved += ('ActionState', *random_removal.TARGETS)
     if address == chance.OWNER:
         headers.add(chance.HEADER_PATH)
         header = (root / chance.HEADER_PATH).read_text()
@@ -105,19 +117,24 @@ def check_source(root, address):
         require(sha256(tokens.encode()).hexdigest() == chance.HEADER_HASH,
                 'positioned equipment unit fields or helper declarations differ')
         reserved += ('Unit', 'positioned_chance', 'func_0812EF94', *(f'func_{target:08X}' for target in chance.CALLS.values()))
+    if address == removal.OWNER:
+        reserved += ('ActionState', *(f'func_{target:08X}' for target in removal.CALLS.values()))
+    if address == target_chance.OWNER:
+        reserved += ('Object', 'ObjectPair', *(f'func_{target:08X}' for target in target_chance.CALLS.values()))
     if address == selection.OWNER:
         reserved += ('SelectionState', 'SelectionEntry', 'Actor080C2618', *selection.OBJECTS,
                      *(f'func_{target:08X}' for target in selection.CALLS.values()))
-    require(address in (OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER, selection.OWNER) and plausible.include_closure(root, source) ==
+    require(address in (random_removal.OWNER, OWNER, battle.OWNER, guard.OWNER, dispatch.OWNER, chance.OWNER, selection.OWNER, removal.OWNER, target_chance.OWNER) and plausible.include_closure(root, source) ==
             (headers, []) and
             base_header((root/'include/ffta.h').read_bytes(), reserved) and
             not any(s in text for s in (chr(92), '??', '%:', chr(0))),
             'equipment owner requires its reviewed C types and local array')
     tokens = ' '.join(TOKEN.findall(plausible.strip_comments_and_strings_keep_strings(text)))
-    expected = {OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
+    expected = {random_removal.OWNER: random_removal.SOURCE_HASH, OWNER: 'e8109fe2fae349a72960c94532ca90763119b4967bf309bbdaee4b46f768af5c',
                 battle.OWNER: battle.SOURCE_HASH, guard.OWNER: guard.SOURCE_HASH,
                 dispatch.OWNER: dispatch.SOURCE_HASH, chance.OWNER: chance.SOURCE_HASH,
-                selection.OWNER: selection.SOURCE_HASH}[address]
+                selection.OWNER: selection.SOURCE_HASH, removal.OWNER: removal.SOURCE_HASH,
+                target_chance.OWNER: target_chance.SOURCE_HASH}[address]
     require(sha256(tokens.encode()).hexdigest() == expected,
             'equipment declarations, local array, or reviewed arithmetic differ')
 
@@ -280,8 +297,17 @@ def prove(data, address, rom, mapping, index, objects, original, ins, calls, ref
     import battle_action_value as battle
     import positioned_equipment_chance as chance
     import equipment_selection_list as selection
+    import equipment_removal_effect as removal
+    import target_equipment_chance as target_chance
     import battle_eligibility as guard
     import battle_action_dispatch as dispatch
+    if address == removal.OWNER:
+        return removal.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
+    if address == target_chance.OWNER:
+        return target_chance.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
+    import random_equipment_removal as random_removal
+    if address == random_removal.OWNER:
+        return random_removal.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == selection.OWNER:
         return selection.prove(data, rom, mapping, index, objects, original, ins, calls, refinement, words)
     if address == chance.OWNER:

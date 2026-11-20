@@ -1466,7 +1466,13 @@ def report_matches(report, root, address):
             from match import allowlisted_volatile_semantics
             from named_data_buffer_profile import (BIOS_FILL_SCHEMA, BIOS_FILL_SELECTOR,
                 BIOS_LOCAL_FILL_SCHEMA, BIOS_LOCAL_FILL_SELECTOR, BIOS_OVERWRITE_SCHEMA, BIOS_OVERWRITE_SELECTOR)
-            if f'* verification: `{BIOS_OVERWRITE_SCHEMA}`' in report.splitlines():
+            import scene_palette_copy
+            if any(line.startswith(scene_palette_copy.RECORD) for line in report.splitlines()):
+                if address != scene_palette_copy.OWNER or f'* verification: `{scene_palette_copy.SCHEMA}`' not in stated:
+                    return False
+                records += allowlisted_volatile_semantics(root, address,
+                    owner_runtime_profile=scene_palette_copy.SELECTOR)
+            elif f'* verification: `{BIOS_OVERWRITE_SCHEMA}`' in report.splitlines():
                 records += allowlisted_volatile_semantics(root, address,
                     owner_runtime_profile=BIOS_OVERWRITE_SELECTOR)
             elif f'* verification: `{BIOS_LOCAL_FILL_SCHEMA}`' in report.splitlines():
