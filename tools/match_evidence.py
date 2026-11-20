@@ -240,6 +240,14 @@ def saved_selectors(report):
     found.signed_runtime = signed_divmod_profile.selector_for_report(report)
     found.owner = (owner_admission_profile.selector_for_report(report) if owner_admission_profile.selected(report)
                    else libgcc_divdi3.SELECTOR if f"* verification: `{libgcc_divdi3.SCHEMA}`" in lines else False)
+    import scene_palette_copy
+    copy_records = [line for line in lines if line.startswith(scene_palette_copy.RECORD)]
+    if copy_records:
+        if (found.owner != scene_palette_copy.SCHEDULER or len(copy_records) != 1
+                or not copy_records[0].startswith(scene_palette_copy.RECORD + f"`{scene_palette_copy.SELECTOR}`,")
+                or lines[0] != f"# 0x{scene_palette_copy.OWNER:08X}"):
+            raise ValueError("unexpected palette-copy selector record")
+        found.owner = scene_palette_copy.SELECTOR
     found.constants = switch_constants.selected_policy(report)
     found.typed_outgoing = typed_switch_frame.selector_for_report(report)
     u16 = {SWITCH_U16_SCALAR_SCHEMA: SWITCH_U16_SCALAR_SELECTOR,
