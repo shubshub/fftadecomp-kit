@@ -14,10 +14,10 @@ the plain analysis refuses.  Every report the plain analysis admits keeps its ev
 function both refuse keeps the plain refusal.  Its obligations, each enforced by a refusal:
 
 F1. A callee's stack reach (the bytes above its entry SP it, or anything it calls, may read or
-    write), the registers of R0-R3 and R12 it may read before writing them, and those it writes
-    on every path to a return are proved by walking its mapped ROM bytes (``CalleeReach``).  The
-    only BIOS calls the walk admits are those in ``Policy.swis``, under the printed GBATEK
-    premise.
+    write), the registers of R0-R3 and R12 it may read before writing them, those it writes on
+    every path to a return, and the registers of R4-R11 it may return changed are proved by
+    walking its mapped ROM bytes (``CalleeReach``).  The only BIOS calls the walk admits are
+    those in ``Policy.swis``, under the printed GBATEK premise.
 F2. A variable stack address in R0-R3 at a call is no escape when the walk proves the callee
     never reads that register.  After the call it is poison unless the callee writes it on
     every path to a return.
@@ -67,8 +67,11 @@ F10. A whole scalar word stored at a fixed offset keeps its value range but not 
     may overwrite: a variable store those its value hull overlaps, a store through a possible
     stack address its candidates, a callee those inside its reach, or all of them when it may
     read a register holding a stack address.  A call walks the callee while a word is mirrored
-    too, since a mirror held in R4-R11 survives the call.  Joins keep a scalar word only when
-    both paths track it.
+    too: a mirror held in R4-R11 survives the call only when the walk proves the callee returns
+    that register restored (F1), and the walk drops it otherwise.  The walk sees the callee's
+    stores through SP and stack addresses handed over in R0-R3 or R12, nothing else: that a
+    callee writes no local word through an address held in R4-R11 is the ABI premise every
+    call rests on.  Joins keep a scalar word only when both paths track it.
 F11. A premise is never stated on an index with no variable in it: it is the same on every run,
     so the premise would be always true or always false (a reloaded constant word makes such
     an index common).
@@ -175,6 +178,7 @@ REGISTER.update({ARM_REG_SP: 13, ARM_REG_LR: 14, ARM_REG_PC: 15, ARM_REG_CPSR: 1
 ARGUMENTS = frozenset(range(4))
 PASSED = ARGUMENTS | {12}       # what a caller may hand a callee in a register: R0-R3 and IP
 CLOBBERED = frozenset({0, 1, 2, 3, 12, 14})
+CALLEE_SAVED = frozenset(range(4, 12))
 # GBATEK Div: (reads, writes).  The SWI handler also stores R2 below SP and restores it, so R2
 # counts as read: a stack address in R2 at the call is a stored copy, never a dead register.
 SWI_ARGUMENTS = {6: (frozenset({0, 1, 2}), frozenset({0, 1, 3}))}
@@ -193,12 +197,16 @@ class CalleeReach:
     untouched at depth 0, `pop {pc}` of the word the entry push saved LR in, or `bx Rm` once
     Rm was popped from that word, at depth 0.  A nested call that may write the saved LR word
     unsaves it, so a later return through it refuses; ``stores`` keeps, for every callee walked,
-    the bytes above its entry SP it may write.
+    the bytes above its entry SP it may write.  ``clobbers`` keeps the registers of R4-R11 that
+    may differ from their entry values at a return: a register written is restored only by a pop
+    from the word its entry value was pushed to, while no store of the callee or of anything it
+    calls may have reached that word since.
     """
 
     def __init__(self, span, swis):
         self.span, self.swis = span, swis
         self.memo, self.stores, self.instructions = {}, {}, 0
+        self.clobbers = {}
 
     def __call__(self, address, active=frozenset()):
         if address in self.memo:
@@ -234,16 +242,19 @@ class CalleeReach:
             return int.from_bytes(data[site - address:site - address + 2], "little")
 
         # depth (words), return register, LR untouched, entry-SP offset of the saved LR word,
-        # argument registers written on every path
-        states = {address: (0, None, True, None, frozenset())}
+        # argument registers written on every path, R4-R11 holding their entry values, and the
+        # (entry-SP offset, register) of every word holding one of those entry values
+        states = {address: (0, None, True, None, frozenset(), CALLEE_SAVED, frozenset())}
         pending, reach, stores, reads, swis, exits = [address], 0, 0, set(), set(), []
+        clobbers = set()
         while pending:
             site = pending.pop()
             self.instructions += 1
             if self.instructions > MAX_CALLEE_INSTRUCTIONS:
                 sip.refuse("callee stack reach budget exhausted")
-            depth, ret, intact, saved, defined = states[site]
+            depth, ret, intact, saved, defined, fresh, kept = states[site]
             popped = surely = None
+            restored = set()
             raw = half(site)
             size = 4 if raw & 0xF800 == 0xF000 else 2
             instruction = next(DECODER.disasm(data[site - address:site - address + size], site, count=1), None)
@@ -259,6 +270,10 @@ class CalleeReach:
                     if saved is not None:
                         sip.refuse(f"{name} saves LR twice")
                     saved = -4 * depth - 4
+                # Ascending registers at ascending addresses, from the new SP up.
+                kept |= {(-4 * depth - 4 * bin(raw & 0x1FF).count("1") + 4 * position, register)
+                         for position, register in enumerate(n for n in range(8) if raw & (1 << n))
+                         if register in fresh}
                 depth += bin(raw & 0x1FF).count("1")
             elif raw & 0xFE00 == 0xBC00:                            # pop
                 registers = [n for n in range(8) if raw & (1 << n)] + ([15] if raw & 0x100 else [])
@@ -273,6 +288,8 @@ class CalleeReach:
                         exits.append(None)
                     elif word == saved:
                         popped, saved = register, None
+                    if (word, register) in kept:
+                        restored.add(register)
                 depth -= len(registers)
                 if saved is not None and saved < -4 * depth:
                     saved = None
@@ -293,6 +310,7 @@ class CalleeReach:
                     stores = max(stores, offset + 4)
                     if offset == saved:
                         saved = None
+                    kept = frozenset(pair for pair in kept if pair[0] != offset)
             elif raw & 0xF800 in (0x4800, 0xA000):                  # literal load, adr
                 pass
             elif raw & 0xFF00 == 0x4700:                            # bx / blx
@@ -313,6 +331,8 @@ class CalleeReach:
                 stores = max(stores, self.stores[target] - 4 * depth)
                 if saved is not None and saved < self.stores[target] - 4 * depth:
                     saved = None            # the inner callee may overwrite the saved LR word
+                kept = frozenset(pair for pair in kept if pair[0] >= self.stores[target] - 4 * depth)
+                fresh -= self.clobbers[target]
                 read |= inner_reads
                 swis |= inner_swis
                 # It may clobber all of these, but surely writes only what every return writes.
@@ -332,8 +352,11 @@ class CalleeReach:
                 sip.refuse(f"{name} uses SP or PC outside push, pop and fixed slots")
             reads |= (read & PASSED) - defined
             defined = defined | ((written if surely is None else surely) & PASSED)
+            fresh = (fresh - written) | restored
+            kept = frozenset(pair for pair in kept if pair[0] >= -4 * depth)    # released words
             if exits and exits[-1] is None:
                 exits[-1] = defined
+                clobbers |= CALLEE_SAVED - fresh
             if ret in written:
                 ret = None
             if popped is not None:
@@ -343,20 +366,22 @@ class CalleeReach:
             for successor in successors:
                 if not address <= successor < end or successor % 2:
                     sip.refuse(f"{name} branches outside its mapped span")
-                state = (depth, ret, intact, saved, defined)
+                state = (depth, ret, intact, saved, defined, fresh, kept)
                 previous = states.get(successor)
                 if previous is not None:
                     if previous[0] != depth:
                         sip.refuse(f"{name} joins different stack depths")
                     # A join keeps only what both paths prove.
                     state = (depth, ret if previous[1] == ret else None, previous[2] and intact,
-                             saved if previous[3] == saved else None, previous[4] & defined)
+                             saved if previous[3] == saved else None, previous[4] & defined,
+                             previous[5] & fresh, previous[6] & kept)
                 if state != previous:
                     states[successor] = state
                     pending.append(successor)
         # Argument registers written on every path to a return: what the call surely replaces.
         writes = frozenset.intersection(*exits) if exits else frozenset()
         self.stores[address] = stores
+        self.clobbers[address] = frozenset(clobbers)
         return reach, frozenset(reads), frozenset(swis), writes
 
 
@@ -579,7 +604,7 @@ class FrameWordsAnalysis(sip.Analysis):
         if self.check and site not in self.copies:
             self.call_sites.add(site)       # a ROM table copy's helper is authenticated, not trusted
         carried = [register for register in range(4) if sip.is_ranged(state.regs[register])]
-        # A mirror held in R4-R11 survives the call, so the words it mirrors need the walk too.
+        # A mirror held in R4-R11 may survive the call, so the words it mirrors need the walk too.
         if not state.words and not state.mirrors and not state.released and not carried:
             return []
         if state.released:
@@ -600,6 +625,11 @@ class FrameWordsAnalysis(sip.Analysis):
                 self.fail(f"callee 0x{target:08X} may reach the pointer-bearing local word at "
                           f"entry-SP{word:+d}" + ("" if reach is not None else f" ({reason})"))
         self.forget(state, floor, 0 if reach is None or receives else floor + reach)
+        # A mirror of a register the callee may return changed ends here (F10): the word keeps its
+        # range, but a later compare of the register says nothing about it.  A refused walk proves
+        # nothing, so every register of R4-R11 counts as changed.
+        changed = CALLEE_SAVED if reach is None else self.reach.clobbers[target]
+        state.mirrors = tuple(pair for pair in state.mirrors if pair[0] not in changed)
         dead = [register for register in carried if register not in reads]
         for register in dead:
             # Never read by the callee: not an escape.  Hidden from the call's own checks here;

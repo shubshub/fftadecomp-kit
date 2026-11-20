@@ -702,6 +702,184 @@ class ReviewReproducerTests(unittest.TestCase):
             admit(code, **callee(0x4770))
 
 
+# cmp r4,#2; bhi .+4; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0]: the compare of R4 bounds the word
+# at sp+8 only through a mirror, and only then is the load through it proved inside the copied bytes.
+REFINED = (0x2C02, 0xD802, 0x9802, 0x4669, 0x5C0A)
+# str r4,[sp,#8] (R4 = entry_R0 & 255 mirrors the word); movs r0,#0; bl callee; REFINED
+MIRRORED = (0x9402, 0x2000, CALLEE) + REFINED
+
+
+class CalleeSavedMirrorTests(unittest.TestCase):
+    """F10: a mirror held in R4-R11 survives a call only when the walk proves that the callee
+    returns its register restored (F1)."""
+
+    def clobbers(self, functions, address=CALLEE):
+        spans = {start: struct.pack(f'<{len(body)}H', *body) for start, body in functions.items()}
+        reach = fw.CalleeReach(spans.__getitem__, fw.POLICY.swis)
+        reach(address)
+        return reach.clobbers[address]
+
+    def test_a_return_restores_a_register_only_from_the_word_its_entry_value_was_pushed_to(self):
+        cases = {
+            'bx lr': ((0x4770,), set()),
+            'movs r4,#0; bx lr': ((0x2400, 0x4770), {4}),
+            'mov r8,r0; bx lr': ((0x4680, 0x4770), {8}),
+            'push {r4,lr}; movs r4,#0; pop {r4,pc}': ((0xB510, 0x2400, 0xBD10), set()),
+            'push {r4,lr}; movs r4,#0; pop {r4}; pop {r1}; bx r1':
+                ((0xB510, 0x2400, 0xBC10, 0xBC02, 0x4708), set()),
+            # the saved word is overwritten before the pop
+            'push {r4,lr}; movs r4,#0; str r4,[sp,#0]; pop {r4,pc}': ((0xB510, 0x2400, 0x9400, 0xBD10), {4}),
+            # pushed once already written: the pop restores the callee's value
+            'movs r4,#0; push {r4,lr}; pop {r4,pc}': ((0x2400, 0xB510, 0xBD10), {4}),
+            # popped from R5's word: R4 returns R5's entry value
+            'push {r4,r5,lr}; add sp,#4; pop {r4}; pop {pc}': ((0xB530, 0xB001, 0xBC10, 0xBD00), {4}),
+            'push {r4,r5,lr}; pop {r5}; pop {r4}; pop {pc}': ((0xB530, 0xBC20, 0xBC10, 0xBD00), {4, 5}),
+            # popped after a further push: each pop reads the other register's word
+            'push {r4,lr}; push {r5}; pop {r4}; pop {r5}; pop {pc}': ((0xB510, 0xB420, 0xBC10, 0xBC20, 0xBD00),
+                                                                    {4, 5}),
+            'push {r4,r5,lr}; movs r4,#0; movs r5,#0; pop {r4,r5,pc}': ((0xB530, 0x2400, 0x2500, 0xBD30), set()),
+            # the word was released and taken again, so an interrupt may have written it
+            'push {lr}; push {r4}; add sp,#4; movs r4,#0; sub sp,#4; pop {r4}; pop {pc}':
+                ((0xB500, 0xB410, 0xB001, 0x2400, 0xB081, 0xBC10, 0xBD00), {4}),
+            # written again after its pop
+            'push {r4,lr}; pop {r4}; movs r4,#0; pop {pc}': ((0xB510, 0xBC10, 0x2400, 0xBD00), {4}),
+            # written on one path only
+            'cmp r0,#0; beq; movs r5,#0; bx lr': ((0x2800, 0xD000, 0x2500, 0x4770), {5}),
+            # the saved word is overwritten on one path only
+            'push {r4,lr}; movs r4,#0; cmp r0,#0; beq; str r0,[sp,#0]; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD000, 0x9000, 0xBD10), {4}),
+            'push {r4,lr}; movs r4,#0; cmp r0,#0; beq; movs r0,#0; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD000, 0x2000, 0xBD10), set()),
+            # two returns, only one of which restores R4: the branch reaches the other first or second
+            'push {r4,lr}; movs r4,#0; cmp r0,#0; beq; pop {r4,pc}; add sp,#4; pop {pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD000, 0xBD10, 0xB001, 0xBD00), {4}),
+            'push {r4,lr}; movs r4,#0; cmp r0,#0; beq; add sp,#4; pop {pc}; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD001, 0xB001, 0xBD00, 0xBD10), {4}),
+            'push {r4,lr}; movs r4,#0; cmp r0,#0; beq; pop {r4,pc}; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD000, 0xBD10, 0xBD10), set()),
+            # a loop that stores over the saved word on a later pass: loop: cmp r0,#0; beq out;
+            # str r1,[sp,#0]; subs r0,#1; b loop; out: pop {r4,pc} (a load there keeps it)
+            'push {r4,lr}; movs r4,#0; loop storing [sp,#0]; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD002, 0x9100, 0x3801, 0xE7FA, 0xBD10), {4}),
+            'push {r4,lr}; movs r4,#0; loop loading [sp,#0]; pop {r4,pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD002, 0x9900, 0x3801, 0xE7FA, 0xBD10), set()),
+            # loop: movs r4,#0; subs r0,#1; bne loop: written on every pass, restored after it
+            'push {r4,lr}; loop writing r4; pop {r4,pc}': ((0xB510, 0x2400, 0x3801, 0xD1FC, 0xBD10), set()),
+            # loops whose back edge arrives fresher than the entry (R4 restored by pop {r4}; push {r4}
+            # on each pass), or holding a pair the entry lacks: the join keeps only what both hold
+            'push {r4,lr}; movs r4,#0; loop of pop {r4}; push {r4}; add sp,#4; pop {pc}':
+                ((0xB510, 0x2400, 0x2800, 0xD101, 0xB001, 0xBD00, 0xBC10, 0xB410, 0x3801, 0xE7F7), {4}),
+            'push {r5,lr}; loop of pop {r4}; push {r4}; add sp,#4; pop {pc}':
+                ((0xB520, 0x2800, 0xD101, 0xBC10, 0xBD00, 0xB001, 0xB410, 0x3801, 0xE7F7), {4}),
+        }
+        for name, (body, expected) in cases.items():
+            with self.subTest(callee=name):
+                self.assertEqual(self.clobbers({CALLEE: body}), expected)
+        # A callee cannot hold the address of its own saved words in a register: forming one
+        # refuses the walk, so a store through it is never missed.
+        for body in ((0xB510, 0xA800, 0x6001, 0xBD10),     # push {r4,lr}; add r0,sp,#0; str r1,[r0,#0]
+                     (0xB510, 0x4668, 0x6001, 0xBD10)):    # push {r4,lr}; mov r0,sp; str r1,[r0,#0]
+            with self.subTest(callee=body):
+                with self.assertRaisesRegex(sip.Refusal, 'uses SP or PC outside push, pop and fixed slots'):
+                    self.clobbers({CALLEE: body})
+
+    def test_a_nested_callee_clobbers_and_stores_for_its_caller(self):
+        # push {lr}; bl inner; pop {pc}: the caller returns whatever the inner callee changed.
+        for inner, expected in (((0x4770,), set()), ((0x2400, 0x4770), {4}),
+                                ((0xB510, 0x2400, 0xBD10), set())):
+            with self.subTest(inner=inner):
+                self.assertEqual(self.clobbers({CALLEE: nested_outer(), INNER: inner}), expected)
+        # push {r4,lr}; movs r4,#0; bl inner; pop {r4,pc}: an inner store over the saved R4 word
+        # (str r0,[sp,#0]; bx lr) means the pop no longer restores R4; an inner load does not.
+        outer = struct.unpack('<4H', assemble(CALLEE, (0xB510, 0x2400, INNER))) + (0xBD10,)
+        self.assertEqual(self.clobbers({CALLEE: outer, INNER: (0x9000, 0x4770)}), {4})
+        self.assertEqual(self.clobbers({CALLEE: outer, INNER: (0x9800, 0x4770)}), set())
+
+    def test_a_callee_that_may_return_the_register_changed_ends_the_mirror(self):
+        # After the call `cmp r4,#2` compares what the callee left in R4 and says nothing about the
+        # word, which still holds entry_R0 & 255: without the mirror the load through it has no
+        # bound.  Before the walk proved preservation the mirror survived these callees and the
+        # access was taken as proved.
+        code = frame_owner(MIRRORED)
+        cases = {
+            'movs r4,#0; bx lr': callee(0x2400, 0x4770),
+            'saves R4, then overwrites the saved word': callee(0xB510, 0x2400, 0x9400, 0xBD10),
+            'an inner callee clobbers R4': two_callees(nested_outer(), (0x2400, 0x4770)),
+            'restores R4 on one of two returns': callee(0xB510, 0x2400, 0x2800, 0xD000, 0xBD10, 0xB001, 0xBD00),
+            'pops R4 from the word R5 was pushed to': callee(0xB530, 0xBC20, 0xBC10, 0xBD00),
+        }
+        for name, kwargs in cases.items():
+            with self.subTest(callee=name):
+                with self.assertRaisesRegex(sip.Refusal, 'index range leaves the allocated local frame'):
+                    admit(code, **kwargs)
+        # Any register of R4-R11, not just R4: adds r6,r4,#0; str r6,[sp,#8]; movs r0,#0; bl callee;
+        # cmp r6,#2; bhi .+4; ldr r0,[sp,#8]; mov r1,sp; ldrb r2,[r1,r0], with movs r6,#0; bx lr.
+        with self.subTest(callee='movs r6,#0; bx lr under an R6 mirror'):
+            with self.assertRaisesRegex(sip.Refusal, 'index range leaves the allocated local frame'):
+                admit(frame_owner((0x1C26, 0x9602, 0x2000, CALLEE, 0x2E02, 0xD802, 0x9802, 0x4669, 0x5C0A)),
+                      **callee(0x2600, 0x4770))
+
+    def test_a_callee_that_returns_the_register_restored_keeps_the_mirror(self):
+        code = frame_owner(MIRRORED)
+        call = site(code, code.index(CALLEE))
+        cases = {
+            'bx lr': callee(0x4770),
+            'movs r5,#0; bx lr (another register)': callee(0x2500, 0x4770),
+            'push {r4,lr}; movs r4,#0; pop {r4,pc}': callee(0xB510, 0x2400, 0xBD10),
+            'push {r4,lr}; movs r4,#0; pop {r4}; pop {r1}; bx r1':
+                callee(0xB510, 0x2400, 0xBC10, 0xBC02, 0x4708),
+            'an inner callee saves and restores R4': two_callees(nested_outer(), (0xB510, 0x2400, 0xBD10)),
+            'restores R4 on both of two returns': callee(0xB510, 0x2400, 0x2800, 0xD000, 0xBD10, 0xBD10),
+        }
+        lines = set()
+        for name, kwargs in cases.items():
+            with self.subTest(callee=name):
+                _, (manifest, _) = admit(code, **kwargs)
+                found = evidence(manifest)
+                self.assertEqual(found['preconditions'], [])
+                self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
+                self.assertEqual([row[:3] for row in words(manifest)['calls']], [[call, CALLEE, 0]])
+                lines.add(sip.precondition_lines(found)[-1])
+        # A proved preservation needs no premise: the line is the same for every one of them.
+        self.assertEqual(len(lines), 1)
+        self.assertNotIn('R4-R11', lines.pop())
+
+    def test_a_callee_the_walk_cannot_follow_ends_every_r4_r11_mirror(self):
+        # A refused walk proves nothing about R4-R11: every mirror held in one ends at the call (and
+        # every local word is forgotten), so the load through the word has no bound.
+        code = frame_owner(MIRRORED)
+        cases = {
+            'swi 5, a BIOS call outside the policy': callee(0xDF05, 0x4770),
+            'a store through its own frame address': callee(0xB510, 0xA800, 0x6001, 0xBD10),
+            'an inner callee with no mapped bytes': callee(*nested_outer()),
+        }
+        for name, kwargs in cases.items():
+            with self.subTest(callee=name):
+                with self.assertRaisesRegex(sip.Refusal, 'index range leaves the allocated local frame'):
+                    admit(code, **kwargs)
+        # The policy's division call is walked under its printed premise and keeps the mirror.
+        _, (manifest, _) = admit(code, **callee(0xDF06, 0x4770))
+        found = evidence(manifest)
+        self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
+        self.assertEqual(words(manifest)['swis'], [6])
+
+    def test_present_behaviour_a_store_through_an_address_held_in_r4_r11_is_not_seen(self):
+        # add r5,sp,#8 keeps the word's address in R5 across the call, and the callee
+        # (movs r0,#200; str r0,[r5,#0]; bx lr) returns R4-R11 unchanged but writes 200 into the
+        # word R4 mirrors.  The walk sees stores through SP and stack addresses handed over in
+        # R0-R3 or R12, nothing else, so the mirror survives and the load is taken as proved
+        # inside the three copied bytes.  That a callee writes no local word through an address
+        # held in R4-R11 is the ABI premise every call rests on.  Recorded as what the analysis
+        # does today: once a call checks what a callee does with R4-R11, this owner must refuse.
+        code = frame_owner((0x9402, 0xAD02, 0x2000, CALLEE) + REFINED)
+        _, (manifest, _) = admit(code, **callee(0x20C8, 0x6028, 0x4770))
+        found = evidence(manifest)
+        self.assertEqual(found['preconditions'], [])
+        self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
+        _, (kept, _) = admit(code, **callee(0x4770))
+        self.assertEqual(sip.precondition_lines(found), sip.precondition_lines(evidence(kept)))
+
+
 def two_callees(outer, inner):
     a, b = callee(*outer), callee(*inner, address=INNER)
     return dict(extra_functions=a['extra_functions'] + b['extra_functions'],
