@@ -5600,6 +5600,8 @@ The ordinary matcher verifies the packed signed halfword written by `0800C720`. 
 
 The original constructor at `0800CC8C` initializes visible rows 0 through 159 and registers one, two, or four interleaved samples. Its caller is unknown. Given a live task, a valid caller-supplied hardware destination and successful DMA submission, the manager duplicates row zero into row 160 and submits the next row for repeated HBlank transfers. Direct use requires a sufficiently large disjoint bank, valid stride and lane offset, and stable row bounds. An inclusive end row of 255 wraps the byte counter.
 
+The mode-1 callback at `0800DE70` packs two 160-halfword scroll planes into 160 four-byte rows. The ordinary matcher binds both packed member qualifiers to the four same-byte reads before stores in the USA ROM. Removing both qualifiers preserves the row data and removes those reads. Scene call `080EA5C0` selects BG2 horizontal and vertical scroll through `080D979C` and `080D8E00`. Constructor `0800CE08` selects slot 1 of `0814980C`, reserves a 640-byte payload and two 644-byte banks, and registers the callback. The dispatcher duplicates row zero into row 160 and submits the bank at offset four for HBlank DMA. The saved report states the allocation, lifetime and channel preconditions. With the USA game tree in `FFTA_SCANLINE_PAIR_ROOT`, run `python -m unittest discover -s tests -p test_scanline_pair.py` for the native access and DMA checks.
+
 ### Explicit named-data buffer composition
 
 `python tools/match.py --root <game> --owner-runtime-profile named-data-buffer-v1 <address>`

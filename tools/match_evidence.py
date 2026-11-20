@@ -1506,6 +1506,10 @@ def report_matches(report, root, address):
             import bg_affine_rows
             if not bg_affine_rows.report_body(report, root):
                 return False
+        if address == 0x0800DE70:
+            import scanline_pair
+            if not scanline_pair.report_body(report, root):
+                return False
         if address == 0x0800C720:
             import scanline_wave
             if not scanline_wave.report_body(report, root):
