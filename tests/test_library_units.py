@@ -576,5 +576,35 @@ class OldToolchainTests(unittest.TestCase):
         self.assertEqual(units.status_summary(self.root.path, functions, {D, E, C}, 0x08150000)[0], [])
 
 
+class GateRuntimeErrorTests(unittest.TestCase):
+    """match.py reports a RuntimeError that leaves the unit gate as a refusal."""
+
+    def setUp(self):
+        self.root = Root([], [])
+        self.addCleanup(self.root.temporary.cleanup)
+
+    def test_a_runtime_error_from_the_gate_is_a_refusal(self):
+        # a plain RuntimeError, so the clause cannot be narrowed to one subclass
+        with patch.object(sys, 'argv', [MATCH_PY, '--root', str(self.root.path), f'0x{A:08X}']), \
+                patch.dict(os.environ, self.root.environment), patch.object(match, 'ROOT', match.ROOT), \
+                patch.object(units, 'gate', side_effect=RuntimeError('the gate failed')) as gate, \
+                self.assertRaises(SystemExit) as refused:
+            match.main()
+        self.assertEqual(gate.call_count, 1)
+        self.assertEqual(refused.exception.code, 'refused: the gate failed')
+        self.assertEqual(list((self.root.path / 'docs/match').iterdir()), [])
+
+    def test_a_table_too_deep_to_decode_is_a_refusal(self):
+        # The decoder stops this with RecursionError, a RuntimeError, at a fixed depth on CPython 3.12
+        # and when the stack runs out on 3.14; with enough stack 3.14 reads to the end and the table
+        # is invalid JSON.  Whichever happens and whichever layer words it: one refusal line, no report.
+        (self.root.path / units.TABLE).write_text('[' * 1000000)
+        result = self.root.run(A, write=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(result.stdout, '')
+        self.assertRegex(result.stderr, r'\Arefused: [^\n]+\n\Z')
+        self.assertEqual(list((self.root.path / 'docs/match').iterdir()), [])
+
+
 if __name__ == '__main__':
     unittest.main()
