@@ -227,7 +227,61 @@ def text(value):
 
 
 def compiler_aliases(selector):
-    return COMPILER_THUNK_ALIASES if selector == COMPILER_THUNKS_DATA_SELECTOR else COMPILER_ALIASES
+    return COMPILER_THUNK_ALIASES if selector == COMPILER_THUNKS_DATA_SELECTOR or \
+        COMPILER_BIOS_FILL.applies(selector) else COMPILER_ALIASES
+
+
+class CompilerRuntimeBiosFill:
+    """Compiler-emitted runtime names under the plain BIOS fill buffer data selector.
+
+    That selector already binds explicit calls of the four pinned runtime
+    entries.  For `/` and `%` agbcc emits the same direct BL, naming
+    __udivsi3, __umodsi3, __divsi3 or __modsi3 instead.  original_bindings
+    binds each such name to the canonical entry the explicit spelling names,
+    so the identity pins in prepare, the walk, the buffer proof and the BIOS
+    fill proof see the same bindings for either spelling.  The preprocessed C
+    may then name no runtime identifier (compiler_namespace), every runtime
+    call must be compiler-emitted, and the report prints each such call site
+    with its name, entry and pinned identity.  Set ``enabled`` to False to
+    keep the plain refusal.
+    """
+
+    enabled = True
+    selectors = (BIOS_DATA_SELECTOR,)
+    aliases = COMPILER_THUNK_ALIASES
+    contract = ('compiler-emitted __udivsi3, __umodsi3, __divsi3 and __modsi3 names at original direct '
+                'Thumb BL relocations, each bound to the pinned runtime entry of the explicit spelling and '
+                'walked as that explicit call; explicit runtime identifiers excluded from preprocessed C; '
+                'original and linked ELF names preserved; exact canonical runtime identities; conditional '
+                'returning ARM ABI only, no numeric result, definedness, termination or arithmetic C '
+                'equivalence theorem')
+
+    def applies(self, selector):
+        return self.enabled is True and selector in self.selectors
+
+    def check(self, selector, calls, bindings, address):
+        """Every runtime binding is one recorded compiler call of its own alias."""
+        from match_evidence import UDIVSI3_RUNTIME
+        identities = {'func_08142AB0': UDIVSI3_RUNTIME, 'func_08142B28': unsigned_remainder.RUNTIME,
+                      'func_081426B8': quotient.RUNTIME, remainder.ADDRESSED_NAME: remainder.RUNTIME}
+        runtime = {site for site, name in bindings.items() if name in self.aliases.values()}
+        if not self.applies(selector) or type(calls) is not dict or not calls or set(calls) != runtime or \
+                any(type(name) is not str or self.aliases.get(name) != bindings[site]
+                    for site, name in calls.items()):
+            raise ValueError('compiler runtime names require the BIOS fill buffer data selector '
+                             'and every runtime call compiler-emitted')
+        return dict(contract=self.contract, calls=[
+            [site-address, name, self.aliases[name], identities[self.aliases[name]]]
+            for site, name in sorted(calls.items())])
+
+    def premise(self, result):
+        rows = result['manifest']['compiler_runtime']
+        return '* compiler runtime binding: ' + ', '.join(
+            f'0x{result["address"] + offset:08X} {name} -> {entry} ({identity})'
+            for offset, name, entry, identity in rows['calls']) + '; ' + rows['contract']
+
+
+COMPILER_BIOS_FILL = CompilerRuntimeBiosFill()
 
 
 def compiler_namespace(source, selector=COMPILER_DATA_SELECTOR):
@@ -988,7 +1042,7 @@ def finish(data, address, calls, context, verified, dependencies, *, buffer_proo
 
 
 def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *, selector=SELECTOR,
-           data_mapping=None, data_bindings=None):
+           data_mapping=None, data_bindings=None, compiler_calls=None):
     import match
     if selector not in SCHEMAS:
         raise ValueError('unknown addressed signed runtime selector')
@@ -1000,8 +1054,12 @@ def verify(data, address, rom, mapping, index, calls, bindings, manifest=None, *
         context += (selector, data_mapping, data_bindings)
     if selector not in DATA_SELECTORS and (data_mapping is not None or data_bindings is not None):
         raise ValueError('typed data requires its separate explicit addressed selector')
+    compiler = None if compiler_calls is None else \
+        COMPILER_BIOS_FILL.check(selector, compiler_calls, bindings, address)
     instructions = match.verify_leaf_instructions(data, address, True, calls,
         addressed_signed_runtime_context=context)
+    if compiler is not None:
+        observed['compiler_runtime'] = compiler
     if manifest is not None and text(manifest) != text(observed):
         raise ValueError('addressed signed runtime manifest differs from fresh native verification')
     return observed, instructions
@@ -1042,9 +1100,15 @@ def original_function(image, address):
 
 
 def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_relocations=None,
-                      selector=SELECTOR):
-    """Canonical addressed calls, with separately requested typed original ABS32."""
+                      selector=SELECTOR, compiler_calls=None):
+    """Canonical addressed calls, with separately requested typed original ABS32.
+
+    compiler_calls, a fresh empty dict, receives each compiler runtime name
+    COMPILER_BIOS_FILL binds, by call site.
+    """
     import match
+    if compiler_calls is not None and (type(compiler_calls) is not dict or compiler_calls):
+        raise ValueError('compiler runtime call sites require a fresh empty collection')
     with_data = data_mapping is not None or data_relocations is not None
     if with_data and (type(data_mapping) is not bytes or type(data_relocations) is not dict or
                       data_relocations):
@@ -1099,9 +1163,14 @@ def original_bindings(image, address, rom, mapping, *, data_mapping=None, data_r
                     target_symbol['type'] not in (0, 2) or \
                     sum(item['name'] == name for item in image['symbols']) != 1:
                 raise ValueError('addressed calls require unique undefined zero-valued global functions')
-            canonical = compiler_aliases(selector).get(name) if selector in COMPILER_SELECTORS else None
+            canonical = compiler_aliases(selector).get(name) if selector in COMPILER_SELECTORS or \
+                COMPILER_BIOS_FILL.applies(selector) else None
             if canonical is not None and target_symbol['size'] != 0:
                 raise ValueError('compiler runtime symbols require zero original size')
+            if canonical is not None and selector not in COMPILER_SELECTORS:
+                if compiler_calls is None:
+                    raise ValueError('compiler runtime names require their recorded call sites')
+                compiler_calls[address+offset] = name
             if selector in COMPILER_SELECTORS and name in compiler_aliases(selector).values():
                 raise ValueError('compiler runtime linking requires original compiler-emitted names')
             target = operations(selector).get(canonical or name)
@@ -1216,7 +1285,7 @@ def linked_bytes(original, linked, address, calls, targets, *, data_relocations=
 
 
 def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
-                 selector=SELECTOR, data_mapping=None):
+                 selector=SELECTOR, data_mapping=None, compiler_calls=None):
     import match
     from inert_spin_profile import fixed_configuration
     fixed_configuration(args)
@@ -1231,7 +1300,10 @@ def object_bytes(runner, workspace, args, original, address, rom, mapping, *,
         thunk_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'),
                         runner.read_binary(f'{workspace}/f.s').decode('utf-8'), original, address)
     calls, bindings, targets = original_bindings(original,address,rom,mapping,
-        data_mapping=data_mapping if data is not None else None, data_relocations=data, selector=selector)
+        data_mapping=data_mapping if data is not None else None, data_relocations=data, selector=selector,
+        compiler_calls=compiler_calls)
+    if compiler_calls:
+        compiler_namespace(runner.read_binary(f'{workspace}/f.i').decode('utf-8'), selector)
     function_literals = {record[0] for record in (data or {}).values()
                          if function_literal(record[0], selector)}
     data_names = {record[0] for record in (data or {}).values()} - function_literals
@@ -1328,13 +1400,15 @@ def build(root, address, args=None, expected=None, *, selector=SELECTOR):
             raw,_,original = match.compile_object(runner,workspace,args,captured,address,
                 candidates[0].relative_to(root).as_posix())
             assembly = runner.read_binary(f'{workspace}/f.s')
+            compiler_calls = {} if COMPILER_BIOS_FILL.applies(selector) else None
             linked_result = object_bytes(runner,workspace,args,original,address,rom,mapping,
-                selector=selector,data_mapping=objects)
+                selector=selector,data_mapping=objects,compiler_calls=compiler_calls)
             body,calls,bindings = linked_result[:3]
             data_options = (dict(data_mapping=objects,data_bindings=linked_result[3])
                             if selector in DATA_SELECTORS else {})
             manifest,instructions = verify(body,address,rom,mapping,index,calls,bindings,expected,
-                                           selector=selector,**data_options)
+                                           selector=selector,compiler_calls=compiler_calls or None,
+                                           **data_options)
             linked = runner.read_binary(f'{workspace}/f.elf')
         check = match._run_replay_process([sys.executable,str(Path(importlib.import_module('plausible').__file__)),
             '--quiet','--addr',f'0x{address:08X}','--json']+
@@ -1380,6 +1454,8 @@ def render(result):
         premise.append('* canonical thunk callee ABI: ' + result['manifest']['thunks']['contract'])
     if selector in (COMPILER_BIOS_SCALAR_DATA_SELECTOR, COMPILER_THUNKS_DATA_SELECTOR):
         premise.append('* compiler runtime binding: ' + result['manifest']['compiler_runtime']['contract'])
+    if selector in COMPILER_BIOS_FILL.selectors and 'compiler_runtime' in result['manifest']:
+        premise.append(COMPILER_BIOS_FILL.premise(result))
     evidence = {key:value for key,value in result.items() if key not in
                 ('body','original_elf','assembly','linked_elf')}
     for key in ('body','original_elf','assembly','linked_elf'):
