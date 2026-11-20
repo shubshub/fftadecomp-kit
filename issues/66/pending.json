@@ -862,66 +862,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "7836a978b3634189a56408f8c176e8bc9450499a1326b3dc5e27eeac209af445",
-        "acknowledged_cursor": 7028815587,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "7836a978b3634189a56408f8c176e8bc9450499a1326b3dc5e27eeac209af445",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0813569C\",\"who\":\"astra-0813569c\",\"note\":\"Recover indexed game function and compare against USA ROM\"}",
-          "created_at": "2026-11-20T02:52:02Z",
-          "id": 7028810070,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T02:52:02Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "00323bb00ac8b441a8145b684cfd3b0ffe6e60a2d11a49ab334ff43e42c480fb",
-        "result": {
-          "address": "0x0813569C",
-          "claim_id": 7028810070,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 18360463,
-          "request_id": 7028810070,
-          "status": "accepted",
-          "who": "astra-0813569c"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "27d97a05544f57e3c9bd4551672b8875c0e552166c6017dc22572bfe5be262ae",
-        "acknowledged_cursor": 7029395004,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "27d97a05544f57e3c9bd4551672b8875c0e552166c6017dc22572bfe5be262ae",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813569C\",\"who\":\"astra-0813569c\",\"claim_id\":7028810070,\"reason\":\"Matched and merged in game PR 305\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-20T03:25:30Z",
-          "id": 7029395004,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-20T03:25:30Z",
-          "user": {
-            "id": 18360463,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "f4043a41136add8e5343b8adad730e5626f02ad80c5557de051661a2b3092661",
-        "result": {
-          "address": "0x0813569C",
-          "claim_id": 7028810070,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 18360463,
-          "request_id": 7029395004,
-          "status": "accepted",
-          "who": "astra-0813569c"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "b206ae8e3ba33a06ba61697fd67e7038cdfa45c57b7a4b13869cb226887d9051",
         "acknowledged_cursor": 7028947360,
         "body_provenance": "acceptance-time",
