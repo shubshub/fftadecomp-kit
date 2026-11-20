@@ -27,3 +27,12 @@ def canonical(value):
 def typed_domain(value):
     """True for a word in the typed address domain once a ROM mirror is folded."""
     return TYPED_DOMAIN[0] <= canonical(value) < TYPED_DOMAIN[1]
+
+
+def names_entry(value, entries):
+    """True for a word that is a function-index row's address once a ROM mirror is folded.
+
+    The Thumb bit is dropped on both sides, so 0x08020000, 0x08020001 and their
+    mirror spellings 0x0A020001 and 0x0C020000 all name the row at 0x08020000.
+    """
+    return any(int(row['rom'], 16) & ~1 == canonical(value) & ~1 for row in entries)

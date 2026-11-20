@@ -2787,7 +2787,7 @@ provenance folds it first (`tools/rom_mirror.py`):
 - indexed code entries and function spans in the thunk literal rules
   (`verify_literal_bindings`, `verify_data_bindings`, the own-span rule and the
   switch span checks) and in the function-address check of the switch and
-  block-copy inventories;
+  block-copy inventories (`rom_mirror.names_entry`);
 - the reserved runtime identities (the `_call_via_rN` table, `__udivsi3` and the
   other pinned runtimes) and every own-function check on a bound object value.
 

@@ -18,7 +18,7 @@ def environment_fingerprint():
              'multiple_switch_native_profile', 'owner_graph_profile', 'owner_runtime_profile',
              'framed_switch_inventory', 'local_long_branch_profile',
              'one_constant_scalar_switch_inventory', 'software_double_profile', 'analyze',
-             'addressed_signed_runtime_profile')
+             'addressed_signed_runtime_profile', 'rom_mirror')
     return dict(toolchain=toolchain_fingerprint(), runtime=runtime_fingerprint(),
         producers={name: hashlib.sha256(Path(importlib.import_module(name).__file__).read_bytes()).hexdigest()
                    for name in names})
