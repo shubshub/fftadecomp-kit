@@ -354,9 +354,10 @@ class WideScalarTests(unittest.TestCase):
         self.assertEqual(wide_scalars.report_line(),
                          "* switch wide scalar premise: each `wide_scalars` word is an exact number of at "
                          "least 0x10000000; GBATEK lists 10000000-FFFFFFFF as unused memory whose reads "
-                         "return the prefetched opcode, so the word is no mapped address; an object address "
-                         "offset by 0x10000000 or more, which agbcc would fold into one such word, is assumed "
-                         "absent from the source")
+                         "return the prefetched opcode, so the word is no mapped address; the hard-coded value "
+                         "of an address plus or minus a constant whose 32-bit sum is 0x10000000 or more (a ROM "
+                         "object plus 0x08000000 is one), an expression agbcc would fold into one such word, is "
+                         "assumed absent from the source")
 
     def test_interposed_pool_words_stay_objects_or_u16(self):
         body, labels, manifest, mapping = pool_tests.fixture()
@@ -505,6 +506,73 @@ class ReportTests(unittest.TestCase):
             result = status.collect(str(self.root), True)
             self.assertEqual(result[1], 1)
             native.assert_called_once()
+
+
+class WideScalarPremiseTests(unittest.TestCase):
+    """The printed premise covers what `admits` takes, not only constants of 0x10000000 or more."""
+
+    ROM_OBJECT, CONSTANT = 0x08200000, 0x08000000
+    WORD = ROM_OBJECT + CONSTANT
+    # the line reports carried before the premise named this case
+    OLD_LINE = ("* switch wide scalar premise: each `wide_scalars` word is an exact number of at "
+                "least 0x10000000; GBATEK lists 10000000-FFFFFFFF as unused memory whose reads "
+                "return the prefetched opcode, so the word is no mapped address; an object address "
+                "offset by 0x10000000 or more, which agbcc would fold into one such word, is assumed "
+                "absent from the source")
+
+    setUp = ReportTests.setUp
+    report = ReportTests.report
+    valid = ReportTests.valid
+
+    def use(self, word):
+        self.body, _, self.manifest, mapping = fixture(wide=(word,))
+        self.assertEqual(json.dumps(mapping).encode(), self.functions)
+        self.rom_path.write_bytes(rom_image(self.body))
+
+    def switch_replay(self, report):
+        return evidence.switch_report_matches(report.splitlines(), self.root, BASE, data_profile=True)
+
+    def test_the_rule_takes_a_rom_object_plus_a_constant_below_its_bound(self):
+        self.assertEqual(self.WORD, 0x10200000)
+        self.assertLess(self.CONSTANT, wide_scalars.LOW)
+        self.assertTrue(wide_scalars.admits(self.WORD))
+        body, _, manifest, mapping = fixture(wide=(self.WORD,))
+        verify(body, manifest, mapping)
+        self.assertEqual([value for _, value in manifest["wide_scalars"]], [self.WORD])
+
+    def test_the_premise_names_that_case(self):
+        self.assertNotIn("offset by 0x10000000 or more", wide_scalars.PREMISE)
+        self.assertIn("the hard-coded value of an address plus or minus a constant whose 32-bit sum is "
+                      "0x10000000 or more (a ROM object plus 0x08000000 is one)", wide_scalars.PREMISE)
+        self.assertIn(f"0x{wide_scalars.LOW:08X} or more (a ROM object plus 0x{self.CONSTANT:08X}",
+                      wide_scalars.PREMISE)
+
+    def test_the_word_reports_under_the_new_line_and_the_old_line_refuses(self):
+        line = wide_scalars.report_line()
+        self.assertTrue(self.OLD_LINE.startswith(wide_scalars.REPORT_PREFIX))
+        self.assertNotEqual(self.OLD_LINE, line)
+        for word in (self.WORD, HALF):
+            with self.subTest(word=hex(word)):
+                self.use(word)
+                report = self.report()
+                self.assertEqual(report.count(line + "\n"), 1)
+                self.assertTrue(self.valid(report))
+                self.assertTrue(self.switch_replay(report))
+                for premise in ([self.OLD_LINE], [self.OLD_LINE, line], [line, self.OLD_LINE], [line, line]):
+                    refused = self.report(premise=premise)
+                    self.assertFalse(self.valid(refused))
+                    # the premise check of the switch replay itself, apart from the whole-text comparison
+                    self.assertFalse(self.switch_replay(refused))
+
+    def test_the_line_refuses_in_a_report_without_the_policy(self):
+        self.body, _, self.manifest, mapping = fixture()
+        self.assertNotIn("wide_scalar_policy", self.manifest)
+        self.functions = json.dumps(mapping).encode()
+        self.rom_path.write_bytes(rom_image(self.body))
+        with mock.patch.object(evidence, "mapping_snapshot", return_value=self.functions):
+            self.assertTrue(self.switch_replay(self.report()))
+            for premise in ([wide_scalars.report_line()], [self.OLD_LINE]):
+                self.assertFalse(self.switch_replay(self.report(premise=premise)))
 
 
 if __name__ == "__main__":
