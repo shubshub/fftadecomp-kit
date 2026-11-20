@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "73a04091e69a9a3a2057f258de61d374296395e6df6c26206c35cd8daf9ba6fb",
+    "acknowledged_cursor": 7031394210,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "73a04091e69a9a3a2057f258de61d374296395e6df6c26206c35cd8daf9ba6fb",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800D324\",\"who\":\"astra-0800d324\",\"note\":\"Validate the four-plane writer in the same verified 3-entry scroll constructor table\"}",
+      "created_at": "2026-11-20T05:31:40Z",
+      "id": 7031394210,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T05:31:40Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "a513dbfacd7b73cb9e0e9e467b860ffd6358f3e63be68585998f1fdb15ba7f00",
+    "result": {
+      "address": "0x0800D324",
+      "claim_id": 7031394210,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7031394210,
+      "status": "accepted",
+      "who": "astra-0800d324"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "eece255983f4a4e171522d01246cf9a4bb1ad39f3efd55b125ef115355046a33",
+    "acknowledged_cursor": 7031405614,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "eece255983f4a4e171522d01246cf9a4bb1ad39f3efd55b125ef115355046a33",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D324\",\"who\":\"astra-0800d324\",\"claim_id\":7031394210,\"reason\":\"Returning the four-plane sibling for another contributor; current quota is reserved for publishing 0800DE70\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T05:32:25Z",
+      "id": 7031405614,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T05:32:25Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "f9c2e1ff5eede1fe50ff10ed10c9f6d75c104f7784fc3d2e30d2dc9a38cbf914",
+    "result": {
+      "address": "0x0800D324",
+      "claim_id": 7031394210,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7031405614,
+      "status": "accepted",
+      "who": "astra-0800d324"
+    }
+  }
+}
