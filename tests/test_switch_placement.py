@@ -4,7 +4,6 @@ import hashlib
 import io
 import json
 import os
-import signal
 import struct
 import subprocess
 from pathlib import Path
@@ -19,6 +18,7 @@ import match
 import match_evidence
 import switch_constants_profile as profile
 import switch_placement as placement
+from event_waits import HangGuard, returns
 from test_switch_constants import SOURCE, fixed_args, assemble, fixture_assembly
 import rebuild
 import status
@@ -39,16 +39,11 @@ class SnapshotDeadline(Exception):
 
 
 def bounded_snapshot(snapshot, path):
-    def expired(signum, frame):
-        raise SnapshotDeadline("artifact open required the test watchdog")
-
-    previous_handler = signal.signal(signal.SIGALRM, expired)
-    previous_timer = signal.setitimer(signal.ITIMER_REAL, 2)
+    # Returning is the event; an open blocked on the FIFO is released and reported.
     try:
-        return snapshot(path)
-    finally:
-        signal.setitimer(signal.ITIMER_REAL, *previous_timer)
-        signal.signal(signal.SIGALRM, previous_handler)
+        return returns(snapshot, path, event="the artifact snapshot returning", fifos=[path])
+    except HangGuard:
+        raise SnapshotDeadline("artifact open required the test watchdog") from None
 
 
 def record_nonregular_capture(record):

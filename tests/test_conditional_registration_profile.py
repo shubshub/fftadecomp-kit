@@ -6,9 +6,9 @@ import json
 import os
 from pathlib import Path
 import shutil
-import signal
 import socket
 import struct
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -16,6 +16,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import conditional_registration_profile as profile
+from event_waits import HANG_GUARD, hang, returns
 
 
 # Capture workspaces must be disk backed (the engine refuses tmpfs), so default to build/.
@@ -556,15 +557,14 @@ class AcquisitionTests(unittest.TestCase):
                     path.mkdir()
                 else:
                     path.symlink_to("item")
-                old_handler = signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(AssertionError("nonregular read blocked")))
-                signal.alarm(2)
-                try:
+                def acquire():
                     with profile.Acquisition(game_root=self.game, kit_root=self.kit) as capture:
                         with self.assertRaises(profile.Failure):
                             capture.acquire({"root": "game", "path": kind})
+                try:
+                    # Returning is the event; a read blocked on the FIFO is released and fails.
+                    returns(acquire, event="the nonregular acquisition returning", fifos=[path])
                 finally:
-                    signal.alarm(0)
-                    signal.signal(signal.SIGALRM, old_handler)
                     if connection is not None:
                         connection.close()
 
@@ -727,15 +727,14 @@ class AcquisitionTests(unittest.TestCase):
                         connection = bound_socket(candidate)
                     else:
                         candidate.mkdir()
-                    old_handler = signal.signal(signal.SIGALRM, lambda *_: (_ for _ in ()).throw(AssertionError("candidate capture blocked")))
-                    signal.alarm(2)
-                    try:
+                    def capture_sources():
                         with profile.Acquisition(game_root=self.game, kit_root=self.kit) as capture:
                             with self.assertRaises(profile.Failure):
                                 capture.sources(ADDRESS)
+                    try:
+                        # Returning is the event; a read blocked on the FIFO is released and fails.
+                        returns(capture_sources, event="the candidate capture returning", fifos=[candidate])
                     finally:
-                        signal.alarm(0)
-                        signal.signal(signal.SIGALRM, old_handler)
                         if connection is not None:
                             connection.close()
                         if kind == "directory":
@@ -2794,8 +2793,27 @@ class FreshCaptureTests(unittest.TestCase):
                     replacement.replace(path)
                     with self.assertRaises(profile.Failure):
                         acquisition.recheck()
-        with patch.object(profile, "CAPTURE_TIMEOUT", 0.01), self.assertRaisesRegex(profile.Failure, "could not complete"):
-            profile._run(["/usr/bin/sleep", "2"], self.workspace, self.workspace)
+        # Expiry is an event: the timed communicate() raises TimeoutExpired as soon as the
+        # tool runs, and must have been given CAPTURE_TIMEOUT, patched to an arbitrary value
+        # that has to arrive unchanged. The handler's own communicate() after the kill is
+        # real, under the hang guard.
+        real_communicate, forwarded = subprocess.Popen.communicate, []
+
+        def communicate(process, *args, **kwargs):
+            if forwarded:
+                try:
+                    return real_communicate(process, timeout=HANG_GUARD)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    raise hang("the killed tool's pipes closing") from None
+            forwarded.append(kwargs.get("timeout", args[1] if len(args) > 1 else None))
+            raise subprocess.TimeoutExpired(process.args, forwarded[0])
+
+        with patch.object(profile, "CAPTURE_TIMEOUT", 7.25), \
+                patch.object(subprocess.Popen, "communicate", communicate), \
+                self.assertRaisesRegex(profile.Failure, "could not complete"):
+            profile._run(["/usr/bin/sleep", "3600"], self.workspace, self.workspace)
+        self.assertEqual(forwarded, [7.25])
 
     def test_all_function_indexes_and_manager_type_are_bound(self):
         game = self.cases[0][3]
