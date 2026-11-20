@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "b2e909ca5096ebe3187fedeb1fcf426bbcea6df9d4ac442e1ac5b827c1f51ff9",
+    "acknowledged_cursor": 7039391222,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b2e909ca5096ebe3187fedeb1fcf426bbcea6df9d4ac442e1ac5b827c1f51ff9",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0800D324\",\"who\":\"lane77-0800D324\",\"note\":\"Verify parked original agbcc C and its native call/frame or switch evidence for publication.\"}",
+      "created_at": "2026-11-20T12:20:39Z",
+      "id": 7039391213,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:20:39Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38037f2491984c6dc4996e7a08fc87d7888506ab410c5111009eb6cf8b26864c",
+    "result": {
+      "address": "0x0800D324",
+      "claim_id": 7039391213,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7039391213,
+      "status": "accepted",
+      "who": "lane77-0800D324"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "dfe157f82293ee1275dcd5e36e2e590bfad698e558f8f2e26c9f1b6fbcf53365",
+    "acknowledged_cursor": 7039696812,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dfe157f82293ee1275dcd5e36e2e590bfad698e558f8f2e26c9f1b6fbcf53365",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0800D324\",\"who\":\"lane77-0800D324\",\"claim_id\":7039391213,\"reason\":\"Parked after two native-frame tests. The 150-byte candidate needs volatile destination reads from a bank that DMA is not reading; the unqualified 120-byte form produces identical output. Evidence in game PR #333.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T12:36:07Z",
+      "id": 7039696727,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:36:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8f8054ae760085eef28f6b254da934be57e12bc4ea403567457036805246252d",
+    "result": {
+      "address": "0x0800D324",
+      "claim_id": 7039391213,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7039696727,
+      "status": "accepted",
+      "who": "lane77-0800D324"
+    }
+  }
+}

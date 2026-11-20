@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "8f0e706abe2d697d9345e4446d15af94ec708e51da48458488f4f97063ad3eb4",
+    "acknowledged_cursor": 7039093636,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "8f0e706abe2d697d9345e4446d15af94ec708e51da48458488f4f97063ad3eb4",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0811C2E8\",\"who\":\"lane77-0811C2E8\",\"note\":\"Verify parked original agbcc C and its native call/frame or switch evidence for publication.\"}",
+      "created_at": "2026-11-20T12:05:18Z",
+      "id": 7039093177,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:05:18Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "84ad7f26f515c63e110be43f1fe710091a21a35a46a95c7ec91636b5c6991a79",
+    "result": {
+      "address": "0x0811C2E8",
+      "claim_id": 7039093177,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 18360463,
+      "request_id": 7039093177,
+      "status": "accepted",
+      "who": "lane77-0811C2E8"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "148619e130d2aae5c16bb5d6d533e8700589d0d1f22e2ee8d57b5163e60f8aae",
+    "acknowledged_cursor": 7039696812,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "148619e130d2aae5c16bb5d6d533e8700589d0d1f22e2ee8d57b5163e60f8aae",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0811C2E8\",\"who\":\"lane77-0811C2E8\",\"claim_id\":7039093177,\"reason\":\"Verified whole Thumb function merged in game PR #333.\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-20T12:36:07Z",
+      "id": 7039696596,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-20T12:36:07Z",
+      "user": {
+        "id": 18360463,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "8f8054ae760085eef28f6b254da934be57e12bc4ea403567457036805246252d",
+    "result": {
+      "address": "0x0811C2E8",
+      "claim_id": 7039093177,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 18360463,
+      "request_id": 7039696596,
+      "status": "accepted",
+      "who": "lane77-0811C2E8"
+    }
+  }
+}
