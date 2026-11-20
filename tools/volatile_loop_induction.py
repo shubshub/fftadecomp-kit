@@ -130,7 +130,14 @@ would otherwise become a new admission; see the shelved notes on kit#137):
   may leave it alone); for a callee whose return form is not known from the
   ROM every r0-r3 depends on that offset, its event and its prior value;
 * a register the callee's ROM code does not write on every path keeps a value
-  that includes its value before the call;
+  that includes its value before the call; so do r2 and r3 after a runtime
+  helper (`__divsi3` and its kin), which is called without a ROM interface:
+  in the ROM, `__divsi3`, `__udivsi3` and `__umodsi3` write neither register
+  when the divisor is zero, `__umodsi3` leaves r2 alone when the dividend is
+  below the divisor, and `__modsi3` leaves r2 alone when the divisor is zero
+  or the dividend's magnitude is below the divisor's (its r3, written on
+  every path, is kept as well); an SWI compares all of r0-r3 at the call, so
+  what it leaves is the same in every compile;
 * outgoing stack-argument words belong to the callee afterwards;
 * any memory access through a value a call left in r12, lr or a return
   register refuses.
@@ -315,8 +322,9 @@ def effects(probe, pc, signatures, interfaces, returns):
                     clobbers, following, True
             target = operands[0]
             if target in vs.RUNTIME_ARITY:
-                return {f"r{n}" for n in range(vs.RUNTIME_ARITY[target])}, clobbers, False, True, \
-                    clobbers, following, True
+                # a runtime helper may leave r2 and r3 alone, so it kills neither
+                named = {f"r{n}" for n in range(vs.RUNTIME_ARITY[target])}
+                return named, clobbers - (ALL_ARGUMENTS - named), False, True, clobbers, following, True
             arity = signatures.get(target, (None, None))[1]
             named = {f"r{n}" for n in range(min(arity, 4))} if arity is not None else set(ALL_ARGUMENTS)
             interface = interfaces(target) if interfaces is not None else None
@@ -762,11 +770,9 @@ class InductionExecutor(vs.Executor):
             self.trace[-1] = event + (("unnamed",) + unnamed,)
         offset = self.shape.offsets.get(record.index) if self.shape.offsets is not None else None
         site = ("site", offset) if offset is not None else ("site", self.role, record.index)
-        trusted = isinstance(target, str) and target in vs.RUNTIME_ARITY or \
-            isinstance(target, tuple) and target[0] == "swi"
-        returned = None if trusted else self.context.return_registers(target, self.interfaces)
+        returned = self.context.return_registers(target, self.interfaces)
         interface = getattr(record, "interface", None)
-        for name in () if trusted else vs.ARGUMENT_REGISTERS:
+        for name in vs.ARGUMENT_REGISTERS:
             if returned is None:
                 # what the callee leaves may hang on its return address
                 value = ("unknown-callee", number, name, before[name], site)
@@ -775,8 +781,9 @@ class InductionExecutor(vs.Executor):
                 if (interface is None or name not in interface[1]) and name not in record.reads:
                     # another return site may leave the register alone, so the old value may stay
                     value = ("retaddr", site, ("unwritten", number, name, before[name]))
-            elif interface is not None and name not in interface[1] and name not in record.reads:
-                # neither compared at the call nor overwritten on every path: the old value may stay
+            elif (interface is None or name not in interface[1]) and name not in record.reads:
+                # neither compared at the call nor known to be overwritten on every path (a
+                # runtime helper's r2 and r3 are neither): the old value may stay
                 value = ("unwritten", number, name, before[name])
             else:
                 continue
