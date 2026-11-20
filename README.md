@@ -510,7 +510,10 @@ build directory.
 
 Producer hashes are environment-independent. Every toolkit change that edits
 a tool file invalidates the reports bound to it, on every host, until they
-are regenerated with `status.py --write --verify`. Pair kit bumps with that
+are regenerated. `status.py --write --verify` regenerates them, except a
+report of a selector family that `status.py` replays before compiling: it
+refuses that report and leaves it stale, and `match.py` with the report's
+selector regenerates it ("Status accounting"). Pair kit bumps with that
 regeneration.
 
 ## Layout it expects
@@ -689,8 +692,12 @@ replays:
   from outside the function, such as a hardware address or another constant.
   A body that loads no such word is refused.
 
-The complete fix is for `status.py --verify` to diff the regenerated report
-against the saved one; that is follow-up work for kit `#247`.
+`status.py --verify` closes both directions: it compiles, so it sees the
+relocations, and it requires the saved report to equal the one `match.py`
+writes (`match.py --check-report`). Of the gates that check a plain report,
+only the cached replay, `status.py` without `--verify`, keeps this limit.
+`rebuild.py --compiled` does not check a plain report at all, so it accepts both
+relabels. "Status accounting" says what each gate compares.
 
 ### Archiving closed reservation receipts
 
@@ -1526,7 +1533,8 @@ is unchanged, and is stated in one report line:
 
 The data-buffer replay relinks the captured source with its switch relocations
 and recomputes the proof, the line and both fingerprints. As for the other
-`* buffer` lines, replay compares the line's text and order among them, not its
+`* buffer` lines, replay compares the line's text and order among them, and
+then the whole report with the text `match.py` writes, which fixes its
 position among the other fields. Besides the typed-data proof's own premise,
 the one limitation stated in each line (case uses of the table registers are
 not checked) is the only addition; no other premise is added.
@@ -3947,9 +3955,12 @@ and headers. `status.py` rejects legacy or stale reports; regenerate them with
 files under `src/`; dependencies outside the fingerprinted set are rejected.
 `status.py --verify` recompiles against the local ROM and exits nonzero if any
 function fails. `status.py --write --verify` also regenerates the match reports
-and validates their fingerprints before counting a successful compilation. This
-keeps the written status and subsequent offline checks consistent after shared
-header or mapping changes. `--verify` alone and `--check` never rewrite reports;
+and validates their fingerprints before counting a successful compilation, with
+one exception: a stale report of a selector family that `status.py` replays
+before compiling is refused and left as it is, and `match.py` with the report's
+selector regenerates it ("Status accounting"). This keeps the written status
+and subsequent offline checks consistent after shared header or mapping
+changes. `--verify` alone and `--check` never rewrite reports;
 `--check` takes precedence if combined with `--write`. Offline report checks
 replay evidence against the local ROM. Schema-specific checks can also require
 fresh source compilation, as the signed-quotient profile does.
@@ -5423,12 +5434,37 @@ and library breakdown also lists each recorded library unit and the functions
 outside those units.
 
 `--verify` performs fresh official matching without rewriting reports;
-`--write --verify` also regenerates and replays them. Fresh no-write verification
-does not require a pre-existing report for legacy profiles; the explicit
-inert-spin, software-double and function-address/thunk profiles require their saved reports as described
-above. `--check` takes precedence over
+`--write --verify` also regenerates and replays them, except the stale reports
+named below the table. Fresh no-write verification requires a saved report for
+every source: a missing report, or one that differs from the report `match.py`
+writes now, fails. `--check` takes precedence over
 `--write`, and any failed main or late source still makes the status gate fail.
 Hosted report/block checks do not substitute for local ROM-backed matching.
+
+What each gate recompiles, what it compares, and what it takes from disk
+unchecked:
+
+| gate | recompiles | compares | takes from disk |
+|---|---|---|---|
+| `match.py ADDR` | that source | the compiled bytes with the ROM | nothing from a saved report. When the shared writer reaches a verdict it overwrites `docs/match/ADDR.md`, with a NOT MATCHING report too; a refusal (`compile failed`, `NOT VERIFIED`), a profile that writes its own report and does not match, and an exploratory toolchain write nothing and leave the saved report as it was |
+| `match.py ADDR --check-report` | that source | the same and, on a MATCH, the report it would write with the saved file, byte for byte; a missing file differs, and a difference exits 1 | nothing; it writes no report |
+| `status.py --verify` | every source, through `match.py --check-report` | the same for each source; where `match.py` compared no report, the saved report must replay | the `match.py` arguments (selector, unit toolchain), recovered from the saved report |
+| `status.py --write --verify` | every source, through `match.py` | the compiled bytes with the ROM; each rewritten report must then replay. The report it replaces is not compared with the new one | the `match.py` arguments, as above |
+| `rebuild.py --compiled` | every source, through `match.py --no-write --emit` | each emitted body, and the SHA-1 of the mixed image, with the base ROM | the `match.py` arguments, as above; a saved report is replayed only when it yields any, so any other report may be missing or edited |
+| `status.py` without `--verify`, with or without `--write` or `--check` | nothing, except in a replay that compiles: the replay of every profile that writes its own report does, and so do the software-double, inert-spin, function-thunk and data-buffer replays and a plain replay that reaches a buffer call, a call thunk or the addressed remainder | the saved report with the text re-rendered from the re-verified evidence: for a plain report, from the bytes on its `* compiled :` line, the ROM, the mappings and the current source digest | where the replay does not compile, that the source compiles to those bytes; the data label ("Plain report fields and labels"); a library unit's orphan-constant exclusion |
+
+A profile that writes its own report returns before the writer the other
+profiles share (the `selector_issue` returns in `tools/match.py`):
+`--unsigned-runtime-profile`, `--signed-runtime-profile`,
+`--addressed-signed-runtime-profile`, `--owner-runtime-profile`,
+`--switch-profile`, and the profiles bound to an address, a library unit or
+the compiler-thunk default path. Under one of these, `match.py --check-report`
+compares nothing, prints no `report` line and exits with the verdict alone;
+`status.py --verify` replays the saved report instead. For the selector
+families that have an `invalid saved ... report` message in `tools/status.py`,
+the saved report must replay before the source is compiled, with `--write`
+too: `--write --verify` does not regenerate such a report once it no longer
+replays, so run `match.py` with the selector.
 
 ## Notes for people extending the analysis
 
