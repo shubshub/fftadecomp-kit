@@ -34,6 +34,9 @@ CONDITIONS = {
 
 
 def control_flow(address):
+    if address == 0x08096CB8:
+        from scene_teardown import FLOW
+        return FLOW
     if address == 0x080C68EC:
         return ('finite scene query with 0..13 nodes as an external premise; original predicate and '
                 'installed clear; protected 13-word result array, two retained record pointers and four state pushes')
@@ -253,6 +256,9 @@ def prove(data, address, rom, mapping, index, objects, bindings):
     require(row['instrs'] == len(instructions) and len(text_rows) == 1 and
             int(text_rows[0][3]) == len(instructions), 'finite loop exact instruction counts differ')
     operations.verify_operations(instructions, edges, address, local_calls, calls, refinement)
+    if address == 0x08096CB8:
+        import scene_teardown
+        return scene_teardown.prove(data,address,rom,mapping,index,objects,bindings,instructions,calls,refinement)
     if address == 0x080C68EC:
         import scene_record_history as scene
         return scene.prove(data,address,rom,mapping,index,objects,bindings,instructions,calls,refinement)

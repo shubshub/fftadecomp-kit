@@ -6799,3 +6799,33 @@ the original decoder. Callers must supply an item ID below 376. The decoder
 cursor must be reset before it is used again after the row returns.
 Set `FFTA_ITEM_TILE_ROW_ROOT` to the game tree to run
 `tests/test_menu_item_tile_row.py`.
+
+### Scene teardown, scroll waves, and unit rows
+
+The scene teardown at `08096CB8` clears two buffers and releases scene
+entries. The proof checks the clear sizes (0x4400 and 0x3900 bytes) against
+the allocations in scene setup. The original-code tests exercise every
+supported list length from zero to 13 with `FFTA_SCENE_TEARDOWN_ROOT`
+set to the game tree.
+
+The scroll-wave task at `080D8E00` renders up to four channels into a
+160-halfword buffer. Its proof follows the constructor and its eleven direct
+call sites. One caller derives its starting index from mutable background
+layers. The report records that runtime bound alongside the table accesses
+that require it. Set `FFTA_SCROLL_WAVE_ROOT` to exercise the original task.
+
+The unit menu row at `08057CDC` uses a separate 44-entry graphic archive.
+Every stream expands to 256 bytes. Graphic IDs zero and one skip decoding,
+and the original still copies the local buffer. The report records the
+valid-input condition. Set `FFTA_UNIT_TILE_ROW_ROOT` to run the row tests.
+
+The sprite selector at `08021854` filters the original tree and exports its
+tile numbers. The proof follows the allocator, filter callback, installed
+clearer and all three incoming calls. Set `FFTA_SPRITE_SELECTION_ROOT`
+to run the original heap and tree tests.
+
+The item-quantity row at `0805C220` draws one of fourteen item icons. Its
+test follows the original row and callers for both font modes and checks
+all fourteen icon streams. The clear count depends on the rendered width.
+The report preserves the zero and wrapped counts possible with a fixed-width
+font. Set `FFTA_ITEM_QUANTITY_ROW_ROOT` to run the item-quantity tests.

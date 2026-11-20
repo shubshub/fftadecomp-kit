@@ -158,6 +158,8 @@ def render(expr):
     kind = expr[0]
     if kind == "c":
         return str(expr[1]) if expr[1] < 0x10000 else f"0x{expr[1]:08X}"
+    if kind == "iteration":
+        return f"one_based_iteration(0x{expr[1]:08X})"
     if kind == "entry":
         return f"entry_R{expr[1]}"
     if kind == "ret":
@@ -1264,7 +1266,10 @@ def prove(data, address, verified_sites, derivations, accesses, copies, *, selec
 def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
                 forwarding=None, analysis_type=None, leaf_switch=None):
     """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
-    analysis = (analysis_type or Analysis)(bytes(data), address, derivations, accesses, dict(copies),
+    from scroll_wave_table_index import OWNER, ScrollWaveAnalysis
+    scroll_wave = address == OWNER and selector == SELECTOR and analysis_type is None
+    factory = ScrollWaveAnalysis if scroll_wave else analysis_type or Analysis
+    analysis = factory(bytes(data), address, derivations, accesses, dict(copies),
                                            signed_shift_congruence=selector == SELECTOR_V2)
     if leaf_switch is not None:
         from owner_switch_buffer_profile import OwnerSwitch
@@ -1279,6 +1284,8 @@ def prove_words(data, address, verified_sites, derivations, accesses, copies, *,
                                        if analysis.halfword(site) & 0xF800 == 0xF000} or \
             set(verified_sites) - sites:
         refuse("raw Thumb CFG differs from the verified instruction set")
+    if scroll_wave:
+        analysis.bind(verified_sites)
     states = analysis.run()
     reachable_derivations = {site for site in derivations if site in states}
     reachable_accesses = {site for site in accesses if site in states}
