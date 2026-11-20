@@ -378,7 +378,35 @@
           "who": "lane77-081332F8"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "8dfacb7638df971c0575426375acf6b184016d76e925a1421408b11830e5889c",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "8dfacb7638df971c0575426375acf6b184016d76e925a1421408b11830e5889c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081332F8\",\"who\":\"lane77-081332F8\",\"claim_id\":7038456313,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:16Z",
+          "id": 7039150894,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x081332F8",
+          "claim_id": 7038456313,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150894,
+          "status": "accepted",
+          "who": "lane77-081332F8"
+        }
+      }
     },
     {
       "claim": {
@@ -410,7 +438,35 @@
           "who": "lane77-081311DC"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "b321f4db14973e79931d9bb13aca7aa5c61eaa2ea58010fe0deec66c3f4c68df",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "b321f4db14973e79931d9bb13aca7aa5c61eaa2ea58010fe0deec66c3f4c68df",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x081311DC\",\"who\":\"lane77-081311DC\",\"claim_id\":7038456422,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150765,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x081311DC",
+          "claim_id": 7038456422,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150765,
+          "status": "accepted",
+          "who": "lane77-081311DC"
+        }
+      }
     },
     {
       "claim": {
@@ -442,7 +498,35 @@
           "who": "lane77-080D9C58"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "6acff1e3f718840e33fa1d72badd7439b4a0c9edb47e68f2ac07ba0707ddccc9",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "6acff1e3f718840e33fa1d72badd7439b4a0c9edb47e68f2ac07ba0707ddccc9",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080D9C58\",\"who\":\"lane77-080D9C58\",\"claim_id\":7038456439,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150776,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x080D9C58",
+          "claim_id": 7038456439,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150776,
+          "status": "accepted",
+          "who": "lane77-080D9C58"
+        }
+      }
     },
     {
       "claim": {
@@ -474,7 +558,35 @@
           "who": "lane77-0813233C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "4214ba2a8f8df3b940f2462071a10c78b4bd462c6a324c7ae639b418b9d7f52d",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "4214ba2a8f8df3b940f2462071a10c78b4bd462c6a324c7ae639b418b9d7f52d",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813233C\",\"who\":\"lane77-0813233C\",\"claim_id\":7038512833,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:16Z",
+          "id": 7039150972,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:16Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x0813233C",
+          "claim_id": 7038512833,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150972,
+          "status": "accepted",
+          "who": "lane77-0813233C"
+        }
+      }
     },
     {
       "claim": {
@@ -506,7 +618,35 @@
           "who": "lane77-08110888"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "db71ee5e1badf3f60f4d2b920b3694e9712647c3e00b0bc0b636ce722ba1966a",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "db71ee5e1badf3f60f4d2b920b3694e9712647c3e00b0bc0b636ce722ba1966a",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08110888\",\"who\":\"lane77-08110888\",\"claim_id\":7038512942,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150769,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x08110888",
+          "claim_id": 7038512942,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150769,
+          "status": "accepted",
+          "who": "lane77-08110888"
+        }
+      }
     },
     {
       "claim": {
@@ -538,7 +678,35 @@
           "who": "lane77-08035D00"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "31bd5d98ad4c5e60ac4e2d7eefa41e81b35c04a8ab5c366579d3b3a339823d66",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "31bd5d98ad4c5e60ac4e2d7eefa41e81b35c04a8ab5c366579d3b3a339823d66",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08035D00\",\"who\":\"lane77-08035D00\",\"claim_id\":7038568069,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150756,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x08035D00",
+          "claim_id": 7038568069,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150756,
+          "status": "accepted",
+          "who": "lane77-08035D00"
+        }
+      }
     },
     {
       "claim": {
@@ -570,7 +738,35 @@
           "who": "lane77-0813325C"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "362190052d5483dc5f3d1f0cb34a545b23828e8d60bd1eb287e68bdb99bf5c67",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "362190052d5483dc5f3d1f0cb34a545b23828e8d60bd1eb287e68bdb99bf5c67",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0813325C\",\"who\":\"lane77-0813325C\",\"claim_id\":7038604198,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150831,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x0813325C",
+          "claim_id": 7038604198,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150831,
+          "status": "accepted",
+          "who": "lane77-0813325C"
+        }
+      }
     },
     {
       "claim": {
@@ -826,7 +1022,35 @@
           "who": "lane77-080868D4"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "acb74da195be7f23c9340fff9de3e9592022e0b171f97d977acb1feb69b026ad",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "acb74da195be7f23c9340fff9de3e9592022e0b171f97d977acb1feb69b026ad",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080868D4\",\"who\":\"lane77-080868D4\",\"claim_id\":7038745317,\"reason\":\"Verified whole Thumb function merged in game PR #331.\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-20T12:08:15Z",
+          "id": 7039150748,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:15Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x080868D4",
+          "claim_id": 7038745317,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 18360463,
+          "request_id": 7039150748,
+          "status": "accepted",
+          "who": "lane77-080868D4"
+        }
+      }
     },
     {
       "claim": {
@@ -1304,6 +1528,38 @@
           "request_id": 7039093636,
           "status": "accepted",
           "who": "lane77-08135B40"
+        }
+      },
+      "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "788f78ccde02beb0bee1b1918ce19f964d9982e625a08ea39323c010668c1929",
+        "acknowledged_cursor": 7039152683,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "788f78ccde02beb0bee1b1918ce19f964d9982e625a08ea39323c010668c1929",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x081306E0\",\"who\":\"lane77-081306E0\",\"note\":\"Verify parked original agbcc C and its native call/frame or switch evidence for publication.\"}",
+          "created_at": "2026-11-20T12:08:21Z",
+          "id": 7039152683,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-20T12:08:21Z",
+          "user": {
+            "id": 18360463,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "8ba4c34c5e781fd14fba8912f28a403a528da0c67d19d89c5fb8d1bef610daec",
+        "result": {
+          "address": "0x081306E0",
+          "claim_id": 7039152683,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 18360463,
+          "request_id": 7039152683,
+          "status": "accepted",
+          "who": "lane77-081306E0"
         }
       },
       "release": null
