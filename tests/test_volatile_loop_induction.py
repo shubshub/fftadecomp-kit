@@ -14,6 +14,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import match
 import volatile_loop_induction as induction
 import volatile_semantics as semantics
+import synthetic_thumb_rom
 
 
 SYMBOL = "g_control_flags_03000940"
@@ -48,11 +49,7 @@ CALLEES = (
 
 
 def synthetic_rom():
-    rom = bytearray(0x300)
-    for address, words in CALLEES:
-        for n, word in enumerate(words):
-            rom[address - 0x08000000 + 2 * n:address - 0x08000000 + 2 * n + 2] = word.to_bytes(2, "little")
-    return bytes(rom), [{"rom": f"0x{address:08X}", "mode": "thumb"} for address, _ in CALLEES]
+    return synthetic_thumb_rom.image(CALLEES, 0x300)
 
 
 def assembly(*body, name="func_08028C34"):
@@ -791,10 +788,8 @@ class RuntimeHelperAndSwiCallTests(Base):
     DIVIDE = ("mov\tr0, r4", "mov\tr1, r4")
 
     def interfaces(self):
-        rom, functions = synthetic_rom()
-        rom = bytearray(rom) + bytes(self.READER + 4 - 0x08000000 - len(rom))
-        rom[self.READER - 0x08000000:self.READER - 0x08000000 + 4] = bytes.fromhex("d0187047")
-        return semantics.RomInterfaces(bytes(rom), functions + [{"rom": f"0x{self.READER:08X}", "mode": "thumb"}])
+        functions = CALLEES + ((self.READER, [0x18D0, 0x4770]),)
+        return semantics.RomInterfaces(*synthetic_thumb_rom.image(functions, self.READER + 4 - 0x08000000))
 
     @unittest.skipUnless(capstone, "capstone required")
     def test_a_runtime_helper_may_leave_r2_and_r3_alone(self):

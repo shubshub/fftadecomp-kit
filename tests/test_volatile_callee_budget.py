@@ -11,13 +11,13 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
 import volatile_semantics as semantics
+import synthetic_thumb_rom
 
 try:
     import capstone  # noqa: F401
 except ImportError:
     capstone = None
 
-BASE = 0x08000000
 LEAF = [0x2000, 0x4770]                  # movs r0, #0; bx lr: reads none, writes r0
 READER = [0x3001, 0x4770]                # adds r0, #1; bx lr: reads r0, writes r0
 READS_R1 = [0x1C08, 0x4770]              # adds r0, r1, #0; bx lr: reads r1, writes r0
@@ -31,19 +31,7 @@ def wide(count):
 
 
 def rom_with(functions):
-    rom = bytearray(0x2000)
-    for address, words in functions:
-        position = address - BASE
-        for word in words:
-            if isinstance(word, tuple):
-                offset = word[1] - (BASE + position + 4)
-                halves = (0xF000 | ((offset >> 12) & 0x7FF), 0xF800 | ((offset >> 1) & 0x7FF))
-            else:
-                halves = (word,)
-            for half in halves:
-                rom[position:position + 2] = half.to_bytes(2, "little")
-                position += 2
-    return bytes(rom), [{"rom": f"0x{address:08X}", "mode": "thumb"} for address, _ in functions]
+    return synthetic_thumb_rom.image(functions, 0x2000)
 
 
 def leaves():
