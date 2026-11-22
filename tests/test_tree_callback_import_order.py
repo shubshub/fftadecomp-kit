@@ -33,6 +33,23 @@ class ImportOrderTests(unittest.TestCase):
                                 capture_output=True, text=True, env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_scheduler_entries_before_owner_dispatch(self):
+        # owner_admission_profile imports affine_sequence_task; while that imported
+        # scheduler_event_definition at module level, each of these failed when imported first
+        # (descriptor_partial_word_prerequisite.Word or scheduler_event_definition.sequence
+        # read while partially initialised).
+        tools = str(Path(__file__).resolve().parents[1] / 'tools')
+        env = dict(os.environ, PYTHONDONTWRITEBYTECODE='1')
+        for name in ('descriptor_partial_word_prerequisite', 'scheduler_event_definition', 'scheduler_copy_state',
+                     'transfer_task_constructor', 'scheduler_descriptor_lifetime', 'scheduler_caller_cutpoint',
+                     'scene_script_position', 'rising_particle_callback', 'affine_sequence_task'):
+            with self.subTest(name=name):
+                code = (f"import sys; sys.path.insert(0, sys.argv[1]); import {name}; import owner_admission_profile; "
+                        "import affine_sequence_task; assert callable(affine_sequence_task.scheduler_inputs)")
+                result = subprocess.run([sys.executable, '-B', '-c', code, tools],
+                                        capture_output=True, text=True, env=env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

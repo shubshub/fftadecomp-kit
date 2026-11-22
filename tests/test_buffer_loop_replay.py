@@ -464,7 +464,9 @@ class BufferLoopReplayTests(unittest.TestCase):
             ("function_thunk_profile.py", "verify_source"),
             ("match_evidence.py", "buffer_report_matches"),
             ("owner_admission_profile.py", "verify"),
-            ("data_buffer_profile.py", "prove")})
+            ("data_buffer_profile.py", "prove"),
+            # The menu list's independent re-walk; its evidence carries loop_replay_lines().
+            ("menu_list_frame.py", "finish")})
         # Producers whose evidence neither states nor binds a replay stay plain.
         plain = {site[0] for site in found if not site[2]}
         self.assertTrue({"owner_runtime_profile.py", "match.py", "scheduler_leaf_output_profile.py"} <= plain)
