@@ -147,7 +147,7 @@ class TwoWordsAlignmentTests(unittest.TestCase):
         values = fixture()
         with self.assertRaisesRegex(ValueError, 'sole complete Thumb'):
             owner.original_bindings(match.elf_image(values[0]), values[2], values[3], values[4],
-                                    b'{}', selector=owner.SELECTOR, index=values[5])
+                                    b'{}', selector=owner.ACYCLIC_SELECTOR, index=values[5])
 
     def test_data_profile_keeps_its_named_object_requirement(self):
         import canonical_integer_two_words_native_profile as data_native

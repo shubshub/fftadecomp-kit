@@ -93,7 +93,7 @@ class RestoringAlignmentTests(unittest.TestCase):
         bindings,_=owner.original_bindings(image,A,b'',mapping,b'{}',selector=profile.ALIGNED_SELECTOR)
         self.assertEqual(bindings,dict(calls=[],data=[],functions=[],switches=[]))
         with self.assertRaisesRegex(ValueError,'sole complete Thumb ELF'):
-            owner.original_bindings(image,A,b'',mapping,b'{}',selector=owner.SELECTOR)
+            owner.original_bindings(image,A,b'',mapping,b'{}',selector=owner.ACYCLIC_SELECTOR)
         marker=f'* verification: `{owner.ALIGNED_SCHEMA}`\n'
         self.assertEqual(owner.selector_for_report(marker),owner.ALIGNED_SELECTOR)
         with self.assertRaises(ValueError):owner.selected(marker*2)

@@ -5637,6 +5637,39 @@ bindings, fixed compiler flags, plausible source and fresh report replay remain
 required. Status and compiled rebuild forward the saved explicit selector.
 Default matching and `restoring-owner-runtime-v1` retain their existing behavior.
 
+### Restoring owners without unsigned division or thunks
+
+`--owner-runtime-profile restoring-owner-runtime-v1` verifies a complete
+restoring Thumb owner as one closed CFG: same-owner `bl` jumps are edges,
+guarded word switches are exact, stack buffers reach callees only through the
+native buffer proof, and every return restores SP, r4-r11 and the entry LR from
+the saved frame. It used to require at least one `__udivsi3` call beside at
+least one canonical `_call_via_rN` thunk, and it refused agbcc's closing
+`c0 46` halfword. Neither was part of a proof, so both are now optional:
+
+* Each runtime is pinned and proved only where it is called: the `__udivsi3`
+  span and zero handler, with a CFG-proven nonzero constant divisor at each
+  site, and the canonical thunk bodies. No argument register of a runtime call
+  may carry a stack address, and a thunk's target register may carry neither a
+  stack address nor the entry LR.
+* When the symbol size is 2 mod 4, the original `.text` must be the symbol plus
+  exactly one `c0 46` halfword (`canonical-external-two-byte-thumb-nop-v1`);
+  when it is 0 mod 4, `.text` must be the symbol. The halfword stays outside the
+  verified extent.
+* An owner in the original domain (unsigned division beside a thunk, no other
+  runtime, size 0 mod 4) keeps `elf-symbol-thumb-restoring-owner-runtime-v1`
+  and its records unchanged. Every other owner is recorded as
+  `elf-symbol-thumb-restoring-owner-optional-runtime-v1` (inventory
+  `private-thumb-owner-optional-runtime-inventory-v1`): the runtimes it calls,
+  possibly none, with their identities, each same-owner `bl` as an edge, and,
+  for a 2-mod-4 size, the closing-halfword policy.
+
+Complete unique ownership, an index instruction count equal to the reached
+count, genuine original ELF bindings, plausible source and fresh report replay
+remain required. Calls to any other runtime, signed division and remainders
+included, stay refused. Status and compiled rebuild forward the selector for
+both schemas.
+
 ### Explicit ignored incoming leaf aliases
 
 `--owner-runtime-profile restoring-owner-ignored-leaf-alias-v1` selects

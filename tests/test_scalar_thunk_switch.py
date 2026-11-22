@@ -147,7 +147,7 @@ bx r1
 
     def test_old_scalar_and_division_compositions_stay_closed(self):
         original,_,values,bindings = self.fixture()
-        for selector in (owner.DIRECT_SWITCH_SELECTOR,owner.SELECTOR):
+        for selector in (owner.DIRECT_SWITCH_SELECTOR,owner.ACYCLIC_SELECTOR):
             with self.subTest(selector=selector),self.assertRaises(ValueError):
                 owner.original_bindings(match.elf_image(original),A,values['rom'],
                     values['mapping'],values['objects'],selector=selector,index=values['index'])

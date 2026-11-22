@@ -44,7 +44,7 @@ class MultipleSwitchTerminalAlignmentTests(unittest.TestCase):
 
     def test_default_owner_remains_strict(self):
         with self.assertRaisesRegex(ValueError, 'sole complete Thumb ELF'):
-            self.bindings(self.image, owner.SELECTOR)
+            self.bindings(self.image, owner.ACYCLIC_SELECTOR)
 
     def test_noncanonical_padding_and_ownership_fail_closed(self):
         for kind in ('padding', 'extra-padding', 'alignment', 'flags', 'symbol-owner', 'size'):
