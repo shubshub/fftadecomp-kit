@@ -23,6 +23,23 @@ def require(condition, message):
         raise ValueError(message)
 
 
+def require_pinned_leaf(rom, mapping, target, registers):
+    """The loop replay trusts `registers` (capstone ids) across calls to `target`: check that premise
+    in the pinned bytes. `target` must be a PINS span whose reached instructions make no call and write
+    none of `registers`."""
+    import owner_admission_profile as owner
+    import owner_graph_profile as graph
+    from match import ROM_BASE
+    require(target in PINS, f'loop replay trusts the unpinned callee {target:08X}')
+    end, count, digest = PINS[target]
+    body = rom[target-ROM_BASE:end-ROM_BASE]
+    require(sha256(body).hexdigest() == digest, f'trusted callee {target:08X} differs from its pin')
+    ins, _, _, calls, _ = graph.graph(body, target, owner.refine(body, target, mapping))
+    require(len(ins) == count and not calls, f'trusted callee {target:08X} is not a pinned leaf')
+    written = {register for instruction in ins.values() for register in instruction.regs_access()[1]}
+    require(not written & set(registers), f'trusted callee {target:08X} writes a register the replay trusts')
+
+
 class MenuListFrame:
     BRANCHES = {0x0805289A: 0x08053084, 0x080528B0: 0x08053084}
 
@@ -65,7 +82,20 @@ class MenuListFrame:
         frame = prove_frame(ins, edges, address, branches, calls, stack_aliases=True, buffer_proof=proof)
         require(frame['maximum_frame_bytes'] == 64 and frame['returns'] == [0x08053092],
                 'menu list must restore the 32-byte allocation and eight saved words')
+        # The re-walk replays the byte-output callee's loop; its lines state that replay and the
+        # registers it trusts across un-inspected calls (frame binds only the proof's fingerprint).
+        # Each trusted callee is checked here: a pinned leaf that writes none of those registers.
+        trusted = {}
+        for records in proof.loop_replays.values():
+            for entry in records:
+                for target, register in entry[3]:
+                    trusted.setdefault(target, set()).add(register)
+        for target, registers in sorted(trusted.items()):
+            require_pinned_leaf(self.rom, self.mapping, target, registers)
         self.evidence = dict(frame=frame, long_branches=record(ins.values(), address),
                              local_output_call=0x08052AD0, output_offsets=[28, 29],
                              installer=[INSTALLER, 0x08052474, REGISTER], runner=RUNNER,
-                             dispatch_sites=[0x08006A34, 0x08006A6A], callback_thunk=THUNK)
+                             dispatch_sites=[0x08006A34, 0x08006A6A], callback_thunk=THUNK,
+                             loop_replay_lines=proof.loop_replay_lines(),
+                             trusted_pinned_leaves=[[target, sorted(r - match.ARM_REG_R0 for r in registers)]
+                                                    for target, registers in sorted(trusted.items())])

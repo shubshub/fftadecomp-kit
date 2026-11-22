@@ -27,6 +27,7 @@ import test_bios_saved_scalar_mmio_literals as saved
 import test_bios_scalar_control as scalar
 import test_bios_scalar_function_literals as scalar_function_literals
 import test_bios_zero_extended_control as zero_extended
+import test_compiler_bios_scalar_control as compiler_scalar
 import test_cpuset_code_image as code_image
 import test_named_bios_fill_source as named_fill
 import test_runtime_summary_profile as runtime_tests
@@ -48,6 +49,9 @@ ADDRESSED_SELECTORS = (
     profile.BIOS_SCALAR_CODE_IMAGE_SELECTOR, profile.BIOS_READONLY_DATA_SELECTOR,
     profile.BIOS_READONLY_THREE_DATA_SELECTOR, profile.BIOS_READONLY_FOUR_DATA_SELECTOR,
     profile.BIOS_FUNCTION_DATA_SELECTOR, profile.BIOS_SCALAR_FUNCTION_DATA_SELECTOR)
+# In BIOS_SELECTORS and DATA_SELECTORS but outside NUMERIC_HARDWARE_SELECTORS: each still
+# refuses an untyped hardware-window word (test_..._refuses_a_hardware_word below).
+REFUSING_SELECTORS = (profile.COMPILER_BIOS_SCALAR_DATA_SELECTOR,)
 
 
 def calls_of(f):
@@ -455,6 +459,7 @@ class AddressedNumericHardwareSelectorSetTests(unittest.TestCase):
     def setUp(self):
         self.fill = helper(self, fill.BiosCpuSetFillTests)
         self.ordinary_function = helper(self, ordinary_function_literals.OrdinaryBiosFunctionLiteralTests)
+        self.compiler_scalar = helper(self, compiler_scalar.CompilerBiosScalarControlTests)
 
     def test_every_member_is_a_bios_fill_selector_with_typed_data(self):
         members = set(profile.NUMERIC_HARDWARE_SELECTORS)
@@ -463,7 +468,9 @@ class AddressedNumericHardwareSelectorSetTests(unittest.TestCase):
 
     def test_every_bios_fill_data_selector_has_a_decision(self):
         both = set(profile.BIOS_SELECTORS) & set(profile.DATA_SELECTORS)
-        undecided = both - set(profile.NUMERIC_HARDWARE_SELECTORS)
+        self.assertLessEqual(set(REFUSING_SELECTORS), both)
+        self.assertFalse(set(REFUSING_SELECTORS) & set(profile.NUMERIC_HARDWARE_SELECTORS))
+        undecided = both - set(profile.NUMERIC_HARDWARE_SELECTORS) - set(REFUSING_SELECTORS)
         self.assertEqual(undecided, set(),
                          'in BIOS_SELECTORS and DATA_SELECTORS but not in NUMERIC_HARDWARE_SELECTORS: either '
                          'add the selector there with a test that it records a hardware-window word, or make '
@@ -495,6 +502,19 @@ class AddressedNumericHardwareSelectorSetTests(unittest.TestCase):
         with patch.object(profile, 'NUMERIC_HARDWARE_SELECTORS', ()), \
                 self.assertRaisesRegex(ValueError, 'exact typed coverage of reached address words'):
             profile.verify(**f)
+
+    def test_the_compiler_bios_scalar_control_selector_refuses_a_hardware_word(self):
+        # #464 added it to BIOS_SELECTORS and to DATA_SELECTORS, not to NUMERIC_HARDWARE_SELECTORS.
+        plain = self.compiler_scalar.fixture()
+        self.assertEqual(plain['selector'], profile.COMPILER_BIOS_SCALAR_DATA_SELECTOR)
+        profile.verify(**plain)
+        f, word, load = numeric_destination(plain, VRAM)
+        with self.assertRaisesRegex(ValueError, 'exact typed coverage of reached address words'):
+            profile.verify(**f)
+        # The refusal is the set's decision: with the selector in the set the same word is recorded.
+        with patch.object(profile, 'NUMERIC_HARDWARE_SELECTORS',
+                          (*profile.NUMERIC_HARDWARE_SELECTORS, profile.COMPILER_BIOS_SCALAR_DATA_SELECTOR)):
+            self.assertEqual(profile.verify(**f)[0]['numeric_hardware_words'], record([[word, VRAM, [load]]]))
 
     def test_the_ordinary_function_literal_selector_refuses_a_hardware_word(self):
         # In FUNCTION_DATA_SELECTORS, so in DATA_SELECTORS, but not a BIOS fill selector.

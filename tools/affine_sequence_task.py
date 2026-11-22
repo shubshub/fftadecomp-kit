@@ -5,7 +5,6 @@ import struct
 
 import bg_affine_transparent_leaf_profile as transparent
 import effect_registry_scheduler as registry
-from scheduler_event_definition import sequence as instructions
 from scroll_prefix_scene import PROVIDER
 import match
 import owner_graph_profile as graph
@@ -56,6 +55,9 @@ def constructor(body, mapping):
 
 
 def scheduler_inputs(proof):
+    # owner_admission_profile imports this module, and scheduler_event_definition reaches
+    # owner_admission_profile at import time; importing it here keeps both importable first.
+    from scheduler_event_definition import sequence as instructions
     # The two registry rows use the same 80-byte callback payload. The
     # phase-103 child separately requests 44 bytes plus the task header.
     direct = 0x08005954
