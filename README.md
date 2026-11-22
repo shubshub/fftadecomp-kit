@@ -604,7 +604,13 @@ prefix and the `11111` suffix. That excludes `bkpt`, `udf`, `cps`, `setend`,
 `rev`, `sxt`/`uxt`, `cbz`, `it`, the hint instructions (the only `nop` is
 `46c0`), a hi-register `mov`/`add`/`cmp` encoding of two low registers, `bx`
 with a nonzero should-be-zero bit, an `stmia` whose writeback base is in the
-list but not lowest, and every other 32-bit decode. `svc` and `blx` keep their
+list but not lowest, `muls` with one register as both operands, a hi-register
+`cmp` whose first operand is `pc`, and every other 32-bit decode. The
+`stmia` and `muls` cases are operand combinations the ARM
+Architecture Reference Manual leaves UNPREDICTABLE for ARMv4T; they are
+refused whatever the ARM7TDMI does with them. The `cmp pc` case follows the
+2005 edition of that manual (DDI 0100I A7.1.23) on purpose: the 2000 edition
+allows R15 there and the ARM7TDMI data sheet defines it. `svc` and `blx` keep their
 older refusals. The complete-owner graph (`owner_graph_profile.graph`) applies
 the same check (`tools/armv4t.py`) to every instruction of its code ranges, so
 the admission paths that replay that graph without the base walk are held to
@@ -3893,9 +3899,10 @@ Three further rules keep a thunk from becoming an arbitrary jump:
 * **Decode.** The taint pass decodes every reached instruction itself. It
   accepts only the 16-bit ARMv4T Thumb mnemonics (so no `uxtb`, `sxth`, `rev`,
   `cps`, `setend`, hint `nop`, `yield`, `sev`, `blx` register, a hi-register
-  `mov`/`cmp`/`add` encoding with two low registers, or an `stmia` whose
-  writeback base is in the list but not lowest) and the bound BL pairs, and refuses
-  `svc`, `bkpt` and `udf` (kit `#180`).
+  `mov`/`cmp`/`add` encoding with two low registers, an `stmia` whose
+  writeback base is in the list but not lowest, `muls` with one register as
+  both operands, or a hi-register `cmp` whose first operand is `pc`) and the
+  bound BL pairs, and refuses `svc`, `bkpt` and `udf` (kit `#180`).
 
 Premises that stay outside the proof, as for `canonical-thunks-v1`: callees,
 including the target reached through a thunk register, follow the ordinary

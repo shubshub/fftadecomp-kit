@@ -188,5 +188,52 @@ class OwnerGraphEncodings(unittest.TestCase):
             self.assertEqual(str(caught.exception), OWNER_GRAPH, name)
 
 
+class UnpredictableOperands(unittest.TestCase):
+    """Operand combinations ARMv4T leaves UNPREDICTABLE, and their defined neighbours."""
+
+    def encoding(self, half):
+        return armv4t.encoding(next(decoder().disasm(halves(half), BASE)))
+
+    def refused(self, half):
+        self.assertFalse(self.encoding(half))
+        with self.assertRaises(ValueError) as caught:
+            match.verify_leaf_instructions(body(half), BASE, True)
+        self.assertEqual(str(caught.exception), ENCODING)
+
+    def test_muls_with_one_register_twice(self):
+        # ARM DDI 0100I A7.1.45: Rd == Rm is UNPREDICTABLE before ARMv6.
+        for register in range(8):
+            with self.subTest(register):
+                self.refused(0x4340 | register << 3 | register)
+                with self.assertRaises(ValueError) as caught:
+                    OwnerGraphEncodings.graph(self, 0x4340 | register << 3 | register, BX_LR)
+                self.assertEqual(str(caught.exception), OWNER_GRAPH)
+        for rd in range(8):
+            for rm in range(8):
+                if rd != rm:
+                    self.assertTrue(self.encoding(0x4340 | rm << 3 | rd), (rd, rm))
+        match.verify_leaf_instructions(body(0x4348), BASE, True)  # muls r0, r1, r0
+        match.verify_leaf_instructions(body(0x4341), BASE, True)  # muls r1, r0, r1
+        self.assertEqual(len(OwnerGraphEncodings.graph(self, 0x4348, BX_LR)[0]), 2)
+
+    def test_cmp_with_pc_as_the_first_operand(self):
+        # ARM DDI 0100I A7.1.23: Rn can be any of R0 to R14 and Rm any of R0 to R15; H1 == 1 with
+        # Rn == 0b111 is UNPREDICTABLE, and so is the form of two low registers.
+        for rm in range(16):
+            with self.subTest(rm):
+                self.refused(0x4587 | rm << 3)  # cmp pc, rM, up to cmp pc, pc
+        for rn in range(15):
+            for rm in range(16):
+                half = 0x4500 | (rn & 8) << 4 | rm << 3 | rn & 7
+                self.assertEqual(self.encoding(half), rn >= 8 or rm >= 8, (rn, rm))
+        for name, half in (('cmp r0, pc', 0x4578), ('cmp r7, pc', 0x457F), ('cmp r7, r8', 0x4547),
+                           ('cmp r8, r0', 0x4580), ('cmp lr, r7', 0x45BE), ('cmp lr, pc', 0x45FE)):
+            with self.subTest(name):
+                self.assertTrue(self.encoding(half))
+        match.verify_leaf_instructions(body(0x4580), BASE, True)  # cmp r8, r0
+        match.verify_leaf_instructions(body(0x45BE), BASE, True)  # cmp lr, r7
+        self.assertEqual(len(OwnerGraphEncodings.graph(self, 0x4580, BX_LR)[0]), 2)
+
+
 if __name__ == '__main__':
     unittest.main()

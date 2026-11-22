@@ -12,6 +12,14 @@ admits, so a walk calls ``encoding`` on each reached 16-bit instruction and
 scan and the switch-thunk taint pass; a walk that decodes Thumb on its own and is
 not fed by one of these is not covered.
 
+The standard is "defined for ARMv4T by the ARM Architecture Reference Manual" (ARM
+DDI 0100I, chapter A7).  An operand combination that chapter leaves UNPREDICTABLE is
+refused whatever the ARM7TDMI does with it: an ``stmia`` whose base is listed but
+not lowest, ``muls`` with one register as both operands, and a hi-register ``cmp``
+whose first operand is ``pc``.  The last follows the 2005 wording on purpose: DDI 0100E
+(2000) A7.1.23 allows R15 as Rn and the ARM7TDMI data sheet (DDI 0029E 5.5.5) defines it.  ``tests/test_armv4t_table.py`` compares ``encoding``
+with a bit-level table of the encodings on every halfword.
+
 An item must come from a detail decode that starts at that instruction (one
 address at a time), or from a multi-instruction decode in which every preceding
 item of the same call was checked and accepted (``owner_graph_profile.graph``
@@ -65,6 +73,10 @@ def encoding(item):
     if mnemonic in ('stm', 'stmia') and half >> 11 == 0x18 and half >> 8 & 7 != 0 and \
             half & (1 << (half >> 8 & 7)) and half & ((1 << (half >> 8 & 7)) - 1):
         return False  # writeback base in the list but not the lowest register: UNPREDICTABLE
+    if half >> 6 == 0x10D and half >> 3 & 7 == half & 7:
+        return False  # muls with Rd == Rm: UNPREDICTABLE before ARMv6 (ARM DDI 0100I A7.1.45)
+    if half & 0xFF87 == 0x4587:
+        return False  # hi-register cmp with Rn == pc: UNPREDICTABLE in DDI 0100I A7.1.23 only (2005 wording, on purpose)
     if half >> 8 == 0x47:  # bx: blx (bit 7) and nonzero low bits are not ARMv4T
         return mnemonic == 'bx' and half & 0x87 == 0
     if half >> 10 == 0x11:  # hi-register add, cmp, mov: at least one register must be high

@@ -93,22 +93,6 @@ FORMATS = (
 )
 # What no row assigns: 1011 with bits 11:8 other than 0000 and x10x, and 11101.
 
-# Encodings the table refuses and ``armv4t.encoding`` admits today; the checker has no rule for
-# either group.  The sweep below requires the disagreement to be exactly this set: a checker that
-# starts refusing a group fails the test until that group is deleted here, and no other
-# disagreement can appear.
-#
-# * ``muls rN, rN``: restricted by both documents as quoted above.  ARM A4.1.40 (the equivalent
-#   ARM instruction) adds that "it is believed all relevant ARMv4 and ARMv5 implementations do not
-#   require this restriction either"; A7.1.45 still gives the Thumb form as UNPREDICTABLE before
-#   ARMv6, and agbcc copies an operand instead of emitting it (``x * x`` compiles to
-#   ``mov r1, r0`` then ``mul r1, r1, r0``).
-# * ``cmp pc, rM``: UNPREDICTABLE in DDI 0100I A7.1.23 only; DDI 0100E A7.1.23 allows R15 as Rn
-#   and DDI 0029E 5.5.5 defines it.  The table follows the 2005 wording on purpose.
-ADMITTED_AGAINST_THE_TABLE = frozenset((
-    *(0x4340 | reg << 3 | reg for reg in range(8)),
-    *(0x4587 | rm << 3 for rm in range(16)),
-))
 FIELDS = (0x000, 0x001, 0x2AA, 0x400, 0x555, 0x7FF)  # 11-bit offset fields sampled in the pair test
 
 
@@ -179,13 +163,12 @@ class CheckerAgainstTheTable(unittest.TestCase):
         table = {half for half in range(0x10000) if classify(half) == V4T}
         checker = {half for half in range(0x10000) if self.admitted(self.first(half), 2)}
         self.assertEqual(named(table - checker), [], self.version)
-        self.assertEqual(named(checker - table), named(ADMITTED_AGAINST_THE_TABLE), self.version)
+        self.assertEqual(named(checker - table), [], self.version)
 
     def test_every_16_bit_halfword_before_a_bl_suffix(self):
         # A 16-bit instruction is decided by its own halfword, whatever follows it.
         wrong = [half for half in range(0xE800)
-                 if self.admitted(self.first(half, 0xF800), 2) !=
-                 (classify(half) == V4T or half in ADMITTED_AGAINST_THE_TABLE)]
+                 if self.admitted(self.first(half, 0xF800), 2) != (classify(half) == V4T)]
         self.assertEqual(named(wrong), [], self.version)
 
     def test_bl_pairs(self):
