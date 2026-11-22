@@ -15,6 +15,7 @@ import match
 import match_evidence
 import plausible
 import volatile_semantics as semantics
+import synthetic_thumb_rom
 
 
 SYMBOL = "g_control_flags_03000940"
@@ -840,19 +841,7 @@ CALLEES = (
 
 
 def synthetic_rom():
-    rom = bytearray(0x300)
-    for address, words in CALLEES:
-        position = address - 0x08000000
-        for word in words:
-            if isinstance(word, tuple):
-                offset = word[1] - (0x08000000 + position + 4)
-                halves = (0xF000 | ((offset >> 12) & 0x7FF), 0xF800 | ((offset >> 1) & 0x7FF))
-            else:
-                halves = (word,)
-            for half in halves:
-                rom[position:position + 2] = half.to_bytes(2, "little")
-                position += 2
-    return bytes(rom), [{"rom": f"0x{address:08X}", "mode": "thumb"} for address, _ in CALLEES]
+    return synthetic_thumb_rom.image(CALLEES, 0x300)
 
 
 try:
