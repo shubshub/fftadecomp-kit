@@ -186,13 +186,17 @@ def prove_frame(instructions, edges, address, branches, calls, *,
     if runtime_calls is not None:
         from function_thunk_profile import ALIASES
         from match import UDIVSI3_ADDRESS, RUNTIME_HELPERS, is_udivsi3_address
-        allowed = dict(ALIASES, __udivsi3=UDIVSI3_ADDRESS)
+        import modsi3_profile as remainder_runtime
+        allowed = dict(ALIASES, __udivsi3=UDIVSI3_ADDRESS, __modsi3=remainder_runtime.ADDRESS)
+        # A caller that names the pinned remainder must name every call into its spans.
+        remainder = type(runtime_calls) is dict and "__modsi3" in runtime_calls.values()
         if type(runtime_calls) is not dict or not runtime_calls or any(
                 type(site) is not int or type(name) is not str or name not in allowed or
                 calls.get(site) != allowed[name]
                 for site, name in runtime_calls.items()) or set(runtime_calls) != {
                     site for site, destination in calls.items()
-                    if destination in RUNTIME_HELPERS.values() or is_udivsi3_address(destination)}:
+                    if destination in RUNTIME_HELPERS.values() or is_udivsi3_address(destination) or
+                    remainder and remainder_runtime.reserved(destination)}:
             raise ValueError("runtime frame checks require exact complete canonical call bindings")
 
     if formal_stack_alias_constant_policy is not None:
@@ -429,7 +433,7 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 if set(clobbered) & aliases.keys():
                     raise ValueError("canonical runtime arguments carry local stack provenance")
                 runtime_name = runtime_calls[site]
-                if runtime_name != "__udivsi3":
+                if runtime_name not in ("__udivsi3", "__modsi3"):
                     target_register = ARM_REG_R0 + int(runtime_name.removeprefix("_call_via_r"))
                     if target_register in aliases or registers.get(target_register) == ("entry-return",):
                         raise ValueError("indirect runtime target carries stack or entry-return provenance")
