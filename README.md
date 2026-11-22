@@ -4492,12 +4492,35 @@ join on the way; a constant, a data symbol, a local, another getter's payload,
 a computed value or a value set in more than one place refuses. The record
 prints what it is and the one premise this needs: it is a task whose data word
 +4 holds a scanline task. A
-variable offset is admitted only from a listed symbol or getter, under the
-printed premise that it stays inside the object, which the proof does not
-bound. A narrowed or extended constant loses its value. Locals, parameters,
-other call results, loaded pointers, a pointer difference, and a variable
-offset from a constant address are refused. Candidates are refused in a source
-with a line splice, a digraph
+register parameter counts when each reference to the function that a scan of
+the ROM finds is traced to one of these objects. The function must lie below
+`0x08150000` (code above it is installed in RAM, and its callers cannot be
+closed without an overlay map). The scan covers the whole ROM: BLs that reach
+the function's start, BLs and Thumb branches that reach anywhere inside it from
+elsewhere, and words holding any address in it; it does not see an address
+formed by arithmetic (an `adr`, an add, an offset table), and the record says
+so. Each BL to the start must lie in an indexed function below `0x08150000`
+with a matched source whose BL relocation there names the function; that
+caller is compiled, must match the ROM, every call of the function in its
+expand dump must reach its own BL in the final listing (cross-jumping can merge
+calls with different arguments into one), and the argument register set in the
+call's block must resolve to an object above (its own parameter refuses: one
+level is traced). An address word counts only as a scanline callback: a
+literal of a matched function holding the Thumb start, read only by that
+function's pc-relative loads (every Thumb and ARM pc-relative load of the word
+in the ROM is checked), which reach r0 unchanged, with no branch target or
+other use between, at a BL to an allocator listed in `volatile_objects.json`
+(`func_0800C3CC`); the scanline manager calls such a callback with the task's
+payload (r0) and the bank it then submits for HBlank DMA (r1). Anything
+reaching inside the function, any other reference, an `adr` in the owner, or
+its own call refuses. The record prints the premises: the code runs where it
+lies, no address of it is formed by arithmetic, and a task's callback is called
+only by the manager. A variable offset is admitted only from a listed symbol,
+a getter or a traced parameter, under the printed premise that it stays inside
+the object, which the proof does not bound. A narrowed or extended constant
+loses its value. Locals, stack parameters, other call results, loaded
+pointers, a pointer difference, and a variable offset from a constant address
+are refused. Candidates are refused in a source with a line splice, a digraph
 or a trigraph, or with more than eight of them, or in a directive. The report
 record prints the object and its evidence, every access with its ROM address
 and fate, and both compiles' `.text` digests. `python tools/volatile_rom_proof.py
