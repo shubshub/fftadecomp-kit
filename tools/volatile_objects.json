@@ -1,0 +1,16 @@
+{
+  "_policy": "RAM objects that hardware reads or writes on its own, so that a volatile qualifier on them is evidence, not steering, wherever tools/volatile_rom_proof.py shows the qualifier's effect on their accesses. An entry names the object (a data symbol, its mapped address and its size) and ROM code that programs a DMA channel with it: the code's bytes are pinned by SHA-256 and the transfer is read off the instructions at every run. Listing an object admits nothing by itself. ONLY the repository maintainer may add an entry; agents park the function and cite the evidence instead.",
+  "version": 1,
+  "entries": [
+    {
+      "symbol": "data_03000030",
+      "address": "0x03000030",
+      "size": 2048,
+      "kind": "dma-source",
+      "start": "0x080013B6",
+      "end": "0x080013E2",
+      "sha256": "3297d626c775190ebf1157e6654a42cd21d5dd6cad879dce2ef42626fc0ae7ce",
+      "reason": "two banks of 128 OAM entries (8 bytes each), selected by data_03000028 and counted by data_03000020; the OAM flush 080012BC loads 0x03000030 (pool word 080014B0), adds the inactive bank's offset (bank << 10) and stores it to DMA0SAD at 080013D4, the OAM cursor to DMA0DAD, and 0x84000000 | (count * 2) to DMA0CNT at 080013E0"
+    }
+  ]
+}

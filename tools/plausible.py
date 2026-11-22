@@ -38,6 +38,12 @@ then compiles each user a second time with the qualifier stripped from that
 declaration and refuses any difference beyond the documented dead load before
 each member store (tools/volatile_semantics.py).
 
+A qualifier of the addressed `src/<ADDR>.c` that none of these exceptions
+admits is admitted where the ROM shows its effect (tools/volatile_rom_proof.py):
+compiled with and without it, the plain build drops, merges or moves one of
+its accesses, and every access reaches a hardware window, a cartridge-bus
+address the function writes, or a shared object of tools/volatile_objects.json.
+
 agbcc reads `volatile`, `__volatile__` and `__volatile` as the same qualifier
 (kit#93).  The `volatile` rule refuses all three, and every exception above
 accepts only the plain spelling; in a file with a line splice, an exception
@@ -1298,6 +1304,10 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x0800C720:
         import scanline_wave
         records.append(scanline_wave.record(root))
+    import volatile_rom_proof
+    proof = volatile_rom_proof.record(root, address)
+    if proof is not None:
+        records.append(proof)
     return records
 
 
@@ -1441,16 +1451,15 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     return findings
 
 
-def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
-               closure=None, untranslated=None, tree=None, project=None):
-    """check_text's findings for one view of a file: the text as given, splices and all.
+def exemptions(text, code, data_symbols=None, relpath=None, volatile_allow=None, closure=None,
+               untranslated=None, tree=None, project=None):
+    """(hardware, counter, allow-listed qualifier offsets, findings) of one view's exceptions.
 
-    Every rule reads the code with its digraphs spelt as cpp reads them, so
-    `%:if 0` meets the rule `#if 0` does (kit#408).
+    Every exception that admits a qualifier before the ROM proof is asked
+    (volatile_rom_proof): the I/O window, the per-address modules, the VBlank
+    DMA counter and the allow list.  The proof considers only what none of
+    them admits.
     """
-    unspelt = strip_comments_and_strings(text)
-    code = spell_digraphs(unspelt)
-    macro_tails = statement_macro_tails(code)
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
     if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
             {relpath, "include/ffta.h"}, []):
@@ -1597,6 +1606,44 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
         code, relpath, data_symbols or {},
         volatile_allow_entries() if volatile_allow is None else volatile_allow, text, closure,
         untranslated, tree)
+    return hardware_qualifiers, counter_qualifiers, listed_qualifiers, findings
+
+
+def exempt_qualifiers(text, relpath, data_symbols, tree, project, closure):
+    """the offsets of a source's qualifiers that an exception admits before the ROM proof"""
+    code = spell_digraphs(strip_comments_and_strings(text))
+    hardware, counter, listed, _ = exemptions(text, code, data_symbols, relpath, None, closure, text,
+                                              tree, project)
+    return hardware | counter | listed
+
+
+def data_symbols_of(root):
+    """config/data_symbols.json of a tree, or {} when it is missing or malformed"""
+    try:
+        value = json.loads((Path(root) / "config" / "data_symbols.json").read_text())
+    except (OSError, ValueError):
+        return {}
+    return value if isinstance(value, dict) else {}
+
+
+def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=None,
+               closure=None, untranslated=None, tree=None, project=None):
+    """check_text's findings for one view of a file: the text as given, splices and all.
+
+    Every rule reads the code with its digraphs spelt as cpp reads them, so
+    `%:if 0` meets the rule `#if 0` does (kit#408).
+    """
+    unspelt = strip_comments_and_strings(text)
+    code = spell_digraphs(unspelt)
+    macro_tails = statement_macro_tails(code)
+    hardware_qualifiers, counter_qualifiers, listed_qualifiers, findings = exemptions(
+        text, code, data_symbols, relpath, volatile_allow, closure, untranslated, tree, project)
+    proved_qualifiers = set()
+    if tree is not None and project is not None and VOLATILE_QUALIFIER.search(code):
+        import volatile_rom_proof
+        proved_qualifiers = volatile_rom_proof.qualifier_offsets(
+            text, tree, project, relpath, hardware_qualifiers | listed_qualifiers | counter_qualifiers,
+            data_symbols or {})
     polling_bodies = hardware_polling_bodies(code, hardware_qualifiers, text)
     for nul in re.finditer("\0", text):
         findings.append((code.count("\n", 0, nul.start()) + 1, "nul-byte", "error",
@@ -1609,7 +1656,8 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     literals = spell_digraphs(unspelt, strip_comments_and_strings_keep_strings(text))
     for rid, sev, pat, msg in RULES:
         for m in re.finditer(pat, literals if rid == "asm-include" else code):
-            if rid == "volatile" and m.start() in hardware_qualifiers | listed_qualifiers | counter_qualifiers:
+            if rid == "volatile" and m.start() in (hardware_qualifiers | listed_qualifiers | counter_qualifiers |
+                                                   proved_qualifiers):
                 continue
             if rid == "dead-code" and m.start() in macro_tails:
                 continue

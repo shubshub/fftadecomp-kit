@@ -4452,6 +4452,47 @@ The register cast still requires the ordinary documented-MMIO rule.
 Set `FFTA_M4A_VSYNC_ROOT` to the game checkout to run the native
 cases in `tests/test_m4a_dma_counter.py`.
 
+**Volatile the ROM shows (`volatile-rom-proof-v1`, `tools/volatile_rom_proof.py`):**
+a `volatile` token of the addressed `src/<ADDR>.c` that no exception above
+or below admits is admitted when the ROM shows the qualifier's effect on a
+hardware or shared object, and refused otherwise. The unit is compiled as
+written and once more for each candidate token with only that token removed,
+each time also with `-da -dp` (agbcc's RTL after every pass, and each
+assembly instruction tagged with its insn UID), which must not change the
+code. Removing the token must change the code. The two expand dumps must hold
+the same memory references in order, apart from volatile references the plain
+build does not expand at all. The token's accesses are the references it
+makes volatile; an access that prints like another reference of the function,
+or one that two tokens claim, refuses. Each one the function emits must be a
+Thumb load or store of its width at its offset in the ROM. Followed by insn UID through every pass of
+the plain build, at least one must be **dropped** (deleted by jump, CSE's
+dead-insn pass, flow or jump2), **merged** (its value taken from an earlier
+access by cse, gcse or cse2) or **moved** (by loop). An access combine folds
+into its use, one the plain build keeps, and one the real build does not emit
+do not count: a token whose removal changes only register allocation,
+constants or combination is refused.
+Every access must also resolve, on the expand RTL, to a constant address or a
+mapped data symbol in the I/O, palette, VRAM, OAM or cartridge-backup window at
+a constant offset; a cartridge-bus address (`0x08000000..0x0E000000`) the
+function itself writes at the same base, by a store the ROM holds; or a data
+symbol listed in the
+maintainer's `tools/volatile_objects.json`, mapped to its listed address.
+Each entry pins ROM code by SHA-256 that stores the object to a DMA channel's
+source or destination register and enables the channel, and that transfer is
+read off the instructions at every run. A variable offset is admitted only
+from a listed symbol, under the printed premise that it stays inside the
+object, which the proof does not bound. A narrowed or extended constant loses
+its value. Locals, parameters, call results, loaded pointers, a pointer
+difference, and a variable offset from a constant address are refused.
+Candidates are refused in a source with a line splice, a digraph
+or a trigraph, or with more than eight of them, or in a directive. The report
+record prints the object and its evidence, every access with its ROM address
+and fate, and both compiles' `.text` digests. `python tools/volatile_rom_proof.py
+--root . ADDR` prints each token's verdict and reason. window_scanline's seven
+writers satisfy the same proof once their payload pointer is vouched for by
+window_scanline's caller paths (`tests/test_volatile_rom_proof.py`, with
+`FFTA_WINDOW_SCANLINE_ROOT`); window_scanline keeps admitting them.
+
 **Allowlisted volatile RAM (kit#90):** volatile RAM is otherwise
 allowed only for an object on the maintainer's `tools/volatile_allow.json`
 (agents never edit it). An entry names a symbol, its address, one header, the
