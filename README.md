@@ -5686,6 +5686,63 @@ remain required. Calls to any other runtime (signed division, the unsigned
 remainder, any other addressed runtime alias) stay refused. Status and compiled
 rebuild forward the selector for both schemas.
 
+### CpuSet copy controls in restoring owners
+
+A restoring owner (`restoring-owner-runtime-v1`) must bind every reached PC
+word in the typed address domain to a typed object or function. A CpuSet copy
+control of 32-bit units is in that domain without being an address:
+`0x04000080` copies 0x80 words. Under
+`elf-symbol-thumb-restoring-owner-optional-runtime-v1` such a word is left out
+of the typed coverage only when the owner CFG proves it is a number that only
+CpuSet reads:
+
+* it is a whole copy control: a count of at least 1 in bits 0-20, the unit in
+  bit 26, bit 24 (fill) clear and no other bit; it is not a switch word, and a
+  word the source names (a relocation) stays a typed object;
+* from each 16-bit `ldr rd, [pc, #imm]` of it, the value is followed over the
+  complete CFG, joining paths by union, through register copies only
+  (`adds rd, rs, #0`, `movs rd, rs`, `mov rd, rs` into r0-r12). Any other read
+  of a register that may hold it (arithmetic, compare, store, address, push,
+  indirect branch) is refused, and so is a conditional instruction or flag
+  read while the flags may come from a copy of it; only a flag-setting
+  instruction clears them, not a call;
+* at a call it may be only in r2, and only when the target is the CpuSet
+  wrapper 0x0814186C, whose indexed four bytes are exactly `svc 0x0B; bx lr`.
+  r0-r3 and r12 belong to the callee after any call; r2 after CpuSet is still
+  followed, and reading it before rewriting it is refused. It may not be left
+  in any register after a return;
+* each load reaches at least one CpuSet call, and at each such call r2 is this
+  exact word on every path (facts kept only where every path agrees).
+
+The report records the wrapper's identity and, for each call, the control, the
+unit, the count, the bytes and the provenance of r0 (source) and r1
+(destination). The provenance is a typed object plus offset, or the word one
+load read from a typed object (the load's site is recorded, so a later call or
+store that may change the object never makes the record name a stale value),
+plus offsets, or a constant, or unknown. Loads from two different sites joined
+on one path are unknown. The premises print on one line, then one line per
+call:
+
+```
+* CpuSet copy control premises: GBATEK CpuSet reads and writes only the spans its control describes; r4-r11 are kept across calls under the ordinary returning ABI; no object extent, containment or nonalias is proved for either range
+* CpuSet copy control: word +0xDB8 = 0x04000080 (128 x 4 = 512 bytes) at call +0xD6A: source *(data_03002818+0x0)@+0xD5E+0x28, destination data_03003860+0x0; extent not proved
+```
+
+After CpuSet, a later call with r2 not yet rewritten is not refused. Under
+the returning ABI a callee takes only the arguments its caller sets, and agbcc
+sets every argument it passes; 08078818 calls `func_0808A604(4, 1)` right
+after its second copy.
+
+Data symbols are points, so no object extent, containment, nonalias,
+readability or writability is claimed for either range; a local pointer is
+bounded by the owner's frame proof, which is unchanged. The existing BIOS
+control rules claim no more: the fill-control recognizers prove only the
+word's use, `BiosFillProof` bounds only a local source, and the BIOS wrapper
+summaries make no claim about an external pointer's extent. The BIOS routine is the
+GBATEK premise, and r4-r11 kept across calls is the ordinary returning ABI the
+owner proof already relies on. Owners in the original runtime domain, fill
+controls and words with reserved bits still need a typed name.
+
 ### Explicit ignored incoming leaf aliases
 
 `--owner-runtime-profile restoring-owner-ignored-leaf-alias-v1` selects

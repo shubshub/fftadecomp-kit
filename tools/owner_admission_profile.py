@@ -47,6 +47,7 @@ import immediate_dma_fill as dma_fill
 import boot_dma3_fill as boot_dma
 import owner_graph_profile as graph
 import owner_runtime_profile as runtime
+import owner_copy_calls as copy_calls
 import function_thunk_profile as thunk
 import ignored_leaf_alias_profile as ignored_leaf
 import named_data_buffer_profile as named_buffer
@@ -1178,6 +1179,15 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if hardware:
             address_words -= {row[0] for row in hardware}
             proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
+    if selector == SELECTOR and proof.get('schema') == runtime.OPTIONAL_SCHEMA:
+        # A whole CpuSet copy control in the address domain is a number only where
+        # the owner CFG proves it is never anything but CpuSet's r2 (owner_copy_calls).
+        controls = copy_calls.copy_controls(ins, edges, address, branches, calls, proof['partition'], data,
+            address_words - set(literals), {offset: name for offset, (name, _) in literals.items()},
+            rom, mapping, index)
+        if controls is not None:
+            address_words -= {word['offset'] for word in controls['words']}
+            proof['cpuset_copy_controls'] = controls
     if address_words != set(literals) or any(rom_mirror.mirror(value) for _, value in literals.values()):
         raise ValueError('owner address literals require exact typed object/function coverage')
     schema = runtime_summary.SCHEMAS[selector] if selector in runtime_summary.SELECTORS else bios_switch.SCHEMA if selector == bios_switch.SELECTOR else transfer_task.SCHEMA if selector == transfer_task.SELECTOR else small_copy_binding.SCHEMA if selector == small_copy_binding.SELECTOR else copy_binding.SCHEMA if selector == copy_binding.SELECTOR else local_calls.SCHEMAS[selector] if selector in local_calls.SELECTORS else spilled_loop.SCHEMA if selector == spilled_loop.SELECTOR else finite_loop.SCHEMA if selector == finite_loop.SELECTOR else stack_query.DIVISION_SCHEMA if selector == stack_query.DIVISION_SELECTOR else stack_query.SCHEMA if selector == stack_query.SELECTOR else nested_query.SCHEMA if selector == nested_query.SELECTOR else query_cont.SCHEMA if selector == query_cont.SELECTOR else list_query.SCHEMA if selector == list_query.SELECTOR else known_query.SCHEMA if selector == known_query.SELECTOR else tree_callback.SCHEMA if selector == tree_callback.SELECTOR else callback_closure.SCHEMA if selector == callback_closure.SELECTOR else literal_callback.SCHEMA if selector == literal_callback.SELECTOR else THUNK_SWITCH_SCHEMA if selector == THUNK_SWITCH_SELECTOR else DIRECT_SWITCH_SCHEMA if selector == DIRECT_SWITCH_SELECTOR else ENTRY_DATA_SWITCH_SCHEMA if selector == ENTRY_DATA_SWITCH_SELECTOR else ENTRY_SWITCH_SCHEMA if selector == ENTRY_SWITCH_SELECTOR else \
@@ -1967,6 +1977,8 @@ def render(address,result):
           if manifest['profile'] == local_calls.SCHEMAS[local_calls.SCHEDULER_CALL_SITES_V2] else []),
         *(manifest['proof']['buffers']['loop_replay']['lines']
           if manifest['profile'] == named_buffer.SCHEMA and 'loop_replay' in manifest['proof']['buffers'] else []),
+        *(copy_calls.control_lines(manifest['proof']['cpuset_copy_controls'])
+          if manifest['profile'] == OPTIONAL_SCHEMA and 'cpuset_copy_controls' in manifest['proof'] else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])
