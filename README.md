@@ -5743,6 +5743,58 @@ GBATEK premise, and r4-r11 kept across calls is the ordinary returning ABI the
 owner proof already relies on. Owners in the original runtime domain, fill
 controls and words with reserved bits still need a typed name.
 
+### Compiler memcpy in restoring owners
+
+agbcc copies a structure by assignment with a call to `memcpy` that the source
+never names; in the ROM that call reaches the 98-byte copy helper at
+0x081443FC. Under `elf-symbol-thumb-restoring-owner-optional-runtime-v1` a
+restoring owner (`restoring-owner-runtime-v1`) may bind such calls:
+
+* only through the unique undefined zero-size `memcpy` symbol of the original
+  object, only when the preprocessed source names neither `memcpy` nor
+  `__builtin_memcpy` (so the call comes from a structure copy), and not
+  beside another name for the helper (an explicit `func_081443FC` call next to
+  `memcpy` is refused);
+* the helper is authenticated as the ROM table copy owners do it: the 98-byte
+  body and its SHA-256, one 49-instruction row in both indexes, the byte-loop
+  path, a closed CFG and no register above r5 written. That SHA-256 is the
+  toolchain's own library `memcpy`: newlib's `libc/string/memcpy.c` from the
+  agbcc tree, preprocessed with its libc Makefile's flags and compiled
+  `-O2 -fno-builtin -mthumb-interwork`, assembles to a function whose 98
+  bytes of code are exactly these. Only those 98 bytes are compared: the
+  object's 2-byte alignment fill after them (`c0 46`, from the assembler) is
+  not part of the identity, and the ROM has `00 00` there. The Makefile's own
+  build omits `-mthumb-interwork` and returns with `pop {pc}` in 96 bytes, so
+  the game linked an interworking build. The recipe and both digests are
+  recorded in the report. Verification checks only the pinned body digest; a
+  kit test recompiles the source, and it skips where the agbcc tree is not
+  installed;
+* at each call r2 is an exact constant from 1 to 1024 on every path (the same
+  must-analysis as the CpuSet copy controls);
+* for each count the pinned bytes are executed on the symbolic interpreter of
+  the buffer copy summary, in all 16 (destination mod 4, source mod 4) cases:
+  the helper writes exactly [dst, dst+n), each destination store following
+  the previous one, with each byte its own source byte, reads only
+  [src, src+n) and its own save words, and returns r0 = dst with SP, r4-r11 and
+  LR restored. That is the libgcc `memcpy` contract for disjoint ranges.
+
+The call stays an ordinary call for the frame proof, so a stack pointer in
+r0-r2 is bounded or refused there exactly as before. The proof names the sites
+`memcpy`; the report records the helper identity, each count's execution
+digest and, for each call, the count and the provenance of r0 (destination)
+and r1 (source), recorded as for the CpuSet copy controls (a pointer read from
+a typed object names its load site). One line names the helper's library
+identity, then one line per call:
+
+```
+* compiler memcpy helper: 0x081443FC is the toolchain newlib libc/string/memcpy.c (89ee5338c9b7afed) compiled -O2 -fno-builtin -mthumb-interwork: 98 bytes aa822d873bad381a
+* compiler memcpy: 0x081443FC at call +0xE72: count 264, destination *(data_03002818+0x0)@+0xE58+0x1BE4, source unknown; contract 16 cases e05ad3f54b833d50; overlap and extent not proved
+```
+
+Overlap, object extent, readability, writability and termination beyond the
+bounded run are not proved. Owners in the original runtime domain still refuse
+the name.
+
 ### Explicit ignored incoming leaf aliases
 
 `--owner-runtime-profile restoring-owner-ignored-leaf-alias-v1` selects

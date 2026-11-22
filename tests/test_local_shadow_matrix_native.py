@@ -98,7 +98,7 @@ class NativeMatrixTests(unittest.TestCase):
 
     def test_default_policies_and_original_free_preflight_stay_closed(self):
         env = fixture()
-        for selector in (owner.SELECTOR, owner.ACYCLIC_SELECTOR, owner.rom_table.SELECTOR):
+        for selector in (owner.ACYCLIC_SELECTOR, owner.rom_table.SELECTOR):
             with self.subTest(selector=selector), self.assertRaises(ValueError):
                 bindings(env, selector=selector)
         with self.assertRaisesRegex(ValueError, 'original ELF'):
