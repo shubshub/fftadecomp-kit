@@ -4479,19 +4479,33 @@ symbol listed in the
 maintainer's `tools/volatile_objects.json`, mapped to its listed address.
 Each entry pins ROM code by SHA-256 that stores the object to a DMA channel's
 source or destination register and enables the channel, and that transfer is
-read off the instructions at every run. A variable offset is admitted only
-from a listed symbol, under the printed premise that it stays inside the
-object, which the proof does not bound. A narrowed or extended constant loses
-its value. Locals, parameters, call results, loaded pointers, a pointer
-difference, and a variable offset from a constant address are refused.
-Candidates are refused in a source with a line splice, a digraph
+read off the instructions at every run. A call result counts only from a
+scanline payload getter listed there (`func_080D9B08`, the blend display's, and
+`func_080DABB4`, the window's): the pinned code must be `return
+0800C614(*(u32 *)(08005BFC(task) + 4))`, both callees' bodies are read as well,
+every call of the getter's name in the function must be a BL to the listed
+address in the ROM, and `bg_affine_rows.scanline_pipeline` must hold (the
+scanline manager hands that payload to the task's callback to fill the bank its
+HBlank DMA transfers). Each call's argument must be a plain parameter, a word
+loaded from memory or another function's result, with no arithmetic and no
+join on the way; a constant, a data symbol, a local, another getter's payload,
+a computed value or a value set in more than one place refuses. The record
+prints what it is and the one premise this needs: it is a task whose data word
++4 holds a scanline task. A
+variable offset is admitted only from a listed symbol or getter, under the
+printed premise that it stays inside the object, which the proof does not
+bound. A narrowed or extended constant loses its value. Locals, parameters,
+other call results, loaded pointers, a pointer difference, and a variable
+offset from a constant address are refused. Candidates are refused in a source
+with a line splice, a digraph
 or a trigraph, or with more than eight of them, or in a directive. The report
 record prints the object and its evidence, every access with its ROM address
 and fate, and both compiles' `.text` digests. `python tools/volatile_rom_proof.py
 --root . ADDR` prints each token's verdict and reason. window_scanline's seven
 writers satisfy the same proof once their payload pointer is vouched for by
 window_scanline's caller paths (`tests/test_volatile_rom_proof.py`, with
-`FFTA_WINDOW_SCANLINE_ROOT`); window_scanline keeps admitting them.
+`FFTA_WINDOW_SCANLINE_ROOT`), and 0811435C, whose rows come from
+`func_080DABB4`, without them; window_scanline keeps admitting all seven.
 
 **Allowlisted volatile RAM (kit#90):** volatile RAM is otherwise
 allowed only for an object on the maintainer's `tools/volatile_allow.json`

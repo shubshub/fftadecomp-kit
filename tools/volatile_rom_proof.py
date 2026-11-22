@@ -62,10 +62,24 @@ the addressed source wherever two things hold, and refuses it otherwise.
      read off its instructions at every run (dma_evidence).  Offsets must
      stay inside the listed size; a variable offset from the symbol is
      admitted only under the printed premise that it stays inside the object,
-     which the proof does not check (the source may compute it on integers).
+     which the proof does not check (the source may compute it on integers);
+   * the result of a scanline payload getter listed in volatile_objects.json:
+     the getter's code must be `return 0800C614(*(u32 *)(08005BFC(task) +
+     4))`, and both callees' bodies are read too (08005BFC is task + 0x18;
+     0800C614 returns a scanline task's payload pointer when its payload
+     size is nonzero, else 0).  That payload is what the scanline manager
+     0800C4B4 hands the task's callback each frame to fill the bank its HBlank
+     DMA transfers, as bg_affine_rows.scanline_pipeline's pinned evidence
+     shows.  Every call of the getter's name in the function must be a BL to
+     its listed address in the ROM, and each call's argument (r0, resolved
+     in the call's block) must not be a constant, a data symbol, a local or
+     a scanline payload.  The record prints what the argument is and the one
+     premise this needs: it is a task whose data word +4 holds a scanline
+     task (the getter does not check the task kind), and offsets stay inside
+     that payload, which the proof does not check either.
    A narrowed or extended constant loses its value, so an address computed
    from one refuses.  Volatile locals and frame slots, parameters (callers are
-   not traced), call results, values loaded from memory, unresolved or
+   not traced), other call results, values loaded from memory, unresolved or
    conflicting bases and a variable offset from a constant address are
    refused.
 
@@ -130,6 +144,17 @@ CART_BUS = (0x08000000, 0x0E000000)
 MODE_BYTES = {"QI": 1, "HI": 2, "SI": 4}
 MODE_SIZE = {"QI": 1, "HI": 2, "SI": 4, "DI": 8, "SF": 4, "DF": 8}
 DMA_SOURCE = {0x040000B0 + 12 * channel: channel for channel in range(4)}
+DMA_KINDS = ("dma-source", "dma-target")
+GETTER_KIND = "scanline-payload-getter"
+# a scanline payload getter returns PAYLOAD(*(u32 *)(TASK_DATA(task) + 4)):
+# push {lr}; bl TASK_DATA; ldr r0, [r0, #4]; bl PAYLOAD; pop {r1}; bx r1
+GETTER_SHAPE = {0: 0xB500, 3: 0x6840, 6: 0xBC02, 7: 0x4708}
+TASK_DATA = 0x08005BFC
+TASK_DATA_BODY = (0x3018, 0x4770)                  # adds r0, #0x18; bx lr
+PAYLOAD = 0x0800C614
+# push {lr}; adds r1, r0, #0; ldrh r0, [r1, #0x10]; movs r2, #0; cmp r0, #0;
+# beq 1f; ldr r2, [r1, #0x14]; 1: adds r0, r2, #0; pop {r1}; bx r1
+PAYLOAD_BODY = (0xB500, 0x1C01, 0x8A08, 0x2200, 0x2800, 0xD000, 0x694A, 0x1C10, 0xBC02, 0x4708)
 MAX_CANDIDATES = 8
 MAX_PRINT_DEPTH = 300
 OBJECTS = Path(__file__).resolve().with_name("volatile_objects.json")
@@ -784,17 +809,181 @@ def dma_evidence(rom, entry):
                      f"{entry['symbol']}")
 
 
-def object_premise(base, offset, width, stores_at_base, data_symbols, entries, rom, typed=None):
+def decode_bl(rom, at):
+    """the target of the Thumb BL pair at ROM address `at`, or None"""
+    if not BASE <= at <= BASE + len(rom) - 4 or at % 2:
+        return None
+    high, low = struct.unpack_from("<HH", rom, at - BASE)
+    if high & 0xF800 != 0xF000 or low & 0xF800 != 0xF800:
+        return None
+    offset = (high & 0x7FF) << 12 | (low & 0x7FF) << 1
+    return at + 4 + (offset - (1 << 23) if offset & 1 << 22 else offset)
+
+
+def call_targets(compiled, address, rom):
+    """{callee symbol: {the ROM's BL target at each of its call relocations}} of the compiled function"""
+    text, start, size, relocations = compiled
+    found = {}
+    for at, kind, name in relocations:
+        if kind == 10 and start <= at < start + size:
+            found.setdefault(name, set()).add(decode_bl(rom, address + at - start))
+    return found
+
+
+def getter_evidence(rom, entry, pipeline=None):
+    """the premise a scanline payload getter's ROM code establishes, or ProofError.
+
+    The pinned getter must be exactly GETTER_SHAPE with its two BLs reaching
+    TASK_DATA and PAYLOAD, whose bodies must be TASK_DATA_BODY and
+    PAYLOAD_BODY; the scanline pipeline (allocator, manager, DMA programming
+    and IRQ path) is bg_affine_rows.scanline_pipeline's evidence.  pipeline,
+    when given, stands for that check (the synthetic-ROM tests); match.py and
+    plausible.py never pass one.
+    """
+    address = int(entry["address"], 16)
+    start, end = int(entry["start"], 16), int(entry["end"], 16)
+    if (start, end) != (address, address + 16) or not BASE <= start < end <= BASE + len(rom):
+        raise ProofError("payload getter evidence range is invalid")
+    body = rom[start - BASE:end - BASE]
+    if sha256(body).hexdigest() != entry["sha256"]:
+        raise ProofError(f"payload getter evidence {start:08X}..{end:08X} changed")
+    half = struct.unpack("<8H", body)
+    if any(half[k] != v for k, v in GETTER_SHAPE.items()) or decode_bl(rom, start + 2) != TASK_DATA or \
+            decode_bl(rom, start + 8) != PAYLOAD:
+        raise ProofError(f"{entry['symbol']} is not `return {PAYLOAD:08X}(*(u32 *)({TASK_DATA:08X}(task) + 4))`")
+    for target, expected in ((TASK_DATA, TASK_DATA_BODY), (PAYLOAD, PAYLOAD_BODY)):
+        if target - BASE + 2 * len(expected) > len(rom) or \
+                struct.unpack_from(f"<{len(expected)}H", rom, target - BASE) != expected:
+            raise ProofError(f"{target:08X} is not the scanline task code the getter evidence reads")
+    if pipeline is None:
+        from bg_affine_rows import scanline_pipeline as pipeline
+    try:
+        pipeline(rom)
+    except (ValueError, ImportError, OSError, struct.error) as error:
+        raise ProofError(f"the scanline pipeline evidence does not hold ({error})") from None
+    return (f"{entry['symbol']} returns a scanline task's payload: {PAYLOAD:08X}(*(u32 *)({TASK_DATA:08X}(task) + 4)) "
+            f"in ROM {start:08X}..{end:08X} (SHA-256 {entry['sha256']}); {TASK_DATA:08X} is task + 0x18 and "
+            f"{PAYLOAD:08X} returns the task's +0x14 when its halfword +0x10 is nonzero, else 0; the scanline "
+            "manager 0800C4B4 passes that payload to the task's callback each frame to fill the bank its HBlank DMA "
+            "transfers (bg_affine_rows.scanline_pipeline: allocator 0800C3CC, manager 0800C4B4, DMA 080009AC and "
+            "080008E0, IRQ path)")
+
+
+def pool_constant(function, value, depth=0):
+    """whether value is, through single-definition pseudos, a load from the constant pool (`*.LC`): a
+    constant the dump does not print, which the resolver would read as a word loaded from memory"""
+    while code(value) == "reg" and int(value[1]) >= FIRST_PSEUDO and depth < 64:
+        definitions = function.defs.get(int(value[1]), [])
+        if len(definitions) != 1:
+            return False
+        value, depth = definitions[0][1], depth + 1
+    return code(value) == "mem" and code(value[1]) == "symbol_ref" and \
+        any(isinstance(x, str) and x.startswith('"*.LC') for x in flatten(value[1]))
+
+
+def plain_argument(function, value):
+    """None when value reaches, through copies of pseudos each set once, a register (a parameter's entry copy or
+    a call's result) or a load from memory (the resolver reads a narrow one as an integer); otherwise what it
+    is instead: a value computed by arithmetic or set in more than one place, whose kind the resolver may take
+    from one side"""
+    for _ in range(64):
+        if code(value) != "reg" or int(value[1]) < FIRST_PSEUDO:
+            break
+        definitions = function.defs.get(int(value[1]), [])
+        if len(definitions) != 1:
+            return "a value set in more than one place" if definitions else "a value never set"
+        value = definitions[0][1]
+    else:
+        return "a value copied too often to read"
+    if code(value) in ("reg", "mem"):
+        return None
+    return f"a computed value ({code(value) or 'unparsed'})"
+
+
+def call_arguments(function, callee, number=0):
+    """[(Base, offset)] of argument register `number` at each call of `callee` in an expand dump: the
+    register's last setting in the call's block, resolved (a constant-pool load is a constant). A parameter,
+    call result or loaded word that is not that plain value (plain_argument) becomes Base("computed", what it
+    is). ProofError when a call's block does not set it"""
+    resolver, found = Resolver(function), []
+    for call in function.insns:
+        if call.code != "call_insn" or f'"{callee}"' not in flatten(call.pattern):
+            continue
+        for insn in reversed(function.insns[:call.index]):
+            if insn.code in ("code_label", "call_insn", "barrier"):
+                raise ProofError(f"r{number} is not set in the block of a call of {callee}")
+            if insn.pattern is None:
+                continue
+            sets = function.sets(insn.pattern)
+            hits = [(source, whole) for target, source, whole in sets
+                    if code(target) == "reg" and int(target[1]) == number]
+            if hits:
+                source, whole = hits[0]
+                value = insn.equal if insn.equal is not None and len(sets) == 1 and whole else source
+                if pool_constant(function, value):
+                    found.append((Base("int"), None))
+                    break
+                base, offset = resolver.resolve(value, insn.index)
+                what = plain_argument(function, value)
+                if base.kind in ("param", "ret", "word") and what:
+                    base, offset = Base("computed", what), None
+                found.append((base, offset))
+                break
+        else:
+            raise ProofError(f"r{number} is not set before a call of {callee}")
+    return found
+
+
+def task_argument(base, getters):
+    """what a getter's argument is, or ProofError when it cannot be a task (a constant, a data symbol, a
+    local, a scanline payload or an unresolved value) or is not a plain one (call_arguments)"""
+    if base.kind == "computed":
+        raise ProofError(f"the getter is passed {base.value}: only a parameter, a call result or a word loaded "
+                         "from memory is taken for a task")
+    if base.kind == "param":
+        return f"parameter r{base.value}" if base.value < 4 else f"stack parameter {base.value - 4}"
+    if base.kind == "word":
+        return "a word loaded from memory"
+    if base.kind == "ret" and base.value not in getters:
+        return f"the result of {base.value}" if base.value else "a call result"
+    what = {"int": "a constant", "fixed": "a constant", "symbol": f"the data symbol {base.value}",
+            "frame": "a local or frame slot", "ret": "a scanline payload"}.get(base.kind, "an unresolved value")
+    raise ProofError(f"the getter is passed {what}, which is no task")
+
+
+def object_premise(base, offset, width, stores_at_base, data_symbols, entries, rom, typed=None, calls=None,
+                   pipeline=None, tasks=None):
     """(premise, offset premise or None) for one access, or ProofError.
 
-    typed, when given, is a callable that may vouch for a parameter or call
-    result (window_scanline's caller-path evidence in the instance test);
-    match.py and plausible.py never pass one.
+    calls maps each callee symbol of the function to the ROM's BL targets at
+    its calls (call_targets); tasks maps a listed getter to the resolved
+    argument of each of its calls (call_arguments).  typed, when given, is a callable that may vouch
+    for a parameter or call result (window_scanline's caller-path evidence in
+    the instance test); match.py and plausible.py never pass one.
     """
     if typed is not None and base.kind in ("param", "ret"):
         premise = typed(base)
         if premise:
             return premise, None
+    if base.kind == "ret":
+        listed = [entry for entry in entries if entry.get("kind") == GETTER_KIND and entry.get("symbol") == base.value]
+        if listed:
+            entry = listed[0]
+            if len(listed) != 1:
+                raise ProofError(f"{base.value} is listed more than once")
+            if (calls or {}).get(base.value) != {int(entry["address"], 16)}:
+                raise ProofError(f"not every call of {base.value} in the function reaches {entry['address']} "
+                                 "in the ROM")
+            if offset is not None and offset < 0:
+                raise ProofError(f"{base.value}'s payload{offset:+#x} lies before the payload")
+            getters = {item.get("symbol") for item in entries if item.get("kind") == GETTER_KIND}
+            arguments = sorted({task_argument(argument, getters) for argument, _ in (tasks or {}).get(base.value, [])})
+            if not arguments:
+                raise ProofError(f"the argument of {base.value} cannot be read")
+            return getter_evidence(rom, entry, pipeline), (
+                f"{base.value}'s argument ({', '.join(arguments)}) is a task whose data word +4 holds a scanline "
+                f"task ({base.value} does not check the task kind), and offsets stay inside that payload (assumed: "
+                "the proof does not bound them)")
     if base.kind == "fixed":
         if offset is None:
             raise ProofError(f"a variable offset from the constant address {base.value:#010x}: nothing bounds it")
@@ -814,7 +1003,7 @@ def object_premise(base, offset, width, stores_at_base, data_symbols, entries, r
             location = int(mapped, 0) if isinstance(mapped, str) else int(mapped)
         except (TypeError, ValueError):
             raise ProofError(f"{base.value} is not mapped by config/data_symbols.json") from None
-        listed = [entry for entry in entries if entry.get("symbol") == base.value]
+        listed = [entry for entry in entries if entry.get("symbol") == base.value and entry.get("kind") in DMA_KINDS]
         if listed:
             entry = listed[0]
             if len(listed) != 1 or int(entry["address"], 16) != location:
@@ -830,7 +1019,8 @@ def object_premise(base, offset, width, stores_at_base, data_symbols, entries, r
             raise ProofError(f"a variable offset from {base.value}, which volatile_objects.json does not size")
         return object_premise(Base("fixed", location), offset, width, stores_at_base, data_symbols, (), rom)[0] \
             .replace(" at ", f" ({base.value}) at ", 1), None
-    reasons = {"param": "a parameter (callers are not traced)", "ret": "a call result",
+    reasons = {"param": "a parameter (callers are not traced)",
+               "ret": "a call result (no listed scanline payload getter)",
                "frame": "a local or frame slot", "loaded": "a pointer loaded from memory",
                "int": "an integer", "unknown": "an unresolved address"}
     raise ProofError(f"the access goes through {reasons.get(base.kind, base.kind)}")
@@ -884,12 +1074,14 @@ def elf_function(data, name):
     if len(texts) != 1:
         raise ProofError("expected one .text section")
     text_index = texts[0]
-    found = []
-    for s, raw in zip(sections, section_data):
+    found, symbol_names = [], {}
+    for table, (s, raw) in enumerate(zip(sections, section_data)):
         if s[1] == 2:
             strings = section_data[s[6]]
+            symbol_names[table] = []
             for at in range(0, len(raw), 16):
                 symbol, value, size, info, _, index = struct.unpack_from("<IIIBBH", raw, at)
+                symbol_names[table].append(string(strings, symbol))
                 if string(strings, symbol) == name and index == text_index:
                     found.append((value & ~1, size, value & 1))
     if len(found) != 1 or not found[0][1] or not found[0][2]:
@@ -897,8 +1089,10 @@ def elf_function(data, name):
     relocations = []
     for s, raw in zip(sections, section_data):
         if s[1] == 9 and s[7] == text_index:
-            relocations += [(at_offset, info & 0xFF) for at_offset, info in
-                            (struct.unpack_from("<II", raw, k) for k in range(0, len(raw), 8))]
+            names = symbol_names.get(s[6], [])
+            for k in range(0, len(raw), 8):
+                at_offset, info = struct.unpack_from("<II", raw, k)
+                relocations.append((at_offset, info & 0xFF, names[info >> 8] if info >> 8 < len(names) else ""))
         elif s[1] == 4 and s[7] == text_index:
             raise ProofError("RELA relocations are not expected")
     return section_data[text_index], found[0][0], found[0][1], sorted(relocations)
@@ -1024,7 +1218,7 @@ class Unit:
 # ------------------------------------------------------------------ the proof
 
 def prove(tree, project, relpath, text, admitted, data_symbols, entries=None, rom=None, typed=None,
-          dependencies=None):
+          dependencies=None, pipeline=None):
     """[(source offset, verdict)] for every candidate token; a verdict is
     ("admitted", record fragment) or ("refused", reason).  None when the source
     has no candidate; ProofError when no token can be decided."""
@@ -1059,7 +1253,7 @@ def prove(tree, project, relpath, text, admitted, data_symbols, entries=None, ro
         real = unit.compile("real", unit.real, name)
         stripped = [unit.compile(f"s{k}", unit.variant(k), name) for k in range(len(offsets))]
     verdicts = [verdict(address, name, real, variant, rom, data_symbols, entries, 1 + text.count("\n", 0, offset),
-                        typed) for offset, variant in zip(offsets, stripped)]
+                        typed, pipeline) for offset, variant in zip(offsets, stripped)]
     return list(zip(offsets, settle(verdicts)))
 
 
@@ -1067,7 +1261,7 @@ def function_matches_rom(compiled, address, rom):
     text, start, size, relocations = compiled
     body = bytearray(text[start:start + size])
     want = bytearray(rom[address - BASE:address - BASE + size])
-    for at, kind in relocations:
+    for at, kind, _ in relocations:
         if not start <= at < start + size:
             continue
         if kind not in (2, 10) or at + 4 > start + size:
@@ -1077,10 +1271,11 @@ def function_matches_rom(compiled, address, rom):
         raise ProofError("the compiled function is not the ROM's (not a match, or another toolchain)")
 
 
-def verdict(address, name, real, stripped, rom, data_symbols, entries, line, typed=None):
+def verdict(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None):
     """(state, record fragment or reason, the R references the token claims)"""
     try:
-        fragment, claimed = token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed)
+        fragment, claimed = token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed,
+                                         pipeline)
         return "admitted", fragment, claimed
     except ProofError as refusal:
         return "refused", str(refusal), set()
@@ -1130,7 +1325,7 @@ def ambiguous(ours, accesses):
     return any(reference[1:4] in signatures and (reference[0], reference[5]) not in claimed for reference in ours)
 
 
-def token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed=None):
+def token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None):
     function_matches_rom(real["text"], address, rom)
     if real["text"] == stripped["text"]:
         raise ProofError("removing it does not change the code")
@@ -1181,10 +1376,14 @@ def token_record(address, name, real, stripped, rom, data_symbols, entries, line
     # only a store the ROM holds makes the function a writer of its base
     stores_at = {base for (base, _, _, store), site in zip(resolved, sites)
                  if store and site[0] is not None and base.kind in ("fixed", "symbol")}
+    calls = call_targets(real["text"], address, rom)
+    getters = {entry.get("symbol") for entry in entries if entry.get("kind") == GETTER_KIND}
+    tasks = {base.value: call_arguments(mine, base.value)
+             for base, _, _, _ in resolved if base.kind == "ret" and base.value in getters}
     premises, ranges = [], []
     for base, offset, width, store in resolved:
         object_text, range_text = object_premise(base, offset, width, base in stores_at, data_symbols, entries, rom,
-                                                 typed)
+                                                 typed, calls, pipeline, tasks)
         if object_text not in premises:
             premises.append(object_text)
         if range_text and range_text not in ranges:

@@ -336,6 +336,191 @@ class EvidenceTests(unittest.TestCase):
             proof.dma_evidence(bytes(rom_with(code2, pool2)), entry_for(code2))
 
 
+def encode_bl(at, target):
+    offset = target - (at + 4)
+    return struct.pack("<HH", 0xF000 | (offset >> 12) & 0x7FF, 0xF800 | (offset >> 1) & 0x7FF)
+
+
+GETTER = 0x080D9B08
+
+
+def getter_rom(at=GETTER, size=0x100000, first=None, second=None, task_data=None, payload=None):
+    """a ROM holding a scanline payload getter at `at` and the two bodies it calls"""
+    first = proof.TASK_DATA if first is None else first
+    second = proof.PAYLOAD if second is None else second
+    rom = bytearray(b"\xff" * size)
+    body = struct.pack("<H", 0xB500) + encode_bl(at + 2, first) + struct.pack("<H", 0x6840) + \
+        encode_bl(at + 8, second) + struct.pack("<HH", 0xBC02, 0x4708)
+    rom[at - proof.BASE:at - proof.BASE + 16] = body
+    for where, halves in ((proof.TASK_DATA, task_data or proof.TASK_DATA_BODY),
+                          (proof.PAYLOAD, payload or proof.PAYLOAD_BODY)):
+        rom[where - proof.BASE:where - proof.BASE + 2 * len(halves)] = struct.pack(f"<{len(halves)}H", *halves)
+    return rom
+
+
+def getter_entry(rom, at=GETTER, **changes):
+    entry = {"symbol": f"func_{at:08X}", "address": f"{at:#010x}", "kind": proof.GETTER_KIND,
+             "start": f"{at:#010x}", "end": f"{at + 16:#010x}",
+             "sha256": sha256(bytes(rom[at - proof.BASE:at - proof.BASE + 16])).hexdigest()}
+    entry.update(changes)
+    return entry
+
+
+def no_pipeline(rom):
+    """stands for bg_affine_rows.scanline_pipeline, which needs the USA ROM"""
+
+
+class GetterTests(unittest.TestCase):
+    def test_bl_decoding(self):
+        rom = bytearray(0x100)
+        rom[0x10:0x14] = encode_bl(0x08000010, 0x08000400)
+        rom[0x20:0x24] = encode_bl(0x08000020, 0x07FFF000)
+        self.assertEqual(proof.decode_bl(rom, 0x08000010), 0x08000400)
+        self.assertEqual(proof.decode_bl(rom, 0x08000020), 0x07FFF000)
+        self.assertIsNone(proof.decode_bl(rom, 0x08000012))
+        self.assertIsNone(proof.decode_bl(rom, 0x080000FE))
+        compiled = (b"", 0x40, 0x20, [(0x48, 10, "func_X"), (0x50, 2, "func_X"), (0x60, 10, "func_Y")])
+        rom[0x08:0x0C] = encode_bl(0x08000008, 0x08001000)
+        self.assertEqual(proof.call_targets(compiled, 0x08000000, rom), {"func_X": {0x08001000}})
+
+    def test_the_getter_is_read_off_its_code(self):
+        rom = getter_rom()
+        premise = proof.getter_evidence(bytes(rom), getter_entry(rom), no_pipeline)
+        self.assertIn("func_080D9B08 returns a scanline task's payload", premise)
+        self.assertIn("0800C614(*(u32 *)(08005BFC(task) + 4))", premise)
+
+    def test_getter_refusals(self):
+        rom = getter_rom()
+        moved = bytearray(rom)
+        moved[GETTER - proof.BASE + 14:GETTER - proof.BASE + 16] = struct.pack("<H", 0x4700)    # bx r0
+        def failing(rom):
+            raise ValueError("changed manager")
+        variants = {
+            "changed": (rom, getter_entry(rom, sha256="0" * 64), no_pipeline),
+            "a range that is not the getter": (rom, getter_entry(rom, end=f"{GETTER + 18:#010x}", sha256=sha256(
+                bytes(rom[GETTER - proof.BASE:GETTER - proof.BASE + 18])).hexdigest()), no_pipeline),
+            "a range away from the address": (rom, getter_entry(rom, address=f"{GETTER + 2:#010x}"), no_pipeline),
+            "another first callee": (getter_rom(first=proof.TASK_DATA + 4), None, no_pipeline),
+            "another second callee": (getter_rom(second=proof.PAYLOAD + 4), None, no_pipeline),
+            "another task data offset": (getter_rom(task_data=(0x301C, 0x4770)), None, no_pipeline),
+            "a payload getter that reads another field": (getter_rom(payload=proof.PAYLOAD_BODY[:6] + (0x698A,) +
+                                                                     proof.PAYLOAD_BODY[7:]), None, no_pipeline),
+            "another return": (moved, None, no_pipeline),
+            "the pipeline": (rom, getter_entry(rom), failing),
+            "a ROM too short": (rom[:0xC000], getter_entry(rom), no_pipeline),
+        }
+        for label, (data, entry, pipeline) in variants.items():
+            with self.subTest(label=label), self.assertRaises(proof.ProofError):
+                proof.getter_evidence(bytes(data), entry or getter_entry(data), pipeline)
+
+    def test_a_call_result_is_admitted_only_from_a_listed_getter_the_rom_calls(self):
+        rom = bytes(getter_rom())
+        entry = getter_entry(rom)
+        name = entry["symbol"]
+        task = {name: [(proof.Base("param", 0), 0)]}
+        text, extent = proof.object_premise(proof.Base("ret", name), None, 1, False, {}, [entry], rom,
+                                            calls={name: {GETTER}}, pipeline=no_pipeline, tasks=task)
+        self.assertIn("returns a scanline task's payload", text)
+        self.assertIn("argument (parameter r0) is a task whose data word +4 holds a scanline task", extent)
+        for argument, reason in ((proof.Base("int", 0x03001000), "a constant"), (proof.Base("fixed", 0x03001000),
+                                 "a constant"), (proof.Base("symbol", "data_03000030"), "the data symbol"),
+                                 (proof.Base("frame", 18), "a local"), (proof.Base("ret", name), "a scanline payload"),
+                                 (proof.Base("unknown"), "an unresolved value")):
+            with self.subTest(argument=argument), self.assertRaisesRegex(proof.ProofError, reason):
+                proof.object_premise(proof.Base("ret", name), 0, 1, False, {}, [entry], rom, calls={name: {GETTER}},
+                                     pipeline=no_pipeline, tasks={name: [(proof.Base("param", 1), 0), (argument, 0)]})
+        for argument, shown in ((proof.Base("word"), "a word loaded from memory"),
+                                (proof.Base("ret", "func_080D9A24"), "the result of func_080D9A24"),
+                                (proof.Base("param", 5), "stack parameter 1")):
+            self.assertIn(f"argument ({shown})", proof.object_premise(
+                proof.Base("ret", name), 0, 1, False, {}, [entry], rom, calls={name: {GETTER}}, pipeline=no_pipeline,
+                tasks={name: [(argument, 0)]})[1])
+        with self.assertRaisesRegex(proof.ProofError, "cannot be read"):
+            proof.object_premise(proof.Base("ret", name), 0, 1, False, {}, [entry], rom, calls={name: {GETTER}},
+                                 pipeline=no_pipeline, tasks={})
+        self.assertIn("returns a scanline task's payload", proof.object_premise(
+            proof.Base("ret", name), 0, 1, False, {}, [entry], rom, calls={name: {GETTER}}, pipeline=no_pipeline,
+            tasks=task)[0])
+        with self.assertRaisesRegex(proof.ProofError, "before the payload"):
+            proof.object_premise(proof.Base("ret", name), -2, 1, False, {}, [entry], rom, calls={name: {GETTER}},
+                                 pipeline=no_pipeline, tasks=task)
+        for calls, reason in (({name: {GETTER + 16}}, "reaches"), ({name: {GETTER, None}}, "reaches"),
+                              ({}, "reaches")):
+            with self.subTest(calls=calls), self.assertRaisesRegex(proof.ProofError, reason):
+                proof.object_premise(proof.Base("ret", name), 0, 1, False, {}, [entry], rom, calls=calls,
+                                     pipeline=no_pipeline, tasks=task)
+        for entries, reason in (([], "call result"), ([dict(entry, kind="dma-source")], "call result"),
+                                ([entry, entry], "more than once")):
+            with self.subTest(entries=len(entries)), self.assertRaisesRegex(proof.ProofError, reason):
+                proof.object_premise(proof.Base("ret", name), 0, 1, False, {}, entries, rom, calls={name: {GETTER}},
+                                     pipeline=no_pipeline)
+        # a getter entry vouches for no data symbol of the same name
+        with self.assertRaisesRegex(proof.ProofError, "does not size"):
+            proof.object_premise(proof.Base("symbol", name), None, 1, False, {name: "0x03000000"}, [entry], rom)
+
+    def test_a_call_s_argument_is_read_in_its_block(self):
+        call = (9, 'call_insn (set (reg:SI 0 r0) (call (mem:SI (symbol_ref:SI ("func_080D9B08")) 0) '
+                   '(const_int 0))) -1 (nil) (nil) (expr_list (use (reg:SI 0 r0)) (nil))')
+        entry = (2, 'insn (set (reg/v:SI 22) (reg:SI 0 r0)) -1 (nil) (nil)')
+        argument = (3, 'insn (set (reg:SI 0 r0) (reg/v:SI 22)) -1 (nil) (nil)')
+        self.assertEqual(proof.call_arguments(function([entry, argument, call]), "func_080D9B08"),
+                         [(proof.Base("param", 0), 0)])
+        pool = [(2, 'insn (set (reg:SI 30) (mem/u:SI (symbol_ref/u:SI ("*.LC0")) 0)) -1 (nil) (nil)'),
+                (3, 'insn (set (reg:SI 0 r0) (reg:SI 30)) -1 (nil) (nil)'), call]
+        self.assertEqual(proof.call_arguments(function(pool), "func_080D9B08"), [(proof.Base("int"), None)])
+        for label, insns in (("a label", [entry, argument, (4, 'code_label 7 ""'), call]),
+                             ("a call", [entry, argument, (4, call[1].replace("func_080D9B08", "func_X")), call]),
+                             ("no setting", [call])):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, "not set"):
+                proof.call_arguments(function(insns), "func_080D9B08")
+
+    def test_a_getter_s_argument_is_taken_only_as_a_plain_value(self):
+        call = (9, 'call_insn (set (reg:SI 0 r0) (call (mem:SI (symbol_ref:SI ("func_080D9B08")) 0) '
+                   '(const_int 0))) -1 (nil) (nil) (expr_list (use (reg:SI 0 r0)) (nil))')
+        other = (5, 'call_insn (set (reg:SI 0 r0) (call (mem:SI (symbol_ref:SI ("func_08000900")) 0) '
+                    '(const_int 0))) -1 (nil) (nil) (expr_list (use (reg:SI 0 r0)) (nil))')
+        entry = (2, 'insn (set (reg/v:SI 22) (reg:SI 0 r0)) -1 (nil) (nil)')
+        second = (3, 'insn (set (reg/v:SI 23) (reg:SI 1 r1)) -1 (nil) (nil)')
+
+        def argument(*insns):
+            (result,) = proof.call_arguments(function(list(insns)), "func_080D9B08")
+            return result
+
+        def to_r0(uid, source):
+            return (uid, f'insn (set (reg:SI 0 r0) {source}) -1 (nil) (nil)')
+
+        # plain: a parameter's copy, a full word loaded from memory, another call's result
+        self.assertEqual(argument(entry, to_r0(8, "(reg/v:SI 22)"), call), (proof.Base("param", 0), 0))
+        loaded = (4, 'insn (set (reg:SI 30) (mem:SI (plus:SI (reg/v:SI 22) (const_int 4)) 0)) -1 (nil) (nil)')
+        self.assertEqual(argument(entry, loaded, to_r0(8, "(reg:SI 30)"), call)[0].kind, "word")
+        result = (6, 'insn (set (reg:SI 31) (reg:SI 0 r0)) -1 (nil) (nil)')
+        self.assertEqual(argument(other, result, to_r0(8, "(reg:SI 31)"), call)[0], proof.Base("ret", "func_08000900"))
+        # not plain: arithmetic on a parameter, a value set on two paths, a narrower load
+        for label, insns, what in (
+                ("a constant plus a parameter",
+                 (entry, second, (4, 'insn (set (reg:SI 30) (plus:SI (reg/v:SI 23) (const_int 50335744))) -1 (nil) '
+                                     '(nil)'), to_r0(8, "(reg:SI 30)"), call), "a computed value (plus)"),
+                ("a join", (entry, second, (4, 'insn (set (reg:SI 30) (reg/v:SI 22)) -1 (nil) (nil)'),
+                            (5, 'insn (set (reg:SI 30) (const_int 50335744)) -1 (nil) (nil)'),
+                            to_r0(8, "(reg:SI 30)"), call), "a value set in more than one place")):
+            with self.subTest(label=label):
+                base, offset = argument(*insns)
+                self.assertEqual((base, offset), (proof.Base("computed", what), None))
+                with self.assertRaisesRegex(proof.ProofError, "only a parameter, a call result or a word"):
+                    proof.task_argument(base, {"func_080D9B08"})
+        halfword = (4, 'insn (set (reg:SI 30) (zero_extend:SI (mem:HI (reg/v:SI 22) 0))) -1 (nil) (nil)')
+        self.assertEqual(argument(entry, halfword, to_r0(8, "(reg:SI 30)"), call)[0].kind, "int")
+
+    def test_listed_getters_have_the_shape_the_rule_reads(self):
+        getters = [entry for entry in proof.load_objects() if entry["kind"] == proof.GETTER_KIND]
+        self.assertEqual({entry["symbol"] for entry in getters}, {"func_080D9B08", "func_080DABB4"})
+        for entry in getters:
+            at = int(entry["address"], 16)
+            with self.subTest(getter=entry["symbol"]):
+                self.assertEqual(proof.getter_evidence(bytes(getter_rom(at)), entry, no_pipeline).split(":")[0],
+                                 f"{entry['symbol']} returns a scanline task's payload")
+
+
 class ObjectTests(unittest.TestCase):
     symbols = {"REG_DISPCNT": "0x04000000", "data_03000030": "0x03000030", "rom_data": "0x08100000"}
 
@@ -489,9 +674,10 @@ class SourceTests(unittest.TestCase):
     def test_registry_is_well_formed(self):
         entries = proof.load_objects()
         self.assertTrue(entries)
+        keys = {"symbol", "address", "kind", "start", "end", "sha256", "reason"}
         for entry in entries:
-            self.assertEqual(set(entry), {"symbol", "address", "size", "kind", "start", "end", "sha256", "reason"})
-            self.assertIn(entry["kind"], ("dma-source", "dma-target"))
+            self.assertIn(entry["kind"], proof.DMA_KINDS + (proof.GETTER_KIND,))
+            self.assertEqual(set(entry), keys | ({"size"} if entry["kind"] in proof.DMA_KINDS else set()))
 
 
 class PlausibleHookTests(unittest.TestCase):
@@ -548,7 +734,8 @@ TYPES = "typedef unsigned char u8;\ntypedef unsigned short u16;\n"
 class CompiledTests(unittest.TestCase):
     """the proof through agbcc, on a ROM built around each compiled function"""
 
-    def run_proof(self, body, symbols=None, entries=(), spliced=True):
+    def run_proof(self, body, symbols=None, entries=(), spliced=True, calls=None):
+        """calls maps a callee symbol to the address the ROM's BL reaches at each of its calls"""
         source = TYPES + body
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -558,13 +745,21 @@ class CompiledTests(unittest.TestCase):
             relpath = f"src/{ADDRESS:08X}.c"
             with tempfile.TemporaryDirectory(dir=root) as work:
                 unit = proof.Unit(root, relpath, source, [], work)
-                text, start, size, _ = unit.compile("probe", unit.real, f"func_{ADDRESS:08X}")["text"]
+                text, start, size, relocations = unit.compile("probe", unit.real, f"func_{ADDRESS:08X}")["text"]
             code, pool = dma_code()
-            rom = rom_with(code, pool, 0x2000)
+            rom = getter_rom() if calls else rom_with(code, pool, 0x2000)
+            if calls:
+                rom[0x100:0x100 + len(code) + len(pool)] = code + pool
             if spliced:
                 rom[ADDRESS - proof.BASE:ADDRESS - proof.BASE + size] = text[start:start + size]
-            entries = [entry_for(code)] if entries == "listed" else list(entries)
-            return proof.prove(root, root, relpath, source, set(), symbols or {}, entries, bytes(rom))
+                for at, kind, name in relocations if calls else ():
+                    if kind == 10 and name in calls:
+                        site = ADDRESS + at - start
+                        rom[site - proof.BASE:site - proof.BASE + 4] = encode_bl(site, calls[name])
+            listed = [entry_for(code)] if entries == "listed" else \
+                [getter_entry(rom)] if entries == "getter" else list(entries)
+            return proof.prove(root, root, relpath, source, set(), symbols or {}, listed, bytes(rom),
+                               **({"pipeline": no_pipeline} if calls else {}))
 
     def verdicts(self, *args, **kwargs):
         return [state for _, (state, _) in self.run_proof(*args, **kwargs)]
@@ -714,6 +909,49 @@ class CompiledTests(unittest.TestCase):
         same = "u16 func_08000400(void) { return *(volatile u16 *)0x04000004; }\n"
         self.assertIn("removing it does not change the code", self.run_proof(same)[0][1][1])
 
+    PAYLOAD = ("typedef volatile struct { u16 a : 16; u16 b : 16; } Entry;\nextern Entry *func_080D9B08(void *task);\n"
+               "void func_08000400(void *task, int i, u16 v) { Entry *e = func_080D9B08(task); e[i].a = v; "
+               "e[i].b = v; }\n")
+
+    def test_a_listed_getter_s_payload_is_admitted(self):
+        result = self.run_proof(self.PAYLOAD, entries="getter", calls={"func_080D9B08": GETTER})
+        (state, text), = [verdict for _, verdict in result]
+        self.assertEqual(state, "admitted", text)
+        self.assertIn("func_080D9B08 returns a scanline task's payload", text)
+        self.assertIn("premise: func_080D9B08's argument (parameter r0) is a task whose data word +4 holds a "
+                      "scanline task", text)
+        self.assertIn("load dropped", text)
+
+    def test_a_getter_s_payload_needs_the_listed_call(self):
+        refused = self.run_proof(self.PAYLOAD, entries="getter", calls={"func_080D9B08": GETTER + 16})
+        self.assertIn("not every call of func_080D9B08", refused[0][1][1])
+        refused = self.run_proof(self.PAYLOAD, calls={"func_080D9B08": GETTER})
+        self.assertIn("a call result", refused[0][1][1])
+        other = self.PAYLOAD.replace("func_080D9B08", "func_080D9B18")
+        refused = self.run_proof(other, entries="getter", calls={"func_080D9B18": GETTER})
+        self.assertIn("a call result", refused[0][1][1])
+
+    def test_a_getter_s_argument_must_be_able_to_be_a_task(self):
+        for task, reason in (("(void *)0x03001000", "a constant"), ("func_080D9B08(task)", "a scanline payload"),
+                             ("&local", "no task"), ("data_03000040", "a constant"),
+                             ("(void *)func_08000400", "a constant"),
+                             ("(void *)(0x03001000 + i)", "a computed value"),
+                             ("i ? task : (void *)0x03001000", "more than one place")):
+            source = self.PAYLOAD.replace("Entry *e = func_080D9B08(task);",
+                                          f"int local; Entry *e = func_080D9B08({task});").replace(
+                "extern Entry *func_080D9B08(void *task);", "extern Entry *func_080D9B08(void *task);\n"
+                "extern u8 data_03000040[];")
+            with self.subTest(task=task):
+                refused = self.run_proof(source, {"data_03000040": "0x03000040"}, entries="getter",
+                                         calls={"func_080D9B08": GETTER})
+                self.assertEqual(refused[0][1][0], "refused", refused)
+                self.assertIn(reason, refused[0][1][1])
+        loaded = self.PAYLOAD.replace("void *task, int i", "void **task, int i").replace("func_080D9B08(task)",
+                                                                                        "func_080D9B08(*task)")
+        result = self.run_proof(loaded, entries="getter", calls={"func_080D9B08": GETTER})
+        self.assertEqual(result[0][1][0], "admitted", result)
+        self.assertIn("argument (a word loaded from memory)", result[0][1][1])
+
     def test_each_qualifier_is_proved_on_its_own(self):
         both = ("u16 func_08000400(u16 v) { volatile u16 *f = (volatile u16 *)0x08000000; *f = 0x90; return *f; }\n")
         self.assertEqual(self.verdicts(both), ["admitted", "refused"])
@@ -822,6 +1060,11 @@ class WindowScanlineInstanceTests(unittest.TestCase):
                     return "the WINxH payload (window_scanline provider and caller-path evidence)"
                 result = proof.prove(root, root, relpath, text, set(), symbols, rom=rom, typed=payload)
                 self.assertEqual([state for _, (state, _) in result], ["admitted", "admitted"], result)
+                if address == window.SHIFTED_ELLIPSE:
+                    # its rows come from func_080DABB4, a listed scanline payload getter: no typed evidence
+                    result = proof.prove(root, root, relpath, text, set(), symbols, rom=rom)
+                    self.assertEqual([state for _, (state, _) in result], ["admitted", "admitted"], result)
+                    self.assertIn("func_080DABB4 returns a scanline task's payload", result[0][1][1])
 
 
 if __name__ == "__main__":
