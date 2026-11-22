@@ -128,8 +128,9 @@ CONTROL_FLOW = 'complete restoring Thumb owner; local BL control, guarded switch
 # The same selector and proofs for every other restoring owner they close. SCHEMA
 # keeps exactly its original domain (owner_runtime_profile.original_domain).
 OPTIONAL_SCHEMA = 'elf-symbol-thumb-restoring-owner-optional-runtime-v1'
-OPTIONAL_CONTROL_FLOW = 'complete restoring Thumb owner; local BL control, guarded switches and exact ordinary calls; canonical thunks and constant unsigned division only where called'
+OPTIONAL_CONTROL_FLOW = 'complete restoring Thumb owner; local BL control, guarded switches and exact ordinary calls; canonical thunks, constant unsigned division and the pinned signed remainder with proven operands only where called'
 TERMINAL_ALIGNMENT_SCHEMA = 'canonical-external-two-byte-thumb-nop-v1'
+REMAINDER_NAMES = runtime.REMAINDER_NAMES
 ACYCLIC_SELECTOR = 'restoring-owner-acyclic-v1'
 ACYCLIC_SCHEMA = 'elf-symbol-thumb-acyclic-stack-alias-v1'
 ACYCLIC_STATE_BUDGET = 4096
@@ -1031,7 +1032,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                 raise ValueError('ignored leaf selector requires an actual discarded incoming alias')
             proof.update(schema=ignored_leaf.SCHEMA, ignored_leaf_aliases=aliases.manifest())
     else:
-        proof = runtime.verify(data,address,rom,mapping,refinement)
+        # The original relocations name the pinned remainder; the inventory must agree.
+        proof = runtime.verify(data,address,rom,mapping,refinement,
+            remainder=runtime.remainder_name(bindings if bindings is not None else
+                                             manifest.get('bindings') if type(manifest) is dict else None))
     ordinary = {'calls':proof['calls'], 'data':[], 'functions':[]}
     if bindings is None:
         if manifest is None:
@@ -1393,6 +1397,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                     installed_shuffle.REMAINDER if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR) and name == '__modsi3' else
                     integer_native.scalar.OPERATIONS[name] if selector in (integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) and name in integer_native.scalar.OPERATIONS else
                     runtime_summary.NAMES[name] if selector in runtime_summary.SELECTORS and name in runtime_summary.NAMES else
+                    match.modsi3.ADDRESS if selector == SELECTOR and name in REMAINDER_NAMES else
                     thunk.ALIASES[name] if name in thunk.ALIASES else
                     match.UDIVSI3_ADDRESS if name=='__udivsi3' else
                     match.function_address_target(name,entries,address,size,len(rom)))
@@ -1529,9 +1534,11 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
             raise ValueError('acyclic owner excludes arithmetic runtimes and indirect thunks')
     elif selector != SELECTOR:
         raise ValueError('unknown complete-owner selector')
-    # SELECTOR names only canonical thunks, __udivsi3 and indexed functions above
-    # (function_address_target refuses every other runtime); runtime.verify pins
-    # and proves whichever of those runtimes the owner actually calls.
+    # SELECTOR names only canonical thunks, __udivsi3, the pinned remainder and
+    # indexed functions above (function_address_target refuses every other runtime);
+    # runtime.verify pins and proves whichever of those runtimes the owner calls.
+    elif set(REMAINDER_NAMES) <= set(targets):
+        raise ValueError('signed remainder call bindings are incomplete or mixed')
     if selector in (local_calls.PANEL_TRANSFER, local_calls.PARTY_EFFECT):
         active_shuffle.compiler_symbol_roles(image, targets)
         if any(row['size'] for row in image['symbols'] if row['name'] in targets):
@@ -1565,7 +1572,8 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
             r'\bmemcpy\b',strip_comments_and_strings(preprocessed)):
         raise ValueError("menu initializer memcpy must be compiler-emitted")
     reserved = (r'\b(?:__divsi3|__modsi3|__udivsi3|__umodsi3)\b'
-                if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else r'\b__udivsi3\b')
+                if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else
+                r'\b(?:__udivsi3|__modsi3)\b' if selector == SELECTOR else r'\b__udivsi3\b')
     if re.search(reserved,strip_comments_and_strings(preprocessed)):
         raise ValueError('division identifiers are reserved for compiler emission')
     bindings,targets=original_bindings(original,address,rom,mapping,objects,selector=selector,index=index)
@@ -1889,6 +1897,13 @@ def build(root,address,args=None,expected=None, *, selector=SELECTOR):
     return data,manifest,source,mapping,index,objects,rom,count,raw
 
 
+def remainder_lines(rows):
+    """One readable line per pinned signed remainder site of an optional-runtime owner."""
+    return [f'* owner remainder: 0x{runtime.modsi3.ADDRESS:08X} at call +0x{row[0]:X}: ' +
+            (f'divisor {row[2]} ({row[1]})' if row[1] == runtime.POSITIVE_DIVISOR else
+             f'signed16 dividend, nonzero divisor ({row[1]})') for row in rows]
+
+
 def render(address,result):
     import match
     data,manifest,source,mapping,index,objects,rom,count,original_elf=result
@@ -1941,6 +1956,8 @@ def render(address,result):
         '* relocations: none','* source plausibility: plausible','* hand-asm allow list: not listed',
         *([f"* scanline constructor contract: {manifest['proof']['contract']}"]
           if address == 0x0800CE08 and manifest['profile'] == named_buffer.SCHEMA else []),
+        *(remainder_lines(manifest['proof']['remainders'])
+          if manifest['profile'] == OPTIONAL_SCHEMA and 'remainders' in manifest['proof'] else []),
         *(stack_index.precondition_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if (manifest['profile'] in stack_index.SCHEMAS.values() or
               manifest['profile'] == runtime_summary.SCHEMA and address == 0x08136A10) else []),

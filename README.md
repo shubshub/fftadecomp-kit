@@ -5637,7 +5637,7 @@ bindings, fixed compiler flags, plausible source and fresh report replay remain
 required. Status and compiled rebuild forward the saved explicit selector.
 Default matching and `restoring-owner-runtime-v1` retain their existing behavior.
 
-### Restoring owners without unsigned division or thunks
+### Restoring owners without unsigned division or thunks, and with the signed remainder
 
 `--owner-runtime-profile restoring-owner-runtime-v1` verifies a complete
 restoring Thumb owner as one closed CFG: same-owner `bl` jumps are edges,
@@ -5663,12 +5663,28 @@ least one canonical `_call_via_rN` thunk, and it refused agbcc's closing
   `private-thumb-owner-optional-runtime-inventory-v1`): the runtimes it calls,
   possibly none, with their identities, each same-owner `bl` as an edge, and,
   for a 2-mod-4 size, the closing-halfword policy.
+* The pinned signed remainder (`agbcc-thumb-modsi3-v1` at 0x08142950 and its
+  zero handler) may be called under one name per owner: `__modsi3`, which `%`
+  emits, or the addressed `func_08142950`. The source may not name `__modsi3`
+  itself. At each site either `r1` holds a CFG-proven constant in
+  [1, 0x7FFFFFFF], which rules out a zero divisor and `INT_MIN % -1` whatever
+  the dividend, or the existing proof of a signed16 `r0` and a nonzero `r1`
+  holds. Constants come from `mov`/`movs` immediates and copies,
+  `adds rd, rn, #0`, `lsls` and `adds`/`subs` by an immediate, and PC-relative
+  loads of an owner literal word outside the typed address domain (every word
+  inside it must carry a typed relocation). A fact survives a join only when
+  every incoming path agrees; an external call erases r0-r3, r12 and LR, and a
+  same-owner `bl` erases LR only. Each site is recorded as
+  `positive-signed32-constant-divisor` with its value, or as
+  `signed16-dividend-nonzero-divisor`, and printed as one
+  `* owner remainder:` report line. A divisor loaded from memory, and a
+  range known only from a comparison (`x > 1 ? x : 2`), stay refused.
 
 Complete unique ownership, an index instruction count equal to the reached
 count, genuine original ELF bindings, plausible source and fresh report replay
-remain required. Calls to any other runtime, signed division and remainders
-included, stay refused. Status and compiled rebuild forward the selector for
-both schemas.
+remain required. Calls to any other runtime (signed division, the unsigned
+remainder, any other addressed runtime alias) stay refused. Status and compiled
+rebuild forward the selector for both schemas.
 
 ### Explicit ignored incoming leaf aliases
 
