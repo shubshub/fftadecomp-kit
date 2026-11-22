@@ -676,7 +676,7 @@ class SourceTests(unittest.TestCase):
         self.assertTrue(entries)
         keys = {"symbol", "address", "kind", "start", "end", "sha256", "reason"}
         for entry in entries:
-            self.assertIn(entry["kind"], proof.DMA_KINDS + (proof.GETTER_KIND,))
+            self.assertIn(entry["kind"], proof.DMA_KINDS + (proof.GETTER_KIND, proof.ALLOCATOR_KIND))
             self.assertEqual(set(entry), keys | ({"size"} if entry["kind"] in proof.DMA_KINDS else set()))
 
 
@@ -723,6 +723,222 @@ class PlausibleHookTests(unittest.TestCase):
                 self.assertEqual(plausible.allowlisted_volatile_uses(root, 0x08000402), [])
         finally:
             proof.record = original
+
+
+def thumb(*halves):
+    return struct.pack(f"<{len(halves)}H", *halves)
+
+
+class CallerScanTests(unittest.TestCase):
+    """the reference scan, the listing layout, the index and the callback flow, without a compiler"""
+
+    def test_references_are_calls_branches_and_address_words(self):
+        rom = bytearray(b"\xff" * 0x2000)
+        rom[0x100:0x104] = encode_bl(0x08000100, 0x08000400)
+        rom[0x600:0x604] = encode_bl(0x08000600, 0x08000400)
+        rom[0x404:0x408] = encode_bl(0x08000404, 0x08000400)          # inside the function: still a call
+        rom[0x3F0:0x3F2] = thumb(0xE000 | ((0x08000400 - 0x080003F4) >> 1))   # b func
+        rom[0x40E:0x410] = thumb(0xE000 | ((0x08000400 - 0x08000412) >> 1) & 0x7FF)  # inside: not a reference
+        rom[0x700:0x704] = struct.pack("<I", 0x08000401)
+        rom[0x803:0x807] = struct.pack("<I", 0x08000400)
+        rom[0x900:0x904] = encode_bl(0x08000900, 0x08000404)                # a call of the body
+        rom[0x430:0x432] = thumb(0xE000 | ((0x08000408 - 0x08000434) >> 1) & 0x7FF)   # a branch into the body
+        rom[0xA01:0xA05] = struct.pack("<I", 0x0800041F)                    # a word holding a body address
+        proof._BL_INDEX.clear()
+        calls, inside, words = proof.rom_references(bytes(rom), 0x08000400, 0x08000420)
+        self.assertEqual(calls, [0x08000100, 0x08000404, 0x08000600])
+        self.assertEqual(inside, [(0x080003F0, 0x08000400), (0x08000430, 0x08000408), (0x08000803, 0x08000400),
+                                  (0x08000900, 0x08000404), (0x08000A01, 0x0800041F)])
+        self.assertEqual(words, [0x08000700])
+
+    def test_every_pc_relative_load_of_a_word_is_found(self):
+        rom = bytearray(b"\xff" * 0x3000)
+        rom[0x100:0x102] = thumb(0x4800 | (0x08000110 - 0x08000104) // 4)    # ldr r0, [pc, #12]
+        rom[0x10E:0x110] = thumb(0x4900)                                       # ldr r1, [pc, #0] reads 08000110
+        rom[0x200:0x204] = struct.pack("<I", 0xE51F0000 | (0x08000208 - 0x08000110))   # ARM ldr r0, [pc, #-0xF8]
+        rom[0x40:0x44] = struct.pack("<I", 0xE59F0000 | (0x08000110 - 0x08000048))     # ARM ldr r0, [pc, #0xC8]
+        self.assertEqual(proof.pc_loads(bytes(rom), 0x08000110), [0x08000040, 0x08000100, 0x0800010E, 0x08000200])
+
+    def test_listing_layout_and_index(self):
+        listing = ("   9              \tfunc_08000400:\n"
+                   "  10 0000 00B5     \t\tpush\t{lr}\n"
+                   "  11              \t@ 0x0002\n"
+                   "  12 0002 0148     \t\tldr\tr0, .L3\t@ 6\t*movsi_insn/6\t[length = 2]\n"
+                   "  13              \t.L2:\n"
+                   "  14 0004 0047     \t\tbx\tr0\n"
+                   "  15 0006 C046     \t\t.align\t2, 0\n"
+                   "  16              \t.L3:\n"
+                   "  17 0008 01040008 \t\t.word\tfunc_08000400\n")
+        self.assertEqual(proof.listing_layout(listing), ([0, 2, 4], {0, 4, 8}))
+        with tempfile.TemporaryDirectory() as root:
+            with self.assertRaisesRegex(proof.ProofError, "no function index"):
+                proof.function_index(root)
+            (Path(root) / "symbols").mkdir()
+            (Path(root) / "symbols" / "functions.txt").write_text(
+                "# FFTA - discovered functions (addr end size instrs)\n08000400 08000420    32  16 return\n")
+            self.assertEqual(proof.function_index(root), [(0x08000400, 0x08000420)])
+
+    def callers(self, rom, address=0x08000800, entries=()):
+        return proof.Callers("/nonexistent", "/nonexistent", address, address + 0x40, bytes(rom), {}, list(entries),
+                             no_pipeline, "/nonexistent")
+
+    def flow(self, *halves, labels=(), at=0x08000100):
+        """follow the pc-relative load that is the first halfword, through a straight line ending in a BL"""
+        rom = bytearray(b"\xff" * 0x1000)
+        rom[at - proof.BASE:at - proof.BASE + 2 * len(halves)] = thumb(*halves)
+        instructions = [2 * k for k in range(len(halves))]
+        return self.callers(rom).follow(instructions, set(labels), 0, at, 0, at, halves[0] >> 8 & 7)
+
+    def call(self, after):
+        """the halfwords of a BL to the allocator after `after` halfwords at 0x08000100"""
+        return struct.unpack("<HH", encode_bl(0x08000100 + 2 * after, ALLOCATOR))
+
+    def test_a_callback_load_must_reach_r0_of_a_call(self):
+        site = (0x08000106, ALLOCATOR)
+        self.assertEqual(self.flow(0x4801, 0x2104, 0x2202, *self.call(3)), site)                # ldr r0 directly
+        self.assertEqual(self.flow(0x4B01, 0x1C18, 0x2304, *self.call(3)), site)                # adds r0, r3, #0
+        self.assertEqual(self.flow(0x4B01, 0x0018, 0x2300, *self.call(3)), site)                # movs r0, r3
+        self.assertEqual(self.flow(0x4B01, 0x1C18, 0x438A, 0x2300, *self.call(4))[1], ALLOCATOR)  # bics r2, r1
+        for label, halves, labels, reason in (
+                ("a branch target between", (0x4801, 0x2104, 0x2202, *self.call(3)), {4}, "branch target"),
+                ("a spill", (0x4B01, 0x9300, 0x1C18, 0x2300, *self.call(4)), (), "otherwise"),
+                ("a callee-saved copy", (0x4B01, 0x4698, 0x1C18, 0x2300, *self.call(4)), (), "not exactly r0"),
+                ("a second argument", (0x4B01, 0x1C19, 0x2000, 0x2300, *self.call(4)), (), "not exactly r0"),
+                ("a value kept in a fourth argument", (0x4B01, 0x1C18, 0x2104, *self.call(3)), (), "not exactly r0"),
+                ("an exchange", (0x4B01, 0x4718, *self.call(2)), (), "control leaves"),
+                ("a return", (0x4801, 0xBD00, *self.call(2)), (), "control leaves"),
+                ("an interrupt", (0x4801, 0xDF0B, *self.call(2)), (), "control leaves"),
+                ("a conditional branch", (0x4801, 0xD000, *self.call(2)), (), "control leaves"),
+                ("overwritten", (0x4B01, 0x2300, *self.call(2)), (), "overwritten"),
+                ("no call", (0x4801, 0x2104), (), "reaches no call")):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
+                self.flow(*halves, labels=labels)
+
+    def argument(self, insns, uid=9, offset=6, callee="func_08000800"):
+        """argument r0 at the call insn `uid`, listed at `offset`, of a caller whose expand dump is `insns`"""
+        callers = self.callers(b"\xff" * 0x1000)
+        callers.compiled[0x08000100] = {"dumps": {"rtl": {"func_08000100": function(insns, "func_08000100")}},
+                                        "text": (b"", 0, 0x20, []), "uids": {uid: [(offset, "bl")]}}
+        return callers.argument(0x08000100, 0x08000106, 0)
+
+    CALL = ('call_insn (set (reg:SI 0 r0) (call (mem:SI (symbol_ref:SI ("{}")) 0) (const_int 0))) -1 (nil) (nil) '
+            '(expr_list (use (reg:SI 0 r0)) (nil))')
+
+    def test_every_call_in_the_source_reaches_its_own_bl(self):
+        call = (9, self.CALL.format("func_08000800"))
+        other = (12, self.CALL.format("func_08000800"))
+
+        def reach(insns, uids, sites):
+            callers = self.callers(b"\xff" * 0x1000)
+            callers.compiled[0x08000100] = {"dumps": {"rtl": {"func_08000100": function(insns, "func_08000100")}},
+                                            "text": (b"", 0, 0x20, []), "uids": uids}
+            callers.calls_reach_code(0x08000100, set(sites))
+
+        reach([call], {9: [(6, "bl")]}, {0x08000106})
+        reach([call, other], {9: [(6, "bl")], 12: [(0x10, "bl")]}, {0x08000106, 0x08000110})
+        for label, insns, uids, sites, reason in (
+                ("a call listed at another instruction", [call], {9: [(8, "bl")]}, {0x08000106}, "reaches none"),
+                ("a call listed nowhere", [call], {}, {0x08000106}, "reaches none"),
+                ("two calls merged into one BL", [call, other], {9: [(6, "bl")]}, {0x08000106}, "reaches none"),
+                ("two calls listed at one BL", [call, other], {9: [(6, "bl")], 12: [(6, "bl")]},
+                 {0x08000106, 0x08000110}, "pair one to one"),
+                ("a BL no call lists", [call], {9: [(6, "bl")]}, {0x08000106, 0x08000110}, "pair one to one")):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
+                reach(insns, uids, sites)
+
+    def test_an_argument_is_read_in_the_call_s_block(self):
+        setting = (2, 'insn (set (reg:SI 0 r0) (const_int 67108928)) -1 (nil) (nil)')
+        call = (9, self.CALL.format("func_08000800"))
+        self.assertEqual(self.argument([setting, call]), (proof.Base("fixed", 0x04000040), 0))
+        # a narrowed constant is no address in a caller either
+        narrowed = [(1, 'insn (set (reg:SI 30) (const_int 67108928)) -1 (nil) (nil)'),
+                    (2, 'insn (set (reg:SI 0 r0) (zero_extend:SI (subreg:HI (reg:SI 30) 0))) -1 (nil) (nil)'), call]
+        self.assertEqual(self.argument(narrowed)[0].kind, "unknown")
+        noted = [(2, 'insn (set (subreg/s/u:HI (reg:SI 0 r0) 0) (reg:SI 27)) -1 (nil) '
+                     '(expr_list:REG_EQUAL (const_int 67108928) (nil))'), call]
+        self.assertEqual(self.argument(noted)[0].kind, "unknown")
+        for label, insns, kwargs, reason in (
+                ("across a label", [setting, (3, 'code_label 7 ""'), call], {}, "sets no r0 in the block"),
+                ("across a call", [setting, (3, self.CALL.format("func_X")), call], {}, "sets no r0 in the block"),
+                ("another callee", [setting, (9, self.CALL.format("func_X"))], {}, "does not name"),
+                ("not listed there", [setting, call], {"offset": 8}, "not one call insn")):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
+                self.argument(insns, **kwargs)
+
+    def registrar(self, *halves, relocated="func_08000800", word=0x08000110, entries=None):
+        """the registration of func_08000800 by synthetic code at 08000100 whose literal is at `word`"""
+        rom = bytearray(b"\xff" * 0x10000)
+        rom[0x100:0x100 + 2 * len(halves)] = thumb(*halves)
+        rom[word - proof.BASE:word - proof.BASE + 4] = struct.pack("<I", 0x08000801)
+        callers = self.callers(rom, entries=[{"kind": proof.ALLOCATOR_KIND, "address": f"{ALLOCATOR:#010x}"}]
+                               if entries is None else entries)
+        callers.compiled[0x08000100] = {"text": (b"", 0, 0x14, [(word - 0x08000100, 2, relocated)]),
+                                        "layout": ([2 * k for k in range(len(halves))], {0})}
+        return callers.registration(0x08000100, word)
+
+    def bl(self, at):
+        return struct.unpack("<HH", encode_bl(at, ALLOCATOR))
+
+    def test_a_registration_is_one_literal_load_to_one_allocator_call(self):
+        once = (0x4803, *self.bl(0x08000102), 0x4770, 0x46C0)       # ldr r0, =func; bl alloc; bx lr
+        site, entry = self.registrar(*once)
+        self.assertEqual((site, entry["address"]), (0x08000102, f"{ALLOCATOR:#010x}"))
+        for label, kwargs, halves, reason in (
+                ("another literal", {"relocated": "func_08000900"}, once, "no literal of func_08000800"),
+                ("an adr", {}, (0xA000, 0x4803, *self.bl(0x08000104), 0x4770), "forms a pc-relative address"),
+                ("two calls", {}, (0x4803, *self.bl(0x08000102), 0x4802, *self.bl(0x08000108), 0x4770),
+                 "passes the function to 2 calls"),
+                ("no allocator", {"entries": []}, once, "no listed scanline callback allocator"),
+                ("no load", {}, (0x4770, 0x46C0), "no instruction of func_08000100 loads")):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
+                self.registrar(*halves, **kwargs)
+
+    def test_another_load_of_the_registration_word_refuses(self):
+        rom_halves = (0x4803, *self.bl(0x08000102), 0x4770, 0x46C0)
+        original = proof.pc_loads
+        with mock.patch.object(proof, "pc_loads", lambda rom, word: original(rom, word) + [0x080000F0]):
+            with self.assertRaisesRegex(proof.ProofError, "load at 080000F0 reads the word"):
+                self.registrar(*rom_halves)
+
+    def test_too_many_references_refuse(self):
+        rom = bytearray(b"\xff" * 0x10000)
+        for k in range(proof.MAX_CALLERS + 1):
+            site = 0x08001000 + 8 * k
+            rom[site - proof.BASE:site - proof.BASE + 4] = encode_bl(site, 0x08000800)
+        proof._BL_INDEX.clear()
+        with self.assertRaisesRegex(proof.ProofError, "more than 16 references"):
+            self.callers(rom).scan()
+
+    def test_stack_parameters_and_late_code(self):
+        with self.assertRaisesRegex(proof.ProofError, "stack parameter 0: callers pass it on the stack"):
+            self.callers(b"\xff" * 0x1000).premise(4, 0, 1, False)
+        with self.assertRaisesRegex(proof.ProofError, "overlay map"):
+            self.callers(b"\xff" * 0x1000, address=proof.CODE_END).premise(0, 0, 1, False)
+        with self.assertRaisesRegex(proof.ProofError, "overlay map"):
+            self.callers(b"\xff" * 0x1000, address=proof.CODE_END + 0x400).premise(5, 0, 1, False)
+
+    @unittest.skipUnless(capstone, "capstone required")
+    def test_allocator_evidence(self):
+        rom = bytearray(b"\xff" * 0x10000)
+        entry = {"symbol": "func_0800C3CC", "address": "0x0800C3CC", "kind": proof.ALLOCATOR_KIND,
+                 "start": "0x0800C3CC", "end": "0x0800C4B4", "sha256": sha256(b"\xff" * 0xE8).hexdigest()}
+        self.assertIn("stores its r0 as a new scanline task's callback", proof.allocator_evidence(rom, entry,
+                                                                                               no_pipeline))
+        def failing(rom):
+            raise ValueError("changed manager")
+        for label, changed, pipeline in (("changed", dict(entry, sha256="0" * 64), no_pipeline),
+                                         ("moved", dict(entry, address="0x0800C3D0"), no_pipeline),
+                                         ("too long", dict(entry, end="0x0800C6CC"), no_pipeline),
+                                         ("the pipeline", entry, failing)):
+            with self.subTest(label=label), self.assertRaises(proof.ProofError):
+                proof.allocator_evidence(rom, changed, pipeline)
+
+    def test_code_end_is_the_index_s(self):
+        import analyze
+        import status
+        self.assertEqual(proof.CODE_END, analyze.CODE_END)
+        self.assertEqual(proof.CODE_END, status.CODE_END)
+
 
 
 COMPILER = Path(os.path.expandvars(proof.CC)).is_file() and shutil.which("cpp") and shutil.which(proof.AS)
@@ -1032,6 +1248,225 @@ class CompiledTests(unittest.TestCase):
             self.assertEqual(len(proof.qualifier_offsets(source, root, root, relpath, set(), {})), 1)
             (root / "include" / "port.inc").write_text("#define PORT 0x02000004\n")
             self.assertEqual(proof.qualifier_offsets(source, root, root, relpath, set(), {}), set())
+
+
+ALLOCATOR = 0x0800C3CC
+
+
+@unittest.skipUnless(COMPILER and capstone, "fixed compiler and capstone required")
+class CallerTests(unittest.TestCase):
+    """caller tracing through agbcc: the addressed function and its callers compiled into a synthetic ROM"""
+
+    CALLEE = ("typedef volatile struct { u16 a : 16; u16 b : 16; } Entry;\n"
+              "void func_08000400(Entry *e, u16 v) { e->a = v; e->b = v; }\n")
+    CALLER = ("extern void func_08000400(void *e, u16 v);\n"
+              "void func_08000800(u16 v) { func_08000400((void *)0x04000040, v); }\n")
+    EDGES = ("typedef struct __attribute__((packed)) { volatile u8 right : 8; volatile u8 left : 8; } Edges;\n"
+             "void func_08000400(void *state, Edges *e) { e->left = 1; e->right = 2; }\n")
+    REGISTRAR = ("extern void *func_0800C3CC(void (*callback)(void *, void *), u32 size, u32 type, u16 *destination);\n"
+                 "extern void func_08000400(void *state, void *e);\n"
+                 "void *func_08000800(void) { return func_0800C3CC(func_08000400, 4, 2, (u16 *)0x04000040); }\n")
+
+    def build(self, root, sources, size=0x100000):
+        """compile each source, splice it at its address, link its calls and function words; index them all"""
+        rom = bytearray(b"\xff" * size)
+        rows = []
+        for address, body in sources.items():
+            source = TYPES + "typedef unsigned int u32;\n" + body
+            relpath = f"src/{address:08X}.c"
+            (root / relpath).write_text(source)
+            with tempfile.TemporaryDirectory(dir=root) as work:
+                unit = proof.Unit(root, relpath, source, [], work)
+                text, start, length, relocations = unit.compile("probe", unit.real, f"func_{address:08X}")["text"]
+            rom[address - proof.BASE:address - proof.BASE + length] = text[start:start + length]
+            for at, kind, name in relocations:
+                site = address + at - start
+                if kind == 10 and name.startswith("func_"):
+                    rom[site - proof.BASE:site - proof.BASE + 4] = encode_bl(site, int(name[5:], 16))
+                elif kind == 2 and name.startswith("func_"):
+                    rom[site - proof.BASE:site - proof.BASE + 4] = struct.pack("<I", int(name[5:], 16) | 1)
+            rows.append(f"{address:08X} {address + length:08X} {length:5d} 0 return")
+        (root / "symbols").mkdir(exist_ok=True)
+        (root / "symbols" / "functions.txt").write_text("# index\n" + "\n".join(sorted(rows)) + "\n")
+        allocator = bytes(range(256))[:0xE8]
+        rom[ALLOCATOR - proof.BASE:ALLOCATOR - proof.BASE + 0xE8] = allocator
+        self.allocator = {"symbol": "func_0800C3CC", "address": f"{ALLOCATOR:#010x}", "kind": proof.ALLOCATOR_KIND,
+                          "start": f"{ALLOCATOR:#010x}", "end": f"{ALLOCATOR + 0xE8:#010x}",
+                          "sha256": sha256(allocator).hexdigest()}
+        return rom
+
+    def trace(self, sources, edit=None, entries=None, address=ADDRESS, size=0x100000):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("src", "include"):
+                (root / name).mkdir()
+            rom = self.build(root, sources, size)
+            if edit:
+                edit(root, rom)
+            relpath = f"src/{address:08X}.c"
+            text = (root / relpath).read_text()
+            listed = [self.allocator] if entries is None else entries(self.allocator)
+            proof._BL_INDEX.clear()
+            return proof.prove(root, root, relpath, text, set(), {}, listed, bytes(rom), pipeline=no_pipeline)
+
+    def test_a_parameter_every_caller_fills_with_hardware_is_admitted(self):
+        result = self.trace({ADDRESS: self.CALLEE, 0x08000800: self.CALLER})
+        (state, text), = [verdict for _, verdict in result]
+        self.assertEqual(state, "admitted", text)
+        self.assertIn("r0 of func_08000400, traced to the references a scan of the ROM finds (1 BL to its start, 0 "
+                      "words holding its Thumb address", text)
+        self.assertIn("no address of it is formed by arithmetic", text)
+        self.assertIn("in func_08000800 passes I/O registers at 0x04000040", text)
+        self.assertIn("premise: the code runs where it lies below 0x08150000", text)
+        self.assertIn("load dropped", text)
+
+    def test_every_caller_must_pass_an_object(self):
+        two = {ADDRESS: self.CALLEE, 0x08000800: self.CALLER,
+               0x08000C00: self.CALLER.replace("func_08000800", "func_08000C00").replace("0x04000040", "0x02000040")}
+        self.assertIn("in no hardware window", self.trace(two)[0][1][1])
+        own = {ADDRESS: self.CALLEE, 0x08000800: "extern void func_08000400(void *e, u16 v);\n"
+                                                  "void func_08000800(void *e, u16 v) { func_08000400(e, v); }\n"}
+        self.assertIn("own parameter", self.trace(own)[0][1][1])
+
+    def test_a_traced_cartridge_address_needs_a_store_the_rom_holds(self):
+        callee = ("void func_08000400(volatile u16 *f) { int z = 0; if (z) *f = 0x90; (void)*f; }\n")
+        caller = ("extern void func_08000400(volatile u16 *f);\n"
+                  "void func_08000800(void) { func_08000400((volatile u16 *)0x08001234); }\n")
+        refused = self.trace({ADDRESS: callee, 0x08000800: caller})
+        self.assertIn("never writes", refused[0][1][1])
+
+    def test_unexplained_references_refuse(self):
+        sources = {ADDRESS: self.CALLEE, 0x08000800: self.CALLER}
+
+        def stray_word(root, rom):
+            rom[0x9000:0x9004] = struct.pack("<I", ADDRESS | 1)
+
+        def branch(root, rom):
+            rom[0x3F0:0x3F2] = struct.pack("<H", 0xE000 | ((ADDRESS - 0x080003F4) >> 1))
+
+        def branch_into_the_body(root, rom):
+            rom[0x3F0:0x3F2] = struct.pack("<H", 0xE000 | ((ADDRESS + 4 - 0x080003F4) >> 1))
+
+        def call_of_the_body(root, rom):
+            rom[0x9000:0x9004] = encode_bl(0x08009000, ADDRESS + 4)
+
+        def word_of_the_body(root, rom):
+            rom[0x9000:0x9004] = struct.pack("<I", ADDRESS + 5)
+
+        def unmatched(root, rom):
+            (root / "src" / "08000800.c").unlink()
+
+        def wrong(root, rom):
+            rom[0x800:0x802] = b"\x00\x00"
+
+        def another_callee(root, rom):
+            caller = root / "src" / "08000800.c"
+            caller.write_text(caller.read_text().replace("func_08000400", "func_08000500"))
+
+        def overlapping(root, rom):
+            index = root / "symbols" / "functions.txt"
+            index.write_text(index.read_text() + "08000800 08000A00   512 256 return\n")
+
+        for edit, reason in ((stray_word, "08009000 lies in 0 indexed functions"),
+                             (branch, "080003F0 reaches or holds 08000400 inside the function"),
+                             (branch_into_the_body, "080003F0 reaches or holds 08000404"),
+                             (call_of_the_body, "08009000 reaches or holds 08000404"),
+                             (word_of_the_body, "08009000 reaches or holds 08000405"), (unmatched, "no matched source"),
+                             (wrong, "does not match the ROM"), (overlapping, "lies in 2 indexed functions"),
+                             (another_callee, "is no call of func_08000400 in func_08000800's source")):
+            with self.subTest(edit=edit.__name__):
+                self.assertIn(reason, self.trace(sources, edit)[0][1][1])
+        self.assertIn("no call of the function", self.trace({ADDRESS: self.CALLEE})[0][1][1])
+        recursive = {ADDRESS: self.CALLEE.replace("e->b = v; }", "e->b = v; if (v) func_08000400("
+                                                  "(Entry *)0x04000040, v - 1); }"),
+                     0x08000800: self.CALLER}
+        self.assertIn("lies in the function itself", self.trace(recursive)[0][1][1])
+
+    def test_calls_a_later_pass_merged_refuse(self):
+        # jump2 cross-jumps these calls into one BL: tracing that BL would read one argument for all of them
+        for label, body in (
+                ("a switch", "switch (c) { case 1: func_08000400((void *)0x04000040, v); break; "
+                             "case 2: func_08000400((void *)0x04000044, v); break; "
+                             "default: func_08000400((void *)0x03001000, v); }"),
+                ("two branches", "if (c) func_08000400((void *)0x04000040, v); "
+                                 "else func_08000400((void *)0x03001000, v);"),
+                ("two branches swapped", "if (c) func_08000400((void *)0x03001000, v); "
+                                         "else func_08000400((void *)0x04000040, v);")):
+            caller = ("extern void func_08000400(void *e, u16 v);\n"
+                      f"void func_08000800(int c, u16 v) {{ {body} }}\n")
+            with self.subTest(label=label):
+                (state, reason), = [verdict for _, verdict in self.trace({ADDRESS: self.CALLEE, 0x08000800: caller})]
+                self.assertEqual(state, "refused", reason)
+
+    def test_late_code_and_late_callers(self):
+        late = proof.CODE_END + 0x400
+        refused = self.trace({late: self.CALLEE.replace("func_08000400", f"func_{late:08X}"),
+                              0x08000800: self.CALLER.replace("func_08000400", f"func_{late:08X}")},
+                             address=late, size=0x160000)
+        self.assertIn("overlay map", refused[0][1][1])
+        refused = self.trace({ADDRESS: self.CALLEE,
+                              late: self.CALLER.replace("func_08000800", f"func_{late:08X}")}, size=0x160000)
+        self.assertIn("lies in late code", refused[0][1][1])
+
+    def test_a_registered_scanline_callback_is_admitted(self):
+        result = self.trace({ADDRESS: self.EDGES, 0x08000800: self.REGISTRAR})
+        self.assertEqual([state for _, (state, _) in result], ["admitted", "admitted"], result)
+        text = result[0][1][1]
+        self.assertIn("(0 BL to its start, 1 words holding its Thumb address, each read only by its owner's pc-relative "
+                      "loads; no branch, BL or word reaching inside it): it is a scanline callback, whose r1 is the "
+                      "task's back bank", text)
+        self.assertIn("registered by func_08000800 (word 080008", text)
+        self.assertIn("a scanline task's callback is called only by the scanline manager 0800C4B4", text)
+        payload = self.EDGES.replace("void *state, Edges *e", "Edges *e, void *state")
+        result = self.trace({ADDRESS: payload, 0x08000800: self.REGISTRAR})
+        self.assertIn("whose r0 is the task's payload (or 0)", result[0][1][1])
+        before = self.EDGES.replace("e->left = 1; e->right = 2;", "e[-1].left = 1; e[-1].right = 2;")
+        self.assertIn("lies before the object", self.trace({ADDRESS: before, 0x08000800: self.REGISTRAR})[0][1][1])
+        third = self.EDGES.replace("void *state, Edges *e", "void *state, void *bank, Edges *e")
+        refused = self.trace({ADDRESS: third, 0x08000800: self.REGISTRAR})
+        self.assertIn("passes its callbacks no r2", refused[0][1][1])
+
+    def test_a_registration_word_read_by_other_code_refuses(self):
+        def foreign(root, rom):
+            text = bytes(rom[0x800:0x900])
+            word = 0x08000800 + text.index(struct.pack("<I", ADDRESS | 1))
+            rom[0x780:0x784] = struct.pack("<HH", 0x4800 | (word - 0x08000784) // 4, 0x4700)   # ldr r0, =func; bx r0
+            index = root / "symbols" / "functions.txt"
+            index.write_text(index.read_text() + "08000780 08000784     4   2 return\n")
+        refused = self.trace({ADDRESS: self.EDGES, 0x08000800: self.REGISTRAR}, foreign)
+        self.assertIn("the pc-relative load at 08000780 reads the word", refused[0][1][1])
+
+    def test_a_callback_registration_must_be_the_only_use(self):
+        stored = self.REGISTRAR.replace("void *func_08000800(void) {",
+                                        "extern void (*g_callback)(void *, void *);\n"
+                                        "void *func_08000800(void) { g_callback = func_08000400;")
+        self.assertIn("otherwise", self.trace({ADDRESS: self.EDGES, 0x08000800: stored})[0][1][1])
+        second = ("extern void *func_0800C3CC(u32 size, void (*callback)(void *, void *));\n"
+                  "extern void func_08000400(void *state, void *e);\n"
+                  "void *func_08000800(void) { return func_0800C3CC(4, func_08000400); }\n")
+        self.assertIn("not exactly r0", self.trace({ADDRESS: self.EDGES, 0x08000800: second})[0][1][1])
+        for entries in (lambda allocator: [], lambda allocator: [dict(allocator, kind="dma-source")]):
+            refused = self.trace({ADDRESS: self.EDGES, 0x08000800: self.REGISTRAR}, entries=entries)
+            self.assertIn("no listed scanline callback allocator", refused[0][1][1])
+
+    def test_a_cached_proof_follows_its_callers(self):
+        self.enterContext(mock.patch.dict(os.environ))
+        os.environ.pop("FFTA_ROM", None)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name in ("src", "include", "config"):
+                (root / name).mkdir()
+            (root / "config" / "data_symbols.json").write_text("{}")
+            rom = self.build(root, {ADDRESS: self.CALLEE, 0x08000800: self.CALLER})
+            (root / "baserom.bin").write_bytes(bytes(rom))
+            relpath = f"src/{ADDRESS:08X}.c"
+            text = (root / relpath).read_text()
+            proof._CACHE.clear()
+            self.assertEqual(len(proof.qualifier_offsets(text, root, root, relpath, set(), {})), 1)
+            caller = root / "src" / "08000800.c"
+            caller.write_text(caller.read_text().replace("(void *)0x04000040", "(void *)0x02000040"))
+            self.assertEqual(proof.qualifier_offsets(text, root, root, relpath, set(), {}), set())
+
 
 
 @unittest.skipUnless(os.getenv("FFTA_WINDOW_SCANLINE_ROOT") and COMPILER and capstone,

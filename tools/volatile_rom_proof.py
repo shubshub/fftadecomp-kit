@@ -76,12 +76,30 @@ the addressed source wherever two things hold, and refuses it otherwise.
      a scanline payload.  The record prints what the argument is and the one
      premise this needs: it is a task whose data word +4 holds a scanline
      task (the getter does not check the task kind), and offsets stay inside
-     that payload, which the proof does not check either.
+     that payload, which the proof does not check either;
+   * a register parameter whose every caller the ROM shows passes one of the
+     objects above (Callers).  The function must lie below CODE_END (code
+     above it is installed in RAM and called at addresses only an overlay
+     map knows), and the whole ROM is scanned for references to it: BL
+     instructions that reach it, Thumb branches into it from outside, and
+     words holding its address.  A branch into it, a BL from another place
+     than an indexed function with a matched source below CODE_END, its own
+     call, and an address word other than below refuse.  Each caller's source
+     is compiled, must match the ROM, must hold a BL relocation to the
+     function at the site, and the argument register set in the call's block
+     is resolved as above, one level deep (the caller's own parameter
+     refuses).  An address word counts only as a scanline callback: a word
+     of an indexed function's literal pool, matched, relocated to the
+     function, loaded only by pc-relative loads whose register reaches r0
+     unchanged (copies only, no branch target, no other use) at a BL to an
+     allocator listed in volatile_objects.json.  The scanline manager calls
+     such a callback with the task's payload (r0) and the bank it then
+     submits for HBlank DMA (r1).  The record prints the premises: the code
+     runs where it lies, and a task's callback is called only by the manager.
    A narrowed or extended constant loses its value, so an address computed
-   from one refuses.  Volatile locals and frame slots, parameters (callers are
-   not traced), other call results, values loaded from memory, unresolved or
-   conflicting bases and a variable offset from a constant address are
-   refused.
+   from one refuses.  Volatile locals and frame slots, stack parameters, other
+   call results, values loaded from memory, unresolved or conflicting bases
+   and a variable offset from a constant address are refused.
 
 Only code tokens of the addressed source `src/<ADDR>.c` that no other
 exception admits are candidates, and none in a preprocessor directive.  A
@@ -146,6 +164,19 @@ MODE_SIZE = {"QI": 1, "HI": 2, "SI": 4, "DI": 8, "SF": 4, "DF": 8}
 DMA_SOURCE = {0x040000B0 + 12 * channel: channel for channel in range(4)}
 DMA_KINDS = ("dma-source", "dma-target")
 GETTER_KIND = "scanline-payload-getter"
+ALLOCATOR_KIND = "scanline-callback-allocator"
+# analyze.py and status.py: the main index; code above it is late, installed in RAM before it runs
+CODE_END = 0x08150000
+MAX_CALLERS = 16
+MAX_FLOW = 64
+# a branch, an exchange or a software interrupt ends the straight line a callback load must follow
+BRANCH = re.compile(r"b|bx|blx|b(?:eq|ne|cs|hs|cc|lo|mi|pl|vs|vc|hi|ls|ge|lt|gt|le|al)|svc|swi|bkpt|udf")
+# what the scanline manager 0800C4B4 passes a task's callback
+CALLBACK_ARGUMENTS = {
+    0: "the task's payload (or 0), which it reads to fill the bank",
+    1: "the task's back bank, which the manager submits for HBlank DMA to the task's register once the callback "
+       "returns",
+}
 # a scanline payload getter returns PAYLOAD(*(u32 *)(TASK_DATA(task) + 4)):
 # push {lr}; bl TASK_DATA; ldr r0, [r0, #4]; bl PAYLOAD; pop {r1}; bx r1
 GETTER_SHAPE = {0: 0xB500, 3: 0x6840, 6: 0xBC02, 7: 0x4708}
@@ -951,13 +982,371 @@ def task_argument(base, getters):
     raise ProofError(f"the getter is passed {what}, which is no task")
 
 
+def allocator_evidence(rom, entry, pipeline=None):
+    """the premise a scanline callback allocator's pinned code establishes, or ProofError"""
+    address = int(entry["address"], 16)
+    start, end = int(entry["start"], 16), int(entry["end"], 16)
+    if start != address or not BASE <= start < end <= BASE + len(rom) or end - start > 512:
+        raise ProofError("allocator evidence range is invalid")
+    if sha256(rom[start - BASE:end - BASE]).hexdigest() != entry["sha256"]:
+        raise ProofError(f"allocator evidence {start:08X}..{end:08X} changed")
+    if pipeline is None:
+        from bg_affine_rows import scanline_pipeline as pipeline
+    try:
+        pipeline(rom)
+    except (ValueError, ImportError, OSError, struct.error) as error:
+        raise ProofError(f"the scanline pipeline evidence does not hold ({error})") from None
+    return (f"{entry['symbol']} (ROM {start:08X}..{end:08X}, SHA-256 {entry['sha256']}) stores its r0 as a new "
+            "scanline task's callback, which the scanline manager 0800C4B4 calls each frame with the task's payload "
+            "(or 0) and the back bank it then submits for HBlank DMA to the task's register "
+            "(bg_affine_rows.scanline_pipeline)")
+
+
+def function_index(project):
+    """[(start, end)] of the project's symbols/functions.txt"""
+    try:
+        lines = (Path(project) / "symbols" / "functions.txt").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        raise ProofError("no function index (symbols/functions.txt) to find the callers in") from None
+    rows = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) >= 2 and all(re.fullmatch(r"[0-9A-F]{8}", part) for part in parts[:2]):
+            rows.append((int(parts[0], 16), int(parts[1], 16)))
+    return rows
+
+
+_BL_INDEX = {}
+
+
+def bl_index(rom):
+    """{target: [ROM addresses of the Thumb BL pairs that reach it]} of the whole ROM (cached per ROM)"""
+    key = (len(rom), sha256(rom).digest())
+    if key not in _BL_INDEX:
+        index = {}
+        for match in re.finditer(rb"(?=[\x00-\xff][\xf0-\xf7][\x00-\xff][\xf8-\xff])", rom):
+            if match.start() % 2 == 0:
+                site = BASE + match.start()
+                index.setdefault(decode_bl(rom, site), []).append(site)
+        _BL_INDEX.clear()
+        _BL_INDEX[key] = index
+    return _BL_INDEX[key]
+
+
+def rom_references(rom, address, end):
+    """(BL sites reaching the start, [(site, target)] of BLs, Thumb branches from outside and words that reach or
+    hold an address inside [address, end) other than the start's call or its Thumb address, sites of words
+    holding address | 1)"""
+    index = bl_index(rom)
+    calls = list(index.get(address, []))
+    inside = [(site, target) for target in range(address + 2, end, 2) for site in index.get(target, [])]
+    for at in range(max(address - 2052, BASE), min(end + 2048, BASE + len(rom) - 1), 2):
+        if address <= at < end:
+            continue
+        half = struct.unpack_from("<H", rom, at - BASE)[0]
+        if half & 0xF800 == 0xE000:
+            offset = (half & 0x7FF) << 1
+            offset -= 1 << 12 if offset & 1 << 11 else 0
+        elif half & 0xF000 == 0xD000 and (half >> 8) & 0xF < 0xE:
+            offset = (half & 0xFF) << 1
+            offset -= 1 << 9 if offset & 1 << 8 else 0
+        else:
+            continue
+        if address <= at + 4 + offset < end:
+            inside.append((at, at + 4 + offset))
+    words = set()
+    for prefix in range(address >> 8, ((end - 1) >> 8) + 1):
+        pattern = struct.pack("<I", prefix << 8)[1:]
+        at = rom.find(pattern, 1)
+        while at >= 1:
+            value = struct.unpack_from("<I", rom, at - 1)[0]
+            if address <= value & ~1 < end:
+                if value == address | 1:
+                    words.add(BASE + at - 1)
+                else:
+                    inside.append((BASE + at - 1, value))
+            at = rom.find(pattern, at + 1)
+    return calls, sorted(set(inside)), sorted(words)
+
+
+def pc_loads(rom, word):
+    """ROM addresses of every Thumb `ldr rd, [pc, #imm]` and ARM `ldr rd, [pc, #+-imm]` that reads the word"""
+    found = []
+    for at in range(max(word - 1024, BASE), word, 2):
+        half = struct.unpack_from("<H", rom, at - BASE)[0]
+        if half & 0xF800 == 0x4800 and ((at + 4) & ~3) + (half & 0xFF) * 4 == word:
+            found.append(at)
+    for at in range(max((word - 4104) & ~3, BASE), min(word + 4096, BASE + len(rom) - 3), 4):
+        arm = struct.unpack_from("<I", rom, at - BASE)[0]
+        if arm >> 26 & 3 == 1 and not arm >> 25 & 1 and arm >> 24 & 1 and not arm >> 22 & 1 and arm >> 20 & 1 \
+                and arm >> 16 & 0xF == 15 and at + 8 + ((arm & 0xFFF) if arm >> 23 & 1 else -(arm & 0xFFF)) == word:
+            found.append(at)
+    return sorted(set(found))
+
+
+class Callers:
+    """the callers of the addressed function, read off the whole ROM and the tree's matched sources (E1).
+
+    Computed once per proof and shared by its tokens; every refusal names what
+    the ROM shows.  dependencies collects (path, SHA-256) of each caller source
+    read, so a cached proof can tell it is stale.
+    """
+
+    def __init__(self, tree, project, address, end, rom, data_symbols, entries, pipeline, work, dependencies=None):
+        self.tree, self.project, self.address, self.end = Path(tree), project, address, end
+        self.rom, self.data_symbols, self.entries, self.pipeline = rom, data_symbols, entries, pipeline
+        self.work, self.dependencies, self.name = Path(work), dependencies, f"func_{address:08X}"
+        self.compiled, self._scan = {}, None
+
+    def caller(self, start):
+        if start not in self.compiled:
+            sources = sorted((self.tree / "src").rglob(f"{start:08X}.c"))
+            if len(sources) != 1:
+                raise ProofError(f"its caller func_{start:08X} has no matched source")
+            relpath = sources[0].relative_to(self.tree).as_posix()
+            text = sources[0].read_text(encoding="utf-8").replace("\r\n", "\n")
+            if self.dependencies is not None:
+                self.dependencies.append((str(sources[0]), sha256(sources[0].read_bytes()).hexdigest()))
+            if unsupported_text(text):
+                raise ProofError(f"its caller {relpath} has a line splice, digraph, trigraph or NUL")
+            work = self.work / f"caller_{start:08X}"
+            work.mkdir()
+            unit = Unit(self.tree, relpath, text, [], work, self.dependencies)
+            compiled = unit.compile("real", unit.real, f"func_{start:08X}")
+            try:
+                function_matches_rom(compiled["text"], start, self.rom)
+            except ProofError:
+                raise ProofError(f"its caller {relpath} does not match the ROM") from None
+            self.compiled[start] = compiled
+        return self.compiled[start]
+
+    def scan(self):
+        if self._scan is None:
+            try:
+                self._scan = ("done", self._references())
+            except ProofError as refusal:
+                self._scan = ("refused", str(refusal))
+        if self._scan[0] == "refused":
+            raise ProofError(self._scan[1])
+        return self._scan[1]
+
+    def _references(self):
+        if self.address >= CODE_END:
+            raise ProofError(f"the parameter's function lies at or above {CODE_END:#010x}, code the game installs in "
+                             "RAM: its callers cannot be closed without an overlay map")
+        calls, inside, words = rom_references(self.rom, self.address, self.end)
+        if inside:
+            site, target = inside[0]
+            raise ProofError(f"{site:08X} reaches or holds {target:08X} inside the function (only calls of its start "
+                             "and its Thumb address are traced)")
+        if not calls and not words:
+            raise ProofError("the ROM holds no call of the function")
+        if len(calls) + len(words) > MAX_CALLERS:
+            raise ProofError(f"more than {MAX_CALLERS} references to the function")
+        rows = function_index(self.project)
+
+        def owner(site):
+            found = [(start, end) for start, end in rows if start <= site < end]
+            if len(found) != 1:
+                raise ProofError(f"{site:08X} lies in {len(found)} indexed functions")
+            if found[0][0] >= CODE_END:
+                raise ProofError(f"{site:08X} lies in late code at or above {CODE_END:#010x}")
+            if found[0][0] == self.address:
+                raise ProofError(f"{site:08X} lies in the function itself")
+            return found[0][0]
+
+        direct = []
+        for site in calls:
+            start = owner(site)
+            compiled = self.caller(start)
+            text, base, size, relocations = compiled["text"]
+            if not any(at - base == site - start and kind == 10 and name == self.name
+                       for at, kind, name in relocations):
+                raise ProofError(f"the BL at {site:08X} is no call of {self.name} in func_{start:08X}'s source")
+            direct.append((site, start))
+        for start in sorted({start for _, start in direct}):
+            self.calls_reach_code(start, {site for site, owner in direct if owner == start})
+        registrations = []
+        for site in words:
+            start = owner(site)
+            registrations.append((site, start) + self.registration(start, site))
+        return direct, registrations
+
+    def calls_reach_code(self, start, sites):
+        """every call of the function in func_<start>'s expand dump reaches its own BL among `sites`: a later pass
+        (jump2's cross-jumping) may merge calls with different arguments into one BL"""
+        compiled = self.caller(start)
+        name, base = f"func_{start:08X}", compiled["text"][1]
+        reached = []
+        for insn in compiled["dumps"]["rtl"][name].insns:
+            if insn.code != "call_insn" or f'"{self.name}"' not in flatten(insn.pattern):
+                continue
+            hits = {start + at - base for at, _ in compiled["uids"].get(insn.uid, [])} & sites
+            if len(hits) != 1:
+                raise ProofError(f"a call of {self.name} in {name}'s source reaches none of its BLs (a later pass "
+                                 "merged or deleted it)")
+            reached.append(hits.pop())
+        if sorted(reached) != sorted(sites):
+            raise ProofError(f"the calls of {self.name} in {name}'s source and its BLs do not pair one to one")
+
+    def registration(self, start, word):
+        """(the allocator BL site, its registry entry) for a literal word of `start` holding the function's address"""
+        if struct.unpack_from("<I", self.rom, word - BASE)[0] != self.address | 1 or word % 4:
+            raise ProofError(f"{word:08X} holds the function's address as no Thumb literal")
+        compiled = self.caller(start)
+        text, base, size, relocations = compiled["text"]
+        if not any(at - base == word - start and kind == 2 and name == self.name for at, kind, name in relocations):
+            raise ProofError(f"the word at {word:08X} is no literal of {self.name} in func_{start:08X}'s source")
+        instructions, labels = compiled["layout"]
+        loads = []
+        for offset in instructions:
+            if not base <= offset < base + size:
+                continue
+            at = start + offset - base
+            half = struct.unpack_from("<H", self.rom, at - BASE)[0]
+            if half & 0xF800 == 0xA000:
+                raise ProofError(f"func_{start:08X} forms a pc-relative address at {at:08X}")
+            if half & 0xF800 == 0x4800 and ((at + 4) & ~3) + (half & 0xFF) * 4 == word:
+                loads.append((offset, at, half >> 8 & 7))
+        if not loads:
+            raise ProofError(f"no instruction of func_{start:08X} loads the word at {word:08X}")
+        foreign = sorted(set(pc_loads(self.rom, word)) - {at for _, at, _ in loads})
+        if foreign:
+            raise ProofError(f"the pc-relative load at {foreign[0]:08X} reads the word at {word:08X} outside "
+                             f"func_{start:08X}'s code")
+        sites = {self.follow(instructions, labels, base, start, offset, at, register)
+                 for offset, at, register in loads}
+        if len(sites) != 1:
+            raise ProofError(f"func_{start:08X} passes the function to {len(sites)} calls")
+        site, target = sites.pop()
+        listed = [entry for entry in self.entries if entry.get("kind") == ALLOCATOR_KIND and
+                  int(entry.get("address", "0"), 16) == target]
+        if len(listed) != 1:
+            raise ProofError(f"func_{start:08X} passes the function at {site:08X} to {target:08X}, no listed "
+                             "scanline callback allocator")
+        return site, listed[0]
+
+    def follow(self, instructions, labels, base, start, offset, at, register):
+        """the (BL site, target) the register loaded at `at` reaches as r0, straight-line, with no other use"""
+        decoder = thumb_decoder()
+        tracked = {f"r{register}"}
+        index = instructions.index(offset)
+        for later in instructions[index + 1:index + 1 + MAX_FLOW]:
+            where = start + later - base
+            if later in labels:
+                raise ProofError(f"a branch target at {where:08X} lies between the load at {at:08X} and its call")
+            insn = next(decoder.disasm(self.rom[where - BASE:where - BASE + 4], where, 1), None)
+            if insn is None:
+                raise ProofError(f"{where:08X} does not decode")
+            read, written = ({insn.reg_name(r) for r in group} for group in insn.regs_access())
+            if insn.mnemonic == "bl":
+                if tracked != {"r0"}:
+                    raise ProofError(f"at the call at {where:08X} the function's address is not exactly r0 "
+                                     f"({', '.join(sorted(tracked))})")
+                return where, decode_bl(self.rom, where)
+            if "pc" in written or BRANCH.fullmatch(insn.mnemonic):
+                raise ProofError(f"control leaves the block at {where:08X} before the load at {at:08X} is used")
+            ops = [op.strip() for op in insn.op_str.split(",")]
+            copy = len(ops) >= 2 and ops[1] in tracked and (
+                insn.mnemonic in ("mov", "movs") and len(ops) == 2 or
+                insn.mnemonic == "adds" and len(ops) == 3 and ops[2] == "#0")
+            if copy:
+                tracked.add(ops[0])
+            elif read & tracked:
+                raise ProofError(f"{where:08X} uses the function's address otherwise "
+                                 f"(`{insn.mnemonic} {insn.op_str}`)")
+            else:
+                tracked -= written
+            if not tracked:
+                raise ProofError(f"the address loaded at {at:08X} is overwritten before a call")
+        raise ProofError(f"the address loaded at {at:08X} reaches no call within {MAX_FLOW} instructions")
+
+    def argument(self, start, site, number):
+        """(Base, offset) of argument register `number` at the call at `site` in func_<start>"""
+        compiled = self.caller(start)
+        name = f"func_{start:08X}"
+        rtl, base = compiled["dumps"]["rtl"][name], compiled["text"][1]
+        found = [insn for insn in rtl.insns if insn.code == "call_insn" and
+                 any(at - base == site - start for at, _ in compiled["uids"].get(insn.uid, []))]
+        if len(found) != 1:
+            raise ProofError(f"the call at {site:08X} is not one call insn of {name}'s expand dump")
+        call = found[0]
+        if [x for x in flatten(call.pattern) if isinstance(x, str) and x == f'"{self.name}"'] == []:
+            raise ProofError(f"the call insn at {site:08X} does not name {self.name}")
+        resolver = Resolver(rtl)
+        for insn in reversed(rtl.insns[:call.index]):
+            if insn.code in ("code_label", "call_insn", "barrier"):
+                break
+            if insn.pattern is None:
+                continue
+            sets = rtl.sets(insn.pattern)
+            for target, source, whole in sets:
+                if code(target) == "reg" and int(target[1]) == number:
+                    value = insn.equal if insn.equal is not None and len(sets) == 1 and whole else source
+                    base, offset = resolver.resolve(value, insn.index)
+                    if base.kind == "int":
+                        return (Base("fixed", base.value), 0) if base.value is not None else UNKNOWN
+                    return UNKNOWN if base.kind in ("word", "bottom") else (base, offset)
+        raise ProofError(f"{name} sets no r{number} in the block of its call at {site:08X}")
+
+    def premise(self, number, offset, width, stores):
+        """(premise, range premise) for an access at `offset` from register parameter `number`"""
+        which = f"parameter r{number}" if number < 4 else f"stack parameter {number - 4}"
+        try:
+            return self._premise(number, offset, width, stores)
+        except ProofError as refusal:
+            raise ProofError(f"the access goes through {which}: {refusal}") from None
+
+    def _premise(self, number, offset, width, stores):
+        if self.address >= CODE_END:
+            self.scan()
+        if number > 3:
+            raise ProofError("callers pass it on the stack, which is not traced")
+        direct, registrations = self.scan()
+        found, ranges = [], [f"the code runs where it lies below {CODE_END:#010x} (no copy of it in RAM is "
+                             "modelled), and no address of it is formed by arithmetic (an adr, an add, an offset "
+                             "table), which the scan does not see"]
+        for site, start in direct:
+            base, extra = self.argument(start, site, number)
+            if base.kind == "param":
+                raise ProofError(f"the call at {site:08X} passes func_{start:08X}'s own parameter (one level of "
+                                 "callers is traced)")
+            total = extra + offset if extra is not None and offset is not None else None
+            compiled = self.caller(start)
+            getters = {entry.get("symbol") for entry in self.entries if entry.get("kind") == GETTER_KIND}
+            tasks = {base.value: call_arguments(compiled["dumps"]["rtl"][f"func_{start:08X}"], base.value)} \
+                if base.kind == "ret" and base.value in getters else {}
+            text, extent = object_premise(base, total, width, stores, self.data_symbols, self.entries, self.rom,
+                                          calls=call_targets(compiled["text"], start, self.rom),
+                                          pipeline=self.pipeline, tasks=tasks)
+            found.append(f"{site:08X} in func_{start:08X} passes {text}")
+            if extent and extent not in ranges:
+                ranges.append(extent)
+        if registrations:
+            if number not in CALLBACK_ARGUMENTS:
+                raise ProofError(f"the scanline manager passes its callbacks no r{number}")
+            if offset is not None and offset < 0:
+                raise ProofError(f"the access at {offset:+#x} lies before the object the manager passes")
+            evidence = [allocator_evidence(self.rom, entry, self.pipeline)
+                        for entry in {id(entry): entry for _, _, _, entry in registrations}.values()]
+            found.append(f"it is a scanline callback, whose r{number} is {CALLBACK_ARGUMENTS[number]}: registered by " +
+                         ", ".join(f"func_{start:08X} (word {word:08X}, call {site:08X})"
+                                   for word, start, site, _ in registrations) + "; " + "; ".join(evidence))
+            ranges.append("a scanline task's callback is called only by the scanline manager 0800C4B4, and offsets "
+                          "stay inside the object it passes (assumed: the proof does not bound them)")
+        return (f"r{number} of {self.name}, traced to the references a scan of the ROM finds ({len(direct)} BL to "
+                f"its start, {len(registrations)} words holding its Thumb address, each read only by its owner's "
+                "pc-relative loads; no branch, BL or word reaching inside it): " + "; ".join(found)), "; ".join(ranges)
+
+
 def object_premise(base, offset, width, stores_at_base, data_symbols, entries, rom, typed=None, calls=None,
-                   pipeline=None, tasks=None):
+                   pipeline=None, tasks=None, callers=None):
     """(premise, offset premise or None) for one access, or ProofError.
 
     calls maps each callee symbol of the function to the ROM's BL targets at
     its calls (call_targets); tasks maps a listed getter to the resolved
-    argument of each of its calls (call_arguments).  typed, when given, is a callable that may vouch
+    argument of each of its calls (call_arguments); callers, a Callers,
+    traces a register parameter.  typed, when given, is a callable that may vouch
     for a parameter or call result (window_scanline's caller-path evidence in
     the instance test); match.py and plausible.py never pass one.
     """
@@ -965,6 +1354,8 @@ def object_premise(base, offset, width, stores_at_base, data_symbols, entries, r
         premise = typed(base)
         if premise:
             return premise, None
+    if base.kind == "param" and callers is not None:
+        return callers.premise(base.value, offset, width, stores_at_base)
     if base.kind == "ret":
         listed = [entry for entry in entries if entry.get("kind") == GETTER_KIND and entry.get("symbol") == base.value]
         if listed:
@@ -1117,6 +1508,23 @@ def listing_uids(listing):
     return uids
 
 
+def listing_layout(listing):
+    """(sorted .text offsets of instructions, .text offsets that carry a label) from `as -aln` output"""
+    instructions, labels, pending = set(), set(), False
+    for line in listing.splitlines():
+        match = re.match(r"\s*\d+\s+([0-9a-f]{4})\s+([0-9A-F]+)\s+(.*)$", line)
+        if match:
+            offset = int(match[1], 16)
+            if pending:
+                labels.add(offset)
+                pending = False
+            if not match[3].lstrip().startswith((".", "@")):
+                instructions.add(offset)
+        elif re.match(r"\s*\d+\s+[.\w$]+:", line):
+            pending = True
+    return sorted(instructions), labels
+
+
 THUMB_ACCESS = (  # (mask, value, store, width)
     (0xF800, 0x7800, False, 1), (0xFE00, 0x5C00, False, 1), (0xFE00, 0x5600, False, 1),
     (0xF800, 0x7000, True, 1), (0xFE00, 0x5400, True, 1),
@@ -1212,7 +1620,8 @@ class Unit:
         for required in ("rtl", "cse", "flow", "combine", "mach"):
             if name not in dumps.get(required, {}):
                 raise ProofError(f"the {label} compile wrote no {required} dump of {name}")
-        return {"text": plain, "dumps": dumps, "uids": listing_uids((directory / "f.lst").read_text())}
+        listing = (directory / "f.lst").read_text()
+        return {"text": plain, "dumps": dumps, "uids": listing_uids(listing), "layout": listing_layout(listing)}
 
 
 # ------------------------------------------------------------------ the proof
@@ -1252,8 +1661,11 @@ def prove(tree, project, relpath, text, admitted, data_symbols, entries=None, ro
         unit = Unit(tree, relpath, text, offsets, work, dependencies)
         real = unit.compile("real", unit.real, name)
         stripped = [unit.compile(f"s{k}", unit.variant(k), name) for k in range(len(offsets))]
-    verdicts = [verdict(address, name, real, variant, rom, data_symbols, entries, 1 + text.count("\n", 0, offset),
-                        typed, pipeline) for offset, variant in zip(offsets, stripped)]
+        callers = Callers(tree, project, address, address + real["text"][2], rom, data_symbols, entries, pipeline,
+                          work, dependencies)
+        verdicts = [verdict(address, name, real, variant, rom, data_symbols, entries,
+                            1 + text.count("\n", 0, offset), typed, pipeline, callers)
+                    for offset, variant in zip(offsets, stripped)]
     return list(zip(offsets, settle(verdicts)))
 
 
@@ -1271,11 +1683,11 @@ def function_matches_rom(compiled, address, rom):
         raise ProofError("the compiled function is not the ROM's (not a match, or another toolchain)")
 
 
-def verdict(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None):
+def verdict(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None, callers=None):
     """(state, record fragment or reason, the R references the token claims)"""
     try:
         fragment, claimed = token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed,
-                                         pipeline)
+                                         pipeline, callers)
         return "admitted", fragment, claimed
     except ProofError as refusal:
         return "refused", str(refusal), set()
@@ -1325,7 +1737,8 @@ def ambiguous(ours, accesses):
     return any(reference[1:4] in signatures and (reference[0], reference[5]) not in claimed for reference in ours)
 
 
-def token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None):
+def token_record(address, name, real, stripped, rom, data_symbols, entries, line, typed=None, pipeline=None,
+                 callers=None):
     function_matches_rom(real["text"], address, rom)
     if real["text"] == stripped["text"]:
         raise ProofError("removing it does not change the code")
@@ -1375,7 +1788,7 @@ def token_record(address, name, real, stripped, rom, data_symbols, entries, line
                                     (f" in {site[4]}" if site[4] != "final" else "")) for site in sites) + ")")
     # only a store the ROM holds makes the function a writer of its base
     stores_at = {base for (base, _, _, store), site in zip(resolved, sites)
-                 if store and site[0] is not None and base.kind in ("fixed", "symbol")}
+                 if store and site[0] is not None and base.kind in ("fixed", "symbol", "param")}
     calls = call_targets(real["text"], address, rom)
     getters = {entry.get("symbol") for entry in entries if entry.get("kind") == GETTER_KIND}
     tasks = {base.value: call_arguments(mine, base.value)
@@ -1383,7 +1796,7 @@ def token_record(address, name, real, stripped, rom, data_symbols, entries, line
     premises, ranges = [], []
     for base, offset, width, store in resolved:
         object_text, range_text = object_premise(base, offset, width, base in stores_at, data_symbols, entries, rom,
-                                                 typed, calls, pipeline, tasks)
+                                                 typed, calls, pipeline, tasks, callers)
         if object_text not in premises:
             premises.append(object_text)
         if range_text and range_text not in ranges:
@@ -1428,7 +1841,7 @@ def cached_proof(tree, project, relpath, text, admitted, data_symbols):
         except OSError:
             return False
 
-    # a cached proof is reused only while every file its compiles read is unchanged
+    # a cached proof is reused only while every file its compiles read is unchanged (callers' sources too)
     if key not in _CACHE or not current(_CACHE[key][1]):
         dependencies = []
         try:

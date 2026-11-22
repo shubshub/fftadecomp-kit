@@ -1,5 +1,5 @@
 {
-  "_policy": "Objects that hardware reads or writes on its own, so that a volatile qualifier on them is evidence, not steering, wherever tools/volatile_rom_proof.py shows the qualifier's effect on their accesses. A dma-source or dma-target entry names a RAM object (a data symbol, its mapped address and its size) and ROM code that programs a DMA channel with it: the code's bytes are pinned by SHA-256 and the transfer is read off the instructions at every run. A scanline-payload-getter entry names a function whose pinned code returns a scanline task's payload, read off its instructions and its two callees' at every run, with the scanline pipeline that hands the payload to the HBlank DMA bank. Listing an object admits nothing by itself. ONLY the repository maintainer may add an entry; agents park the function and cite the evidence instead.",
+  "_policy": "Objects that hardware reads or writes on its own, so that a volatile qualifier on them is evidence, not steering, wherever tools/volatile_rom_proof.py shows the qualifier's effect on their accesses. A dma-source or dma-target entry names a RAM object (a data symbol, its mapped address and its size) and ROM code that programs a DMA channel with it: the code's bytes are pinned by SHA-256 and the transfer is read off the instructions at every run. A scanline-payload-getter entry names a function whose pinned code returns a scanline task's payload, read off its instructions and its two callees' at every run, with the scanline pipeline that hands the payload to the HBlank DMA bank. A scanline-callback-allocator entry names the function that makes its r0 a new scanline task's callback, pinned by SHA-256, with the same pipeline, whose manager calls that callback with the task's payload and the bank it submits for HBlank DMA. Listing an object admits nothing by itself. ONLY the repository maintainer may add an entry; agents park the function and cite the evidence instead.",
   "version": 1,
   "entries": [
     {
@@ -29,6 +29,15 @@
       "end": "0x080DABC4",
       "sha256": "502c18b4fa9b7f56bf20af9f00382302e63dea7ec6daa070c4cb9ba032f122f4",
       "reason": "the window task's scanline payload: 080DAB84 creates the task with event callback 080D9C58, whose event 0 allocates the WIN0H/WIN1H scanline task and stores it in the task data word +4; 080DABB4 returns 0800C614 of that word, the WINxH rows tools/window_scanline.py's writers fill and the scanline manager 0800C4B4 converts into the HBlank DMA bank"
+    },
+    {
+      "symbol": "func_0800C3CC",
+      "address": "0x0800C3CC",
+      "kind": "scanline-callback-allocator",
+      "start": "0x0800C3CC",
+      "end": "0x0800C4B4",
+      "sha256": "0de1cf88f1da097ba540acc0061d0f3ef1aa86f0e7ed9b0baa2a4aba876d579d",
+      "reason": "allocates a scanline task (payload, two banks, a one-halfword HBlank channel for the register in r3) and stores r0 as its callback (task + 0); the manager 0800C4B4 calls task->callback(payload_size ? payload : 0, back bank) for each active task, copies row 0 to row 160, flips the banks and submits the filled bank with 080009AC for repeated HBlank DMA to the task's register"
     }
   ]
 }
