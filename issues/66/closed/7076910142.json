@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "dc4979b8a618006b8e808531cefff6b325b049e562074fbdab0835a0ca37b026",
+    "acknowledged_cursor": 7076910142,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "dc4979b8a618006b8e808531cefff6b325b049e562074fbdab0835a0ca37b026",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803FF9C\",\"who\":\"claude-ffta2\",\"note\":\"hand match (never attempted, 2026-11-22)\"}",
+      "created_at": "2026-11-22T09:04:06Z",
+      "id": 7076910142,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-22T09:04:06Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1d8ffb8636f0eaa8cabe6d644269fb40cf3688aab291eb25331094936e07c68c",
+    "result": {
+      "address": "0x0803FF9C",
+      "claim_id": 7076910142,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 31369,
+      "request_id": 7076910142,
+      "status": "accepted",
+      "who": "claude-ffta2"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "b657ebf9938f0d8848debf43740b0b72a4a50c5a97060000edda337312fa2a9e",
+    "acknowledged_cursor": 7077397036,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "b657ebf9938f0d8848debf43740b0b72a4a50c5a97060000edda337312fa2a9e",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803FF9C\",\"who\":\"claude-ffta2\",\"claim_id\":7076910142,\"reason\":\"retry 2026-11-22: 492/496, only the flag test differs (shared with 08040B70); parked for the large-function focus\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-22T09:49:49Z",
+      "id": 7077397036,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-22T09:49:49Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "38f682c5a3d0613038d250422758e42d9cdfb696ec3c4201e2ca5a27fa5d6ce0",
+    "result": {
+      "address": "0x0803FF9C",
+      "claim_id": 7076910142,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 31369,
+      "request_id": 7077397036,
+      "status": "accepted",
+      "who": "claude-ffta2"
+    }
+  }
+}
