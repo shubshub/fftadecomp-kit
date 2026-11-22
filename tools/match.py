@@ -37,6 +37,7 @@ import armv4t
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 import switch_wide_scalars as wide_scalars
+import switch_bios_control_words as control_words
 import switch_data_thunks
 import m4a_track_switch as music
 import modsi3_profile as modsi3
@@ -266,6 +267,38 @@ class Runner:
             self.sh(f"rm -f -- {outputs} && rmdir -- {shlex.quote(path)}")
 
 
+def preprocess_source(runner, workspace, cpp, source, includes=""):
+    """compile_object's first step: cpp writes the translation unit of `source` to f.i; returns its text."""
+    temporary = shlex.quote(workspace)
+    runner.sh(f"export TMPDIR={temporary}; {cpp} {plausibility.CPP_OPTIONS} {includes}{shlex.quote(source)} "
+              f"-o {temporary}/f.i")
+    return runner.read_binary(f"{workspace}/f.i").decode("utf-8")
+
+
+def addressed_translation_unit(root, address, source_digest):
+    """The addressed source's translation unit, preprocessed as compile_object does, from a snapshot of
+    the files source_fingerprint binds; ValueError when the snapshot's digest is not `source_digest`."""
+    root = Path(root)
+    candidates = list((root / "src").rglob(f"{address:08X}.c"))
+    if len(candidates) != 1:
+        raise ValueError("the translation unit needs exactly one addressed source")
+    (root / "build").mkdir(exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="ffta_replay_", dir=root / "build") as directory:
+        captured = Path(directory)
+        for path in source_paths(root, address):
+            destination = captured / path.relative_to(root)
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(path.read_bytes())
+        if source_fingerprint(captured, address) != source_digest:
+            raise ValueError("the translation unit's source snapshot differs from the report")
+        runner = Runner(DEFAULT_CC, "Ubuntu", DEFAULT_WSL_PATH, root=captured)
+        with runner.workspace() as workspace:
+            preprocessed = preprocess_source(runner, workspace, DEFAULT_CPP,
+                                             candidates[0].relative_to(root).as_posix())
+        verify_dependencies(preprocessed, captured, address)
+    return preprocessed
+
+
 def compile_object(runner, workspace, args, root, address, source, thumb=True, rewrite=None,
                    diagnostics=None, oam_prefix=()):
     """cpp -> cc1 -> as -> objcopy; rewrite, if given, maps the verified .i text first.
@@ -276,9 +309,7 @@ def compile_object(runner, workspace, args, root, address, source, thumb=True, r
     if oam_prefix:
         import oam_list_context as oam
         includes = oam.prefix_options(address, source, oam_prefix)
-    runner.sh(f"{environment}{args.cpp} {plausibility.CPP_OPTIONS} {includes}{shlex.quote(source)} "
-              f"-o {temporary}/f.i")
-    preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
+    preprocessed = preprocess_source(runner, workspace, args.cpp, source, includes)
     if oam_prefix:
         oam.verify_dependencies(preprocessed, root, oam_prefix)
     else:
@@ -2572,12 +2603,24 @@ def switch_scalar_words(data, address, instructions, descriptor, data_relocation
                         allow_empty=False):
     """(u16 records, wide records): the u16 scalar words, and the words outside
     the GBA bus that switch_wide_scalars binds. Any other value refuses."""
+    records, wide, _ = switch_scalar_word_classes(data, address, instructions, descriptor, data_relocations,
+                                                  functions, allow_empty=allow_empty)
+    return records, wide
+
+
+def switch_scalar_word_classes(data, address, instructions, descriptor, data_relocations, functions=(),
+                               allow_empty=False, bios=None):
+    """(u16 records, wide records, control records): switch_scalar_words' two
+    lists and, given `bios` = (rom, mapping, calls, declared), the BIOS copy
+    control words that switch_bios_control_words binds (declared() gives the
+    argument words of a callee's prototype in the source). Any other value
+    refuses."""
     known = {address + descriptor["literal"]} | {
         address + offset for offset in (*data_relocations, *functions)}
     reached = {((item.address + 4) & ~3) + operand.mem.disp
                for item in instructions for operand in item.operands
                if operand.type == ARM_OP_MEM and operand.mem.base == ARM_REG_PC}
-    records, wide = [], []
+    records, wide, controls = [], [], []
     table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
     for literal in sorted(reached - known):
         offset = literal - address
@@ -2588,15 +2631,28 @@ def switch_scalar_words(data, address, instructions, descriptor, data_relocation
         if wide_scalars.admits(value):
             wide.append([offset, value])
         elif value > 0xFFFF:
-            raise ValueError("switch scalar policy admits only u16 literal values")
+            if bios is None:
+                raise ValueError("switch scalar policy admits only u16 literal values")
+            rom, mapping, calls, declared = bios
+            try:
+                controls.append([offset, value, *control_words.uses(
+                    data, address, instructions, calls, BufferCallProof(rom, mapping).span, offset, value,
+                    declared)])
+            except ValueError as error:
+                raise ValueError(f"switch scalar policy admits only u16 literal values: 0x{value:08X} at "
+                                 f"0x{literal:08X} is no BIOS copy control word ({error})") from error
         else:
             records.append([offset, value])
-    if not records and not wide and not allow_empty:
+    if not records and not wide and not controls and not allow_empty:
         raise ValueError("u16 switch-data policy requires a reached scalar word")
-    return records, wide
+    return records, wide, controls
 
 
-def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None):
+def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None, declared=None):
+    """(instructions, control-flow summary) of a verified switch caller, or ValueError.
+
+    `declared`, given, is switch_bios_control_words.declarations() of the
+    caller's preprocessed source; without it no callee has known arguments."""
     data_profile = data_mapping is not None
     complete_data = data_profile and isinstance(manifest, dict) and \
         manifest.get("data_policy") == SWITCH_MULTIPLE_DATA_POLICY
@@ -2621,6 +2677,9 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
     wide_data = scalar_data and "wide_scalar_policy" in manifest
     if wide_data:
         wide_scalars.check_context(manifest["wide_scalar_policy"])
+    control_data = scalar_data and "control_word_policy" in manifest
+    if control_data:
+        control_words.check_context(manifest["control_word_policy"])
     outgoing_frame = isinstance(manifest, dict) and "frame_policy" in manifest
     if outgoing_frame and (not complete_data or scalar_data or
             manifest["frame_policy"] != typed_switch_frame.SELECTOR):
@@ -2641,6 +2700,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         fields.add("local_long_branches")
     if wide_data:
         fields.update(wide_scalars.FIELDS)
+    if control_data:
+        fields.update(control_words.FIELDS)
     if function_data:
         fields.update(("function_policy", "functions"))
     if thunk_selector:
@@ -2713,9 +2774,16 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                 raise ValueError("wide switch scalars require unique ordered exact words outside the GBA bus")
             previous = offset
             wide[offset] = value
+    controls = {}
+    if control_data:
+        for offset, value, *_ in control_words.records(manifest):
+            if offset < 0 or (address + offset) % 4 or offset + 4 > len(data) or \
+                    struct.unpack_from("<I", data, offset)[0] != value:
+                raise ValueError("switch control words require exact aligned complete words")
+            controls[offset] = value
     if scalar_data:
         records = manifest["scalars"]
-        if not isinstance(records, list) or not (0 if wide else 1) <= len(records) <= len(data) // 4:
+        if not isinstance(records, list) or not (0 if wide or controls else 1) <= len(records) <= len(data) // 4:
             raise ValueError("u16 switch-data requires a finite nonempty scalar manifest")
         previous = -1
         table_end = descriptor["table"] + 4 * (descriptor["bound"] + 1)
@@ -2779,7 +2847,8 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
                                      "or indexed function spans as data")
     calls = {}
     previous = -1
-    occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars, *wide, *functions)
+    occupied = {position for offset in (*relocations, *(data_relocations or {}), *scalars, *wide, *controls,
+                                        *functions)
                 for position in range(offset, offset + 4)}
     if thunk_selector:
         # Each thunk BL is bound here and only here; manifest["calls"] never names one.
@@ -2865,10 +2934,12 @@ def verify_switches(data, address, rom, mapping, manifest, *, data_mapping=None)
         expected_literals = {address + descriptor["literal"]} | {
             address + offset for offset in (*data_relocations, *functions)}
         if scalar_data:
-            if [manifest["scalars"], manifest.get("wide_scalars", [])] != list(switch_scalar_words(
-                    data, address, instructions, descriptor, data_relocations, functions)):
+            if [manifest["scalars"], manifest.get("wide_scalars", []), manifest.get("control_words", [])] != \
+                    list(switch_scalar_word_classes(
+                        data, address, instructions, descriptor, data_relocations, functions,
+                        bios=(rom, mapping, calls, control_words.undeclared if declared is None else declared))):
                 raise ValueError("complete reachable u16 scalar literal-word coverage is required")
-            expected_literals.update(address + offset for offset in (*scalars, *wide))
+            expected_literals.update(address + offset for offset in (*scalars, *wide, *controls))
         if reached_literals != expected_literals:
             raise ValueError("complete switch-data literal-word coverage is required")
     if function_data or thunk_selector or fixed_frame:
@@ -6017,6 +6088,8 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
         out.append(f"* switch manifest: `{switch_manifest(switch_evidence)}`\n")
         if "wide_scalar_policy" in switch_evidence:
             out.append(f"{wide_scalars.report_line()}\n")
+        for line in control_words.report_lines(addr, switch_evidence):
+            out.append(f"{line}\n")
         if "thunk_policy" in switch_evidence:
             # kit #393: each load-bearing thunk store premise, as the manifest derives it
             for line in switch_data_thunks.premise_lines(addr, switch_evidence):
@@ -6698,6 +6771,7 @@ def main():
                     got, addr, rom, mapping, division_evidence, selector=args.unsigned_quotient_profile)
             elif switch_relocations:
                 thunk_names = {target: name for name, target in function_thunk.ALIASES.items()}
+                declared = None
                 switch_evidence = {
                     "calls": [[site - addr, f"func_{target:08X}"]
                               for site, target in sorted(calls.items())
@@ -6733,15 +6807,22 @@ def main():
                         engine_track_rom=rom if thunk_switch_selector == music.SELECTOR else None,
                         switch_thunk_premises=thunk_premises)
                     switch_evidence["data_policy"] = SWITCH_MULTIPLE_DATA_POLICY
-                    scalar_records, wide_records = switch_scalar_words(
+                    # The argument words of a callee's prototype, from the unit cpp wrote for this compile.
+                    declared = control_words.declarations(
+                        lambda: runner.read_binary(f"{workspace}/f.i").decode("utf-8"))
+                    scalar_records, wide_records, control_records = switch_scalar_word_classes(
                         got, addr, scalar_instructions, switch_evidence["switch"], data_relocations,
-                        function_relocations, allow_empty=bool(thunk_switch_selector))
-                    if scalar_records or wide_records or not thunk_switch_selector:
+                        function_relocations, allow_empty=bool(thunk_switch_selector),
+                        bios=(rom, mapping, calls, declared))
+                    if scalar_records or wide_records or control_records or not thunk_switch_selector:
                         switch_evidence["scalar_policy"] = SWITCH_U16_SCALAR_POLICY
                         switch_evidence["scalars"] = scalar_records
                     if wide_records:
                         switch_evidence["wide_scalar_policy"] = wide_scalars.POLICY
                         switch_evidence["wide_scalars"] = wide_records
+                    if control_records:
+                        switch_evidence["control_word_policy"] = control_words.POLICY
+                        switch_evidence["control_words"] = control_records
                     if thunk_switch_selector:
                         if thunk_switch_selector == music.SELECTOR:
                             switch_evidence["engine_tracks"] = music.entry_contract(rom, addr, got)
@@ -6773,7 +6854,7 @@ def main():
                     try:
                         verified_instructions, _ = verify_switches(
                             got, addr, rom, mapping, switch_evidence,
-                            data_mapping=data_mapping if data_relocations else None)
+                            data_mapping=data_mapping if data_relocations else None, declared=declared)
                     except ValueError as switch_error:
                         if not owner_switch_buffer.retries(switch_evidence, args, calls, data_relocations,
                                                            function_relocations, thumb,

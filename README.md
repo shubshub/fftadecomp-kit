@@ -3818,8 +3818,91 @@ exists; the u16 `scalars` list may then be empty. Replay recomputes both lists
 from the bytes. The report prints the premise as
 `* switch wide scalar premise: ...`, exactly once and only when the manifest
 carries the policy. A word above `0xFFFF` and below `0x10000000` is still
-refused, and interposed pool words must still be typed objects or u16
-scalars. Nothing is claimed about how the code uses the value.
+refused unless it is a BIOS copy control word (below), and interposed pool
+words must still be typed objects or u16 scalars. Nothing is claimed about
+how the code uses the value.
+
+### Switch BIOS copy control words
+
+The same u16 scalar switch policies also bind a reached literal word above
+`0xFFFF` and below `0x10000000` when the walk shows it is nothing but the
+control word of a BIOS memory copy: GBATEK (BIOS Memory Copy) gives r2 of
+CpuSet and CpuFastSet as the length/mode word (bits 0-20 the count, bit 24 a
+fixed source, bit 26 32-bit units for CpuSet), so `0x04000080` copies 0x80
+words and is not an address. `tools/switch_bios_control_words.py` admits a
+word only when:
+
+* every reached load of it is a 16-bit `ldr rd, [pc, #imm]`, and from each
+  load one straight-line path carries the value only through register copies
+  (`adds rd, rn, #0`, `mov rd, rm`) into r2 of direct calls, reaching at
+  least one such call. Any other read refuses (a store, a push, arithmetic, a
+  comparison, an address), as do a copy in r0, r1 or r3 at a call, a copy in
+  r2 at any call but the indexed CpuSet (`swi 0x0B; bx lr`) or CpuFastSet
+  (`swi 0x0C; bx lr`) wrapper, and a copy live at a conditional branch, an
+  unbound call or a return. The flags an `adds` copy sets count as a copy
+  until an instruction overwrites them: read, or live at a return or at any
+  call but one of the wrapper, they refuse;
+* the wrapper is recognised as the BIOS wrapper summaries recognise it: the
+  call's target is the CpuSet or CpuFastSet entry of
+  `bios_wrapper_summary_profile.MEMORY`, and its complete, unique indexed row
+  holds exactly that wrapper's bytes. Never by name;
+* a call is not taken to write r2 or the flags, so the copy a wrapper call
+  leaves in r2, and the flags' taint, stay copies until an instruction
+  overwrites them, whatever calls come in between: a callee may return with
+  r2 unwritten. Any read of the left r2 refuses, by any instruction (a
+  register copy, `bx r2` and `mov pc, r2` included), and so does its being
+  live at a conditional branch, a second call or a PC write other than a
+  return. It may reach two things unread:
+  * the first call after the wrapper call, when that callee would not
+    receive it as an argument: its file-scope prototype in the preprocessed
+    source must declare at most two argument words, read as the volatile
+    checker reads one (`volatile_semantics.function_signature`); an
+    unprototyped `()`, a variadic list, a missing or an unreadable
+    declaration refuses. Where the kit has its own count for the callee,
+    the larger of that and the prototype's decides: a BIOS SWI wrapper (an
+    address of `bios_wrapper_summary_profile.WRAPPERS`, or any indexed row
+    that begins with `swi`) and a call thunk (a row that begins with
+    `bx rN`, rN not lr) count all of r0-r3, so a source that declares the
+    CpuFastSet or CpuSet wrapper with two arguments is still refused. The
+    ROM interface summary (`volatile_semantics.RomInterfaces`) gives none
+    for a callee whose CFG holds a word switch, which is why the prototype
+    is used;
+  * the function's own return, `pop {..., pc}` or `bx rN`, the forms the
+    switch verifier admits as a return. A return reads r0 (r0-r1 for a
+    64-bit result; agbcc returns a larger struct through memory) and a
+    caller treats r2 as clobbered after any call. The walk takes every such
+    instruction for that return; one that is not a return (a `bx lr` after
+    a call has written lr, a `bx r3`) is refused by the switch verifier's
+    return provenance, which every switch path runs;
+* stated premises: the callee of that first call reads only the arguments
+  its prototype declares, the function's callers treat r2 as clobbered
+  after calling it, and other calls neither read nor change a copy in
+  r4-r11;
+* the value is a whole control word for each routine it reaches, by the rule
+  the wrapper summaries apply to a local copy (`control_spans`): no reserved
+  bit, a count of at least 1, a multiple of 8 for CpuFastSet.
+
+The walk is the owner selectors' saved scalar-control walk
+(`bios_cpuset_fill_profile.saved_scalar_control_words`) widened to copy
+controls (bit 24 clear), unconditional branches, copies in r0-r11 and
+CpuFastSet, and narrowed by the flag and left-in-place rules above.
+
+Each word is recorded exactly, apart from the u16 and wide words, as
+`"control_words": [[offset, value, [[load, call], ...], [[call, arguments],
+...]], ...]` under `"control_word_policy": "bios-copy-control-words-v1"`, and
+only when one exists: the wrapper calls each load reaches, then each first
+call after one that the left r2 reaches, with the argument words of its
+callee's prototype. Replay recomputes the list from the bytes and the index, and
+preprocesses the bound source (`addressed_translation_unit`, the cpp step
+`compile_object` runs, on a snapshot of the files the source SHA-256 binds)
+only when a left copy reaches a call. The report prints
+`* switch control word premise: ...` once and one `* switch control word: ...`
+line per word, naming its address, its loads, its calls, the decoded routine,
+mode and count, and each such first callee with its declared argument words, and
+replay requires those lines exactly. A report without a control word is
+unchanged. Not proved: what the BIOS routine does with r2, or which spelling
+the source used (a data symbol at the same address links to the same bytes).
+
 ### Switch function literals
 
 `--switch-data-profile u16-scalars-functions-v1` and
