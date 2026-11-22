@@ -166,8 +166,11 @@ _CONDITIONS = (
     ((0, 1, 3), lambda n, z, c, v: not z and n == v), ((0, 1, 3), lambda n, z, c, v: z or n != v))
 
 
-def run(body, entry, count, destination_alignment, source_alignment):
+def run(body, entry, count, destination_alignment, source_alignment, *, maximum=MAX_COUNT):
     """Execute the helper bytes once on symbolic regions; return the observed effect.
+
+    ``maximum`` bounds the count (the buffer summary keeps MAX_COUNT); the
+    step budget bounds the run either way.
 
     Destination and source are distinct regions whose base addresses are
     unknown, apart from their low two bits.  Every value the helper could only
@@ -177,7 +180,7 @@ def run(body, entry, count, destination_alignment, source_alignment):
     content.
     """
     require(type(body) is bytes and len(body) % 2 == 0 and type(entry) is int and
-            type(count) is int and 0 <= count <= MAX_COUNT and
+            type(maximum) is int and type(count) is int and 0 <= count <= maximum and
             destination_alignment in range(4) and source_alignment in range(4),
             'copy helper run requires exact bounded inputs')
     entry_tokens = [Token(f'entry-r{i}') for i in range(16)]

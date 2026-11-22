@@ -1042,6 +1042,14 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if manifest is None:
             raise ValueError('typed owner bindings are required')
         bindings = manifest.get('bindings')
+    if selector == SELECTOR and type(bindings) is dict and type(bindings.get('calls')) is list and \
+            any(type(row) is list and row[1:] == ['memcpy'] for row in bindings['calls']):
+        # original_bindings bound the compiler's memcpy to the pinned helper; the
+        # proof names those sites after it, and compiler_memcpy below proves them.
+        if proof.get('schema') != runtime.OPTIONAL_SCHEMA:
+            raise ValueError('compiler memcpy binding requires the optional-runtime schema')
+        proof['calls'] = rom_copy.name_calls(proof['calls'], bindings)
+        ordinary['calls'] = [[site, name] for site, name in proof['calls'] if name != 'memcpy']
     if type(bindings) is not dict or set(bindings) != {'calls','data','functions','switches'} or \
             bindings['calls'] != sorted(proof['calls'] + proof['runtime_calls']):
         raise ValueError('owner bindings do not cover every exact reached external call')
@@ -1179,6 +1187,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if hardware:
             address_words -= {row[0] for row in hardware}
             proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
+    if selector == SELECTOR and any(name == 'memcpy' for _, name in proof['calls']):
+        proof['compiler_memcpy'] = copy_calls.compiler_memcpy(ins, edges, address, branches, calls, data,
+            [site for site, name in proof['calls'] if name == 'memcpy'],
+            {offset: name for offset, (name, _) in literals.items()}, rom, mapping, index)
     if selector == SELECTOR and proof.get('schema') == runtime.OPTIONAL_SCHEMA:
         # A whole CpuSet copy control in the address domain is a number only where
         # the owner CFG proves it is never anything but CpuSet's r2 (owner_copy_calls).
@@ -1394,7 +1406,7 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
                         instruction.id!=match.ARM_INS_BL or instruction.size!=4 or \
                         instruction.operands[0].imm!=address+site:
                     raise ValueError('owner call requires canonical Thumb BL zero addend')
-                destination=(rom_copy.memcpy_target(image,target) if selector in rom_copy.SELECTORS and name == 'memcpy' else
+                destination=(rom_copy.memcpy_target(image,target) if (selector in rom_copy.SELECTORS or selector == SELECTOR) and name == 'memcpy' else
                     transfer_task.original_target(image,address,site,target)
                     if selector == transfer_task.SELECTOR and name == 'memcpy' else
                     small_copy_binding.original_target(image,address,rom,mapping,index,objects,site,target)
@@ -1549,6 +1561,9 @@ def original_bindings(image,address,rom,mapping,objects, *, selector=SELECTOR, i
     # runtime.verify pins and proves whichever of those runtimes the owner calls.
     elif set(REMAINDER_NAMES) <= set(targets):
         raise ValueError('signed remainder call bindings are incomplete or mixed')
+    elif 'memcpy' in targets and any(name != 'memcpy' and not is_object and destination == rom_copy.HELPER
+                                     for name, (destination, is_object) in targets.items()):
+        raise ValueError('compiler copy helper cannot be laundered through another call identity')
     if selector in (local_calls.PANEL_TRANSFER, local_calls.PARTY_EFFECT):
         active_shuffle.compiler_symbol_roles(image, targets)
         if any(row['size'] for row in image['symbols'] if row['name'] in targets):
@@ -1581,6 +1596,8 @@ def object_bytes(runner,workspace,args,original,address,rom,mapping,objects, *, 
     if selector == stack_index.SELECTOR and address == 0x0807DDB8 and re.search(
             r'\bmemcpy\b',strip_comments_and_strings(preprocessed)):
         raise ValueError("menu initializer memcpy must be compiler-emitted")
+    if selector == SELECTOR and re.search(r'\b(?:__builtin_)?memcpy\b', strip_comments_and_strings(preprocessed)):
+        raise ValueError('compiler memcpy must be compiler-emitted, not named in the source')
     reserved = (r'\b(?:__divsi3|__modsi3|__udivsi3|__umodsi3)\b'
                 if selector in (installed_shuffle.SELECTOR, active_shuffle.SELECTOR, active_selection.SELECTOR, weighted_effect.SELECTOR, stat_drain.SELECTOR, *runtime_summary.SELECTORS, integer_pair.SELECTOR, integer_three.SELECTOR, integer_native.SELECTOR, integer_aligned_two.SELECTOR, integer_two.SELECTOR, integer_words.SELECTOR, integer_locals.SELECTOR, integer_data.SELECTOR) else
                 r'\b(?:__udivsi3|__modsi3)\b' if selector == SELECTOR else r'\b__udivsi3\b')
@@ -1979,6 +1996,8 @@ def render(address,result):
           if manifest['profile'] == named_buffer.SCHEMA and 'loop_replay' in manifest['proof']['buffers'] else []),
         *(copy_calls.control_lines(manifest['proof']['cpuset_copy_controls'])
           if manifest['profile'] == OPTIONAL_SCHEMA and 'cpuset_copy_controls' in manifest['proof'] else []),
+        *(copy_calls.memcpy_lines(manifest['proof']['compiler_memcpy'])
+          if manifest['profile'] == OPTIONAL_SCHEMA and 'compiler_memcpy' in manifest['proof'] else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])

@@ -1,4 +1,4 @@
-"""Copy calls of a closed restoring owner: CpuSet copy control words.
+"""Copy calls of a closed restoring owner: CpuSet copy control words and compiler memcpy.
 
 A restoring owner must bind every reached PC-relative word in the typed address
 domain [0x02000000, 0x09000000) to a typed object or function, so that no
@@ -44,8 +44,44 @@ containment, nonalias, readability or writability is proved for either range;
 the frame proof of the owner, which runs unchanged, is what bounds any local
 pointer.  The BIOS routine is the GBATEK premise; r4-r11 kept across calls is
 the owner proof's ordinary returning ABI premise.
+
+agbcc copies a structure by assignment with a call to ``memcpy`` that the
+source never names.  ``compiler_memcpy`` records such calls, which
+``owner_admission_profile.original_bindings`` binds, for this selector, to the
+pinned ROM helper 0x081443FC only through the unique undefined ``memcpy``
+symbol of the original object (and only when the preprocessed source names
+neither ``memcpy`` nor ``__builtin_memcpy``, so the call comes from a
+structure copy, not from a call the source spells).  Each call needs:
+
+* the helper authenticated by ``rom_table_copy_profile.helper_facts``: the
+  98-byte body with its SHA-256 in both indexes as one 49-instruction row,
+  its byte-loop path, a closed CFG, no register above r5 written.  That
+  SHA-256 is the toolchain's own library memcpy: newlib's
+  ``libc/string/memcpy.c`` from the agbcc tree, preprocessed with its libc
+  Makefile's flags and compiled ``-O2 -fno-builtin -mthumb-interwork``, has
+  these 98 bytes of code (``LIBRARY_MEMCPY``, ``toolchain_memcpy``).  Only
+  the 98 bytes are compared: the object's alignment fill after them (``c0
+  46`` from the assembler; the ROM has ``00 00``) is not part of the
+  identity.  Verification checks the pinned body digest only; the kit test
+  recompiles the source, and skips where the agbcc tree is not installed;
+* r2 an exact constant n, 1 <= n <= MEMCPY_LIMIT, on every path (the
+  must-analysis above);
+* the libgcc memcpy contract for that n, proved by executing the pinned bytes
+  on the symbolic interpreter of ``copy_helper_summary_profile`` for all 16
+  (destination mod 4, source mod 4) cases: writes exactly [dst, dst+n), each
+  byte its own source byte, reads only [src, src+n) and its own save words,
+  r0 = dst at the return, SP, r4-r11 and LR restored; and every destination
+  store follows the previous one, a forward byte/word copy.
+
+The call stays an ordinary call for the frame proof, so a stack pointer in
+r0-r2 is bounded or refused there as before.  Each call is recorded with its
+count and the provenance of r0 (destination) and r1 (source).  The
+interpreter treats the two ranges as disjoint, which is memcpy's own
+precondition: overlap, object extent, readability and writability are not
+proved.
 """
 import hashlib
+import json
 import struct
 
 from capstone.arm import (ARM_OP_IMM, ARM_OP_MEM, ARM_OP_REG, ARM_REG_R0, ARM_REG_R12,
@@ -311,6 +347,105 @@ CONTROL_PREMISES = ('GBATEK CpuSet reads and writes only the spans its control d
                     'is proved for either range')
 
 
+# The ROM helper's identity: the toolchain's newlib memcpy, built as the agbcc libc
+# Makefile preprocesses it, with the game's -mthumb-interwork (the Makefile's own
+# build omits it, and then the function returns with pop {pc} in 96 bytes).
+LIBRARY_MEMCPY = dict(
+    source='libc/string/memcpy.c',
+    source_sha256='89ee5338c9b7afed59068cfb408769c0c46cefe0c59f979731a4520311e53990',
+    cpp_flags=['-I', '../ginclude', '-I', 'include', '-nostdinc', '-undef', '-DABORT_PROVIDED',
+               '-DHAVE_GETTIMEOFDAY', '-D__thumb__', '-DARM_RDI_MONITOR', '-D__GNUC__',
+               '-DINTERNAL_NEWLIB', '-D__USER_LABEL_PREFIX__='],
+    cc1_flags=['-O2', '-fno-builtin', '-mthumb-interwork'],
+    assembler_flags=['-mcpu=arm7tdmi'],
+    body_sha256='aa822d873bad381a62e3c3e07b06003a41beea59bc3edc791f7e316eb08b7ebb',
+    # The assembler's alignment fill after the function in the compiled object; not part of the
+    # identity (the ROM has 00 00 there).
+    body_bytes=98, object_fill='c046')
+
+
+def toolchain_memcpy(tree, cc, cpp, assembler, objcopy, scratch):
+    """Compile the toolchain's library memcpy as LIBRARY_MEMCPY records; return its .text bytes."""
+    import subprocess
+    from pathlib import Path
+    tree, scratch = Path(tree), Path(scratch)
+    source = tree / LIBRARY_MEMCPY['source']
+    require(source.is_file() and hashlib.sha256(source.read_bytes()).hexdigest() ==
+            LIBRARY_MEMCPY['source_sha256'], 'toolchain library memcpy source differs')
+    run = dict(check=True, capture_output=True, cwd=tree / 'libc')
+    subprocess.run([cpp, *LIBRARY_MEMCPY['cpp_flags'], 'string/memcpy.c', '-o', str(scratch / 'memcpy.i')], **run)
+    subprocess.run([cc, *LIBRARY_MEMCPY['cc1_flags'], str(scratch / 'memcpy.i'), '-o', str(scratch / 'memcpy.s')], **run)
+    subprocess.run([assembler, *LIBRARY_MEMCPY['assembler_flags'], str(scratch / 'memcpy.s'), '-o',
+                    str(scratch / 'memcpy.o')], **run)
+    subprocess.run([objcopy, '-O', 'binary', '-j', '.text', str(scratch / 'memcpy.o'),
+                    str(scratch / 'memcpy.bin')], **run)
+    return (scratch / 'memcpy.bin').read_bytes()
+
+
+MEMCPY_SCHEMA = 'owner-compiler-memcpy-binding-v1'
+MEMCPY_LIMIT = 1024
+MEMCPY_CONTRACT = (
+    'compiler-emitted memcpy (the unique undefined memcpy symbol of the original object, not named '
+    'in the source) bound to the pinned 98-byte ROM helper 0x081443FC, whose bytes are the '
+    "toolchain's newlib memcpy (libc/string/memcpy.c, -O2 -fno-builtin -mthumb-interwork, recorded "
+    'recipe); r2 an exact constant count '
+    f'from 1 to {MEMCPY_LIMIT} on every path; for each count the pinned bytes executed in all 16 '
+    'alignment cases write exactly [dst, dst+n) forward, each byte its own source byte, read only '
+    '[src, src+n) and their own save words, return r0 = dst and restore SP, r4-r11 and LR; per call '
+    'the count and destination/source provenance are recorded; the call stays ordinary for the '
+    'frame proof; no overlap, object extent, readability, writability or termination theorem')
+
+
+def forward_contract(body, count):
+    """The libgcc memcpy contract of the pinned helper for one count, in all 16 alignment cases."""
+    import copy_helper_summary_profile as summary
+    cases = []
+    for destination in range(4):
+        for source in range(4):
+            case = summary.run(body, summary.HELPER, count, destination, source, maximum=MEMCPY_LIMIT)
+            cursor = 0
+            for region, offset, width in case['writes']:
+                if region == 'destination':
+                    require(offset == cursor and width in (1, 4),
+                            'copy helper does not write the destination forward')
+                    cursor += width
+            require(cursor == count, 'copy helper does not write the whole destination')
+            cases.append(case)
+    return dict(count=count, cases=len(cases),
+                steps=[min(case['steps'] for case in cases), max(case['steps'] for case in cases)],
+                execution_sha256=hashlib.sha256(json.dumps(cases, separators=(',', ':')).encode()).hexdigest())
+
+
+def compiler_memcpy(instructions, edges, address, branches, calls, data, sites, names, rom, mapping, index):
+    """The record of the owner's bound memcpy calls at owner offsets ``sites``."""
+    import match
+    import rom_table_copy_profile as rom_copy
+    require(sites, 'compiler memcpy record requires a bound call')
+    helper = rom_copy.helper_facts(rom, mapping, index)
+    body = rom[rom_copy.HELPER - match.ROM_BASE:rom_copy.HELPER - match.ROM_BASE + 98]
+    require(hashlib.sha256(body).hexdigest() == helper['body_sha256'] == LIBRARY_MEMCPY['body_sha256'],
+            "copy helper is not the toolchain's library memcpy")
+    facts = states(instructions, edges, address, branches, calls, data)
+    records, contracts = [], {}
+    for offset in sites:
+        site = address + offset
+        require(calls.get(site) == rom_copy.HELPER, 'compiler memcpy is not a direct call to the pinned helper')
+        arguments = facts[site]
+        count = arguments.get(R2)
+        require(type(count) is int and 1 <= count <= MEMCPY_LIMIT,
+                f'compiler memcpy count must be an exact constant from 1 to {MEMCPY_LIMIT} on every path')
+        if count not in contracts:
+            contracts[count] = forward_contract(body, count)
+        try:
+            destination, source = (origin(arguments.get(ARM_REG_R0 + n), names) for n in (0, 1))
+        except KeyError as error:
+            raise ValueError('compiler memcpy argument names an unbound literal') from error
+        records.append(dict(site=offset, count=count, destination=destination, source=source))
+    return dict(schema=MEMCPY_SCHEMA, contract=MEMCPY_CONTRACT, helper=helper, library_identity=LIBRARY_MEMCPY,
+                contracts=[contracts[count] for count in sorted(contracts)], calls=records,
+                source_named=False, overlap_proved=False, object_extent_proved=False)
+
+
 def where(fact):
     """A short printed form of one provenance record; a loaded word names its load site."""
     if 'constant' in fact:
@@ -320,6 +455,19 @@ def where(fact):
     if 'loaded_from' in fact:
         return f'*({fact["loaded_from"]}+0x{fact["field"]:X})@+0x{fact["load"]:X}+0x{fact["offset"]:X}'
     return 'unknown'
+
+
+def memcpy_lines(record):
+    """One report line per recorded compiler memcpy call."""
+    digests = {row['count']: row['execution_sha256'][:16] for row in record['contracts']}
+    library = record['library_identity']
+    return [f'* compiler memcpy helper: 0x{record["helper"]["helper"]:08X} is the toolchain newlib '
+            f'{library["source"]} ({library["source_sha256"][:16]}) compiled {" ".join(library["cc1_flags"])}: '
+            f'{library["body_bytes"]} bytes {library["body_sha256"][:16]}'] + [
+            f'* compiler memcpy: 0x{record["helper"]["helper"]:08X} at call +0x{call["site"]:X}: '
+            f'count {call["count"]}, destination {where(call["destination"])}, source '
+            f'{where(call["source"])}; contract 16 cases {digests[call["count"]]}; overlap and extent not proved'
+            for call in record['calls']]
 
 
 def control_lines(record):
