@@ -922,7 +922,35 @@
           "who": "claude-ffta2"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "ef1d3609ec5292a0cead1d53dcca98e3fd20c3c5cca24e0ca0727db272587aae",
+        "acknowledged_cursor": 7080273772,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "ef1d3609ec5292a0cead1d53dcca98e3fd20c3c5cca24e0ca0727db272587aae",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08117B9C\",\"who\":\"claude-ffta2\",\"claim_id\":7079790132,\"reason\":\"byte identical 1168/1168, refused: frame escapes inside a loop (kit #137); parked as evidence\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-22T14:04:40Z",
+          "id": 7080273772,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-22T14:04:40Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "773b149b1bc20fbe832a89d62d5a7e26009ed25158f9fd9dcdac89acebf39e40",
+        "result": {
+          "address": "0x08117B9C",
+          "claim_id": 7079790132,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 31369,
+          "request_id": 7080273772,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      }
     },
     {
       "claim": {
