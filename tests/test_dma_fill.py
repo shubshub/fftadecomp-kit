@@ -366,7 +366,7 @@ class DmaFillWalkTests(unittest.TestCase):
                        "movs r1, #0xc0\nadd r3, sp, #0\nlsls r1, r1, #0x13"):
             with self.subTest(window=window):
                 self.refused(source(window=window), ESCAPE)
-        self.records(source(window="movs r1, #0xc0\nmov r3, r8\ncmp r3, #0\nmuls r3, r3\nlsls r1, r1, #0x13"))
+        self.records(source(window="movs r1, #0xc0\nmov r3, r8\ncmp r3, #0\nmuls r3, r5\nlsls r1, r1, #0x13"))
         # The control store before the destination store.
         self.refused(source(window="movs r1, #0xc0\nlsls r1, r1, #0x13\nldr r2, =0x8100C000\nstr r2, [r4, #8]",
                             tail=""), ESCAPE)
