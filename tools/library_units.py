@@ -48,6 +48,8 @@ ROM_BASE = 0x08000000
 TOOLCHAINS = {
     "agbcc-O0-v1": {"cc": "$HOME/agbcc/gcc/agbcc", "flags": "-mthumb-interwork -O0", "old": False},
     "agbcc-O1-v1": {"cc": "$HOME/agbcc/gcc/agbcc", "flags": "-mthumb-interwork -O1", "old": False},
+    "agbcc-O2-prologue-bugfix-v1": {"cc": "$HOME/agbcc/gcc/agbcc",
+                                    "flags": "-mthumb-interwork -O2 -fprologue-bugfix", "old": False},
     "old-agbcc-O2-v1": {"cc": "$HOME/agbcc/gcc/old_agbcc", "flags": "-mthumb-interwork -O2", "old": True},
 }
 KEYS = {"name", "start", "end", "toolchain", "identity", "proof", "evidence"}
@@ -633,7 +635,10 @@ def report_admitted(report, root, address):
 
 
 def status_summary(root, functions, matched, code_end):
-    """Per-unit counts and the proof/staleness problems of the table, for status.py."""
+    """Per-unit counts and the proof/staleness problems of the table, for status.py.
+
+    A unit counts every index function inside it, also beyond code_end; the
+    functions outside every unit are counted below code_end only."""
     problems = []
     try:
         units = load(root)
@@ -641,8 +646,7 @@ def status_summary(root, functions, matched, code_end):
         return [f"library units: {error}"], None
     if not units:
         return [], None
-    spans = [(int(entry["rom"], 16) & ~1, int(entry["end"], 16)) for entry in functions
-             if int(entry["rom"], 16) < code_end]
+    spans = [(int(entry["rom"], 16) & ~1, int(entry["end"], 16)) for entry in functions]
     rows = []
     outside = [0, 0]
     inside_any = set()
@@ -670,7 +674,7 @@ def status_summary(root, functions, matched, code_end):
         except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
             problems.append(f"{label}: {error}")
     for start, _ in spans:
-        if start not in inside_any:
+        if start < code_end and start not in inside_any:
             outside[0] += 1
             outside[1] += start in matched
     return problems, {"units": rows, "outside_functions": outside[0], "outside_matched": outside[1]}

@@ -760,5 +760,190 @@ class OrphanRecordTests(unittest.TestCase):
                 self.assertFalse(match_evidence.report_matches(self.with_record(record), self.root.path, A))
 
 
+
+# a branching leaf that saves no low register: agbcc -O2 pushes lr, -fprologue-bugfix returns by bx lr
+BRANCH_LEAF = """void func_08002100(void)
+{
+    if (!(*(unsigned short *)0x03001000 & 1))
+        *(unsigned short *)0x03001004 = 0;
+}
+"""
+# no branch: the same object with and without -fprologue-bugfix
+MEMBER = """int func_08002200(int a, int b)
+{
+    return a - b;
+}
+"""
+LATE_OUTSIDE = """int func_08002300(int a, int b)
+{
+    return a + b;
+}
+"""
+H, I, J = 0x08002100, 0x08002200, 0x08002300
+BUGFIX = 'agbcc-O2-prologue-bugfix-v1'
+BUGFIX_FLAGS = '-mthumb-interwork -O2 -fprologue-bugfix'
+
+
+@unittest.skipUnless(HAVE_COMPILER, 'fixed compiler required')
+class PrologueBugfixUnitTests(unittest.TestCase):
+    """agbcc -O2 -fprologue-bugfix inside a unit naming it, nowhere else; a unit in late ROM is counted."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.root = Root([(A, COUNTDOWN, match.DEFAULT_CC, '-mthumb-interwork -O1'),
+                         (B, LOOP.format(address=B), match.DEFAULT_CC, match.DEFAULT_FLAGS),
+                         (C, OUTSIDE, match.DEFAULT_CC, match.DEFAULT_FLAGS),
+                         (H, BRANCH_LEAF, match.DEFAULT_CC, BUGFIX_FLAGS),
+                         (I, MEMBER, match.DEFAULT_CC, match.DEFAULT_FLAGS),
+                         (J, LATE_OUTSIDE, match.DEFAULT_CC, match.DEFAULT_FLAGS)], [])
+        rom = (cls.root.path / 'baserom.bin').read_bytes()
+        digest = [{'address': f'0x{H:08X}', 'size': cls.root.end(I) - H,
+                   'sha256': hashlib.sha256(rom[H - match.ROM_BASE:cls.root.end(I) - match.ROM_BASE]).hexdigest()}]
+        cls.o1_row = row('testlib', A, cls.root.end(B), 'agbcc-O1-v1', A)
+        cls.row = row('monitor', H, cls.root.end(I), BUGFIX, H, digest)
+        cls.root.write_table([cls.o1_row, cls.row])
+        cls.environment = patch.dict(os.environ, FFTA_ROM=str(cls.root.path / 'baserom.bin'))
+        cls.environment.start()
+        cls.reports = {}
+        for address, options in ((A, ('--unit-toolchain', 'agbcc-O1-v1')), (B, ()), (C, ()),
+                                 (H, ('--unit-toolchain', BUGFIX)), (I, ()), (J, ())):
+            result = cls.root.run(address, *options, write=True)
+            assert result.returncode == 0, result.stdout + result.stderr
+            cls.reports[address] = cls.root.report(address)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.environment.stop()
+        cls.root.temporary.cleanup()
+
+    def setUp(self):
+        self.root.write_table([self.o1_row, self.row])
+
+    def refused(self, address, options, message):
+        result = self.root.run(address, *options)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(message, result.stderr)
+
+    def test_the_flag_set_is_exact(self):
+        self.assertEqual(units.TOOLCHAINS[BUGFIX],
+                         {'cc': '$HOME/agbcc/gcc/agbcc', 'flags': BUGFIX_FLAGS, 'old': False})
+        tool = units.resolve(BUGFIX)
+        self.assertEqual((tool['cc'], tool['flags']), (match.DEFAULT_CC, BUGFIX_FLAGS))
+        self.assertEqual(tool['sha256'], hashlib.sha256(
+            Path(os.path.expandvars(match.DEFAULT_CC)).read_bytes()).hexdigest())
+        report = self.reports[H]
+        self.assertIn(f'* compiler: `$HOME/agbcc/gcc/agbcc {BUGFIX_FLAGS}`', report.splitlines())
+        for flags in ('-mthumb-interwork -O2', '-mthumb-interwork -fprologue-bugfix -O2',
+                      BUGFIX_FLAGS + ' -fno-common', '-mthumb-interwork -O1 -fprologue-bugfix'):
+            with self.subTest(flags=flags):
+                forged = report.replace(f'{BUGFIX_FLAGS}`', f'{flags}`')
+                self.assertNotEqual(forged, report)
+                self.assertFalse(match_evidence.report_matches(forged, self.root.path, H))
+
+    def test_the_proof_verifies_only_with_the_unit_toolchain(self):
+        report = self.reports[H]
+        self.assertIn('**MATCH - byte identical**', report)
+        self.assertIn(f'* library unit: `{units.canonical(self.row)}`', report)
+        self.assertIn(f'* unit toolchain: `{BUGFIX}`', report)
+        self.assertIsNone(units.binding(report)[3])
+        self.assertTrue(match_evidence.report_matches(report, self.root.path, H))
+        self.assertEqual(rebuild.saved_profile_arguments(report, self.root.path, H), ['--unit-toolchain', BUGFIX])
+        # the default toolchain saves lr in this leaf; the unit's returns by bx lr
+        unit = units.containing(units.load(self.root.path), H)
+        default = units.compiled_signature(self.root.path, H, match.DEFAULT_CC, match.DEFAULT_FLAGS)[0]
+        bugfix = units.compiled_signature(self.root.path, H, match.DEFAULT_CC, BUGFIX_FLAGS)[0]
+        rom = (self.root.path / 'baserom.bin').read_bytes()
+        body = rom[H - match.ROM_BASE:self.root.end(H) - match.ROM_BASE]
+        self.assertEqual(bugfix[:len(body)], body)
+        self.assertEqual(default[:2], bytes.fromhex('00b5'))
+        self.assertNotEqual(body[:2], bytes.fromhex('00b5'))
+        self.assertIn(bytes.fromhex('7047'), body)
+        self.assertTrue(units.necessary(self.root.path, unit))
+        self.refused(H, (), f"default-toolchain object differs from {BUGFIX}'s")
+        self.refused(H, ('--flags', BUGFIX_FLAGS), f'verify it with --unit-toolchain {BUGFIX}')
+        self.refused(H, ('--unit-toolchain', BUGFIX, '--flags', BUGFIX_FLAGS), 'do not combine')
+        self.refused(H, ('--unit-toolchain', 'agbcc-O1-v1'), f'built with {BUGFIX}, not agbcc-O1-v1')
+
+    def test_a_member_verifies_with_either_toolchain(self):
+        self.assertTrue(match_evidence.report_matches(self.reports[I], self.root.path, I))
+        self.assertIsNone(units.binding(self.reports[I]))
+        self.assertIn('verdict MATCH - byte identical',
+                      self.root.run(I, '--unit-toolchain', BUGFIX).stdout.splitlines())
+
+    def test_the_toolchain_is_refused_outside_its_unit(self):
+        self.refused(C, ('--unit-toolchain', BUGFIX), 'not inside a library unit')
+        self.refused(J, ('--unit-toolchain', BUGFIX), 'not inside a library unit')
+        self.refused(A, ('--unit-toolchain', BUGFIX), f'built with agbcc-O1-v1, not {BUGFIX}')
+        result = self.root.run(C, '--flags', BUGFIX_FLAGS, write=True)
+        self.assertEqual(result.returncode, 1)
+        self.assertTrue(any(line.startswith('verdict NOT VERIFIED') for line in result.stdout.splitlines()))
+        self.assertEqual(self.root.report(C), self.reports[C])
+        bound = self.reports[C].replace('* compiler:', '\n'.join(units.report_lines(
+            {'unit': units.containing(units.load(self.root.path), H), 'tool': units.resolve(BUGFIX)}, None)) +
+            '\n* compiler:').replace(f'{match.DEFAULT_CC} {match.DEFAULT_FLAGS}`', f'{match.DEFAULT_CC} {BUGFIX_FLAGS}`')
+        self.assertFalse(match_evidence.report_matches(bound, self.root.path, C))
+        self.root.write_table([self.o1_row])
+        self.refused(H, ('--unit-toolchain', BUGFIX), 'not inside a library unit')
+        self.assertFalse(match_evidence.report_matches(self.reports[H], self.root.path, H))
+
+    def test_a_unit_in_late_rom_counts_its_functions(self):
+        functions = json.loads((self.root.path / 'config/functions.json').read_text())
+        problems, summary = units.status_summary(self.root.path, functions, {A, B, C, H, I, J}, H)
+        self.assertEqual(problems, [])
+        late = [unit for unit in summary['units'] if unit['name'] == 'monitor']
+        size = self.root.end(H) - H + self.root.end(I) - I
+        self.assertEqual([(unit['functions'], unit['matched'], unit['bytes'], unit['matched_bytes'])
+                          for unit in late], [(2, 2, size, size)])
+        self.assertEqual((summary['outside_functions'], summary['outside_matched']), (1, 1))
+        # a function outside units that starts exactly at code_end is late, not counted outside units
+        summary = units.status_summary(self.root.path, functions, {A, B, C, H, I, J}, J)[1]
+        self.assertEqual((summary['outside_functions'], summary['outside_matched']), (1, 1))
+        problems, summary = units.status_summary(self.root.path, functions, {A, B, C, I, J}, H)
+        self.assertEqual(problems, [f'library unit monitor: proving function 0x{H:08X} is not verified'])
+
+    def test_status_passes_verified_late_functions_to_the_units(self):
+        progress = {}
+        with patch.object(status, 'CODE_END', H):
+            result = status.collect(str(self.root.path), False, progress=progress)
+        self.assertEqual(result[4], [])
+        self.assertEqual((result[0], result[1], result[5]), (3, 3, 3))
+        rows = {unit['name']: (unit['matched'], unit['functions']) for unit in progress['library_units']['units']}
+        self.assertEqual(rows, {'testlib': (2, 2), 'monitor': (2, 2)})
+        self.assertEqual((progress['library_units']['outside_functions'],
+                          progress['library_units']['outside_matched']), (1, 1))
+        with patch.object(status, 'CODE_END', H):
+            block = status.render(*result[:5], late_f=result[5], late_b=result[6], progress=progress)[0]
+        self.assertIn(f'Library functions below `0x{H:08X}` are included in the totals above; '
+                      'those at or above it are among the additional late-ROM spans.', block.splitlines())
+        self.assertNotIn('Library functions are included in the totals above.', block.splitlines())
+        early = dict(progress, library_units=dict(progress['library_units'], units=[
+            unit for unit in progress['library_units']['units'] if unit['name'] == 'testlib']))
+        with patch.object(status, 'CODE_END', H):
+            block = status.render(*result[:5], late_f=result[5], late_b=result[6], progress=early)[0]
+        self.assertIn('Library functions are included in the totals above.', block.splitlines())
+
+    def test_a_refused_late_function_does_not_count_for_its_unit(self):
+        # a main body that reaches into the proof, or a main body of unknown extent, refuses late functions
+        path = self.root.path / 'docs/match' / f'{C:08X}.md'
+        self.addCleanup(path.write_text, path.read_text())
+        cases = (('* compiled : `' + '00' * (H + 2 - C) + '`\n',
+                  [f'{H:08X}: late function overlaps another verified body'], (1, 2), 2),
+                 ('no extent\n',
+                  [f'{address:08X}: cannot exclude overlap with an unknown complete main-body extent'
+                   for address in (H, I, J)], (0, 2), 0))
+        for text, refusals, monitor, late in cases:
+            with self.subTest(refusals=refusals[0]):
+                path.write_text(text)
+                progress = {}
+                with patch.object(status, 'CODE_END', H), patch.object(status, 'report_matches', return_value=True):
+                    result = status.collect(str(self.root.path), False, progress=progress)
+                self.assertEqual(result[4], refusals + [
+                    f'library unit monitor: proving function 0x{H:08X} is not verified'])
+                self.assertEqual((result[1], result[5]), (3, late))
+                rows = {unit['name']: (unit['matched'], unit['functions'])
+                        for unit in progress['library_units']['units']}
+                self.assertEqual(rows, {'testlib': (2, 2), 'monitor': monitor})
+
+
 if __name__ == '__main__':
     unittest.main()
