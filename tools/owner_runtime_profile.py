@@ -4,6 +4,11 @@ The caller supplies the frozen native owner reconstruction. Every invocation
 replays that graph, its complete partition, canonical runtime identities, ordinary
 call bindings, and the opt-in restoring-frame proof. No addressed runtime alias
 or inferred dynamic indirect-callee contract is accepted.
+
+SCHEMA records exactly the domain it was written for: constant unsigned division
+beside at least one canonical thunk, nothing else, in a whole number of words.
+Every other owner the same proofs close is recorded under OPTIONAL_SCHEMA, which
+pins each runtime it actually calls and nothing it does not.
 """
 
 import hashlib
@@ -22,6 +27,7 @@ import owner_graph_profile as inventory
 import analyze
 
 SCHEMA = "private-thumb-owner-thunk-udiv-inventory-v1"
+OPTIONAL_SCHEMA = "private-thumb-owner-optional-runtime-inventory-v1"
 
 
 def verify_operations(instructions, edges, address, branches, calls, refinement):
@@ -125,9 +131,14 @@ def canonical_calls(calls, entries, address, size, rom):
         else:
             ordinary[site] = match.function_address_target(
                 f"func_{target:08X}", entries, address, size, len(rom))
-    if "__udivsi3" not in runtime.values() or not set(runtime.values()) & thunks.ALIASES.keys():
-        raise ValueError("composition requires actual unsigned division and canonical thunk calls")
     return runtime, ordinary
+
+
+def original_domain(runtime, size):
+    """True only for the owners SCHEMA was written for, so its records never change."""
+    names = set(runtime.values())
+    return "__udivsi3" in names and bool(names & thunks.ALIASES.keys()) and \
+        names <= {"__udivsi3", *thunks.ALIASES} and size % 4 == 0
 
 
 def verify(data, address, rom, mapping, refinement, manifest=None):
@@ -155,31 +166,46 @@ def verify(data, address, rom, mapping, refinement, manifest=None):
     if len(instructions) != owners[0]["instrs"]:
         raise ValueError("owner composition instruction count differs from exact mapping")
     runtime, ordinary = canonical_calls(calls, entries, address, len(data), rom)
-    match.verify_udivsi3_identity(rom, mapping)
-    dependencies = thunks.dependencies([name for name in runtime.values()
-                                       if name != "__udivsi3"], rom)
+    original = original_domain(runtime, len(data))
+    # Each runtime identity and operand proof runs exactly when that runtime is
+    # called. None of the frame, alias, buffer or partition proofs depends on a
+    # runtime being present; without one the frame proof sees ordinary calls only.
+    udiv_sites = {site for site, name in runtime.items() if name == "__udivsi3"}
+    thunk_names = [name for name in runtime.values() if name in thunks.ALIASES]
+    if udiv_sites:
+        match.verify_udivsi3_identity(rom, mapping)
+    dependencies = thunks.dependencies(thunk_names, rom)
     divisors = prove_divisors(instructions, edges, address, branches, calls,
-                             {site for site, name in runtime.items() if name == "__udivsi3"})
+                             udiv_sites) if udiv_sites else {}
     buffer = match.BufferCallProof(rom, mapping)
     frame_record = frame.prove_frame(instructions, edges, address, branches, calls,
                                     stack_aliases=True, buffer_proof=buffer,
-                                    runtime_calls=runtime)
+                                    runtime_calls=runtime or None)
     observed = {
-        "schema": SCHEMA, "address": address, "end": end, "bytes": len(data),
+        "schema": SCHEMA if original else OPTIONAL_SCHEMA, "address": address, "end": end,
+        "bytes": len(data),
         "instructions": len(instructions), "body_sha256": hashlib.sha256(data).hexdigest(),
         "mapping_sha256": hashlib.sha256(mapping).hexdigest(),
         "calls": [[site - address, f"func_{target:08X}"]
                   for site, target in sorted(ordinary.items())],
         "runtime_calls": [[site - address, name] for site, name in sorted(runtime.items())],
-        "thunk_ABI": thunks.ABI, "thunk_dependencies": dependencies,
-        "udiv_runtime": match.UDIVSI3_RUNTIME,
-        "udiv_dependencies": [list(identity) for identity in match.UDIVSI3_IDENTITIES],
-        "divisors": [[site - address, value] for site, value in sorted(divisors.items())],
         "frame": frame_record, "partition": partition,
         "buffer_dependencies": [[target, hashlib.sha256(body).hexdigest()]
                                 for target, body in sorted(buffer.dependencies.items())],
         "source_or_original_ELF_admission": False,
     }
+    if not original:
+        # Each same-owner BL is a jump, recorded as an edge; prove_frame shows no
+        # return goes through the LR it leaves.
+        observed["local_branches"] = [[site - address, target - address]
+                                      for site, target in sorted(branches.items())]
+    if thunk_names:
+        observed.update(thunk_ABI=thunks.ABI, thunk_dependencies=dependencies)
+    if udiv_sites:
+        observed.update(
+            udiv_runtime=match.UDIVSI3_RUNTIME,
+            udiv_dependencies=[list(identity) for identity in match.UDIVSI3_IDENTITIES],
+            divisors=[[site - address, value] for site, value in sorted(divisors.items())])
     if manifest is not None and (type(manifest) is not dict or
                                 json.dumps(manifest, sort_keys=True) !=
                                 json.dumps(observed, sort_keys=True)):

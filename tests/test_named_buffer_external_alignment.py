@@ -69,7 +69,8 @@ class ExternalAlignmentTests(unittest.TestCase):
                 self.bindings(image)
 
     def test_other_selectors_keep_their_original_extent_contract(self):
-        for selector in (owner.SELECTOR, owner.ACYCLIC_SELECTOR):
+        # restoring-owner-runtime-v1 admits the same closing halfword (its own tests).
+        for selector in (owner.ACYCLIC_SELECTOR,):
             with self.subTest(selector=selector), self.assertRaisesRegex(ValueError, 'sole complete'):
                 self.bindings(self.image, selector)
 
