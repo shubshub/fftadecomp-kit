@@ -435,12 +435,9 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
     spans = index_progress(fns, matched_main)
     if progress is not None:
         progress.update(spans)
-    unit_problems, unit_summary = library_units.status_summary(root, fns, matched_main, CODE_END)
-    problems.extend(unit_problems)
-    if progress is not None and unit_summary is not None:
-        progress["library_units"] = unit_summary
 
     late_f, late_b = 0, 0
+    late_matched = set()
     unknown_main_extent = any(size is None and not late for _, size, late in verified_bodies)
     for index, (address, size, late) in enumerate(verified_bodies):
         if not late:
@@ -455,6 +452,12 @@ def collect(root, verify, quiet=False, write_reports=False, jobs=1, worker_proce
             continue
         late_f += 1
         late_b += size
+        late_matched.add(address)
+    # a unit in late ROM counts its verified late functions
+    unit_problems, unit_summary = library_units.status_summary(root, fns, matched_main | late_matched, CODE_END)
+    problems.extend(unit_problems)
+    if progress is not None and unit_summary is not None:
+        progress["library_units"] = unit_summary
     return total_fns, len(matched_main), spans["total"], spans["matched"], problems, late_f, late_b
 
 
@@ -547,8 +550,12 @@ def render(total_f, matched_f, total_b, matched_b, problems, prefix="", badge_ba
         lines += [""] + render_regions(progress)
     units = (progress or {}).get("library_units")
     if units:
+        included = "Library functions are included in the totals above."
+        if any(unit["end"] > CODE_END for unit in units["units"]):
+            included = (f"Library functions below `0x{CODE_END:08X}` are included in the totals above; "
+                        "those at or above it are among the additional late-ROM spans.")
         lines += [
-            "", "Library functions are included in the totals above.", "",
+            "", included, "",
             "| Unit | Range | Toolchain | Functions matched | Bytes matched |",
             "|---|---|---|---|---|",
         ] + [f"| {unit['name']} | `0x{unit['start']:08X}`-`0x{unit['end']:08X}` | `{unit['toolchain']}` | "

@@ -2917,6 +2917,7 @@ closed set of toolchains a row may name and all the checks:
 |---|---|---|
 | `agbcc-O0-v1` | `$HOME/agbcc/gcc/agbcc` | `-mthumb-interwork -O0` |
 | `agbcc-O1-v1` | `$HOME/agbcc/gcc/agbcc` | `-mthumb-interwork -O1` |
+| `agbcc-O2-prologue-bugfix-v1` | `$HOME/agbcc/gcc/agbcc` | `-mthumb-interwork -O2 -fprologue-bugfix` |
 | `old-agbcc-O2-v1` | `$HOME/agbcc/gcc/old_agbcc` | `-mthumb-interwork -O2` |
 
 ```json
@@ -3086,7 +3087,11 @@ and `* unit compiler SHA-256:`, and `* unit orphan constants:` when a
 compiler binary hash and the unit's compiler line. `status.py --verify`
 and `rebuild.py --compiled` replay unit reports with their
 `--unit-toolchain`, and the status block
-lists each unit's functions apart from everything outside units. The
+lists each unit's functions apart from everything outside units. A unit
+may lie at or above `0x08150000`; its row then counts its verified late-ROM
+functions, which the block counts among the late-ROM spans and not in the
+main totals, and the row for everything outside units still counts only the
+main index. The
 saved-report check recompiles a function that calls through `_call_via_rN`;
 for a unit report it compiles with the report's unit toolchain and removes
 the authenticated orphan constants first, as `match.py` does, and every
@@ -3098,6 +3103,20 @@ binary that accepts `-fprologue-bugfix`, which only the new compiler has.
 `make -C gcc old` in a tree that already built `agbcc` relinks the new
 objects, so build it from a clean tree (see "Reproducing the reference
 agbcc").
+
+`agbcc-O2-prologue-bugfix-v1` is the default compiler and flags plus
+pret/agbcc's `-fprologue-bugfix`. Without that option, `far_jump_used_p` in
+`gcc/thumb.c` returns a far-jump flag cached while reload computes the frame
+offsets, before branch lengths are known. So a leaf that saves no low register
+but has a conditional branch also pushes `lr` and returns by popping it into
+a free low register for `bx`. With the option the prologue scans the final
+jumps again, and such a leaf returns by `bx lr`. Reload still laid out its
+frame as if `lr` were pushed, so such a leaf loads a stack-passed argument 4
+bytes above where it lies (`ldr r0, [sp, #4]` with nothing pushed, for the
+fifth argument): a ROM leaf that reads its stack arguments correctly without
+saving `lr` was not built with this toolchain. A function that saves a low
+register or calls saves `lr` either way; inside such a unit the consistency
+check admits its default-toolchain report when the two objects are identical.
 
 A decomp whose table names `old-agbcc-O2-v1` needs `old_agbcc` installed to
 verify any function in that unit. Default-toolchain reports there are
