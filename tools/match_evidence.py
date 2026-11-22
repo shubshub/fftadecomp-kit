@@ -18,6 +18,7 @@ import switch_constants_profile as switch_constants
 import typed_switch_outgoing_frame as typed_switch_frame
 import switch_pool_outgoing_frame as pool_switch_frame
 import switch_wide_scalars as wide_scalars
+import switch_bios_control_words as control_words
 import switch_data_thunks
 import m4a_track_switch as music
 import subprocess
@@ -950,9 +951,17 @@ def switch_report_matches(lines, root, address, *, data_profile=False, parts=Non
                 [wide_scalars.report_line()] if isinstance(manifest, dict) and
                 "wide_scalar_policy" in manifest else []):
             return False
+        # So are the control-word premise and the line of each control word.
+        if [line for line in lines if line.lstrip().startswith(control_words.REPORT_PREFIX)] != \
+                control_words.report_lines(address, manifest):
+            return False
         rom = Path(report_rom_path(root)).read_bytes()
+        # A callee's prototype comes from the bound source, preprocessed only if a control word needs one.
+        from match import addressed_translation_unit
+        digest = unquote("* source SHA-256: ")
+        declared = control_words.declarations(lambda: addressed_translation_unit(root, address, digest))
         instructions, control_flow = verify_switches(data, address, rom, mapping, manifest,
-                                                    data_mapping=objects)
+                                                    data_mapping=objects, declared=declared)
         if thunk_selector is not None and switch_data_thunks.selector_for_manifest(manifest) != thunk_selector:
             return False
         fingerprint = (switch_data_thunks.fingerprint if thunk_selector is not None else
