@@ -3,11 +3,14 @@ from contextlib import redirect_stdout
 import copy
 import io
 import json
+from pathlib import Path
 import struct
 import sys
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import test_bios_scalar_function_literals as fixtures
 
 profile, match, A = fixtures.profile, fixtures.match, fixtures.A

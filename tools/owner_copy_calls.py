@@ -2,11 +2,14 @@
 
 A restoring owner must bind every reached PC-relative word in the typed address
 domain [0x02000000, 0x09000000) to a typed object or function, so that no
-address is written in the source as a bare number.  A CpuSet copy control
-whose count has bit 26 set (32-bit units) lies in that domain without being an
-address: 0x04000080 copies 0x80 words.  ``copy_controls`` takes such a word
-out of the typed coverage only when the owner's own CFG proves it is a number
-passed to CpuSet and nothing else:
+address is written in the source as a bare number; under the optional schema
+an untyped word in the hardware window [0x04000000, 0x08000000) none of whose
+loads may reach CpuSet's r2 (``reaches_cpuset_control``) is a numeric hardware
+word instead (owner_admission_profile).  A CpuSet copy control whose count has
+bit 26 set (32-bit units) lies in that domain without being an address:
+0x04000080 copies 0x80 words.  ``copy_controls`` takes such a word out of the
+typed coverage only when the owner's own CFG proves it is a number passed to
+CpuSet and nothing else:
 
 * the word is a whole CpuSet copy control: count (bits 0-20) at least 1, bit
   26 the unit (4 bytes; 2 when clear), bit 24 (fill) clear and no other bit
@@ -280,6 +283,41 @@ def control_uses(instructions, edges, branches, calls, load):
                 pending.append(successor)
     require(uses, 'CpuSet copy control load reaches no CpuSet call')
     return sorted(uses)
+
+
+def reaches_cpuset_control(instructions, edges, branches, calls, load):
+    """True when the value loaded at ``load`` may be r2 at a call to the CpuSet wrapper.
+
+    The register copies ``control_uses`` follows, over the complete CFG, union at
+    joins; any other write ends a register's copy and every call ends r0-r3, r12
+    and LR. Never refuses: it only decides that a word is not a plain number.
+    """
+    seed = instructions[load].operands[0].reg
+    marks, pending = {load: frozenset()}, [load]
+    while pending:
+        site = pending.pop()
+        held = marks[site]
+        if site in calls:
+            if R2 in held and calls[site] == cpuset.ADDRESS:
+                return True
+            held = held - CLOBBERED
+        elif site in branches:
+            held = held - {ARM_REG_LR}
+        else:
+            writes = set(instructions[site].regs_access()[1])
+            copy = _copy(instructions[site])
+            if site == load:
+                held = (held - writes) | {seed}
+            elif copy is not None and copy[1] in held:
+                held = (held - writes) | {copy[0]}
+            else:
+                held = held - writes
+        for successor in edges[site]:
+            merged = marks.get(successor, frozenset()) | held
+            if marks.get(successor) != merged:
+                marks[successor] = merged
+                pending.append(successor)
+    return False
 
 
 def wrapper(rom, mapping, index):

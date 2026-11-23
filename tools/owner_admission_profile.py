@@ -499,6 +499,13 @@ def numeric_hardware_record(rows):
     return dict(schema=NUMERIC_HARDWARE_SCHEMA, words=rows, contract=NUMERIC_HARDWARE_CONTRACT)
 
 
+def numeric_hardware_lines(record):
+    """The contract, then one report line per numeric hardware word of a restoring owner."""
+    return [f'* numeric hardware literal premises: {NUMERIC_HARDWARE_CONTRACT}'] + [
+        f'* numeric hardware literal: word +0x{offset:X} = 0x{value:08X}, loaded at ' +
+        ', '.join(f'+0x{site:X}' for site in sites) for offset, value, sites in record['words']]
+
+
 def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindings=None,
            selector=SELECTOR, source_fingerprint=None, rodata=None, premises=None):
     """Replay complete structural/frame/runtime proof before typed provenance."""
@@ -1190,6 +1197,21 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         address_words -= {site for site,_ in rodata['sites']}
     if selector in NUMERIC_HARDWARE_SELECTORS or selector == named_buffer.SELECTOR and address == 0x0811C2E8:
         hardware = numeric_hardware_words(ins, edges, calls, proof['partition'], address, address_words - set(literals))
+        if hardware:
+            address_words -= {row[0] for row in hardware}
+            proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
+    if selector == SELECTOR and proof.get('schema') == runtime.OPTIONAL_SCHEMA:
+        # An untyped hardware-window word is a number, as on the default path. A word with
+        # a load that may reach CpuSet's r2 is left to the copy controls below, which
+        # prove it or refuse; RAM and ROM words keep needing a type.
+        remaining = address_words - set(literals)
+        if copy_calls.cpuset.ADDRESS in calls.values():
+            remaining -= {row['address'] - address for row in proof['partition']['words']
+                          if row['address'] - address in remaining and
+                          NUMERIC_HARDWARE[0] <= row['value'] < NUMERIC_HARDWARE[1] and
+                          any(copy_calls.reaches_cpuset_control(ins, edges, branches, calls, site)
+                              for site in row['load_sites'])}
+        hardware = numeric_hardware_words(ins, edges, calls, proof['partition'], address, remaining)
         if hardware:
             address_words -= {row[0] for row in hardware}
             proof['numeric_hardware_words'] = numeric_hardware_record(hardware)
@@ -2006,6 +2028,8 @@ def render(address,result):
           if manifest['profile'] == OPTIONAL_SCHEMA and 'cpuset_copy_controls' in manifest['proof'] else []),
         *(copy_calls.memcpy_lines(manifest['proof']['compiler_memcpy'])
           if manifest['profile'] == OPTIONAL_SCHEMA and 'compiler_memcpy' in manifest['proof'] else []),
+        *(numeric_hardware_lines(manifest['proof']['numeric_hardware_words'])
+          if manifest['profile'] == OPTIONAL_SCHEMA and 'numeric_hardware_words' in manifest['proof'] else []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])
