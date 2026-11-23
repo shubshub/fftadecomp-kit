@@ -531,6 +531,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
             return False
         instructions = verify_leaf_instructions(data, address, True, buffer_proof=proof,
                                                 call_resolver=proof.target, incoming_narrow_reads=True)
+        from callee_saved_watch import LINE_PREFIX, premise_lines
+        premises = premise_lines(proof)
         if stack_arguments:
             # match.py tries the version-1 proof first and writes version 2 only when it is refused.
             first = BufferCallProof(rom, mapping, loop_replay=True, bios_wrappers=True)
@@ -543,7 +545,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
                 return False
         if not (bool(proof.dependencies) and
                 fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and
-                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines()):
+                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
+                [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] == premises):
             return False
         if parts is not None:
             parts.update(instructions=instructions, buffer_proof=proof)
@@ -636,12 +639,14 @@ def function_address_report_matches(lines, root, address, buffer_profile=False, 
         selected_rom = report_rom_path(root)
         rom = Path(selected_rom).read_bytes()
         if buffer_profile:
+            from callee_saved_watch import LINE_PREFIX, premise_lines
             instructions, proof = verify_function_buffers(data, address, rom, functions, manifest)
             if single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
                         address, data, manifest, source_digest, functions, proof.fingerprint()) or \
-                    buffer_proof_lines(lines) != proof.loop_replay_lines() + proof.bios_summary_lines():
+                    buffer_proof_lines(lines) != proof.loop_replay_lines() + proof.bios_summary_lines() or \
+                    [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] != premise_lines(proof):
                 return False
             control_flow = CALL_SUMMARY
             schema = FUNCTION_BUFFER_SCHEMA
@@ -1317,11 +1322,18 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
             else:
                 function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom))
 
+        import callee_saved_watch
+        watch = callee_saved_watch.Context(rom, entries)
         try:
             reached = verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None,
                                                self_calls=self_sites,
                                                incoming_narrow_reads=thumb and self_sites is None,
-                                               dma_fills=fills)
+                                               dma_fills=fills, callee_watch=watch if calls and thumb else None)
+            # Issuance made the #350 check with its buffer proof; the replay repeats it and must
+            # find exactly the premise lines the report states.
+            if [line for line in lines if line.lstrip().startswith(callee_saved_watch.LINE_PREFIX)] != \
+                    callee_saved_watch.premise_lines(watch):
+                return False
             if self_sites is not None and {item.address for item in reached
                     if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
                 return False
@@ -1332,12 +1344,14 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
             # that replay has no DMA fill rule, so its lines would go unchecked
             if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None or fills is not None:
                 return False
+            watch = None              # its walk did not finish: the report states no premise line
             reached = verify_addressed_modsi3_source(
                 root, address, data, rom, mapping, single("* source SHA-256: ")[1:-1],
                 profile == FRAMED_LINKED_SCHEMA)
         if parts is not None:
+            # The premise lines are rendered from the watch, as match.py writes them from its proof.
             parts.update(instructions=reached, self_sites=self_sites or frozenset(),
-                         dma_lines=fills.report_lines() if fills is not None else ())
+                         dma_lines=fills.report_lines() if fills is not None else (), callee_watch=watch)
         if thunk_calls:
             # a library unit report replays with its unit's toolchain
             import library_units

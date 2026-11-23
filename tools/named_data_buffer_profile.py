@@ -317,6 +317,8 @@ class NamedDataBufferProof(match.BufferCallProof):
                 raise ValueError('jump-table buffer callee excludes calls and local BL control')
             inspector = GuardedSwitchBufferProof(self.rom, self.mapping, self.index, self.objects)
             inspector._delegated = True
+            import callee_saved_watch
+            callee_saved_watch.delegate(inspector, self)
             instructions, transfers = inspector.inspect(address, data)
             self.records[address] = inspector.records[address]
             return instructions, transfers
@@ -344,6 +346,8 @@ class RootGuardedSwitchBufferProof(NamedDataBufferProof):
         # Reuse only the existing complete instruction/edge inventory. Alias
         # effects are replayed on this object, without scratch projection.
         inspector = GuardedSwitchBufferProof(self.rom, self.mapping, self.index, self.objects)
+        import callee_saved_watch
+        callee_saved_watch.delegate(inspector, self)
         instructions, transfers = inspector.inspect(address, data)
         self.records[address] = inspector.records[address]
         if inspector._guarded_switches:
@@ -1116,6 +1120,8 @@ class GuardedAliasBufferProof(NamedDataBufferProof):
             self._guarded_switches[address] = self.records[address]
             return instructions, {transfer: edges[transfer]}
         inspector = GuardedSwitchBufferProof(self.rom, self.mapping, self.index, self.objects)
+        import callee_saved_watch
+        callee_saved_watch.delegate(inspector, self)
         instructions, transfers = inspector.inspect(address, data)
         self.records[address] = inspector.records[address]
         self._guarded_switches.update(inspector._guarded_switches)

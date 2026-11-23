@@ -170,10 +170,13 @@ class KnownQueryCalleeTests(unittest.TestCase):
                 rom = fixture()['rom']
                 with self.assertRaisesRegex(ValueError, 'pinned'):
                     owner.verify(**fixture(patch_rom={address+2: rom[address+2-match.ROM_BASE] ^ 1}))
+        # 0x08099842 becomes sub sp,#12, so its pop {r0}; bx r0 branches to a frame word: the
+        # callee-saved walk of the call refuses that first (kit #350).
+        expected = {0x08099840: 'a branch at 0x08099856 targets a frame address'}
         for address in (0x080C8298, 0x0809AB3C, 0x08099840, 0x0809AB5C):
             with self.subTest(address=hex(address)):
                 rom = fixture()['rom']
-                with self.assertRaisesRegex(ValueError, 'pinned list-query family bytes'):
+                with self.assertRaisesRegex(ValueError, expected.get(address, 'pinned list-query family bytes')):
                     owner.verify(**fixture(f_code=callee_code(after=(0x2000, ANY, 0x2000, 0x2100, SEARCH)),
                                            patch_rom={address+2: rom[address+2-match.ROM_BASE] ^ 1}))
 

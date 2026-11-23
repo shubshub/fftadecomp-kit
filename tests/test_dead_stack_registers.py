@@ -28,6 +28,7 @@ BEQ_BACK2 = 0xd0fd                                  # beq to the instruction bef
 MOV_LR_PC, BX_R2, BX_PC, NOP = 0x46fe, 0x4710, 0x4778, 0x46c0
 ARM_BX_LR = (0xff1e, 0xe12f)                        # bx lr (ARM), as two halfwords
 READ_R3 = 0x1c19                                    # adds r1, r3, #0
+VIA_R3 = match.RUNTIME_HELPERS['_call_via_r3']      # bx r3; nop
 
 
 def bl(site, target):
@@ -90,10 +91,10 @@ def owner_shape2(after=(MOVS_R2_0, MOVS_R0_0, G), c_code=C_LEAVES_R2, g_code=G_K
 
 
 def build(bodies):
-    rom = bytearray(ROM_SIZE)
+    images = {address: assemble(address, tokens) for address, tokens in sorted(bodies.items())}
+    rom = bytearray(max([ROM_SIZE] + [address - match.ROM_BASE + len(raw) for address, raw in images.items()]))
     rows = []
-    for address, tokens in sorted(bodies.items()):
-        raw = assemble(address, tokens)
+    for address, raw in images.items():
         rom[address - match.ROM_BASE:address - match.ROM_BASE + len(raw)] = raw
         rows.append(dict(rom=f'0x{address:08X}', end=f'0x{address + len(raw):08X}', mode='thumb', instrs=0))
     return bytes(rom), json.dumps(rows).encode()
@@ -211,16 +212,23 @@ class DeadCallArgumentTests(unittest.TestCase):
 
     def test_callee_saved_copy_stays_tracked_across_the_alias_free_call(self):
         # push {r4,lr}; sub sp,#8; mov r0,sp; adds r4,r0,#0; bl P; movs r0,#1; bl C; <after>; ...; pop {r4}
-        # R4 does not make a call inspected (the walk trusts R4-R11 across every call it does not
-        # inspect), so the call is alias-free; R4 stays an alias and a later store through it is checked.
-        def bodies(after):
-            values = owner_shape1()
+        # The call is alias-free for its arguments; R4 stays an alias and a later store through it is
+        # checked.  R4 holds the stack address across the call, so the callee-saved walk follows C
+        # (kit #350): a bare `bx r3` it reaches with that value live refuses, while a call through
+        # the real _call_via_r3 to an unknown address is premised.
+        def bodies(after, c_code=C_KILLS_R3):
+            values = owner_shape1(c_code)
             values[OWNER] = [PUSH_R4_LR, SUB8, MOV_R0_SP, 0x1c04, P, MOVS_R0_1, C, *after,
                              ADD8, POP_R4, POP_R0, BX_R0]
+            values[VIA_R3] = [BX_R3, NOP]
             return values
-        self.assertEqual(len(walk(bodies(())).dead_registers.evidence()['calls']), 1)
+        with self.assertRaisesRegex(ValueError, f'callee 0x{X:08X}: an indirect branch at 0x{X:08X} '
+                                                f'while watched values are live'):
+            walk(bodies(()))
+        via_r3 = [PUSH_LR, SUB8, 0x1c0b, MOV_R0_SP, Y, MOV_R2_SP, VIA_R3, ADD8, POP_R0, BX_R0]
+        self.assertEqual(len(walk(bodies((), via_r3)).dead_registers.evidence()['calls']), 1)
         with self.assertRaisesRegex(ValueError, 'outside allocated local words|stack-alias'):
-            walk(bodies((0x7520,)))                                         # strb r0,[r4,#20]
+            walk(bodies((0x7520,), via_r3))                                 # strb r0,[r4,#20]
 
     def test_pointer_bearing_frame_word_keeps_the_inspection(self):
         # add r1,sp,#4; str r1,[sp]: the callee may read the word through its incoming stack.

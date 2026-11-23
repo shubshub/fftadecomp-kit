@@ -16,6 +16,10 @@ import conditional_local_buffer_profile as local
 import scheduler_counted_loop_profile as counted
 from test_scheduler_predicates import half, bl, fixture, A, B, C, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S = counted.SCHEDULER
 
 
@@ -81,7 +85,7 @@ def layout(data, calls, base=A):
 
 
 def bound(data, calls, policy=local.SCHEDULER_LOOP):
-    bodies = {A: data, B: half(0x4770), S: bytes(60), 0x08005954: bytes(206)}
+    bodies = {A: data, B: half(0x4770), S: SCHEDULER_STUB, 0x08005954: bytes(206)}
     p = fixture(bodies, policy=policy)
     span = p.span
     runtimes = set(match.function_thunk.ALIASES.values())

@@ -73,6 +73,8 @@ class SwitchCallees:
         if not refinement['word_switches']:
             return None
         delegate = named.GuardedSwitchBufferProof(self.rom, self.mapping, self.index, None)
+        import callee_saved_watch
+        callee_saved_watch.delegate(delegate, proof)
         instructions, transfers = delegate.inspect(address, data)
         record = delegate.records[address]
         previous = self.records.setdefault(address, record)

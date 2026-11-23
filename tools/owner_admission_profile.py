@@ -835,6 +835,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if buffers.loop_replays:
             # Absent unless a callee was replayed, so reports without a replay keep their meaning.
             proof['buffers']['loop_replay'] = buffers.loop_replay_manifest()
+        import callee_saved_watch
+        if callee_saved_watch.premise_lines(buffers):
+            # Absent unless a call was admitted under the callee-saved ABI premise (#350).
+            proof['buffers']['callee_saved_premises'] = callee_saved_watch.premise_lines(buffers)
         if selector == copy_binding.SELECTOR:
             identity = copy_binding.native_manifest(data,address,rom,mapping,index,objects,
                 bindings if bindings is not None else (manifest or {}).get('bindings'))
@@ -2030,6 +2034,7 @@ def render(address,result):
           if manifest['profile'] == OPTIONAL_SCHEMA and 'compiler_memcpy' in manifest['proof'] else []),
         *(numeric_hardware_lines(manifest['proof']['numeric_hardware_words'])
           if manifest['profile'] == OPTIONAL_SCHEMA and 'numeric_hardware_words' in manifest['proof'] else []),
+        *((manifest.get('proof') or {}).get('buffers') or {}).get('callee_saved_premises', []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])

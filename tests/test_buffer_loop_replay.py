@@ -530,6 +530,12 @@ class BufferLoopReplayTests(unittest.TestCase):
             for body in ("movs r7, #0\nbx lr", "push {r7, lr}\npop {r7, pc}", "mov r8, r0\nbx lr",
                          "bl 1f\nbx lr\n1:\nbx lr", "svc 1\nbx lr", "mov pc, r0"):
                 with self.subTest(body=body):
+                    if body == "mov pc, r0":
+                        # The owner keeps its buffer alias in R6 over the call, and a computed jump
+                        # to an unknown address cannot be checked for reading it (#350).
+                        with self.assertRaisesRegex(ValueError, "not a recognised word switch"):
+                            self.fixture(counted(4), frame=8, child=body)
+                        continue
                     self.fixture(counted(4), frame=8, child=body)
                     rom = (self.root / "baserom.bin").read_bytes()
                     entry = json.loads(self.mapping)[2]

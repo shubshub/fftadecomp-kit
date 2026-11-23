@@ -482,6 +482,11 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 # Do not retain a saved-register token in potentially changed bytes.
                 stack = [(kind, None if kind == "local" else value) for kind, value in stack]
                 alias_calls.add(site)
+            watched = [register for register in aliases if ARM_REG_R0 + 4 <= register <= ARM_REG_R0 + 11]
+            if watched and buffer_proof is not None:
+                # R4-R11 aliases are not passed to the callee walk; the callee must not use them (#350).
+                import callee_saved_watch
+                callee_saved_watch.core_check(buffer_proof, address, site, calls[site], watched)
             destroyed = set(clobbered)
             if call_preservation is not None:
                 destroyed.update(set(preserved) - call_preservation[site])
