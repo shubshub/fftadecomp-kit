@@ -3849,6 +3849,9 @@ class BufferCallProof:
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
                             tuple(sorted(set(watched) | {register for register in aliases if register not in CALLER_CLOBBERED}))))
+                    # R4-R11 aliases are not passed to the walk; the callee must not use them (#350).
+                    import callee_saved_watch
+                    callee_saved_watch.core_check(self, address, current, operands[0].imm, aliases, constants)
                     call_alternatives = getattr(result, 'alternatives', None)
                     if self.word_provenance:
                         words = dict(result.words)
@@ -4363,9 +4366,10 @@ def _ordinary_call_replay(proof, address=None):
 
 
 # the only verify_leaf_instructions parameters a self-calling function may set
-SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls")
+SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls",
+                        "callee_watch")
 INCOMING_NARROW_READ_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver",
-                                   "buffer_proof", "incoming_narrow_reads", "dma_fills")
+                                   "buffer_proof", "incoming_narrow_reads", "dma_fills", "callee_watch")
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
@@ -4394,7 +4398,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_interposed_pool=False, switch_outgoing_stack=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
                              incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
-                             switch_thunk_premises=None, dma_fills=None, menu_list_frame=None):
+                             switch_thunk_premises=None, dma_fills=None, menu_list_frame=None,
+                             callee_watch=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -5254,6 +5259,13 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     call_alternatives = getattr(returned_aliases, 'alternatives', None)
                     if word_mode:
                         words = dict(returned_aliases.words)
+            if buffer_proof is not None or callee_watch is not None:
+                # R4-R11 aliases are not passed to the callee walk; the callee must not use them (#350).
+                # Without a buffer proof, ``callee_watch`` (a callee_saved_watch.Context) supplies the
+                # ROM and mapping, so a report replay repeats the check its issuance made.
+                import callee_saved_watch
+                callee_saved_watch.core_check(buffer_proof if buffer_proof is not None else callee_watch,
+                                              address, current, operands[0].imm, aliases, constants)
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
@@ -5997,7 +6009,7 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                   same_bytes, listing, label=None, plausible=True, volatile_records=(),
                   hand_asm_allowed=None, findings=(), flash_evidence=None, empty_profile=False,
                   mapping=None, empty_index=None, control_flow=None, framed_profile=False,
-                  buffer_proof=None, mapped=False, self_sites=frozenset(), data_profile=False,
+                  buffer_proof=None, callee_watch=None, mapped=False, self_sites=frozenset(), data_profile=False,
                   data_mapping=None, data_buffer_evidence=None, address_manifest=None,
                   switches=False, switch_evidence=None, preloaded_profile=False,
                   thunk_switch_selector=None, float_evidence=None, rom=None, shift_evidence=None,
@@ -6044,6 +6056,12 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
         out.append(f"* buffer calls: {summary}\n")
         out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
         for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
+            out.append(line + "\n")
+    if buffer_proof is not None or callee_watch is not None:
+        # The #350 premises: issuance records them with its buffer proof, a plain replay with the
+        # callee_saved_watch.Context it walks with.
+        import callee_saved_watch
+        for line in callee_saved_watch.premise_lines(buffer_proof if buffer_proof is not None else callee_watch):
             out.append(line + "\n")
     if mapped:
         out.append(f"* mapping SHA-256: `{mapping_fingerprint(mapping)}`\n")
@@ -6920,7 +6938,10 @@ def main():
                 dma_fills = dma_fill.Fills(rom) if thumb else None
                 try:
                     verified_instructions = (
-                        verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites) if self_sites else
+                        # The #350 callee walk runs here too, recording its premises with the
+                        # (otherwise unused) buffer proof, whose report lines state them.
+                        verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites,
+                                                 callee_watch=buffer_proof) if self_sites else
                         verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof,
                                                  incoming_narrow_reads=thumb, dma_fills=dma_fills))
                 except ValueError:

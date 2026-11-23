@@ -47,6 +47,10 @@ class AddressedSignedRuntimeTests(unittest.TestCase):
         self.rom[0x14274C:0x14274E] = bytes.fromhex('7047')
         self.rom[0x142742:0x142746] = bl(0x08142742, 0x0814274C)
         self.rom[0x142A16:0x142A1A] = bl(0x08142A16, 0x0814274C)
+        # Each runtime entry returns (bx lr), so a caller that keeps a stack address in R4-R11
+        # across the call has a callee the callee-saved check can walk (kit #350).
+        for entry in (profile.quotient.ADDRESS, profile.remainder.ADDRESS):
+            self.rom[entry-match.ROM_BASE:entry-match.ROM_BASE+2] = bytes.fromhex('7047')
         for module in (profile.quotient, profile.remainder):
             ids = tuple((lo, hi, hashlib.sha256(self.rom[lo-match.ROM_BASE:hi-match.ROM_BASE]).hexdigest())
                         for lo, hi, _ in module.IDENTITIES)

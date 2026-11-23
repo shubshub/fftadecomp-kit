@@ -77,6 +77,7 @@ off under v1 so that v1 reports keep their meaning:
   a sign-extended scaled index (`lsls #24; asrs #22`, a `s8` times four) is known
   to be word aligned.  Its range is not narrowed: the access still needs a premise.
 """
+import functools
 import json
 
 from capstone.arm import ARM_REG_R0, ARM_REG_SP
@@ -201,6 +202,7 @@ class Policy:
         self.selector = selector
         self.owner_switch = None    # a complete, canonical call-free owner dispatch
         self.forwarding = None      # v2: the buffer proof whose forwarded-slot facts bind the owner
+        self.callee_watch = None    # the buffer proof whose ROM and mapping check callees (#350)
         self.derivations = set()
         self.accesses = set()
         self.spills = set()         # exact stack addresses spilled by `str Rd,[sp,#k]` (frame words)
@@ -273,7 +275,8 @@ class Policy:
                               spills=frozenset(self.spills), callee_span=self.callee_span,
                               returned={site: {register: frozenset(offsets)
                                                for register, offsets in found.items()}
-                                        for site, found in self.returned.items()})
+                                        for site, found in self.returned.items()},
+                              callee_watch=self.callee_watch)
         return self.evidence
 
 
@@ -561,8 +564,10 @@ def trim_init(init, new_depth):
 
 
 class Analysis:
-    def __init__(self, data, address, derivations, accesses, copies, *, signed_shift_congruence=False):
+    def __init__(self, data, address, derivations, accesses, copies, *, signed_shift_congruence=False,
+                 callee_watch=None):
         self.data, self.address = data, address
+        self.callee_watch = callee_watch
         self.signed_shift_congruence = signed_shift_congruence
         self.end = address + len(data)
         self.derivations, self.accesses = derivations, accesses
@@ -634,6 +639,22 @@ class Analysis:
         for register in registers:
             if is_ranged(state.regs[register]):
                 self.fail(f"ranged stack address escapes through {what}")
+
+    def watch_call(self, state, site, target):
+        """Check the callee for reads of R4-R11 that hold a ranged address (#350).
+
+        A copy the callee hands back in R0-R3 or R12 must then be dead in this owner."""
+        ranged = [register for register in range(4, 12) if is_ranged(state.regs[register])]
+        if not ranged or self.callee_watch is None:
+            return
+        import callee_saved_watch
+        checker = callee_saved_watch.checker_for(self.callee_watch)
+        try:
+            # The check's own walk supplies the constants at the call; this analysis's scalars
+            # are carried across calls, and the check does not rely on that.
+            checker.call(target, frozenset(ranged), caller=self.address, site=site)
+        except callee_saved_watch.WatchRefusal as error:
+            self.fail(f"ranged stack address in a callee-saved register at a call: {error}")
 
     # ---- frame --------------------------------------------------------
     def frame_check(self, state, lo, hi, width, *, load):
@@ -869,6 +890,7 @@ class Analysis:
             # untracked.  As for R0-R3, it is refused at the call.
             self.no_escape(state, (0, 1, 2, 3, 12), "a call argument register")
             self.writers.add(site)
+            self.watch_call(state, site, target)
             result = None
             if site in self.copies:
                 result = self.copy_site(state, site)
@@ -1256,21 +1278,24 @@ def forwarded_lines(evidence):
 
 
 def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-          forwarding=None, spills=frozenset(), callee_span=None, returned=None):
+          forwarding=None, spills=frozenset(), callee_span=None, returned=None, callee_watch=None):
     import stack_index_frame_words_profile as frame_words
-    return frame_words.prove(prove_words, data, address, verified_sites, derivations, accesses, copies,
+    # The #350 callee walk checks each call either analysis makes.
+    return frame_words.prove(functools.partial(prove_words, callee_watch=callee_watch), data, address,
+                             verified_sites, derivations, accesses, copies,
                              selector=selector, forwarding=forwarding, spills=spills,
                              callee_span=callee_span, returned=returned or {})
 
 
 def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-                forwarding=None, analysis_type=None, leaf_switch=None):
+                forwarding=None, analysis_type=None, leaf_switch=None, callee_watch=None):
     """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
     from scroll_wave_table_index import OWNER, ScrollWaveAnalysis
     scroll_wave = address == OWNER and selector == SELECTOR and analysis_type is None
     factory = ScrollWaveAnalysis if scroll_wave else analysis_type or Analysis
     analysis = factory(bytes(data), address, derivations, accesses, dict(copies),
-                                           signed_shift_congruence=selector == SELECTOR_V2)
+                                           signed_shift_congruence=selector == SELECTOR_V2,
+                                           callee_watch=callee_watch)
     if leaf_switch is not None:
         from owner_switch_buffer_profile import OwnerSwitch
         if (type(leaf_switch) is not OwnerSwitch or selector != SELECTOR_V2 or analysis_type is not None
@@ -1321,6 +1346,7 @@ class StackIndexBufferProof(rom_copy.RomTableCopyBufferProof):
         self.index_policy = Policy(address, len(data), self.selector)
         # The plain mapped span: frame words walk callees without charging this proof's budget.
         self.index_policy.callee_span = lambda callee: match.BufferCallProof.span(self, callee)
+        self.index_policy.callee_watch = self
 
     def index_copies(self):
         return {site: (record["destination_offset"], record["count"])

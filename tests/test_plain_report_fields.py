@@ -77,6 +77,12 @@ def insert_after(lines, prefix, added):
     return lines[:at + 1] + list(added) + lines[at + 1:]
 
 
+def insert_before(lines, prefix, added):
+    """`added` placed before the line starting with `prefix`."""
+    at = next(index for index, line in enumerate(lines) if line.startswith(prefix))
+    return lines[:at] + list(added) + lines[at:]
+
+
 class FieldListTests(unittest.TestCase):
     def setUp(self):
         directory = tempfile.TemporaryDirectory(prefix="plain_report_fields_")
@@ -153,6 +159,23 @@ class FieldListTests(unittest.TestCase):
             if line.startswith(("* buffer calls", "* buffer proof SHA-256")):
                 with self.subTest(line=line), self.assertRaisesRegex(ValueError, "duplicated"):
                     self.check(report_lines(evidence.STACK_BUFFER_SCHEMA) + [line], evidence.STACK_BUFFER_SCHEMA)
+
+    def test_callee_saved_premise_lines_only_on_the_call_schemas(self):
+        # Kit #350: match.py writes them after the buffer proof lines, before the mapping line.
+        premises = ["* callee-saved premise: call at 0x08000204 in 0x08000200 through _call_via_r3 to an "
+                    "unknown address, with R5 depending on owner stack addresses; unproved premise: x",
+                    "* callee-saved premise: indexed stack load at 0x08000206 in 0x08000200, excluding the "
+                    "saved or released frame word at sp+8; unproved premise: y",
+                    "* callee-saved fact: 0x02000000 may still hold the frame address stored at 0x08000208 in "
+                    "0x08000200 when 0x08000200 returns at 0x0800020C, releasing that frame; z"]
+        for schema in PLAIN[2:]:
+            with self.subTest(schema=schema):
+                self.check(insert_before(report_lines(schema), "* mapping SHA-256", premises), schema)
+                with self.assertRaisesRegex(ValueError, "order"):
+                    self.check(insert_after(report_lines(schema), "* mapping SHA-256", premises), schema)
+        for schema in PLAIN[:2]:
+            with self.subTest(schema=schema), self.assertRaisesRegex(ValueError, "not written"):
+                self.check(report_lines(schema) + premises[:1], schema)
 
     def test_fields_keep_the_writer_order(self):
         def swap(lines, first, second):
@@ -690,6 +713,96 @@ class OneSourceResolutionTests(unittest.TestCase):
                 self.assertEqual([path for path in every if self.admitted(path)],
                                  [] if expected is None else [expected])
 
+
+
+# Kit #350 on the plain framed schemas: the owner keeps the addresses of two locals in R4 and R5
+# across a call (an inlined helper's output pointers, as 080D8CD4 does), so the callee is walked;
+# it calls through _call_via_r3 to an unknown address, a premised site.
+PREMISE_TYPES = ("typedef unsigned short u16;\ntypedef short s16;\ntypedef signed char s8;\n"
+                 "typedef unsigned char u8;\nextern u16 data_02000000[];\n")
+PREMISE_HELPER = """extern u8 *func_08000400(void *object);
+extern u8 func_08000500(u8 x, u8 y);
+static inline void get_coordinates(void *object, s16 *x, s16 *y)
+{
+    u8 *position = func_08000400(object);
+
+    *x = (s8)position[10];
+    *y = (s8)position[11];
+}
+"""
+PREMISE_SOURCES = {
+    "frame-calls": PREMISE_TYPES + PREMISE_HELPER + """u8 func_08000200(void *object)
+{
+    s16 x, y;
+
+    get_coordinates(object, &x, &y);
+    return func_08000500(x, y);
+}
+""",
+    "frame-data": PREMISE_TYPES + PREMISE_HELPER + """u8 func_08000200(void *object)
+{
+    s16 x, y;
+
+    get_coordinates(object, &x, &y);
+    data_02000000[0] = x;
+    return func_08000500(x, y);
+}
+""",
+}
+PREMISE_CALLEES = [
+    ("func_08000400", ".equ via_r3, 0x%08X\npush {lr}\nldr r3, =0x02000000\nldr r3, [r3]\nbl via_r3\n"
+                      "pop {r1}\nbx r1\n.ltorg" % match.RUNTIME_HELPERS["_call_via_r3"]),
+    ("func_08000500", "movs r0, #0\nbx lr"),
+]
+
+
+@unittest.skipUnless(os.path.exists(os.path.expandvars(match.DEFAULT_CC)), "fixed compiler required")
+class PlainFramedPremiseReplayTests(unittest.TestCase):
+    """A plain framed report with callee-saved premise lines replays: the closed re-render states
+    them in match.py's slot, from the walk the replay repeats."""
+
+    @classmethod
+    def setUpClass(cls):
+        import test_data_buffer_calls as data_calls
+        if not data_calls.tools_present():
+            raise unittest.SkipTest("fixed compiler and ARM tools required")
+        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(prefix="plain_framed_premises_", dir=scratch)
+        cls.roots, cls.reports = {}, {}
+        for name, source in PREMISE_SOURCES.items():
+            root = data_calls.build(Path(cls.temporary.name) / name, source, PREMISE_CALLEES, large=True)
+            code, output, report = data_calls.run(root)
+            assert code == 0, output
+            cls.roots[name], cls.reports[name] = root, report
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def replays(self, name, text):
+        with patch.dict(os.environ, FFTA_ROM=str(self.roots[name] / "baserom.bin")):
+            return evidence.report_matches(text, self.roots[name], ADDRESS)
+
+    def test_a_plain_framed_report_with_a_premise_line_replays(self):
+        schemas = {"frame-calls": evidence.FRAMED_LINKED_SCHEMA, "frame-data": evidence.FRAMED_DATA_SCHEMA}
+        for name, schema in schemas.items():
+            with self.subTest(name=name):
+                report = self.reports[name]
+                self.assertIn(f"* verification: `{schema}`", report)
+                premises = [line for line in report.splitlines() if line.startswith("* callee-saved premise:")]
+                self.assertEqual(len(premises), 1)
+                self.assertIn("call at 0x08000406 in 0x08000400 through _call_via_r3 to an unknown address, "
+                              "with R4,R5 depending on owner stack addresses", premises[0])
+                self.assertTrue(self.replays(name, report))
+                # The line is held to the walk: dropped, edited or moved, the report does not replay.
+                self.assertFalse(self.replays(name, report.replace(premises[0] + "\n", "")))
+                self.assertFalse(self.replays(name, report.replace("R4,R5 depending", "R4 depending")))
+                rows = report.splitlines()
+                at = rows.index(premises[0])
+                moved = rows[:at] + rows[at + 1:]
+                moved.insert(moved.index("* source plausibility: plausible"), premises[0])
+                self.assertFalse(self.replays(name, "\n".join(moved) + "\n"))
 
 if __name__ == "__main__":
     unittest.main()

@@ -313,7 +313,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
-          "* DMA fills", "* DMA fill premise", "* DMA fill manifest")
+          "* DMA fills", "* DMA fill premise", "* DMA fill manifest",
+          "* callee-saved premise", "* callee-saved fact")
 
 
 def report_matches(report, root, address):
@@ -387,6 +388,7 @@ def report_matches(report, root, address):
         # DMA fill lines (kit #239) replay with the same rule and must equal the recomputed lines.
         dma_lines = dma_fill.report_fields(lines)
         fills = dma_fill.Fills(rom) if dma_lines else None
+        from callee_saved_watch import LINE_PREFIX, premise_lines
         instructions, proof, proved_schema, proved = verify_source(
             root, address, data, rom, functions, objects, source_digest, fills)
         if fills is not None:
@@ -397,6 +399,7 @@ def report_matches(report, root, address):
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
                 buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
+                [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] == premise_lines(proof) and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
                                                    functions, objects, proof.fingerprint()) and
                 source_fingerprint(root, address) == source_digest and mapping_snapshot(root) == functions and

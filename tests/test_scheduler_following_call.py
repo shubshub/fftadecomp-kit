@@ -14,6 +14,10 @@ import scheduler_branch_profile as branch
 import owner_admission_profile as owner
 from test_scheduler_predicates import half, bl, fixture, A, B, C, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S=branch.SCHEDULER
 SELECTOR=local.SCHEDULER_FOLLOWING
 
@@ -29,7 +33,7 @@ def raw_caller(*, preserved_alias=False, reintroduce_alias=False, following_targ
 
 
 def bound(data,calls,policy=SELECTOR):
-    bodies={A:data,B:half(0x4770),S:bytes(60),0x08005954:bytes(206)}
+    bodies={A:data,B:half(0x4770),S: SCHEDULER_STUB,0x08005954:bytes(206)}
     p=fixture(bodies,policy=policy);span=p.span
     runtimes=set(match.function_thunk.ALIASES.values())
     p.span=lambda a:half(0x4710) if a in runtimes else span(a)

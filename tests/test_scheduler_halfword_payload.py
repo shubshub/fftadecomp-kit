@@ -15,6 +15,10 @@ import conditional_local_buffer_profile as local
 import scheduler_halfword_payload_profile as profile
 from test_scheduler_predicates import half, bl, A, B, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S = profile.SCHEDULER
 LEAF = half(0x4B02, 0x8C9A, 0x8002, 0x8CD8, 0x8008, 0x4770, 0x7F40, 0x0200)
 STACK = [LOCAL]*13 + [SAVED]*5
@@ -52,7 +56,7 @@ def bound(data, calls, *, leaf_data=LEAF, helper_count=6, policy=profile.SELECTO
     # The output helper is fully proved from actual instructions and exact dual
     # indexes at a synthetic address. Only the old conditional scheduler byte
     # identities/runtime transport are substituted; caller frame replay is real.
-    bodies = {A: data, B: leaf_data, S: bytes(60), 0x08005954: bytes(206)}
+    bodies = {A: data, B: leaf_data, S: SCHEDULER_STUB, 0x08005954: bytes(206)}
     rom = bytearray(max(a+len(b) for a, b in bodies.items())-match.ROM_BASE)
     rows, lines = [], []
     for a, b in sorted(bodies.items()):

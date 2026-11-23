@@ -18,6 +18,10 @@ import owner_admission_profile as owner
 import scheduler_call_site_profile as profile
 from test_scheduler_predicates import half, bl, fixture, A, B, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S, POOL, DIRECT = profile.SCHEDULER, profile.POOL, profile.DIRECT
 CALLBACK, OTHER_CALLBACK = 0x08001601, 0x08001701
 MANAGER = 0x0200F430
@@ -132,7 +136,7 @@ def payload(*, store=0x9001, value=0xA807, frame=9, extra=()):
     return p
 
 
-BODIES = {S: bytes(60), POOL: bytes(44), DIRECT: bytes(206)}
+BODIES = {S: SCHEDULER_STUB, POOL: bytes(44), DIRECT: bytes(206)}
 
 
 def bound(owner_program, *, policy=SELECTOR, callee=half(0x4770), pins=None):
@@ -612,7 +616,9 @@ class CallSiteSummaryTests(unittest.TestCase):
         callee.call(S)
         callee.emit(0xBC01, 0x4700)
         body, _ = callee.build()
-        with self.assertRaisesRegex(ValueError, 'buffer callee 0x08001200: buffer callee 0x08005B6C'):
+        # With no stand-in body to walk (zero bytes), the ordinary walk of the scheduler refuses.
+        with mock.patch.dict(BODIES, {S: bytes(60)}), \
+                self.assertRaisesRegex(ValueError, 'buffer callee 0x08001200: buffer callee 0x08005B6C'):
             verified(program, callee=body)
 
     def test_bind_refuses_no_entry_and_runtime_thunk_calls(self):

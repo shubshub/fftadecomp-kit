@@ -15,6 +15,10 @@ import scheduler_two_payload_profile as profile
 import owner_admission_profile as owner
 from test_scheduler_predicates import half, bl, fixture, A, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S = profile.SCHEDULER
 STACK = [LOCAL]*15+[SAVED]*3
 BASE, DESCRIPTOR = -72, -44
@@ -40,7 +44,7 @@ def raw_caller(words, descriptor_word, first_word, second_word, *, partial=False
 
 
 def bound(data, calls, policy=profile.SELECTOR):
-    bodies = {A:data, S:bytes(60), 0x08005954:bytes(206)}
+    bodies = {A:data, S: SCHEDULER_STUB, 0x08005954:bytes(206)}
     p = fixture(bodies, policy=policy)
     span = p.span
     runtimes = set(match.function_thunk.ALIASES.values())

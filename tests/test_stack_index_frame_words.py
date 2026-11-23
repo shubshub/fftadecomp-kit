@@ -863,21 +863,20 @@ class CalleeSavedMirrorTests(unittest.TestCase):
         self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
         self.assertEqual(words(manifest)['swis'], [6])
 
-    def test_present_behaviour_a_store_through_an_address_held_in_r4_r11_is_not_seen(self):
+    def test_a_store_through_an_address_held_in_r4_r11_is_seen(self):
         # add r5,sp,#8 keeps the word's address in R5 across the call, and the callee
         # (movs r0,#200; str r0,[r5,#0]; bx lr) returns R4-R11 unchanged but writes 200 into the
-        # word R4 mirrors.  The walk sees stores through SP and stack addresses handed over in
-        # R0-R3 or R12, nothing else, so the mirror survives and the load is taken as proved
-        # inside the three copied bytes.  That a callee writes no local word through an address
-        # held in R4-R11 is the ABI premise every call rests on.  Recorded as what the analysis
-        # does today: once a call checks what a callee does with R4-R11, this owner must refuse.
+        # word R4 mirrors.  A call is walked while R4-R11 hold an owner stack address (kit #350),
+        # so the store through R5 refuses the owner.  A callee that leaves R5 alone (bx lr) keeps
+        # the mirror, and the load is proved inside the three copied bytes.
         code = frame_owner((0x9402, 0xAD02, 0x2000, CALLEE) + REFINED)
-        _, (manifest, _) = admit(code, **callee(0x20C8, 0x6028, 0x4770))
-        found = evidence(manifest)
+        with self.assertRaisesRegex(ValueError, f"callee 0x{CALLEE:08X}: a memory access base at 0x{CALLEE + 2:08X} "
+                                                f"uses a watched callee-saved register's value"):
+            admit(code, **callee(0x20C8, 0x6028, 0x4770))
+        _, (kept, _) = admit(code, **callee(0x4770))
+        found = evidence(kept)
         self.assertEqual(found['preconditions'], [])
         self.assertEqual([row[1:] for row in found['accesses']], [['load', 1, -36, -34, 0]])
-        _, (kept, _) = admit(code, **callee(0x4770))
-        self.assertEqual(sip.precondition_lines(found), sip.precondition_lines(evidence(kept)))
 
 
 def two_callees(outer, inner):

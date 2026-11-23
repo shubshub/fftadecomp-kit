@@ -14,6 +14,10 @@ import scheduler_branch_profile as branch
 import scheduler_live_alias_profile as live
 from test_scheduler_predicates import half, bl, fixture, A, B, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S = branch.SCHEDULER
 SELECTOR = local.SCHEDULER_LIVE_ALIAS
 PAYLOAD = local.SCHEDULER_LIVE_ALIAS_PAYLOAD
@@ -42,7 +46,7 @@ def caller(*, first=(), second=()):
 
 
 def bound(data, calls, h1=LEAF, h2=LEAF, policy=SELECTOR, extra=None):
-    bodies = {A: data, H1: h1, H2: h2, S: bytes(60), 0x08005954: bytes(206), **(extra or {})}
+    bodies = {A: data, H1: h1, H2: h2, S: SCHEDULER_STUB, 0x08005954: bytes(206), **(extra or {})}
     p = fixture(bodies, policy=policy)
     span = p.span
     runtime = set(match.function_thunk.ALIASES.values())

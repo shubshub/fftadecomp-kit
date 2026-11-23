@@ -16,6 +16,10 @@ import scheduler_projected_outputs_profile as profile
 import test_formal_entry_word_halfword_effects as screen_fixture
 from test_scheduler_predicates import half, bl, R0, LOCAL, SAVED
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 A, P, N, T, W, C = (0x08001000, 0x08001200, 0x08001400,
                      0x08001600, 0x08001800, 0x08001A00)
 STACK = [LOCAL]*13 + [SAVED]*4
@@ -293,7 +297,7 @@ class ProjectedFullFrameTests(unittest.TestCase):
         world=half(0xB530,0x9C03,0x9D04,0x0400,0x12C0,0x3004,0x8018,
                    0x0109,0x8021,0x0412,0x12D2,0x3208,0x802A,0xBC30,0xBC01,0x4700)
         bodies={A:caller,P:pair_body(),N:half(0x4770),T:table_body(),W:world,C:fixture['data'],
-                profile.SCHEDULER:bytes(60),0x08005954:bytes(206)}
+                profile.SCHEDULER: SCHEDULER_STUB,0x08005954:bytes(206)}
         identities={name:(a,len(bodies[a]),count,hashlib.sha256(bodies[a]).hexdigest())
             for name,a,count in [('PAIR',P,14),('NOOP',N,1),('TABLE',T,13),('WORLD',W,16),('SCREEN',C,51)]}
         if bad_helper:bodies[P]=half(0xB510)+bodies[P][2:]

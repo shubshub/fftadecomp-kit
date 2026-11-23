@@ -657,7 +657,10 @@ refuses a report in which:
    order. On `elf-symbol-thumb-frame-v1`, `-frame-calls-v1` and
    `-frame-data-v1`, the `* DMA fill` lines are exempt in the same way:
    replay requires them to equal the recomputed block exactly, right after
-   the stack-frame line (see "Immediate DMA fills from a local unit"). The
+   the stack-frame line (see "Immediate DMA fills from a local unit"). On the
+   call schemas the `* callee-saved premise:` and `* callee-saved fact:` lines
+   (kit #350) are exempt too: replay recomputes them and requires them to be
+   equal. The
    two self-call lines appear together or not at all.
    `* compiler:` is required, even though `library_units` alone admits a
    report without it;
@@ -881,6 +884,339 @@ Framed reports use `elf-symbol-thumb-frame-v1` or
 The linked variant also requires the usual mapping fingerprint and call
 summary. Existing unframed schemas remain accepted without report churn.
 
+### Callee-saved registers holding stack addresses (kit #350)
+
+Where the walk has a buffer proof, and in the stack-index analysis, a call made
+while R4-R11 hold a frame address (exact or ranged) also walks what the call
+executes (`callee_saved_watch.py`). The callee may save and restore the value, but
+no bit that depends on it may reach a use:
+
+* a load or store address or index, or the bits a store writes outside the walked frames;
+* a comparison, a conditional branch on flags it set, or a carry into ADC or SBC;
+* a SWI argument or a branch target;
+* an unresolved callee in R0-R3 or R12. IP is scratch that thunks and veneers read
+  (`_call_via_ip`), so a watched value there refuses, as kit #348 refuses a ranged R12.
+  A frame address that a walked callee returned and the caller merely left in IP is an
+  argument like any other of an unresolved call: the code may write the words it can
+  reach, and the premise states that it does not branch to it. At a SWI it is no argument
+  (below).
+
+Each watched register must hold its own value again at the return. A dependent value
+left in R0-R3 or R12 is handed back, and the caller's code after the call must not use
+it; flags left depending on one are handed back the same way. A frame address left there
+is handed back as one the caller may not use, other than in a comparison. The model:
+
+* **Frames.** SP is an exact offset from the SP at the call. Every SP-derived value is a
+  frame address, never an unknown scalar:
+  * exact, one of a few exact words, or one of a proved range (an index whose unsigned
+    range a mask, a narrow load, a compare or a loop bound proves; every word it may reach
+    is checked, with no premise);
+  * a stack array base plus or minus an unknown index: somewhere in the frame it was
+    taken from (premised, below);
+  * after any other arithmetic, or rebuilt from stored bytes: of unknown provenance. An
+    access through one refuses.
+
+  Arithmetic on a frame address keeps the bits that are the same for every frame address
+  (the stack is IWRAM, 0x03000000-0x03007FFF). A result that is the same for every frame
+  address carries no address and is a plain number: x != 0 (agbcc's branchless
+  `negs`/`orrs`/`lsrs #31`), the IWRAM page (`lsrs #24`, `#30` or `#31`), the distance
+  between two tracked frame addresses, or between two addresses in one probed input's
+  object. Any other result that cannot be a whole address is bits of one, tracked with the
+  frame address it came from, so that shifting it back into the high bits makes an address
+  of unknown provenance again. An address of unknown provenance remembers the frame
+  addresses it was computed from, so bits taken from it name their source too. No range
+  test stands in for that: a value below 0x02000000 may still be part of an address. A
+  narrow store over a frame address leaves its other bytes marked as part of one.
+* **Registers.** A register's constant, range, signed range and the compare that decided a
+  branch are dropped whenever the register changes, including across a summarised call
+  that does not return it unchanged. A pop restores what was known of the register its
+  push saved, and a word load from a frame word what was known of a plain number a word
+  store wrote there (a function pointer kept in a local still resolves its call), unless
+  the word was written in between. Ranges are widened only where a loop starts (the target
+  of a backward branch), to the compare constants of every function on the call chain. A
+  range that only that widening produced, and that no comparison with a proved value has
+  bounded since, is an unknown index where the words it would reach overrun its object
+  (a push, the owner's frame or below SP): premised (INDEX), not checked word by word.
+  A comparison with a proved value proves the bound it sets on its edge. Where every
+  path into a loop head but the widened one arrives bounded, the walk is repeated with
+  the head's range the join of those paths, proved while every path stays inside it, and
+  the first pass's lines are dropped. So a compare-bounded loop that overruns its array is
+  checked word by word and refuses.
+* **Stale words.** A word below the checked call's SP that the walk has not written holds
+  whatever earlier code left there, perhaps any frame address. After an unresolved call or
+  a SWI, every word below SP is stale again, except that a word holding a watched value
+  keeps those bits: that code need not overwrite it (an unresolved call's premise says it
+  does not). After a summarised callee, a word below SP holds what the summary says the
+  callee leaves there; a word it does not surely write keeps what it held, frame addresses
+  and watched values included, and may hold what the callee left (stale) below the highest
+  SP at which the callee runs code that is not walked (or recurses). A word written on
+  one path only, or by a store that may have gone elsewhere, may still be stale. A word
+  load that may find nothing but what earlier code left, besides what the walk wrote, is
+  premised at that load where what it reads is used as an address or escapes (UNSET,
+  below); as a branch target, or handed to code that is not walked, it stays an address of
+  unknown provenance. Walked code refuses on such a word as on any other address of unknown
+  provenance: a branch to it, or an access through it where UNSET cannot hold. The bytes a
+  narrow store does not write of such a word stay stale.
+* **Nested callees.** A nested callee runs in its caller's context, so its stack
+  arguments and anything else above its entry SP are the caller's tracked words. The
+  words a walked callee leaves below SP are kept, so a later callee sees them. The checked
+  callee's own frame starts at its entry SP: a store at or above it writes the owner's
+  frame and refuses, as the core's walk refuses it, except a plain value stored to a word
+  the callee also reads there as a stack argument (ARGS, below).
+* **Summaries.** A callee reached while only a saved copy is live, with no dependent
+  register and clean flags, may be skipped with a summary, probed once with symbolic
+  inputs. The summary lists:
+  * every access it makes through its register and stack-argument inputs, and the inputs
+    that decide a branch (where the caller knows such an input, the callee is walked
+    there, on the paths it takes);
+  * what each register holds at its return, including bits of addresses and lazily
+    premised values;
+  * the words it leaves below its entry SP;
+  * the input words a full-word store writes on every path, which overwrite the caller's
+    words where the input is one exact frame address, and the input bytes a narrow store
+    writes on every path (a store whose address may be something else, such as the
+    callee's own local, writes no input surely);
+  * the words of its own frame it reads at an unknown index, or a callee of it reads,
+    where a path may not have written them ("early" reads, below);
+  * the unresolved calls, SWIs, indexed accesses and the other premised sites it reaches,
+    with the frame words of its own that hold its inputs. These are premised where the
+    summary is used, against the values there, and at the callee's own sites: an access
+    at an unknown offset through an input, or a narrow load through one, is stated where
+    the callee makes it, and the stale words code it does not walk can reach are stated at
+    every such site that is given frame addresses.
+
+  An access at an unknown offset through an input that is an exact frame address there
+  stays inside that object (INDEX, below). Arithmetic on an input carries the input as its
+  source: where the input is plain data, so is the result; where it is a frame address, the
+  result is bits of that address or an address of unknown provenance there, and the callee
+  is walked there if it uses one. A probe marks the bytes of its own frame that a path may
+  not have written: they hold what its caller's walk has there, a watched value perhaps,
+  which the probe does not know. A store that may miss a word (through one of several
+  addresses, at an unknown index, by a callee on some of its paths, or by unresolved code
+  given the word) or that writes part of it keeps the rest marked, and so do joins and the
+  words a callee leaves on some of its returns only; where the summary is used, a marked
+  word a callee leaves keeps what the caller's word held. What unresolved code inside the
+  callee may hand back from objects the caller passed is found in the caller's frames. It
+  is added to every register and leftover word through which the probe has an input handed
+  back. The summary is not used when an access reaches a dependent value, a saved word or
+  the caller's frame, when it reads as plain data a word that holds a frame address or part
+  of one in the caller's state, when an input address or bits of one escape to memory the
+  walk does not track (by its own store or a nested callee's), when it reads back marked
+  bytes of its own frame, when an early read finds more in the caller's state than
+  earlier code may leave there (a watched value; for a whole word, an address; for bytes,
+  part of an address where the word cannot be plain data; below a recursion's first frame,
+  where its deeper levels read, a watched value), when a word it leaves below its SP holds
+  an input that cannot be stated there, or when a function pointer it calls through is
+  known at the call site; the callee is walked in context instead. Recursion iterates the
+  summary to a fixpoint. The summary states the words its first level leaves below its
+  entry SP, stale where its deeper levels may write them. The callee's own frame addresses
+  are then one span released at its return, and a premised site reached at several SPs,
+  by recursion or by call paths of different depth,
+  keeps the words named from its shallowest execution. Its line names the recursions it runs
+  at every depth of, with their frames, and claims every word of the stack between each
+  execution's SP and the entry of the summarised callee as well. A union over depths would
+  never converge, because each level names the levels above it a frame further away. The
+  bounded stack region covers every level.
+
+  The test `tests/test_callee_saved_summaries.py` checks, on the retail ROM, that for every
+  callee check the decomp's shipped reports make, summaries admit nothing the walk in
+  context refuses and state every line it states. No check is exempt. A walk in context
+  that hits its budget is run again with a raised one (minutes, about 1 GB), and one that
+  cannot end because a callee recurses past the depth limit is compared by induction: that
+  walk skips with summaries only the recursive calls. At a site stated at several depths,
+  every word the walk in context names is either an address the summaries name there or a
+  word between that execution's SP and the entry of the summarised callee. The registers are
+  compared as everywhere else.
+* **Code that is not walked.** An unresolved call or a SWI given frame addresses (in
+  R0-R3 or R12, or in the words of the calling function's frame, where its stack arguments
+  are) may write any word of their objects that no push wrote, and any object it finds
+  addressed there, with a plain value or any of those addresses (an enumerated SWI, only
+  what GBATEK documents: BIOS premise). It may return one in
+  R0-R3 or R12: exactly as given, or anywhere in its object, which is at most the run of
+  live words around it that no push wrote (stated in the call's premise). A frame address
+  below SP (a returned callee's frame) is of an object below SP. A word it can reach that
+  holds only what earlier code left, a word of the calling function's frame that nothing
+  has written among them, is no address under STALE (the word is named there); a value
+  read from such a word and handed on is one of unknown provenance.
+* **Bits and flags.**
+  * AND, ORR and BIC with a known constant fix bits, known shifts move them, and sums and
+    NEG carry them upward.
+  * A product, a rotate, or a shift by an unknown amount depends on every bit.
+  * Flags are tracked per flag. An instruction that does not write a flag (TST writes
+    only N and Z) keeps its dependence, and so does a call that is not walked or a SWI.
+    A compare of known constants decides its branch.
+* **Thunk calls.** A `_call_via_rN` call is walked at rN's destination when a literal, a ROM
+  word, another thunk or a summarised callee that preserves rN gives it. A destination in
+  a ROM wait-state mirror is folded onto the ROM it names (kit #377).
+
+The walk is deterministic: stale words that several sites of a summarised callee can reach
+are named at each of them, so the report does not depend on the interpreter's hash seed.
+
+#### Premises
+
+Before kit #350, the walks carried R4-R11 across a call unchanged, so every class below
+was assumed silently, everywhere: that a callee never reads, compares, stores or hands back
+those values, never stores through them, and never builds an address from what they point
+at. Each class is now stated in the report, one line per site that relies on it, with the
+registers and frame words relied on. A line is offered only where the premise can be true;
+where it cannot, the check refuses. Replay recomputes every line and requires the report
+to carry exactly those lines. A site reached at several depths is stated once, with what
+the claim covers at the deeper ones.
+
+Every class is *analysis precision*: a premise the walk could remove by modelling more
+(walking the code it cannot resolve, carrying a count or a flag across a call, bounding an
+index from the code that sets it). One premise is a *game-state invariant* instead, true
+only because the game never reaches some state: the INDEX premise at 0x0809AC22 (the
+iterator's append), whose line adds "game-state invariant: the battle has at most 13
+registered units (a design limit the scene and script data keep; not enforced by code)".
+The decomp side checked every reachable battle (213 scene contexts) and found at most 13.
+UNSET is precision where the read is guarded by a count the walk does not correlate with
+the writes (0802C270, 08132208); an unguarded read of what earlier code left, used as an
+address, would itself be a game bug.
+
+##### Unresolved calls and SWIs
+
+*Assumed before:* code reached through an unresolved function pointer, outside ROM or in
+the BIOS left R4-R11 and the caller's frame alone.
+*Stated now:* the call or SWI, with the callee-saved registers and frame words that depend
+on owner stack addresses there, or "given frame addresses" where it receives only those.
+The premise: that code uses the values those registers hold on entry only to save and
+restore them, neither reads nor writes those frame words, and returns no address into the
+caller's frame except within the objects it is given. The last clause is the trust kit
+#398 and #402 already place in a callee nothing walks: it returns no address into its
+caller's frame. Nothing in R0-R3 or R12 may depend on a watched value or address a word that
+does; that refuses. Where R12 holds a frame address a walked callee returned (agbcc leaves
+such dead pointers), that address is one of the arguments, and the premise adds that the
+code does not branch to it. At a SWI, R12 is no argument: the BIOS dispatcher pushes R11,
+R12 and LR, loads R12 with the routine's own address before branching to it, and pops them
+before it returns. Such an address left in R12 at a SWI is stated as a register the BIOS
+saves and restores, under the BIOS premise. For the SWIs the decomp's reports reach, the
+premise also states what the routine stores into the objects it is given, as GBATEK
+documents it: Div (0x06), Sqrt (0x08) and ArcTan2 (0x0A) store nothing to memory; CpuSet
+(0x0B) and CpuFastSet (0x0C) store only data they copy from those objects, so an address
+copied stays an address; BgAffineSet (0x0E) and ObjAffineSet (0x0F) store only numbers
+they compute. Such a SWI given frame addresses is stated at its site even when nothing
+there depends on an owner stack address, and the line names the routine. Any other SWI,
+like code reached through a function pointer, may store any address it can reach.
+
+```
+* callee-saved premise: call at 0x080D4632 in 0x080D45D0 through _call_via_r3 to an unknown address, with R12 holding a frame address a callee returned; unproved premise: code reached through an unresolved function pointer, or outside ROM, uses the values those registers hold on entry only to save and restore them, neither reads nor writes those frame words, returns no address into the caller's frame except within the objects it is given, and does not branch to the address R12 holds
+```
+
+##### INDEX: indexed stack accesses
+
+*Assumed before:* a callee's accesses through a stack array never reached the caller's
+saved registers.
+*Stated now:* each access through a stack array base plus an unknown index, or through one
+of several exact addresses, with the excluded words that matter (saved, below SP or in
+another function's frame). The premise: the access stays inside that array. Such an access
+reaches only live words of the frame it was taken from that no push wrote, and a store
+there may change any of them. Exact candidates are checked exactly, never premised. An
+index whose range a comparison proves needs no premise; one whose range only widening
+gave is premised where it would overrun its array. Where no admissible word is reachable,
+the access refuses.
+
+##### STALE: words code that is not walked can reach
+
+*Assumed before:* uninitialised stack words and partly overwritten addresses never fed an
+address to code that is not walked.
+*Stated now:* each unresolved call, SWI or summarised call whose code can reach frame
+words that were never written, that hold part of a frame address, or that hold an address
+of unknown provenance. The premise: those words hold no frame address that earlier code
+left there, and that code neither copies nor builds an address from them.
+
+##### UNSET: word loads that may find what earlier code left
+
+*Assumed before:* a word the walk could not prove written (an array a callee filled
+through an index, a local written on one path) never held a frame address left by earlier
+code.
+*Stated now:* the word load and the words it may read unwritten, where what it reads is
+used as an address or stored where the walk does not look. The premise: it reads no frame
+address that earlier code left there. A word that may also hold an address of unknown
+provenance written by the walk is not covered, and an access through it refuses.
+
+##### ESCAPE: frame addresses stored where the walk does not look
+
+*Assumed before:* a callee never stored a frame address, or bits of one, to memory outside
+the frames.
+*Stated now:* the store site, the memory written (an address, or the base register and
+offset) and the frame words addressed. For a whole address the premise is that code that
+loads that address back while its frame is live uses it only inside the object it
+addresses. For bits of one (a halfword written to a DMA address register, a byte, or any
+other part that varies with the frame address) the line names the frame words whose
+address it is, and the premise is that no code rebuilds an address from those bits. Either
+is refused where the address may reach a saved register, a return address, a word below
+SP, the owner's untracked frame or a word that depends on an owner stack address, and
+bits of an address of unknown provenance refuse. A value that is the same for every frame
+address carries no address and needs no line. Where that memory may still hold a whole
+address when its frame is released, a `* callee-saved fact:` line says so: the address
+dangles, and the premise covers only loads while the frame is live.
+
+##### READ: bytes that may be part of an address
+
+*Assumed before:* bytes read from the stack were never part of a frame address.
+*Stated now:* a narrow load whose bytes, read from a word that may hold plain data
+instead, are rebuilt into an address that is then used or are stored where the walk does
+not look, and a narrow load in a summarised callee, through one of its inputs, of a word
+that may be uninitialised or hold part of a frame address (stated at that load). The
+premise: those bytes are plain data, no part of a frame address. A byte of a word that
+certainly holds a frame address stays bits of one, and an address rebuilt from it refuses.
+
+##### REBUILT: words a narrow store may have partly overwritten
+
+*Assumed before:* a narrow store never left part of a frame address behind.
+*Stated now:* a word load of frame words that a narrow store through a stack array address
+may have partly overwritten while they held a frame address, where what it loads is used as
+an address (a load whose value is only masked or stored back needs no premise). The premise:
+that store missed those words, so they hold the whole address used. Where the store
+certainly wrote the word, the load is of unknown provenance and an access through it
+refuses.
+
+##### ARGS: a checked callee's own stack arguments
+
+*Assumed before:* a callee never wrote above its entry SP.
+*Stated now:* a store by the checked callee above its entry SP of a plain value to a word
+it also reads there (agbcc's `p += 4` on a fifth or later argument). The premise: the
+callee's stack arguments cover those words, and its caller does not read them after the
+call. A store there of a frame address or a dependent value, or to a word the callee never
+reads as an argument, refuses.
+
+```
+* callee-saved premise: call at 0x080117A4 in 0x0801174C through _call_via_r2 resolved to 0x03005E79 (IWRAM), with the frame word at sp+32 depending on owner stack addresses; unproved premise: code reached through an unresolved function pointer, or outside ROM, uses the values those registers hold on entry only to save and restore them, neither reads nor writes those frame words, and returns no address into the caller's frame except within the objects it is given
+* callee-saved premise: SWI 0x0E (BgAffineSet) at 0x08141864 in 0x08141864, with R4 depending on owner stack addresses; unproved premise: the BIOS uses the values those registers hold on entry only to save and restore them, neither reads nor writes those frame words, stores into the objects it is given only numbers it computes, and returns no address into the caller's frame except within the objects it is given
+* callee-saved premise: indexed stack load at 0x080D7540 in 0x080D74E0, excluding the frame word at sp+28 (saved, released or in another function's frame); unproved premise: an access through a variable index or pointer into a stack array stays inside that array, so it reaches no saved register, return address, word below SP or word of another function's frame
+* callee-saved premise: address of the frame words at sp+0,sp+4,sp+8,sp+12,sp+16 stored to the memory at R0+0x0 at 0x080117B4 in 0x0801174C, with the frame word at sp+32 depending on owner stack addresses; unproved premise: code that loads that address back while its frame is live uses it only inside the object it addresses, so it reaches no saved register, return address or word that depends on an owner stack address
+* callee-saved fact: the memory at R0+0x0 may still hold the frame address stored at 0x080117B4 in 0x0801174C when 0x0801174C returns at 0x0801184C, releasing that frame; the address dangles: the escape premise covers only loads while the frame is live
+* callee-saved premise: bits of the address of the frame word at sp+12 stored to 0x03000946 at 0x080034F0 in 0x080034B8, with the frame word at sp+120 depending on owner stack addresses; unproved premise: no code rebuilds an address from those bits
+* callee-saved premise: code not walked from 0x080117A4 in 0x0801174C can reach the uninitialised, partly overwritten or unknown-provenance frame words at sp+0,sp+4; unproved premise: those words hold no frame address that earlier code left there, and code that is not walked neither copies nor builds an address from part of a frame address or from an address of unknown provenance
+* callee-saved premise: word load at 0x0802BA8E in 0x0802BA40 of the frame words at sp+0,sp+4,sp+8,sp+12,sp+16,sp+20,sp+24,sp+28,sp+32,sp+36,sp+40,sp+44,sp+48, which may not have been written before it; unproved premise: it reads no frame address that earlier code left there
+* callee-saved premise: narrow load at 0x0809811E in 0x0809801C of the frame word at sp+0, which may hold plain data or part of a frame address; unproved premise: the bytes read there are plain data, no part of a frame address (the buffer was filled before)
+* callee-saved premise: word load at 0x0801182C in 0x0801174C of the frame word at sp+16, which a narrow store through a stack array address may have partly overwritten while it held a frame address; unproved premise: that store missed them, so they hold the whole address used here
+* callee-saved premise: store at 0x080B49D0 in 0x080B48CC above its entry SP, to the word at entry SP+12; unproved premise: the callee's stack arguments cover these words, and its caller does not read them after the call
+```
+
+Owner reports carry these lines in `proof.buffers.callee_saved_premises`. Replay
+recomputes them, including for linked and self-calling reports that replay without a
+buffer proof. Anything the walk cannot model refuses, for example:
+
+* control outside an indexed span, or non-ARMv4T code;
+* a computed branch that is not a recognised switch, or an unmodelled SP write;
+* an access through a frame address of unknown provenance, or a branch to a word that may
+  hold only what earlier code left;
+* a store by the checked callee above its entry SP other than to its own stack arguments;
+* recursion deeper than 32 calls that no summary covers.
+
+A call is taken not to return only when its callee provably never does.
+
+Three verifiers run their own executors and still state "each call returns preserving
+R4-R11" as a premise instead of calling this walk:
+`conditional-known-query-stack-buffer-v1`, `conditional-finite-local-word-loops-v1` and
+`conditional-finite-spilled-scalar-loops-v1`. Their reports have no buffer proof. Eight
+shipped reports keep a stack address in R4-R11 across a call under them and are not
+checked: 0x0800A420, 0x08023130, 0x08026838, 0x080970E8, 0x08099494 and 0x08124238
+(known-query), 0x080C68EC (finite local-word loops) and 0x080F1E20 (finite spilled-scalar
+loops). A follow-up issue hooks the walk into those executors.
+
 ### Direct Thumb calls
 
 A separate linked profile supports unconditional Thumb `BL` relocations to
@@ -1068,8 +1404,10 @@ verified by the version-2 proof below together with its typed data literals
 A nested call receiving an alias in a caller-clobbered register requires the
 same proof, even when that register contains only a stale argument. Overwriting
 the register before use can discharge that obligation. Recursive buffer calls
-and nesting beyond sixteen inspected callees are rejected. Calls with aliases
-only in callee-saved registers retain the existing ordinary ABI assumption.
+and nesting beyond sixteen inspected callees are rejected. A call with aliases
+only in callee-saved registers is walked by the callee-saved check (kit #350,
+below); only where that check does not run (the verifiers with their own
+executors listed there) does it keep the ordinary ABI assumption.
 Other calls likewise use ordinary ABI summaries; this does not prove arbitrary
 callee behavior, termination, or whole-program memory safety. The bounds are
 allocated stack words; they do not infer C object sizes within those words.

@@ -16,6 +16,10 @@ import scheduler_loop_composition_profile as composition
 from test_scheduler_predicates import half, bl, fixture, A, B
 from test_scheduler_counted_loop import decoded
 
+# A stand-in for the pinned scheduler that is a function: callers keep stack addresses in
+# R4-R11 across it, and the callee-saved check walks it (kit #350). 29 x movs r0,r0; bx lr.
+SCHEDULER_STUB = bytes(58) + b'\x70\x47'
+
 S = composition.SCHEDULER
 SELECTOR = local.SCHEDULER_LOOP_LIVE_ALIAS
 C = 0x08001300
@@ -127,7 +131,7 @@ def phases(data, calls, base=A):
 
 
 def bound(data, calls, policy=SELECTOR, callee=half(0x4770)):
-    bodies = {A: data, B: callee, C: half(0x4770), S: bytes(60), 0x08005954: bytes(206)}
+    bodies = {A: data, B: callee, C: half(0x4770), S: SCHEDULER_STUB, 0x08005954: bytes(206)}
     p = fixture(bodies, policy=policy)
     span = p.span
     runtimes = set(match.function_thunk.ALIASES.values())
