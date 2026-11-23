@@ -48,6 +48,7 @@ import boot_dma3_fill as boot_dma
 import owner_graph_profile as graph
 import owner_runtime_profile as runtime
 import owner_copy_calls as copy_calls
+import bios_wrapper_summary_profile as bios_summary
 import function_thunk_profile as thunk
 import ignored_leaf_alias_profile as ignored_leaf
 import named_data_buffer_profile as named_buffer
@@ -255,7 +256,10 @@ def selected(report):
             '* inert spin', '* switches', '* buffer', '* signed quotient', '* signed remainder')) and not (
                 # Its own loop-replay disclosure; report replay requires exactly the recomputed lines.
                 fields == [f'* verification: `{named_buffer.SCHEMA}`'] and
-                line.startswith('* buffer loop replay: `bounded-loop-replay-v2` '))
+                line.startswith('* buffer loop replay: `bounded-loop-replay-v2` ') or
+                # The BIOS wrapper summaries a restoring owner applied, likewise recomputed.
+                fields == [f'* verification: `{OPTIONAL_SCHEMA}`'] and
+                line.startswith(('* buffer BIOS summaries: ', '* buffer BIOS premise: ', '* buffer BIOS manifest: ')))
             for line in report.splitlines()):
         raise ValueError('mixed or malformed complete-owner profile')
     return True
@@ -1985,6 +1989,8 @@ def render(address,result):
           if address == 0x0800CE08 and manifest['profile'] == named_buffer.SCHEMA else []),
         *(remainder_lines(manifest['proof']['remainders'])
           if manifest['profile'] == OPTIONAL_SCHEMA and 'remainders' in manifest['proof'] else []),
+        *(bios_summary.manifest_lines(manifest['proof']['bios_summaries'])
+          if manifest['profile'] == OPTIONAL_SCHEMA and 'bios_summaries' in manifest['proof'] else []),
         *(stack_index.precondition_lines(manifest['proof']['buffers']['stack_index_preconditions'])
           if (manifest['profile'] in stack_index.SCHEMAS.values() or
               manifest['profile'] == runtime_summary.SCHEMA and address == 0x08136A10) else []),

@@ -471,7 +471,8 @@ def prove_frame(instructions, edges, address, branches, calls, *,
                 returned_aliases = (bounded_output_proof.check_call(calls[site],offsets,native_stack,site=site)
                         if bounded_output_proof is not None else
                         buffer_proof.check_call(calls[site], offsets, native_stack,
-                            **({'site':site} if root_switch_buffer or restoring_local_buffer or callback_context_buffer or buffer_proof.bios_fill_proof is not None else {})))
+                            **({'site':site} if root_switch_buffer or restoring_local_buffer or callback_context_buffer or buffer_proof.bios_fill_proof is not None or
+                               getattr(buffer_proof, 'bios_summaries', None) is not None else {})))
                 if returned_aliases and not returned_local_aliases:
                     raise ValueError("local alias return requires a separate provenance policy")
                 if returned_local_aliases:

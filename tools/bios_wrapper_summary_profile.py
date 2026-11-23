@@ -6,8 +6,10 @@ word).  A four- or six-byte BIOS wrapper (`svc N; bx lr`) cannot be walked: the
 routine is not in the ROM.  This module replaces that walk, for eight exact
 indexed wrappers, by a summary whose behaviour is a stated premise, as in every
 existing BIOS contract, and whose memory spans are proved from the owner's own
-code.  It is constructed only by the plain path (`BufferCallProof(...,
-bios_wrappers=True)`); no subclass and no selector uses it.
+code.  It is constructed by the plain path (`BufferCallProof(...,
+bios_wrappers=True)`) and by the restoring owner (`owner_runtime_profile.verify`),
+which binds its complete owner CFG first (`bind_owner`) so that each memory call
+is discharged where its frame proof makes it; no subclass uses it.
 
 Identity: the call is an actual direct BL site; the target is one of the
 entries below; `BufferCallProof.span` gives its complete, unique,
@@ -24,7 +26,9 @@ discharged when the owner's CFG is complete (`finish`, called by
 `verify_leaf_instructions` for the owner):
 
 * R2 is known from `bios_cpuset_fill_profile.prove_bits` over the verifier's
-  own owner CFG, with its zero-extension rules;
+  own owner CFG, with its zero-extension rules (the restoring owner's CFG is its
+  native inventory graph, where a same-owner BL jump counts as a call: it only
+  loses facts);
 * CpuSet: count is bits 0-20, the unit is 4 bytes if bit 26 is set and 2
   otherwise, bit 24 selects a fill from one source unit; CpuFastSet moves
   32-bit units in blocks of eight; BgAffineSet reads `count` 20-byte records
@@ -168,6 +172,23 @@ class BiosWrapperSummaries:
         self.scalar = {}
         self.pending = {}
         self.memory = {}
+        # (data, address, instructions, edges) of a complete owner CFG known before the
+        # walk (bind_owner), with R2's bit states once a memory call needs them; None
+        # leaves every memory call pending until finish.
+        self.owner = None
+        self.owner_states = None
+
+    def bind_owner(self, data, address, instructions, edges):
+        """Discharge each memory call at the owner's own call over this exact CFG.
+
+        For a walk that does not end in verify_leaf_instructions (the restoring owner's
+        frame proof), whose CFG is complete before the walk starts.  The checks are
+        finish's, on the frame the walk has at the call.
+        """
+        if self.owner is not None or self.pending or self.memory or type(data) is not bytes or \
+                address not in instructions or set(edges) != set(instructions):
+            raise ValueError('BIOS wrapper summaries bind one complete owner CFG before any call')
+        self.owner = (data, address, instructions, edges)
 
     @staticmethod
     def covers(address):
@@ -220,7 +241,14 @@ class BiosWrapperSummaries:
                 raise ValueError('BIOS memory wrapper refuses a local pointer outside R0 and R1')
             key = (site, address, arguments.get(match.ARM_REG_R0), arguments.get(match.ARM_REG_R0 + 1),
                    tuple(tuple(word) for word in stack), tuple(sorted(protected)))
-            self.pending[key] = key
+            if self.owner is None:
+                self.pending[key] = key
+            else:
+                code, owner, instructions, edges = self.owner
+                if self.owner_states is None:
+                    self.owner_states = cpuset.prove_bits(instructions, edges, owner, code,
+                                                          zero_extension=True)
+                self._discharge(key, code, owner, instructions, self.owner_states)
         # No callee-clobber record: like every uninspected call, R4-R11 survival is
         # trusted under the premise, and a loop replay that relies on it says so.
         proof.dependencies[address] = data
@@ -228,48 +256,51 @@ class BiosWrapperSummaries:
 
     def finish(self, data, address, instructions, edges):
         """Discharge the owner's memory-wrapper calls over its complete verified CFG."""
-        import match
         pending = sorted((key for key in self.pending if key[0] in instructions), key=repr)
         if not pending:
             return
         states = cpuset.prove_bits(instructions, edges, address, data, zero_extension=True)
+        for key in pending:
+            try:
+                self._discharge(key, data, address, instructions, states)
+            except ValueError as error:
+                raise ValueError(f'buffer callee 0x{key[1]:08X}: {error}') from error
+            del self.pending[key]
+
+    def _discharge(self, key, data, address, instructions, states):
+        """Prove one memory call's spans and kills, then record it."""
+        import match
         decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
         decoder.detail = True
-        for key in pending:
-            site, target, source, destination, stack, protected = key
-            name = MEMORY[target][0]
-            instruction = instructions[site]
-            if instruction.id != match.ARM_INS_BL or instruction.size != 4 or \
-                    len(instruction.operands) != 1 or instruction.operands[0].imm != target:
-                raise ValueError(f'buffer callee 0x{target:08X}: BIOS {name} site is not its direct BL '
-                                 'in the owner CFG')
-            ones, zeros = states[site].get(match.ARM_REG_R0 + 2, (0, 0))
-            try:
-                spans = control_spans(target, source, destination, ones, zeros)
-                if spans[0] is not None:
-                    check_span(spans[0], stack, protected, write=False)
-                if spans[1] is not None:
-                    check_span(spans[1], stack, protected, write=True)
-                if spans[0] is not None and spans[1] is not None and \
-                        spans[0][0] < spans[1][0] + spans[1][1] and spans[1][0] < spans[0][0] + spans[0][1]:
-                    raise ValueError('BIOS local source and destination overlap')
-                killed = []
-                for register, offset in ((0, source), (1, destination)):
-                    if offset is None:
-                        continue
-                    if not match.stack_alias_overwritten_before_use(
-                            data, address, site + instruction.size, match.ARM_REG_R0 + register, decoder):
-                        raise ValueError(f'R{register} carried a local pointer into BIOS {name} and is not '
-                                         'written before any read, call or return')
-                    killed.append(register)
-            except ValueError as error:
-                raise ValueError(f'buffer callee 0x{target:08X}: {error}') from error
-            record = dict(site=site, target=target, routine=name, control=[ones, zeros],
-                          source=None if spans[0] is None else list(spans[0][:2]),
-                          destination=None if spans[1] is None else list(spans[1][:2]),
-                          unit=spans[2], count=spans[3], killed=killed, pointer_words=list(protected))
-            self.memory[canonical(record)] = record
-            del self.pending[key]
+        site, target, source, destination, stack, protected = key
+        name = MEMORY[target][0]
+        instruction = instructions.get(site)
+        if instruction is None or instruction.id != match.ARM_INS_BL or instruction.size != 4 or \
+                len(instruction.operands) != 1 or instruction.operands[0].imm != target:
+            raise ValueError(f'BIOS {name} site is not its direct BL in the owner CFG')
+        ones, zeros = states[site].get(match.ARM_REG_R0 + 2, (0, 0))
+        spans = control_spans(target, source, destination, ones, zeros)
+        if spans[0] is not None:
+            check_span(spans[0], stack, protected, write=False)
+        if spans[1] is not None:
+            check_span(spans[1], stack, protected, write=True)
+        if spans[0] is not None and spans[1] is not None and \
+                spans[0][0] < spans[1][0] + spans[1][1] and spans[1][0] < spans[0][0] + spans[0][1]:
+            raise ValueError('BIOS local source and destination overlap')
+        killed = []
+        for register, offset in ((0, source), (1, destination)):
+            if offset is None:
+                continue
+            if not match.stack_alias_overwritten_before_use(
+                    data, address, site + instruction.size, match.ARM_REG_R0 + register, decoder):
+                raise ValueError(f'R{register} carried a local pointer into BIOS {name} and is not '
+                                 'written before any read, call or return')
+            killed.append(register)
+        record = dict(site=site, target=target, routine=name, control=[ones, zeros],
+                      source=None if spans[0] is None else list(spans[0][:2]),
+                      destination=None if spans[1] is None else list(spans[1][:2]),
+                      unit=spans[2], count=spans[3], killed=killed, pointer_words=list(protected))
+        self.memory[canonical(record)] = record
 
     def observed(self):
         return bool(self.scalar or self.pending or self.memory)
@@ -294,10 +325,14 @@ class BiosWrapperSummaries:
         """Report lines; none when no summary was applied, so other reports are unchanged."""
         if not self.observed():
             return []
-        # The schema and contract are the summary line, each premise is a line of its own,
-        # and the rest (wrappers, sites and, with memory sites, the bit rules) is the manifest.
-        manifest = self.manifest()
-        sites = {key: value for key, value in manifest.items() if key not in ('schema', 'contract', 'premises')}
-        return [f'* buffer BIOS summaries: `{SCHEMA}` {CONTRACT}',
-                *(f'* buffer BIOS premise: {premise}' for premise in manifest['premises']),
-                f'* buffer BIOS manifest: `{canonical(sites)}`']
+        return manifest_lines(self.manifest())
+
+
+def manifest_lines(manifest):
+    """The report lines of one summaries manifest (BiosWrapperSummaries.manifest)."""
+    # The schema and contract are the summary line, each premise is a line of its own,
+    # and the rest (wrappers, sites and, with memory sites, the bit rules) is the manifest.
+    sites = {key: value for key, value in manifest.items() if key not in ('schema', 'contract', 'premises')}
+    return [f'* buffer BIOS summaries: `{SCHEMA}` {CONTRACT}',
+            *(f'* buffer BIOS premise: {premise}' for premise in manifest['premises']),
+            f'* buffer BIOS manifest: `{canonical(sites)}`']
