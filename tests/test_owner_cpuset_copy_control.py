@@ -3,8 +3,10 @@
 0x04000080 asks CpuSet for 0x80 32-bit units; as a PC word it lies in the typed
 address domain, so the owner's typed coverage refused it as an unnamed address.
 It is taken out of that coverage only when the owner CFG proves the word is
-never anything but CpuSet's r2.  The fixtures are assembled, so each shape is
-exact.
+never anything but CpuSet's r2.  A hardware-window word none of whose loads
+may reach CpuSet's r2 is a numeric hardware word instead
+(test_restoring_owner_numeric_hardware).  The fixtures are assembled, so each
+shape is exact.
 """
 import copy
 import json
@@ -160,11 +162,12 @@ class CopyControlTests(unittest.TestCase):
         self.assertNotIn('cpuset_copy_controls', manifest['proof'])
 
     def test_control_used_other_than_as_cpuset_r2_refused(self):
+        # A word none of whose loads may reach CpuSet's r2 (unused, only offset, or passed
+        # to another callee) is a numeric hardware word, not a refused control.
         load = SOURCE + ['ldr r5, .Lcontrol']
         cases = {
             'address': (load + ['ldr r3, [r5]', 'adds r2, r5, #0', 'bl func_0814186C'],
                         'read other than by a register copy'),
-            'arithmetic': (load + ['adds r2, r5, #4', 'bl func_0814186C'], 'read other than by a register copy'),
             'compare': (load + ['cmp r5, #0', 'adds r2, r5, #0', 'bl func_0814186C'],
                         'read other than by a register copy'),
             'store': (load + ['str r5, [sp]', 'adds r2, r5, #0', 'bl func_0814186C'],
@@ -173,7 +176,6 @@ class CopyControlTests(unittest.TestCase):
                                'other than as the CpuSet r2 control'),
             'source argument': (load + ['adds r0, r5, #0', 'adds r2, r5, #0', 'bl func_0814186C'],
                                 'other than as the CpuSet r2 control'),
-            'other callee': (load + ['adds r2, r5, #0', 'bl func_08011000'], 'other than as the CpuSet r2 control'),
             'flags': (load + ['adds r2, r5, #0', 'beq .Lnext', '.Lnext:', 'bl func_0814186C'],
                       'flags set from a CpuSet copy control are read'),
             'flags after the call': (COPY + ['beq .Lnext', '.Lnext:'], 'flags set from a CpuSet copy control are read'),
@@ -182,7 +184,6 @@ class CopyControlTests(unittest.TestCase):
                                            'other than as the CpuSet r2 control'),
             'returned': (COPY + ['adds r3, r5, #0'], 'survives a return'),
             'left in r2': (COPY + ['adds r0, r2, #0'], 'read before it is rewritten'),
-            'unused': (SOURCE + ['ldr r5, .Lcontrol', 'movs r2, #1', 'bl func_0814186C'], 'reaches no CpuSet call'),
             'one path': (load + ['adds r2, r5, #0', 'cmp r4, #0', 'beq .Lcall', 'movs r2, #1', '.Lcall:',
                                  'bl func_0814186C'], 'not r2 on every path'),
         }

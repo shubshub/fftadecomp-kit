@@ -5741,8 +5741,11 @@ control rules claim no more: the fill-control recognizers prove only the
 word's use, `BiosFillProof` bounds only a local source, and the BIOS wrapper
 summaries make no claim about an external pointer's extent. The BIOS routine is the
 GBATEK premise, and r4-r11 kept across calls is the ordinary returning ABI the
-owner proof already relies on. Owners in the original runtime domain, fill
-controls and words with reserved bits still need a typed name.
+owner proof already relies on. Owners in the original runtime domain still need
+a typed name for such a word, and so do fill controls and words with reserved
+bits that may reach CpuSet's r2 through register copies. A hardware-window word
+none of whose loads may reach CpuSet's r2 that way is a number (see "Fixed
+hardware addresses as numbers in restoring owners").
 
 ### BIOS wrappers in restoring owners
 
@@ -5841,6 +5844,68 @@ identity, then one line per call:
 Overlap, object extent, readability, writability and termination beyond the
 bounded run are not proved. Owners in the original runtime domain still refuse
 the name.
+
+### Fixed hardware addresses as numbers in restoring owners
+
+A source may write a VRAM, palette, OAM or I/O address as a number:
+`(u8 *)0x0600B000 + (unit - 2) * 0x100` folds to one pool word `0x0600AE00`
+with no relocation (0806B6D0). Spelled with a data symbol,
+`data_0600AE00 + unit * 0x100`, the function compiles to 7144 bytes instead of
+7140 and no longer matches. Under
+`elf-symbol-thumb-restoring-owner-optional-runtime-v1` a restoring owner
+(`restoring-owner-runtime-v1`) now gives each reached pool word in the typed
+domain the first class that applies:
+
+1. a typed ABS32 object or function literal, or the owner's own switch word;
+2. a numeric hardware word: any other word in `[0x04000000,0x08000000)`, the
+   class of "Fixed hardware addresses as numbers in BIOS fill owners" and of the
+   default path's data-buffer schemas, provided no load of it may reach, through
+   register copies, r2 at a call to the CpuSet wrapper 0x0814186C and none is
+   accepted by the CpuSet scalar-control recognizers. A load is followed over
+   the complete CFG, union at joins, through the register copies the copy
+   controls follow; any other write ends a copy, every call ends r0-r3, r12 and
+   LR, and a same-owner BL jump ends only LR;
+3. a CpuSet copy control ("CpuSet copy controls in restoring owners"), which
+   proves its word or refuses.
+
+Every other reached word still needs typed provenance: RAM (`0x02`, `0x03`),
+ROM and its wait-state mirrors, and a window word with a load that may reach
+CpuSet's r2 through register copies but is not a proved copy control (a fill
+control, a word with reserved bits, a word loaded once as an address and once
+as r2). So the classes stay disjoint and a copy control keeps its own record;
+I/O register words such as `0x04000080` that never reach CpuSet's r2 are
+numbers here as on the default path. A value stored and reloaded (through the
+stack, say) is not followed: a fill control that reaches r2 that way is a
+numeric hardware word, with literal identity only, as it is on the default
+path, whose recognizers follow no memory either.
+
+The record is the same `numeric_hardware_words`
+(`reached-numeric-hardware-literals-v1`, rows `[offset, value, load sites]`).
+It claims literal identity only: the original ELF word has no relocation and
+the linker must preserve it exactly. It is present only when the class is not
+empty, so other reports keep their bytes; replay recomputes it, and an edited,
+dropped or extended list is refused. The report prints the record's contract as
+the premise, then one line per word:
+
+```
+* numeric hardware literal premises: Reached PC-loaded literals in [0x04000000,0x08000000) that are not a typed ABS32 object or function, switch word or numeric MMIO literal, and none of whose loads the BIOS scalar control recognizers accept. Original ELF words have no relocation; the linker must preserve them exactly. Literal identity only, no typed symbol, pointee type, control role, hardware access validity, physical readability, memory effects, initialization, nonalias, bounds, numeric result, termination or C semantic equivalence theorem.
+* numeric hardware literal: word +0x1954 = 0x0600AE00, loaded at +0x18B8
+```
+
+What the typed coverage protects is kept: no untyped pool word is itself a RAM
+or ROM address, so none is an IWRAM stack address or a code pointer. Tracked
+stack aliases come only from SP arithmetic and no address in the window lies in
+the stack, so the frame, alias and BIOS summary proofs are unchanged. The
+CpuSet copy and compiler memcpy records name typed objects only, so a numeric
+word that reaches one of their pointer arguments is refused there. The original
+runtime domain (`elf-symbol-thumb-restoring-owner-runtime-v1`) and every other
+owner selector are unchanged. `tests/test_restoring_owner_numeric_hardware.py`
+covers the window bounds, RAM, ROM and mirror words, words not read whole by a
+PC load (refused by the owner partition first), typed and offset hardware
+objects, numbers at or inside a named object, every load of a word, copy
+controls beside numbers, words that may reach CpuSet's r2, control-shaped words
+that never do, numbers passed as CpuSet's source or destination, the original
+domain, forged manifests and a compiled C owner whose report replays.
 
 ### Explicit ignored incoming leaf aliases
 
@@ -6727,8 +6792,10 @@ relocation, and the linker must preserve it exactly. A register that holds such
 a word is a non-local value. Tracked stack aliases come only from SP
 arithmetic, and no address in the window lies in the stack, so the existing
 buffer, fill-source and frame proofs are unchanged. No typed symbol, pointee
-type, hardware access validity or memory effect is claimed. Every other owner
-and addressed selector is unchanged, including the ordinary-BIOS, runtime and
+type, hardware access validity or memory effect is claimed. The restoring
+owner's optional-runtime schema has the same class (see "Fixed hardware
+addresses as numbers in restoring owners"). Every other owner and addressed
+selector is unchanged, including the ordinary-BIOS, runtime and
 native-buffer data selectors and every callback data selector other than the
 menu ring initializer. The addressed list is written out: a selector added to
 the BIOS fill and data selector sets gains this class only when it is also

@@ -4,11 +4,14 @@ from contextlib import redirect_stdout
 import copy
 import io
 import json
+from pathlib import Path
 import struct
 import sys
 import unittest
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 import bios_fast_fill_source_profile as fast
 import m4a_max_lines as max_lines
 import named_data_buffer_profile as buffers
