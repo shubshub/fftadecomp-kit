@@ -1156,8 +1156,10 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
     functions = {offset:(name,struct.unpack_from('<I',data,offset)[0])
                  for offset,name in bindings['functions']}
     thunk.verify_literal_bindings(data,address,ins.values(),calls,mapping,functions)
+    # The restoring owner checks only its data bindings here: its function literals,
+    # verified by verify_literal_bindings above, are not data and have no data symbol.
     data_literals = ({offset:literals[offset] for offset,name,addend in bindings['data']}
-                     if selector in (*local_calls.SELECTORS, *named_buffer.THUNK_SELECTORS, query_cont.SELECTOR, nested_query.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, spilled_loop.SELECTOR)
+                     if selector in (*local_calls.SELECTORS, *named_buffer.THUNK_SELECTORS, query_cont.SELECTOR, nested_query.SELECTOR, finite_loop.SELECTOR, stack_query.SELECTOR, stack_query.DIVISION_SELECTOR, spilled_loop.SELECTOR, SELECTOR)
                      or menu_modes or selector == named_buffer.EQUIPMENT_SELECTOR and address == 0x080C01D0 else literals)
     thunk.verify_data_bindings(calls,data_literals,match.parse_data_symbols(objects),json.loads(mapping))
     # All actual address-domain PC words require typed object/function provenance,
