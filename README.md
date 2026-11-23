@@ -1306,9 +1306,10 @@ A wrapper is reached by such a walk only when a tracked local pointer is live at
 the call, in a register or as a pointer-bearing frame word. Without the summary
 the walk reaches the `svc` and refuses (`non-leaf calls and interrupts require
 linked CFG verification`). A wrapper call with no live pointer stays an ordinary
-ABI call and is not recorded. No owner, addressed, function-literal or switch
-selector uses the summary: it is set only by `BufferCallProof(...,
-bios_wrappers=True)`, which refuses any subclass.
+ABI call and is not recorded. No addressed, function-literal or switch selector
+uses the summary, and of the owner selectors only `restoring-owner-runtime-v1`
+does (see "BIOS wrappers in restoring owners"): it is set only by
+`BufferCallProof(..., bios_wrappers=True)`, which refuses any subclass.
 
 | entry | bytes | SWI | routine | kind |
 |---|---|---|---|---|
@@ -5742,6 +5743,52 @@ summaries make no claim about an external pointer's extent. The BIOS routine is 
 GBATEK premise, and r4-r11 kept across calls is the ordinary returning ABI the
 owner proof already relies on. Owners in the original runtime domain, fill
 controls and words with reserved bits still need a typed name.
+
+### BIOS wrappers in restoring owners
+
+`restoring-owner-runtime-v1` proves its frame with `prove_frame` and a plain
+`BufferCallProof`. A call made while r0-r3, r12 or LR holds a stack address is
+walked, and a walk that reaches a BIOS wrapper's `svc` refuses (`buffer callee
+0x0814186C: non-leaf calls and interrupts require linked CFG verification`).
+agbcc's `CpuFill16(0, dest, n)` hands CpuSet the address of a stack halfword, so
+large owners with that idiom (08076560, 0807E37C, 080802E4) stopped there.
+
+The owner now applies the summaries of "GBA BIOS wrappers in plain buffer walks"
+at its own calls, with the same identity, span, kill and premise rules and the
+same report lines. Two differences follow from the frame proof:
+
+* the owner's CFG is complete before the walk, so the summaries are bound to it
+  (`BiosWrapperSummaries.bind_owner`) and each memory call is discharged where
+  it is made, on the frame `prove_frame` has at that call. R2's bits come from
+  `bios_cpuset_fill_profile.prove_bits` over the owner's inventory graph, where
+  a same-owner `bl` jump counts as a call and so only loses facts; the bit proof
+  runs only once a memory call needs it;
+* a memory wrapper is summarised only at the owner's own call, as on the plain
+  path: a stack address that reaches one inside a walked callee stays refused,
+  now with `BIOS memory wrapper is summarised only at the owner's own call`, and
+  a scalar wrapper given a stack address anywhere with `scalar BIOS wrapper
+  refuses a tracked local pointer in R0-R3, R12 or LR`. Both were refused before
+  at the `svc`.
+
+After the call `prove_frame` forgets r0-r3, r12 and LR and the contents of every
+local word, as after any walked callee; a register that carried a stack address
+in must be rewritten before any read, call (a same-owner `bl` included) or
+return. Saved words are outside every span. When a summary is applied the
+inventory records `bios_summaries` (the plain manifest) and the wrapper's bytes
+under `buffer_dependencies`, and the owner is recorded under
+`elf-symbol-thumb-restoring-owner-optional-runtime-v1` even when its runtimes
+are those of the original domain, whose records never contain a summary. The
+report prints the plain path's lines: the summaries line (schema and contract),
+the three `* buffer BIOS premise:` lines and the manifest. For 080802E4's fill
+of a stack halfword at entry SP-36 with control `0x01000084`:
+
+```
+* buffer BIOS manifest: `{"bit_rules":"zero-extending-byte-load-and-bounded-multiply-v2: an LDRB result is zero above bit 7; MULS of values below 2**a and 2**b is below 2**(a+b) when a+b<=32; LDRH is excluded (a misaligned halfword load rotates); no other instruction gains facts","memory_sites":[{"control":[16777348,4278189947],"count":null,"destination":null,"killed":[0],"pointer_words":[],"routine":"CpuSet","site":134745322,"source":[-36,2],"target":135534700,"unit":2}],"scalar_sites":[],"wrappers":[[135534700,"CpuSet",11,"0bdf7047"]]}`
+```
+
+An owner that calls no wrapper with a stack address gets no new record, line or
+fingerprint input. Synthetic boundaries are in
+`tests/test_restoring_owner_bios_summaries.py`.
 
 ### Compiler memcpy in restoring owners
 

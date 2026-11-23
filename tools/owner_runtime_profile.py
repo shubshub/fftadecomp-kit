@@ -302,13 +302,20 @@ def verify(data, address, rom, mapping, refinement, manifest=None, *, remainder=
         modsi3.verify_identity(rom, mapping)
     remainders = prove_remainders(instructions, edges, address, branches, calls,
                                   remainder_sites, data) if remainder_sites else []
-    buffer = match.BufferCallProof(rom, mapping)
+    # A stack address handed to an exact indexed BIOS SWI wrapper is summarised, as on
+    # the plain path, instead of walked (bios_wrapper_summary_profile): memory wrappers
+    # at the owner's own calls only, discharged at the call over this complete CFG.
+    buffer = match.BufferCallProof(rom, mapping, bios_wrappers=True)
+    buffer.bios_summaries.bind_owner(data, address, instructions, edges)
     # The frame proof names the remainder by its canonical runtime, whatever the
     # relocation called it: its arguments may carry no stack provenance.
     frame_record = frame.prove_frame(instructions, edges, address, branches, calls,
                                     stack_aliases=True, buffer_proof=buffer,
                                     runtime_calls={site: "__modsi3" if site in remainder_sites else name
                                                    for site, name in runtime.items()} or None)
+    summaries = buffer.bios_summaries.observed()
+    # SCHEMA's domain never contained a summarised BIOS call.
+    original = original and not summaries
     observed = {
         "schema": SCHEMA if original else OPTIONAL_SCHEMA, "address": address, "end": end,
         "bytes": len(data),
@@ -339,6 +346,8 @@ def verify(data, address, rom, mapping, refinement, manifest=None, *, remainder=
             remainder_runtime=modsi3.RUNTIME,
             remainder_dependencies=[list(identity) for identity in modsi3.IDENTITIES],
             remainders=remainders)
+    if summaries:
+        observed["bios_summaries"] = buffer.bios_summaries.manifest()
     if manifest is not None and (type(manifest) is not dict or
                                 json.dumps(manifest, sort_keys=True) !=
                                 json.dumps(observed, sort_keys=True)):

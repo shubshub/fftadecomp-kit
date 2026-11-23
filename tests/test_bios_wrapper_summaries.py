@@ -601,7 +601,7 @@ class BiosWrapperSummaryTests(unittest.TestCase):
             with self.subTest(line=line):
                 self.assertTrue(line.startswith(evidence.BUFFER_LINES))
 
-    def test_only_the_plain_path_opts_in(self):
+    def test_only_the_plain_path_and_the_restoring_owner_opt_in(self):
         found = []
         for path in sorted((ROOT / "tools").glob("*.py")):
             tree = ast.parse(path.read_text())
@@ -620,7 +620,8 @@ class BiosWrapperSummaryTests(unittest.TestCase):
             ("function_thunk_profile.py", "verify_source", "BufferCallProof", True),
             ("match.py", "main", "BufferCallProof", True), ("match.py", "main", "BufferCallProof", True),
             ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True),
-            ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True)])
+            ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True),
+            ("owner_runtime_profile.py", "verify", "BufferCallProof", True)])
 
 
 FILL_C = """typedef unsigned short u16;
