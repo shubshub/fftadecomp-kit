@@ -70,8 +70,11 @@ def original_callers(rom, mapping, index):
         span_record(a, b, entries, rows, rom)
         return rom[a-BASE:b-BASE]
     spans = {}
+    # Each span is the function's exact row in both indexes. The registering
+    # caller's row ends at 0x08079690, after the pool word 0x0807968C that its
+    # LDR R2,[PC,#0x20] at 0x08079668 reads.
     for a, b, h in (
-            (0x08078818, 0x0807968C, "d4ccf7d2dc63a9c24fa57a9bfc1b71db6fa3336cd3f11080a839690c2a55db74"),
+            (0x08078818, 0x08079690, "a72c7a8b944a86f6010032b97235519c0e4d7c0ad97e67f4542c116bc7e7d5b5"),
             (0x080069F4, 0x08006A7C, "870059083b005c705d9ed3a284ac753f0cb32cb52f1110640bd37b4b31d8e726"),
             (0x08006A7C, 0x08006AB8, "877bd60e35bf7d06ab032e5c96a33ebdb416480ba6ede87050d91f229136bb03")):
         require(digest(body(a, b)) == h, "callback caller or scheduler changed")

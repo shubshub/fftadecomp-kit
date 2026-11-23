@@ -1,5 +1,6 @@
 """Native callback dispatch, ROM table copy and the recorded menu-choice premise."""
 import os
+import hashlib
 import json
 from pathlib import Path
 import struct
@@ -12,7 +13,69 @@ import match_evidence
 import menu_mode_dispatcher as menu
 import owner_admission_profile as owner
 import rom_table_copy_profile as rom_copy
+import software_float_profile as software_float
 import stack_index_precondition_profile as index
+
+CALLER = 0x08078818
+CALLER_END = 0x08079690
+EXACT = (CALLER, CALLER_END, 1387)
+SPAN_REFUSAL = 'exact unique nonoverlapping Thumb spans/counts'
+# The other rows the caller proof reads, and the function after the caller.
+ROWS = ((0x080069F4, 0x08006A7C, 66), (0x08006A7C, 0x08006AB8, 30),
+        (0x08084DA0, 0x08085370, 594), (0x08079690, 0x0807974C, 71))
+
+
+def caller_indexes(mapping_row, text_row):
+    """Both index snapshots with these caller rows; None leaves a row out."""
+    mapping = [{'rom': f'0x{a:08X}', 'end': f'0x{b:08X}', 'mode': 'thumb', 'instrs': n}
+               for a, b, n in ROWS + ((mapping_row,) if mapping_row else ())]
+    text = [f'{a:08X} {b:08X} {b-a} {n} return' for a, b, n in ROWS + ((text_row,) if text_row else ())]
+    return json.dumps(mapping).encode(), ('\n'.join(text)+'\n').encode()
+
+
+class CallerSpan(unittest.TestCase):
+    """The registering caller's body is pinned over its exact index row."""
+
+    @classmethod
+    def setUpClass(cls):
+        selected = os.environ.get('FFTA_ROM')
+        if not selected or not Path(selected).is_file():
+            raise unittest.SkipTest('FFTA_ROM must reference the approved ROM')
+        cls.rom = Path(selected).read_bytes()
+        if hashlib.sha256(cls.rom).hexdigest() != software_float.ROM_SHA256:
+            raise unittest.SkipTest('FFTA_ROM is not the approved image')
+
+    def test_caller_row_ends_after_its_last_pool_word(self):
+        # LDR R2,[PC,#0x20] at 0x08079668 reads the word at 0x0807968C, so the
+        # caller ends at 0x08079690, where the next function starts.
+        ldr, = struct.unpack_from('<H', self.rom, 0x08079668-menu.BASE)
+        self.assertEqual(ldr, 0x4A08)
+        self.assertEqual(((0x08079668+4) & ~3) + 4*(ldr & 0xFF), CALLER_END-4)
+        mapping, text = caller_indexes(EXACT, EXACT)
+        bodies = menu.original_callers(self.rom, mapping, text)['checked_bodies']
+        self.assertEqual(bodies[f'0x{CALLER:08X}'],
+                         hashlib.sha256(self.rom[CALLER-menu.BASE:CALLER_END-menu.BASE]).hexdigest())
+
+    def test_any_other_caller_row_refuses(self):
+        old = (CALLER, 0x0807968C, 1850)  # both indexes before the fix: one word short, halfword count
+        wrong = [old, (CALLER, 0x0807968C, 1387), (CALLER, 0x08079688, 1385),
+                 (CALLER, 0x08079694, 1388), (CALLER+2, CALLER_END, 1386)]
+        cases = [(row, row) for row in wrong] + [
+            (None, None), (EXACT, None), (None, EXACT),
+            (EXACT, old), (old, EXACT), (EXACT, (CALLER, CALLER_END, 1386))]
+        for mapping_row, text_row in cases:
+            mapping, text = caller_indexes(mapping_row, text_row)
+            with self.subTest(mapping=mapping_row, text=text_row), \
+                    self.assertRaisesRegex(ValueError, SPAN_REFUSAL):
+                menu.original_callers(self.rom, mapping, text)
+
+    def test_last_pool_word_is_part_of_the_pinned_body(self):
+        mapping, text = caller_indexes(EXACT, EXACT)
+        for pc in (CALLER, 0x080792F0, CALLER_END-4, CALLER_END-1):
+            changed = bytearray(self.rom)
+            changed[pc-menu.BASE] ^= 1
+            with self.subTest(pc=hex(pc)), self.assertRaisesRegex(ValueError, 'callback caller or scheduler changed'):
+                menu.original_callers(bytes(changed), mapping, text)
 
 
 @unittest.skipUnless(os.environ.get('FFTA_MENU_MODE_ROOT'), 'requires the indexed game, ROM and 0807DDB8 source')
