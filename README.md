@@ -3082,6 +3082,80 @@ the bound is on the unsigned value of the scaled, signed index. A bound below
 the table size therefore also excludes negative indices, and a reviewer has to
 check that no negative value occurs.
 
+#### On the default path: one retry after the plain walk refuses
+
+The default Thumb path runs the same analysis without a selector, but only as
+a retry (`tools/default_stack_index_profile.py`). Its stack-buffer walks (the
+plain path, the data-buffer proofs and the function-buffer proof) track exact
+stack offsets only. They refuse a frame address plus a runtime index at its
+first use:
+
+```
+unsupported stack-alias use or escape
+unsupported stack-address materialization
+stack-alias index is not a known constant
+```
+
+After one of those three refusals, and only then, the walk runs once more on a
+fresh proof with the v2 analysis attached. A walk that does not refuse at one
+of them is the walk it was before, so no verdict the default path reaches
+without the retry changes. A refused retry keeps the plain refusal and adds its
+reason, for example `unsupported stack-alias use or escape; default stack-index
+retry: stack index: ranged stack address escapes through a call argument
+register`. The retry also runs for a function with no calls. The plain path's
+fallback walk used to need a call, and the stack-buffer schemas needed an
+inspected buffer call. Their evidence is now an inspected buffer call or an
+admitted retry. A call-free report says `control flow: closed leaf CFG`, and
+replay holds that line to the walk.
+
+The analysis is v2's, with three differences:
+
+* **R4-R11 at calls.** A callee must restore those registers, but nothing
+  stops it reading them first. The retry attaches the callee watch of #350 to
+  its proof, as the selector route does, so a ranged address held in R4-R11 at
+  a call is admitted only when that walk of what the call executes admits the
+  call, by showing the value unused or under one of its recorded premises
+  ("ranged stack address in a callee-saved register at a call: ..."
+  otherwise). Those premise lines print in the report. A policy without the
+  watch refuses the call itself ("ranged stack address escapes through a
+  callee-saved register at a call").
+* **Premises bound loads only.** An access that the in-function value ranges
+  do not prove in bounds needs a premise row, exactly as under the selector:
+  a reviewed entry in `config/stack_index_premises.json` that repeats every
+  row, or the function refuses and prints the entry to review. A **store**
+  that needs a premise refuses outright ("the store at ... needs a runtime
+  premise (...); on the default path premise rows admit loads only"). An
+  out-of-range store could overwrite saved registers or the saved LR. A load
+  premise is not harmless either: if it is false, the load can read a saved
+  register, the saved LR or the caller's frame, and the walk treats that value
+  as one that holds no address into the frame. The admission rests on the
+  reviewed premise.
+* **What a proved access means.** The value ranges show that every byte the
+  access can touch lies in allocated local words (and, for a load, initialised
+  ones). They do not show which local array the access belongs to; only a
+  premise row is checked against one array's extent.
+* **Copy-helper initialisation.** The loads must read initialised bytes. A
+  summarised call to the pinned copy helper `func_081443FC` with a local
+  destination and a non-local source counts as initialising its destination
+  bytes at the call. The copy summary proves that write set exactly. A
+  local-to-local copy initialises nothing, because its source may be stale.
+
+An admitted retry adds buffer proof lines, which are part of the fingerprint
+and which replay recomputes: one summary line naming the trigger and the
+counts, one line per proved access (site, kind, width, entry-SP range and
+step), one line per copy-helper initialisation, then the selector route's
+premise and frame-word lines with the same text. A premise row is therefore
+printed only in the report of the function it admits. For `08146E54`, whose
+loop counter (0..2) indexes two 3-byte local arrays:
+
+```
+* buffer stack index: `default-stack-index-retry-v1` after `unsupported stack-alias use or escape`: ...; 2 accesses proved by in-function ranges, 0 loads under reviewed premise rows, 2 variable derivations
+* buffer stack index access: site 0x08146F52 load width 1 entry_SP-0x34..-0x32 step 2^0, proved
+* buffer stack index access: site 0x08146F54 load width 1 entry_SP-0x38..-0x36 step 2^0, proved
+```
+`default_stack_index_profile.POLICY.enabled = False` restores the plain
+refusals, and a report a retry admitted then fails replay.
+
 ### Buffer owners with stale aliases a callee overwrites
 
 `--owner-runtime-profile named-data-buffer-dead-argument-aliases-v1` admits a

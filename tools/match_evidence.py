@@ -517,20 +517,30 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
         rom = Path(report_rom_path(root)).read_bytes()
         data = bytes.fromhex(encoded[1])
         from inert_spin_profile import index_snapshot
+        import default_stack_index_profile as default_index
         # Without a function index nothing is summarised or delegated, and the walk refuses as before.
         indexed = stack_arguments and (Path(root) / "symbols/functions.txt").is_file()
-        proof = BufferCallProof(rom, mapping, stack_arguments=stack_arguments, loop_replay=True,
-                                bios_wrappers=True,
-                                copy_helper_index=index_snapshot(root) if indexed else None,
-                                switch_callee_index=index_snapshot(root) if indexed else None,
-                                dead_registers=stack_arguments is True)
+
+        make_proof = lambda: BufferCallProof(
+            rom, mapping, stack_arguments=stack_arguments, loop_replay=True, bios_wrappers=True,
+            copy_helper_index=index_snapshot(root) if indexed else None,
+            switch_callee_index=index_snapshot(root) if indexed else None,
+            dead_registers=stack_arguments is True)
+        proof = make_proof()
         if proof.span(address) != data:
             return False
         verdict = f"**MATCH - byte identical** - {len(data)}/{len(data)} bytes"
         if verdict not in lines:
             return False
-        instructions = verify_leaf_instructions(data, address, True, buffer_proof=proof,
-                                                call_resolver=proof.target, incoming_narrow_reads=True)
+
+        run = lambda candidate: verify_leaf_instructions(
+            data, address, True, buffer_proof=candidate, call_resolver=candidate.target,
+            incoming_narrow_reads=True)
+        if stack_arguments:
+            # match.py retries a refused stack-argument walk once at a variable stack index.
+            instructions, proof = default_index.walk(make_proof, run, data, address, default_index.snapshot(root))
+        else:
+            instructions = run(proof)
         from callee_saved_watch import LINE_PREFIX, premise_lines
         premises = premise_lines(proof)
         if stack_arguments:
@@ -543,7 +553,12 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
                 pass
             else:
                 return False
-        if not (bool(proof.dependencies) and
+        # A call-free walk is a buffer walk only when the default stack-index retry admitted it, and
+        # its report then says "closed leaf CFG" (report_matches admits that line for this schema only).
+        leaf = proof.stack_index_retry is not None and not any(
+            item.mnemonic == "bl" and item.operands and not address < item.operands[0].imm < address + len(data)
+            for item in instructions)
+        if not (proof.buffer_evidence() and ("* control flow: closed leaf CFG" in lines) == leaf and
                 fingerprints == [f"* buffer proof SHA-256: `{proof.fingerprint()}`"] and
                 buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
                 [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] == premises):
@@ -640,7 +655,9 @@ def function_address_report_matches(lines, root, address, buffer_profile=False, 
         rom = Path(selected_rom).read_bytes()
         if buffer_profile:
             from callee_saved_watch import LINE_PREFIX, premise_lines
-            instructions, proof = verify_function_buffers(data, address, rom, functions, manifest)
+            import default_stack_index_profile as default_index
+            instructions, proof = verify_function_buffers(data, address, rom, functions, manifest,
+                                                          default_index.snapshot(root))
             if single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(
@@ -1741,9 +1758,13 @@ def report_matches(report, root, address):
                     [f"* verification: `{BUFFER_SCHEMA}`"],
                     [f"* verification: `{STACK_BUFFER_SCHEMA}`"]):
         snapshot = mapping_snapshot(root)
+        # A call-free body admitted by the default stack-index retry says "closed leaf CFG";
+        # buffer_report_matches holds the line to the walk's calls.
         profile_valid = (snapshot is not None and
                          f"* mapping SHA-256: `{mapping_fingerprint(snapshot)}`" in lines and
-                         f"* control flow: {CALL_SUMMARY}" in lines)
+                         (f"* control flow: {CALL_SUMMARY}" in lines or
+                          profiles == [f"* verification: `{STACK_BUFFER_SCHEMA}`"] and
+                          "* control flow: closed leaf CFG" in lines))
         if profiles in ([f"* verification: `{BUFFER_SCHEMA}`"],
                         [f"* verification: `{STACK_BUFFER_SCHEMA}`"]):
             profile_valid = profile_valid and buffer_report_matches(
@@ -1797,6 +1818,9 @@ def legacy_report_closed(report, root, address, profile, parts):
     except (KeyError, TypeError, AttributeError):
         return False
     linked_data = profile in (DATA_SCHEMA, FRAMED_DATA_SCHEMA)
+    # match.py binds the function map of every walk the default stack-index retry admits, calls or not.
+    retried = profile == STACK_BUFFER_SCHEMA and \
+        getattr(parts.get("buffer_proof"), "stack_index_retry", None) is not None
     return closed_report(report, root, address, dict(
-        parts, schema=profile, mapped=called or linked_data,
+        parts, schema=profile, mapped=called or linked_data or retried,
         control_flow=CALL_SUMMARY if called else "closed leaf CFG", data_profile=linked_data))

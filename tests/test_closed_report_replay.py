@@ -571,6 +571,7 @@ class BranchTests(ClosureAssertions, unittest.TestCase):
 
     def proof(self, stack_arguments, body=None):
         return SimpleNamespace(dependencies={CALLEE}, stack_arguments=stack_arguments,
+                               stack_index_retry=None, buffer_evidence=lambda: True,
                                fingerprint=lambda: "ab" * 32, loop_replay_lines=lambda: [],
                                bios_summary_lines=lambda: [], span=lambda address: body or self.CALL,
                                target=lambda target: None)

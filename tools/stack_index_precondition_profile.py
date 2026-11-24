@@ -197,6 +197,11 @@ def shift_expr(operation, value, amount):
 class Policy:
     """Collect the core's deferred sites, then prove them in ``finish``."""
 
+    # True: R4-R11 holding a ranged address are carried across a call, checked by the #350
+    # callee watch when ``callee_watch`` is set. False (the default-path retry,
+    # default_stack_index_profile): they need the watch, and are refused at the call without one.
+    carry_callee_saved = True
+
     def __init__(self, owner, size, selector=SELECTOR):
         self.owner, self.size = owner, size
         self.selector = selector
@@ -270,7 +275,7 @@ class Policy:
             return self.evidence
         self.evidence = prove(data, address, sorted(instruction.address for instruction in instructions),
                               frozenset(self.derivations), frozenset(self.accesses), copies,
-                              selector=self.selector,
+                              selector=self.selector, carry_callee_saved=self.carry_callee_saved,
                               forwarding=None if self.forwarding is None else self.forwarding.forwarding_facts(),
                               spills=frozenset(self.spills), callee_span=self.callee_span,
                               returned={site: {register: frozenset(offsets)
@@ -564,6 +569,10 @@ def trim_init(init, new_depth):
 
 
 class Analysis:
+    # False: a ranged address in R4-R11 at a call is admitted only under the #350 callee watch
+    # (``callee_watch``), and refused without one (set by prove_words).
+    carry_callee_saved = True
+
     def __init__(self, data, address, derivations, accesses, copies, *, signed_shift_congruence=False,
                  callee_watch=None):
         self.data, self.address = data, address
@@ -889,6 +898,10 @@ class Analysis:
             # yet a callee need not write it: an address held there could survive the call
             # untracked.  As for R0-R3, it is refused at the call.
             self.no_escape(state, (0, 1, 2, 3, 12), "a call argument register")
+            if not self.carry_callee_saved and self.callee_watch is None:
+                # Callee-saved obliges a callee to restore R4-R11, not to leave them unread: without
+                # the #350 callee walk below, a ranged address there is refused.
+                self.no_escape(state, range(4, 12), "a callee-saved register at a call")
             self.writers.add(site)
             self.watch_call(state, site, target)
             result = None
@@ -1278,17 +1291,20 @@ def forwarded_lines(evidence):
 
 
 def prove(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-          forwarding=None, spills=frozenset(), callee_span=None, returned=None, callee_watch=None):
+          forwarding=None, spills=frozenset(), callee_span=None, returned=None, callee_watch=None,
+          carry_callee_saved=True):
     import stack_index_frame_words_profile as frame_words
     # The #350 callee walk checks each call either analysis makes.
-    return frame_words.prove(functools.partial(prove_words, callee_watch=callee_watch), data, address,
+    return frame_words.prove(functools.partial(prove_words, callee_watch=callee_watch,
+                                               carry_callee_saved=carry_callee_saved), data, address,
                              verified_sites, derivations, accesses, copies,
                              selector=selector, forwarding=forwarding, spills=spills,
                              callee_span=callee_span, returned=returned or {})
 
 
 def prove_words(data, address, verified_sites, derivations, accesses, copies, *, selector=SELECTOR,
-                forwarding=None, analysis_type=None, leaf_switch=None, callee_watch=None):
+                forwarding=None, analysis_type=None, leaf_switch=None, callee_watch=None,
+                carry_callee_saved=True):
     """One analysis; ``analysis_type`` (frame words) replaces the plain one when given."""
     from scroll_wave_table_index import OWNER, ScrollWaveAnalysis
     scroll_wave = address == OWNER and selector == SELECTOR and analysis_type is None
@@ -1296,6 +1312,8 @@ def prove_words(data, address, verified_sites, derivations, accesses, copies, *,
     analysis = factory(bytes(data), address, derivations, accesses, dict(copies),
                                            signed_shift_congruence=selector == SELECTOR_V2,
                                            callee_watch=callee_watch)
+    if not carry_callee_saved:
+        analysis.carry_callee_saved = False
     if leaf_switch is not None:
         from owner_switch_buffer_profile import OwnerSwitch
         if (type(leaf_switch) is not OwnerSwitch or selector != SELECTOR_V2 or analysis_type is not None

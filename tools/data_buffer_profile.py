@@ -118,7 +118,7 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
-          index=None, switch_relocations=None, dma_fills=None):
+          index=None, switch_relocations=None, dma_fills=None, premises=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -131,7 +131,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     proof's word, not an untyped literal.
     dma_fills, a fresh dma_fill_profile.Fills, goes to the plain path's walk; the
     function-literal path has no DMA fill rule, so a DMA source store there stays refused.
+    premises, the decomp's reviewed stack-index premise file, serves the default stack-index
+    retry (default_stack_index_profile) of the two plain walks below; the owner switch, the
+    menu list frame and the map record loader keep their own walks.
     """
+    import default_stack_index_profile as default_index
     import match
     import function_thunk_profile as thunk
     function_relocations = function_relocations or {}
@@ -155,9 +159,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         if address == 0x0801A518:
             from map_record_loader import MapRecordProof
             proof = MapRecordProof(data, rom, mapping, index, calls)
+            rebuild = None
         else:
-            proof = match.FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
-                                                  dead_registers=True)
+            rebuild = lambda: match.FunctionBufferCallProof(
+                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
+            proof = rebuild()
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
         # thunks; the object words are bound like the function-literal path's.
@@ -175,8 +181,10 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             elif match.function_address_target(f"func_{target:08X}", entries, address, len(data), len(rom)) != target:
                 raise ValueError("data-buffer call target is not its canonical function")
         thunk.verify_data_bindings(calls, literals, symbols, entries)
-        proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
-                                      copy_helper_index=index, switch_callee_index=index, dead_registers=True)
+        rebuild = lambda: match.BufferCallProof(
+            rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
+            copy_helper_index=index, switch_callee_index=index, dead_registers=True)
+        proof = rebuild()
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
     frame = None
@@ -189,14 +197,29 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         import owner_switch_buffer_profile as owner_switch
         instructions = owner_switch.walk(proof, data, address, calls, switch_relocations)
     elif schema == FUNCTION_SCHEMA:
-        instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof, menu_list_frame=frame)
+        run = lambda candidate: match.verify_leaf_instructions(
+            data, address, True, calls, buffer_proof=candidate, menu_list_frame=frame)
+        if frame is not None or rebuild is None:
+            instructions = run(proof)
+        else:
+            try:
+                instructions = run(proof)
+            except ValueError as error:
+                instructions, proof = default_index.retry(error, run, rebuild, data, address, premises)
         if frame is not None:
             schema = MENU_LIST_SCHEMA
             manifest["restoring_menu_frame"] = frame.evidence
     else:
-        instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
-                                                      incoming_narrow_reads=True, dma_fills=dma_fills)
-    if not proof.dependencies:
+        run = lambda candidate: match.verify_leaf_instructions(
+            data, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True, dma_fills=dma_fills)
+        try:
+            instructions = run(proof)
+        except ValueError as error:
+            if dma_fills is not None and default_index.POLICY.triggered(error):
+                # The caller keeps this recorder: the retry's walk starts it afresh.
+                dma_fills.__init__(dma_fills.rom)
+            instructions, proof = default_index.retry(error, run, rebuild, data, address, premises)
+    if not proof.buffer_evidence():
         raise ValueError("data-buffer evidence requires an inspected buffer call")
     match.verify_data_literals(instructions, address, literals)
     thunk.verify_literal_bindings(data, address, instructions, calls, mapping, function_relocations)
@@ -284,8 +307,10 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                                                   allow_switch_data=True)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
+            import default_stack_index_profile as default_index
             result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
-                           switch_relocations=switches, dma_fills=dma_fills)
+                           switch_relocations=switches, dma_fills=dma_fills,
+                           premises=default_index.snapshot(root))
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -304,7 +329,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee, dead-register, BIOS premise and DMA fill premise lines may repeat.
+# copy-summary, switch-callee, dead-register, BIOS premise, DMA fill premise and stack-index lines may repeat.
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
@@ -314,7 +339,10 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
           "* DMA fills", "* DMA fill premise", "* DMA fill manifest",
-          "* callee-saved premise", "* callee-saved fact")
+          "* callee-saved premise", "* callee-saved fact",
+          # default_stack_index_profile.lines
+          "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
+          "* buffer stack index premise", "* buffer stack index frame words")
 
 
 def report_matches(report, root, address):
@@ -364,7 +392,7 @@ def report_matches(report, root, address):
                 quoted("* source SHA-256: ") != source_digest or \
                 quoted("* mapping SHA-256: ") != mapping_fingerprint(functions) or \
                 quoted("* data symbols SHA-256: ") != mapping_fingerprint(objects) or \
-                single("* control flow: ") != CALL_SUMMARY or \
+                single("* control flow: ") not in (CALL_SUMMARY, "closed leaf CFG") or \
                 single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
                 single(CALLS_FIELD) != SUMMARIES[schema] or \
                 quoted("* compiler: ") != f"{DEFAULT_CC} {DEFAULT_FLAGS}" or \
@@ -395,7 +423,11 @@ def report_matches(report, root, address):
             dma_fill.check_report(fills, lines)
         framed = uses_stack_frame(instructions)
         stack_lines = [line for line in lines if key(line) == "* stack frame"]
-        if not (proved_schema == schema and proved == manifest and
+        # Only a walk the default stack-index retry admitted can have no call (match.py's control flow line).
+        called = any(item.mnemonic == "bl" and item.operands and
+                     not address < item.operands[0].imm < address + len(data) for item in instructions)
+        flow = CALL_SUMMARY if called or proof.stack_index_retry is None else "closed leaf CFG"
+        if not (proved_schema == schema and proved == manifest and single("* control flow: ") == flow and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
                 buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
@@ -409,7 +441,7 @@ def report_matches(report, root, address):
         from match_evidence import closed_report
         return closed_report(report, root, address, dict(
             schema=schema, data=data, instructions=instructions, buffer_proof=proof, mapped=True,
-            control_flow=CALL_SUMMARY, data_profile=True, data_mapping=objects, data_buffer_evidence=manifest,
+            control_flow=flow, data_profile=True, data_mapping=objects, data_buffer_evidence=manifest,
             dma_lines=fills.report_lines() if fills is not None else ()))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, json.JSONDecodeError):
