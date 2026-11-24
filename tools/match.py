@@ -2151,15 +2151,21 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
-def verify_function_buffers(data, address, rom, mapping, manifest):
+def verify_function_buffers(data, address, rom, mapping, manifest, premises=None):
+    """``premises``: the decomp's reviewed stack-index premise file, for the default retry."""
+    import default_stack_index_profile as default_index
     calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest)
     if manifest["data"] or not calls:
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
-    proof = FunctionBufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
-    if proof.span(address) != data:
+
+    make_proof = lambda: FunctionBufferCallProof(
+        rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
+    if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
-    instructions = verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)
-    if not proof.dependencies:
+    instructions, proof = default_index.walk(
+        make_proof, lambda proof: verify_leaf_instructions(data, address, True, calls, buffer_proof=proof),
+        data, address, premises)
+    if not proof.buffer_evidence():
         raise ValueError("function-buffer evidence requires an inspected buffer call")
     verify_data_literals(instructions, address, literals)
     return instructions, proof
@@ -3468,6 +3474,8 @@ class BufferCallProof:
     _loop_replay_opt_in = True
     loop_replay = False
     index_policy = None
+    # The default stack-index retry's record (default_stack_index_profile); None on every other walk.
+    stack_index_retry = None
     # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
     # entries become proved leaf calls; None keeps every runtime refused.
     runtime_summaries = None
@@ -4268,6 +4276,9 @@ class BufferCallProof:
             lines.extend(self.owner_switch.lines())
         if self.dead_registers is not None:
             lines.extend(self.dead_registers.lines())
+        if self.stack_index_retry is not None:
+            import default_stack_index_profile as default_index
+            lines.extend(default_index.lines(self.stack_index_retry))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4330,7 +4341,20 @@ class BufferCallProof:
             # Only a proof that accepted a dead stack-address register adds this.
             digest.update(json.dumps(self.dead_registers.evidence(), sort_keys=True,
                                      separators=(",", ":")).encode())
+        if self.stack_index_retry is not None:
+            # Only a walk the default stack-index retry admitted adds this.
+            digest.update(json.dumps(self.stack_index_retry, sort_keys=True,
+                                     separators=(",", ":")).encode())
         return digest.hexdigest()
+
+    def buffer_evidence(self):
+        """An inspected buffer call, or the default stack-index retry's record."""
+        return bool(self.dependencies) or self.stack_index_retry is not None
+
+    def index_copies(self):
+        """Initialised local bytes for the default stack-index retry (default_stack_index_profile)."""
+        import default_stack_index_profile as default_index
+        return default_index.copies(self)
 
 
 class FunctionBufferCallProof(BufferCallProof):
@@ -6051,7 +6075,7 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
         raise ValueError("DMA fill lines require the stack-frame line")
     for line in dma_lines:
         out.append(line + "\n")
-    if buffer_proof is not None and buffer_proof.dependencies:
+    if buffer_proof is not None and buffer_proof.buffer_evidence():
         summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
         out.append(f"* buffer calls: {summary}\n")
         out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
@@ -6918,16 +6942,18 @@ def main():
                     verified_instructions, _ = verify_function_addresses(
                         got, addr, rom, mapping, data_mapping, address_manifest)
                 except ValueError as address_error:
+                    import default_stack_index_profile as default_index
                     try:
                         if data_relocations:
                             # Typed objects beside the function-buffer proof.
                             verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
                                                   data_relocations, function_relocations,
-                                                  index=empty_index if addr in (data_buffer.MENU_LIST_ADDRESS, 0x0801A518) else None)
+                                                  index=empty_index if addr in (data_buffer.MENU_LIST_ADDRESS, 0x0801A518) else None,
+                                                  premises=default_index.snapshot(ROOT))
                         else:
                             verified_instructions, buffer_proof = verify_function_buffers(
-                                got, addr, rom, mapping, address_manifest)
+                                got, addr, rom, mapping, address_manifest, default_index.snapshot(ROOT))
                     except ValueError as buffer_error:
                         raise ValueError(f"{address_error}; "
                                          f"{'function-data-buffer' if data_relocations else 'function-buffer'} "
@@ -6944,25 +6970,38 @@ def main():
                                                  callee_watch=buffer_proof) if self_sites else
                         verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof,
                                                  incoming_narrow_reads=thumb, dma_fills=dma_fills))
-                except ValueError:
-                    if not thumb or not calls or self_sites:
+                except ValueError as first_error:
+                    if not thumb or self_sites:
                         raise
-                    buffer_proof = BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True,
-                                                   bios_wrappers=True,
-                                                   copy_helper_index=inert_spin.index_snapshot(ROOT),
-                                                   switch_callee_index=inert_spin.index_snapshot(ROOT),
-                                                   dead_registers=True)
-                    dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
-                    verified_instructions = verify_leaf_instructions(got, addr, thumb, calls,
-                                                                      buffer_proof=buffer_proof,
-                                                                      incoming_narrow_reads=True,
-                                                                      dma_fills=dma_fills)
-                if thumb and data_relocations and buffer_proof.dependencies:
+                    if not calls and mapping is None:
+                        raise                        # a stack-buffer report binds the function map
+                    import default_stack_index_profile as default_index
+                    # One fresh recorder for the stack-argument walk and one for the stack-index retry.
+                    walk_fills = [dma_fill.Fills(rom), dma_fill.Fills(rom)] if dma_fills is not None else [None, None]
+                    stack_buffer_proof = lambda: BufferCallProof(
+                        rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
+                        copy_helper_index=inert_spin.index_snapshot(ROOT),
+                        switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True)
+                    stack_buffer_walk = lambda proof: verify_leaf_instructions(
+                        got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
+                        dma_fills=walk_fills[proof.index_policy is not None])
+                    if calls:
+                        verified_instructions, buffer_proof = default_index.walk(
+                            stack_buffer_proof, stack_buffer_walk, got, addr, default_index.snapshot(ROOT))
+                    else:
+                        # A call-free body has no buffer call to inspect: only the stack-index retry.
+                        verified_instructions, buffer_proof = default_index.retry(
+                            first_error, stack_buffer_walk, stack_buffer_proof, got, addr,
+                            default_index.snapshot(ROOT))
+                    dma_fills = walk_fills[buffer_proof.index_policy is not None]
+                if thumb and data_relocations and buffer_proof.buffer_evidence():
                     # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
+                    import default_stack_index_profile as default_index
                     dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
                     verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                         data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
-                                          index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills)
+                                          index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills,
+                                          premises=default_index.snapshot(ROOT))
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:
@@ -6975,13 +7014,13 @@ def main():
                 function_thunk.verify_own_span_literals(
                     got, addr, verified_instructions,
                     switch_evidence["switch"]["literal"] if thunk_switch_selector else None)
-            if buffer_proof.stack_arguments and not buffer_proof.dependencies:
+            if buffer_proof.stack_arguments and not buffer_proof.buffer_evidence():
                 raise ValueError("stack-buffer evidence requires an inspected buffer call")
-            if buffer_proof.dependencies and data_relocations and data_buffer_evidence is None:
+            if buffer_proof.buffer_evidence() and data_relocations and data_buffer_evidence is None:
                 raise ValueError("buffer-call evidence does not support data relocations")
-            if buffer_proof.dependencies and len(buffer_proof.span(addr)) != len(got):
+            if buffer_proof.buffer_evidence() and len(buffer_proof.span(addr)) != len(got):
                 raise ValueError("buffer caller requires an exact complete mapped span")
-            if dma_fills is not None and dma_fills.records and buffer_proof.dependencies and \
+            if dma_fills is not None and dma_fills.records and buffer_proof.buffer_evidence() and \
                     data_buffer_evidence is None:
                 raise ValueError("DMA fill records require the plain frame, call, data or data-buffer schemas")
             if dma_fills is not None and dma_fills.records and not uses_stack_frame(verified_instructions):
@@ -7003,10 +7042,10 @@ def main():
         schema = FRAMED_DATA_SCHEMA if framed_profile else DATA_SCHEMA
     elif framed_profile:
         schema = FRAMED_LINKED_SCHEMA if linked_profile else FRAMED_SCHEMA
-    if buffer_proof.dependencies:
+    if buffer_proof.buffer_evidence():
         schema = STACK_BUFFER_SCHEMA if buffer_proof.stack_arguments else BUFFER_SCHEMA
     if function_relocations:
-        schema = (FUNCTION_BUFFER_SCHEMA if buffer_proof.dependencies else
+        schema = (FUNCTION_BUFFER_SCHEMA if buffer_proof.buffer_evidence() else
                   FRAMED_FUNCTION_ADDRESS_SCHEMA if framed_profile else FUNCTION_ADDRESS_SCHEMA)
     if data_buffer_evidence is not None:
         schema = data_buffer_schema
@@ -7238,7 +7277,8 @@ def main():
             hand_asm_allowed=hand_asm_allowed, findings=findings, flash_evidence=flash_evidence,
             empty_profile=empty_profile, mapping=mapping, empty_index=empty_index, control_flow=control_flow,
             framed_profile=framed_profile, buffer_proof=buffer_proof,
-            mapped=bool(linked_profile or data_profile or function_relocations or switch_relocations or spin_profile),
+            mapped=bool(linked_profile or data_profile or function_relocations or switch_relocations or spin_profile or
+                        buffer_proof.stack_index_retry is not None),
             self_sites=self_sites, data_profile=data_profile, data_mapping=data_mapping,
             data_buffer_evidence=data_buffer_evidence, address_manifest=address_manifest,
             switches=bool(switch_relocations) and quotient_evidence is None and buffer_proof.owner_switch is None,

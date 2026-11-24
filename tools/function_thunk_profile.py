@@ -445,7 +445,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
     --unit-toolchain does; otherwise it uses the default toolchain."""
     from match import (DEFAULT_CC, DEFAULT_CPP, DEFAULT_AS, DEFAULT_OBJCOPY, DEFAULT_LD,
                        DEFAULT_FLAGS, DEFAULT_WSL_PATH, Runner, compile_object, link_calls,
-                       _run_replay_process, plausibility_result, verify_leaf_instructions, BufferCallProof)
+                       _run_replay_process, plausibility_result, verify_leaf_instructions, BufferCallProof,
+                       function_bytes)
     from match_evidence import source_paths, source_fingerprint, mapping_snapshot, data_snapshot, report_rom_path
     if _replay_active.get():
         raise ValueError("recursive function-thunk replay is unsupported")
@@ -484,19 +485,32 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                         runner, workspace, args, object_data, address, rom, mapping, objects, index)
                 if manifest is None:
                     functions = {}
-                    got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
-                                            len(rom), rom, objects, functions)
+                    if buffer_stack_arguments and not original["relocations"]:
+                        # A call-free stack-buffer report (the default stack-index retry): match.py
+                        # compares the object's own bytes, as here.
+                        got, calls, literals = function_bytes(object_data, original["text"], f"func_{address:08X}",
+                                                              address, True), {}, {}
+                    else:
+                        got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
+                                                len(rom), rom, objects, functions)
                     if functions:
                         raise ValueError("legacy thunk evidence cannot carry function literals")
                     if buffer_stack_arguments is not None or any(reserved(target) for target in calls.values()):
-                        proof = BufferCallProof(rom, mapping, stack_arguments=buffer_stack_arguments,
-                                                loop_replay=True, bios_wrappers=True,
-                                                copy_helper_index=index if buffer_stack_arguments else None,
-                                                switch_callee_index=index if buffer_stack_arguments else None) \
-                            if buffer_stack_arguments is not None else None
-                        instructions = verify_leaf_instructions(got, address, True, calls, buffer_proof=proof,
-                                                                incoming_narrow_reads=True)
-                        if proof is not None and (not proof.dependencies or literals or proof.span(address) != got):
+                        make_proof = lambda: BufferCallProof(
+                            rom, mapping, stack_arguments=buffer_stack_arguments, loop_replay=True,
+                            bios_wrappers=True, copy_helper_index=index if buffer_stack_arguments else None,
+                            switch_callee_index=index if buffer_stack_arguments else None)
+                        run = lambda candidate: verify_leaf_instructions(
+                            got, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True)
+                        if buffer_stack_arguments:
+                            # match.py retries a refused stack-argument walk once at a variable stack index.
+                            import default_stack_index_profile as default_index
+                            instructions, proof = default_index.walk(make_proof, run, got, address,
+                                                                     default_index.snapshot(root))
+                        else:
+                            proof = make_proof() if buffer_stack_arguments is not None else None
+                            instructions = run(proof)
+                        if proof is not None and (not proof.buffer_evidence() or literals or proof.span(address) != got):
                             raise ValueError("legacy thunk buffer replay requires its complete buffer-only proof")
                         verify_literal_bindings(got, address, instructions, calls, mapping, functions)
                         if any(reserved(target) for target in calls.values()):
