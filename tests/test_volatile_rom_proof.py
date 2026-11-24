@@ -70,6 +70,126 @@ class DumpTests(unittest.TestCase):
         self.assertEqual([(i.uid, s, proof.rtl_mode(m)) for i, m, s in fn.mems()], [(2, True, "QI")])
 
 
+LDRSH = ('insn (parallel[ \n            (set (reg:SI 30)\n                (sign_extend:SI (mem/s:HI (reg/v:SI 22) 0)))\n'
+         '            (clobber (scratch:SI))\n        ] ) -1 (nil)\n    (nil)')
+IO = 'insn (set (reg:SI 31) (const_int 67108928)) -1 (nil) (nil)'
+
+
+class ParallelTests(unittest.TestCase):
+    """agbcc prints a vector as `(parallel[ ... ] )`: every set in it defines, every clobber kills, and any
+    other pattern that can write a register refuses"""
+
+    def resolver(self, insns):
+        return proof.Resolver(function(insns))
+
+    def test_vectors_are_parsed_as_vectors(self):
+        fn = function([(2, ENTRY), (3, LDRSH)])
+        pattern = fn.by_uid[3].pattern
+        self.assertEqual(proof.code(pattern), "parallel")
+        self.assertEqual((len(pattern), proof.code(pattern[1])), (2, proof.VECTOR))
+        self.assertEqual([proof.code(item) for item in pattern[1][1:]], ["set", "clobber"])
+        self.assertEqual(fn.opaque, [])
+        for broken in ('insn (parallel[ (set (reg:SI 30) (reg:SI 31)) ) -1 (nil) (nil)',
+                       'insn (parallel (set (reg:SI 30) (reg:SI 31)) ] ) -1 (nil) (nil)'):
+            with self.subTest(broken=broken), self.assertRaises(proof.ProofError):
+                function([(2, ENTRY), (3, broken)])
+
+    def test_a_sign_extending_load_defines_its_register(self):
+        # ldrsh: the index it loads is an integer, so a store at a listed symbol plus it resolves
+        insns = [(2, ENTRY), (3, LDRSH), (4, ResolverTests.POOL.replace("reg:SI 23", "reg:SI 32")),
+                 (5, 'insn (set (mem/v:HI (plus:SI (reg:SI 32) (reg:SI 30)) 0) (const_int 0)) -1 (nil) (nil)')]
+        fn = function(insns)
+        self.assertEqual([insn.uid for insn, _ in fn.defs[30]], [3])
+        self.assertEqual(self.resolver(insns).values[30], (proof.Base("int"), None))
+        insn = fn.by_uid[5]
+        mem, = [m for m, _ in proof.walk_mems(insn.pattern, [])]
+        self.assertEqual(proof.Resolver(fn).address(insn, mem), (proof.Base("symbol", "data_03000030"), None))
+        # the loaded index prints by its definition, not as an undefined temporary
+        self.assertNotIn("T*", fn.name(mem[1]))
+
+    def test_a_pointer_one_path_loads_by_ldrsh_is_not_the_other_path_s_constant(self):
+        # `u32 a = 0x04000004; if (c) a = *(s16 *)p; (void)*(volatile u16 *)a;`: the second definition is an
+        # ldrsh parallel, so a is the I/O address only on one path
+        loaded = LDRSH.replace("reg:SI 30", "reg/v:SI 31")
+        insns = [(2, ENTRY), (3, 'insn (set (reg/v:SI 31) (const_int 67108868)) -1 (nil) (nil)'),
+                 (4, 'jump_insn (set (pc) (if_then_else (eq (reg:SI 23) (const_int 0)) (label_ref 7) (pc))) '
+                     '-1 (nil) (nil)'),
+                 (5, loaded), (7, 'code_label 6 ""'),
+                 (8, 'insn (set (reg:SI 32) (mem/v:HI (reg/v:SI 31) 0)) -1 (nil) (nil)')]
+        fn = function(insns)
+        insn = fn.by_uid[8]
+        mem, = [m for m, _ in proof.walk_mems(insn.pattern, [])]
+        self.assertEqual(proof.Resolver(fn).address(insn, mem)[0].kind, "unknown")
+
+    def test_a_parallel_with_two_sets_defines_both(self):
+        both = 'insn (parallel[ (set (reg:SI 30) (const_int 4)) (set (reg:SI 31) (reg/v:SI 22)) ] ) -1 (nil) (nil)'
+        resolver = self.resolver([(2, ENTRY), (3, both)])
+        self.assertEqual(resolver.values[30], (proof.Base("int", 4), 4))
+        self.assertEqual(resolver.values[31], (proof.Base("param", 0), 0))
+
+    def test_a_clobber_kills_a_tracked_pointer(self):
+        store = (5, 'insn (set (mem/v:HI (reg:SI 31) 0) (const_int 0)) -1 (nil) (nil)')
+        for label, kill in (
+                ("in a parallel", 'insn (parallel[ (set (reg:SI 30) (const_int 0)) (clobber (reg:SI 31)) ] ) '
+                                  '-1 (nil) (nil)'),
+                ("at the top", 'insn (clobber (reg:SI 31)) -1 (nil) (nil)'),
+                ("through a subreg", 'insn (parallel[ (set (reg:SI 30) (const_int 0)) '
+                                     '(clobber (subreg:HI (reg:SI 31) 0)) ] ) -1 (nil) (nil)')):
+            with self.subTest(label=label):
+                fn = function([(2, IO), (3, kill), store])
+                insn = fn.by_uid[5]
+                mem, = [m for m, _ in proof.walk_mems(insn.pattern, [])]
+                self.assertEqual(proof.Resolver(fn).address(insn, mem)[0].kind, "unknown")
+        # a register only a clobber defines is no index: a listed symbol plus it does not keep the symbol
+        only = [(2, ResolverTests.POOL.replace("reg:SI 23", "reg:SI 32")),
+                (3, 'insn (parallel[ (set (reg:SI 30) (const_int 0)) (clobber (reg:SI 31)) ] ) -1 (nil) (nil)'),
+                (5, 'insn (set (mem/v:HI (plus:SI (reg:SI 32) (reg:SI 31)) 0) (const_int 0)) -1 (nil) (nil)')]
+        fn = function(only)
+        insn = fn.by_uid[5]
+        mem, = [m for m, _ in proof.walk_mems(insn.pattern, [])]
+        self.assertEqual(proof.Resolver(fn).address(insn, mem)[0].kind, "unknown")
+        # without the clobber the store is at the I/O address
+        fn = function([(2, IO), store])
+        insn = fn.by_uid[5]
+        mem, = [m for m, _ in proof.walk_mems(insn.pattern, [])]
+        self.assertEqual(proof.Resolver(fn).address(insn, mem), (proof.Base("fixed", 0x04000040), 0))
+        # a clobbered argument register is no longer the parameter
+        kill = 'insn (parallel[ (set (reg:SI 30) (const_int 0)) (clobber (reg:SI 0 r0)) ] ) -1 (nil) (nil)'
+        copy = 'insn (set (reg:SI 31) (reg:SI 0 r0)) -1 (nil) (nil)'
+        self.assertEqual(self.resolver([(3, kill), (4, copy)]).values[31][0].kind, "unknown")
+        self.assertEqual(self.resolver([(4, copy)]).values[31], (proof.Base("param", 0), 0))
+        # a clobber of a scratch or of memory writes no register
+        scratch = 'insn (parallel[ (set (reg:SI 30) (const_int 0)) (clobber (scratch:SI)) (clobber (mem:BLK ' \
+                  '(scratch) 0)) ] ) -1 (nil) (nil)'
+        self.assertEqual(proof.Function.sets(function([(3, scratch)]).by_uid[3].pattern),
+                         [(["reg:SI", "30"], ["const_int", "0"], True)])
+
+    def test_a_pattern_the_proof_cannot_read_refuses(self):
+        for label, pattern, what in (
+                ("a parallel holding an unspec", 'insn (parallel[ (set (reg:SI 30) (const_int 0)) '
+                                                 '(unspec:SI[ (reg:SI 31) ]  3) ] ) -1 (nil) (nil)',
+                 "a parallel holding unspec"),
+                ("a parallel holding a return", 'jump_insn (parallel[ (return) (use (reg:SI 30)) ] ) -1 (nil) (nil)',
+                 "a parallel holding return"),
+                ("a parallel of two vectors", 'insn (parallel[ (set (reg:SI 30) (const_int 0)) ] '
+                                              '[ (clobber (reg:SI 31)) ] ) -1 (nil) (nil)', "a parallel without one vector"),
+                ("an unknown code", 'insn (trap_if (const_int 1) (const_int 0)) -1 (nil) (nil)', "a trap_if pattern"),
+                ("an auto-increment", 'insn (set (reg:SI 30) (mem:SI (post_inc:SI (reg:SI 31)) 0)) -1 (nil) (nil)',
+                 "an auto-increment")):
+            with self.subTest(label=label):
+                fn = function([(2, ENTRY), (3, pattern)])
+                self.assertEqual(len(fn.opaque), 1)
+                with self.assertRaisesRegex(proof.ProofError, f"insn UID 3 holds {what}.*does not model"):
+                    proof.Resolver(fn)
+        # what the proof reads in full: a tablejump's parallel, a frame push, a blockage
+        for pattern in ('jump_insn (parallel[ (set (pc) (reg:SI 30)) (use (label_ref 9)) ] ) -1 (nil) (nil)',
+                        'insn (set (mem:SI (pre_dec:SI (reg:SI 13 sp)) 0) (reg:SI 30)) -1 (nil) (nil)',
+                        'insn (unspec_volatile[ (const_int 0) ]  0) -1 (nil) (nil)',
+                        'insn (use (reg:SI 30)) -1 (nil) (nil)'):
+            with self.subTest(pattern=pattern):
+                self.assertEqual(function([(2, ENTRY), (3, pattern)]).opaque, [])
+
+
 class ResolverTests(unittest.TestCase):
     def address(self, insns, uid):
         fn = function(insns)
@@ -1137,6 +1257,25 @@ class CompiledTests(unittest.TestCase):
         self.assertIn("premise: func_080D9B08's argument (parameter r0) is a task whose data word +4 holds a "
                       "scanline task", text)
         self.assertIn("load dropped", text)
+
+    def test_a_pointer_an_ldrsh_may_have_set_is_no_constant_address(self):
+        # kit main read only the constant: the ldrsh parallel's definition of `a` was invisible
+        source = ("void func_08000400(int c, short *p) { unsigned int a = 0x04000004; if (c) a = *p; "
+                  "(void)*(volatile u16 *)a; }\n")
+        (state, text), = [verdict for _, verdict in self.run_proof(source)]
+        self.assertEqual(state, "refused", text)
+        self.assertIn("unresolved address", text)
+        constant = "void func_08000400(int c) { unsigned int a = 0x04000004; (void)*(volatile u16 *)a; }\n"
+        self.assertEqual(self.verdicts(constant), ["admitted"])
+
+    def test_an_index_a_sign_extending_load_reads_resolves(self):
+        # Thumb ldrsh expands to (parallel [(set (reg) (sign_extend (mem:HI ..))) (clobber (scratch))])
+        source = self.PAYLOAD.replace("void *task, int i, u16 v", "void *task, short *at, u16 v").replace(
+            "Entry *e = func_080D9B08(task);", "Entry *e = func_080D9B08(task); int i = *at;")
+        result = self.run_proof(source, entries="getter", calls={"func_080D9B08": GETTER})
+        (state, text), = [verdict for _, verdict in result]
+        self.assertEqual(state, "admitted", text)
+        self.assertIn("func_080D9B08's argument (parameter r0)", text)
 
     def test_a_getter_s_payload_needs_the_listed_call(self):
         refused = self.run_proof(self.PAYLOAD, entries="getter", calls={"func_080D9B08": GETTER + 16})
