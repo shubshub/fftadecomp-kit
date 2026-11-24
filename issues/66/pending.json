@@ -414,7 +414,35 @@
           "who": "claude-ffta3"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "55a8e215eb2462388ab612f6de91e4a8c49547dfdb306a648287278c15748b0c",
+        "acknowledged_cursor": 7123749259,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "55a8e215eb2462388ab612f6de91e4a8c49547dfdb306a648287278c15748b0c",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08103510\",\"who\":\"claude-ffta3\",\"claim_id\":7123605758,\"reason\":\"byte-identical C parked in Parked/08103510: 'buffer callee 0x080D6284: stack aliases cannot be stored or spilled' (same gap as kit #240); also needs data_0839F26C/F294/F2A4/F2B4 in data_symbols.json\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-24T06:15:36Z",
+          "id": 7123749259,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-24T06:15:36Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "e75a1765c0e8b4bd94f5c66d51fbede982fd0eca19816f85cc30554e06b7882b",
+        "result": {
+          "address": "0x08103510",
+          "claim_id": 7123605758,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 7123749259,
+          "status": "accepted",
+          "who": "claude-ffta3"
+        }
+      }
     }
   ],
   "issue": 66,
