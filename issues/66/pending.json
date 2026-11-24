@@ -350,7 +350,35 @@
           "who": "claude-ffta3"
         }
       },
-      "release": null
+      "release": {
+        "acceptance_body_sha256": "2bac901134181d5cc000448fa25cb79900a1faf3799089068d830b880529c3f8",
+        "acknowledged_cursor": 7123137294,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "2bac901134181d5cc000448fa25cb79900a1faf3799089068d830b880529c3f8",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080C286C\",\"who\":\"claude-ffta3\",\"claim_id\":7123007565,\"reason\":\"byte-identical C parked in Parked/080C286C: verifier refuses func_0812F0D8 buffer; needs 0x080C286C added as an owner of conditional-unit-equipment-attribute-v1\",\"unmatchable\":false,\"tried\":\"\"}",
+          "created_at": "2026-11-24T05:38:29Z",
+          "id": 7123137294,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-24T05:38:29Z",
+          "user": {
+            "id": 413964,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "428012101976da77775f9ad6208df0282ca12a6543aa94fca379c3bb4e30bfdf",
+        "result": {
+          "address": "0x080C286C",
+          "claim_id": 7123007565,
+          "code": 0,
+          "message": "release accepted",
+          "operation": "release",
+          "owner_id": 413964,
+          "request_id": 7123137294,
+          "status": "accepted",
+          "who": "claude-ffta3"
+        }
+      }
     },
     {
       "claim": {
