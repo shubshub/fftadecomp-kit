@@ -315,66 +315,6 @@
         }
       },
       "release": null
-    },
-    {
-      "claim": {
-        "acceptance_body_sha256": "d1ee2a81d416233c0107919ff105dd094566820ff268da5b3d64b9ddfe009001",
-        "acknowledged_cursor": 7123592366,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "d1ee2a81d416233c0107919ff105dd094566820ff268da5b3d64b9ddfe009001",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x080014C8\",\"who\":\"claude-ffta3\",\"note\":\"hand match (never attempted, 2026-11-24)\"}",
-          "created_at": "2026-11-24T06:06:34Z",
-          "id": 7123592366,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-24T06:06:34Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "716eeffd0478d75db6056650bef699c79085521b55ce746575be378e1f366afc",
-        "result": {
-          "address": "0x080014C8",
-          "claim_id": 7123592366,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 413964,
-          "request_id": 7123592366,
-          "status": "accepted",
-          "who": "claude-ffta3"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "21fb23422475d1cdddc056113551271ffc2ff2292d4c284357f4c8be7d0a8858",
-        "acknowledged_cursor": 7124163302,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "21fb23422475d1cdddc056113551271ffc2ff2292d4c284357f4c8be7d0a8858",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x080014C8\",\"who\":\"claude-ffta3\",\"claim_id\":7123592366,\"reason\":\"byte-identical C parked in Parked/080014C8: needs data_08149510 (sprite size table) in data_symbols.json, and uses volatile on the destination (read-before-store); volatile_rom_proof refuses a stack-passed pointer\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-24T06:39:46Z",
-          "id": 7124163302,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-24T06:39:46Z",
-          "user": {
-            "id": 413964,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "5bbc71f37876d69ed179c3f5f17316bf226f848ad1722e69204c1b4d84eda071",
-        "result": {
-          "address": "0x080014C8",
-          "claim_id": 7123592366,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 413964,
-          "request_id": 7124163302,
-          "status": "accepted",
-          "who": "claude-ffta3"
-        }
-      }
     }
   ],
   "issue": 66,
