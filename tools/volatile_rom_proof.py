@@ -47,7 +47,13 @@ the addressed source wherever two things hold, and refuses it otherwise.
    or the pseudo itself plus a non-pointer offset (an induction variable), a
    sum must have exactly one pointer side, and a hard argument register is
    followed to the function's entry (a parameter) or the call before it (a
-   call result).  The objects (OBJECT_WINDOWS, CART_BUS, volatile_objects.json):
+   call result).  Every set of an insn defines its destination, those of a
+   parallel included (agbcc's ldrsh is `(parallel [(set (reg) (sign_extend
+   (mem:HI ..))) (clobber (scratch))])`), and a clobbered register holds no
+   value the proof knows.  An expand dump holding any other pattern that can
+   write a register (a parallel with another element, an unknown code, an
+   auto-increment outside the frame) refuses.  The objects (OBJECT_WINDOWS,
+   CART_BUS, volatile_objects.json):
    * a constant address, or a data symbol mapped there, in the I/O, palette,
      VRAM, OAM or cartridge backup window, at a constant offset that keeps the
      whole access inside the window;
@@ -227,6 +233,10 @@ def _tokens(text):
             if text.startswith(";; Function ", i):
                 out.append(("function", text[i:end].split()[2]))
             i = end
+        elif c in "[]":
+            # an RTL vector: agbcc prints `(parallel[ (set ...) (clobber ...) ] )`
+            out.append(c)
+            i += 1
         elif c == '"':
             j = i + 1
             while j < n and text[j] != '"':
@@ -235,7 +245,7 @@ def _tokens(text):
             i = j + 1
         else:
             j = i
-            while j < n and not text[j].isspace() and text[j] not in '()"':
+            while j < n and not text[j].isspace() and text[j] not in '()"[]':
                 j += 1
             out.append(text[i:j])
             i = j
@@ -245,16 +255,18 @@ def _tokens(text):
 
 
 def parse_dump(text):
-    """{function name: [top-level form]} of one agbcc RTL dump"""
+    """{function name: [top-level form]} of one agbcc RTL dump; a vector is a list headed VECTOR"""
     functions, current, stack = {}, None, []
     for token in _tokens(text):
         if isinstance(token, tuple):
             if token[1] in functions:
                 raise ProofError(f"function {token[1]} appears twice in one dump")
             current = functions.setdefault(token[1], [])
-        elif token == "(":
-            stack.append([])
-        elif token == ")":
+        elif token in ("(", "["):
+            stack.append([VECTOR] if token == "[" else [])
+        elif token in (")", "]"):
+            if not stack or (stack[-1][:1] == [VECTOR]) != (token == "]"):
+                raise ProofError("unbalanced RTL vector")
             done = stack.pop()
             if stack:
                 stack[-1].append(done)
@@ -265,8 +277,11 @@ def parse_dump(text):
     return functions
 
 
+VECTOR = "["          # the head parse_dump gives an RTL vector
+
+
 def code(x):
-    """an RTL expression's code (`mem` of `mem/s/v:HI`)"""
+    """an RTL expression's code (`mem` of `mem/s/v:HI`; VECTOR for a vector)"""
     if isinstance(x, list) and x and isinstance(x[0], str) and not x[0].startswith('"'):
         return x[0].split(":")[0].split("/")[0]
     return None
@@ -281,6 +296,13 @@ def rtl_mode(x):
 
 
 INSN_CODES = ("insn", "jump_insn", "call_insn", "note", "code_label", "barrier")
+# an insn pattern whose register writes Function.sets reads in full: one of these codes at the top, and a
+# parallel's vector holding only MODELLED_ITEMS; an auto-increment of a register other than the frame's writes it
+# too.  Any other pattern of an expand dump refuses the proof (Function.opaque, Resolver)
+MODELLED_TOP = {"set", "clobber", "use", "call", "parallel", "addr_vec", "addr_diff_vec", "return",
+                "unspec_volatile"}
+MODELLED_ITEMS = {"set", "clobber", "use"}
+AUTO_INC = {"pre_inc", "pre_dec", "post_inc", "post_dec", "pre_modify", "post_modify"}
 
 
 class Insn:
@@ -298,6 +320,27 @@ class Insn:
             if rtl_mode(notes) in ("REG_EQUAL", "REG_EQUIV") and self.equal is None:
                 self.equal = notes[1]
             notes = notes[2] if len(notes) > 2 else None
+
+
+def unmodelled(pattern):
+    """what in an insn pattern writes a register in a way Function.sets does not read, or None"""
+    head = code(pattern)
+    if head not in MODELLED_TOP:
+        return f"a {head or 'malformed'} pattern"
+    if head == "parallel":
+        if len(pattern) != 2 or code(pattern[1]) != VECTOR:
+            return "a parallel without one vector"
+        for item in pattern[1][1:]:
+            if code(item) not in MODELLED_ITEMS:
+                return f"a parallel holding {code(item) or 'a bare token'}"
+    stack = [pattern]
+    while stack:
+        x = stack.pop()
+        if isinstance(x, list):
+            if code(x) in AUTO_INC and not (len(x) > 1 and code(x[1]) == "reg" and int(x[1][1]) in FRAME_REGISTERS):
+                return f"an auto-increment ({code(x)})"
+            stack.extend(x[1:])
+    return None
 
 
 def walk_mems(x, out, store=False):
@@ -360,6 +403,9 @@ class Function:
             if insn.links != ((before.uid if before else 0), (after.uid if after else 0)):
                 raise ProofError(f"the insn chain is broken at UID {insn.uid}")
         self.defs = {}
+        # (insn UID, what) of each pattern whose register writes sets() does not read
+        self.opaque = [(insn.uid, what) for insn in self.insns
+                       if insn.pattern is not None for what in [unmodelled(insn.pattern)] if what]
         users = set()
         for insn in self.insns:
             if insn.pattern is None:
@@ -379,15 +425,26 @@ class Function:
     def sets(pattern):
         """[(destination register or memory, the value it then holds, whether the set names it whole)].
 
-        A set through a subreg defines the whole register: a subreg as wide
-        as the register or wider gives it the value narrowed to its mode, and
-        a narrower subreg of a promoted variable (/s) gives it the value
-        extended as the variable's signedness says (PROMOTE_MODE).  Any other
-        narrower subreg, strict_low_part, zero_extract or sign_extract
-        writes only part of it: the value is ["partial"], which the resolver
-        cannot resolve."""
+        Every set of a parallel's vector counts.  A set through a subreg
+        defines the whole register: a subreg as wide as the register or wider
+        gives it the value narrowed to its mode, and a narrower subreg of a
+        promoted variable (/s) gives it the value extended as the variable's
+        signedness says (PROMOTE_MODE).  Any other narrower subreg,
+        strict_low_part, zero_extract or sign_extract writes only part of it:
+        the value is ["partial"], which the resolver cannot resolve.  A
+        clobber of a register kills it: the value is ["clobber"], which the
+        resolver cannot resolve either; a clobber of a scratch or of memory
+        writes no register.  Patterns unmodelled() names are not read here."""
         found = []
-        for item in [pattern] + (pattern[1:] if code(pattern) == "parallel" else []):
+        items = pattern[1][1:] if code(pattern) == "parallel" and len(pattern) == 2 and \
+            code(pattern[1]) == VECTOR else [pattern]
+        for item in items:
+            if code(item) == "clobber" and len(item) == 2:
+                target = item[1]
+                while code(target) in ("subreg", "strict_low_part", "zero_extract", "sign_extract"):
+                    target = target[1]
+                if code(target) == "reg":
+                    found.append((target, ["clobber"], code(item[1]) == "reg"))
             if code(item) == "set":
                 target, source = item[1], item[2]
                 whole = code(target) == "reg"
@@ -581,6 +638,9 @@ class Resolver:
     """
 
     def __init__(self, function):
+        if function.opaque:
+            uid, what = function.opaque[0]
+            raise ProofError(f"insn UID {uid} holds {what}, whose register writes the proof does not model")
         self.function = function
         self.values = {number: BOTTOM for number in function.defs}
         for _ in range(FIXPOINT_ROUNDS):

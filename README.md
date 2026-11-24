@@ -4855,8 +4855,13 @@ its own call refuses. The record prints the premises: the code runs where it
 lies, no address of it is formed by arithmetic, and a task's callback is called
 only by the manager. A variable offset is admitted only from a listed symbol,
 a getter or a traced parameter, under the printed premise that it stays inside
-the object, which the proof does not bound. A narrowed or extended constant
-loses its value. Locals, stack parameters, other call results, loaded
+the object, which the proof does not bound. Every set of an insn defines its
+register, those of a `parallel` included (agbcc's `ldrsh` sets the register
+beside a clobbered scratch), and a clobbered register holds no known value; an
+expand dump with any other pattern that writes a register (another element in
+a parallel, an unknown code, an auto-increment outside the frame) refuses. A
+narrowed or extended constant loses its value. Locals, stack parameters, other
+call results, loaded
 pointers, a pointer difference, and a variable offset from a constant address
 are refused. Candidates are refused in a source with a line splice, a digraph
 or a trigraph, or with more than eight of them, or in a directive. The report
