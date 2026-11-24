@@ -16,6 +16,7 @@ from test_rom_table_copy import fixture, HELPER, OWNER
 BASE = match.ROM_BASE
 CALLEE, OTHER, THIRD = 0x08014000, 0x08014100, 0x08014200
 VIA_R3, VIA_R6 = match.RUNTIME_HELPERS['_call_via_r3'], match.RUNTIME_HELPERS['_call_via_r6']
+VIA_R2 = match.RUNTIME_HELPERS['_call_via_r2']
 BX_LR = 0x4770
 # agbcc's high-register frame: push {r4-r7,lr}; mov r7,sl; mov r6,sb; mov r5,r8; push {r5-r7};
 # ... pop {r3,r4,r5}; mov r8,r3; mov sb,r4; mov sl,r5; pop {r4-r7}; pop {r0}; bx r0
@@ -2080,6 +2081,118 @@ class ReplayWithoutBufferProofTests(unittest.TestCase):
         self.assertEqual(len(watch.premise_lines(context)), 1)
         self.assertIn('with R7 depending on owner stack addresses', watch.premise_lines(context)[0])
 
+
+
+# A bare `bx r3` (kit #350 follow-up): MPlayMain at 0x08144B2C ends with `bx r3` at 0x08144D84,
+# which six callers BL to as a call through R3.  The function index gives that halfword its own
+# row inside MPlayMain's span.  PLAYER is that shape: a body whose ninth halfword is bx r3, with
+# a one-instruction row at it.
+PLAYER = 0x08014400
+BARE = PLAYER + 0x10
+PLAYER_BODY = (0xB500, 0x2000, 0x2100, 0x2200, 0x2300, 0x2000, 0x2100, 0x2200, 0x4718, 0x46C0)
+
+
+def bare_rom(callee, bare_halfword=0x4718, extra=None):
+    body = PLAYER_BODY[:8] + (bare_halfword,) + PLAYER_BODY[9:]
+    functions = {PLAYER: body, BARE: (bare_halfword,), CALLEE: callee}
+    functions.update(extra or {})
+    return rom_with(functions)
+
+
+class BareThunkTests(unittest.TestCase):
+    """A BL to an aligned Thumb halfword that is exactly `bx r3` is a call through R3."""
+
+    def lines(self, callee, watched=frozenset({5}), **options):
+        rom, entries = bare_rom(callee, **options)
+        class Proof:
+            pass
+        proof = Proof()
+        proof.rom, proof.entries = rom, entries
+        copies = watch.checker_for(proof).call(CALLEE, frozenset(watched))
+        return copies, watch.premise_lines(proof)
+
+    def test_a_call_to_a_bare_bx_r3_is_premised_whatever_span_it_sits_in(self):
+        # push {lr}; bl BARE; pop {pc}, with R5 watched: R3 is unknown, so the call is premised.
+        copies, lines = self.lines((0xB500, BARE, 0xBD00))
+        self.assertEqual(copies, {})
+        self.assertEqual(lines, [
+            f'{watch.PREMISE_PREFIX} call at 0x{CALLEE + 2:08X} in 0x{CALLEE:08X} through the bx r3 at '
+            f'0x{BARE:08X} to an unknown address, with R5 depending on owner stack addresses; {watch.PREMISE}'])
+
+    def test_a_bare_bx_r3_is_walked_at_a_known_destination(self):
+        # ldr r3,=OTHER|1; bl BARE: OTHER (cmp r5,#0; bx lr) is walked, and compares R5.
+        callee = function(CALLEE, [0xB500, ('LIT', 3, 0), BARE, 0xBD00], [OTHER | 1])
+        with self.assertRaisesRegex(watch.WatchRefusal, f"callee 0x{OTHER:08X}: a comparison"):
+            self.lines(callee, extra={OTHER: (0x2D00, BX_LR)})
+        self.assertEqual(self.lines(callee, extra={OTHER: (BX_LR,)}), ({}, []))
+        # Through _call_via_r2 to the bare bx r3 (r2 = BARE|1), and on to an unknown R3.
+        callee = function(CALLEE, [0xB500, ('LIT', 2, 0), VIA_R2, 0xBD00], [BARE | 1])
+        _, lines = self.lines(callee)
+        self.assertEqual(len(lines), 1)
+        self.assertIn(f'through _call_via_r2 then the bx r3 at 0x{BARE:08X} to an unknown address', lines[0])
+
+    def test_a_bare_bx_r3_may_not_branch_to_a_watched_value(self):
+        # adds r3,r5,#0; bl BARE
+        with self.assertRaisesRegex(watch.WatchRefusal, 'the call-via thunk branches to the watched R3'):
+            self.lines((0xB500, 0x1C2B, BARE, 0xBD00))
+
+    def test_anything_else_in_an_overlapping_span_still_refuses(self):
+        # The same row and span holding bx r2, or a BL to the halfword after the bx r3.
+        with self.assertRaisesRegex(watch.WatchRefusal, 'mapping overlaps another span'):
+            self.lines((0xB500, BARE, 0xBD00), bare_halfword=0x4710)
+        with self.assertRaisesRegex(watch.WatchRefusal, 'mapping overlaps another span'):
+            self.lines((0xB500, BARE + 2, 0xBD00), extra={BARE + 2: (0x46C0,)})
+
+    def test_a_bare_bx_r3_at_an_odd_address_or_reached_as_arm_code_refuses(self):
+        # ODD's bytes 00 18 47 00 read bx r3 at its odd address ODD + 1, which is no Thumb instruction.
+        odd = 0x08014500
+        rom, entries = bare_rom((0xB500, BARE, 0xBD00), extra={odd: (0x1800, 0x0047)})
+        checker = watch.Checker(rom, entries)
+        self.assertTrue(checker.bare_thunk(BARE))
+        self.assertEqual(struct.unpack_from('<H', rom, odd + 1 - BASE)[0], 0x4718)
+        self.assertFalse(checker.bare_thunk(odd + 1))
+        self.assertEqual(checker.resolve(odd + 1, {}, frozenset({5})), odd + 1)
+        with self.assertRaisesRegex(watch.WatchRefusal, 'not unique aligned Thumb code'):
+            watch.Checker(rom, entries).call(BARE + 1, frozenset({5}))
+        # _call_via_r2 to BARE without the Thumb bit branches to ARM code.
+        callee = function(CALLEE, [0xB500, ('LIT', 2, 0), VIA_R2, 0xBD00], [BARE])
+        with self.assertRaisesRegex(watch.WatchRefusal, 'which is not Thumb code'):
+            self.lines(callee)
+
+    def test_a_bare_bx_r3_to_iwram_states_its_destination(self):
+        # ldr r3,=0x03000001; bl BARE: code outside ROM, premised with its address.
+        callee = function(CALLEE, [0xB500, ('LIT', 3, 0), BARE, 0xBD00], [0x03000001])
+        _, lines = self.lines(callee)
+        self.assertEqual(len(lines), 1)
+        self.assertIn(f'through the bx r3 at 0x{BARE:08X} resolved to 0x03000001 (IWRAM)', lines[0])
+
+    def test_a_summarised_callee_calling_a_bare_bx_r3_agrees_with_the_walk_in_context(self):
+        # CALLEE: push {r5,lr}; movs r5,#0; [r3 = ...;] bl OTHER; pop {r5,pc}, so the saved R5 is
+        # the watched word and OTHER (push {lr}; bl BARE; pop {pc}) is used by its summary.
+        other = (0xB500, BARE, 0xBD00)
+        functions = {PLAYER: PLAYER_BODY, BARE: (0x4718,), OTHER: other, CALLEE: (0xB520, 0x2500, OTHER, 0xBD20)}
+        rom, entries = rom_with(functions)
+        self.assertIsNotNone(watch.Checker(rom, entries).isolation(OTHER))
+        in_context = outcome(functions, False)
+        self.assertNotEqual(in_context[0], 'refused')
+        self.assertEqual(outcome(functions, True), in_context)
+        self.assertEqual([premise[3] for premise in in_context[1] if premise[0] == 'call'], [(BARE,)])
+        # R3 known at CALLEE's call (ldr r3,=FOURTH|1): the walk goes through the bare bx r3 to
+        # FOURTH (ldr r0,[sp,#4]; cmp r0,#0), which compares the saved R5 and refuses.  The
+        # summary does not apply where its function pointer is known.
+        fourth = 0x08014300
+        functions[fourth] = (0x9801, 0x2800, BX_LR)
+        functions[CALLEE] = function(CALLEE, [0xB520, 0x2500, ('LIT', 3, 0), OTHER, 0xBD20], [fourth | 1])
+        in_context = outcome(functions, False)
+        self.assertEqual(in_context[0], 'refused')
+        self.assertIn('a comparison', in_context[1])
+        self.assertEqual(outcome(functions, True), in_context)
+        # R3 a frame address (add r3,sp,#4, the saved LR's word, not the one that depends on R5):
+        # the bare bx r3 would branch into the frame.
+        functions[CALLEE] = (0xB520, 0x2500, 0xAB01, OTHER, 0xBD20)
+        in_context = outcome(functions, False)
+        self.assertEqual(in_context[0], 'refused')
+        self.assertEqual(outcome(functions, True), in_context)
 
 if __name__ == '__main__':
     unittest.main()
