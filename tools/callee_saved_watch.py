@@ -79,7 +79,8 @@ The walk is interprocedural and follows one frame model:
   * recursion deeper than ``MAX_DEPTH`` that no summary covers.
   A call is taken not to return only if its callee provably never does.
 
-A call through a ``_call_via_rN`` thunk is walked at its destination when rN is known:
+A call through a ``_call_via_rN`` thunk, or to any other aligned Thumb halfword that is exactly
+``bx r3`` (MPlayMain's tail at 0x08144D84), is walked at its destination when rN is known:
 from a literal, a word read from ROM at a known address, or another thunk.  Values are
 tracked through walked code and summarised callees that preserve them, never across other
 calls.  When the destination is unknown or outside ROM, nothing in R0-R3 or R12 may depend
@@ -752,6 +753,18 @@ def span(rom, entries, target):
     return rom[target - match.ROM_BASE:end - match.ROM_BASE], end
 
 
+BX_R3 = 0x4718
+
+
+def link_register(link):
+    """The register a call-via ``link`` (``Checker.chain``) branches to."""
+    return link if link < 16 else 3
+
+
+def chain_registers(links):
+    return {link_register(link) for link in links}
+
+
 class Checker:
     """The callee-saved check of one verification, memoised per call shape."""
 
@@ -997,17 +1010,33 @@ class Checker:
     def arguments(constants):
         return tuple(sorted((number, value) for number, value in constants.items() if number in (0, 1, 2, 3, 12)))
 
+    def bare_thunk(self, target):
+        """Whether ``target`` is an aligned Thumb halfword that is exactly ``bx r3`` and no
+        ``_call_via_rN`` runtime helper.  A BL there is a call through R3 with LR set, as one to
+        ``_call_via_r3`` is: only that halfword runs, so the span the function index puts it in
+        does not matter (0x08144D84 is the tail of MPlayMain, a real call target)."""
+        offset = target - match.ROM_BASE
+        return target not in match.RUNTIME_HELPERS.values() and not target % 2 and \
+            0 <= offset and offset + 2 <= len(self.rom) and \
+            struct.unpack_from("<H", self.rom, offset)[0] == BX_R3
+
     def chain(self, thunk, constants):
-        numbers = []
-        while thunk in match.RUNTIME_HELPERS.values() and len(numbers) < 16:
-            number = (thunk - match.RUNTIME_HELPERS["_call_via_r0"]) // 4
-            numbers.append(number)
-            thunk = constants.get(number, 0) & ~1
-        return tuple(numbers)
+        """The thunks a call to ``thunk`` goes through, as ``link`` values: the register number
+        of a ``_call_via_rN``, or the address of a bare ``bx r3``."""
+        links = []
+        while len(links) < 16:
+            if thunk in match.RUNTIME_HELPERS.values():
+                links.append((thunk - match.RUNTIME_HELPERS["_call_via_r0"]) // 4)
+            elif self.bare_thunk(thunk):
+                links.append(thunk)
+            else:
+                break
+            thunk = constants.get(link_register(links[-1]), 0) & ~1
+        return tuple(links)
 
     def destination(self, thunk, constants):
-        numbers = self.chain(thunk, constants)
-        return constants.get(numbers[-1]) if numbers else None
+        links = self.chain(thunk, constants)
+        return constants.get(link_register(links[-1])) if links else None
 
     def resolve(self, target, constants, watched):
         """The callee proper: the target itself or a call-via thunk's known ROM destination
@@ -1015,11 +1044,16 @@ class Checker:
         IWRAM routine installed at run time).  ``watched`` holds the registers whose values
         must not become a branch target."""
         seen = set()
-        while target in match.RUNTIME_HELPERS.values() and target not in seen:
-            seen.add(target)
-            number = (target - match.RUNTIME_HELPERS["_call_via_r0"]) // 4
-            if not match.thunk_is_call_via(self.rom, target, number):
+        while target not in seen:
+            if target in match.RUNTIME_HELPERS.values():
+                number = (target - match.RUNTIME_HELPERS["_call_via_r0"]) // 4
+                if not match.thunk_is_call_via(self.rom, target, number):
+                    break
+            elif self.bare_thunk(target):
+                number = 3
+            else:
                 break
+            seen.add(target)
             if number in watched:
                 refuse(target, f"the call-via thunk branches to the watched R{number}")
             destination = constants.get(number)
@@ -2453,7 +2487,7 @@ class Checker:
                                 records.append(template[:4] + (excluded,))
                             continue
                         if template[0].startswith("call") and template[4] is None and any(
-                                number in template[3] and token[0] == "A" and isinstance(token[1], int)
+                                number in chain_registers(template[3]) and token[0] == "A" and isinstance(token[1], int)
                                 and token[1] in constants for number, tokens in template[-2] for token in tokens):
                             return None      # its function pointer is known here: walked, and resolved
                         given, held_words = [], []           # its arguments, as values here
@@ -2495,7 +2529,7 @@ class Checker:
                                                    taints(input_value(token[1])) for token in tokens)}))
                         held = tuple(number for number, value in given if number in CALLEE_SAVED and live(value))
                         if template[0].startswith("call") and any(frames(value) for number, value in given
-                                                         if number in template[3]):
+                                                         if number in chain_registers(template[3])):
                             return None                  # a thunk branching to a frame address
                         for number, value in given:
                             pointed = {point - at for token in value if token[0] in ("F", "FR")
@@ -3504,7 +3538,8 @@ def premise_lines(proof):
             depth = " at any recursion depth" if record[0].endswith("+") else ""
             if record[0].startswith("call"):
                 _, function, site, chain, destination, registers, stacked, flagged = record
-                through = " then ".join(f"_call_via_r{number}" for number in chain)
+                through = " then ".join(f"_call_via_r{link}" if link < 16 else f"the bx r3 at 0x{link:08X}"
+                                        for link in chain)
                 where = "to an unknown address" if destination is None else \
                     f"resolved to 0x{destination:08X} ({region(destination)})"
                 head, premise = f"call at 0x{site:08X} in 0x{function:08X}{depth} through {through} {where}", PREMISE

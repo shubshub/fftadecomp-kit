@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
 sys.dont_write_bytecode = True
 import match
+import callee_saved_watch
 import dead_register
 
 OWNER, P, C, G, X, Y = 0x08010000, 0x08011000, 0x08012000, 0x08013000, 0x08014000, 0x08016000
@@ -214,21 +215,34 @@ class DeadCallArgumentTests(unittest.TestCase):
         # push {r4,lr}; sub sp,#8; mov r0,sp; adds r4,r0,#0; bl P; movs r0,#1; bl C; <after>; ...; pop {r4}
         # The call is alias-free for its arguments; R4 stays an alias and a later store through it is
         # checked.  R4 holds the stack address across the call, so the callee-saved walk follows C
-        # (kit #350): a bare `bx r3` it reaches with that value live refuses, while a call through
-        # the real _call_via_r3 to an unknown address is premised.
-        def bodies(after, c_code=C_KILLS_R3):
+        # (kit #350).  C's call to X, a bare `bx r3`, is a call through R3 as one to the real
+        # _call_via_r3 is: R3 is unknown there, so each is premised at its call.  Any other
+        # indirect branch at X refuses with the value live.
+        def bodies(after, c_code=C_KILLS_R3, x_code=THUNK):
             values = owner_shape1(c_code)
             values[OWNER] = [PUSH_R4_LR, SUB8, MOV_R0_SP, 0x1c04, P, MOVS_R0_1, C, *after,
                              ADD8, POP_R4, POP_R0, BX_R0]
             values[VIA_R3] = [BX_R3, NOP]
+            values[X] = x_code
             return values
+        via_r3 = [PUSH_LR, SUB8, 0x1c0b, MOV_R0_SP, Y, MOV_R2_SP, VIA_R3, ADD8, POP_R0, BX_R0]
+        for c_code, through in ((C_KILLS_R3, f'the bx r3 at 0x{X:08X}'), (via_r3, '_call_via_r3')):
+            with self.subTest(through):
+                proof = walk(bodies((), c_code))
+                self.assertEqual(len(proof.dead_registers.evidence()['calls']), 1)
+                # The call is premised, and so are C's uninitialised locals it is given in R2.
+                self.assertEqual(callee_saved_watch.premise_lines(proof), [
+                    f'{callee_saved_watch.PREMISE_PREFIX} call at 0x{C + 14:08X} in 0x{C:08X} through {through} '
+                    f'to an unknown address, with R4 depending on owner stack addresses; {callee_saved_watch.PREMISE}',
+                    f'{callee_saved_watch.PREMISE_PREFIX} code not walked from 0x{C + 14:08X} in 0x{C:08X} can reach '
+                    f'the uninitialised, partly overwritten or unknown-provenance frame words at sp+0,sp+4; '
+                    f'{callee_saved_watch.STALE_PREMISE}'])
+                with self.assertRaisesRegex(ValueError, 'outside allocated local words|stack-alias'):
+                    walk(bodies((0x7520,), c_code))                         # strb r0,[r4,#20]
+        # bx r1, which holds what bx r3 would branch to.
         with self.assertRaisesRegex(ValueError, f'callee 0x{X:08X}: an indirect branch at 0x{X:08X} '
                                                 f'while watched values are live'):
-            walk(bodies(()))
-        via_r3 = [PUSH_LR, SUB8, 0x1c0b, MOV_R0_SP, Y, MOV_R2_SP, VIA_R3, ADD8, POP_R0, BX_R0]
-        self.assertEqual(len(walk(bodies((), via_r3)).dead_registers.evidence()['calls']), 1)
-        with self.assertRaisesRegex(ValueError, 'outside allocated local words|stack-alias'):
-            walk(bodies((0x7520,), via_r3))                                 # strb r0,[r4,#20]
+            walk(bodies((), x_code=[BX_R1]))
 
     def test_pointer_bearing_frame_word_keeps_the_inspection(self):
         # add r1,sp,#4; str r1,[sp]: the callee may read the word through its incoming stack.
