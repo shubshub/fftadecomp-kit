@@ -415,6 +415,9 @@ def effects(probe, pc, signatures, interfaces, returns):
             return set(), set(), False, False, set(), [probe.labels[operands[0]]], True
         if m[:1] == "b" and m[1:] in vs.INVERSE:
             return set(), set(), True, False, set(), [probe.labels[operands[0]], pc + 1], True
+        if m == "bl" and pc in probe.labels.far:
+            # agbcc's far jump: a branch that overwrites lr (Executor.step)
+            return set(), {"lr"}, False, False, {"lr"}, [probe.labels[operands[0]]], True
         if m == "bl":
             via = re.fullmatch(r"_call_via_(r[0-9]|r1[0-2]|ip|fp|sl|sb|lr)", operands[0])
             clobbers = {"r0", "r1", "r2", "r3", "r12", "lr"}

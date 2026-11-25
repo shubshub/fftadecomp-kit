@@ -183,6 +183,10 @@ from plausible import VOLATILE_QUALIFIER, declaration_tokens
 
 MASK = 0xFFFFFFFF
 SP = ("sp",)
+# the tag of lr after a far jump, (FAR_JUMP, compile, instruction): the address
+# after the `bl` in each compile's own code, which nothing may read; a return
+# through it is refused as a computed jump
+FAR_JUMP = "far-jump"
 # Cost bounds, not soundness bounds: every path is checked in full, and a
 # function the bounds cut short is refused, never accepted on the paths seen.
 # All paths are held at once with their records, so the true ceiling is
@@ -1068,11 +1072,13 @@ class Labels(dict):
     front of a literal word, or of a directive, names data or padding that
     the instruction stream does not hold.  `aligned` holds the labels of
     literal words known to start on a word boundary: nothing but labels and
-    literal words since an `.align 2, 0`.  GAS does not align `.word`."""
+    literal words since an `.align 2, 0`.  GAS does not align `.word`.  `far`
+    holds the indices of agbcc's far jumps: a `bl` to a label, which agbcc
+    emits for a branch beyond the reach of `b` and marks `@ far jump`."""
 
     def __init__(self):
         super().__init__()
-        self.code, self.aligned = set(), set()
+        self.code, self.aligned, self.far = set(), set(), set()
 
 
 def parse_assembly(text):
@@ -1084,7 +1090,8 @@ def parse_assembly(text):
     """
     functions, outside, current, thumb_func, name = {}, [], None, False, None
     for raw in text.splitlines():
-        line = raw.split("@", 1)[0].strip()
+        line, _, comment = raw.partition("@")
+        line = line.strip()
         if not line:
             continue
         if re.match(r"\.(?:code\s+32|arm)\b", line):
@@ -1131,6 +1138,8 @@ def parse_assembly(text):
         labels.code.update(pending)
         pending, owners = [], []
         mnemonic, _, operands = re.sub(r"\s+", " ", line).partition(" ")
+        if mnemonic.lower() == "bl" and comment.strip() == "far jump":
+            labels.far.add(len(instructions))
         instructions.append((mnemonic.lower(), split_operands(operands), line))
     if current is not None:
         raise SemanticError("unterminated function in the compiler output")
@@ -1349,6 +1358,8 @@ class Executor:
         name = register(operand)
         if name == "pc":
             self.fail(text, "pc-relative arithmetic is not modelled")
+        if name and isinstance(self.regs[name], tuple) and self.regs[name][:1] == (FAR_JUMP,):
+            self.fail(text, "lr is read after a far jump overwrote it")
         if name:
             return self.regs[name]
         constant = immediate(operand)
@@ -2062,6 +2073,16 @@ class Executor:
             if mnemonic == "b" or self.decide(mnemonic[1:], text):
                 return self.target(operands[0], text)
             return None
+        if mnemonic == "bl" and pc in self.labels.far:
+            # a branch to a label of this function (target() refuses any
+            # other), not a call: it overwrites lr and returns nowhere
+            if len(operands) != 1 or not operands[0].startswith(".L"):
+                self.fail(text, "unsupported far jump form")
+            record.kind, record.unconditional, record.writes = "branch", True, {"lr"}
+            self.records.append(record)
+            regs["lr"] = (FAR_JUMP, self.label, pc)
+            self.derived -= {"lr"}
+            return self.target(operands[0], text)
         if mnemonic == "bl":
             if len(operands) != 1:
                 self.fail(text, "unsupported call form")
@@ -3305,8 +3326,8 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
         raise SemanticError("the real and stripped compiles differ outside their functions")
     names = set(real)
     for function in real.values():
-        for mnemonic, operands, _ in function[0]:
-            if mnemonic == "bl" and operands:
+        for index, (mnemonic, operands, _) in enumerate(function[0]):
+            if mnemonic == "bl" and operands and index not in function[1].far:
                 names.add(operands[0])
     # Read declarations from the comment- and string-stripped text, so that
     # braces or semicolons inside a literal cannot fold a real declaration
