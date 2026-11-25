@@ -3175,7 +3175,7 @@ def show_event(event):
     if event[0] == "escape":
         return "frame escape {" + ", ".join(f"{offset:+#x}: {show(value)}" for offset, value in event[1]) + "}" + \
             (f" after {show_stores(event[2])}" if len(event) > 2 else "")
-    if event[0] in ("loop", "back-edge", "saved"):
+    if event[0] in ("loop", "back-edge", "saved", "join", "join-end"):
         return f"{event[0]} {event[1:]}"        # volatile_loop_induction
     return "return" + (f" {show(event[1])}" if len(event) > 1 else "")
 

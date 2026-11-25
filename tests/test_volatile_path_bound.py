@@ -6,6 +6,9 @@ from pathlib import Path
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+from unittest import mock
+
+import volatile_loop_induction as induction
 import volatile_semantics as semantics
 
 
@@ -51,8 +54,15 @@ class PathBoundTests(unittest.TestCase):
             semantics._compare_compiles(real, real, PREPROCESSED, SYMBOL, DECLARATION)
         self.assertIn("without the read-modify-write load", str(caught.exception))
 
-    def test_more_than_1024_paths_are_refused(self):
-        with self.assertRaises(semantics.SemanticError) as caught:
+    def test_more_than_1024_paths_are_merged_where_they_join(self):
+        # kit#137 rule B: was "more than 1024 paths are refused", which stays the refusal
+        # without the rule.  The eleven tests rejoin one after another, so their 2048 paths
+        # merge to 12
+        (result,) = compare(11)
+        self.assertEqual(result[:2], ("func_08028C34", 12))
+        self.assertIn("paths merged at instructions", semantics.record(SYMBOL, [result]))
+        with mock.patch.object(induction.POLICY, "join_cuts", False), \
+                self.assertRaises(semantics.SemanticError) as caught:
             compare(11)
         self.assertIn("has more than 1024 paths; the semantic check is bounded", str(caught.exception))
 
