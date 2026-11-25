@@ -1331,6 +1331,10 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
         # report_matches admits DMA fill lines here only on the plain framed profiles (kit #239)
         dma_lines = dma_fill.report_fields(lines)
         fills = dma_fill.Fills(rom) if dma_lines else None
+        # and the exit-scratch premise lines likewise (kit #538): a ledger only when stated
+        import return_scratch_profile
+        scratch_lines = return_scratch_profile.report_fields(lines)
+        scratch = return_scratch_profile.ReturnScratch() if scratch_lines else None
 
         thunk_calls = set()
         def resolve(target):
@@ -1350,11 +1354,14 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
             reached = verify_leaf_instructions(data, address, thumb, call_resolver=resolve if calls else None,
                                                self_calls=self_sites,
                                                incoming_narrow_reads=thumb and self_sites is None,
-                                               dma_fills=fills, callee_watch=watch if calls and thumb else None)
+                                               dma_fills=fills, callee_watch=watch if calls and thumb else None,
+                                               return_scratch=scratch)
             # Issuance made the #350 check with its buffer proof; the replay repeats it and must
             # find exactly the premise lines the report states.
             if [line for line in lines if line.lstrip().startswith(callee_saved_watch.LINE_PREFIX)] != \
                     callee_saved_watch.premise_lines(watch):
+                return False
+            if (scratch.report_lines() if scratch is not None else []) != scratch_lines:
                 return False
             if self_sites is not None and {item.address for item in reached
                     if item.mnemonic == "bl" and item.operands and item.operands[0].imm == address} != self_sites:
@@ -1363,8 +1370,9 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
             if fills is not None:
                 dma_fill.check_report(fills, lines)
         except modsi3.AddressedRemainderRequired:
-            # that replay has no DMA fill rule, so its lines would go unchecked
-            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None or fills is not None:
+            # that replay has no DMA fill or exit-scratch rule, so their lines would go unchecked
+            if profile not in (LINKED_SCHEMA, FRAMED_LINKED_SCHEMA) or self_sites is not None or \
+                    fills is not None or scratch is not None:
                 return False
             watch = None              # its walk did not finish: the report states no premise line
             reached = verify_addressed_modsi3_source(
@@ -1373,7 +1381,8 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
         if parts is not None:
             # The premise lines are rendered from the watch, as match.py writes them from its proof.
             parts.update(instructions=reached, self_sites=self_sites or frozenset(),
-                         dma_lines=fills.report_lines() if fills is not None else (), callee_watch=watch)
+                         dma_lines=fills.report_lines() if fills is not None else (), callee_watch=watch,
+                         scratch_lines=scratch.report_lines() if scratch is not None else ())
         if thunk_calls:
             # a library unit report replays with its unit's toolchain
             import library_units
@@ -1605,6 +1614,12 @@ def report_matches(report, root, address):
             [f"* verification: `{schema}`"] for schema in (FRAMED_SCHEMA, FRAMED_LINKED_SCHEMA, FRAMED_DATA_SCHEMA,
                                                           DATA_BUFFER_SCHEMA)]:
         # DMA fill lines belong to the plain framed profiles and the plain data-buffer schema only
+        return False
+    import return_scratch_profile
+    if return_scratch_profile.report_fields(stated) and \
+            [line for line in stated if line.startswith("* verification:")] not in [
+            [f"* verification: `{schema}`"] for schema in (FRAMED_SCHEMA, FRAMED_LINKED_SCHEMA, FRAMED_DATA_SCHEMA)]:
+        # exit-scratch premise lines belong to the plain framed profiles only (kit #538)
         return False
     import plausible
     try:

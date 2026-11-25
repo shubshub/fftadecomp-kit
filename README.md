@@ -875,9 +875,59 @@ the same proven adjustment. No new report schema or opt-in is required.
 
 Other register-controlled SP writes and untracked stack-pointer transformations
 remain rejected. This is a bounded CFG profile, not a general proof of memory
-safety, pointer lifetime, or callee behavior. In particular, the existing normal
-frame profile can leave a stack alias in a return register after restoring SP;
+safety, pointer lifetime, or callee behavior. A frame address left in a return
+register is refused or stated as described in "Frame addresses at a return";
 null-comparison support does not introduce a new pointer-return policy.
+
+### Frame addresses at a return
+
+Every `verify_leaf_instructions` walk checks the registers it returns with (kit
+#538). The stack-argument buffer walks already refused a frame address in R0-R3
+at a return, except for the R2/R3 projections of their type-gated opt-in
+profiles (root-return scratch, direct output, known query, map record); the
+restoring owner's frame proof refused one at every exit; and per-function
+profiles with walkers of their own check their own exits. The other walks - the
+plain and version-1 walks of the default path, the self-call walk, the
+restoring owner's acyclic and ignored-leaf walk, the structural walk of a callee
+a version-1 proof inspects, and every other `verify_leaf_instructions` walk
+without a stack-argument proof - did not look, so a function returning the
+address of its own expired frame was admitted. Its caller then holds an address below its SP, where its next
+callee builds its frame and can be made to write through it into its own saved
+registers. `tools/return_scratch_profile.py` holds the rule:
+
+* a frame address in R0 or R1, the result registers, refuses (`local stack
+  pointer escapes through a return register`);
+* one in R2 or R3 refuses too, except in the root walk of a function whose report
+  is one of the plain framed schemas (`elf-symbol-thumb-frame-v1`,
+  `-frame-calls-v1`, `-frame-data-v1`). There the existing
+  `thumb-discarded-exit-scratch-v1` premise applies - R2/R3 carry no results
+  under the agbcc Thumb ABI - and the report states it and every return site,
+  register and entry-SP offset it covers, after the stack-frame line:
+
+  ```
+  * stack frame exit scratch premise: `thumb-discarded-exit-scratch-v1` r2/r3 are discarded scratch at external returns; no result values are returned through them
+  * stack frame exit scratch: `0x0801CADE r3 -12`
+  ```
+
+  The restoring owner's acyclic and ignored-leaf walk applies the same premise
+  and records the sites in its owner proof as `discarded_exit_scratch`, as its
+  frame proof records its own, so the owner evidence on the report carries them.
+  The premise is about the callers, which no walk checks (after a call every
+  walk treats R0-R3 as unknown scalars, not as dead), so it is always recorded;
+* an address into the caller's frame (entry-SP offset zero or more) refuses in
+  every register, and R12 keeps the exemption it has in the stack-argument walks
+  (IP is scratch, not a result register);
+* a callee inspected by a version-1 proof refuses a frame address in any of R0-R3
+  at its return: its consumer is a known caller.
+
+Replay re-walks with the premise only when the report states these lines and
+requires the recomputed lines to equal them, so a report without them does not
+replay for a function that needs them. `0801CAB8`, `0809B120` and `08127380`
+leave a local's address in R3 at their returns and state the premise, and
+`0809C9E8` (restoring-owner-acyclic-v1) records one in R2; nothing in the ROM
+returns its frame in R0 or R1. A frame address that outlives its frame through
+memory rather than a return register is outside this check. Boundaries are in
+`tests/test_return_frame_alias.py`.
 
 Framed reports use `elf-symbol-thumb-frame-v1` or
 `elf-symbol-thumb-frame-calls-v1` and require an explicit stack-summary line.
@@ -1682,8 +1732,13 @@ killing writes: a cycle that can avoid them refuses (least fixpoint), and the
 walk stops at 4,096 states.
 
 A stack address left in a register at a return is still refused ("local stack
-pointer escapes through a return register"), as before. When the proof fails,
-the inspection's refusal stands unchanged. Each accepted call is stated on a
+pointer escapes through a return register"), as before, and so is a callee
+whose inspection refused because it returns its own frame address in a
+register: the rule never turns that refusal into an alias-free call, since the
+caller would receive the address (kit #538). A callee whose inspection refuses
+earlier, for another reason, and that would also return its own frame address
+is covered only by that callee's own report, which the return check refuses.
+When the proof fails, the inspection's refusal stands unchanged. Each accepted call is stated on a
 `* buffer dead register:` line (site, callee, register, offset and killing
 writes), and the records, with the hash of every callee body the walk read, are
 bound into the buffer proof fingerprint; a proof that accepts nothing keeps its

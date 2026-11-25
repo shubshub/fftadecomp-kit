@@ -1038,14 +1038,20 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
             if type(row.get('instrs')) is not int or row['instrs'] != len(ins):
                 raise ValueError('ignored leaf caller JSON reachable instruction count differs')
             aliases = ignored_leaf.IgnoredLeafAliasProof(rom,mapping,index,objects,address,len(data),calls)
+        # Kit #538: an own-frame address left in R2/R3 at a return, recorded under the discarded-exit-scratch
+        # premise as the frame proof records its own; R0/R1 refuse in the walk.
+        import return_scratch_profile as return_scratch
+        scratch = return_scratch.ReturnScratch()
         verified = match.verify_leaf_instructions(data,address,True,calls,
-            acyclic_state_budget=ACYCLIC_STATE_BUDGET, ignored_leaf_alias_proof=aliases)
+            acyclic_state_budget=ACYCLIC_STATE_BUDGET, ignored_leaf_alias_proof=aliases, return_scratch=scratch)
         if {item.address for item in verified} != set(ins):
             raise ValueError('acyclic native verification differs from complete owner CFG')
         proof = {'schema': ACYCLIC_SCHEMA, 'state_budget': ACYCLIC_STATE_BUDGET,
                  'instructions': len(verified), 'calls': [[site-address, f'func_{target:08X}']
                     for site,target in sorted(calls.items())], 'runtime_calls': [],
                  'partition': graph.partition(data,address,refinement,ins,words)}
+        if scratch.sites:
+            proof['discarded_exit_scratch'] = return_scratch.manifest(scratch)
         if aliases is not None:
             if not aliases.observations:
                 raise ValueError('ignored leaf selector requires an actual discarded incoming alias')

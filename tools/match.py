@@ -57,6 +57,7 @@ import function_thunk_profile as function_thunk
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
+import return_scratch_profile as return_scratch_profile
 import empty_body_profile as empty_body
 import library_units
 import rom_mirror
@@ -3731,10 +3732,13 @@ class BufferCallProof:
         saved = self._snapshot_ledgers()
         try:
             return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
-        except ValueError:
+        except ValueError as refused:
             # A callee inspected only for stack addresses it overwrites unread is an
-            # alias-free call; the records of the refused inspection are discarded.
-            if self.dead_registers.call(address, arguments, incoming, protected, context, saved) is None:
+            # alias-free call; the records of the refused inspection are discarded.  An
+            # inspection refused because the callee returns its own frame address keeps
+            # its refusal (kit #538): the call would hand that address to this owner.
+            if return_scratch_profile.ESCAPE in str(refused) or \
+                    self.dead_registers.call(address, arguments, incoming, protected, context, saved) is None:
                 raise
             return self.word_result({}, {})
 
@@ -4474,9 +4478,10 @@ def _ordinary_call_replay(proof, address=None):
 
 # the only verify_leaf_instructions parameters a self-calling function may set
 SELF_CALL_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver", "self_calls",
-                        "callee_watch")
+                        "callee_watch", "return_scratch")
 INCOMING_NARROW_READ_PARAMETERS = ("data", "address", "thumb", "validated_calls", "call_resolver",
-                                   "buffer_proof", "incoming_narrow_reads", "dma_fills", "callee_watch")
+                                   "buffer_proof", "incoming_narrow_reads", "dma_fills", "callee_watch",
+                                   "return_scratch")
 
 
 def verify_leaf_instructions(data, address, thumb, validated_calls=None,
@@ -4506,7 +4511,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
                              incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
                              switch_thunk_premises=None, dma_fills=None, menu_list_frame=None,
-                             callee_watch=None):
+                             callee_watch=None, return_scratch=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
@@ -4519,9 +4524,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
 
     dma_fills (a dma_fill_profile.Fills) admits the stack-alias store to a DMA source
     register of an immediate fixed-source fill; it requires incoming_narrow_reads.
+
+    A walk without a stack-argument proof refuses a frame address in R0-R3 at a
+    return (kit #538).  return_scratch (a return_scratch_profile.ReturnScratch)
+    admits R2/R3 there under the discarded-exit-scratch premise; only the root
+    walks of the plain framed schemas pass one.
     """
     if dma_fills is not None and (type(dma_fills) is not dma_fill.Fills or incoming_narrow_reads is not True):
         raise ValueError("DMA fills require the plain Thumb direct-call path")
+    if return_scratch is not None and (type(return_scratch) is not return_scratch_profile.ReturnScratch or
+                                       buffer_proof is not None and buffer_proof.stack_arguments):
+        raise ValueError("return scratch requires a root walk without a stack-argument proof")
     if incoming_narrow_reads is not False and (
             incoming_narrow_reads is not True or thumb is not True or
             buffer_proof is not None and type(buffer_proof) is not BufferCallProof or any(
@@ -5342,6 +5355,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             # IP is ABI scratch, not a result register. Keep its alias tracked
             # through calls and later uses, but an unobserved value at return
             # does not return a pointer. All other escape checks still apply.
+            if not stack_arguments:
+                # Kit #538: these walks never looked; R0/R1 refuse, R2/R3 only under the premise.
+                return_scratch_profile.check_return(aliases, ARM_REG_R0, current, return_scratch)
             if stack_arguments and aliases.keys() - {ARM_REG_R12}:
                 from static_callback_r6_frame_profile import structural_return_aliases
                 aliases = structural_return_aliases(buffer_proof, data, address, current, aliases)
@@ -6174,7 +6190,7 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                   remainder_evidence=None, quotient_evidence=None, signed_quotient_profile=None,
                   spin_profile=False, spin_evidence=None, function_index=None, double_profile=False,
                   double_evidence=None, thunk_profile=False, function_address_profile=None,
-                  thunk_evidence=None, unit_context=None, unit_orphan=None, dma_lines=()):
+                  thunk_evidence=None, unit_context=None, unit_orphan=None, dma_lines=(), scratch_lines=()):
     """The complete text of a match report.
 
     match.py writes exactly this (or, with --check-report, compares it with
@@ -6206,6 +6222,10 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
     elif dma_lines:
         raise ValueError("DMA fill lines require the stack-frame line")
     for line in dma_lines:
+        out.append(line + "\n")
+    if scratch_lines and not framed_profile:
+        raise ValueError("exit scratch lines require the stack-frame line")
+    for line in scratch_lines:
         out.append(line + "\n")
     if buffer_proof is not None and buffer_proof.buffer_evidence():
         summary = STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY
@@ -6752,6 +6772,7 @@ def main():
             double_switch_relocations = {}
             thunk_evidence = None
             dma_fills = None
+            return_scratch = None
             self_sites = frozenset()
             if thunk_profile:
                 got, calls, function_relocations, data_relocations = function_thunk.object_bytes(
@@ -7096,19 +7117,24 @@ def main():
                 # The one policy object for immediate DMA fills (kit #239); each later walk takes a
                 # fresh one only when this one exists.
                 dma_fills = dma_fill.Fills(rom) if thumb else None
+                # Kit #538: R2/R3 frame addresses at a return, under the discarded-exit-scratch premise.
+                return_scratch = return_scratch_profile.ReturnScratch()
                 try:
                     verified_instructions = (
                         # The #350 callee walk runs here too, recording its premises with the
                         # (otherwise unused) buffer proof, whose report lines state them.
                         verify_leaf_instructions(got, addr, thumb, calls, self_calls=self_sites,
-                                                 callee_watch=buffer_proof) if self_sites else
+                                                 callee_watch=buffer_proof,
+                                                 return_scratch=return_scratch) if self_sites else
                         verify_leaf_instructions(got, addr, thumb, calls, buffer_proof=buffer_proof,
-                                                 incoming_narrow_reads=thumb, dma_fills=dma_fills))
+                                                 incoming_narrow_reads=thumb, dma_fills=dma_fills,
+                                                 return_scratch=return_scratch))
                 except ValueError as first_error:
                     if not thumb or self_sites:
                         raise
                     if not calls and mapping is None:
                         raise                        # a stack-buffer report binds the function map
+                    return_scratch = None            # the stack-argument walks refuse R0-R3 themselves
                     import default_stack_index_profile as default_index
                     # One fresh recorder for the stack-argument walk and one for the stack-index retry.
                     walk_fills = [dma_fill.Fills(rom), dma_fill.Fills(rom)] if dma_fills is not None else [None, None]
@@ -7162,6 +7188,11 @@ def main():
                 raise ValueError("DMA fill records require the stack-frame line")
             if remainder_leaf.active():
                 remainder_leaf.require_summarised(buffer_proof, calls)
+            if return_scratch is not None and return_scratch.sites and (
+                    buffer_proof.buffer_evidence() or data_buffer_evidence is not None or
+                    not uses_stack_frame(verified_instructions)):
+                # Only the plain framed schemas state the premise (render_report, plain_report_fields).
+                raise ValueError(return_scratch_profile.ESCAPE)
     except Exception as e:                       # noqa: BLE001
         if remainder_leaf.active():
             sys.exit(f"compile failed:\n{e}")
@@ -7442,7 +7473,8 @@ def main():
             double_profile=double_profile, double_evidence=double_evidence, thunk_profile=thunk_profile,
             function_address_profile=args.function_address_profile, thunk_evidence=thunk_evidence,
             unit_context=unit_context, unit_orphan=unit_orphan,
-            dma_lines=dma_fills.report_lines() if dma_fills is not None else ())
+            dma_lines=dma_fills.report_lines() if dma_fills is not None else (),
+            scratch_lines=return_scratch.report_lines() if return_scratch is not None else ())
         if args.check_report:
             # what status.py --verify requires of a MATCH: the saved report is exactly the one this run
             # would write (a source that does not match keeps its verdict and compares nothing)

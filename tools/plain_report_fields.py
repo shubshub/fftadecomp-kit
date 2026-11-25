@@ -18,9 +18,12 @@ admits exactly the lines the writer produces for the claimed schema:
    recomputed proof lines exactly and in order. On the three framed schemas
    without buffer calls, the `* DMA fill` lines may repeat:
    `dma_fill_profile.check_report` requires them to equal the recomputed
-   block exactly, right after the stack-frame line. On the call schemas the
-   `* callee-saved premise:` and `* callee-saved fact:` lines (kit #350) may
-   repeat too, and replay requires them to equal the recomputed lines the same way;
+   block exactly, right after the stack-frame line, and so may the
+   `* stack frame exit scratch` lines (kit #538), which
+   `match_evidence.legacy_report_control_flow` holds to the recomputed lines.
+   On the call schemas the `* callee-saved premise:` and `* callee-saved fact:`
+   lines (kit #350) may repeat too, and replay requires them to equal the
+   recomputed lines the same way;
 3. `* source:` names the file match.py compiles for the address
    (`match_evidence.report_source`, which match.py itself calls: `src/<ADDR>.c`,
    else the first `<ADDR>.c` under `src/` in sorted order), and
@@ -48,6 +51,7 @@ Library-unit lines are admitted at most once each; `library_units` validates the
 import re
 
 from dma_fill_profile import MARKER as DMA_FILL_LINES  # its summary, premise and manifest lines
+from return_scratch_profile import MARKER as EXIT_SCRATCH_LINES  # the #538 premise and sites lines
 
 # Every bullet is a field line: the first non-blank character (Unicode blanks included) is `*`, `-`
 # or `+`, followed by a blank.
@@ -68,8 +72,8 @@ UNIT = ("* library unit: ", "* unit toolchain: ", "* unit compiler SHA-256: ", "
 HAND_ASM = re.compile(r"not listed|listed \(.*\)")
 
 # The writer's field order (match.py's report writer); the buffer proof lines follow their fingerprint.
-ORDER = (COMMON[:3] + FRAME + (DMA_FILL_LINES,) + BUFFER + (PROOF_LINES, PREMISES) + CALLS + SELF_CALLS + DATA + UNIT +
-         COMMON[3:])
+ORDER = (COMMON[:3] + FRAME + (DMA_FILL_LINES, EXIT_SCRATCH_LINES) + BUFFER + (PROOF_LINES, PREMISES) + CALLS +
+         SELF_CALLS + DATA + UNIT + COMMON[3:])
 
 
 def layout(schema):
@@ -91,8 +95,8 @@ def layout(schema):
     required = COMMON + (FRAME if framed else ()) + (CALLS if calls else ()) + \
         (DATA if data else ()) + (BUFFER if buffer else ())
     optional = UNIT + (SELF_CALLS if calls and not buffer else ())
-    return required, optional, ((PROOF_LINES,) if buffer else ()) + ((DMA_FILL_LINES,) if framed and not buffer else ()) + \
-        ((PREMISES,) if calls else ())
+    return required, optional, ((PROOF_LINES,) if buffer else ()) + \
+        ((DMA_FILL_LINES, EXIT_SCRATCH_LINES) if framed and not buffer else ()) + ((PREMISES,) if calls else ())
 
 
 def check(lines, schema, address, root):
