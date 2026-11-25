@@ -5436,8 +5436,8 @@ check sees every spelling, the earlier syntactic rule against statements
 that only read `symbol.member` is gone.
 
 **Relational loop induction (kit#137).** Only a refusal by one of those
-bounds can become an admission, and only for a function with a loop
-(`tools/volatile_loop_induction.py`, one policy object). That function is
+bounds can become an admission, and only for a function with a loop, or one
+whose paths merge (`tools/volatile_loop_induction.py`, one policy object). That function is
 checked again with each loop cut at the target of a depth-first back edge
 (control flow that enters a loop in more than one place refuses): a path
 cuts a loop when it first reaches the cut point and ends when it
@@ -5483,15 +5483,41 @@ never drops below it; the saved slots join each escape snapshot; and r4-r11
 must hold their entry values at every return. Untyped calls stay refused.
 The invariants the proof rests on are listed in the module's docstring.
 
+Two rules carry the run further, each behind one switch on the policy object
+and each reached only where the run would refuse:
+
+* **A loop that escapes the frame** (`escaped_loops`). Where the frame
+  escapes inside a loop (a local's address passed to a callee, say), the loop
+  is entered with the frame already escaped: a snapshot of every frame byte
+  but the push area at the cut, compared between the compiles, then frame
+  stores as events and frame loads behind the cut's barrier, as after any
+  escape. A store at a fixed frame address outside the push area is then
+  admitted in the loop. A frame address stored in the frame, a store over a
+  pushed register and a frame access at a variable offset still refuse.
+* **Join cuts** (`join_cuts`). Where the loop cuts alone, or a function
+  without a loop, still exceed a bound, paths are also merged where they
+  rejoin. Arrivals at a join are grouped by the decisions made before its
+  immediate dominator. The first arrival of a group goes on from a state
+  generalised over what the region between the dominator and the join may
+  write, forgetting every branch outcome learned there; a value a call left
+  in a register is kept exactly, like an address. Every later arrival
+  ends at the join once its state is an instance of that state, under the
+  loop cut's back-edge obligations. A join the compiles do not share, or
+  whose obligations fail, is not cut, and its paths are enumerated as before.
+  A read-modify-write load and its store on either side of a join stay
+  refused (rule 3 reads its window as straight-line code).
+
 A report that relies on it says so in the semantic record:
 `loops by relational induction at instructions [N, ...]
 (relational-loop-induction-v1, premise: callees preserve r4-r11 and sp, and
 leave their return address only in the register their ROM return sites jump
-through)`. A function it cannot prove keeps the bound's message, followed by
+through)`, adding `paths merged at instructions [...]` and `cuts entered with
+the frame escaped at instructions [...]` where the two rules were used. A function it cannot prove keeps the bound's message, followed by
 `; relational loop induction (kit#137): ` and the reason. The rule is on the
 default path because it only turns that refusal into an admission and prints
 its premise in each report that uses it; no saved report reaches a bound, so
-none changes. The opt-in BIOS fill rules, by contrast, change walks that
+none changes. The same holds for its two rules: each runs only where the run
+before it refuses, and needs no premise of its own. The opt-in BIOS fill rules, by contrast, change walks that
 already admit.
 
 The match report records `* allowlisted volatile: ...` for each such object,

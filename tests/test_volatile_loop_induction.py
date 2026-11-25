@@ -1,10 +1,12 @@
 """kit#137: relational loop induction turns only a bound refusal of the volatile check into a proof."""
 
+import contextlib
 import json
 import os
 import shutil
 import subprocess
 import sys
+import types
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -205,12 +207,23 @@ class InductionTests(Base):
         (result,) = self.compare(body)
         self.assertNotIn("relational induction", semantics.record(SYMBOL, [result]))
 
-    def test_a_bound_without_a_loop_keeps_its_refusal(self):
+    def test_a_bound_without_a_loop_is_decided_by_join_cuts(self):
+        # kit#137 rule B: was "keeps its refusal".  Three if-statements in a row are 8 paths;
+        # merged where each rejoins, they are 4
         body = FRAME + tuple(line for n in range(1, 4) for line in
                              (f"cmp\tr0, #{n}", f"beq\t.L{20 + n}", f"add\tr1, r1, #{n}", f".L{20 + n}:")) + \
             MEMBER + END
-        with mock.patch.object(semantics, "MAX_PATHS", 4), self.assertRaises(semantics.BoundExceeded) as caught:
-            self.compare(body)
+        with mock.patch.object(semantics, "MAX_PATHS", 4):
+            (result,) = self.compare(body)
+            self.assertEqual(result[1], 4)
+            self.assertEqual(semantics.record(SYMBOL, [result]).split("; ", 1)[1],
+                             "`func_08028C34` agrees on 4 paths; read-modify-write loads at [13], chained re-reads "
+                             f"at [], paths merged at instructions [5, 8, 11] ({induction.NAME}, premise: "
+                             f"{induction.PREMISE})")
+            # without rule B the bound is the refusal, as before
+            with mock.patch.object(induction.POLICY, "join_cuts", False), \
+                    self.assertRaises(semantics.BoundExceeded) as caught:
+                self.compare(body)
         self.assertEqual(str(caught.exception), "func_08028C34 has more than 4 paths; the semantic check is bounded")
 
     def test_the_policy_is_one_object(self):
@@ -455,10 +468,16 @@ class ObligationTests(Base):
                                                "add\tr5, r5, #1") + MEMBER + END
         self.refused(body, "is computed from a value read back from memory")
 
-    def test_the_frame_may_not_escape_inside_a_loop(self):
+    def test_a_loop_that_escapes_the_frame_is_entered_with_it_escaped(self):
+        # kit#137 rule A: was "the frame may not escape inside a loop", which stays the refusal
+        # without the rule
         body = FRAME + ("add\tsp, sp, #-8",) + loop("mov\tr0, sp", "bl\tfunc_0802A2C0") + MEMBER + \
             ("add\tsp, sp, #8",) + END
-        self.refused(body, "the frame escapes inside a loop")
+        (result,) = self.compare(body)
+        self.assertIn("loops by relational induction at instructions [4], cuts entered with the frame escaped at "
+                      "instructions [4]", semantics.record(SYMBOL, [result]))
+        with mock.patch.object(induction.POLICY, "escaped_loops", False):
+            self.refused(body, "the frame escapes inside a loop")
         # escaped before the loop, the same loop passes
         early = FRAME + ("mov\tr6, r0", "add\tsp, sp, #-8", "mov\tr0, sp", "bl\tfunc_0802A2C0") + \
             loop("mov\tr0, sp", "bl\tfunc_0802A2C0", start="r6") + MEMBER + ("add\tsp, sp, #8",) + END
@@ -858,6 +877,421 @@ class RuntimeHelperAndSwiCallTests(Base):
         # what an SWI leaves does not hang on the call site
         self.compare(FRAME + MEMBER + loop(*self.DIVIDE, "mov\tr2, #0", "mov\tr3, #0", "swi\t6", "mov\tr0, r1",
                                            "bl\tfunc_08000240") + END, self.interfaces())
+
+
+
+# ---------------------------------------------------------------- kit#137 rules A and B
+
+def diamonds(count, first=20):
+    """count if-statements in a row, each rejoining before the next: 2**count paths"""
+    return tuple(line for n in range(count) for line in
+                 (f"cmp\tr0, #{n + 1}", f"beq\t.L{first + n}", f"add\tr1, r1, #{n + 1}", f".L{first + n}:"))
+
+
+CALL = ("mov\tr0, r1", "bl\tfunc_0802A2C0")
+SHAPES = PREPROCESSED + "extern void func_08000300(int, int *, int *, int *);\n"
+
+
+class Bounded(Base):
+    """MAX_PATHS 8 (or `paths`): every body below has more paths unmerged, so the induction
+    run, and its rules A and B, decide it"""
+    paths = 8
+
+    def setUp(self):
+        patcher = mock.patch.object(semantics, "MAX_PATHS", self.paths)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def admitted(self, body, preprocessed=PREPROCESSED):
+        results = self.compare(body, preprocessed=preprocessed)
+        return results, semantics.record(SYMBOL, results, perturbed=True)
+
+    def refused_by(self, body, reason=None, preprocessed=PREPROCESSED):
+        """refused for a reason of its own, not at a bound"""
+        with self.assertRaises(semantics.SemanticError) as caught:
+            self.compare(body, preprocessed=preprocessed)
+        message = str(caught.exception)
+        tail = message.split("relational loop induction (kit#137): ", 1)[-1]
+        self.assertNotIn("the semantic check is bounded", tail, message)
+        self.assertNotIn("unknown branch conditions on one path", tail, message)
+        if reason is not None:
+            self.assertIn(reason, tail)
+        return message
+
+
+class FourShapeTests(Bounded):
+    """the shapes of the four byte-identical sources kit main refuses (kit#137); each test
+    fails on kit main, which refuses it at the bound and then in the induction run"""
+    paths = 1024
+
+    def test_a_counted_loop_that_passes_locals_to_a_callee(self):
+        # 08116514 and 08117B9C: 24 iterations, a flag per object, and on flagged ones the
+        # addresses of three locals passed to a callee that fills them
+        body = FRAME + ("add\tsp, sp, #-24", "mov\tr6, r1", "mov\tr5, #0", ".L10:", "add\tr0, r6, r5",
+                        "ldrb\tr0, [r0]", "cmp\tr0, #0", "beq\t.L11", "add\tr1, sp, #16", "add\tr2, sp, #18",
+                        "add\tr3, sp, #20", "mov\tr0, r5", "bl\tfunc_08000300", "add\tr1, sp, #16",
+                        "ldrh\tr0, [r1]", "cmp\tr0, #9", "bhi\t.L12", "mov\tr2, #9", "strh\tr2, [r1]", ".L12:",
+                        "ldrh\tr0, [r1]", "bl\tfunc_0802A2C0", "mov\tr1, #0", "mov\tr2, #0", "mov\tr3, #0",
+                        ".L11:", "add\tr5, r5, #1", "cmp\tr5, #23",
+                        "bls\t.L10") + diamonds(4) + MEMBER + ("add\tsp, sp, #24",) + END
+        _, text = self.admitted(body, SHAPES)
+        self.assertIn("loops by relational induction at instructions [5], cuts entered with the frame escaped at "
+                      "instructions [5]", text)
+
+    def test_a_record_walk_with_an_unknown_count_and_a_switch(self):
+        # 08087FB8: `for (i = 0; i < *count; i++)` over records, a switch on each record's
+        # kind, one case filling a local array and passing its address on
+        body = FRAME + ("add\tsp, sp, #-16", "mov\tr6, r1", "mov\tr4, r2", "mov\tr7, #0", "b\t.L71",
+                        ".L70:", "ldrb\tr0, [r6]", "cmp\tr0, #2", "bhi\t.L72", "lsl\tr0, r0, #2",
+                        "ldr\tr2, .L62", "add\tr0, r0, r2", "ldr\tr0, [r0]", "mov\tpc, r0", ".L63:",
+                        ".align\t2, 0", ".L62:", ".word\t.L61", ".align\t2, 0", ".L61:", ".word\t.L64",
+                        ".word\t.L65", ".word\t.L72", ".L64:", "add\tr1, sp, #8", "mov\tr0, #1", "strh\tr0, [r1]",
+                        "strh\tr7, [r1, #2]", "add\tr0, sp, #8", "bl\tfunc_0802A2C0", "mov\tr0, #0",
+                        "mov\tr1, #0", "mov\tr2, #0", "mov\tr3, #0", "b\t.L72", ".L65:",
+                        "mov\tr0, r7", "bl\tfunc_0802A2C0", ".L72:", "add\tr7, r7, #1", "add\tr6, r6, #4",
+                        ".L71:", "ldrh\tr0, [r4]", "cmp\tr7, r0", "bcc\t.L70") + diamonds(4) + MEMBER + \
+            ("add\tsp, sp, #16",) + END
+        _, text = self.admitted(body)
+        self.assertIn("cuts entered with the frame escaped at instructions", text)
+
+    def test_a_chain_of_decision_blocks_past_the_path_bound(self):
+        # 08140638: no loop; independent blocks, one of them a switch whose case stores a
+        # pinned member, multiply to more than 1024 paths
+        body = FRAME + ("mov\tr5, r3",) + diamonds(5) + ("cmp\tr2, #2", "bhi\t.L40", "lsl\tr0, r2, #2", "ldr\tr3, .L52",
+                                      "add\tr0, r0, r3", "ldr\tr0, [r0]", "mov\tpc, r0", ".L53:", ".align\t2, 0",
+                                      ".L52:", ".word\t.L51", ".align\t2, 0", ".L51:", ".word\t.L41",
+                                      ".word\t.L42", ".word\t.L40", ".L41:") + MEMBER + \
+            ("b\t.L40", ".L42:", "mov\tr0, #3", "bl\tfunc_0802A2C0", ".L40:", "mov\tr0, r5", "mov\tr1, #0") + \
+            diamonds(6, first=60) + END
+        _, text = self.admitted(body)
+        self.assertIn("paths merged at instructions", text)
+        self.assertNotIn("cuts entered", text)
+
+
+class EscapedLoopTests(Bounded):
+    """rule A: a loop an iteration of which escapes the frame is entered with it escaped"""
+
+    def test_frame_stores_after_the_escape_are_compared(self):
+        body = FRAME + ("add\tsp, sp, #-8",) + loop("mov\tr0, sp", "bl\tfunc_0802A2C0", ("real", "mov\tr1, #1"),
+                                                     ("stripped", "mov\tr1, #2"), "str\tr1, [sp]",
+                                                     "mov\tr1, #0") + MEMBER + ("add\tsp, sp, #8",) + END
+        self.refused_by(body, "differ in observable behaviour")
+
+    def test_frame_stores_before_the_loop_join_the_snapshot_at_the_cut(self):
+        self.refused_by(self.BEFORE, "frame escape")
+
+    # the compiles store the word differently before the loop; the escaping branch
+    # overwrites it before it escapes, the other branch reads it behind the cut's barrier
+    BEFORE = FRAME + ("add\tsp, sp, #-8", "mov\tr5, r1", ("real", "mov\tr1, #1"), ("stripped", "mov\tr1, #2"),
+                      "str\tr1, [sp, #4]", "mov\tr1, #0") + \
+        loop("cmp\tr5, #0", "beq\t.L13", "mov\tr2, #5", "str\tr2, [sp, #4]", "mov\tr0, sp", "bl\tfunc_0802A2C0",
+             "b\t.L14", ".L13:", "ldr\tr0, [sp, #4]", "bl\tfunc_0802A2C0", ".L14:", "mov\tr0, #0", "mov\tr1, #0",
+             "mov\tr2, #0", "mov\tr3, #0") + MEMBER + ("add\tsp, sp, #8",) + END
+
+    FRAME_ADDRESS = FRAME + ("add\tsp, sp, #-8",) + loop("add\tr1, sp, #4", "str\tr1, [sp]", "mov\tr1, #0",
+                                                         "mov\tr0, sp", "bl\tfunc_0802A2C0") + MEMBER + \
+        ("add\tsp, sp, #8",) + END
+
+    def test_a_frame_address_stored_in_the_escaped_frame(self):
+        self.refused_by(self.FRAME_ADDRESS, "stores a frame address")
+
+    VARIABLE = FRAME + ("add\tsp, sp, #-8",) + loop("mov\tr0, sp", "bl\tfunc_0802A2C0", "mov\tr2, sp",
+                                                    "lsl\tr3, r4, #2", "ldr\tr1, [r2, r3]", "mov\tr0, r1",
+                                                    "bl\tfunc_0802A2C0", "mov\tr0, #0", "mov\tr1, #0",
+                                                    "mov\tr2, #0", "mov\tr3, #0") + MEMBER + \
+        ("add\tsp, sp, #8",) + END
+
+    def test_a_variable_frame_offset_stays_refused(self):
+        self.refused_by(self.VARIABLE, "non-constant offset")
+
+    # push {r4-r7, lr}, then sp -= 8: sp+12 holds the saved r5.  The loop is tested at the
+    # top, so the path that leaves it never runs the body that overwrites the slot
+    BYTE = FRAME + ("add\tsp, sp, #-8",) + top_tested("mov\tr0, sp", "bl\tfunc_0802A2C0", "add\tr1, sp, #13",
+                                                       "mov\tr2, #0", "strb\tr2, [r1]", "mov\tr0, #0", "mov\tr1, #0",
+                                                       "mov\tr2, #0", "mov\tr3, #0") + MEMBER + \
+        ("add\tsp, sp, #8",) + END
+
+    @staticmethod
+    def saved(slot):
+        return FRAME + ("add\tsp, sp, #-8",) + top_tested("mov\tr0, sp", "bl\tfunc_0802A2C0", f"add\tr1, sp, #{slot}",
+                                                          "mov\tr2, #0", "str\tr2, [r1]", "mov\tr0, #0",
+                                                          "mov\tr1, #0", "mov\tr2, #0", "mov\tr3, #0") + MEMBER + \
+            ("add\tsp, sp, #8",) + END
+
+    def test_a_store_to_a_saved_register_slot(self):
+        self.refused_by(self.saved(12), "a frame store in a loop outside the slots")
+        # one byte into it, the compiles identical: the model would still pop r5's entry value
+        self.refused_by(self.BYTE, "a frame store in a loop outside the slots")
+        # one word lower, outside the push area, it is escaped memory behind the barrier
+        self.admitted(self.saved(4))
+
+
+class JoinCutTests(Bounded):
+    """rule B: paths merged where they join"""
+
+    def test_a_chain_of_if_statements_is_merged(self):
+        (result,), text = self.admitted(FRAME + diamonds(4) + CALL + MEMBER + END)
+        self.assertLess(result[1], 8)
+        self.assertIn("paths merged at instructions", text)
+
+    @staticmethod
+    def arms(first, second, after=("mov\tr0, r5", "bl\tfunc_0802A2C0")):
+        """`if (r0) second else first;` then four if-statements and `after`: the branch
+        (second) is explored first and opens the join, the fall-through (first) ends there"""
+        return FRAME + ("cmp\tr0, #0", "beq\t.L31") + first + ("b\t.L32", ".L31:") + second + (".L32:",) + \
+            diamonds(4) + after + MEMBER + END
+
+    def test_a_difference_on_either_arm(self):
+        # the arm that ends at the join: its r5 does not pair with the real compile's, so the
+        # join is not cut, and the enumeration sees the call differ
+        with mock.patch.object(semantics, "MAX_PATHS", 12):
+            self.refused_by(self.arms((("real", "mov\tr5, #1"), ("stripped", "mov\tr5, #3")), ("mov\tr5, #2",)),
+                            "differ in observable behaviour")
+        # the arm that opens it: the suffix sees the call differ
+        self.refused_by(self.arms(("mov\tr5, #1",), (("real", "mov\tr5, #2"), ("stripped", "mov\tr5, #4"))),
+                        "differ in observable behaviour")
+
+    FORGOTTEN = FRAME + ("cmp\tr0, #0", "beq\t.L31", "mov\tr5, #1", "b\t.L32", ".L31:", "mov\tr5, #2", ".L32:",
+                         "cmp\tr0, #0", "beq\t.L33", ("real", "mov\tr2, #1"), ("stripped", "mov\tr2, #2"),
+                         "mov\tr0, r5", "mov\tr1, #0", "bl\tfunc_0802A2C0", "mov\tr0, #0", "mov\tr1, #0", "mov\tr2, #0",
+                         "mov\tr3, #0", ".L33:") + diamonds(4) + MEMBER + END
+
+    def test_what_the_merged_paths_learned_is_forgotten(self):
+        # the second test repeats the first: the opener's outcome, kept, would hide the call
+        # that only the other arm reaches, where the compiles pass different r2
+        self.refused_by(self.FORGOTTEN)
+
+    def test_a_planted_read_in_one_arm(self):
+        with mock.patch.object(semantics, "MAX_PATHS", 32):
+            self.refused_by(FRAME + ("cmp\tr0, #0", "beq\t.L31", "ldr\tr1, .L3", ("real", "ldrb\tr3, [r1, #@P@]"),
+                                     "mov\tr1, #0", ".L31:") + diamonds(4) + CALL + MEMBER + END)
+
+    # the escaping arm opens the join; the other meets it with the frame unescaped and
+    # escapes there, its frame word differing between the compiles
+    MEETS = FRAME + ("add\tsp, sp, #-8", "mov\tr2, #7", "str\tr2, [sp]", "cmp\tr0, #0", "beq\t.L41",
+                     ("real", "mov\tr3, #7"), ("stripped", "mov\tr3, #8"), "str\tr3, [sp]", "mov\tr3, #0",
+                     "b\t.L42", ".L41:", "mov\tr0, sp", "bl\tfunc_0802A2C0", "mov\tr0, #0", "mov\tr1, #0",
+                     "mov\tr2, #0", "mov\tr3, #0", ".L42:") + diamonds(4) + \
+        ("ldr\tr0, [sp]", "bl\tfunc_0802A2C0") + MEMBER + ("add\tsp, sp, #8",) + END
+
+    def test_a_path_that_meets_an_escaped_join_escapes_there(self):
+        self.refused_by(self.MEETS, "frame escape")
+
+    # the opener's arm stores the frame through a register; the compiles stored the word
+    # differently before the branch, which only the other arm still reads
+    OPENER_STORE = FRAME + ("add\tsp, sp, #-8", ("real", "mov\tr2, #1"), ("stripped", "mov\tr2, #2"),
+                            "str\tr2, [sp, #4]", "mov\tr2, #0", "cmp\tr0, #0", "beq\t.L31", "b\t.L32", ".L31:",
+                            "mov\tr3, #7", "add\tr2, sp, #4", "str\tr3, [r2]", "mov\tr2, #0", "mov\tr3, #0",
+                            ".L32:") + diamonds(4) + ("ldr\tr0, [sp, #4]", "bl\tfunc_0802A2C0") + MEMBER + \
+        ("add\tsp, sp, #8",) + END
+
+    def test_a_frame_store_through_a_register_on_the_opening_arm(self):
+        # not cut: the arms are enumerated and the other arm's difference is seen
+        with mock.patch.object(semantics, "MAX_PATHS", 12):
+            self.refused_by(self.OPENER_STORE, "differ in observable behaviour")
+
+    # a frame address that differs between the arms: kept exactly, so it must agree
+    KEPT = FRAME + ("add\tsp, sp, #-16", "mov\tr2, #0", "str\tr2, [sp, #4]", "str\tr2, [sp, #8]", "cmp\tr0, #0",
+                    "beq\t.L31", ("real", "add\tr5, sp, #4"), ("stripped", "add\tr5, sp, #8"), "b\t.L32", ".L31:",
+                    "add\tr5, sp, #4", ".L32:") + diamonds(4) + \
+        ("mov\tr2, #7", "str\tr2, [r5]", "ldr\tr0, [sp, #4]", "bl\tfunc_0802A2C0") + MEMBER + \
+        ("add\tsp, sp, #16",) + END
+
+    def test_a_kept_address_must_agree_where_the_paths_meet(self):
+        # not cut: r5 differs from the opening arm's in one compile; the enumeration sees it
+        with mock.patch.object(semantics, "MAX_PATHS", 12):
+            self.refused_by(self.KEPT, "differ in observable behaviour")
+
+    # the opener's arm stores to memory; the store hides behind the join's barrier, so the
+    # test after it is a decision on both arms
+    BARRIER = FRAME + ("mov\tr6, r1", "cmp\tr0, #0", "beq\t.L31", "b\t.L32", ".L31:", "mov\tr3, #1",
+                       "str\tr3, [r6, #8]", ".L32:") + diamonds(4) + \
+        ("ldr\tr3, [r6, #8]", "cmp\tr3, #1", "beq\t.L33", ("real", "mov\tr0, #1"), ("stripped", "mov\tr0, #2"),
+         "bl\tfunc_0802A2C0", ".L33:") + MEMBER + END
+
+    def test_memory_an_arm_writes_is_behind_the_joins_barrier(self):
+        self.refused_by(self.BARRIER, "differ in observable behaviour")
+
+    # one compile joins before the store, the other after it (cross-jumping)
+    EVENTS = FRAME + ("ldr\tr6, .L3", "cmp\tr0, #0", "beq\t.L61", "mov\tr2, #1", ("real", "b\t.L62"),
+                      ("stripped", "str\tr2, [r6, #8]"), ("stripped", "b\t.L63"), ".L61:", "mov\tr2, #2", ".L62:",
+                      "str\tr2, [r6, #8]", ".L63:") + diamonds(4) + CALL + MEMBER + END
+
+    def test_compiles_that_join_on_either_side_of_an_event(self):
+        # that join is not cut in any compile; the four after it are
+        with mock.patch.object(semantics, "MAX_PATHS", 12):
+            _, text = self.admitted(self.EVENTS)
+        self.assertIn("paths merged at instructions", text)
+
+    # a value a call left in a register, on the arm that ends at the join, dereferenced after it
+    LEFT_BY_CALL = FRAME + ("mov\tr6, r1", "mov\tr5, r7", "cmp\tr0, #0", "beq\t.L31", "mov\tr0, #1",
+                            "bl\tfunc_0802A2C0", "mov\tr5, r0", "b\t.L32", ".L31:", "mov\tr5, r7", ".L32:",
+                            "mov\tr0, r4", "mov\tr1, #0", "mov\tr2, #0", "mov\tr3, #0") + diamonds(6) + \
+        ("ldr\tr1, [r5]", "str\tr1, [r6]") + MEMBER + END
+
+    def test_a_value_a_call_left_is_kept_at_a_join(self):
+        # not a shared symbol: the join is not cut, and the dereference refuses as it does
+        # with no join between the call and it
+        with mock.patch.object(semantics, "MAX_PATHS", 32):
+            self.refused_by(self.LEFT_BY_CALL, "a memory access through a value a call left in a register")
+
+    # the arm that ends at the join calls a function; the register it leaves is live after the
+    # join, and the dead load before it moves the call (so what the callee leaves may differ)
+    CALL_ON_ENDING_ARM = FRAME + ("mov\tr6, r1", "mov\tr5, r2") + MEMBER + \
+        ("mov\tr1, r6", "cmp\tr5, #0", "beq\t.L31", "mov\tr0, #1", "bl\tfunc_0802A2C0", "b\t.L32", ".L31:",
+         "mov\tr0, #5", ".L32:", "mov\tr7, r1", "mov\tr1, #0", "mov\tr0, #0") + \
+        tuple(line for n in range(4) for line in (f"cmp\tr5, #{n + 1}", f"beq\t.L{40 + n}", f"add\tr0, r0, #{n + 1}",
+                                                   f".L{40 + n}:")) + ("str\tr7, [r6]",) + END
+
+    def test_a_register_a_call_on_the_ending_arm_leaves(self):
+        with mock.patch.object(semantics, "MAX_PATHS", 16):
+            self.refused_by(self.CALL_ON_ENDING_ARM, "differ in observable behaviour")
+
+    # a frame address on the arm that ends at the join, where the opening arm has an ordinary
+    # pointer; the compiles stored the frame word differently before the branch
+    FRAME_ADDRESS_ON_ENDING_ARM = FRAME + ("add\tsp, sp, #-8", "mov\tr6, r1", ("real", "mov\tr2, #1"),
+                                           ("stripped", "mov\tr2, #2"), "str\tr2, [sp, #4]", "cmp\tr0, #0",
+                                           "beq\t.L31", "add\tr5, sp, #4", "b\t.L32", ".L31:", "mov\tr5, r6",
+                                           ".L32:", "mov\tr2, #0") + diamonds(4) + \
+        ("ldr\tr0, [r5]", "bl\tfunc_0802A2C0") + MEMBER + ("add\tsp, sp, #8",) + END
+
+    def test_a_frame_address_on_the_ending_arm(self):
+        with mock.patch.object(semantics, "MAX_PATHS", 16):
+            self.refused_by(self.FRAME_ADDRESS_ON_ENDING_ARM, "differ in observable behaviour")
+
+    # the arms leave different words in a region slot; the compiles differ on the ending arm
+    # only, and the word is read after more joins
+    SLOT = FRAME + ("add\tsp, sp, #-8", "cmp\tr0, #0", "beq\t.L31", ("real", "mov\tr3, #1"),
+                    ("stripped", "mov\tr3, #2"), "str\tr3, [sp, #4]", "b\t.L32", ".L31:", "mov\tr3, #1",
+                    "str\tr3, [sp, #4]", ".L32:", "mov\tr3, #0") + diamonds(6) + \
+        ("ldr\tr0, [sp, #4]", "bl\tfunc_0802A2C0") + MEMBER + ("add\tsp, sp, #8",) + END
+
+    def test_arrivals_that_differ_before_the_dominator(self):
+        # the first join is not cut (its slot does not pair); each later join's groups keep
+        # the two arms apart, so the word is compared on each
+        with mock.patch.object(semantics, "MAX_PATHS", 32):
+            self.refused_by(self.SLOT, "differ in observable behaviour")
+
+    # a five-argument call: the real compile reads its outgoing word back, the stripped compile
+    # uses the value it stored there; the callee owns that word, the frame unescaped
+    OUTGOING = FRAME + ("mov\tr6, r1", "add\tsp, sp, #-8", "mov\tr5, #7", "str\tr5, [sp]", "mov\tr0, #0",
+                        "mov\tr1, #0", "mov\tr2, #0", "mov\tr3, #0", "bl\tfunc_0802A300", ("real", "ldr\tr0, [sp]"),
+                        ("stripped", "mov\tr0, #7"), "str\tr0, [r6]", "mov\tr0, r7") + diamonds(6) + CALL + \
+        MEMBER + ("add\tsp, sp, #8",) + END
+
+    def test_an_outgoing_word_a_callee_owns(self):
+        with mock.patch.object(semantics, "MAX_PATHS", 32):
+            self.refused_by(self.OUTGOING, "differ in observable behaviour")
+
+    def test_join_events_are_named(self):
+        self.assertEqual(semantics.show_event(("join", 2, 5)), "join (2, 5)")
+        self.assertEqual(semantics.show_event(("join-end", 2, 5)), "join-end (2, 5)")
+
+    def test_a_dead_load_and_its_store_on_either_side_of_a_join(self):
+        # a known false refusal: the join's cut record sits inside the read-modify-write
+        # window, which rule 3 reads as straight-line code (a follow-up, kit#137)
+        self.refused_by(FRAME + diamonds(4) + ("ldr\tr1, .L3", "add\tr1, r1, #@P@", ("real", "ldrb\tr2, [r1]"),
+                                               "cmp\tr0, #9", "beq\t.L51", "mov\tr2, #1", "b\t.L52", ".L51:",
+                                               "mov\tr2, #2", ".L52:", "strb\tr2, [r1]") + END,
+                        "is a dead load of")
+
+
+class RuleMutantTests(Bounded):
+    """each rule of A and B, dropped, admits an input it refuses: the rule is load-bearing.
+    Where the input is a wrong admission (the compiles differ), the test says so."""
+
+    def mutant_admits(self, body, *patches, paths=None):
+        with contextlib.ExitStack() as stack:
+            for patch in patches:
+                stack.enter_context(patch)
+            if paths is not None:
+                stack.enter_context(mock.patch.object(semantics, "MAX_PATHS", paths))
+            self.compare(body)
+
+    def test_without_the_snapshot_at_the_cut(self):
+        # wrong: the frame words the callee reads differ
+        def silent(self, where, refuse):
+            self.escaped, self.frame_base, self.pre_escaped = True, 0, True
+        self.mutant_admits(EscapedLoopTests.BEFORE, mock.patch.object(induction.InductionExecutor, "enter_escaped",
+                                                                       silent))
+
+    def test_without_refusing_a_stored_frame_address(self):
+        self.mutant_admits(EscapedLoopTests.FRAME_ADDRESS, mock.patch.object(
+            induction.InductionExecutor, "stored_frame_address", lambda self, entries: False))
+
+    def test_without_the_push_area(self):
+        # wrong: the loop overwrites the saved r5, and the epilogue's pop is still taken for it
+        self.mutant_admits(EscapedLoopTests.saved(12), mock.patch.object(
+            induction.InductionExecutor, "in_push_area", lambda self, start, width: False))
+
+    def test_without_refusing_variable_frame_offsets(self):
+        self.mutant_admits(EscapedLoopTests.VARIABLE, mock.patch.object(
+            induction.InductionExecutor, "variable_frame_offsets", lambda self: self.escaped))
+
+    def test_without_forgetting_branch_facts(self):
+        # wrong: the call with different arguments is on the arm that ended at the join
+        original = induction.InductionExecutor.open_join
+
+        def keep(self, pc, group, arrival, mark):
+            known = dict(self.known)
+            original(self, pc, group, arrival, mark)
+            self.known.update(known)
+        self.mutant_admits(JoinCutTests.FORGOTTEN, mock.patch.object(induction.InductionExecutor, "open_join", keep))
+
+    def test_without_pairing_where_the_paths_meet(self):
+        # wrong: r5 is 1 in one compile and 3 in the other on the arm that ends at the join
+        original = induction.InductionExecutor.end_join
+
+        def unpaired(self, pc, group, arrival, mark):
+            role, backs = self.role, dict(self.context.join_backs)
+            self.role = "real"
+            try:
+                original(self, pc, group, arrival, mark)
+            finally:
+                self.role = role
+                self.context.join_backs.clear()
+                self.context.join_backs.update(backs)
+        self.mutant_admits(JoinCutTests.arms((("real", "mov\tr5, #1"), ("stripped", "mov\tr5, #3")),
+                                             ("mov\tr5, #2",)),
+                           mock.patch.object(induction.InductionExecutor, "end_join", unpaired), paths=12)
+
+    def test_without_the_snapshot_where_an_unescaped_path_meets(self):
+        # wrong: the frame word differs on the arm that meets the join unescaped
+        def silent(self, where):
+            self.escaped, self.frame_base = True, 0
+        self.mutant_admits(JoinCutTests.MEETS, mock.patch.object(induction.InductionExecutor, "meet_escaped", silent))
+
+    def test_without_refusing_stray_frame_stores_in_a_region(self):
+        # wrong: the arm that ends at the join reads the word the compiles stored differently
+        self.mutant_admits(JoinCutTests.OPENER_STORE, mock.patch.object(
+            induction.InductionExecutor, "stray_frame_store", lambda self, entries, slots, escaped, snapshot=False:
+            None), paths=12)
+
+    def test_without_keeping_addresses_exactly(self):
+        # wrong: the compiles store through different frame addresses on one arm
+        original = induction.InductionExecutor.check_locations
+
+        def unkept(self, current, opened, where, refuse, says, plain=None):
+            original(self, current, types.SimpleNamespace(**{**vars(opened), "kept": set()}), where, refuse, says,
+                     plain)
+        self.mutant_admits(JoinCutTests.KEPT, mock.patch.object(induction.InductionExecutor, "check_locations",
+                                                                unkept), paths=12)
+
+    def test_without_the_joins_barrier(self):
+        # wrong: the call the compiles make differently is on the arm that ended at the join
+        joins = induction.Shape.joins.fget
+
+        def unbarred(self):
+            return {pc: entry[:3] + (False,) for pc, entry in joins(self).items()}
+        self.mutant_admits(JoinCutTests.BARRIER, mock.patch.object(induction.Shape, "joins", property(unbarred)))
+
+    def test_without_giving_a_join_up(self):
+        # a join the compiles do not share refuses instead of being enumerated
+        def refuse(self, group, why, message=None):
+            raise semantics.SemanticError(why)
+        with mock.patch.object(induction.InductionExecutor, "give_up", refuse), \
+                self.assertRaises(semantics.SemanticError):
+            self.mutant_admits(JoinCutTests.EVENTS, paths=12)
 
 
 if __name__ == "__main__":
