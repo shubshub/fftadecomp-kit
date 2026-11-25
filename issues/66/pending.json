@@ -226,66 +226,6 @@
     },
     {
       "claim": {
-        "acceptance_body_sha256": "5991af02203ef04166c161c9afc4a075dc147e11df76a8ddf955cdd7e7b20696",
-        "acknowledged_cursor": 7163036133,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "5991af02203ef04166c161c9afc4a075dc147e11df76a8ddf955cdd7e7b20696",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08003B1C\",\"who\":\"agent\",\"note\":\"\"}",
-          "created_at": "2026-11-25T12:55:06Z",
-          "id": 7163036133,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-25T12:55:06Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "0f6f07fc6cc9d9081420ff1cb02951e53dafb5815110167721c20a348a297101",
-        "result": {
-          "address": "0x08003B1C",
-          "claim_id": 7163036133,
-          "code": 0,
-          "message": "claim accepted",
-          "operation": "claim",
-          "owner_id": 31369,
-          "request_id": 7163036133,
-          "status": "accepted",
-          "who": "agent"
-        }
-      },
-      "release": {
-        "acceptance_body_sha256": "0176d23973e0f421bc8bdc19d1926200928b447e39419279bad796bfd8e89013",
-        "acknowledged_cursor": 7175887579,
-        "body_provenance": "acceptance-time",
-        "body_sha256": "0176d23973e0f421bc8bdc19d1926200928b447e39419279bad796bfd8e89013",
-        "comment": {
-          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x08003B1C\",\"who\":\"agent\",\"claim_id\":7163036133,\"reason\":\"merged in shubshub/fftadecomp#356 (be3fd1e22a6)\",\"unmatchable\":false,\"tried\":\"\"}",
-          "created_at": "2026-11-25T22:03:48Z",
-          "id": 7175887579,
-          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
-          "updated_at": "2026-11-25T22:03:48Z",
-          "user": {
-            "id": 31369,
-            "type": "User"
-          }
-        },
-        "ledger_body_sha256": "139be7a972ce7c2333549c9a7c266841ce51d4ca9ff4cbced044f5f7b560c161",
-        "result": {
-          "address": "0x08003B1C",
-          "claim_id": 7163036133,
-          "code": 0,
-          "message": "release accepted",
-          "operation": "release",
-          "owner_id": 31369,
-          "request_id": 7175887579,
-          "status": "accepted",
-          "who": "agent"
-        }
-      }
-    },
-    {
-      "claim": {
         "acceptance_body_sha256": "e7bd1f3c857be44db52bae672e8bd53ef5009664bde769103a6d7c053ddf1244",
         "acknowledged_cursor": 7163054896,
         "body_provenance": "acceptance-time",
