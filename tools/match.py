@@ -61,6 +61,7 @@ import empty_body_profile as empty_body
 import library_units
 import rom_mirror
 import counted_stack_cursor_loop as counted_cursor
+import split_join_profile as split_join
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -3314,6 +3315,23 @@ def merge_possible_aliases(previous, incoming):
     return tuple(sorted(merged.items()))
 
 
+def join_walk_state(previous, outgoing, stack, constants, words, merged_aliases):
+    """The core walk's join of two states around their already merged register aliases.
+
+    A state is (return registers, saved-stack flags, register aliases, constants,
+    pointer-bearing slots, words); ``stack``, ``constants`` and ``words`` are the
+    outgoing state's own.  The split-join rule merges at its keys through this same
+    function, so the two joins cannot drift apart.
+    """
+    return (previous[0] & outgoing[0],
+            tuple((saved[0] and incoming[0], saved[1] and incoming[1], saved[2] and incoming[2])
+                  for saved, incoming in zip(previous[1], stack)),
+            merged_aliases,
+            tuple((register, value) for register, value in previous[3] if constants.get(register) == value),
+            merge_possible_aliases(previous[4], outgoing[4]),
+            tuple((slot, value) for slot, value in previous[5] if words.get(slot) == value))
+
+
 def stack_alias_overwritten_before_use(data, address, successor, register, decoder, *, exit_sites=frozenset(),
                                        call_kill=None):
     """Prove a differing Thumb join alias is killed on every path before observation.
@@ -3601,6 +3619,9 @@ class BufferCallProof:
         # (function, loop head) -> counted stack-cursor loop record of the owner walk (counted_stack_cursor_loop);
         # never written inside a callee check, so a callee check's snapshot need not hold it
         self.cursor_loops = {}
+        # Disagreeing forward joins a stack-argument walk kept apart (SplitJoins), as
+        # (walk, join, register, kept offset, split offset) keys; empty in every other proof.
+        self.split_joins = {}
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Targets of un-inspected calls an inspected callee (transitively) relies on
@@ -3725,10 +3746,13 @@ class BufferCallProof:
                 None if self.copy_summaries is None else
                 (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations)),
                 dict(self.switch_callees.records) if self.switch_callees is not None else None,
-                self.dead_registers.snapshot() if self.dead_registers is not None else None)
+                self.dead_registers.snapshot() if self.dead_registers is not None else None,
+                dict(self.split_joins))
 
     def _restore_ledgers(self, saved):
-        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot = saved
+        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot = saved
+        self.split_joins.clear()
+        self.split_joins.update(split_snapshot)
         for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
                                   snapshot):
             ledger.clear()
@@ -4330,6 +4354,7 @@ class BufferCallProof:
             lines.extend(default_index.lines(self.stack_index_retry))
         if remainder_leaf.is_summaries(self.runtime_summaries):
             lines.extend(self.runtime_summaries.lines())
+        lines.extend(split_join.lines(self.split_joins))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4399,6 +4424,10 @@ class BufferCallProof:
         if remainder_leaf.is_summaries(self.runtime_summaries) and self.runtime_summaries.sites:
             # Only a summarised compiler __modsi3 call adds this.
             digest.update(self.runtime_summaries.digest_text().encode())
+        if self.split_joins:
+            # Only a walk that kept a disagreeing join apart adds this; every other fingerprint is unchanged.
+            digest.update(json.dumps([split_join.SCHEMA, split_join.records(self.split_joins)],
+                                     separators=(",", ":")).encode())
         return digest.hexdigest()
 
     def buffer_evidence(self):
@@ -5084,6 +5113,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
     if path_states is None and counted_cursor.applies(thumb, buffer_proof, bounded_index):
         cursor_loops = counted_cursor.CursorLoops(loop_replay_transfer, loop_replay_condition,
                                                   buffer_proof.callee_clobbers, address, instructions, edges)
+    # Disagreeing forward joins of a stack-argument walk are kept apart once they would refuse.  A walk
+    # with a variable stack-index policy keeps the join: the policy records deferred accesses per
+    # instruction and analyses the CFG itself, and was never shown sound over split states.
+    split_joins = split_join.SplitJoins(buffer_proof, address) if (
+        split_join.POLICY.enabled and thumb and stack_arguments and path_states is None and cursor is None and
+        bounded_index is None and type(buffer_proof) in (BufferCallProof, FunctionBufferCallProof)) else None
     while pending:
         iteration = 0
         if path_states is None:
@@ -5674,6 +5709,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                                 successor, instruction)
             if target_key is None:
                 continue
+            if split_joins is not None and isinstance(state_key, split_join.Key) and type(target_key) is int:
+                target_key = split_joins.follow(state_key, successor, outgoing)
             previous = states.get(target_key)
             if previous is None:
                 merged = outgoing
@@ -5715,17 +5752,23 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     if cursor_loops is None or type(state_key) is tuple or not cursor_loops.engage(
                             instruction, current, successor, previous, outgoing, previous_register_aliases,
                             incoming_aliases, revisit, states, pending):
-                        raise
+                        if split_joins is None or not split_joins.applies(current, successor, target_key):
+                            raise
+                        before = dict(previous_register_aliases)
+                        split_joins.divert(
+                            states, pending, target_key, successor, previous, outgoing,
+                            {register: offset for register, offset in incoming_aliases
+                             if register in before and before[register] != offset},
+                            lambda joined: split_join.merge(
+                                joined, outgoing, stack, merge_possible_aliases,
+                                lambda register, first, second: stack_alias_overwritten_before_use(
+                                    data, address, successor, register, decoder) or root_scratch_join_dead(
+                                    buffer_proof, data, address, successor, register, first, second, decoder),
+                                lambda kept, aliases: join_walk_state(kept, outgoing, stack, constants, words,
+                                                                      aliases)))
+                        continue
                     break
-                merged_slots = merge_possible_aliases(previous[4], outgoing[4])
-                merged = (previous[0] & outgoing[0],
-                          tuple((saved[0] and incoming[0], saved[1] and incoming[1],
-                                 saved[2] and incoming[2])
-                                for saved, incoming
-                                in zip(previous[1], stack)), merged_aliases,
-                          tuple((register, value) for register, value in previous[3]
-                                if constants.get(register) == value), merged_slots,
-                          tuple((slot,value) for slot,value in previous[5] if words.get(slot)==value))
+                merged = join_walk_state(previous, outgoing, stack, constants, words, merged_aliases)
             if (cursor_loops is not None and cursor_loops.settle(target_key, merged)) or previous != merged:
                 states[target_key] = merged
                 pending.append(target_key)
