@@ -4864,6 +4864,35 @@ The register cast still requires the ordinary documented-MMIO rule.
 Set `FFTA_M4A_VSYNC_ROOT` to the game checkout to run the native
 cases in `tests/test_m4a_dma_counter.py`.
 
+**The SDK's BIOS fill temporary (`bios-fill-temporary-v1`, `tools/bios_fill_temporary.py`):**
+the SDK's `CpuFill16`/`CpuFill32` pass CpuSet (`func_0814186C`) a volatile
+temporary. agbcc gives a volatile local its frame slot as it expands the
+declaration and a plain local whose address is taken one only later, so the
+qualifier shows in the code. A `volatile` token that no
+other exception admits is admitted when it belongs to such a fill:
+`{ volatile u16 t = [(volatile u16)] value; func_0814186C([(void *)]&t, dest,
+control); }` (or `u32`), open-coded or as the whole body of a function-like
+macro defined once, with `t` nowhere else. The unit is compiled as written and
+with each fill's tokens removed, with the volatile proof's exact census (a
+macro's tokens reach the unit once per use). The function must equal the ROM,
+the ROM's `func_0814186C` must be `swi 0x0B; bx lr`, removing a fill's tokens
+must change the code and remove as many volatile frame stores as the fill has
+uses, and those stores must be every volatile frame store of the function. In
+the expand RTL each fill is a CpuSet call whose `r0` is a frame slot, whose
+`r2` is a constant with bit 24 (a fixed source) set and bit 26 set exactly for
+a word temporary, whose block holds the one volatile store to the slot, and
+whose `r1` and `r3`, when frame addresses, miss the slot (`r1` with every
+byte it is filled over);
+outside that block nothing reads, writes or takes the address of the slot (a
+later block may give it to its own temporary), and inside it only the address
+is formed. In the code, which is the ROM's, the straight line before the BL
+stores the slot once, with the temporary's width, and at the BL holds its
+address in `r0`, no `r1` that fills over it and no `r3` in it. The store and
+the address come in either order, with or without the qualifier: a halfword
+has no `sp`-relative store, so its address comes first, while a word may be
+stored at `sp+K` before `r0` is formed. What shows the qualifier is the code
+it changes. The report record lists each fill's site, slot and control word.
+
 **Volatile the ROM shows (`volatile-rom-proof-v1`, `tools/volatile_rom_proof.py`):**
 a `volatile` token of the addressed `src/<ADDR>.c` that no exception above
 or below admits is admitted when the ROM shows the qualifier's effect on a

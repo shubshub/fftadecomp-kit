@@ -1606,8 +1606,10 @@ def rom_access(rom, address, length, store, width):
 class Unit:
     """the addressed source's unit in a work directory, compiled as variants"""
 
-    def __init__(self, tree, relpath, text, offsets, work, dependencies=None):
-        """dependencies, when given, collects (path, SHA-256) of every file the unit reads"""
+    def __init__(self, tree, relpath, text, offsets, work, dependencies=None, repeated=frozenset()):
+        """dependencies, when given, collects (path, SHA-256) of every file the unit reads.  A candidate at an
+        offset in repeated (a token of a macro body) may reach the unit more than once; every other reaches
+        it exactly once.  reaches[k] is how often candidate k's marker reached it."""
         import plausible
         self.tree, self.work = Path(tree).resolve(), Path(work)
         command = f"cpp {plausible.CPP_OPTIONS} {shlex.quote(relpath)}"
@@ -1646,19 +1648,26 @@ class Unit:
             target.write_text(data, encoding="utf-8")
         run(f"{command} -o {shlex.quote(str(self.work / 'marked.i'))}", copy)
         marked = (self.work / "marked.i").read_bytes().decode("utf-8")
-        restored = marked
-        for marker in markers:
-            if len(re.findall(r"\b" + marker + r"\b", marked)) != 1 or marked.count(marker) != 1:
+        restored, reaches = marked, []
+        for offset, marker in zip(offsets, markers):
+            count = marked.count(marker)
+            if len(re.findall(r"\b" + marker + r"\b", marked)) != count or count < 1 or \
+                    count > 1 and offset not in repeated:
                 raise ProofError("a candidate qualifier does not reach the unit exactly once")
+            reaches.append(count)
             restored = restored.replace(marker, "volatile")
         if restored != real:
             raise ProofError("the unit changes when only its candidate qualifiers are renamed")
-        self.real, self.marked, self.markers = real, marked, markers
+        self.real, self.marked, self.markers, self.reaches = real, marked, markers, reaches
 
     def variant(self, removed):
+        return self.variant_without({removed})
+
+    def variant_without(self, removed):
+        """the unit with the candidates whose indices are in removed blanked, the others restored"""
         text = self.marked
         for index, marker in enumerate(self.markers):
-            text = text.replace(marker, " " * 8 if index == removed else "volatile")
+            text = text.replace(marker, " " * 8 if index in removed else "volatile")
         return text
 
     def compile(self, label, preprocessed, name):
