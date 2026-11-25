@@ -478,9 +478,16 @@ class PinnedProfileTests(unittest.TestCase):
                     function in ("selected_switch_layout", "verify_switches"):
                 opted = any(keyword.arg == "allow_backward_cases" for keyword in parent.keywords)
                 counts[(function, opted)] = counts.get((function, opted), 0) + 1
-        # The dispatch-identified (interposed-pool) branch is forward-only.
-        self.assertEqual(counts, {("selected_switch_layout", True): 1, ("selected_switch_layout", False): 1,
+        # Both dispatch-identified (interposed-pool) branches, the selector's and the fallback
+        # after the fixed layout refused (interposed_pool_switch), are forward-only.
+        self.assertEqual(counts, {("selected_switch_layout", True): 1, ("selected_switch_layout", False): 2,
                                   ("verify_switches", True): 1})
+        for file, function, kind, name, parent in self.references():
+            if name == "switch_layout" and file == "match.py" and kind == "call" and \
+                    function == "selected_switch_layout" and \
+                    not any(keyword.arg == "allow_backward_cases" for keyword in parent.keywords):
+                with self.subTest(line=parent.lineno):
+                    self.assertTrue(any(keyword.arg == "interposed_pool" for keyword in parent.keywords))
         # Other than the three isolated qualified multi-switch calls, defaults stay forward-only.
         for file, function, kind, name, parent in self.references():
             if name == "switch_layout" and kind == "call" and \

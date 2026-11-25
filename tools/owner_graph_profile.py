@@ -60,7 +60,11 @@ def graph(data, address, refinement, *, one_object_word_switch=False,
                 raise ValueError('one-object-word graph literal escapes owner')
             data_words = {offset: ('inventory_numeric_word' if one_numeric_word_switch
                                    else 'inventory_object_word', struct.unpack_from('<I', data, offset)[0])}
-        if two_constant_word_switch and switch.get('interposed_words') == 2:
+        if 'pool_policy' in switch:
+            # A table behind its dispatch's literal pool (interposed_pool_switch).
+            from interposed_pool_switch import replay as pool_replay
+            layout = pool_replay(data, address, words, switch)
+        elif two_constant_word_switch and switch.get('interposed_words') == 2:
             from switch_constants_profile import layout as constants_layout
             layout = constants_layout(data, address, words)
         else:

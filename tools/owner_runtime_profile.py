@@ -275,9 +275,12 @@ def verify(data, address, rom, mapping, refinement, manifest=None, *, remainder=
                 row is not owners[0] and int(row["rom"], 16) < end and
                 int(row["end"], 16) > address for row in entries):
         raise ValueError("owner composition requires exact unique nonoverlapping complete ROM ownership")
+    import interposed_pool_switch as pool
+    # The same refinement as owner_admission_profile.refine.
     fresh = analyze.refine_function(
         data, address, entries, max_bytes=len(data), max_instructions=len(data)//2,
-        rom_end=match.ROM_BASE + len(rom), same_owner_long_branches=True)
+        rom_end=match.ROM_BASE + len(rom), same_owner_long_branches=True,
+        interposed_pool_switch=pool.POLICY.enabled)
     if fresh != refinement:
         raise ValueError('owner refinement differs from fresh native CFG/guard replay')
     instructions, edges, branches, calls, words = inventory.graph(data, address, fresh)

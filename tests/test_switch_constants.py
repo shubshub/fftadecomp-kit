@@ -971,10 +971,28 @@ class ObjectAndCFGTests(unittest.TestCase):
     def test_lower_optins_are_boolean_isolated_and_default_off(self):
         original, _, body, mapping = self.fixture()
         image = match.elf_image(original)
-        for enabled in (False, 0, 1, "true", None):
+        for enabled in (0, 1, "true", None):
             with self.subTest(enabled=enabled), self.assertRaises(ValueError):
                 match.call_bindings(image, "func_08000000", ADDRESS, mapping, 0x2000,
                                     switch_relocations={}, allow_switch_constants=enabled)
+        # Off, the two constants are no longer this profile's: the link places the table behind them as an
+        # ordinary dispatch-identified pool (interposed_pool_switch), and no walk of the default path without
+        # the opt-in takes that table; without that rule the link refuses as before.
+        import interposed_pool_switch as pool
+        with patch.object(pool.POLICY, "enabled", False), self.assertRaises(ValueError):
+            match.call_bindings(image, "func_08000000", ADDRESS, mapping, 0x2000,
+                                switch_relocations={}, allow_switch_constants=False)
+        linked_words = {}
+        calls, _, _ = match.call_bindings(image, "func_08000000", ADDRESS, mapping, 0x2000,
+                                          switch_relocations=linked_words, allow_switch_constants=False)
+        layout = match.selected_switch_layout(body, ADDRESS, linked_words)
+        self.assertEqual(layout["dispatch"], profile.layout(body, ADDRESS, linked_words)["dispatch"])
+        manifest = dict(calls=[[site - ADDRESS, f"func_{target:08X}"] for site, target in sorted(calls.items())],
+                        switch=layout)
+        with self.assertRaisesRegex(ValueError, "switch requires one exact adjacent unsigned guard"):
+            match.verify_switches(body, ADDRESS, body + bytes(0x2000 - len(body)), mapping, manifest)
+        with self.assertRaisesRegex(ValueError, "switch requires one exact adjacent unsigned guard"):
+            match.verify_leaf_instructions(body, ADDRESS, True, calls, switch_relocations=linked_words)
         for option in ("data_mapping", "function_relocations", "udivsi3_bindings", "modsi3_bindings",
                        "divsi3_bindings", "double_bindings", "double_index"):
             with self.subTest(option=option), self.assertRaises(ValueError):

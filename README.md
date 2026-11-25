@@ -1931,7 +1931,7 @@ that proof, authenticated from the ROM bytes with the primitives
 
 1. the proof is that plain stack-argument instance, bound to one owner only;
 2. `analyze.refine_function` finds exactly one word switch with no interposed
-   scalar words;
+   scalar words, or one behind its dispatch's own literal pool (next section);
 3. the owner graph closes with no local BL control;
 4. the linked switch relocations and direct calls are exactly those the ROM
    bytes give;
@@ -1954,7 +1954,7 @@ the case address left in registers after the dispatch is not checked: both are
 ROM code addresses, never stack aliases. Each report line states this.
 
 An owner without typed objects, the function-literal path, the switch-data
-selectors, and the preloaded and interposed-pool layouts keep their walk and
+selectors, and the preloaded and fixed five-word layouts keep their walk and
 message. An owner switch beside an untyped literal in the hardware window (the
 numeric hardware class) refuses with `numeric hardware words require the exact
 complete owner graph`, because that class is defined only over owners without a
@@ -2054,6 +2054,84 @@ premise: the leaf contract and the operand records are re-proved from the ROM
 and the bytes on every run. `signed_remainder_leaf_profile.POLICY.enabled =
 False` restores the plain refusal, and a report carrying the lines then fails
 replay.
+
+### Jump tables behind their dispatch's literal pool
+
+agbcc ends a jump-table dispatch with `mov pc, rN`, an unconditional transfer,
+so the function's pending literal pool is flushed right there: the words that
+earlier blocks load (numbers, RAM and ROM object addresses) sit between the
+dispatch and the table-pointer word, which is the pool's last word, and the
+table follows it:
+
+```
+cmp   r0, #9            ; bound 9: ten entries
+bls   dispatch
+b     default
+dispatch:
+lsls  r0, r0, #2
+ldr   r1, [pc, #8]      ; the table pointer
+adds  r0, r0, r1
+ldr   r0, [r0]
+mov   pc, r0
+.word 0x08394585        ; pool word, loaded earlier by ldr r2, [pc, #...]
+.word table             ; table pointer
+table: .word case0, ...
+```
+
+The refinement looked for the pointer only at a fixed position (no pool, the
+five-word pool, or the selector-only one-object and two-constant layouts), so
+it left such a dispatch unresolved. The restoring owner then refused with
+`complete-owner text reachable instruction count differs`, or with
+`structural inventory is not closed` once the index count was right. The
+default path refused at the link (`switch requires one exact adjacent
+unsigned guard and five-op dispatch`) or in the owner switch above (`owner
+switch requires one guarded table without scalar words`).
+
+Where no existing layout finds a table, `interposed_pool_switch` now places it
+with the dispatch-identified layout of the `u16-scalars-v2` switch-data
+selector (`switch_layout(..., interposed_pool=True)`). That layout finds the
+pointer by the dispatch's own PC-relative load, not by its position. It adds no
+fact about the table. The table's location (the exact five-op dispatch whose
+load reaches the pointer, which is the address of the next word), its extent
+(the guard's `cmp` on the dispatch's selector, one of the three canonical
+guards, reached only through its guarded predecessors), and every entry (an
+even address in the owner after the table, never into the guard, dispatch,
+pool, pointer or table bytes) are proved from the bytes as for an adjacent
+table. The pool words are data, never code. Every byte from the dispatch's end
+to the pointer is reserved, only zero alignment may precede the first word, and
+each pool word must be read by a reached PC-relative load (`interposed switch
+pool requires every reached word load`). The owner's proof then binds each
+word as an ordinary literal: the restoring owner's partition and literal
+classes, or the typed-data proof's coverage, where an untyped RAM or ROM
+address refuses.
+
+The opt-in is taken by `owner_admission_profile.refine`, the restoring
+owner's refinement. About 240 call sites in about 160 tool modules use it:
+the owner route itself, and many proofs that read a callee's control-flow
+facts from it (callee frames, scratch death, bounded outputs, division
+children). Before the rule a callee with such a table had no closed
+refinement, so those uses refused or fell back to having no fact. With the
+rule they can gain facts but never lose one. Regenerating every report bound
+to a changed tool gave no evidence change beyond tool digests and the new
+file's entry in the digest tables. The runtime owner's fresh replay takes the
+opt-in too, and so do the default path's link layout (`selected_switch_layout`,
+only after the fixed layout refused) and the owner switch of the default
+typed-data buffer walk. The buffer-free switch walk and the switch-data
+selectors keep their own layouts and messages. One table per owner stays the
+owner switch's limit, cases stay forward, and a pool word that is a `.text`
+relocation, or that no reached load reads, refuses. The refinement descriptor
+carries
+`"pool_policy": "interposed-pool-word-switch-v1"` and the word count, which
+the owner graph replays from the bytes and both fingerprints bind. An owner
+switch that uses the rule adds one clause to its line:
+
+```
+* buffer owner switch: `guarded-switch-owner-v1` 0x08000200: dispatch at 0x08000216, bound 4, 5 successors, table 0123456789abcdef; table pointer: only PC load is the dispatch, case uses of the table registers unchecked; table behind its 1-word literal pool (interposed-pool-word-switch-v1): every pool word reserved as data, read by a reached PC load and bound as a literal
+```
+
+The rule carries no premise. A refinement or link that finds a table today is
+unchanged, and `interposed_pool_switch.POLICY.enabled = False` restores every
+refusal.
 
 ### Function literals with bounded buffer calls
 
