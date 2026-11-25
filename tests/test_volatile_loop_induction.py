@@ -587,8 +587,11 @@ class FrameAndCallTests(Base):
         self.refused(body, "a frame access at a non-constant offset before the frame escapes")
 
     def test_a_call_with_no_prototype_stays_refused(self):
-        body = FRAME + loop() + ("bl\t.L30\t@ far jump",) + MEMBER + END + (".L30:", "bx\tlr")
+        body = FRAME + loop() + ("bl\tfunc_08000270",) + MEMBER + END
         self.refused(body, "no prototype with a fixed argument list")
+        # a far jump is a branch: this one overwrites lr before the return through it
+        body = FRAME + loop() + ("bl\t.L30\t@ far jump",) + MEMBER + END + (".L30:", "bx\tlr")
+        self.refused(body, "computed jumps are not modelled at `bx\tlr`")
 
     def test_stack_argument_words_belong_to_the_callee(self):
         # both compiles stored the fifth argument; only the stripped one reads its own copy back

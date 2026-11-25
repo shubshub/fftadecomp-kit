@@ -5658,6 +5658,15 @@ hardware may run or jump into the pool, table or padding that the model
 steps over. A table is read as written only on a word boundary, which GAS
 does not give `.word`: its words must follow `.align 2, 0` with nothing but
 labels and literal words between, or the dispatch fails closed.
+agbcc's far jump is a branch, not a call: for a branch beyond the reach of
+`b`, agbcc emits `bl .Ln` and marks it `@ far jump`, or `@far jump` after
+the inverse branch of a conditional one (`b<inverse> .LCBn; bl .Ln;
+.LCBn:`). Only a `bl` with either mark to a code label of the same function
+is read this way. Its one successor is the label; it overwrites lr and
+returns nowhere, so a later read of lr, or a return through it, fails
+closed. An unmarked `bl` to a label, and the mark on any other `bl`, stay
+refused. The loop induction follows the jump too, so a loop closed by one
+is cut like any other.
 The path and decision bounds are cost bounds (kit#137): every path is
 checked in full and a function they cut short is refused, never accepted on
 the paths seen. The path bound was 256; holding 1024 paths, measured on
