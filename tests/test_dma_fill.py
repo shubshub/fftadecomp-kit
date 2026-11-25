@@ -120,7 +120,8 @@ class DmaFillWalkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, ESCAPE):
             self.walk(source(), fills=False)
         # A function without such a store records nothing, writes no lines and walks as before.
-        fills = self.walk("push {r4, lr}\nsub sp, #4\nmov r0, sp\nstr r1, [r0]\nadd sp, #4\npop {r4}\npop {r1}\nbx r1")
+        fills = self.walk("push {r4, lr}\nsub sp, #4\nmov r0, sp\nstr r1, [r0]\nmovs r0, #0\nadd sp, #4\npop {r4}\n"
+                          "pop {r1}\nbx r1")
         self.assertEqual((fills.records, fills.report_lines()), ([], []))
 
     def test_each_channel_unit_and_the_interrupt_bit(self):
@@ -402,7 +403,7 @@ class DmaFillWalkTests(unittest.TestCase):
         self.assertEqual((record["source"], record["unit"]), (-16, 4))
         # Without an allocation SP addresses a saved register.
         text = ("push {r4, lr}\nmov r0, sp\nldr r4, =0x040000D4\nstr r0, [r4]\nldr r1, =0x02000000\n"
-                "str r1, [r4, #4]\nldr r2, =0x81000001\nstr r2, [r4, #8]\nldr r3, [r4, #8]\n"
+                "str r1, [r4, #4]\nldr r2, =0x81000001\nstr r2, [r4, #8]\nldr r3, [r4, #8]\nmovs r0, #0\n"
                 "pop {r4}\npop {r1}\nbx r1\n.ltorg")
         self.refused(text, UNIT)
 
@@ -599,9 +600,12 @@ class DmaFillReportTests(unittest.TestCase):
     def report(self, data, mapping, lines, schema=evidence.FRAMED_LINKED_SCHEMA, objects=None):
         """The report match.py writes for these bytes (report_fixtures), with `lines` in place of its DMA
         fill block, right after the stack-frame line; `lines` may be a tampered block."""
+        import return_scratch_profile as return_scratch
         try:
+            # match.py's root walk carries the exit-scratch ledger too (kit #538).
             instructions = match.verify_leaf_instructions(data, BASE, True, call_resolver=lambda target: None,
-                                                          incoming_narrow_reads=True, dma_fills=dma.Fills(BOOT_ROM))
+                                                          incoming_narrow_reads=True, dma_fills=dma.Fills(BOOT_ROM),
+                                                          return_scratch=return_scratch.ReturnScratch())
         except (ValueError, KeyError, TypeError, AttributeError):
             instructions = report_fixtures.decode(data, BASE)
         linked = any(instruction.mnemonic == "bl" for instruction in instructions)
@@ -662,6 +666,22 @@ class DmaFillReportTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertNotEqual(lines_, lines)
                 self.assertFalse(self.replays(self.report(data, mapping, lines_)))
+
+    def test_exit_scratch_lines_follow_the_dma_fill_block(self):
+        # A fill and a local's address left in r3 at the return: both blocks, in the writer's order.
+        import return_scratch_profile as return_scratch
+        text = source(after="bl callee\nadd r3, sp, #0")
+        data, mapping = self.tree(text)
+        fills, ledger = dma.Fills(), return_scratch.ReturnScratch()
+        match.verify_leaf_instructions(data, BASE, True, calls(data), incoming_narrow_reads=True, dma_fills=fills,
+                                       return_scratch=ledger)
+        block, exit_lines = fills.report_lines(), ledger.report_lines()
+        self.assertEqual(len(exit_lines), 2)
+        self.assertTrue(self.replays(self.report(data, mapping, block + exit_lines)))
+        for name, lines in (("scratch first", exit_lines + block), ("no scratch lines", block),
+                            ("scratch inside the block", block[:1] + exit_lines + block[1:])):
+            with self.subTest(name=name):
+                self.assertFalse(self.replays(self.report(data, mapping, lines)))
 
     def test_lines_sit_right_after_the_stack_frame_line(self):
         text = source(after="bl callee")

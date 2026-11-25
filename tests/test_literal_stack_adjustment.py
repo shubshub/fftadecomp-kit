@@ -117,10 +117,12 @@ class LiteralStackAdjustmentTests(unittest.TestCase):
                 self.verify(self.frame(sequence.replace("movs r0, #192", replacement)))
         with self.assertRaisesRegex(ValueError, "overflows"):
             self.verify(self.frame(sequence.replace("#3", "#31")))
+        # r0 is cleared before the return so that the path that runs the whole constant ends cleanly and the
+        # bypassing path is the one refused.
         for bypass in ("movs r0, #192\nlsls r0, r0, #3\nbypass:\nadd r0, sp",
                        "movs r0, #192\nbypass:\nlsls r0, r0, #3\nadd r0, sp"):
             with self.subTest(bypass=bypass), self.assertRaisesRegex(ValueError, "constant is bypassed"):
-                self.verify(self.frame("cmp r1, #0\nbeq bypass\n" + bypass))
+                self.verify(self.frame("cmp r1, #0\nbeq bypass\n" + bypass + "\nmovs r0, #0"))
 
     def test_shifted_alias_escape_and_general_index_refusals_unchanged(self):
         sequence = "movs r0, #192\nlsls r0, r0, #3\nadd r0, sp"
@@ -132,10 +134,11 @@ class LiteralStackAdjustmentTests(unittest.TestCase):
         # The same arithmetic still cannot authorize a general memory index.
         with self.assertRaisesRegex(ValueError, "index is not a known constant"):
             self.verify(self.frame("mov r0, sp\nmovs r1, #1\nlsls r1, r1, #2\nldr r2, [r0, r1]"))
-        # Differing aliases remain subject to the existing all-path join rule.
+        # Differing aliases remain subject to the existing all-path join rule (r0 is cleared after the join,
+        # so no frame address reaches the return).
         with self.assertRaisesRegex(ValueError, "inconsistent stack aliases"):
             self.verify(self.frame("cmp r1, #0\nbeq other\n" + sequence +
-                "\nb joined\nother:\nmov r0, sp\njoined:\nldr r1, [r0]"))
+                "\nb joined\nother:\nmov r0, sp\njoined:\nldr r1, [r0]\nmovs r0, #0"))
 
     def test_fixed_compiler_natural_large_array_retains_original_elf(self):
         (self.root / "src").mkdir()

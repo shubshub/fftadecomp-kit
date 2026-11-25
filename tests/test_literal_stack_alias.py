@@ -68,14 +68,16 @@ class LiteralStackAliasTests(unittest.TestCase):
         data[6:8] = struct.pack("<H", 0x48FF)
         with self.assertRaisesRegex(ValueError, "stack alias literal is outside"):
             match.verify_leaf_instructions(bytes(data), BASE, True)
-        # Both following reachable instructions encode an aligned zero word.
+        # Both following reachable instructions encode an aligned zero word (r0 is cleared after them, so no
+        # frame address reaches the return).
         source = self.frame("ldr r0, code_word\nadd r0, sp\n.balign 4\n"
-                            "code_word:\nmovs r0, r0\nmovs r0, r0")
+                            "code_word:\nmovs r0, r0\nmovs r0, r0\nmovs r0, #0")
         with self.assertRaisesRegex(ValueError, "literal read overlaps reachable code"):
             self.verify(source)
 
     def test_branch_cannot_bypass_load_even_with_matching_depth(self):
-        source = self.sequence().replace("ldr r0, offset\n",
+        # r0 is cleared before the return, so the bypassing path is the one refused.
+        source = self.sequence(after="movs r0, #0").replace("ldr r0, offset\n",
             "cmp r1, #0\nbeq bypass\nldr r0, offset\nbypass:\n")
         with self.assertRaisesRegex(ValueError, "literal load is bypassed"):
             self.verify(source)
@@ -91,7 +93,7 @@ class LiteralStackAliasTests(unittest.TestCase):
                          if match.CS_GRP_CALL in i.groups}
                 match.verify_leaf_instructions(data, BASE, True, calls)
         source = self.frame("cmp r1, #0\nbeq other\nldr r0, offset\nadd r0, sp\n"
-                            "b joined\nother:\nmov r0, sp\njoined:\nldr r1, [r0]")
+                            "b joined\nother:\nmov r0, sp\njoined:\nldr r1, [r0]\nmovs r0, #0")
         source += "\n.balign 4\noffset:\n.word 1540"
         with self.assertRaisesRegex(ValueError, "inconsistent stack aliases"):
             self.verify(source)
