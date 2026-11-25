@@ -4,6 +4,7 @@ Fixtures are assembled Thumb owners with the eight wrappers at their exact
 ROM addresses; no game ROM is needed.
 """
 import ast
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -364,6 +365,163 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         self.refused(r"R1 carried a local pointer", owner(destination.format("adds r6, r1, #0\nmovs r1, #0"), frame=8))
         self.refused(r"R1 carried a local pointer", owner(destination.format("bl callee\nmovs r1, #0"), frame=8))
 
+    # A call whose callee writes the carried register first -----------------------
+
+    def kills(self, proof):
+        (site,) = self.memory(proof)
+        return site["killed"], site.get("call_kills")
+
+    def test_a_callee_that_writes_the_carried_register_first_kills_it(self):
+        proof = self.walk(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        symbols = self.build(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        killed, (kill,) = self.kills(proof)
+        callee = self.rom[CALLEE - BASE:symbols["callee_end"] - BASE]
+        self.assertEqual(killed, [0])
+        self.assertEqual(kill, dict(site=kill["site"], register=0, callee=CALLEE, end=symbols["callee_end"],
+                                    body_sha256=hashlib.sha256(callee).hexdigest(), states=1,
+                                    kills=[[CALLEE, 0]]))
+        # The register is written by a later instruction of the callee, past a branch and other writes.
+        proof = self.walk(fill(after="bl callee"), "movs r1, #1\nb next\nnext:\nmovs r2, #0\nadds r0, r1, r2\nbx lr")
+        self.assertEqual(self.kills(proof)[1][0]["kills"], [[CALLEE + 6, 0]])
+        # R1, a local destination, killed the same way.
+        destination = owner("adds r0, r4, #0\nmov r1, sp\nmovs r2, #4\nbl CpuSet\nbl callee", frame=8)
+        killed, (kill,) = self.kills(self.walk(destination, "movs r1, #0\nbx lr"))
+        self.assertEqual((killed, kill["register"], kill["kills"]), ([1], 1, [[CALLEE, 1]]))
+
+    def test_each_carried_register_needs_its_own_callee_proof(self):
+        copy = owner("add r0, sp, #8\nmov r1, sp\nmovs r2, #4\nbl CpuSet\nbl callee", frame=16)
+        killed, kills = self.kills(self.walk(copy, "movs r0, #0\nmovs r1, #0\nbx lr"))
+        self.assertEqual((killed, [(kill["register"], kill["kills"]) for kill in kills]),
+                         ([0, 1], [(0, [[CALLEE, 0]]), (1, [[CALLEE + 2, 1]])]))
+        # The callee writes R0 first but reads R1 first: R0 is killed, R1 is not.
+        self.refused(r"R1 carried a local pointer into BIOS CpuSet and is not written before any read, call or return",
+                     copy, "movs r0, #0\nadds r2, r1, #0\nmovs r1, #0\nbx lr")
+
+    def test_a_callee_kill_needs_every_path_of_the_callee(self):
+        message = r"R0 carried a local pointer into BIOS CpuSet and is not written before any read, call or return"
+        for name, callee in (
+                ("reads it first", "adds r1, r0, #0\nmovs r0, #0\nbx lr"),
+                ("compares it first", "cmp r0, #0\nmovs r0, #0\nbx lr"),
+                ("saves it first", "push {r0}\nmovs r0, #0\npop {r1}\nbx lr"),
+                ("returns first", "bx lr"),
+                ("one path skips the write", "cmp r1, #0\nbeq out\nmovs r0, #0\nout:\nbx lr"),
+                ("calls first", "push {lr}\nbl CpuSet\nmovs r0, #0\npop {r1}\nbx r1"),
+                ("interrupt first", "svc #0\nmovs r0, #0\nbx lr"),
+                ("a cycle can avoid the write", "loop:\ncmp r1, #0\nbne loop\nmovs r0, #0\nbx lr"),
+                ("an endless loop", "loop:\nb loop"),
+                ("indirect transfer first", "bx r1"),
+                ("leaves its span first", "b caller")):
+            with self.subTest(callee=name):
+                self.refused(message, fill(after="bl callee"), callee)
+
+    def test_a_callee_kill_needs_an_exact_mapped_direct_call(self):
+        symbols = self.build(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        rows = [{"rom": f"0x{symbols[name]:08X}", "end": f"0x{symbols[name + '_end']:08X}", "mode": "thumb"}
+                for name in ("caller", *WRAPPERS.values())]
+        exact = {"rom": f"0x{CALLEE:08X}", "end": f"0x{symbols['callee_end']:08X}", "mode": "thumb"}
+
+        def entry(entries, callee=CALLEE, register=match.ARM_REG_R0):
+            summaries = bios.BiosWrapperSummaries()
+            summaries.span = match.BufferCallProof(self.rom, json.dumps(entries).encode()).span
+            return summaries.callee_entry(callee, register)
+
+        self.assertEqual(entry(rows + [exact])["kills"], [[CALLEE, 0]])
+        # No row, an interior row, a row that overlaps another, an interior target, or no span reader.
+        self.assertIsNone(entry(rows))
+        self.assertIsNone(entry(rows + [dict(exact, rom=f"0x{CALLEE + 2:08X}")]))
+        self.assertIsNone(entry(rows + [exact, {"rom": f"0x{CALLEE + 2:08X}", "end": f"0x{CALLEE + 4:08X}",
+                                                "mode": "thumb"}]))
+        self.assertIsNone(entry(rows + [exact], CALLEE + 2))
+        self.assertIsNone(bios.BiosWrapperSummaries().callee_entry(CALLEE, match.ARM_REG_R0))
+        # Only R0-R3: a callee that writes R12 first is not a kill of R12 here.
+        symbols = self.build(fill(after="bl callee"), "mov ip, r1\nmovs r0, #0\nbx lr")
+        exact = {"rom": f"0x{CALLEE:08X}", "end": f"0x{symbols['callee_end']:08X}", "mode": "thumb"}
+        self.assertEqual(entry(rows + [exact])["kills"], [[CALLEE + 2, 0]])
+        self.assertIsNone(entry(rows + [exact], register=match.ARM_REG_R12))
+        # A wrapper is not a callee that writes R0: its SVC comes first.
+        self.refused(r"R0 carried a local pointer into BIOS CpuSet and is not written before any read, "
+                     r"call or return", fill(after="bl CpuSet"))
+
+    def test_the_call_kill_hook_is_opt_in(self):
+        self.build(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+        decoder.detail = True
+        (site,) = [instruction.address for instruction in decoder.disasm(self.body, BASE)
+                   if instruction.mnemonic == "bl" and instruction.operands[0].imm == CALLEE]
+        seen = []
+
+        def policy(answer):
+            return lambda call, target, register: seen.append((call, target, register)) or answer
+
+        self.assertFalse(match.stack_alias_overwritten_before_use(self.body, BASE, site, match.ARM_REG_R0, decoder))
+        self.assertFalse(match.stack_alias_overwritten_before_use(self.body, BASE, site, match.ARM_REG_R0, decoder,
+                                                                  call_kill=policy(False)))
+        self.assertTrue(match.stack_alias_overwritten_before_use(self.body, BASE, site, match.ARM_REG_R0, decoder,
+                                                                 call_kill=policy(True)))
+        self.assertEqual(seen, [(site, CALLEE, match.ARM_REG_R0)] * 2)
+
+    def test_a_four_byte_bl_that_is_not_an_armv4t_pair_is_never_offered(self):
+        # F000 D001: Capstone decodes a Thumb-2 BL (J1 = J2 = 0); the ARM7TDMI runs a BL prefix and then a
+        # BEQ, falling through with R0 live. Even an always-true policy must not make it a killing call.
+        address = 0x08900000
+        data = bytes.fromhex("00f001d0011c0020011c7047")
+        decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+        decoder.detail = True
+        item = next(decoder.disasm(data[:4], address, count=1))
+        self.assertEqual((item.mnemonic, item.size), ("bl", 4))
+        seen = []
+        self.assertFalse(match.stack_alias_overwritten_before_use(
+            data, address, address, match.ARM_REG_R0, decoder,
+            call_kill=lambda call, target, register: seen.append(call) or True))
+        self.assertEqual(seen, [])
+
+    def test_a_call_kill_is_stated_on_its_own_line(self):
+        proof = self.walk(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        (site,) = self.memory(proof)
+        (kill,) = site["call_kills"]
+        lines = proof.bios_summary_lines()
+        self.assertEqual(lines[-1], f"* buffer BIOS call kill: call 0x{kill['site']:08X} to 0x{CALLEE:08X} kills r0 "
+                                    f"(left by CpuSet at 0x{site['site']:08X}): the callee writes r0@0x{CALLEE:08X} "
+                                    f"before any read, call, interrupt, return or cycle on every path from its entry "
+                                    f"(1 states)")
+        self.assertEqual(len(lines), 6)
+        # A site without a call kill keeps the five lines.
+        self.assertEqual(len(self.walk(fill()).bios_summary_lines()), 5)
+        self.assertEqual(bios.call_kill_lines({"memory_sites": [dict(site, call_kills=[])]}), [])
+
+    def test_call_kills_are_bound_into_the_report(self):
+        proof = self.walk(fill(after="bl callee"), "movs r0, #0\nbx lr")
+        lines = proof.bios_summary_lines()
+        summary, gbatek, outputs, trusted, manifest, kill_line = lines
+        self.assertTrue(self.accepted(self.report(proof)))
+        for name, edited in (("no kill line", [summary, gbatek, outputs, trusted, manifest]),
+                             ("kill line edited", [summary, gbatek, outputs, trusted, manifest,
+                                                   kill_line.replace("(1 states)", "(2 states)")]),
+                             ("kill line twice", lines + [kill_line]),
+                             ("kill line first", [kill_line, summary, gbatek, outputs, trusted, manifest])):
+            with self.subTest(edit=name):
+                self.assertFalse(self.accepted(self.report(proof, lines=edited)))
+
+        def edited(change):
+            value = json.loads(manifest.split("`")[1])
+            change(value["memory_sites"][0])
+            return f"* buffer BIOS manifest: `{bios.canonical(value)}`"
+
+        for name, change in (("no call kills", lambda site: site.pop("call_kills")),
+                             ("callee hash", lambda site: site["call_kills"][0].update(body_sha256="0" * 64)),
+                             ("states", lambda site: site["call_kills"][0].update(states=2)),
+                             ("killing write", lambda site: site["call_kills"][0].update(kills=[[CALLEE + 2, 0]])),
+                             ("call site", lambda site: site["call_kills"][0].update(site=site["site"])),
+                             ("no kill", lambda site: site.update(killed=[]))):
+            with self.subTest(edit=name):
+                line = edited(change)
+                self.assertNotEqual(line, manifest)
+                self.assertFalse(self.accepted(self.report(proof, lines=[summary, gbatek, outputs, trusted, line,
+                                                                         kill_line])))
+        # The same report beside a callee of the same size that reads R0 first does not replay.
+        self.build(fill(after="bl callee"), "adds r1, r0, #0\nbx lr")
+        self.assertFalse(self.accepted(self.report(proof)))
+
     def test_joined_controls_are_intersected(self):
         # R2 is proved over the owner CFG with joins intersected, not read off one path.
         fill_or_copy = ("mov r0, sp\nmovs r1, #0\nstrh r1, [r0]\nadds r1, r5, #0\ncmp r4, #0\nbeq copy\n"
@@ -592,11 +750,12 @@ class BiosWrapperSummaryTests(unittest.TestCase):
     def test_foreign_report_validators_refuse_the_lines(self):
         # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES, and
         # one with it compares every such line with the recomputed proof
-        # (test_closed_report_replay.BufferLineTests replays each check).  The three summary lines are such lines.
+        # (test_closed_report_replay.BufferLineTests replays each check).  The three summary lines and the
+        # call-kill line are such lines.
         tree = ast.parse((ROOT / "tools" / "bios_wrapper_summary_profile.py").read_text())
         written = [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant)
                    and isinstance(node.value, str) and node.value.startswith("* ")]
-        self.assertEqual(len(written), 3)
+        self.assertEqual(len(written), 4)
         for line in written:
             with self.subTest(line=line):
                 self.assertTrue(line.startswith(evidence.BUFFER_LINES))
@@ -678,6 +837,21 @@ int func_08000200(int value)
 
     func_08000400(&local);
     return func_08141898(value) + local;
+}
+"""
+# CpuSet fills a halfword from a local, and the next call's callee writes R0 before reading it.
+CALL_KILL_C = """typedef unsigned short u16;
+typedef unsigned int u32;
+extern void func_0814186C(const void *source, void *destination, u32 control);
+extern u32 func_08000400(void);
+u32 func_08000200(u16 *destination, u16 value)
+{
+    u16 fill;
+    u16 *source = &fill;
+
+    *source = value;
+    func_0814186C(source, destination, 0x01000010);
+    return func_08000400();
 }
 """
 NATIVE = 0x08000200
@@ -847,6 +1021,37 @@ class BiosWrapperNativeTests(unittest.TestCase):
         self.assertEqual(code, 0, output)
         self.assertEqual(report, disabled)
         self.assertTrue(self.replays(report))
+
+    def test_a_following_call_whose_callee_writes_r0_first_matches_and_replays(self):
+        self.build(CALL_KILL_C, "movs r0, #7\nbx lr")
+        code, output, report = self.run_match()
+        self.assertEqual(code, 0, output)
+        self.assertIn(f"* verification: `{evidence.BUFFER_SCHEMA}`", report.splitlines())
+        (manifest,) = [line for line in report.splitlines() if line.startswith("* buffer BIOS manifest: ")]
+        (site,) = json.loads(manifest.split("`")[1])["memory_sites"]
+        (kill,) = site["call_kills"]
+        self.assertEqual((site["killed"], kill["callee"], kill["register"], kill["kills"]),
+                         ([0], 0x08000400, 0, [[0x08000400, 0]]))
+        self.assertEqual(kill["site"], site["site"] + 4)
+        (kill_line,) = [line for line in report.splitlines() if line.startswith("* buffer BIOS call kill: ")]
+        self.assertEqual(report.splitlines()[report.splitlines().index(manifest) + 1], kill_line)
+        self.assertTrue(self.replays(report))
+        states = kill_line[kill_line.rindex("("):]
+        for edited in (report.replace(kill_line + "\n", ""),
+                       report.replace(kill_line, kill_line.replace(states, "(%d states)" % (kill["states"] + 1))),
+                       report.replace(kill_line, kill_line.replace("kills r0", "kills r1")),
+                       report.replace(kill_line, kill_line + "\n" + kill_line)):
+            with self.subTest(edited=edited.count("* buffer BIOS call kill: ")):
+                self.assertFalse(self.replays(edited))
+        self.assertFalse(self.replays(report.replace(manifest, manifest.replace(
+            kill["body_sha256"], "0" * 64))))
+        # A callee that reads R0 first: the carried address may be observed, so the call refuses.
+        self.build(CALL_KILL_C, "adds r0, #7\nbx lr")
+        code, output, report = self.run_match()
+        self.assertNotEqual(code, 0, output)
+        self.assertIsNone(report)
+        self.assertIn("buffer callee 0x0814186C: R0 carried a local pointer into BIOS CpuSet and is not "
+                      "written before any read, call or return", output)
 
     def test_scalar_wrapper_beside_a_pointer_word_matches_and_replays(self):
         self.build(SQRT_C, "ldr r0, [sp]\nmovs r1, #0\nstr r1, [r0]\nmovs r0, #0\nbx lr")

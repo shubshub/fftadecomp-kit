@@ -44,7 +44,14 @@ discharged when the owner's CFG is complete (`finish`, called by
   return-carrying word; a local source and a local destination are disjoint;
 * each register that carried a local pointer into the call is written before
   any read, call, interrupt or return on every path from the call
-  (`match.stack_alias_overwritten_before_use`).
+  (`match.stack_alias_overwritten_before_use`), where a call counts as the write
+  only if it is an unconditional direct BL to a mapped callee whose own bytes
+  write that register before any read, call, interrupt, return or cycle on every
+  path from its entry (`dead_register.prove` with `thumb_step`, the walk of the
+  dead stack-address call rule).  The record names each such call, the callee's
+  span end, the SHA-256 of its bytes, its killing writes and the states proved,
+  and the report states each on a `* buffer BIOS call kill:` line after the
+  manifest (none without such a call, so every other report is unchanged).
 
 After every summarised call R0-R3, R12 and the flags are unknown scalars and
 the frame keeps its facts (no span reaches a word the walk holds a fact
@@ -64,6 +71,7 @@ import hashlib
 import json
 
 import bios_cpuset_fill_profile as cpuset
+import dead_register
 
 SCHEMA = 'gba-bios-swi-wrapper-summaries-v1'
 CPUSET = cpuset.ADDRESS
@@ -177,6 +185,10 @@ class BiosWrapperSummaries:
         # leaves every memory call pending until finish.
         self.owner = None
         self.owner_states = None
+        # The proof's mapped-span reader, for callees that kill a carried register
+        # (set by every call, so that a pending discharge has it), and their entry proofs.
+        self.span = None
+        self.callee_entries = {}
 
     def bind_owner(self, data, address, instructions, edges):
         """Discharge each memory call at the owner's own call over this exact CFG.
@@ -219,6 +231,7 @@ class BiosWrapperSummaries:
             raise ValueError('BIOS wrapper summaries exclude word-provenance, callee-frame and '
                              'forwarded-slot contexts')
         name, _, wrapper = WRAPPERS[address]
+        self.span = proof.span
         data = proof.span(address)
         if data != wrapper:
             raise ValueError(f'BIOS {name} summary requires the exact indexed wrapper bytes')
@@ -288,11 +301,20 @@ class BiosWrapperSummaries:
                 spans[0][0] < spans[1][0] + spans[1][1] and spans[1][0] < spans[0][0] + spans[0][1]:
             raise ValueError('BIOS local source and destination overlap')
         killed = []
+        call_kills = []
+
+        def call_kill(call, callee, carried):
+            entry = self.callee_entry(callee, carried)
+            if entry is not None:
+                call_kills.append(dict(entry, site=call, register=carried - match.ARM_REG_R0))
+            return entry is not None
+
         for register, offset in ((0, source), (1, destination)):
             if offset is None:
                 continue
             if not match.stack_alias_overwritten_before_use(
-                    data, address, site + instruction.size, match.ARM_REG_R0 + register, decoder):
+                    data, address, site + instruction.size, match.ARM_REG_R0 + register, decoder,
+                    call_kill=call_kill):
                 raise ValueError(f'R{register} carried a local pointer into BIOS {name} and is not '
                                  'written before any read, call or return')
             killed.append(register)
@@ -300,7 +322,32 @@ class BiosWrapperSummaries:
                       source=None if spans[0] is None else list(spans[0][:2]),
                       destination=None if spans[1] is None else list(spans[1][:2]),
                       unit=spans[2], count=spans[3], killed=killed, pointer_words=list(protected))
+        if call_kills:
+            # Only a record that relies on a callee carries the key, so every other manifest is unchanged.
+            record['call_kills'] = sorted(call_kills, key=lambda kill: (kill['site'], kill['register']))
         self.memory[canonical(record)] = record
+
+    def callee_entry(self, callee, register):
+        """The entry proof that ``callee`` writes ``register`` before any read, call or return, or None."""
+        key = (callee, register)
+        if key not in self.callee_entries:
+            entry = None
+            if self.span is not None and register in dead_register.ARGUMENTS:
+                try:
+                    body = self.span(callee)
+                    result = dead_register.prove(
+                        callee, {register}, dead_register.thumb_step(callee, body),
+                        end='dead register reaches the end of its callee',
+                        cycle='dead register callee has a path without its killing write',
+                        budget='dead register callee state budget exceeded')
+                    entry = dict(callee=callee, end=callee + len(body), body_sha256=dead_register.sha(body),
+                                 states=result.states,
+                                 kills=sorted([site, written - dead_register.ARM_REG_R0]
+                                              for site, written in result.kills))
+                except ValueError:
+                    entry = None
+            self.callee_entries[key] = entry
+        return self.callee_entries[key]
 
     def observed(self):
         return bool(self.scalar or self.pending or self.memory)
@@ -335,4 +382,23 @@ def manifest_lines(manifest):
     sites = {key: value for key, value in manifest.items() if key not in ('schema', 'contract', 'premises')}
     return [f'* buffer BIOS summaries: `{SCHEMA}` {CONTRACT}',
             *(f'* buffer BIOS premise: {premise}' for premise in manifest['premises']),
-            f'* buffer BIOS manifest: `{canonical(sites)}`']
+            f'* buffer BIOS manifest: `{canonical(sites)}`',
+            *call_kill_lines(manifest)]
+
+
+def call_kill_lines(manifest):
+    """One line per call that killed a carried register; none for a manifest without call_kills.
+
+    The contract above says each carried register is written before any read, call or return. Where a
+    call is that write, the line states it and the callee's own proof, so no report reads as if the
+    contract held as worded.
+    """
+    lines = []
+    for site in manifest.get('memory_sites', ()):
+        for kill in site.get('call_kills', ()):
+            writes = ' '.join(f'r{register}@0x{address:08X}' for address, register in kill['kills'])
+            lines.append(f"* buffer BIOS call kill: call 0x{kill['site']:08X} to 0x{kill['callee']:08X} "
+                         f"kills r{kill['register']} (left by {site['routine']} at 0x{site['site']:08X}): the "
+                         f"callee writes {writes} before any read, call, interrupt, return or cycle on every "
+                         f"path from its entry ({kill['states']} states)")
+    return lines
