@@ -175,10 +175,15 @@ class CursorLoops:
                 previous[5] != outgoing[5] or len(previous[1]) != len(outgoing[1]) or \
                 any(loop.head < end and successor < loop.end for loop in self.loops):
             return False
+        # A split-join state (a tuple key that is not a plain one) inside the region would
+        # not be replayed pass by pass: the join keeps its refusal.
+        if any(isinstance(key, tuple) and type(key) is not tuple and successor <= key[0] < end
+               for key in (*states, *pending)):
+            return False
         loop = Loop(successor, current, end, live[0])
         self.loops.append(loop)
         # Region sites still queued from the merged first pass are walked again as pass 0.
-        pending[:] = [item for item in pending if type(item) is tuple or not successor <= item < end]
+        pending[:] = [item for item in pending if isinstance(item, tuple) or not successor <= item < end]
         key = (successor, 0)
         states[key] = previous
         self.facts[key] = self.entry_facts(loop, previous)

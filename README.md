@@ -1602,6 +1602,61 @@ the walk already uses for calls it does not inspect. A loop without calls ends
 its line with `calls none`. Proofs without such a loop keep their previous
 fingerprint and lines. `Policy.enabled` in the module turns the rule off.
 
+### Disagreeing forward joins in stack buffer walks
+
+The stack-argument buffer walks keep one merged state per instruction. When two
+paths reach a join with one register holding two different frame offsets, the
+walk refuses (`inconsistent possible pointer offsets at control-flow join`)
+unless the register is dead there or a counted stack-cursor loop takes the join.
+`tools/split_join_profile.py` keeps the offsets apart instead. It acts inside
+the walk, at the one point where the merged walk would refuse the join, and only
+in a stack-argument walk of the plain or function-buffer proof with ordinary
+joined states (no exact path states, no owner-switch cursor, no variable
+stack-index policy: the default stack-index retry keeps the join), at a forward
+join (the join lies above the edge's source), for the registers whose offsets
+still disagree after the dead-register rules. Back edges keep their refusal. A
+rotated loop reaches its loop-carried join by two forward edges, so it can split:
+its split states go round the loop until they converge, or until the budget or a
+frame check refuses.
+
+A walk that never reaches such a join is unchanged. A buffer callee's inspection
+is such a walk too: where it refused at a join and the dead-register rule then
+took the call (the callee writes its stack-address arguments before reading
+them), the callee is now walked apart and inspected, and the owner's proof
+records a split instead of a dead-register call.
+
+The incoming state goes to a key made of the join and its disagreeing
+`(register, offset)` pairs. A state stays on that key while one of those
+registers still holds its offset and returns to the plain state, and to its
+unchanged merge, once none does. States are merged at one key only when they
+agree on every disagreeing register, and every other field goes through the core
+walk's own join, so two offsets of one register are never merged: every access
+bound, callee inspection, escape check and return check runs on each alternative
+with its exact offsets. A split register in R0-R3 that still holds a frame
+address at a return is refused there as any stack address is (`local stack
+pointer escapes through a return register`); R12 keeps its exemption, as in
+every stack-argument walk. Pointer-bearing frame words are never split on: two
+states that meet on one key and disagree on one refuse, while split states that
+never meet again each carry their own words. A counted stack-cursor loop does
+not engage over a split state inside its region, and more than 512 split keys in
+one walk refuse (`split join budget exhausted`).
+
+Each split is recorded as (walk, join, register, kept offset, split offset),
+bound into the buffer proof fingerprint and stated on one line per walk and
+join; a proof that splits nothing keeps its fingerprint and lines:
+
+```
+* buffer split join: `stack-split-join-v1` walk 0x08000200 join 0x08000220 keeps r0 -20/-16 apart (entry-SP offsets, kept/split) until those registers are rewritten; each alternative is walked and checked on its own
+```
+
+In the ROM this admits 0804A6B0, whose two paths reach one shared CpuSet fill
+(0x0804A932) with its zero source in R0 at `sp+0x38` on one path and `sp+0x3a`
+on the other. `split_join_profile.POLICY.enabled` turns the rule off.
+Synthetic and compiled boundaries are in `tests/test_split_joins.py`; the
+joins `tests/test_stack_argument_join_lifetime.py` used to refuse for a live
+read, a callee or a later call are now walked apart, and refused with the rule
+off.
+
 ### Dead stack-address registers at calls
 
 The default stack-argument buffer proofs (the frame-buffer version-2 retry, the

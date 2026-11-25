@@ -239,10 +239,22 @@ class CompilerLifecycleTests(unittest.TestCase):
         structural=owner.refine(caller_data,self.A,mapping)
         self.assertTrue(structural['cfg_closed'],structural)
         command=[sys.executable,str(Path(match.__file__)),'--root',str(self.root),'08010000']
-        for selector in (None,owner.ACYCLIC_SELECTOR):
-            options=[] if selector is None else ['--owner-runtime-profile',selector]
-            default=subprocess.run(command+['--no-write',*options],capture_output=True,text=True)
-            self.assertNotEqual(default.returncode,0)
+        # The restoring owner without this rule refuses the stack address r1 still holds at the leaf call.
+        acyclic=subprocess.run(command+['--no-write','--owner-runtime-profile',owner.ACYCLIC_SELECTOR],
+                               capture_output=True,text=True)
+        self.assertNotEqual(acyclic.returncode,0)
+        self.assertIn('stack aliases cannot cross calls in caller-clobbered registers',acyclic.stdout+acyclic.stderr)
+        # The default path refused only at the join where r1 is sp or sp+4. split_join_profile keeps the two
+        # offsets apart there: each alternative is checked exactly and the leaf is inspected with it, so the
+        # default path now proves the owner through the split.
+        default=subprocess.run(command,capture_output=True,text=True)
+        self.assertEqual(default.returncode,0,default.stdout+default.stderr)
+        lines=(self.root/'docs/match/08010000.md').read_text().splitlines()
+        self.assertIn('* verification: `elf-symbol-thumb-frame-buffer-calls-v2`',lines)
+        self.assertEqual([line for line in lines if line.startswith('* buffer split join: ')],
+            ['* buffer split join: `stack-split-join-v1` walk 0x08010000 join 0x08010012 keeps r1 -8/-12 apart '
+             '(entry-SP offsets, kept/split) until those registers are rewritten; each alternative is walked '
+             'and checked on its own'])
         fresh=subprocess.run(command+['--owner-runtime-profile',ignored.SELECTOR],
                              capture_output=True,text=True)
         self.assertEqual(fresh.returncode,0,fresh.stdout+fresh.stderr)

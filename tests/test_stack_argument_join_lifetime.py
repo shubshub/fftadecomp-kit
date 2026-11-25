@@ -1,8 +1,10 @@
 """Stack-argument joins may forget only registers killed before observation."""
 import json
 import unittest
+from unittest.mock import patch
 
 import test_stack_alias_join_lifetime as fixtures
+import split_join_profile as split_join
 
 match = fixtures.match
 BASE = fixtures.BASE
@@ -34,7 +36,17 @@ class StackArgumentJoinLifetimeTests(unittest.TestCase):
         decoder.detail = True
         calls = {item.address: item.operands[0].imm for item in decoder.disasm(data, BASE)
                  if match.CS_GRP_CALL in item.groups}
+        self.proof = proof
         return match.verify_leaf_instructions(data, BASE, True, calls, buffer_proof=proof)
+
+    def split(self, source):
+        """Refused at the join without the split-join rule; with it, R8's two offsets are walked apart."""
+        with patch.object(split_join.POLICY, 'enabled', False), \
+                self.assertRaisesRegex(ValueError, 'inconsistent possible pointer offsets'):
+            self.verify(source)
+        self.verify(source)
+        (record,) = self.proof.split_joins
+        self.assertEqual((record[2], set(record[3:])), (match.ARM_REG_R0 + 8, {-23, -21}))
 
     def test_real_shape_dead_r8_sp21_sp23(self):
         self.verify(self.joined())
@@ -43,23 +55,22 @@ class StackArgumentJoinLifetimeTests(unittest.TestCase):
         self.verify(self.joined('cmp r0, #1\nbeq left\nmovs r2, #2\n'
             'mov r8, r2\nb done\nleft:\nmovs r3, #3\nmov r8, r3\ndone:'))
 
-    def test_live_read_and_memory_access_before_overwrite_refused(self):
+    def test_live_read_and_memory_access_before_overwrite_are_walked_apart(self):
         for after in ('mov r2, r8\nmovs r2, #0',
                       'mov r1, r8\nldrb r0, [r1]\nmovs r1, #0'):
-            with self.subTest(after=after), self.assertRaises(ValueError):
-                self.verify(self.joined(after))
+            with self.subTest(after=after):
+                self.split(self.joined(after))
 
-    def test_external_store_and_call_forwarding_refused(self):
-        for after in ('mov r0, r8\nstr r0, [r3]\nmovs r0, #0',
-                      'mov r0, r8\nbl callee\nmovs r0, #0',
-                      'bl callee'):
-            with self.subTest(after=after), self.assertRaises(ValueError):
-                self.verify(self.joined(after))
+    def test_external_store_refused_and_call_forwarding_walked_apart(self):
+        with self.assertRaisesRegex(ValueError, 'unsupported stack-alias use or escape'):
+            self.verify(self.joined('mov r0, r8\nstr r0, [r3]\nmovs r0, #0'))
+        for after in ('mov r0, r8\nbl callee\nmovs r0, #0', 'bl callee'):
+            with self.subTest(after=after):
+                self.split(self.joined(after))
 
-    def test_one_live_successor_refused(self):
-        with self.assertRaises(ValueError):
-            self.verify(self.joined('cmp r0, #1\nbeq live\nmovs r2, #0\n'
-                'mov r8, r2\nb done\nlive:\nmov r2, r8\nmovs r2, #0\ndone:'))
+    def test_one_live_successor_is_walked_apart(self):
+        self.split(self.joined('cmp r0, #1\nbeq live\nmovs r2, #0\n'
+                               'mov r8, r2\nb done\nlive:\nmov r2, r8\nmovs r2, #0\ndone:'))
 
     def test_pointer_word_join_remains_rejected(self):
         with self.assertRaisesRegex(ValueError, 'inconsistent possible pointer offsets'):
