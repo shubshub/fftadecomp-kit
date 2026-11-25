@@ -157,7 +157,12 @@ def join_splices(text):
 
 
 def strip_comments_and_strings(text):
-    """replace comments and string/char literals with spaces, keeping offsets"""
+    """replace comments and string/char literals with spaces, keeping offsets.
+
+    A block comment's newlines become spaces too: cpp reads the comment as one
+    space, so a directive goes on past one that spans lines.  The result
+    therefore numbers lines differently from the text after such a comment; a
+    line number is counted in the text itself, at the same offset."""
     out = list(text)
     i, n = 0, len(text)
     while i < n:
@@ -883,7 +888,8 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
     allowed, findings = set(), []
 
     def finding(offset, message):
-        findings.append((code.count("\n", 0, min(offset, len(code))) + 1,
+        # offsets index source; its comments keep their newlines
+        findings.append((source.count("\n", 0, min(offset, len(source))) + 1,
                          "volatile-allowlist", "error", message))
 
     source = join_splices(text if text is not None else code)
@@ -1311,12 +1317,14 @@ def allowlisted_volatile_uses(root, address, entries=None):
     return records
 
 
-def inert_control_flow(text):
+def inert_control_flow(text, lines=None):
     """find `if (c) X; else X;` - identical arms, so the test means nothing.
 
     This is the shape that appeared in a rejected match: the branches store the
     same value, so the only effect is to make the compiler keep a frame it
     would otherwise drop.  Semantically it is `X;`, and nobody writes that.
+    lines, when given, is the text the offsets index, comments and all, which
+    numbers the lines (text may be its stripped code).
     """
     hits = []
     pat = re.compile(
@@ -1326,7 +1334,7 @@ def inert_control_flow(text):
         a = " ".join(m.group("a").split())
         b = " ".join(m.group("b").split())
         if a and a == b:
-            line = text.count("\n", 0, m.start()) + 1
+            line = (text if lines is None else lines).count("\n", 0, m.start()) + 1
             hits.append((line, "inert-control-flow", "suspect",
                          f"`if ({m.group('cond').strip()}) {a}; else {b};` - both "
                          f"arms do the same thing, so the test exists only to "
@@ -1645,12 +1653,14 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             text, tree, project, relpath, hardware_qualifiers | listed_qualifiers | counter_qualifiers,
             data_symbols or {})
     polling_bodies = hardware_polling_bodies(code, hardware_qualifiers, text)
+    # line numbers are counted in text: code's offsets are text's, but a block
+    # comment's newlines are blanked in it
     for nul in re.finditer("\0", text):
-        findings.append((code.count("\n", 0, nul.start()) + 1, "nul-byte", "error",
+        findings.append((text.count("\n", 0, nul.start()) + 1, "nul-byte", "error",
                          "a NUL byte: cpp reads it as whitespace, even inside a line splice, where "
                          "these scans read a character, and no real source holds one"))
     for offset, name in preprocessor_probes(text):
-        findings.append((code.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
+        findings.append((text.count("\n", 0, offset) + 1, "preprocessor-probe", "error",
                          f"`{name}` asks the preprocessor about the files or the build: no gcc 2.95-era "
                          "source does, and it can tell the volatile census's copy from the tree"))
     literals = spell_digraphs(unspelt, strip_comments_and_strings_keep_strings(text))
@@ -1663,13 +1673,13 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
                 continue
             if rid == "empty-body" and m.start() in polling_bodies:
                 continue
-            line = code.count("\n", 0, m.start()) + 1
+            line = text.count("\n", 0, m.start()) + 1
             if sev == "suspect" and justified(text, line):
                 continue
             # an inline-asm-looking thing inside a comment is not code
             findings.append((line, rid, sev, GNU_VOLATILE.format(m[0]) if rid == "volatile" and
                              m[0] != "volatile" else msg))
-    findings += inert_control_flow(code)
+    findings += inert_control_flow(code, text)
     # comments are where hackiness gets admitted, so scan them raw too
     for i, raw in enumerate(text.split("\n"), 1):
         if JUSTIFY in raw:
