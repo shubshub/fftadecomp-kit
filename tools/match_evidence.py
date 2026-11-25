@@ -533,8 +533,13 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
         if verdict not in lines:
             return False
 
+        # Under the signed remainder leaf retry the summarised __modsi3 entry is not a callee
+        # (BufferCallProof.resolve_call); every other replay resolves calls as before.
+        import signed_remainder_leaf_profile as remainder_leaf
         run = lambda candidate: verify_leaf_instructions(
-            data, address, True, buffer_proof=candidate, call_resolver=candidate.target,
+            data, address, True, buffer_proof=candidate,
+            call_resolver=candidate.resolve_call if remainder_leaf.is_summaries(
+                getattr(candidate, "runtime_summaries", None)) else candidate.target,
             incoming_narrow_reads=True)
         if stack_arguments:
             # match.py retries a refused stack-argument walk once at a variable stack index.
@@ -1522,6 +1527,14 @@ def issued_report_pins(report, root, address):
 def report_matches(report, root, address):
     if not valid_match_verdict(report):
         return False
+    import signed_remainder_leaf_profile as remainder_leaf
+    if remainder_leaf.selected(report) and not remainder_leaf.active():
+        # A default-path signed remainder leaf report replays its plain buffer schema with the
+        # policy active; every other report replays with it off.
+        if not remainder_leaf.replayable(report):
+            return False
+        with remainder_leaf.activated():
+            return report_matches(report, root, address)
     import library_units
     if not library_units.report_admitted(report, root, address):
         # a unit report must bind its current row and compiler; any other

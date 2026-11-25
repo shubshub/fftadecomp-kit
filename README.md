@@ -1976,6 +1976,85 @@ position among the other fields. Besides the typed-data proof's own premise,
 the one limitation stated in each line (case uses of the table registers are
 not checked) is the only addition; no other premise is added.
 
+### Compiler `__modsi3` as a leaf call in the default buffer walk
+
+The default path's call binding refuses a compiler signed remainder next to a
+jump table, a runtime call thunk, function literals or another runtime:
+
+```
+signed remainder excludes mixed aliases, addressed calls with data, and other profiles
+```
+
+The isolated remainder profile proves only a frameless caller with register
+operands. Callers with a frame, local buffers handed to callees, typed objects
+or their own table therefore stopped at this refusal, even where the
+bounded-buffer walk proves everything else about them.
+
+On that refusal only, `signed_remainder_leaf_profile` runs the default path
+once more. Where the compiler-thunk route below applies, it runs only after
+that route has refused too. The retry needs a run with no selector, the fixed
+toolchain, no library unit and no label, and an original object that names
+`__modsi3` but not `func_08142950`. Nothing admitted today reaches it, so no
+existing report or verdict changes. In the retry:
+
+1. Every `__modsi3` relocation binds to the pinned entry 0x08142950 with the
+   isolated profile's identity check. The addressed spelling, `__udivsi3`,
+   `__divsi3`, `__umodsi3`, the float and double runtimes, and function
+   literals refuse. So does `__modsi3` or `func_08142950` named in the
+   preprocessed C.
+2. The plain stack-argument buffer proof applies the leaf contract of
+   `runtime_summary_profile` to a BL to that exact entry, restricted to
+   `__modsi3`. This is the default path's own proof, the one that carries the
+   copy-helper and jump-table callee summaries, and no selector's proof gets
+   it. The contract:
+   * native proof of every path of the pinned body and of the `__div0` hook;
+   * no memory operand, and R4-R11 and SP restored;
+   * R0 returns an unknown scalar, and R1-R3, R12, LR and the flags are
+     clobbered;
+   * a tracked local pointer in R0, R1 or LR is refused, and a dead pointer in
+     R3 is discarded only because every return overwrites it.
+3. Every summarised call site needs a numeric operand record, whether it is in
+   the owner or in an inspected callee. `owner_runtime_profile.prove_remainders`
+   computes the record over that walk's CFG. It is either a CFG-constant
+   divisor in 1..0x7FFFFFFF, or a signed16 dividend and a nonzero divisor
+   (`modsi3_profile.prove_operands`). A site without a record refuses, so no
+   admitted remainder divides by zero or computes `INT_MIN % -1`. A
+   `rand() % byte` whose divisor may be 0 stays refused.
+4. A table may sit beside the summary only as the owner switch that the
+   data-buffer proof binds (above). Every other switch context refuses.
+
+The schema stays the plain buffer one (`elf-symbol-thumb-data-buffer-calls-v1`
+or `elf-symbol-thumb-frame-buffer-calls-v2`). The data-buffer manifest names
+each site `__modsi3`. The summary and every record are stated in
+`* buffer signed remainder` lines and bound into the buffer proof fingerprint.
+They are bound only when a site was summarised, so every other fingerprint is
+unchanged. Inside this retry the default stack-index retry still applies to the
+stack-argument walks. A report that needs both carries the `* buffer stack index`
+lines first, then the `* buffer signed remainder` lines, and the fingerprint binds
+both in that order. For example:
+
+```
+* buffer signed remainder: `thumb-compiler-modsi3-numeric-leaf-summary-v1` __modsi3 0x08142950 (102 instructions, e29c5cee2bafd4fc) and __div0 as a native-proved leaf: R0 unknown scalar, R1-R3/R12/LR/flags clobbered, R4-R11/SP restored, no memory operand; no local pointer in R0/R1/LR; no remainder value or range
+* buffer signed remainder: call 0x080AE9B8 (0x080AE7D8+0x1E0): divisor 41 (positive-signed32-constant-divisor); dead scratch discarded: none
+```
+
+`match.py --check-report` reruns the default path, so the retry, the records
+and the lines regenerate from the source. The cached replay runs a report that
+carries these lines with the policy active, and only under those two schemas.
+The data-buffer replay relinks the captured source in the same binding. A
+refused retry keeps the plain refusal first:
+
+```
+signed remainder excludes mixed aliases, addressed calls with data, and other profiles; signed remainder leaf summary: ...
+```
+
+Not proved, as for the selector's summary: the remainder's value or any range
+for it, and termination. The default path is used because the rule adds no
+premise: the leaf contract and the operand records are re-proved from the ROM
+and the bytes on every run. `signed_remainder_leaf_profile.POLICY.enabled =
+False` restores the plain refusal, and a report carrying the lines then fails
+replay.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the
