@@ -1932,7 +1932,8 @@ that proof, authenticated from the ROM bytes with the primitives
 1. the proof is that plain stack-argument instance, bound to one owner only;
 2. `analyze.refine_function` finds exactly one word switch with no interposed
    scalar words, or one behind its dispatch's own literal pool (next section);
-3. the owner graph closes with no local BL control;
+3. the owner graph closes with no local BL control, apart from the switch's own
+   far default arm (below);
 4. the linked switch relocations and direct calls are exactly those the ROM
    bytes give;
 5. the walk re-derives the layout from those table words (`switch_layout`: the
@@ -1952,6 +1953,27 @@ switch's word, not an untyped literal, when the dispatch's load is its only PC
 load. As in the switch profiles (#139), what the cases do with the table base or
 the case address left in registers after the dispatch is not checked: both are
 ROM code addresses, never stack aliases. Each report line states this.
+
+When the shared default block is out of a narrow branch's reach, agbcc
+guards the dispatch with `bls dispatch; bl default`: a same-owner BL that
+`switch_layout` already accepts as the guard's default arm. The walk takes
+that one BL as a jump to the default block that loses LR. It is no call: it
+has no ABI clobbers and no continuation, and LR leaves the return registers
+and loses any constant or alias. Every return the walk reaches after it must
+then come from the saved entry LR with a balanced frame, exactly as after an
+external BL: `bx lr` there, or popping a re-pushed LR into PC, refuses. Any
+other same-owner BL still refuses with `owner switch excludes local BL
+control`. The record gains `far_default` (`guarded-switch-far-default-v1`,
+site and target), bound into the fingerprint, and the line one clause:
+
+```
+; far default arm (guarded-switch-far-default-v1): same-owner BL at 0x080B104A to 0x080B18AE taken as a jump that loses LR; every return re-proved from the saved entry LR
+```
+
+The walk proves the entry-LR return and the balanced frame on every path, but
+not that R4-R11 are restored. The owner-switch walk proves that for no owner,
+and the BL writes only LR. `owner_switch_buffer_profile.FAR_DEFAULT.enabled =
+False` restores the refusal.
 
 An owner without typed objects, the function-literal path, the switch-data
 selectors, and the preloaded and fixed five-word layouts keep their walk and

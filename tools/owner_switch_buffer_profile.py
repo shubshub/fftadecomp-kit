@@ -32,7 +32,11 @@ switch_callee_profile):
    `interposed_pool_switch` (each reserved as data, read by a reached PC load and
    bound by the typed-data proof as an ordinary literal; the report line says so);
 3. `owner_graph_profile.graph` closes the owner CFG with no local BL control
-   (`owner switch excludes local BL control`);
+   (`owner switch excludes local BL control`), apart from the switch's own far
+   default arm: agbcc's `bls dispatch; bl default` guard, a same-owner BL the
+   layout already recognizes.  The walk takes it as a jump that loses LR (no
+   call ABI, no continuation), so every later return must still come from the
+   saved entry LR; the report line states the arm (FAR_DEFAULT);
 4. the linked object's switch relocations and direct calls are exactly those the
    ROM bytes give (`owner switch differs from its linked relocations`);
 5. the walk re-derives the layout from those table words (`match.switch_layout`:
@@ -59,6 +63,18 @@ POLICY = 'guarded-switch-owner-v1'
 LINE = '* buffer owner switch'
 # Stated in each report line: what the typed-literal coverage checks of the table pointer.
 POINTER_RULE = 'table pointer: only PC load is the dispatch, case uses of the table registers unchecked'
+# The switch's own far default arm (a same-owner BL in the guard), taken as a jump that loses LR.
+FAR_DEFAULT_NAME = 'guarded-switch-far-default-v1'
+FAR_DEFAULT_RULE = ('far default arm ({name}): same-owner BL at 0x{site:08X} to 0x{target:08X} taken as a jump '
+                    'that loses LR; every return re-proved from the saved entry LR')
+
+
+class FarDefault:
+    """The far-default arm's single switch; False restores `owner switch excludes local BL control`."""
+    enabled = True
+
+
+FAR_DEFAULT = FarDefault()
 # The plain switch-data manifests (one or several typed objects); every other switch
 # policy keeps its own walk and refusal.
 PLAIN_FIELDS = frozenset(('calls', 'switch', 'data', 'data_policy'))
@@ -67,6 +83,19 @@ PLAIN_FIELDS = frozenset(('calls', 'switch', 'data', 'data_policy'))
 def require(condition, message):
     if not condition:
         raise ValueError(message)
+
+
+def far_default(switch, address, branches):
+    """{site: target} of the switch's own far default BL, the only local BL an owner switch takes.
+
+    branches are the owner graph's same-owner BL edges; any other local BL refuses.
+    """
+    if not branches:
+        return {}
+    site, target = address + switch['guard'] + 2, address + switch['default']
+    require(FAR_DEFAULT.enabled and switch['dispatch'] - switch['comparison'] == 8 and
+            dict(branches) == {site: target}, 'owner switch excludes local BL control')
+    return {site: target}
 
 
 class OwnerSwitch:
@@ -90,7 +119,9 @@ class OwnerSwitch:
         require(len(switches) == 1 and (not switches[0].get('interposed_words', 0) or pool.marked(switches[0])),
                 'owner switch requires one guarded table without scalar words')
         instructions, edges, branches, actual, words = graph.graph(data, address, refinement)
-        require(not branches, 'owner switch excludes local BL control')
+        require(plain or not branches, 'owner switch excludes local BL control')
+        # The walk takes this arm as a jump; match.verify_leaf_instructions re-derives it.
+        self.branches = far_default(switches[0], address, branches)
         require(dict(linked) == words and dict(calls) == actual,
                 'owner switch differs from its linked relocations')
         layout = {key: value for key, value in switches[0].items() if key != 'schema'}
@@ -109,6 +140,10 @@ class OwnerSwitch:
             successors=list(edges[transfer]),
             table_words_sha256=hashlib.sha256(b''.join(
                 data[offset:offset + 4] for offset in sorted(words))).hexdigest())
+        if self.branches:
+            # Only an owner whose switch has the far default arm carries this key.
+            (site, target), = self.branches.items()
+            self.record['far_default'] = dict(policy=FAR_DEFAULT_NAME, site=site, target=target)
         self.cursor = None
         from menu_local_cursor import OWNER, END, MenuCursor
         if plain and address == OWNER and address + len(data) == END:
@@ -129,6 +164,9 @@ class OwnerSwitch:
                   f"adjacent output at SP+{cursor['adjacent_output']}" if cursor else '')
         if 'pool_policy' in record['switch']:
             detail += '; ' + pool.RULE.format(words=record['switch']['interposed_words'])
+        if 'far_default' in record:
+            arm = record['far_default']
+            detail += '; ' + FAR_DEFAULT_RULE.format(name=arm['policy'], site=arm['site'], target=arm['target'])
         return [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
                 f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
                 f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']
