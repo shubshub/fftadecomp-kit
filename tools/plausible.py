@@ -39,8 +39,9 @@ declaration and refuses any difference beyond the documented dead load before
 each member store (tools/volatile_semantics.py).
 
 A qualifier of the addressed `src/<ADDR>.c` that is the SDK's BIOS fill
-temporary, `volatile u16`/`u32` passed by address to CpuSet with a fixed
-source, is admitted where the ROM shows that fill (tools/bios_fill_temporary.py).
+temporary, `volatile u16`/`u32` passed by address to CpuSet, or `volatile u32`
+to CpuFastSet, with a fixed source, is admitted where the ROM shows that fill
+(tools/bios_fill_temporary.py).
 
 A qualifier of the addressed `src/<ADDR>.c` that none of these exceptions
 admits is admitted where the ROM shows its effect (tools/volatile_rom_proof.py):

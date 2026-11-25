@@ -20,6 +20,7 @@ except ImportError:
     capstone = None
 
 CPUSET = "extern void func_0814186C(const void *source, void *destination, unsigned int control);\n"
+FASTSET = "extern void func_08141868(const void *source, void *destination, unsigned int control);\n"
 TYPES = "typedef unsigned char u8;\ntypedef unsigned short u16;\ntypedef unsigned int u32;\n"
 BLOCK = "void func_08000400(u16 *dest) {\n    {\n        volatile u16 tmp = 0;\n" \
         "        func_0814186C((const void *)&tmp, dest, 0x01000100);\n    }\n}\n"
@@ -30,6 +31,15 @@ MACRO = ("#define CpuFill16(value, dest, size)                \\\n"
          "        0x01000000 | ((size) / (16 / 8) & 0x1FFFFF)); \\\n"
          "}\n"
          "void func_08000400(u16 *dest) { CpuFill16(0, dest, 0x40); CpuFill16(0, dest + 0x20, 0x40); }\n")
+FAST = ("#define CpuFastFill(value, dest, size)              \\\n"
+        "{                                                   \\\n"
+        "    volatile u32 tmp = (volatile u32)(value);       \\\n"
+        "    func_08141868((void *)&tmp, (dest),             \\\n"
+        "        0x01000000 | ((size) / (32 / 8) & 0x1FFFFF)); \\\n"
+        "}\n"
+        "extern void func_08001000(u32 *out);\n"
+        "void func_08000400(u32 *dest) {\n    u32 out;\n    func_08001000(&out);\n"
+        "    CpuFastFill(0, dest, 0x80);\n    CpuFastFill(out, dest + 0x40, 0x20);\n}\n")
 
 
 def groups(source):
@@ -53,6 +63,19 @@ class SourceTests(unittest.TestCase):
         self.assertEqual((found["kind"], found["name"], found["temporary"]), ("macro", "CpuFill16", "tmp"))
         self.assertEqual([source[o:o + 8] for o in found["offsets"]], ["volatile", "volatile"])
         self.assertEqual(found["line"], 7)
+
+    def test_a_cpufastset_fill_takes_a_word(self):
+        (found,) = fill.fill_groups(TYPES + FASTSET + FAST)
+        self.assertEqual((found["kind"], found["name"], found["type"], found["callee"]),
+                         ("macro", "CpuFastFill", "u32", "func_08141868"))
+        block = TYPES + CPUSET + BLOCK
+        self.assertEqual(fill.fill_groups(block)[0]["callee"], "func_0814186C")
+        word = block.replace("volatile u16 tmp = 0", "volatile u32 tmp = 0").replace(
+            "func_0814186C((const", "func_08141868((const")
+        (found,) = fill.fill_groups(word)
+        self.assertEqual((found["type"], found["callee"]), ("u32", "func_08141868"))
+        # CpuFastSet reads words only: a halfword temporary is no fill of it
+        self.assertEqual(fill.fill_groups(word.replace("volatile u32 tmp", "volatile u16 tmp")), [])
 
     def test_shapes_that_are_no_fill(self):
         source = TYPES + CPUSET + BLOCK
@@ -100,8 +123,9 @@ def function(insns, name="func_08000400"):
     return proof.Function(proof.parse_dump(dump(name, insns))[name])
 
 
-def fill_insns(uid, offset=-2, control=0x01000100, mode="HI", store=True, frame_r0=True, dest="(reg/v:SI 22)"):
-    """the expand RTL of one fill: the slot's address, the value, the volatile store and the CpuSet call"""
+def fill_insns(uid, offset=-2, control=0x01000100, mode="HI", store=True, frame_r0=True, dest="(reg/v:SI 22)",
+               callee="func_0814186C"):
+    """the expand RTL of one fill: the slot's address, the value, the volatile store and the BIOS call"""
     address = f"(plus:SI (reg:SI 18 virtual-stack-vars) (const_int {offset}))"
     out = [(uid, f"insn (set (reg:SI {uid + 100}) {address}) -1 (nil) (nil)"),
            (uid + 1, f"insn (set (reg:{mode} {uid + 101}) (const_int 0)) -1 (nil) (nil)")]
@@ -112,7 +136,7 @@ def fill_insns(uid, offset=-2, control=0x01000100, mode="HI", store=True, frame_
     out += [(uid + 3, f"insn (set (reg:SI 0 r0) {source}) -1 (nil) (nil)"),
             (uid + 4, f"insn (set (reg:SI 1 r1) {dest}) -1 (nil) (nil)"),
             (uid + 5, f"insn (set (reg:SI 2 r2) (const_int {control})) -1 (nil) (nil)"),
-            (uid + 6, 'call_insn (call (mem:SI (symbol_ref:SI ("func_0814186C")) 0) (const_int 0)) -1 (nil) '
+            (uid + 6, f'call_insn (call (mem:SI (symbol_ref:SI ("{callee}")) 0) (const_int 0)) -1 (nil) '
                       '(nil) (expr_list (use (reg:SI 0 r0)) (nil))')]
     return out
 
@@ -155,6 +179,29 @@ class RtlTests(unittest.TestCase):
                 else:
                     with self.assertRaisesRegex(proof.ProofError, reason):
                         fill.fills(function([ENTRY] + insns))
+
+    def test_a_cpufastset_fill(self):
+        fast = dict(offset=-4, mode="SI", callee="func_08141868")
+        (found,) = fill.fills(function([ENTRY] + fill_insns(10, control=0x01000008, **fast)))
+        self.assertEqual((found["slot"], found["width"], found["control"], found["callee"], found["store_uid"]),
+                         ((18, -4), 4, 0x01000008, "func_08141868", 12))
+        frame = "(plus:SI (reg:SI 18 virtual) (const_int -32))"
+        # one word from -32 ends at -28 for CpuSet; CpuFastSet writes eight, to 0, over the slot at -4
+        word = dict(offset=-4, mode="SI", dest=frame)
+        self.assertEqual(len(fill.fills(function([ENTRY] + fill_insns(10, control=0x05000001, **word)))), 1)
+        for label, insns, reason in (
+                ("a halfword temporary", fill_insns(10, control=0x01000008, callee="func_08141868"),
+                 "passes CpuFastSet a 2-byte temporary"),
+                ("a unit bit", fill_insns(10, control=0x05000008, **fast), "a bit outside 0-20 and 24"),
+                ("a bit above the count", fill_insns(10, control=0x01200008, **fast), "a bit outside 0-20 and 24"),
+                ("no fixed-source bit", fill_insns(10, control=0x00000008, **fast), "without bit 24"),
+                ("eight words over the slot", fill_insns(10, control=0x01000001, dest=frame, **fast),
+                 "passes r1 an address that reaches")):
+            with self.subTest(label=label), self.assertRaisesRegex(proof.ProofError, reason):
+                fill.fills(function([ENTRY] + insns))
+        self.assertEqual(fill.filled(0x01000001, 4, "func_08141868"), 32)
+        self.assertEqual(fill.filled(0x01000009, 4, "func_08141868"), 64)
+        self.assertEqual(fill.filled(0x01000009, 4), 36)
 
     def test_a_removal_keeps_only_stores_the_function_makes(self):
         a, b, moved = (18, -2, 2), (18, -4, 2), (18, -6, 2)
@@ -220,11 +267,12 @@ def encode_bl(at, target):
 ADDRESS = 0x08000400
 
 
-def window(items, uid=7, labels=()):
-    """(rom, compiled, fill) for a function at ADDRESS whose code is items: halfwords, ("bl", target)"""
+def window(items, uid=7, labels=(), control=0x01000100):
+    """(rom, compiled, fill) for a function at ADDRESS whose code is items: halfwords, ("bl", target); each
+    LDR_R2 loads `control` from a literal pool after the code"""
     rom = bytearray(b"\xff" * 0x150000)
     rom[0x14186C:0x141870] = fill.CPUSET_BYTES
-    code, offsets, site = b"", [], None
+    code, offsets, site = bytearray(), [], None
     for item in items:
         offsets.append(len(code))
         if isinstance(item, tuple):
@@ -232,10 +280,16 @@ def window(items, uid=7, labels=()):
             code += encode_bl(ADDRESS + len(code), item[1])
         else:
             code += thumb(item)
+    pool = len(code) + 3 & ~3
+    code += bytes(pool - len(code)) + struct.pack("<I", control)
+    for item, at in zip(items, offsets):
+        if item == LDR_R2:
+            code[at:at + 2] = thumb(LDR_R2 | (pool - (at + 4 & ~3)) // 4)
+    code = bytes(code)
     rom[ADDRESS - fill.BASE:ADDRESS - fill.BASE + len(code)] = code
     compiled = {"text": (code, 0, len(code), []), "layout": (offsets, set(labels)), "uids": {uid: [(site, "bl")]}}
     return bytes(rom), compiled, {"call": proof.Insn(["call_insn", str(uid), "0", "0", ["call"]], 0), "width": 2,
-                                  "control": 0x01000100}
+                                  "control": control}
 
 
 ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1 = 0xA90E, 0x2000, 0x8008
@@ -263,8 +317,7 @@ class RomTests(unittest.TestCase):
     def test_r1_must_miss_the_slot(self):
         # the slot is sp+0x38; r1 = sp+0x30 with four halfwords ends at it, five reach it, sp+0x38 is it
         shape = [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, 0xA90C, ADD_R0_SP_38, LDR_R2, ("bl", 0x0814186C)]
-        rom, compiled, one = window(shape)
-        one.update(control=0x01000004)
+        rom, compiled, one = window(shape, control=0x01000004)
         self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
         for label, items, control, reason in (
                 ("a fill that runs into it", shape, 0x01000005, "passes r1 sp\\+0x30, which reaches"),
@@ -273,7 +326,52 @@ class RomTests(unittest.TestCase):
                 ("r3 in the slot", [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, LDR_R1, 0xAB0E, ADD_R0_SP_38, LDR_R2,
                                     ("bl", 0x0814186C)], 0x01000100, "passes r3 sp\\+0x38, which reaches")):
             with self.subTest(label=label):
-                rom, compiled, one = window(items)
+                rom, compiled, one = window(items, control=control)
+                with self.assertRaisesRegex(proof.ProofError, reason):
+                    fill.rom_fill(rom, ADDRESS, compiled, one)
+
+    def test_a_cpufastset_fill_in_the_rom(self):
+        # 0801A176: movs r0, #0; str r0, [sp]; ldr r1, [sp, #0xc]; ldr r2, =0x010013F8; mov r0, sp; bl CpuFastSet
+        fast = dict(width=4, callee="func_08141868")
+        items = [MOVS_R0_0, 0x9000, 0x9903, LDR_R2, 0x4668, ("bl", 0x08141868)]
+        rom, compiled, one = window(items, control=0x010013F8)
+        one.update(fast)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 10, 0, ADDRESS + 8))
+        rom, compiled, one = window(items[:-1] + [("bl", 0x0814186C)], control=0x010013F8)
+        one.update(fast)
+        with self.assertRaisesRegex(proof.ProofError, "does not reach 08141868"):
+            fill.rom_fill(rom, ADDRESS, compiled, one)
+        # the slot is sp+0x1c and r1 is sp: one word misses it, CpuFastSet's run of eight reaches it
+        items = [MOVS_R0_0, 0x9007, 0xA900, LDR_R2, 0xA807]
+        rom, compiled, one = window(items + [("bl", 0x0814186C)], control=0x05000001)
+        one.update(width=4)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x1C)
+        rom, compiled, one = window(items + [("bl", 0x08141868)], control=0x01000001)
+        one.update(fast)
+        with self.assertRaisesRegex(proof.ProofError, "passes r1 sp\\+0x0, which reaches"):
+            fill.rom_fill(rom, ADDRESS, compiled, one)
+
+    def test_r2_set_in_the_line_must_be_the_control_word(self):
+        shape = [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, LDR_R1, LDR_R2, ADD_R0_SP_38, ("bl", 0x0814186C)]
+        rom, compiled, one = window(shape, control=0x01000040)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
+        # an immediate shifted into place: movs r2, #0x81; lsls r2, r2, #17; adds r2, #0x20
+        built = shape[:4] + [0x2281, 0x0452, 0x3220] + shape[5:]
+        rom, compiled, one = window(built, control=0x01020020)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
+        # agbcc may keep the constant in a callee-saved register across calls (adds r2, r6, #0): the line does not
+        # show it, and the control word is the RTL's (fills)
+        rom, compiled, one = window(shape[:4] + [0x1C32] + shape[5:], control=0x01000040)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
+        # a literal that a load then replaces (ldr r2, [sp, #8]) is no longer what r2 holds
+        rom, compiled, one = window(shape[:5] + [0x9A02] + shape[5:], control=0x01000040)
+        one.update(control=0x01000080)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
+        for label, items, control, reason in (
+                ("another literal", shape, 0x01000080, "r2 holds 0x01000040 at the BL"),
+                ("another immediate", built, 0x01020000, "r2 holds 0x01020020 at the BL")):
+            with self.subTest(label=label):
+                rom, compiled, one = window(items, control=0x01000040 if items is shape else 0x01020020)
                 one.update(control=control)
                 with self.assertRaisesRegex(proof.ProofError, reason):
                     fill.rom_fill(rom, ADDRESS, compiled, one)
@@ -300,14 +398,17 @@ class RomTests(unittest.TestCase):
 
 class IdentityTests(unittest.TestCase):
     def test_cpuset_must_be_the_bios_call_in_the_rom(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "src").mkdir()
-            source = TYPES + CPUSET + BLOCK
-            (root / "src" / "08000400.c").write_text(source)
-            rom = bytearray(b"\xff" * 0x150000)
-            with self.assertRaisesRegex(proof.ProofError, "swi 0x0B"):
-                fill.prove(root, root, "src/08000400.c", source, set(), rom=bytes(rom))
+        for label, source, bios, reason in (
+                ("CpuSet", TYPES + CPUSET + BLOCK, (0x14186C, fill.CPUFASTSET_BYTES), "swi 0x0B"),
+                ("CpuFastSet", TYPES + FASTSET + FAST, (0x141868, fill.CPUSET_BYTES), "swi 0x0C")):
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "src").mkdir()
+                (root / "src" / "08000400.c").write_text(source)
+                rom = bytearray(b"\xff" * 0x150000)
+                rom[bios[0]:bios[0] + 4] = bios[1]
+                with self.assertRaisesRegex(proof.ProofError, reason):
+                    fill.prove(root, root, "src/08000400.c", source, set(), rom=bytes(rom))
 
 
 @unittest.skipUnless(shutil.which("cpp"), "cpp required")
@@ -335,8 +436,8 @@ COMPILER = Path(os.path.expandvars(proof.CC)).is_file() and shutil.which("cpp") 
 class CompiledTests(unittest.TestCase):
     """the rule through agbcc, on a ROM built around each compiled function"""
 
-    def run_fill(self, body):
-        source = TYPES + CPUSET + body
+    def run_fill(self, body, head=CPUSET):
+        source = TYPES + head + body
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / "src").mkdir()
@@ -347,16 +448,17 @@ class CompiledTests(unittest.TestCase):
                 text, start, size, relocations = unit.compile("probe", unit.real, "func_08000400")["text"]
             rom = bytearray(b"\xff" * 0x150000)
             rom[0x14186C:0x141870] = fill.CPUSET_BYTES
+            rom[0x141868:0x14186C] = fill.CPUFASTSET_BYTES
             rom[ADDRESS - fill.BASE:ADDRESS - fill.BASE + size] = text[start:start + size]
             for at, kind, name in relocations:
                 if kind == 10:
                     site = ADDRESS + at - start
-                    target = {"func_0814186C": 0x0814186C}.get(name, 0x08001000)
+                    target = {"func_0814186C": 0x0814186C, "func_08141868": 0x08141868}.get(name, 0x08001000)
                     rom[site - fill.BASE:site - fill.BASE + 4] = encode_bl(site, target)
             return fill.prove(root, root, "src/08000400.c", source, set(), rom=bytes(rom))
 
-    def states(self, body):
-        return [state for _, (state, _) in self.run_fill(body)]
+    def states(self, body, head=CPUSET):
+        return [state for _, (state, _) in self.run_fill(body, head)]
 
     def test_the_sdk_block_and_macro_are_admitted(self):
         two = ("void func_08000400(u16 *dest) {\n    {\n        volatile u16 tmp = 0;\n"
@@ -375,6 +477,25 @@ class CompiledTests(unittest.TestCase):
                  "        volatile u16 tmp = 0;\n        func_0814186C((const void *)&tmp, dest, 0x01000100);\n"
                  "    }\n}\n")
         self.assertEqual(self.states(fifth), ["admitted"])
+
+    def test_the_sdk_fast_fill_is_admitted(self):
+        result = self.run_fill(FAST, FASTSET)
+        self.assertEqual([state for _, (state, _) in result], ["admitted", "admitted"], result)
+        text = result[0][1][1]
+        self.assertIn("(macro CpuFastFill, used 2 times)", text)
+        self.assertIn("control 0x01000020, 4-byte units", text)
+        self.assertIn("08141868 is `swi 0x0C; bx lr` in the ROM", text)
+        self.assertNotIn("0814186C", text)
+        local = "extern void func_08001000(u32 *out);\nvoid func_08000400(u32 *dest) {\n    u32 out;\n" \
+                "    func_08001000(&out);\n"
+        block = local + ("    {\n        volatile u32 fill = out;\n\n"
+                         "        func_08141868((const void *)&fill, dest, 0x01000400);\n    }\n}\n")
+        self.assertEqual(self.states(block, FASTSET), ["admitted"])
+
+    def test_a_fast_fill_the_rom_does_not_show_refuses(self):
+        for control, reason in (("0x00000020", "without bit 24"), ("0x05000020", "a bit outside 0-20 and 24")):
+            with self.subTest(control=control), self.assertRaisesRegex(proof.ProofError, reason):
+                self.run_fill(FAST.replace("0x01000000 |", f"{control} |"), FASTSET)
 
     def test_a_qualifier_that_changes_nothing_refuses(self):
         # the second arm's temporary compiles alike without its qualifier: the ROM does not show it
