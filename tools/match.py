@@ -4960,6 +4960,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         raise ValueError("switch-data requires a verified local switch")
     root_buffer_switch = False
     cursor = None
+    # The owner switch's own far default arm (owner_switch_buffer_profile.far_default).
+    owner_switch_branches = {}
     if switch_relocations is not None:
         from named_data_buffer_profile import root_switch_context
         from owner_switch_buffer_profile import context as owner_switch_context
@@ -4967,6 +4969,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                                             switch_relocations, switch_data_relocations)
         if owner_switch:
             cursor = buffer_proof.owner_switch.cursor
+            owner_switch_branches = dict(buffer_proof.owner_switch.branches)
         root_buffer_switch = owner_switch or root_switch_context(buffer_proof, data, address,
             validated_calls, switch_relocations, switch_data_relocations)
         if not thumb or buffer_proof is not None and not root_buffer_switch or call_resolver is not None:
@@ -5136,6 +5139,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         # across these edges and refuses an LR read after one; the restoring
         # frame proof below re-proves every edge.
         local_branch = (calling and (menu_list_frame is not None and current in menu_list_frame.BRANCHES or
+                                     current in owner_switch_branches or
                                      double_context is not None or switch_outgoing_stack is not None or
                                      addressed_signed_runtime.local_branches(addressed_signed_runtime_context)) and
                         len(operands) == 1 and operands[0].type == ARM_OP_IMM and
@@ -5143,6 +5147,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if local_branch:
             from local_long_branch_profile import target as local_target
             local_branches[current] = local_target(instruction, address, end)
+            if current in owner_switch_branches and local_branches[current] != owner_switch_branches[current]:
+                raise ValueError("owner switch far default differs from its authenticated owner graph")
             calling = False
         if CS_GRP_INT in instruction.groups or calling and not (calls or call_resolver):
             raise ValueError("non-leaf calls and interrupts require linked CFG verification")
@@ -5916,6 +5922,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if type(menu_list_frame) is not MenuListFrame or type(buffer_proof) is not FunctionBufferCallProof:
             raise ValueError("menu list long branches require the typed function-buffer walk")
         menu_list_frame.finish(data, address, instructions, edges, local_branches, calls, buffer_proof)
+    elif local_branches and owner_switch_branches:
+        # The owner switch's far default arm only: the walk above took it as a jump that loses LR
+        # (LR left the return registers, constants and aliases), so each return it reached was
+        # proved from the saved entry LR with a balanced frame, as after any external BL.
+        if local_branches != owner_switch_branches:
+            raise ValueError("owner switch walk took a local BL other than its far default arm")
     elif local_branches:
         from local_long_branch_profile import prove_frame
         prove_frame(instructions, edges, address, local_branches, calls)
