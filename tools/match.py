@@ -43,6 +43,7 @@ import m4a_track_switch as music
 import modsi3_profile as modsi3
 import divsi3_profile as divsi3
 import division_switch_profile as division_switches
+import signed_remainder_leaf_profile as remainder_leaf
 import signed_divmod_profile as signed_divmod
 import unsigned_divmod_profile as unsigned_divmod
 import addressed_signed_runtime_profile as addressed_signed_runtime
@@ -868,6 +869,8 @@ def call_bindings(image, name, address, mapping, rom_size,
     data_relocations = {}
     data_symbols = parse_data_symbols(data_mapping)
     occupied = set()
+    # Compiler __modsi3 sites bound for the default path's leaf summary retry only.
+    leaf_remainders = {}
     for section_index in image["relocations"]:
         section = image["sections"][section_index]
         if section[1] != 9 or section[7] != image["text_index"] or \
@@ -1010,7 +1013,11 @@ def call_bindings(image, name, address, mapping, rom_size,
                 target = divsi3.ADDRESS
                 candidates = []
             elif remainder:
-                if modsi3_bindings is None:
+                if remainder_leaf.active():
+                    # The default-path retry: only compiler __modsi3, summarised by the buffer walk.
+                    if target_symbol["name"] != remainder_leaf.NAME or double_bindings is not None or modsi3_bindings:
+                        raise ValueError("signed remainder leaf summary binds only compiler __modsi3 calls")
+                elif modsi3_bindings is None:
                     raise ValueError("signed remainder requires its isolated binding profile")
                 if double_bindings is not None and target_symbol["name"] != "__modsi3":
                     raise ValueError("software-double composition requires canonical __modsi3 provenance")
@@ -1082,7 +1089,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                     raise ValueError("division call relocation has a noncanonical addend")
                 bindings = (float_bindings if float_operation else ashldi3_bindings if left_shift else umodsi3_bindings if unsigned_remainder else
                             double_bindings if double_operation else divsi3_bindings if quotient else
-                            modsi3_bindings if remainder else udivsi3_bindings)
+                            (leaf_remainders if remainder_leaf.active() else modsi3_bindings) if remainder else
+                            udivsi3_bindings)
                 bindings[address + relocation] = target_symbol["name"]
             positions = set(range(relocation, relocation + 4))
             if positions & occupied:
@@ -1091,6 +1099,10 @@ def call_bindings(image, name, address, mapping, rom_size,
             calls[address + relocation] = target
             if not own_entry:
                 targets[target_symbol["name"]] = target
+    if leaf_remainders and (udivsi3_bindings or divsi3_bindings or umodsi3_bindings or ashldi3_bindings or
+                            float_bindings or double_bindings is not None or function_relocations or
+                            function_thunks or signed_runtime_profile is not None):
+        raise ValueError("signed remainder leaf summary excludes other runtimes and function literals")
     if signed_runtime_profile is not None and (not divsi3_bindings or not modsi3_bindings or
             set(modsi3_bindings.values()) != {'__modsi3'}):
         raise ValueError('signed divmod requires both canonical original runtime relocations')
@@ -1192,6 +1204,7 @@ def call_bindings(image, name, address, mapping, rom_size,
         data_names = {binding[0] for binding in data_relocations.values()}
         for target_name in targets:
             if target_name not in data_names and target_name not in composed_thunks and not (
+                    target_name == remainder_leaf.NAME and leaf_remainders) and not (
                     function_thunks and target_name in function_thunk.ALIASES) and not (
                     target_name == "__divsi3" and divsi3_bindings and division_switches.POLICY.enabled) and not (double_bindings is not None and
                     (software_double.call_target(target_name) is not None or target_name == "__modsi3")):
@@ -1422,7 +1435,12 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
     elif divsi3_bindings:
         raise ValueError("signed quotient bindings have no linked runtime")
     remainder_targets = {name: target for name, target in targets.items() if modsi3.reserved(target)}
-    if remainder_targets:
+    if remainder_targets and remainder_leaf.active():
+        if remainder_targets != {remainder_leaf.NAME: modsi3.ADDRESS} or modsi3_bindings or \
+                double_bindings is not None or function_relocations or \
+                any(target != modsi3.ADDRESS for target in calls.values() if modsi3.reserved(target)):
+            raise ValueError("linked signed remainder leaf bindings are incomplete or mixed")
+    elif remainder_targets:
         if not isinstance(modsi3_bindings, dict) or not modsi3_bindings or \
                 set(modsi3_bindings.values()) not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
                 double_bindings is not None and set(modsi3_bindings.values()) != {"__modsi3"} or \
@@ -3533,6 +3551,11 @@ class BufferCallProof:
             if type(self) is not BufferCallProof or stack_arguments is not True:
                 raise ValueError("switch callees require the plain stack-argument buffer proof")
             self.switch_callees = SwitchCallees(rom, mapping, switch_callee_index)
+        if remainder_leaf.active() and type(self) is BufferCallProof and stack_arguments is True and \
+                copy_helper_index is not None:
+            # The default path's signed remainder retry: this plain stack-argument instance
+            # summarises compiler __modsi3 (signed_remainder_leaf_profile); no other proof does.
+            self.runtime_summaries = remainder_leaf.summaries(rom, mapping, copy_helper_index)
         if dead_registers is not False:
             if dead_registers is not True or stack_arguments is not True or \
                     type(self) not in (BufferCallProof, FunctionBufferCallProof):
@@ -4279,6 +4302,8 @@ class BufferCallProof:
         if self.stack_index_retry is not None:
             import default_stack_index_profile as default_index
             lines.extend(default_index.lines(self.stack_index_retry))
+        if remainder_leaf.is_summaries(self.runtime_summaries):
+            lines.extend(self.runtime_summaries.lines())
         return lines
 
     def record_cursor_loops(self, records):
@@ -4345,6 +4370,9 @@ class BufferCallProof:
             # Only a walk the default stack-index retry admitted adds this.
             digest.update(json.dumps(self.stack_index_retry, sort_keys=True,
                                      separators=(",", ":")).encode())
+        if remainder_leaf.is_summaries(self.runtime_summaries) and self.runtime_summaries.sites:
+            # Only a summarised compiler __modsi3 call adds this.
+            digest.update(self.runtime_summaries.digest_text().encode())
         return digest.hexdigest()
 
     def buffer_evidence(self):
@@ -4463,9 +4491,18 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         from transfer_mask_argument import MaskedArgumentProof, ROOT
         if type(masked_argument_proof) is not MaskedArgumentProof or address != ROOT or masked_argument_proof.data != data:
             raise ValueError("masked argument proof requires its original transfer leaf")
+    if runtime_summaries is None and buffer_proof is not None and \
+            remainder_leaf.is_summaries(getattr(buffer_proof, "runtime_summaries", None)):
+        # The owner walk of the default path's signed remainder retry adopts its proof's summary.
+        runtime_summaries = buffer_proof.runtime_summaries
     if runtime_summaries is not None:
         from runtime_summary_profile import RuntimeSummaries
-        if type(runtime_summaries) is not RuntimeSummaries or not thumb or any(
+        leaf_summaries = remainder_leaf.is_summaries(runtime_summaries)
+        # The only table beside the leaf summary is the owner switch its data-buffer proof bound.
+        owner_table = leaf_summaries and switch_relocations is not None and \
+            owner_switch_buffer.context(buffer_proof, data, address, validated_calls, switch_relocations,
+                                        switch_data_relocations)
+        if type(runtime_summaries) is not RuntimeSummaries and not leaf_summaries or not thumb or any(
                 value is not None for value in (udivsi3_context, modsi3_context, divsi3_context,
                     double_context, function_thunk_context, umodsi3_context, ashldi3_context, float_context,
                     signed_quotient_profile, signed_runtime_context, remainder_inventory_context,
@@ -4475,8 +4512,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                     zero_aware_mixed_inventory_context, zero_aware_unsigned_quotient_inventory_context,
                     addressed_signed_runtime_context, entry_recursive_calls, unsigned_quotient_profile,
                     self_calls, ignored_leaf_alias_proof, finite_small_copy_context,
-                    typed_switch_outgoing_frame, switch_relocations, switch_data_relocations,
-                    switch_constants_policy, inert_spin_context, acyclic_state_budget,
+                    typed_switch_outgoing_frame, None if owner_table else switch_relocations,
+                    switch_data_relocations, switch_constants_policy, inert_spin_context, acyclic_state_budget,
                     stack_pointer_compare_profile)) or preloaded_switch or allow_switch_constants or \
                 allow_switch_scalar_frame or backward_switch_cases or buffer_proof is None or \
                 buffer_proof.runtime_summaries is not runtime_summaries:
@@ -5824,6 +5861,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         shift = ashldi3.for_bindings(ashldi3_context[3])
         if hasattr(shift, "prove_counts"):
             shift.prove_counts(instructions, edges, address, ashldi3_context[3], data)
+    if remainder_leaf.is_summaries(runtime_summaries):
+        # Every summarised compiler __modsi3 site this walk reached gets its numeric operand
+        # record; the owner's walk ends after every inspected callee's, so it checks them all.
+        runtime_summaries.record(instructions, edges, address, local_branches, calls, data)
+        if not buffer_proof.active:
+            runtime_summaries.complete()
     if signed_numeric:
         # Canonical double and explicit framed inventory reuse the complete local
         # stack/save/restore proof. The operand proof remains register-only:
@@ -6591,6 +6634,8 @@ def main():
             if unit_context is not None:
                 object_data, text_data, original, unit_orphan = library_units.exclude_orphan_constants(
                     runner, workspace, args, object_data, addr, rom, mapping, data_mapping, empty_index)
+            if remainder_leaf.active():
+                remainder_leaf.namespace(runner.read_binary(f"{workspace}/f.i").decode("utf-8"))
             calls = {}
             data_relocations = {}
             function_relocations = {}
@@ -7026,10 +7071,25 @@ def main():
             if dma_fills is not None and dma_fills.records and not uses_stack_frame(verified_instructions):
                 # render_report writes the block after the stack-frame line; refuse here, before writing
                 raise ValueError("DMA fill records require the stack-frame line")
+            if remainder_leaf.active():
+                remainder_leaf.require_summarised(buffer_proof, calls)
     except Exception as e:                       # noqa: BLE001
+        if remainder_leaf.active():
+            sys.exit(f"compile failed:\n{e}")
         routed = addressed_signed_runtime.COMPILER_THUNKS_POLICY
+        leaf = remainder_leaf.POLICY
         if routed.applies(args, gate, original):
-            return selector_issue(routed.issue(e))
+            if not leaf.applies(args, gate, original, e):
+                return selector_issue(routed.issue(e))
+            # The signed remainder leaf retry runs only after the compiler-thunk route refused.
+            try:
+                return selector_issue(routed.issue(e))
+            except SystemExit as stop:
+                if not leaf.routed_refusal(stop, e):
+                    raise
+                return leaf.retry(main, stop.code)
+        if leaf.applies(args, gate, original, e):
+            return leaf.retry(main, f"compile failed:\n{e}")
         sys.exit(f"compile failed:\n{e}")
 
     if len(got) < span:

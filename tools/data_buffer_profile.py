@@ -83,6 +83,9 @@ def report_lines(schema, address, data, manifest, source_digest, mapping, object
 
 def call_name(target):
     from match import RUNTIME_HELPERS
+    import signed_remainder_leaf_profile as remainder_leaf
+    if target == remainder_leaf.ADDRESS and remainder_leaf.active():
+        return remainder_leaf.NAME  # bound only from compiler __modsi3 relocations
     names = [name for name, value in RUNTIME_HELPERS.items() if value == target]
     return names[0] if names else f"func_{target:08X}"
 
@@ -175,6 +178,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             if offset % 2 or not 0 <= offset <= len(data) - 4 or \
                     occupied & set(range(offset, offset + 4)):
                 raise ValueError("data-buffer calls must be complete instructions outside literal words")
+            if target == match.remainder_leaf.ADDRESS and match.remainder_leaf.active():
+                continue  # the pinned compiler __modsi3 the walk summarises (signed_remainder_leaf_profile)
             if target in match.RUNTIME_HELPERS.values():
                 if not match.thunk_is_call_via(rom, target, (target - match.RUNTIME_HELPERS["_call_via_r0"]) // 4):
                     raise ValueError("data-buffer call target does not match its runtime thunk")
@@ -271,6 +276,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                        plausibility_result)
     from match_evidence import source_paths, source_fingerprint, mapping_snapshot, data_snapshot, report_rom_path
     from inert_spin_profile import index_snapshot
+    import signed_remainder_leaf_profile as remainder_leaf
     if _replay_active.get():
         raise ValueError("recursive data-buffer replay is unsupported")
     token = _replay_active.set(True)
@@ -301,6 +307,8 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
             with runner.workspace() as workspace:
                 _, _, original = compile_object(runner, workspace, args, captured, address,
                                                 candidates[0].relative_to(root).as_posix())
+                if remainder_leaf.active():
+                    remainder_leaf.namespace(runner.read_binary(f"{workspace}/f.i").decode("utf-8"))
                 functions, switches = {}, {}
                 got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
                                                   len(rom), rom, objects, functions, switches,
@@ -329,11 +337,13 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee, dead-register, BIOS premise, DMA fill premise and stack-index lines may repeat.
+# copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, DMA fill premise and stack-index
+# lines may repeat.
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
-          "* buffer owner switch", "* buffer dead register", "* mapping SHA-256", "* control flow",
+          "* buffer owner switch", "* buffer dead register", "* buffer signed remainder", "* mapping SHA-256",
+          "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
