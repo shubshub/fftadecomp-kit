@@ -182,7 +182,14 @@ class OneObjectOrdinaryCycleInventoryTests(unittest.TestCase):
         self.assertEqual(self.manifest['numeric_input_preconditions'],[])
         self.assertEqual(self.manifest['object_word']['value'],D)
         self.assertTrue(self.manifest['object_word']['load_sites'])
-        self.assertFalse(owner.refine(self.body,A,self.mapping)['cfg_closed'])
+        # Without the interposed-pool rule the default owner refinement stops at the dispatch; with it,
+        # the table is placed behind its pool and marked as that rule's (interposed_pool_switch).
+        import interposed_pool_switch as pool
+        from unittest import mock
+        with mock.patch.object(pool.POLICY, 'enabled', False):
+            self.assertFalse(owner.refine(self.body, A, self.mapping)['cfg_closed'])
+        placed = owner.refine(self.body, A, self.mapping)['word_switches']
+        self.assertTrue(placed and all(pool.marked(switch) for switch in placed))
         with self.assertRaises(ValueError):graph.graph(self.body,A,self.refinement)
         with self.assertRaises(ValueError):self.native(selector='one-object-word-udiv-div-target-state-inventory-v1')
         run=subprocess.run([sys.executable,str(Path(profile.__file__)),'--profile',profile.SELECTOR,

@@ -45,6 +45,7 @@ import divsi3_profile as divsi3
 import division_switch_profile as division_switches
 import signed_remainder_leaf_profile as remainder_leaf
 import signed_divmod_profile as signed_divmod
+import interposed_pool_switch as pool_table_rule
 import unsigned_divmod_profile as unsigned_divmod
 import addressed_signed_runtime_profile as addressed_signed_runtime
 import umodsi3_profile as umodsi3
@@ -2261,7 +2262,19 @@ def selected_switch_layout(data, address, relocations, data_relocations=None,
             all(type(offset) is int for offset in relocations) and \
             preloaded_switch_encoding(data, address, min(relocations)) is not None:
         return preloaded_switch_layout(data, address, relocations, data_relocations)
-    return switch_layout(data, address, relocations, data_relocations, allow_backward_cases=True)
+    try:
+        return switch_layout(data, address, relocations, data_relocations, allow_backward_cases=True)
+    except ValueError as error:
+        if not pool_table_rule.POLICY.enabled:
+            raise
+        # Only where the fixed layouts refuse: the table behind its dispatch's literal pool
+        # (interposed_pool_switch). No walk takes this descriptor as it is: the buffer-free
+        # switch walk re-derives its fixed layout and refuses, and the owner-switch
+        # data-buffer proof re-derives the table from the ROM bytes.
+        try:
+            return switch_layout(data, address, relocations, data_relocations, interposed_pool=True)
+        except ValueError:
+            raise error from None
 
 
 def preloaded_switch_layout(data, address, relocations, data_relocations):
@@ -4962,6 +4975,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             switch = (constants_layout(data, address, switch_relocations, switch_constants_policy)
                       if switch_constants_policy is not None else
                       constants_layout(data, address, switch_relocations))
+            reserved.update(range(address + switch["dispatch"] + 10,
+                                  address + switch["literal"]))
+        elif owner_switch and pool_table_rule.marked(buffer_proof.owner_switch.record["switch"]):
+            # The owner switch's table behind its own literal pool (interposed_pool_switch):
+            # the alignment and pool words stay data; the typed-data proof binds each read word.
+            switch = switch_layout(data, address, switch_relocations, None, interposed_pool=True)
+            if any(buffer_proof.owner_switch.record["switch"].get(key) != value for key, value in switch.items()):
+                raise ValueError("owner switch pool layout differs from its authenticated owner")
             reserved.update(range(address + switch["dispatch"] + 10,
                                   address + switch["literal"]))
         elif switch_interposed_pool:

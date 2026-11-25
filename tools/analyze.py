@@ -202,11 +202,13 @@ def refinement_ranges(intervals):
 def refinement_word_switch(data, address, position, end, engine, *,
                            same_owner_long_branches=False, one_object_word_switch=False,
                            two_constant_word_switch=False, one_numeric_word_switch=False,
-                           multiple_switch_profile=None):
+                           multiple_switch_profile=None, interposed_pool_switch=False):
     """Recognize one adjacent guarded word table within the bounded window.
 
     This reuses the byte-exact matching parser, without inventing ELF relocation
     provenance. The enclosing CFG must separately prove the guard predecessors.
+    interposed_pool_switch (interposed_pool_switch.py) places a table behind its
+    dispatch's literal pool, only where no other layout finds one.
     """
     if type(one_numeric_word_switch) is not bool or one_numeric_word_switch and (
             one_object_word_switch or two_constant_word_switch):
@@ -232,6 +234,7 @@ def refinement_word_switch(data, address, position, end, engine, *,
         return None
     literal = (((address + dispatch + 6) & ~3) + load.operands[1].mem.disp) - address
     candidates = []
+    pooled = []
     for guard_size in ((4, 6, 8) if same_owner_long_branches else (4, 6)):
         compare = instruction(dispatch - guard_size)
         if compare is None or compare.mnemonic != "cmp" or \
@@ -245,6 +248,12 @@ def refinement_word_switch(data, address, position, end, engine, *,
             continue
         relocations = {offset: struct.unpack_from("<I", data, offset)[0] - address
                        for offset in range(literal, table_end, 4)}
+        if interposed_pool_switch:
+            from interposed_pool_switch import refine as pool_refine
+            descriptor = pool_refine(data[:end - address], address, relocations,
+                                     dispatch, dispatch - guard_size)
+            if descriptor is not None:
+                pooled.append(descriptor)
         from match import switch_layout
         for interposed_words in ((0,) if backward else (0, 5)):
             if interposed_words and guard_size != 6:
@@ -282,6 +291,9 @@ def refinement_word_switch(data, address, position, end, engine, *,
             if descriptor["dispatch"] == dispatch and descriptor["comparison"] == dispatch - guard_size:
                 descriptor["interposed_words"] = 1
                 candidates.append(descriptor)
+    if not candidates and interposed_pool_switch:
+        # Only where every fixed layout found no table.
+        return pooled[0] if len(pooled) == 1 else None
     return candidates[0] if len(candidates) == 1 else None
 
 
@@ -369,7 +381,7 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     same_owner_long_branches=False, full_rom_inventory=False,
                     arm_inventory=False, one_object_word_switch=False,
                     two_constant_word_switch=False, one_numeric_word_switch=False,
-                    multiple_switch_profile=None):
+                    multiple_switch_profile=None, interposed_pool_switch=False):
     """Inspect a byte window beginning at an indexed entry, with ARM opt-in.
 
     The opt-in local-long-branch discovery still grants no ABI or match admission;
@@ -437,6 +449,11 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
         fail("one-numeric-word switch inventory opt-in must be Boolean")
     if one_numeric_word_switch and (one_object_word_switch or two_constant_word_switch):
         fail("numeric switch opt-in cannot combine object or two-constant layouts")
+    if type(interposed_pool_switch) is not bool:
+        fail("interposed-pool switch inventory opt-in must be Boolean")
+    elif interposed_pool_switch and (one_object_word_switch or two_constant_word_switch or
+                                     one_numeric_word_switch or multiple_switch_profile is not None):
+        fail("interposed-pool switch opt-in cannot combine other switch layouts")
     if reasons:
         result["partial_reasons"] = sorted(reasons)
         return result
@@ -664,7 +681,8 @@ def refine_function(data, address, functions, max_bytes=4096, max_instructions=1
                     one_object_word_switch=one_object_word_switch,
                     two_constant_word_switch=two_constant_word_switch,
                     one_numeric_word_switch=one_numeric_word_switch,
-                    multiple_switch_profile=multiple_switch_profile)
+                    multiple_switch_profile=multiple_switch_profile,
+                    interposed_pool_switch=interposed_pool_switch)
                 if switch is None:
                     fail("unresolved jump", position)
                     continue

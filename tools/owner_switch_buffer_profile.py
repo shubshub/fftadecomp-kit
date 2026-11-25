@@ -27,7 +27,10 @@ switch_callee_profile):
    (the instance with jump-table callee summaries), bound to one owner only
    (`owner switch requires the default plain stack-argument buffer proof`);
 2. `analyze.refine_function` finds exactly one word switch, with no interposed
-   scalar words (`owner switch requires one guarded table without scalar words`);
+   scalar words (`owner switch requires one guarded table without scalar words`),
+   unless the words are the dispatch's own literal pool placed by
+   `interposed_pool_switch` (each reserved as data, read by a reached PC load and
+   bound by the typed-data proof as an ordinary literal; the report line says so);
 3. `owner_graph_profile.graph` closes the owner CFG with no local BL control
    (`owner switch excludes local BL control`);
 4. the linked object's switch relocations and direct calls are exactly those the
@@ -78,12 +81,13 @@ class OwnerSwitch:
         indexed_leaf = type(proof) is StackIndexV2BufferProof and not calls
         require((plain or indexed_leaf) and proof.stack_arguments is True and proof.owner_switch is None,
                 'owner switch requires the default plain stack-argument buffer proof or a bounded-index leaf')
+        import interposed_pool_switch as pool
         data = bytes(data)
         refinement = analyze.refine_function(data, address, json.loads(json.dumps(proof.entries)),
             max_bytes=len(data), max_instructions=len(data) // 2, rom_end=0x09000000,
-            same_owner_long_branches=True)
+            same_owner_long_branches=True, interposed_pool_switch=pool.POLICY.enabled)
         switches = refinement['word_switches']
-        require(len(switches) == 1 and not switches[0].get('interposed_words', 0),
+        require(len(switches) == 1 and (not switches[0].get('interposed_words', 0) or pool.marked(switches[0])),
                 'owner switch requires one guarded table without scalar words')
         instructions, edges, branches, actual, words = graph.graph(data, address, refinement)
         require(not branches, 'owner switch excludes local BL control')
@@ -118,10 +122,13 @@ class OwnerSwitch:
         return self.record
 
     def lines(self):
+        import interposed_pool_switch as pool
         record = self.evidence()
         cursor = record.get('local_cursor')
         detail = (f"; counted local STM at 0x{cursor['store']:08X} through SP offsets {cursor['offsets']}, "
                   f"adjacent output at SP+{cursor['adjacent_output']}" if cursor else '')
+        if 'pool_policy' in record['switch']:
+            detail += '; ' + pool.RULE.format(words=record['switch']['interposed_words'])
         return [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
                 f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
                 f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']

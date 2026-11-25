@@ -474,9 +474,11 @@ def selector_for_report(report):
 
 
 def refine(data, address, mapping, *, multiple_switch_profile=None):
+    import interposed_pool_switch as pool
     return analyze.refine_function(data, address, json.loads(mapping), max_bytes=len(data),
             max_instructions=len(data)//2, rom_end=0x09000000, same_owner_long_branches=True,
-            multiple_switch_profile=multiple_switch_profile)
+            multiple_switch_profile=multiple_switch_profile,
+            interposed_pool_switch=pool.POLICY.enabled and multiple_switch_profile is None)
 
 
 def numeric_hardware_words(instructions, edges, calls, partition, address, remaining):

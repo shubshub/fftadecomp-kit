@@ -110,7 +110,14 @@ class NumericSwitchSourceTests(unittest.TestCase):
 
     def test_old_default_and_acyclic_numeric_policy_stay_closed(self):
         v = fixture(); data = v[3][0x100:0x144]
-        self.assertFalse(owner.refine(data, BASE, v[4])['cfg_closed'])
+        # Without the interposed-pool rule the default owner refinement stops at the dispatch; with it,
+        # the table is placed behind its pool and marked as that rule's (interposed_pool_switch).
+        import interposed_pool_switch as pool
+        from unittest import mock
+        with mock.patch.object(pool.POLICY, 'enabled', False):
+            self.assertFalse(owner.refine(data, BASE, v[4])['cfg_closed'])
+        placed = owner.refine(data, BASE, v[4])['word_switches']
+        self.assertTrue(placed and all(pool.marked(switch) for switch in placed))
         with self.assertRaisesRegex(ValueError, 'excludes local CFG cycles'):
             inventory.verify(data, BASE, *v[3:6], {BASE+50: CALLEE},
                 {BASE+50: 'func_08001000'}, selector=inventory.SELECTOR)
