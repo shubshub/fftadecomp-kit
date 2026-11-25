@@ -1,0 +1,60 @@
+{
+  "claim": {
+    "acceptance_body_sha256": "e7bd1f3c857be44db52bae672e8bd53ef5009664bde769103a6d7c053ddf1244",
+    "acknowledged_cursor": 7163054896,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "e7bd1f3c857be44db52bae672e8bd53ef5009664bde769103a6d7c053ddf1244",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x0803701C\",\"who\":\"agent\",\"note\":\"\"}",
+      "created_at": "2026-11-25T12:55:55Z",
+      "id": 7163054896,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-25T12:55:55Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "dc614805c5e9e298249334e6daa6a0115a08f5ae842423136f0c7a3a7d63e208",
+    "result": {
+      "address": "0x0803701C",
+      "claim_id": 7163054896,
+      "code": 0,
+      "message": "claim accepted",
+      "operation": "claim",
+      "owner_id": 31369,
+      "request_id": 7163054896,
+      "status": "accepted",
+      "who": "agent"
+    }
+  },
+  "release": {
+    "acceptance_body_sha256": "011eb1e93d3bab4f3cae32910f25ecfdbdb5ea2ba45f58f2b2ef0f0e1d2397e0",
+    "acknowledged_cursor": 7175896699,
+    "body_provenance": "acceptance-time",
+    "body_sha256": "011eb1e93d3bab4f3cae32910f25ecfdbdb5ea2ba45f58f2b2ef0f0e1d2397e0",
+    "comment": {
+      "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"release\",\"address\":\"0x0803701C\",\"who\":\"agent\",\"claim_id\":7163054896,\"reason\":\"merged in shubshub/fftadecomp#356 (be3fd1e22a6)\",\"unmatchable\":false,\"tried\":\"\"}",
+      "created_at": "2026-11-25T22:04:15Z",
+      "id": 7175896699,
+      "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+      "updated_at": "2026-11-25T22:04:15Z",
+      "user": {
+        "id": 31369,
+        "type": "User"
+      }
+    },
+    "ledger_body_sha256": "1bc2c41ac8628e1613e2414a5f41b687d7ccb89e351948093fb57ca77084aea6",
+    "result": {
+      "address": "0x0803701C",
+      "claim_id": 7163054896,
+      "code": 0,
+      "message": "release accepted",
+      "operation": "release",
+      "owner_id": 31369,
+      "request_id": 7175896699,
+      "status": "accepted",
+      "who": "agent"
+    }
+  }
+}
