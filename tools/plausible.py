@@ -38,6 +38,10 @@ then compiles each user a second time with the qualifier stripped from that
 declaration and refuses any difference beyond the documented dead load before
 each member store (tools/volatile_semantics.py).
 
+A qualifier of the addressed `src/<ADDR>.c` that is the SDK's BIOS fill
+temporary, `volatile u16`/`u32` passed by address to CpuSet with a fixed
+source, is admitted where the ROM shows that fill (tools/bios_fill_temporary.py).
+
 A qualifier of the addressed `src/<ADDR>.c` that none of these exceptions
 admits is admitted where the ROM shows its effect (tools/volatile_rom_proof.py):
 compiled with and without it, the plain build drops, merges or moves one of
@@ -1310,6 +1314,10 @@ def allowlisted_volatile_uses(root, address, entries=None):
     if address == 0x0800C720:
         import scanline_wave
         records.append(scanline_wave.record(root))
+    import bios_fill_temporary
+    fill = bios_fill_temporary.record(root, address)
+    if fill is not None:
+        records.append(fill)
     import volatile_rom_proof
     proof = volatile_rom_proof.record(root, address)
     if proof is not None:
@@ -1460,13 +1468,14 @@ def check_text(text, origin="", data_symbols=None, relpath=None, volatile_allow=
 
 
 def exemptions(text, code, data_symbols=None, relpath=None, volatile_allow=None, closure=None,
-               untranslated=None, tree=None, project=None):
+               untranslated=None, tree=None, project=None, fill_temporaries=True):
     """(hardware, counter, allow-listed qualifier offsets, findings) of one view's exceptions.
 
     Every exception that admits a qualifier before the ROM proof is asked
     (volatile_rom_proof): the I/O window, the per-address modules, the VBlank
-    DMA counter and the allow list.  The proof considers only what none of
-    them admits.
+    DMA counter, the allow list and, last, the SDK's BIOS fill temporary
+    (bios_fill_temporary, with the hardware offsets), which considers only
+    what the others leave.  The proof considers only what none of them admits.
     """
     hardware_qualifiers = hardware_volatile_offsets(text, code, data_symbols or {})
     if relpath == "src/08000718.c" and tree is not None and project is not None and closure == (
@@ -1614,14 +1623,19 @@ def exemptions(text, code, data_symbols=None, relpath=None, volatile_allow=None,
         code, relpath, data_symbols or {},
         volatile_allow_entries() if volatile_allow is None else volatile_allow, text, closure,
         untranslated, tree)
+    if fill_temporaries and tree is not None and project is not None and VOLATILE_QUALIFIER.search(code):
+        import bios_fill_temporary
+        hardware_qualifiers |= bios_fill_temporary.qualifier_offsets(
+            text, tree, project, relpath, hardware_qualifiers | counter_qualifiers | listed_qualifiers)
     return hardware_qualifiers, counter_qualifiers, listed_qualifiers, findings
 
 
-def exempt_qualifiers(text, relpath, data_symbols, tree, project, closure):
-    """the offsets of a source's qualifiers that an exception admits before the ROM proof"""
+def exempt_qualifiers(text, relpath, data_symbols, tree, project, closure, fill_temporaries=True):
+    """the offsets of a source's qualifiers that an exception admits before the ROM proof (all but the
+    BIOS fill temporary's when fill_temporaries is false)"""
     code = spell_digraphs(strip_comments_and_strings(text))
     hardware, counter, listed, _ = exemptions(text, code, data_symbols, relpath, None, closure, text,
-                                              tree, project)
+                                              tree, project, fill_temporaries)
     return hardware | counter | listed
 
 
