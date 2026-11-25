@@ -337,14 +337,14 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, DMA fill premise and stack-index
-# lines may repeat.
+# copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, BIOS call kill, DMA fill premise
+# and stack-index lines may repeat.
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
           "* buffer owner switch", "* buffer dead register", "* buffer signed remainder", "* mapping SHA-256",
           "* control flow",
-          "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest",
+          "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS call kill",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",

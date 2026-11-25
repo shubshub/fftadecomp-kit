@@ -1707,6 +1707,29 @@ Every summarised call must meet these obligations; each refusal names the wrappe
      any read, call, interrupt or return on every path from the call
      (`match.stack_alias_overwritten_before_use`; `R<n> carried a local pointer
      into BIOS <routine> and is not written before any read, call or return`).
+     A call on such a path is that write only when it is an unconditional direct
+     BL to a callee with its own complete, unique, non-overlapping indexed Thumb
+     row whose bytes write the register before any read, call, interrupt, return
+     or cycle on every path from its entry: `dead_register.prove` with
+     `thumb_step`, the walk of "Dead stack-address registers at calls", for R0-R3
+     only. The callee cannot observe the address, and after the call the register
+     holds whatever the callee left there, which the walk already treats as an
+     unknown scalar. Any other call refuses as before. The memory-site record then
+     carries `call_kills`: the call site, the register, the callee, its span end,
+     the SHA-256 of its bytes, its killing writes and the states proved; and the
+     report states each such call on its own line after the manifest, because the
+     summary line's contract ("written before any read, call or return") then does
+     not hold as worded:
+
+     ```
+     * buffer BIOS call kill: call 0x0801A184 to 0x0801A320 kills r0 (left by CpuFastSet at 0x0801A180): the callee writes r0@0x0801A326 before any read, call, interrupt, return or cycle on every path from its entry (4 states)
+     ```
+
+     A record that needs no callee has no such key and no such line, so every other
+     manifest and report is unchanged.
+     0801A320 after the CpuFastSet in 0801A15C, and the callees after CpuSet in
+     08023FD0, 0803BAE8, 0804C97C, 0804D9D0, 0804DDCC and 0806E170 (and, on the
+     restoring owner, 08023F00, 0805262C, 08053348 and 08055C38) are such callees.
 6. The call returns no alias; R0-R3, R12 and the flags are unknown scalars
    afterwards. A destination span holds no word the walk keeps a fact about, so no
    fact is invalidated.

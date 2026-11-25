@@ -15,6 +15,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'tools'))
@@ -207,6 +208,51 @@ class OwnerBiosSummaryTests(unittest.TestCase):
         for name, middle in cases.items():
             with self.subTest(name=name):
                 self.refused(NOT_DISCHARGED, middle, POOL if '.Lfill' in ' '.join(middle) else [])
+
+    def test_a_call_whose_callee_writes_r0_first_kills_it_and_is_reported(self):
+        # The 08023F00 shape: CpuSet, then straight into a callee whose first instruction writes r0.
+        wrappers = {cpuset.ADDRESS: cpuset.WRAPPER, CALLEE: bytes.fromhex('00207047')}  # movs r0, #0; bx lr
+        middle = FILL[:-1] + ['bl func_08012000']
+        fixture, manifest, instructions = self.admitted(middle, wrappers=wrappers)
+        summaries = manifest['proof']['bios_summaries']
+        [site] = self.sites(manifest)
+        [call] = [item.address for item in instructions if item.mnemonic == 'bl' and
+                  item.operands[0].imm == CALLEE]
+        [kill] = site['call_kills']
+        self.assertEqual({key: kill[key] for key in ('site', 'register', 'callee', 'end', 'kills', 'states')},
+                         {'site': call, 'register': 0, 'callee': CALLEE, 'end': CALLEE + 4,
+                          'kills': [[CALLEE, 0]], 'states': 1})
+        report = fixture.report(manifest, len(instructions)).splitlines()
+        lines = [line for line in report if line.startswith('* buffer BIOS')]
+        self.assertEqual(lines, bios.manifest_lines(summaries))
+        self.assertEqual(lines[-1], f'* buffer BIOS call kill: call 0x{call:08X} to 0x{CALLEE:08X} kills r0 (left '
+                                    f'by CpuSet at 0x{site["site"]:08X}): the callee writes r0@0x{CALLEE:08X} '
+                                    f'before any read, call, interrupt, return or cycle on every path from its '
+                                    f'entry (1 states)')
+        self.assertTrue(owner.selected('\n'.join(report)))
+        # Replay rebuilds the proof and compares the whole rendered report, so the line cannot be dropped,
+        # edited or repeated (the rebuild itself is the fixture's, as fixture.report renders it).
+        result = (fixture.data, manifest, 'synthetic-source', fixture.mapping, fixture.index, fixture.objects,
+                  bytes(fixture.rom), len(instructions), fixture.original)
+        text, kill_line = fixture.report(manifest, len(instructions)), lines[-1]
+        with mock.patch.object(owner, 'build', lambda *args, **kwargs: result):
+            self.assertTrue(owner.report_matches(text, self.root, A))
+            for name, edited in (('dropped', text.replace(kill_line + '\n', '')),
+                                 ('states edited', text.replace(kill_line, kill_line.replace('(1 states)',
+                                                                                             '(2 states)'))),
+                                 ('register edited', text.replace(kill_line, kill_line.replace('kills r0',
+                                                                                               'kills r1'))),
+                                 ('repeated', text.replace(kill_line, kill_line + '\n' + kill_line))):
+                with self.subTest(edit=name):
+                    self.assertNotEqual(edited, text)
+                    self.assertFalse(owner.report_matches(edited, self.root, A))
+        altered = copy.deepcopy(manifest)
+        del altered['proof']['bios_summaries']['memory_sites'][0]['call_kills']
+        with self.assertRaisesRegex(ValueError, 'manifest differs'):
+            fixture.verify(manifest=altered)
+        # A callee that reads r0 first leaves the obligation open.
+        self.refused(NOT_DISCHARGED, middle, wrappers={cpuset.ADDRESS: cpuset.WRAPPER,
+                                                       CALLEE: bytes.fromhex('011c00207047')})
 
     def test_frame_words_a_summarised_call_may_write_lose_their_contents(self):
         # r8 is spilled to sp+4 and restored from it; a CpuSet destination over the

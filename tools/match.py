@@ -3314,11 +3314,16 @@ def merge_possible_aliases(previous, incoming):
     return tuple(sorted(merged.items()))
 
 
-def stack_alias_overwritten_before_use(data, address, successor, register, decoder, *, exit_sites=frozenset()):
+def stack_alias_overwritten_before_use(data, address, successor, register, decoder, *, exit_sites=frozenset(),
+                                       call_kill=None):
     """Prove a differing Thumb join alias is killed on every path before observation.
 
     ``exit_sites`` are exact normal-return instructions a caller-selected policy
     has already proved discard this register; by default no exit kills it.
+    ``call_kill(site, target, register)`` is a caller-selected policy for an
+    unconditional direct BL: true when it has proved the callee writes the
+    register before reading it, which makes the call the killing write.  By
+    default every call refuses.
     """
     if not ARM_REG_R0 <= register <= ARM_REG_R12:
         return False
@@ -3332,6 +3337,14 @@ def stack_alias_overwritten_before_use(data, address, successor, register, decod
             return False
         instruction = next(decoder.disasm(data[current - address:current - address + 4],
                                          current, count=1), None)
+        if call_kill is not None and instruction is not None and instruction.id == ARM_INS_BL and \
+                instruction.size == 4 and current + 4 <= end and armv4t.instruction(instruction) and \
+                instruction.cc in (ARM_CC_AL, ARM_CC_INVALID) and len(instruction.operands) == 1 and \
+                instruction.operands[0].type == ARM_OP_IMM and \
+                call_kill(current, instruction.operands[0].imm, register):
+            edges[current] = ()
+            safe.add(current)
+            continue
         # The ARMv4T encoding check refuses "it" first; the ARM_INS_IT test is defence in depth.
         if instruction is None or current + instruction.size > end or \
                 not armv4t.instruction(instruction) or \
