@@ -242,10 +242,13 @@ class SummaryAgreementTests(unittest.TestCase):
         self.assertEqual(missing, [], 'premises the walk in context states and summaries do not')
         self.assertLessEqual(set(in_context[2].items()), set(summarised[2].items()))
 
-    def test_summaries_admit_and_state_no_less_than_the_walk_in_context(self):
+    def agree(self, part):
+        """Every check of PART (``parts``) compared as above, and the checks of PART whose walk in
+        context hits its budget are exactly the fixture's budget checks in PART."""
         budget = []
-        for name, watched in self.fixture['checks']:
-            key = f'{name}:{",".join(map(str, watched))}'
+        checks = parts(self.fixture['checks'])[part]
+        for name, watched in checks:
+            key = check_key(name, watched)
             target = int(name, 16)
             summarised = self.walk(target, watched, True)
             in_context = self.walk(target, watched, False)
@@ -260,8 +263,66 @@ class SummaryAgreementTests(unittest.TestCase):
                 continue
             with self.subTest(check=key):
                 self.compare(summarised, in_context)
-        self.assertEqual(sorted(budget), sorted(f'{name}:{",".join(map(str, watched))}'
-                                                for name, watched in self.fixture['budget']))
+        mine = {check_key(name, watched) for name, watched in checks}
+        self.assertEqual(sorted(budget), sorted(key for key in (check_key(name, watched)
+                                                                for name, watched in self.fixture['budget'])
+                                                if key in mine))
+
+
+PARTS = 6
+
+
+def check_key(name, watched):
+    return f'{name}:{",".join(map(str, watched))}'
+
+
+def parts(checks):
+    """The fixture's checks in PARTS parts, every PARTS-th one from each start."""
+    return [checks[start::PARTS] for start in range(PARTS)]
+
+
+def part_test(part):
+    """The test that compares part PART (``parts``), so a suite can run the parts side by side."""
+    def test(self):
+        self.agree(part)
+    test.__name__ = f'test_summaries_admit_and_state_no_less_than_the_walk_in_context_part_{part + 1}'
+    test.__doc__ = f'The comparison of part {part + 1} of {PARTS} of the recorded checks.'
+    return test
+
+
+for _part in range(PARTS):
+    setattr(SummaryAgreementTests, part_test(_part).__name__, part_test(_part))
+del _part
+
+
+@unittest.skipUnless(FIXTURE.is_file(), 'the recorded checks are missing')
+class PartitionTests(unittest.TestCase):
+    """The parts above cover the fixture's checks: each check in exactly one part, a test per
+    part, and every budget check among them, so the parts compare and bound exactly what one
+    comparison of every check would."""
+
+    def test_the_parts_partition_the_checks(self):
+        fixture = json.loads(FIXTURE.read_text())
+        keys = [check_key(name, watched) for name, watched in fixture['checks']]
+        self.assertEqual(len(keys), len(set(keys)))
+        split = [[check_key(name, watched) for name, watched in part] for part in parts(fixture['checks'])]
+        self.assertEqual(len(split), PARTS)
+        self.assertTrue(all(split))
+        self.assertEqual(sorted(key for part in split for key in part), sorted(keys))
+        budget = {check_key(name, watched) for name, watched in fixture['budget']}
+        self.assertLessEqual(budget, set(keys))
+        self.assertEqual(budget, {key for part in split for key in part if key in budget})
+        tests = [f'test_summaries_admit_and_state_no_less_than_the_walk_in_context_part_{k}' for k in range(1, PARTS + 1)]
+        self.assertEqual(sorted(name for name in dir(SummaryAgreementTests)
+                                if name.startswith('test_summaries_admit_and_state_no_less_than_the_walk_in_context')),
+                         sorted(tests))
+        # Each test compares its own part: part k is index k - 1.
+        for index, name in enumerate(tests):
+            case = SummaryAgreementTests(name)
+            compared = []
+            case.agree = compared.append
+            getattr(case, name)()
+            self.assertEqual(compared, [index], name)
 
 
 if __name__ == '__main__':
