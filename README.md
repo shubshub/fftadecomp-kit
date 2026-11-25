@@ -5202,7 +5202,10 @@ the control word has no bit outside 0-20 and 24, and its count of words
 rounds up to a multiple of 8, as the BIOS writes eight words at a time.
 Outside that block nothing reads, writes or takes the address of the slot (a
 later block may give it to its own temporary), and inside it only the address
-is formed. In the code, which is the ROM's, every path into the fill's BL
+is formed. Every frame reference needs a constant offset; a pseudo with
+several definitions, such as the pointers a structure copy's block move
+advances, is read through the definition that reaches the reference in a
+straight line, with no branch target between. In the code, which is the ROM's, every path into the fill's BL
 stores the slot once, with the temporary's width, and at the BL holds its
 address in `r0`, no `r1` that fills over it and no `r3` in it; where the path
 sets `r2` or the stored register to a literal or an immediate, it is the

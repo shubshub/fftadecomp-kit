@@ -43,8 +43,10 @@ holds:
    (which the BIOS does not read), when frame addresses, are in the slot's frame and miss the slot: r1 with all
    the bytes it is filled over (the control word's count of units, for CpuFastSet rounded up to 8 words), r3
    itself.  No insn outside a fill's block (its first insn to its call) reads, writes or forms an address in the
-   slot; no frame reference of the function has an unknown offset.  So the slot is the block's alone: a later
-   block may give it to its own temporary, but no later statement reads it.
+   slot; no frame reference of the function has an unknown offset.  (A pseudo with several definitions, such as
+   the pointers a block move advances, is read through the definition that reaches the reference in a straight
+   line, with no branch target between.)  So the slot is the block's alone: a later block may give it to its own
+   temporary, but no later statement reads it.
 6. Each fill in R's code, which is the ROM's (rom_fill).  The fill's BL is its call's one site; a call that left no
    site (cross-jumping replaced the end of its block by a branch into another fill's identical tail) has the BL that
    the last insn of its block the code still holds reaches in a straight line, through unconditional branches only.
@@ -231,9 +233,24 @@ def fill_groups(raw):
 
 # ------------------------------------------------------------------ the expand RTL
 
-def frame_offset(function, x, depth=0):
+def reaching(function, number, at):
+    """(insn, value) of the definition of pseudo `number` that the insn at index `at` reads: the nearest one
+    before it with no branch target, barrier or insn whose register writes are not read between, else None"""
+    opaque = {uid for uid, _ in function.opaque}
+    for insn in reversed(function.insns[:at]):
+        if insn.code in ("code_label", "barrier") or insn.uid in opaque:
+            return None
+        mine = [value for other, value in function.defs.get(number, []) if other is insn]
+        if mine:
+            return (insn, mine[0]) if len(mine) == 1 else None
+    return None
+
+
+def frame_offset(function, x, depth=0, at=None):
     """(frame register, constant offset) of an address built from a frame register by constants, through
-    single-definition pseudos, else None (the resolver keeps no frame offsets)"""
+    single-definition pseudos, else None (the resolver keeps no frame offsets).  Read at insn index `at`, a pseudo
+    with several definitions has the one that reaches it in a straight line: a block move (movstrsi) advances its
+    own pointers, so they have two"""
     if depth > 32:
         return None
     head = code(x)
@@ -242,12 +259,16 @@ def frame_offset(function, x, depth=0):
         if number < proof.FIRST_PSEUDO:
             return (number, 0) if number in proof.FRAME_REGISTERS else None
         definitions = function.defs.get(number, [])
-        return frame_offset(function, definitions[0][1], depth + 1) if len(definitions) == 1 else None
+        if len(definitions) == 1:
+            insn, value = definitions[0]
+            return frame_offset(function, value, depth + 1, None if at is None else insn.index)
+        found = reaching(function, number, at) if at is not None else None
+        return frame_offset(function, found[1], depth + 1, found[0].index) if found else None
     if head in ("plus", "minus") and len(x) == 3:
         sign = 1 if head == "plus" else -1
         for inner, constant, factor in ((x[1], x[2], sign), (x[2], x[1], 1)):
             if code(constant) == "const_int" and (head == "plus" or inner is x[1]):
-                found = frame_offset(function, inner, depth + 1)
+                found = frame_offset(function, inner, depth + 1, at)
                 if found is not None:
                     return found[0], found[1] + factor * int(constant[1])
     return None
@@ -278,7 +299,7 @@ def frame_reference(function, resolver, x, at):
     when it is one at an offset the proof cannot tell, or may be one; None when it is no frame address"""
     base, _ = resolver.resolve(x, at)
     if base.kind == "frame":
-        return frame_offset(function, x) or (base.value, None)
+        return frame_offset(function, x, at=at) or (base.value, None)
     if base.kind == "unknown" and mentions_frame(function, x):
         return None, None
     return None
@@ -358,7 +379,7 @@ def fills(function):
     found = []
     for call, callee in calls:
         source = argument(function, call, 0)
-        slot = frame_offset(function, source) if source is not None else None
+        slot = frame_offset(function, source, at=call.index) if source is not None else None
         if slot is None:
             continue
         start = block_start(function, call.index)
@@ -388,7 +409,7 @@ def fills(function):
         # the destination, and r3, which the BIOS does not read, hold no address in the slot
         for number, size in ((1, filled(value, width, callee)), (3, 1)):
             passed = argument(function, call, number)
-            target = frame_offset(function, passed) if passed is not None else None
+            target = frame_offset(function, passed, at=call.index) if passed is not None else None
             if target is None:
                 continue
             if target[0] != slot[0]:
