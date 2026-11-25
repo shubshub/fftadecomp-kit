@@ -145,6 +145,25 @@ def fill_insns(uid, offset=-2, control=0x01000100, mode="HI", store=True, frame_
 ENTRY = (2, "insn (set (reg/v:SI 22) (reg:SI 0 r0)) -1 (nil) (nil)")
 
 
+def block_move(uid, offset, label=False):
+    """the RTL of a 12-byte structure copy into the frame at offset (movstrsi): the destination pointer, then
+    one parallel that copies three words through it and advances it; label puts a branch target between them"""
+    words = "".join(f"            (set (mem:SI (plus:SI (reg:SI 100) (const_int {k})) 0)\n"
+                    f"                (mem:SI (plus:SI (reg:SI 101) (const_int {k})) 0))\n" for k in (4, 8))
+    out = [(uid, f"insn (set (reg:SI 100) (plus:SI (reg:SI 18 virtual-stack-vars) (const_int {offset}))) "
+                 "-1 (nil) (nil)"),
+           (uid + 1, "insn (set (reg:SI 101) (reg/v:SI 22)) -1 (nil) (nil)")]
+    if label:
+        out.append((uid + 2, 'code_label 99 ""'))
+    out.append((uid + 3, "insn (parallel[ \n            (set (mem:SI (reg:SI 100) 0)\n"
+                         "                (mem:SI (reg:SI 101) 0))\n" + words +
+                         "            (set (reg:SI 100) (plus:SI (reg:SI 100) (const_int 12)))\n"
+                         "            (set (reg:SI 101) (plus:SI (reg:SI 101) (const_int 12)))\n"
+                         "            (clobber (scratch:SI))\n            (clobber (scratch:SI))\n"
+                         "            (clobber (scratch:SI))\n        ] ) -1 (nil)\n    (nil)"))
+    return out
+
+
 class RtlTests(unittest.TestCase):
     def test_a_fill_is_read_off_its_block(self):
         (found,) = fill.fills(function([ENTRY] + fill_insns(10)))
@@ -205,6 +224,32 @@ class RtlTests(unittest.TestCase):
         self.assertEqual(fill.filled(0x01000001, 4, "func_08141868"), 32)
         self.assertEqual(fill.filled(0x01000009, 4, "func_08141868"), 64)
         self.assertEqual(fill.filled(0x01000009, 4), 36)
+
+    def test_a_block_move_is_placed_by_its_pointers_reaching_definitions(self):
+        # 08081FB0: a structure copy into the frame advances its own pointers, so each has two definitions;
+        # read where the copy reads them, the destination is the one before it, and after it that plus 12
+        label = (29, 'code_label 98 ""')
+        fn = function([ENTRY] + block_move(3, -16) + [label] + fill_insns(10))
+        touches = fill.frame_touches(fn, proof.Resolver(fn))
+        self.assertEqual(Counter((offset, width, what) for _, _, offset, width, what, _ in touches if offset != -2),
+                         Counter([(-16, None, "address"), (-16, 4, "store"), (-12, 4, "store"), (-8, 4, "store"),
+                                  (-4, None, "address")]))
+        (found,) = fill.fills(fn)
+        self.assertEqual(found["slot"], (18, -2))
+        # the pointer moved on by 2 after the copy reaches the slot: forming it is placed, and refused
+        onward = [(19, "insn (set (reg:SI 100) (plus:SI (reg:SI 100) (const_int 2))) -1 (nil) (nil)"),
+                  (20, "insn (set (mem:HI (reg:SI 100) 0) (const_int 0)) -1 (nil) (nil)")]
+        for label_, insns, reason in (
+                ("a store the pointer reaches the slot with", [ENTRY] + block_move(3, -16) + onward + [label] +
+                 fill_insns(10), "UID 19 uses the fill temporary's slot outside its block \\(address\\)"),
+                ("a copy over the slot", [ENTRY] + block_move(3, -8) + [label] + fill_insns(10),
+                 "UID 6 uses the fill temporary's slot outside its block"),
+                ("a branch target between the pointer and the copy",
+                 [ENTRY] + block_move(3, -16, label=True) + [label] + fill_insns(10), "no constant offset"),
+                ("the advanced pointer as the destination", [ENTRY] + block_move(3, -16) +
+                 fill_insns(10, control=0x01000002, dest="(reg:SI 100)"), "passes r1 an address that reaches")):
+            with self.subTest(label=label_), self.assertRaisesRegex(proof.ProofError, reason):
+                fill.fills(function(insns))
 
     def test_a_removal_keeps_only_stores_the_function_makes(self):
         a, b, moved = (18, -2, 2), (18, -4, 2), (18, -6, 2)
@@ -680,6 +725,16 @@ class CompiledTests(unittest.TestCase):
         block = local + ("    {\n        volatile u32 fill = out;\n\n"
                          "        func_08141868((const void *)&fill, dest, 0x01000400);\n    }\n}\n")
         self.assertEqual(self.states(block, FASTSET), ["admitted"])
+
+    def test_a_fill_beside_a_structure_copy_is_admitted(self):
+        # 08081FB0: the copy into a frame structure is a block move, whose pointers have two definitions each
+        copy = ("struct S { u32 a, b, c; };\nextern void func_08001000(u32 *out);\n"
+                "extern void func_08001004(struct S *s, u32 out);\n"
+                "void func_08000400(u32 *dest, struct S *src)\n{\n    u32 out;\n\n"
+                "    func_08001000(&out);\n    {\n        volatile u32 fill = 0;\n\n"
+                "        func_08141868((const void *)&fill, dest, 0x01000008);\n    }\n"
+                "    {\n        struct S copy;\n\n        copy = *src;\n        func_08001004(&copy, out);\n    }\n}\n")
+        self.assertEqual(self.states(copy, FASTSET), ["admitted"])
 
     def test_a_fast_fill_the_rom_does_not_show_refuses(self):
         for control, reason in (("0x00000020", "without bit 24"), ("0x05000020", "a bit outside 0-20 and 24")):
