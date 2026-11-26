@@ -60,6 +60,21 @@ class TextRuleTests(unittest.TestCase):
             with self.subTest(body=body, declarations=declarations[:40]):
                 self.assertIn("volatile-allowlist", rules(body, declarations))
 
+    def test_a_local_copy_is_refused(self):
+        tagged = "struct Saved { unsigned char unknown_00[4]; __typeof__(" + SYMBOL + ") control; };\n"
+        for declarations, body in ((STATE, "State local; local.control = " + SYMBOL + ";"),
+                                   (STATE, "static State kept; kept.control = " + SYMBOL + ";"),
+                                   (STATE, "State many[2]; many[0].control = " + SYMBOL + ";"),
+                                   (tagged, "struct Saved local; x = local.control.display;")):
+            with self.subTest(body=body):
+                found = [message for _, rule, _, message in plausible.check_text(
+                    declarations + "void f(void) { " + body + " }\n", data_symbols=allowlist.MAPPING,
+                    relpath="src/08028C34.c", volatile_allow=[allowlist.ENTRY]) if rule == "volatile-allowlist"]
+                self.assertTrue(any("a local instance of the struct" in message for message in found), found)
+        # a pointer to the struct, and a global instance, are not local copies
+        self.assertEqual(rules("State *p = state; p->control = " + SYMBOL + ";"), [])
+        self.assertEqual(rules("g.control = " + SYMBOL + ";", STATE + "extern State g;\n"), [])
+
     def test_sites(self):
         code = STATE + "void f(void) { " + SAVE + " x = state->control.unknown_3C; }\n"
         admitted, typeofs, findings = plausible.typed_copy_sites(code, SYMBOL, allowlist.ENTRY["declaration"])
@@ -128,6 +143,38 @@ class SemanticTests(unittest.TestCase):
     def test_the_copy_s_address_does_not_escape(self):
         escape = ("mov\tr0, r4", "add\tr0, r0, #101", "bl\tfunc_0802A2C0")
         self.refused(body(*escape), "escapes", perturbed=body(*escape, read="ldrb\tr0, [r4, #161]"))
+
+    def test_a_load_the_stripped_compile_does_not_make_is_refused(self):
+        # a planted or doubled read of the copy: the real compile reads it, the stripped one does not
+        # (the real compile's extra load, the permuted compile's): a pinned copy member moves with it
+        for extra, moved in (("ldrb\tr3, [r4, #160]", "ldrb\tr3, [r4, #161]"),
+                             ("ldrb\tr3, [r4, #161]", "ldrb\tr3, [r4, #160]"),
+                             ("ldrb\tr3, [r4, #8]", "ldrb\tr3, [r4, #8]"),
+                             ("ldr\tr3, [sp, #4]", "ldr\tr3, [sp, #4]")):
+            with self.subTest(extra=extra):
+                self.refused(body(extra), "is not the stripped compile's load there",
+                             perturbed=body(moved, read="ldrb\tr0, [r4, #161]"), stripped=body())
+
+    def test_the_loads_are_paired_in_order(self):
+        # the same two loads, swapped: a multiset would pair them, the order does not
+        first, second = "ldrb\tr3, [r4, #8]", "ldrb\tr2, [r4, #9]"
+        self.refused(body(first, second), "is not the stripped compile's load there",
+                     perturbed=body(first, second, read="ldrb\tr0, [r4, #161]"), stripped=body(second, first))
+
+    def test_a_copy_in_the_frame_is_refused(self):
+        frame = fixtures.assembly("push\t{r4, lr}", "add\tsp, sp, #-80", "mov\tr0, sp", "ldr\tr1, .L3",
+                                  "mov\tr2, #62", "bl\tmemcpy", "mov\tr0, #0", "add\tsp, sp, #80", "pop\t{r4}",
+                                  "pop\t{r1}", "bx\tr1")
+        self.refused(frame, "is saved into the frame", perturbed=frame)
+
+    def test_the_composition_route_refuses_a_typeof(self):
+        token = semantics.COMPILER_COPY.set(BINDING)
+        try:
+            with self.assertRaisesRegex(semantics.SemanticError, "not admitted on the overwritten-store composition"):
+                semantics._compare_compiles(body(), body(), PREPROCESSED, SYMBOL, fixtures.DECLARATION,
+                                            body(read="ldrb\tr0, [r4, #161]"), _ordinary_overwrite=True)
+        finally:
+            semantics.COMPILER_COPY.reset(token)
 
     def test_one_destination_per_function(self):
         record = types.SimpleNamespace

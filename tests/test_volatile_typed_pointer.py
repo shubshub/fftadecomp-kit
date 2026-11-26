@@ -67,6 +67,34 @@ class TextRuleTests(unittest.TestCase):
             with self.subTest(body=body):
                 self.assertIn("volatile-allowlist", rules(body, declarations))
 
+    def test_the_binding_dominates_every_use(self):
+        # the initialiser, or a statement of the declaration's own block before every use
+        for body in ("__typeof__(" + SYMBOL + ") *control = &" + SYMBOL + "; control->display = 1;",
+                     POINTER + " x = 1; y = 2; " + BIND + " control->display = 1;"):
+            with self.subTest(body=body):
+                self.assertEqual(rules(body), [])
+        for body, reason in (
+                (POINTER + " (void)control->display; " + BIND, "used before its binding"),
+                (POINTER + " if (c) { " + BIND + " control->display = 1; return; } control->display = 2;",
+                 "must be bound in its declaration's own block"),
+                (POINTER + " if (c) { " + BIND + " } control->display = 2;",
+                 "must be bound in its declaration's own block"),
+                ("{ " + POINTER + " } { " + BIND + " control->display = 2; }",
+                 "must be bound in its declaration's own block"),
+                (POINTER + " if (c) goto done; " + BIND + " done: control->display = 2;", "could let a path skip"),
+                (POINTER + " switch (c) { case 0: " + BIND + " case 1: control->display = 2; }",
+                 "must be bound in its declaration's own block"),
+                ("switch (c) { case 0: { " + POINTER + " " + BIND + " control->display = 2; } }", None),
+                (POINTER + " " + BIND + " control->display = 2; if (c) goto out; out: ;", "`goto`")):
+            with self.subTest(body=body):
+                found = [message for _, rule, _, message in plausible.check_text(
+                    COPY + "void f(int c) { " + body + " }\n", data_symbols=allowlist.MAPPING,
+                    relpath="src/08028C34.c", volatile_allow=[allowlist.ENTRY]) if rule == "volatile-allowlist"]
+                if reason is None:
+                    self.assertEqual(found, [])
+                else:
+                    self.assertTrue(any(reason in message for message in found), found)
+
     def test_a_file_scope_pointer_is_refused(self):
         source = COPY + POINTER + "\nvoid f(void) { " + BIND + " control->display = 1; }\n"
         found = [rule for _, rule, _, _ in plausible.check_text(
