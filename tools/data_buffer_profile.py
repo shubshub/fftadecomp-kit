@@ -367,7 +367,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           # closure_slot_profile.lines
           "* buffer closure slot",
           # function_literal_exit_scratch_profile.lines
-          "* buffer function-literal exit scratch", "* buffer frame exit scratch",
+          "* buffer function-literal exit scratch", "* buffer frame exit scratch", "* buffer frame result r1",
           # default_stack_index_profile.lines
           "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
           "* buffer stack index premise", "* buffer stack index frame words")

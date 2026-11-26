@@ -35,6 +35,8 @@ bound under their own payload tag; ``FRAME_POLICY`` gates it.
 """
 import json
 
+import frame_result_r1_profile as frame_r1
+
 LINE = "* buffer function-literal exit scratch"
 FRAME_LINE = "* buffer frame exit scratch"
 FUNCTION, FRAME = "function-literal", "frame-buffer"
@@ -94,6 +96,7 @@ def _bind(proof):
     proof._return_root = (address, data, returns)
     proof._return_scratch = {}
     proof._return_scratch_joins = set()
+    proof._frame_r1_sites = {}
     proof._function_exit_bound = True
     return True
 
@@ -110,14 +113,18 @@ def aliases(proof, data, address, site, held, split_state=False):
     if root is None or not eligible(proof) or address != root[0] or data != root[1] or \
             (split_state if frame else _split(proof, address)):
         return held
-    if not any(register in (match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3) for register in held):
+    watched = (match.ARM_REG_R0 + 1, match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3) if frame else \
+        (match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3)
+    if not any(register in watched for register in held):
         return held
     if not getattr(proof, "_function_exit_bound", False):
         if getattr(proof, "_return_root", None) is not None or not _bind(proof):
             proof._function_exit_root = None
             return held
     from named_data_buffer_profile import RootReturnScratchMixin
-    return RootReturnScratchMixin.root_return_aliases(proof, data, address, site, held)
+    projected = RootReturnScratchMixin.root_return_aliases(proof, data, address, site, held)
+    # The frame-buffer owner's R1, only on the ROM's caller evidence (frame_result_r1_profile).
+    return frame_r1.project(proof, data, address, site, projected, root[2]) if frame else projected
 
 
 def _split(proof, address):
@@ -140,21 +147,31 @@ def record(proof, address):
     kind = getattr(proof, "_function_exit_kind", FUNCTION)
     if sites and kind != FUNCTION:
         proof.function_exit_scratch["kind"] = kind
+    frame_r1.record(proof)
 
 
 def lines(proof):
+    return _scratch_lines(proof) + frame_r1.lines(proof)
+
+
+def _scratch_lines(proof):
     scratch = getattr(proof, "function_exit_scratch", None)
     if not scratch:
         return []
     sites = ", ".join(f"`0x{site:08X} r{register} {offset:+d}`" for site, register, offset in scratch["sites"])
+    # With the frame-buffer owner's R1 rule used, R1 keeps the refusal except as its own line states.
+    kept = "R0, R1 (but for the frame result r1 line)" if getattr(proof, "frame_result_r1", None) else "R0/R1"
     return [f"{_LINES[scratch.get('kind', FUNCTION)]}: `{scratch['schema']}` premise, not checked: {scratch['contract']}; own-frame "
-            f"addresses dropped at the owner's normal returns: {sites}; R0/R1 and every callee return keep "
+            f"addresses dropped at the owner's normal returns: {sites}; {kept} and every callee return keep "
             f"the escape refusal"]
 
 
 def fingerprint_payload(proof):
     scratch = getattr(proof, "function_exit_scratch", None)
-    if not scratch:
-        return None
-    return json.dumps([_TAGS[scratch.get("kind", FUNCTION)], scratch], sort_keys=True,
-                      separators=(",", ":")).encode()
+    payload = json.dumps([_TAGS[scratch.get("kind", FUNCTION)], scratch], sort_keys=True,
+                         separators=(",", ":")).encode() if scratch else None
+    # The frame-buffer owner's R1 evidence (frame_result_r1_profile), only when it dropped one.
+    r1 = frame_r1.fingerprint_payload(proof)
+    if r1 is None:
+        return payload
+    return (payload or b"") + len(r1).to_bytes(8, "little") + r1

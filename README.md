@@ -2677,6 +2677,41 @@ projects: it refuses only a return reached in a state the split keeps apart,
 so every projection is made from a merged state. The function-literal owner
 still refuses any walk that kept a join apart.
 
+#### R1 of a frame-buffer owner
+
+R1 is a result register (the high word of a 64-bit result), so an own-frame
+address left there is not dropped under the ABI premise. The frame-buffer
+owner drops it at its normal returns (`frame_result_r1_profile`) only on
+evidence from the ROM that no caller reads it:
+
+* no four bytes of the ROM, at any offset, equal the function's address or
+  its Thumb address, data tables and code included, and no halfword-aligned
+  ROM word equals either one in a mirror of the cartridge ROM (the 16 MiB
+  steps 0x09000000-0x0DFFFFFF). So no image copied verbatim from ROM to IWRAM
+  or EWRAM holds such a word either, whatever the alignment of the copy, and
+  code executing there or in the BIOS cannot reach ROM by a direct branch (a
+  Thumb BL reaches 4 MiB, an ARM B or BL 32 MiB);
+* no Thumb B or B<cond> outside the function branches to its entry, and the
+  mapped function that ends at its entry has a closed control-flow graph, so
+  nothing falls into it;
+* every Thumb BL in the ROM that targets it lies in a mapped Thumb function,
+  decodes as that BL there, and from the next instruction that caller writes
+  R1 before any read, call or return on every path (`dead_register.prove`
+  with `dead_register.thumb_step`). A self call refuses.
+
+R0 keeps the refusal. A failed check refuses with its reason (`local stack
+pointer escapes through a return register (R1: ...)`). What the scan cannot
+see is an address formed at run time (including a mirror address assembled
+from bytes at an odd offset) and code run from VRAM or OAM, the only other
+memory within a direct branch's reach of ROM, so the report states the
+residual premise with the evidence, bound into the fingerprint:
+
+    * buffer frame result r1: `frame-result-r1-dead-at-callers-v1` own-frame addresses dropped at the owner's normal returns: `0x<return site> r1 <entry-SP offset>`; no ROM word at any byte offset equals <function> or <function|1> and no halfword-aligned one equals either in a ROM mirror (0x09000000-0x0DFFFFFF), no Thumb branch outside it reaches its entry and nothing falls into it; every direct caller writes R1 before any read, call or return: <BL site> in <caller> (R1 written at <sites>; <n> states), ...; unproved runtime premise: code runs only from the BIOS, ROM, EWRAM and IWRAM, and no code reaches the function through an address formed at run time (by arithmetic, in decompressed data, or as a ROM mirror address assembled from bytes at an odd offset) rather than stored in the ROM, so its direct callers are all its callers
+
+`frame_result_r1_profile.POLICY.enabled = False` restores the refusal;
+`tests/test_frame_result_r1.py` covers the scan, the evidence and a native
+report.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is
