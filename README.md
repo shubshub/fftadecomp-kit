@@ -6042,6 +6042,12 @@ symbolically along every path, and the check requires:
   branch conditions (a condition and its inverse are one decision, since
   agbcc writes a far `beq .L` as `bne .LCB; b .L`) and, for a non-void
   function, the same return value.
+  Values are compared in a normal form, and one exact identity joins two
+  forms of a byte (kit #375). agbcc narrows `x - 1` either as `sub r0, #1`
+  and a byte store or as `lsl #24; lsr #24`, so `lsr(2^24 * B, 24)` is
+  `trunc8(B)` when B's constant and every coefficient are divisible by 2^24
+  (no carry or remainder is assumed away). Any other shift, any remainder
+  and `asr` stay opaque (08057578's `bldy_lo--` tests).
   When a stack address escapes (as a call argument or a value stored to
   memory), every local frame byte at that moment, with the stores applied in
   program order, is part of the behaviour too, relative to the first
