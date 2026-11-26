@@ -185,6 +185,7 @@ depth).
 """
 
 import contextvars
+from hashlib import sha256
 import re
 
 from plausible import VOLATILE_QUALIFIER, declaration_tokens
@@ -2838,6 +2839,10 @@ class StoredTestRereads(list):
     """kit#375, rule R4: the stored-value test re-reads, a tagged result part"""
 
 
+class OperandReads(list):
+    """kit#165, R2: the `|= ALL_ONES` operand reads a variant compile proves, a tagged result part"""
+
+
 class SpillReloads(list):
     """kit#165: the dead loads whose read-modify-write window holds a spill reload,
     a tagged result part"""
@@ -3237,9 +3242,103 @@ def canonical_versions(value, events):
     return tuple(canonical_versions(part, events) for part in value)
 
 
+# kit#165, R2: match.py sets a callable(rewrite) -> the assembly of the addressed source compiled
+# with rewrite applied to its preprocessed text, for the `|= ALL_ONES` variant compiles
+OPERAND_READ_COMPILE = contextvars.ContextVar("all_ones_or_variant_compile", default=None)
+
+
+def all_ones_or_statements(text, symbol, declaration):
+    """[(offset of `|=`, member, line, member offset)] for every statement `symbol.member |= C;`
+    of the (preprocessed) text whose integer constant C is the pinned member's all-ones value"""
+    from plausible import C_TOKEN, integer_literal, strip_comments_and_strings
+    plain = strip_comments_and_strings(text)
+    layout, _ = members(declaration)
+    widths = {name: width for _, name, _, width, qualified in layout if qualified}
+    offsets = {name: offset for _, name, offset, _, qualified in layout if qualified}
+    tokens = [(m[0], m.start()) for m in C_TOKEN.finditer(plain)]
+    found = []
+    for k in range(len(tokens) - 5):
+        words = [token for token, _ in tokens[k:k + 6]]
+        if words[0] != symbol or words[1:2] != ["."] or words[2] not in widths or words[3] != "|=" or \
+                words[5] != ";" or k == 0 or tokens[k - 1][0] not in (";", "{", "}", ")", "else", ":"):
+            continue
+        if integer_literal(re.sub(r"[uU]$", "", words[4])) == (1 << 8 * widths[words[2]]) - 1:
+            found.append((tokens[k + 3][1], words[2], plain.count("\n", 0, tokens[k][1]) + 1,
+                          offsets[words[2]]))
+    return found
+
+
+def operand_read_anchors(real_assembly, preprocessed, symbol, declaration):
+    """{(function, instruction index): description} of the `symbol.member |= ALL_ONES` operand
+    reads (kit#165, R2) that a variant compile proves.
+
+    For each such statement the source is compiled once more with that `|=`
+    written `=` (OPERAND_READ_COMPILE).  The variant must compile to the
+    real code with exactly one instruction taken out, an `ldrb` or `ldrh`:
+    the statement's own operand read, which `=` does not make.  Literal
+    pools and the text outside the functions must not change.  A statement
+    whose variant differs in any other way, or a load two statements claim,
+    explains nothing.
+    """
+    compile_variant = OPERAND_READ_COMPILE.get()
+    statements = all_ones_or_statements(preprocessed, symbol, declaration)
+    if compile_variant is None or not statements:
+        return {}
+    real, real_outside = parse_assembly(real_assembly)
+    anchors, claimed = {}, set()
+    for number, (_, member, line, member_offset) in enumerate(statements):
+        def rewrite(text, number=number):
+            found = all_ones_or_statements(text, symbol, declaration)
+            if len(found) != len(statements):
+                raise SemanticError("the `|=` variant compile reads a different preprocessed text")
+            at = found[number][0]
+            return text[:at] + " =" + text[at + 2:]
+        assembly = compile_variant(rewrite)
+        variant, variant_outside = parse_assembly(assembly)
+        if sorted(variant) != sorted(real) or normalised(variant_outside) != normalised(real_outside):
+            continue
+        removed = []
+        for name in sorted(real):
+            mine = [(m, o) for m, o, _ in real[name][0]]
+            theirs = [(m, o) for m, o, _ in variant[name][0]]
+            if mine == theirs and real[name][2] == variant[name][2]:
+                continue
+            index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b), len(theirs))
+            if len(mine) != len(theirs) + 1 or mine[:index] + mine[index + 1:] != theirs or \
+                    mine[index][0] not in ("ldrb", "ldrh") or real[name][2] != variant[name][2]:
+                removed = None
+                break
+            # two identical loads in a row: either can be the one taken out, and the operand
+            # read is the first (the store's own read-modify-write load sits next to the store)
+            while index > 0 and mine[index - 1] == mine[index]:
+                index -= 1
+            removed.append((name, index))
+        if not removed or len(removed) != 1:
+            continue
+        if removed[0] in claimed:
+            anchors.pop(removed[0], None)
+            continue
+        claimed.add(removed[0])
+        anchors[removed[0]] = (f"`{symbol}.{member} |=` at preprocessed line {line} (variant `=` code SHA-256 "
+                               f"`{sha256(assembly.encode('utf-8')).hexdigest()}`)", member_offset)
+    return anchors
+
+
+def all_ones_operand_read(records, position, address, width):
+    """is the load at position followed at once by the read-modify-write load of a store of
+    the member's all-ones value (the operand read of `|= ALL_ONES`, kit#165 R2)?"""
+    if position + 1 >= len(records):
+        return False
+    inner = records[position + 1]
+    if inner.kind != "load" or inner.signed or inner.address != address or inner.width != width:
+        return False
+    store = read_modify_write_store(records, position + 1, address, width)
+    return store is not None and records[store].value == (1 << 8 * width) - 1
+
+
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
                      interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None,
-                     _capture_load_provenance=False):
+                     _capture_load_provenance=False, operand_reads=None):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -3259,6 +3358,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     reloads = set()         # kit#165: dead loads whose window holds a spill reload
     tests = set()           # kit#375, rule R4: stored-value test re-reads
     copies = set()          # kit#375, rule T: the typed copies
+    operands = set()        # kit#165, R2: `|= ALL_ONES` operand reads a variant compile proves
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3322,6 +3422,13 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         "so the load must be overwritten before the call")
                 if verdict:
                     store = read_modify_write_store(records, position, record.address, record.width)
+                    anchor = (operand_reads or {}).get((name, record.index))
+                    if store is None and anchor and anchor[1] == object_offset(record.address, symbol, size) and \
+                            all_ones_operand_read(records, position, record.address, record.width):
+                        # the operand read of `|= ALL_ONES`; the next load is its store's own
+                        operands.add(f"instruction {record.index + 1}: {anchor[0]}")
+                        classified_dead_reads.add(record.index)
+                        continue
                     # one store explains one load; a second dead load in the
                     # window already refuses, so the second test is defence in depth
                     if store is None or store in explained_stores:
@@ -3483,7 +3590,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     tail = ((WholeObjectArguments(sorted(whole)),) if whole else ()) + \
         ((SpillReloads(sorted(reloads)),) if reloads else ()) + \
         ((StoredTestRereads(sorted(tests)),) if tests else ()) + \
-        ((TypedCopies(sorted(copies)),) if copies else ())
+        ((TypedCopies(sorted(copies)),) if copies else ()) + \
+        ((OperandReads(sorted(operands)),) if operands else ())
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
@@ -3831,8 +3939,10 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
         return [(name, composition.compare_function(name, real[name], stripped[name], perturbed[name],
                     signatures, symbol, size, pinned, mapping, selector=composition.SELECTOR,
                     premise=composition.PREMISE, interfaces=interfaces)) for name in sorted(real)]
+    anchors = operand_read_anchors(real_assembly, preprocessed, symbol, declaration)
     return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
-                                       interfaces, unloaded_all_ones=perturbed_assembly is not None)
+                                       interfaces, unloaded_all_ones=perturbed_assembly is not None,
+                                       operand_reads=anchors)
             for name in sorted(real)]
 
 
@@ -3851,8 +3961,9 @@ def record(symbol, results, perturbed=False):
         reloads = next((part for part in extra if isinstance(part, SpillReloads)), [])
         tests = next((part for part in extra if isinstance(part, StoredTestRereads)), [])
         copies = next((part for part in extra if isinstance(part, TypedCopies)), [])
+        operands = next((part for part in extra if isinstance(part, OperandReads)), [])
         extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads,
-                                                                 StoredTestRereads, TypedCopies))]
+                                                                 StoredTestRereads, TypedCopies, OperandReads))]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -3877,6 +3988,7 @@ def record(symbol, results, perturbed=False):
                      (f", read-modify-write windows holding a spill reload (kit#165) at "
                       f"{list(n + 1 for n in reloads)}" if reloads else "") +
                      (f", typed copies (kit#375): {'; '.join(copies)}" if copies else "") +
+                     (f", all-ones `|=` operand reads (kit#165): {'; '.join(operands)}" if operands else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
                      (f", {loops.describe()}" if loops else "") +
                      (f", BIOS calls by their GBATEK interfaces: {'; '.join(bios)} ({BIOS_NAME}, premise: "
