@@ -3802,9 +3802,9 @@ class BufferCallProof:
         # constructors and their replays opt in; every other route keeps the thunk refusal.
         self.call_via_targets = call_via_targets is True
         if bios_wrappers is not False:
-            if bios_wrappers is not True or type(self) is not BufferCallProof or \
+            if bios_wrappers is not True or type(self) not in (BufferCallProof, FunctionBufferCallProof) or \
                     discarded_exit_scratch is not None or bios_fill_proof is not None:
-                raise ValueError("BIOS wrapper summaries require the plain buffer proof")
+                raise ValueError("BIOS wrapper summaries require the plain or function-literal buffer proof")
             from bios_wrapper_summary_profile import BiosWrapperSummaries
             self.bios_summaries = BiosWrapperSummaries()
         # Replay is stated in the report (loop_replay_lines) and bound in the fingerprint, so
@@ -3827,16 +3827,16 @@ class BufferCallProof:
         if copy_helper_index is not None:
             from copy_helper_summary_profile import CopySummaries
             # Scratch and BIOS-fill policies already refuse stack arguments above.
-            if type(self) is not BufferCallProof or stack_arguments is not True:
-                raise ValueError("copy summaries require the plain stack-argument buffer proof")
+            if type(self) not in (BufferCallProof, FunctionBufferCallProof) or stack_arguments is not True:
+                raise ValueError("copy summaries require the plain or function-literal stack-argument buffer proof")
             self.copy_summaries = CopySummaries(rom, mapping, copy_helper_index)
             from motion_wrapper_summary_profile import MotionSummaries
             self.motion_summaries = MotionSummaries(rom, mapping)
         if switch_callee_index is not None:
             from switch_callee_profile import SwitchCallees
             # Scratch and BIOS-fill policies already refuse stack arguments above.
-            if type(self) is not BufferCallProof or stack_arguments is not True:
-                raise ValueError("switch callees require the plain stack-argument buffer proof")
+            if type(self) not in (BufferCallProof, FunctionBufferCallProof) or stack_arguments is not True:
+                raise ValueError("switch callees require the plain or function-literal stack-argument buffer proof")
             self.switch_callees = SwitchCallees(rom, mapping, switch_callee_index)
         if remainder_leaf.active() and type(self) is BufferCallProof and stack_arguments is True and \
                 copy_helper_index is not None:
@@ -7637,8 +7637,7 @@ def main():
                             verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
                                                   data_relocations, function_relocations,
-                                                  index=empty_index if addr in (data_buffer.MENU_LIST_ADDRESS, 0x0801A518) else None,
-                                                  premises=default_index.snapshot(ROOT))
+                                                  index=empty_index, premises=default_index.snapshot(ROOT))
                         else:
                             # The buffer proof binds a call-via call by its canonical thunk name (T1);
                             # a manifest without one is the frameless proof's, unchanged.

@@ -232,9 +232,13 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             proof = MapRecordProof(data, rom, mapping, index, calls)
             rebuild = None
         else:
+            # The plain path's default-walk summaries (BIOS wrappers, the pinned copy helper,
+            # jump-table callees), each under its own checks; a call none of them covers is
+            # walked or refused as before.
             rebuild = lambda: match.FunctionBufferCallProof(
-                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True,
-                forward_slots=True)
+                rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
+                copy_helper_index=index, switch_callee_index=index, dead_registers=True,
+                call_via_targets=True, forward_slots=True)
             proof = rebuild()
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN

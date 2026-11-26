@@ -2236,8 +2236,10 @@ The typed-data proof beside the version-2 walk (`data_buffer_profile`) builds
 the same plain proof for its plain path, and takes the same index from
 `match.py` and from its own replay, so a caller with typed object words is
 summarised the same way; its report carries and replays the same lines. Its
-function-literal path builds a `FunctionBufferCallProof` and still refuses
-the call.
+function-literal path builds a `FunctionBufferCallProof` with the same
+summaries and index (the BIOS wrapper summaries too), so a caller that also
+holds function literals is summarised the same way; any other subclass still
+refuses the summaries at construction.
 
 ### Jump-table callees in the default stack buffer walk
 
@@ -2291,8 +2293,8 @@ The typed-data proof beside the version-2 walk (`data_buffer_profile`) builds
 the same plain proof for its plain path, and takes the same index from
 `match.py` and from its own replay, so a caller with typed object words reaches
 a jump-table callee the same way; its report carries and replays the same
-lines. Its function-literal path builds a `FunctionBufferCallProof` and still
-refuses such a callee.
+lines. Its function-literal path builds a `FunctionBufferCallProof` with the
+same index and reaches such a callee the same way.
 
 ### A jump table in the owner of the default typed-data buffer walk
 
@@ -3096,8 +3098,10 @@ verified by two schemas, one for each matcher path. Neither needs a selector.
   path. When the frameless function-address proof fails and the function has
   data relocations, the matcher tries the function-buffer proof
   (`FunctionBufferCallProof`, version 2 with pointer slots and loop replay)
-  with the canonical function literals and the typed object literals. Runtime
-  thunks are bound as on that path without data.
+  with the canonical function literals and the typed object literals, and the
+  plain path's BIOS wrapper, copy-helper and jump-table-callee summaries under
+  their own checks (`match.py` and the replay pass it the same function index).
+  Runtime thunks are bound as on that path without data.
 
 Both require an inspected buffer dependency and an exact complete mapped
 caller span. Every typed object word is bound as `elf-symbol-thumb-data-v1`
