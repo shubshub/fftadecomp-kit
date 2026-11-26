@@ -5196,13 +5196,17 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 switch_data_relocations is not None or udivsi3_context is not None or \
                 modsi3_context is not None or divsi3_context is not None or preloaded_switch:
             raise ValueError("inert spins require a fresh isolated Thumb direct-call context")
-        # Neither wide runtime composes with spins; 08142280 is not reserved, so name both.
+        # A wide runtime composes with spins only as the software-double context's own canonical
+        # __muldi3/__divdi3 binding at that site (software_double.spin_wide_call); 08142280 is not
+        # reserved, so name both wide entries.
         if any(target in RUNTIME_HELPERS.values() or is_udivsi3_address(target) or
                modsi3.reserved(target) or divsi3.reserved(target) or ashldi3.reserved(target) or
-               double_context is not None and target in software_double.WIDE_OPERATIONS.values() or
+               double_context is not None and target in software_double.WIDE_OPERATIONS.values() and
+               not software_double.spin_wide_call(double_context, site, target) or
                (software_double.reserved(target) or software_float.reserved(target)) and not
-               (double_context is not None and target in software_double.OPERATIONS.values())
-               for target in (validated_calls or {}).values()):
+               (double_context is not None and (target in software_double.OPERATIONS.values() or
+                                                software_double.spin_wide_call(double_context, site, target)))
+               for site, target in (validated_calls or {}).items()):
             raise ValueError("inert spins exclude unproved arithmetic runtimes and call thunks")
     if divsi3_context is not None:
         if not thumb or buffer_proof is not None or call_resolver is not None or \

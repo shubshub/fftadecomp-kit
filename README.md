@@ -7047,13 +7047,30 @@ SP through a tracked stack address. The three computed `__clz_tab` loads
 bounds them to ROM is established by inspection of the pinned bodies. Operands
 and those table loads are target-state inputs: no arithmetic, zero-divisor or
 termination claim is made. Explicit `func_08142A20` calls, `__moddi3`,
-`__udivdi3` and other wide runtimes remain refused in this profile, and neither
-wide runtime composes with inert spins. Explicit `func_08142280` calls are a
+`__udivdi3` and other wide runtimes remain refused in this profile. Explicit `func_08142280` calls are a
 deliberate tightening: they verified under this selector before, as ordinary
 entry-only calls, and are now refused, because inside the selector any call to
 `08142280` must be the canonical `__divdi3`. Outside the selector, `__muldi3`
 and `__divdi3` stay unbound, and an explicit `func_08142280` keeps its existing
 ordinary entry-only binding.
+
+The two wide runtimes compose with the optional `software-double-inert-self-spin-v1`
+record, as the binary64 operations do. The spin guard exempts a call beside a spin
+only when the software-double context binds that exact site to `__muldi3` at
+`08142A20` or `__divdi3` at `08142280`, through the original compiler relocation
+already checked complete against the linked calls, with the closure proved as
+above (`software_double_profile.spin_wide_call`). Partial correctness is the
+stance of both records, so they add nothing to each other. The spin record states
+no termination, and the closure states no arithmetic, zero-divisor or termination
+claim. A spin closes a region with no calls; the runtime calls lie outside it.
+Outside the selector nothing changes. `08142A20`, a reserved body, still refuses
+beside a spin with `inert spins exclude unproved arithmetic runtimes and call thunks`.
+An explicit `08142280` stays the ordinary entry-only call it was. Inside the
+selector, thunks, the word runtimes and every other wide name keep that refusal. Reports keep their format: the manifest
+carries its `wide_integer` and `inert_spin` records side by side.
+`software_double_profile.WIDE_SPINS.enabled = False` restores the refusal. The
+first caller is `08008480`, the s64 twin of the merged binary64 spline setup
+`08007270`, with that sibling's `if (count <= 2) for (;;) ;` guard.
 
 The standalone source of `__divdi3` at `08142280` uses
 `--owner-runtime-profile libgcc-divdi3-v1`. Both the default compiler and

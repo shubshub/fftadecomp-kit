@@ -57,7 +57,7 @@ DIVISION_IDENTITIES = (
 # (08142304, 081423E8, 0814255C) unconstrained; that the code bounds them to
 # ROM rests on inspection of the pinned bodies. Numeric registers and table
 # loads are target-state inputs; no arithmetic or termination claim is made.
-# Inert spins compose with neither wide runtime.
+# Inert spins compose with them only through WIDE_SPINS (spin_wide_call).
 WIDE_OPERATIONS = {"__muldi3": 0x08142A20, "__divdi3": 0x08142280}
 WIDE_RUNTIME = "agbcc-thumb-muldi3-divdi3-target-state-closure-v1"
 WIDE_IDENTITIES = (
@@ -94,6 +94,30 @@ def call_target(name, owner=None, site=None):
 
 def wide_call(name, target):
     return name in WIDE_OPERATIONS and target == WIDE_OPERATIONS[name]
+
+
+class WideSpinPolicy:
+    """Wide runtimes beside inert self-spins inside this selector; ``enabled = False`` restores
+    "inert spins exclude unproved arithmetic runtimes and call thunks" for them."""
+
+    enabled = True
+
+
+WIDE_SPINS = WideSpinPolicy()
+
+
+def spin_wide_call(context, site, target):
+    """Whether a call beside an inert spin is the double context's own canonical __muldi3/__divdi3.
+
+    The bindings are the original ELF's compiler relocations, already checked complete against the
+    linked calls (verify_context); the pinned wide closure is proved by prove_wide_closure.  An
+    unbound site, another name or an interior target is not, and neither is any call outside the
+    software-double context (where 08142280 stays an ordinary entry-only call).
+    """
+    if not WIDE_SPINS.enabled or context is None or type(site) is not int:
+        return False
+    bindings = context[3]
+    return type(bindings) is dict and wide_call(bindings.get(site), target)
 
 
 def shared_division_call(name, target):

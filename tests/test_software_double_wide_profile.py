@@ -264,37 +264,151 @@ class SoftwareDoubleWideTests(fixture.SoftwareDoubleTests):
                 self.assertRaisesRegex(ValueError,'stack access exceeds its frame'):
             profile.prove_wide_closure(bytes(rom),self.mapping,self.index)
 
-    def test_inert_spins_compose_with_neither_wide_runtime(self):
-        # 08142A20 is a reserved closure body but 08142280 is not; both are refused alike.
-        for operator,name in (('*','__muldi3'),('/','__divdi3')):
-            (self.root/'src/08000000.c').write_text(
-                'typedef long long s64;\ns64 func_08000000(int count, s64 left, s64 right)\n{\n'
-                f'    if (count <= 2)\n        for (;;)\n            ;\n    return left {operator} right;\n}}\n')
-            runner=match.Runner(match.DEFAULT_CC,root=self.root,timeout=120)
-            with self.subTest(name=name),runner.workspace() as workspace:
-                _,_,original=match.compile_object(runner,workspace,self.args,self.root,BASE,'src/08000000.c')
-                symbol,_=match.function_record(original,'func_08000000',BASE,True)
-                self.indexes(symbol['size'],1)
-                body,calls,bindings=profile.object_bytes(runner,workspace,self.args,original,BASE,
-                                                         self.mapping,self.runtime_rom,self.index)
+    SPIN_SOURCE=('typedef long long s64;\ns64 func_08000000(int count, s64 left, s64 right)\n{\n'
+                 '    if (count <= 2)\n        for (;;)\n            ;\n    return left OPERATOR right;\n}\n')
+
+    def spin_object(self,operator,source=None):
+        """(body, calls, bindings, rom) of a spin-guarded caller of one wide runtime, in this root."""
+        (self.root/'src/08000000.c').write_text((source or self.SPIN_SOURCE).replace('OPERATOR',operator))
+        runner=match.Runner(match.DEFAULT_CC,root=self.root,timeout=120)
+        with runner.workspace() as workspace:
+            _,_,original=match.compile_object(runner,workspace,self.args,self.root,BASE,'src/08000000.c')
+            symbol,_=match.function_record(original,'func_08000000',BASE,True)
+            self.indexes(symbol['size'],1)
+            body,calls,bindings=profile.object_bytes(runner,workspace,self.args,original,BASE,
+                                                     self.mapping,self.runtime_rom,self.index)
+        rom=bytearray(self.runtime_rom);rom[:len(body)]=body
+        return body,calls,bindings,bytes(rom)
+
+    def test_inert_spins_compose_with_bound_wide_runtimes(self):
+        for operator,name,target in (('*','__muldi3',MUL),('/','__divdi3',DIV)):
+            with self.subTest(name=name):
+                body,calls,bindings,rom=self.spin_object(operator)
                 self.assertEqual(set(bindings.values()),{name})
-                rom=bytearray(self.runtime_rom);rom[:len(body)]=body;rom=bytes(rom)
+                self.assertEqual(set(calls.values()),{target})
                 context=(rom,self.mapping,self.index,bindings)
+                # Without the spin record the self-branch still has no verified return.
                 with self.assertRaisesRegex(ValueError,'no path to a verified return'):
                     match.verify_leaf_instructions(body,BASE,True,calls,double_context=context)
-                with self.assertRaisesRegex(ValueError,'inert spins exclude unproved arithmetic runtimes'):
-                    match.verify_leaf_instructions(body,BASE,True,calls,double_context=context,
-                                                   inert_spin_context={})
-                if name!='__divdi3': continue
-                # A saved report claiming the spin is refused too. Outside the
-                # selector 08142280 is an ordinary call, which yields the CFG.
                 spin={}
-                instructions=match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context=spin)
+                instructions=match.verify_leaf_instructions(body,BASE,True,calls,double_context=context,
+                                                            inert_spin_context=spin)
+                self.assertEqual(len(spin['spins']),1)
                 self.indexes(len(body),len(instructions))
                 manifest=profile.make_manifest(calls,BASE,bindings,instructions,spins=spin['spins'])
-                self.assertIn('inert_spin',manifest)
-                with self.assertRaisesRegex(ValueError,'inert spins exclude unproved arithmetic runtimes'):
-                    profile.verify(body,BASE,rom,self.mapping,self.index,manifest)
+                self.assertEqual(manifest['inert_spin'],{'schema':profile.INERT_SPIN_SCHEMA,'spins':spin['spins']})
+                self.assertEqual([row[1] for row in manifest['wide_integer']['calls']],[name])
+                self.assertEqual(len(profile.verify(body,BASE,rom,self.mapping,self.index,manifest)),len(instructions))
+                # The spin record is still checked against the converged CFG.
+                for spins in ([],[spin['spins'][0]+2],spin['spins']+[0]):
+                    altered=copy.deepcopy(manifest);altered['inert_spin']['spins']=spins
+                    with self.assertRaises(ValueError):
+                        profile.verify(body,BASE,rom,self.mapping,self.index,altered)
+                # The exemption is the context's own canonical binding at that exact site.
+                site=next(iter(calls))
+                other='__divdi3' if name=='__muldi3' else '__muldi3'
+                for forged in ({site:other},{},{site+2:name},{**bindings,site+4:name}):
+                    with self.assertRaises(ValueError):
+                        match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context={},
+                                                       double_context=(rom,self.mapping,self.index,forged))
+                # One line restores the refusal, in the walk and in replay.
+                with patch.object(profile.WIDE_SPINS,'enabled',False):
+                    with self.assertRaisesRegex(ValueError,'inert spins exclude unproved arithmetic runtimes'):
+                        match.verify_leaf_instructions(body,BASE,True,calls,double_context=context,
+                                                       inert_spin_context={})
+                    with self.assertRaisesRegex(ValueError,'inert spins exclude unproved arithmetic runtimes'):
+                        profile.verify(body,BASE,rom,self.mapping,self.index,manifest)
+
+    def test_a_wide_call_inside_the_nonreturning_region_refuses(self):
+        # The quotient is computed only on the path that ends in the spin. That region must hold
+        # nothing but the inert self-branch, so the exemption never admits a wide call inside it.
+        source=('typedef long long s64;\ns64 func_08000000(int count, s64 *p)\n{\n'
+                '    if (count <= 2) {\n        p[0] = p[1] OPERATOR p[2];\n        for (;;)\n            ;\n    }\n'
+                '    return p[1] * p[2];\n}\n')
+        body,calls,bindings,rom=self.spin_object('/',source)
+        self.assertIn('__divdi3',bindings.values())
+        context=(rom,self.mapping,self.index,bindings)
+        with self.assertRaisesRegex(ValueError,'no path to a verified return'):
+            match.verify_leaf_instructions(body,BASE,True,calls,double_context=context)
+        with self.assertRaisesRegex(ValueError,'non-return-reaching node must itself be an inert'):
+            match.verify_leaf_instructions(body,BASE,True,calls,double_context=context,inert_spin_context={})
+
+    def test_match_py_issues_and_rechecks_a_spin_guarded_wide_report(self):
+        # match.py runs as __main__ when it issues a report: run it as a separate process, as the
+        # decomp's tools do, so the rule is exercised where reports are written.
+        import sys
+        body,calls,bindings,rom=self.spin_object('/')
+        instructions=match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context={},
+                                                    double_context=(rom,self.mapping,self.index,bindings))
+        self.indexes(len(body),len(instructions))
+        (self.root/'config/functions.json').write_bytes(self.mapping)
+        (self.root/'symbols/functions.txt').write_bytes(self.index)
+        (self.root/'config/data_symbols.json').write_text('{}')
+        (self.root/'baserom.bin').write_bytes(rom)
+        tool=Path(match.__file__).resolve()
+        environment=dict(os.environ,FFTA_ROM=str(self.root/'baserom.bin'),PYTHONDONTWRITEBYTECODE='1')
+        def run(*options):
+            return subprocess.run([sys.executable,str(tool),'--root',str(self.root),'--software-double-profile',
+                                   profile.SELECTOR,*options,'0x08000000'],capture_output=True,text=True,
+                                  env=environment,timeout=600)
+        result=run()
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('verdict MATCH - byte identical',result.stdout)
+        report=(self.root/'docs/match/08000000.md').read_text()
+        self.assertIn('software-double-inert-self-spin-v1',report)
+        self.assertIn('__divdi3',report)
+        result=run('--check-report','--no-write')
+        self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+        self.assertIn('report  identical to the saved docs/match/08000000.md',result.stdout)
+
+    def test_wide_spin_exemption_stays_inside_the_selector(self):
+        # Outside the software-double context nothing changed: 08142A20 is a reserved body and
+        # still refuses beside a spin; 08142280 stays an ordinary entry-only call, as before.
+        body,calls,bindings,rom=self.spin_object('*')
+        with self.assertRaisesRegex(ValueError,'inert spins exclude unproved arithmetic runtimes'):
+            match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context={})
+        body,calls,bindings,rom=self.spin_object('/')
+        spin={}
+        instructions=match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context=spin)
+        self.assertEqual(len(spin['spins']),1)
+        self.assertEqual(set(calls.values()),{DIV})
+        self.assertTrue(instructions)
+
+    def test_spin_wide_call_binds_only_the_canonical_site(self):
+        bindings={BASE+8:'__muldi3',BASE+16:'__divdi3',BASE+24:'__modsi3'}
+        context=(b'',b'',b'',bindings)
+        self.assertTrue(profile.spin_wide_call(context,BASE+8,MUL))
+        self.assertTrue(profile.spin_wide_call(context,BASE+16,DIV))
+        for site,target in ((BASE+8,DIV),(BASE+16,MUL),(BASE+8,MUL+2),(BASE+24,0x08142950),
+                            (BASE+12,MUL),('0x08000008',MUL),(None,MUL)):
+            with self.subTest(site=site,target=target):
+                self.assertFalse(profile.spin_wide_call(context,site,target))
+        self.assertFalse(profile.spin_wide_call(None,BASE+8,MUL))
+        self.assertFalse(profile.spin_wide_call((b'',b'',b'',[(BASE+8,'__muldi3')]),BASE+8,MUL))
+        with patch.object(profile.WIDE_SPINS,'enabled',False):
+            self.assertFalse(profile.spin_wide_call(context,BASE+8,MUL))
+
+    def test_other_runtimes_beside_a_spin_still_refuse(self):
+        # A spin beside a wide runtime and a call thunk, or beside an unbound wide runtime.
+        sources=(
+            'typedef long long s64;\ns64 func_08000000(int count, s64 left, s64 (*f)(s64))\n{\n'
+            '    if (count <= 2)\n        for (;;)\n            ;\n    return f(left * left);\n}\n',
+            'typedef long long s64;\ns64 func_08000000(int count, s64 left, s64 right)\n{\n'
+            '    if (count <= 2)\n        for (;;)\n            ;\n    return left % right;\n}\n')
+        for source in sources:
+            with self.subTest(source=source.splitlines()[-2]):
+                (self.root/'src/08000000.c').write_text(source)
+                runner=match.Runner(match.DEFAULT_CC,root=self.root,timeout=120)
+                with runner.workspace() as workspace:
+                    _,_,original=match.compile_object(runner,workspace,self.args,self.root,BASE,'src/08000000.c')
+                    symbol,_=match.function_record(original,'func_08000000',BASE,True)
+                    self.indexes(symbol['size'],1)
+                    with self.assertRaises(ValueError):
+                        body,calls,bindings=profile.object_bytes(runner,workspace,self.args,original,BASE,
+                                                                 self.mapping,self.runtime_rom,self.index)
+                        rom=bytearray(self.runtime_rom);rom[:len(body)]=body
+                        match.verify_leaf_instructions(body,BASE,True,calls,inert_spin_context={},
+                            double_context=(bytes(rom),self.mapping,self.index,bindings))
 
 class WideLibgccProvenanceTests(unittest.TestCase):
     """Every pinned closure body is a local agbcc libgcc selection, not a hand fixture."""
