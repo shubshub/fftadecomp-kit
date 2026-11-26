@@ -154,9 +154,10 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         "functions": [[offset, name] for offset, (name, _) in sorted(function_relocations.items())]}
     entries = json.loads(mapping)
     if schema == FUNCTION_SCHEMA:
-        # The function-literal path's own bindings: canonical function literals,
-        # direct calls only (no runtime thunks), typed object words.
-        bound, literals = match.function_address_bindings(data, address, rom, mapping, objects, manifest)
+        # The function-literal path's own bindings: canonical function literals, direct calls,
+        # canonical call-via thunks (call_via_target_profile T1), typed object words.
+        bound, literals = match.function_address_bindings(data, address, rom, mapping, objects, manifest,
+                                                          allow_call_thunks=True)
         if bound != calls:
             raise ValueError("data-buffer calls differ from their canonical bindings")
         if address == 0x0801A518:
@@ -312,7 +313,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                 functions, switches = {}, {}
                 got, calls, literals = link_calls(runner, workspace, args, original, address, mapping,
                                                   len(rom), rom, objects, functions, switches,
-                                                  allow_switch_data=True)
+                                                  allow_switch_data=True, function_literal_thunks=True)
             if got != data:
                 raise ValueError("data-buffer fresh complete bytes differ")
             import default_stack_index_profile as default_index

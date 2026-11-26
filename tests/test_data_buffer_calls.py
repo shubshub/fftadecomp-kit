@@ -106,7 +106,7 @@ def tools_present():
         all(shutil.which(tool) for tool in (match.DEFAULT_AS, match.DEFAULT_LD, match.DEFAULT_OBJCOPY))
 
 
-def build(root, source, callees, objects=OBJECTS, large=False):
+def build(root, source, callees, objects=OBJECTS, large=False, function_literal_thunks=False):
     """A complete tree: the caller from `source`, assembled callees from 0x08000400.
 
     callees: [(name, assembly)], each 0x100 apart; `large` adds the CpuSet wrapper
@@ -155,7 +155,7 @@ def build(root, source, callees, objects=OBJECTS, large=False):
         entries.insert(0, {"rom": f"0x{A:08X}", "end": f"0x{A + symbol['size']:08X}", "mode": "thumb"})
         mapping = json.dumps(entries).encode()
         body, _, _ = match.link_calls(runner, workspace, args, original, A, mapping, len(rom), bytes(rom),
-                                      objects, {})
+                                      objects, {}, function_literal_thunks=function_literal_thunks)
     assert A + len(body) <= CALLEES
     rom[A - BASE:A - BASE + len(body)] = body
     (root / "config/functions.json").write_bytes(mapping)
@@ -531,9 +531,11 @@ void func_08000200(u16 value)
 
     # --- (b) the function-literal path ---
 
-    def test_function_literal_path_excludes_runtime_thunks_in_dependencies(self):
+    def test_function_literal_path_walks_runtime_thunks_in_dependencies(self):
         # The callee drops every alias before calling the callback through _call_via_r2; the
-        # thunks are indexed, as in the ROM, so only the function-buffer exclusion refuses it.
+        # thunks are indexed, as in the ROM.  The function-buffer exclusion refused it until
+        # call_via_target_profile's T1: the call passes no frame address, so it is an ordinary
+        # call as on the plain path, and the exclusion returns only with T1's policy off.
         callee = ("push {lr}\nstrh r0, [r1]\nstrh r0, [r1, #6]\nmovs r0, #0\nmovs r1, #0\n"
                   f"bl 0x{match.RUNTIME_HELPERS['_call_via_r2']:08X}\npop {{r0}}\nbx r0")
         root = self.fixture("literal_thunk", LITERAL % dict(extra=""),
@@ -545,8 +547,15 @@ void func_08000200(u16 value)
         (root / "symbols/functions.txt").write_text("".join(
             f"{int(entry['rom'], 16):08X} {int(entry['end'], 16):08X} "
             f"{int(entry['end'], 16) - int(entry['rom'], 16)} 0 return\n" for entry in entries))
-        self.assertRefused(root, "function-data-buffer proof: buffer callee 0x08000400: "
-                                 "function-buffer evidence excludes runtime call thunks in inspected dependencies")
+        code, output, report = run(root)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(verification(report), data_buffer.FUNCTION_SCHEMA)
+        self.assertTrue(self.replays(report, root))
+        import call_via_target_profile as call_via
+        body, rom, mapping, objects, calls, literals, functions = self.linked(root)
+        with patch.object(call_via.POLICY, "enabled", False), self.assertRaisesRegex(
+                ValueError, "function-buffer evidence excludes runtime call thunks in inspected dependencies"):
+            data_buffer.prove(body, A, rom, mapping, objects, calls, literals, functions)
 
     def test_function_literal_beside_buffer_and_typed_data(self):
         root = self.fixture("literal", LITERAL % dict(extra=""),

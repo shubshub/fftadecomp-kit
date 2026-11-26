@@ -191,11 +191,20 @@ class BufferIndexTests(unittest.TestCase):
             with self.subTest(operation=operation), self.assertRaises(ValueError):
                 self.fixture(operation, arch="armv7-m")
 
-    def test_function_buffer_inheritance_preserves_runtime_exclusion(self):
+    def test_function_buffer_runtime_exclusion_follows_the_call_via_policy(self):
+        import call_via_target_profile as call_via
         proof = self.fixture("movs r2, #2\nldrsh r0, [r4, r2]",
                              proof_type=match.FunctionBufferCallProof)
-        with self.assertRaisesRegex(ValueError, "excludes runtime call thunks"):
-            proof.target(match.RUNTIME_HELPERS["_call_via_r2"])
+        thunk = match.RUNTIME_HELPERS["_call_via_r2"]
+        # With call_via_target_profile.POLICY off the function-buffer proof keeps its own exclusion.
+        with patch.object(call_via.POLICY, "enabled", False), \
+                self.assertRaisesRegex(ValueError, "excludes runtime call thunks"):
+            proof.target(thunk)
+        # With it on, a thunk is a target exactly as for the plain proof, which this fixture does not index.
+        for checked in (proof, match.BufferCallProof(proof.rom, json.dumps(proof.entries), stack_arguments=True)):
+            with self.subTest(type(checked).__name__), \
+                    self.assertRaisesRegex(ValueError, "buffer call target is not unique aligned Thumb ROM code"):
+                checked.target(thunk)
 
     def test_report_replays_and_binds_current_inputs(self):
         self.fixture("movs r2, #1\nstrb r0, [r4, r2]")

@@ -2376,13 +2376,14 @@ literal and an actually inspected buffer dependency. The matcher preserves
 function-address version 1 when its frameless proof succeeds; otherwise this
 composition must succeed in full or verification fails, without a legacy
 buffer-only fallback. Fixed frames and multiple direct calls are supported;
-switches, runtime-thunk bindings and indirect-call dependencies remain
-excluded. A caller that also has named object relocations uses the separate
+switches and indirect-call dependencies remain excluded, and canonical
+`_call_via_rN` thunks are admitted only as "Call-via thunks beside function
+literals" below says. A caller that also has named object relocations uses the separate
 `elf-symbol-thumb-function-data-buffer-calls-v1` schema below instead. No buffer bounds, escape or provenance check is
 relaxed, and block transfers and incoming-pointer spills remain unsupported.
-Every reached direct call in an inspected dependency is checked against the
-runtime-thunk exclusion, even if the buffer survives only in a callee-saved
-register and no borrowed argument is passed to that call. This restriction is
+With that rule off, every reached direct call in an inspected dependency is
+checked against the runtime-thunk exclusion, even if the buffer survives only in
+a callee-saved register and no borrowed argument is passed to that call. This restriction is
 specific to the combined profile; the legacy buffer profiles are unchanged.
 
 The new report retains both binding and buffer evidence and adds a
@@ -2408,6 +2409,28 @@ protect only that word: descriptor frames and saved control require separate
 byte-range proofs or invalidation of affected facts, with no assumed allocator
 or frame separation. Those additional capabilities are not part of this profile.
 
+### Call-via thunks beside function literals
+
+On the default path (no selector, control-flow profile or library unit:
+`match.default_call_route`), a function-literal caller may also call agbcc's
+canonical `_call_via_rN` thunks (`bx rN; mov r8, r8` at `0x08142244 + 4N`),
+in its own body and in the dependencies its buffer walk inspects, on both the
+`elf-symbol-thumb-function-buffer-calls-v1` and the
+`elf-symbol-thumb-function-data-buffer-calls-v1` proofs. The link binds each
+thunk call by its canonical name and checks the thunk's bytes in the ROM (`call
+helper does not match its thunk in the ROM`). As on the plain and data-buffer
+paths, a thunk caller's code-valued pool words must carry their canonical
+function relocations and none may name the caller's own bytes
+(`function_thunk.verify_literal_bindings`, `verify_own_span_literals`). A thunk
+call is walked as the plain buffer proof walks it, so a call through a thunk
+whose target is not known, with a frame address in R0-R3, still refuses
+(`non-leaf indirect control flow requires linked CFG verification`). Selector
+routes keep the link refusal (`function-address evidence does not support
+runtime call thunks`), and `call_via_target_profile.POLICY.enabled = False`
+restores it on every route, with the function-buffer proof's own exclusion
+(`function-buffer evidence excludes runtime call thunks in inspected
+dependencies`).
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is
@@ -2426,7 +2449,7 @@ verified by two schemas, one for each matcher path. Neither needs a selector.
   data relocations, the matcher tries the function-buffer proof
   (`FunctionBufferCallProof`, version 2 with pointer slots and loop replay)
   with the canonical function literals and the typed object literals. Runtime
-  thunks stay excluded, as on that path without data.
+  thunks are bound as on that path without data.
 
 Both require an inspected buffer dependency and an exact complete mapped
 caller span. Every typed object word is bound as `elf-symbol-thumb-data-v1`
