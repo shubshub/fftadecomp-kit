@@ -18,6 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "tests"))
 import match
+import released_scratch_profile as released_scratch
 import match_evidence as evidence
 import data_buffer_profile as data_buffer
 import function_literal_exit_scratch_profile as function_exit
@@ -244,13 +245,24 @@ class ExitScratchNativeTests(unittest.TestCase):
         self.assertIsNone(getattr(self.prove(root)()[1], "function_exit_scratch", None))
 
     def test_callee_return_keeps_its_refusal(self):
-        prove = self.prove(self.fixture("own", OWN))
+        root = self.fixture("own", OWN)
+        prove = self.prove(root)
         with self.assertRaises(ValueError) as on:
             prove()
         with patch.object(function_exit.POLICY, "enabled", False), self.assertRaises(ValueError) as off:
             prove()
         self.assertEqual(str(on.exception), str(off.exception))
-        self.assertIn("buffer callee 0x08000400", str(on.exception))
+        # The callee's own frame in R3 is handed back released (released_scratch_profile) and refuses
+        # where it reaches the owner's return, which this rule does not project either.
+        self.assertIn("local stack pointer escapes through a return register", str(on.exception))
+        with patch.object(released_scratch, "callee_return", lambda proof, address, site, aliases, **_: aliases), \
+                self.assertRaisesRegex(ValueError, "buffer callee 0x08000400"):
+            prove()
+        # This rule never drops the released marker at the owner's return: no report, or one without
+        # an exit-scratch line.
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, output)
+        self.assertTrue(report is None or not self.scratch(report), report)
 
 
 if __name__ == "__main__":

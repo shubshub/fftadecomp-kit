@@ -1953,6 +1953,31 @@ every decided branch (site, condition, edge, flag site and operands):
 A callee the entry proof admits keeps its version-1 record and line.
 `dead_register.THROUGH_CALLS.enabled = False` keeps the entry proof alone.
 Boundaries are in `tests/test_dead_register_through_calls.py`.
+### A callee's released frame address in R2 or R3
+
+A callee that passes one of its own locals to a further call may return with
+that local's address still in R2 or R3, since agbcc does not clear scratch
+registers (`0x08006EC0` passes `mov r2, sp` to `0x08006C88` and returns with
+it). The callee's frame is released by the return, so the value points below
+its caller's SP. The default stack-argument walks refused every such return
+("local stack pointer escapes through a return register").
+`released_scratch_profile` checks the caller instead, in the plain and
+function-literal stack-argument proofs only (exact types).
+
+At a return of an inspected callee, an R2 or R3 alias at a negative offset
+from that callee's entry SP is recorded and handed back to the caller as a
+marker. R0 and R1, an offset at or above the entry SP and every return of the
+owner itself keep the refusal. Both walks of the caller carry the marker
+through their joins. Any instruction that reads it refuses, and so does a
+call while it is in R0-R3. A write clears it (the site is recorded), and a
+return of a walked caller hands it on the same way. An inspection that
+recorded a release and then refused keeps its refusal: the dead-register
+fallback would discard the record, as kit #538 keeps the refusal of a callee
+that returns its own frame. The value is never dropped, so no premise is
+stated. The records are stated on one
+`* buffer released scratch:` line and bound into the buffer fingerprint only
+when there is one. Synthetic boundaries are in `tests/test_released_scratch.py`.
+
 ### Calls into the boot IWRAM code image
 
 The game copies a small Thumb image (a clear, a fill and a copy routine) into
