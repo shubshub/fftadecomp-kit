@@ -69,6 +69,7 @@ import library_units
 import rom_mirror
 import counted_stack_cursor_loop as counted_cursor
 import split_join_profile as split_join
+import released_scratch_profile as released_scratch
 import iwram_image_profile as iwram_image
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
@@ -3877,6 +3878,9 @@ class BufferCallProof:
         # Disagreeing forward joins a stack-argument walk kept apart (SplitJoins), as
         # (walk, join, register, kept offset, split offset) keys; empty in every other proof.
         self.split_joins = {}
+        # released_scratch_profile: (callee, return site, register, offset or None) released
+        # frame addresses handed back in R2/R3, and (function, site, register) clearing writes.
+        self.released_scratch, self.released_kills = set(), set()
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Exact call-via resolutions ((site, target) -> record) and the target each resolved call
@@ -4037,14 +4041,18 @@ class BufferCallProof:
         if self.dead_registers is None:
             return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
         saved = self._snapshot_ledgers()
+        released_before = set(self.released_scratch)
         try:
             return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
         except ValueError as refused:
             # A callee inspected only for stack addresses it overwrites unread is an
             # alias-free call; the records of the refused inspection are discarded.  An
             # inspection refused because the callee returns its own frame address keeps
-            # its refusal (kit #538): the call would hand that address to this owner.
+            # its refusal (kit #538): the call would hand that address to this owner.  So
+            # does one that recorded a released callee frame address before it refused
+            # (released_scratch_profile): discarding the record would drop that address.
             if return_scratch_profile.ESCAPE in str(refused) or \
+                    released_scratch.recorded_since(self, released_before) or \
                     self.dead_registers.call(address, arguments, incoming, protected, context, saved) is None:
                 raise
             return self.word_result({}, {})
@@ -4069,11 +4077,11 @@ class BufferCallProof:
                 if self.default_forwarding else None,
                 self.store_bounds.snapshot() if self.store_bounds is not None else None,
                 self.motion_summaries.snapshot() if self.motion_summaries is not None else None,
-                set(self.iwram_image_calls))
+                (set(self.released_scratch), set(self.released_kills)), set(self.iwram_image_calls))
 
     def _restore_ledgers(self, saved):
         snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
-            forward_snapshot, bound_snapshot, motion_snapshot, image_snapshot = saved
+            forward_snapshot, bound_snapshot, motion_snapshot, released_snapshot, image_snapshot = saved
         if bound_snapshot is not None:
             self.store_bounds.restore(bound_snapshot)
         if motion_snapshot is not None:
@@ -4093,6 +4101,7 @@ class BufferCallProof:
         self.call_via_records.update(via_snapshot[0])
         self.call_via_effective.clear()
         self.call_via_effective.update(via_snapshot[1])
+        self.released_scratch, self.released_kills = (set(values) for values in released_snapshot)
         for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted,
                                    self.far_jumps), snapshot):
             ledger.clear()
@@ -4225,6 +4234,8 @@ class BufferCallProof:
                 operands = instruction.operands
                 registers = tuple(operand.reg for operand in operands if operand.type == ARM_OP_REG)
                 read, written = instruction.regs_access()
+                released_scratch.step(self, address, current, instruction, aliases,
+                                      CS_GRP_CALL in instruction.groups)
                 if set(written) & set(watched):
                     raise ValueError("descriptor call does not prove preservation of a live alias register")
                 returning = current not in finite_transfers and (instruction.mnemonic == "bx" or
@@ -4306,6 +4317,7 @@ class BufferCallProof:
                         result = self.import_stale_words(result, aliases, depth)
                     self.finish_call_constants(constants, result, site=current, target=callee)
                     aliases.update(result)
+                    released_scratch.after_call(self, callee, aliases)
                     # An inspected callee's own writes to R4-R11 are not trusted
                     # to be restored; uninspected calls keep the ABI premise.
                     nested_clobbers = self.callee_clobbers.get(callee, ())
@@ -4436,6 +4448,7 @@ class BufferCallProof:
                 if current in finite_transfers:
                     successors = finite_transfers[current]
                 elif returning:
+                    aliases = released_scratch.callee_return(self, address, current, aliases, own_frame=False)
                     aliases = self.normal_return_aliases(address, current, aliases)
                     for position, key in stale_words(aliases).items():
                         # Released words leave with the frame; the caller keeps tracking them.
@@ -4748,6 +4761,7 @@ class BufferCallProof:
         lines.extend(function_exit.lines(self))
         lines.extend(forwarded_slots_profile.lines(self))
         lines.extend(iwram_image.lines(self))
+        lines.extend(released_scratch.lines(self))
         lines.extend(far_jump.lines(self))
         return lines
 
@@ -4856,6 +4870,9 @@ class BufferCallProof:
         if remainder_leaf.is_summaries(self.runtime_summaries) and self.runtime_summaries.sites:
             # Only a summarised compiler __modsi3 call adds this.
             digest.update(self.runtime_summaries.digest_text().encode())
+        if (released := released_scratch.digest(self)) is not None:
+            # Only a walk that handed a callee's released frame address back adds this.
+            digest.update(released.encode())
         if self.split_joins:
             # Only a walk that kept a disagreeing join apart adds this; every other fingerprint is unchanged.
             digest.update(json.dumps([split_join.SCHEMA, split_join.records(self.split_joins)],
@@ -5612,6 +5629,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         constants = dict(incoming_state[3])
         pointer_slots = dict(incoming_state[4])
         words = dict(incoming_state[5])
+        if buffer_proof is not None:
+            # released_scratch_profile rule 3: a released callee frame address is never used.
+            released_scratch.step(buffer_proof, address, current, instruction, aliases,
+                                  CS_GRP_CALL in instruction.groups)
         if cursor is not None and current == cursor.store:
             cursor.check_store(iteration, aliases, stack, constants, pointer_slots, return_registers)
         word_mode = buffer_proof is not None and buffer_proof.word_provenance
@@ -5832,6 +5853,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 aliases = function_exit.aliases(buffer_proof, data, address, current, aliases,
                                                 split_state=split_joins is not None and
                                                 isinstance(state_key, split_join.Key))
+                # An inspected callee's own released frame address in R2/R3 goes back to its
+                # walked caller as a marker (released_scratch_profile); the root is unchanged.
+                aliases = released_scratch.callee_return(buffer_proof, address, current, aliases)
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
@@ -5901,10 +5925,14 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             for register in caller_clobbered:
                 constants.pop(register, None)
                 aliases.pop(register, None)
+            released_target = getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm)
             if buffer_proof is not None:
                 buffer_proof.finish_call_constants(constants, returned_aliases,
                                                    site=current, target=operands[0].imm)
             aliases.update(returned_aliases)
+            if buffer_proof is not None:
+                # The callee whose walk recorded the release: a resolved call-via call's target.
+                released_scratch.after_call(buffer_proof, released_target, aliases)
             if bounded_index is not None:
                 # Frame words cannot see these aliases in their own values: they are told.
                 bounded_index.note_returned(current, returned_aliases, call_alternatives)

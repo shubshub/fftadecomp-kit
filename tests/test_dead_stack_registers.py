@@ -362,12 +362,20 @@ class DeadEntryProofTests(unittest.TestCase):
 
 
 class ReturnsStayRefusedTests(unittest.TestCase):
-    """A stack address left in a register at a return keeps the walk's refusal."""
+    """A stack address left in a register at a return keeps the walk's refusal, except a walked
+    callee's own released frame in R2/R3, which released_scratch_profile hands back as a marker."""
 
     def test_inspected_callee_returns_its_own_frame_in_r2(self):
-        with self.assertRaisesRegex(ValueError, f'buffer callee 0x{C:08X}: {ESCAPE}'):
-            walk(owner_shape2())
-        same_refusal(self, owner_shape2())
+        # Kit #538's shape: C returns its own released sp+4 in R2.  The owner's write clears the
+        # marker, so the walk is admitted without the dead-register rule; an owner that reads R2
+        # first still refuses.
+        proof = walk(owner_shape2())
+        self.assertEqual({(row[0], row[2]) for row in proof.released_scratch}, {(C, 2)})
+        self.assertTrue(all(row[3] < 0 for row in proof.released_scratch))
+        self.assertFalse(proof.dead_registers.observed())
+        with self.assertRaisesRegex(ValueError, 'released callee frame address in r2 is read'):
+            walk(owner_shape2(after=(0x1c10, MOVS_R2_0, MOVS_R0_0, G)))
+        same_refusal(self, owner_shape2(after=(0x1c10, MOVS_R2_0, MOVS_R0_0, G)))
 
     def test_root_returns_a_frame_address_in_r2_or_r3(self):
         for name, bodies in (
