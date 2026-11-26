@@ -6234,6 +6234,24 @@ symbolically along every path, and the check requires:
     a store of the member's all-ones value the window keeps only the
     narrower forms: agbcc may fold that store's own load away (081175D4
     keeps it), so a dead load before one may be planted;
+  - the **operand read of `symbol.member |= ALL_ONES`** (kit #165; 08126118:
+    `ldrb r0, [r2]; ldrb r0, [r2]; movs r0, #0xff; strb r0, [r2]` for
+    `bldcnt_lo |= 0xff`). The volatile operand read stays, combine folds the
+    OR to the constant, and the bit-field store makes its own read. The ROM
+    cannot tell that first read from a planted `(void)sym.m;`, so the source
+    has to show it:
+    - the dead load is followed at once by a second load of the same member,
+      which is the read-modify-write load of a store of the all-ones value;
+    - the source has a statement `symbol.member |= C;` for that member, with
+      the integer constant C equal to its all-ones value;
+    - match.py compiles the source once more with that `|=` written `=`,
+      and that variant must be the real code with exactly that one load taken
+      out, its literal pools and the rest of the unit unchanged.
+
+    A load two statements claim explains nothing. A planted read has no `|=`
+    to rewrite, and a planted read beside a real `|=` leaves a third load,
+    so both are refused. The record names the statement's line and the
+    variant's code digest;
   - a **chained re-read** for `a = (b = v)`: a load of the member, at its
     width, whose store is the immediately preceding memory access, with only
     register arithmetic in between, whose value reaches, through copies only,

@@ -502,18 +502,27 @@ def _allowlisted_volatile_compiles(root, address, args, runner, used, source, in
                 def check():
                     return volatile_semantics.compare(real, stripped, preprocessed, entry["symbol"],
                                                       declaration, perturbed, interfaces)
+
+                def compile_variant(rewrite):
+                    # kit#165, R2: the source with one `|= ALL_ONES` written `=`
+                    compile_object(runner, workspace, args, str(root), address, source, rewrite=rewrite)
+                    return runner.read_binary(f"{workspace}/f.s").decode("utf-8")
+                variants = volatile_semantics.OPERAND_READ_COMPILE.set(compile_variant)
                 try:
-                    results, extents = check(), None
-                except volatile_semantics.SemanticError as refusal:
-                    if conditional_interfaces:
-                        raise
-                    import escaped_local_extents
-                    results, extents = escaped_local_extents.retry(refusal, {"real": real,
-                        "stripped": stripped, "layout-perturbed": perturbed}, lambda label: debug_compile(
-                        runner, workspace, args, str(root), address, source, declaration, label,
-                        {"real": real_image, "stripped": stripped_image,
-                         "layout-perturbed": perturbed_image}[label]), check,
-                        objects=lambda: parse_data_symbols(data_snapshot(root)), rom=rom)
+                    try:
+                        results, extents = check(), None
+                    except volatile_semantics.SemanticError as refusal:
+                        if conditional_interfaces:
+                            raise
+                        import escaped_local_extents
+                        results, extents = escaped_local_extents.retry(refusal, {"real": real,
+                            "stripped": stripped, "layout-perturbed": perturbed}, lambda label: debug_compile(
+                            runner, workspace, args, str(root), address, source, declaration, label,
+                            {"real": real_image, "stripped": stripped_image,
+                             "layout-perturbed": perturbed_image}[label]), check,
+                            objects=lambda: parse_data_symbols(data_snapshot(root)), rom=rom)
+                finally:
+                    volatile_semantics.OPERAND_READ_COMPILE.reset(variants)
                 records.append(volatile_semantics.record(entry["symbol"], results, perturbed=True))
                 records += [extents] if extents else []
     return records
