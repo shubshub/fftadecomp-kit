@@ -6007,7 +6007,13 @@ One typed pointer to the object is admitted too (kit #375, rule P). It is
 declared `__typeof__(symbol) *name;` (any typeof spelling) as the first tokens
 of a statement inside a function body. It is bound exactly once to
 `&symbol`, either in its initialiser or by one statement `name = &symbol;`
-after the declaration. Every other use of `name` must be one of these:
+in the declaration's own block (never in a nested or another block). The
+binding must dominate every use:
+- no use comes before it;
+- no label follows the declaration in its block;
+- there is no `goto` in the unit.
+
+Every other use of `name` must be one of these:
 - `name->member`, with a non-array member of the declaration, not under `&`;
 - one complete argument at a void-pointer parameter, under the conditions
   above, with no other argument of that call naming the symbol or `name`.
@@ -6025,8 +6031,11 @@ but such a transfer are all refused. They keep the typeof and `&` refusals.
 
 One typed copy of the object in a struct member is admitted as well (kit
 #375, rule T, items 1, 2, 4 and 5). The member is declared
-`__typeof__(symbol) name;` directly inside a `struct { ... }` body; a union,
-a qualified copy or a local copy is refused, and so is a second copy. Every
+`__typeof__(symbol) name;` directly inside a `struct { ... }` body. These
+are refused:
+- a union or qualified member, or a second copy;
+- a local copy on every route: an instance of the struct declared in a
+  function body, or a save whose memcpy destination is a frame address. Every
 later `->name` or `.name` must be one of these:
 - the save `E->name = symbol;`, a whole statement;
 - the restore `symbol = E->name;`;
@@ -6050,7 +6059,20 @@ member in the permuted compile. An access inside it must also:
 
 An address with the copy's base and another term (a variable offset)
 refuses. So does the copy's address in a call other than the save, in a
-stored value, or as the return value. The record names the save and prints
+stored value, or as the return value.
+
+A typeof carries the pinned members' qualifiers off the object, and the
+check pairs only loads of `symbol + k` by member. So whenever rule P or T
+admits a typeof, every other load on each path, frame loads included, must
+be the stripped compile's load there: in order, with the same width,
+signedness, address and value. A read the qualifier added has no
+counterpart and refuses:
+- a planted `(void)copy.m`;
+- a doubled read the stripped compile merges;
+- a read through the pointer before its binding.
+
+Neither rule is admitted on the overwritten-store composition route, which
+pairs traces itself. The record names the save and prints
 the premise that no check here can prove, because the copy outlives the
 function: the copy is read only by member, through this function's typed
 declaration, and no other function (and no pointer this function does not

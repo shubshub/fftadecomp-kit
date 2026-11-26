@@ -1901,7 +1901,11 @@ class Executor:
                                    f"as the void-pointer argument {position + 1} of {callee} at instruction "
                                    f"{record.index + 1}")
             if target == "memcpy" and COMPILER_COPY.get() is not None and position == 1:
-                # kit#375, rule T: the save `copy = symbol`, a typed copy at the destination
+                # kit#375, rule T: the save `copy = symbol`, a typed copy at the destination, which
+                # may not be a frame address (a local copy is not admitted on any route)
+                if is_stack(arguments[0]) or carries(arguments[0], SP):
+                    self.fail(text, f"the typed copy of {self.symbol} is saved into the frame; a local copy "
+                              "is not admitted")
                 record.copy_destination = arguments[0]
         self.escape(arguments, text)
         if self.frame is not None:
@@ -3338,7 +3342,7 @@ def all_ones_operand_read(records, position, address, width):
 
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
                      interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None,
-                     _capture_load_provenance=False, operand_reads=None):
+                     _capture_load_provenance=False, operand_reads=None, typed=False):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -3490,6 +3494,21 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
                        interfaces, _capture_load_provenance=_capture_load_provenance)
         premised = premised or getattr(path, "premised", False) or getattr(other, "premised", False)
+        if typed:
+            # kit#375, rules P and T: a typeof carries the qualifier off the object, onto the
+            # typed pointer's target or the typed copy, and only loads of `symbol + k` are paired
+            # above.  So every other load on the path, frame loads included, must be one the
+            # stripped compile makes, in the same order, by width, signedness, address and value:
+            # a read the qualifier added (a planted `(void)copy.m`, a re-read the stripped compile
+            # merges, a read through a pointer before its binding) has no counterpart.
+            mine_reads, their_reads = foreign_loads(path, symbol, size), foreign_loads(other, symbol, size)
+            if [read[:4] for read in mine_reads] != [read[:4] for read in their_reads]:
+                index = next((i for i, (a, b) in enumerate(zip(mine_reads, their_reads)) if a[:4] != b[:4]),
+                             min(len(mine_reads), len(their_reads)))
+                shown = f"`{mine_reads[index][4]}`" if index < len(mine_reads) else "none"
+                raise SemanticError(f"{name}: a load outside {symbol}, {shown}, is not the stripped compile's "
+                                    f"load there (path {number}); with a typed pointer or copy every load must "
+                                    "be one the stripped compile makes, in order")
         if forwarded_updates:
             # Ordinary reads crossed by the distinct forwarding proof are not
             # discarded: require their complete ordered provenance in both
@@ -3664,6 +3683,14 @@ def remap(expression, atom, mapping):
     if expression == atom and 0 in mapping:
         return make_linear(mapping[0], {atom: 1})
     return tuple(remap(part, atom, mapping) if isinstance(part, tuple) else part for part in expression)
+
+
+def foreign_loads(path, symbol, size):
+    """kit#375: the path's loads outside `symbol + k`, frame loads included, in order:
+    (width, signed, address, value, text)"""
+    return [(record.width, record.signed, record.address, record.value, record.text) for record in path.records
+            if record.kind == "load" and (record.address is None or
+                                          object_offset(record.address, symbol, size) is None)]
 
 
 def copy_offset(address, copy, size):
@@ -3871,7 +3898,12 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     typed_admitted, typeofs, typed_findings = typed_pointer_sites(plain, symbol, declaration, fragments)
     if not typeofs:
         # rule T: one typed copy in a struct member (typed_copy_sites)
-        typed_admitted, _, typed_findings = typed_copy_sites(plain, symbol, declaration)
+        typed_admitted, typeofs, typed_findings = typed_copy_sites(plain, symbol, declaration)
+    if typeofs and _ordinary_overwrite:
+        # the overwritten-store composition pairs traces itself and never reaches compare_function's
+        # pairing of every foreign load, which a typeof needs
+        raise SemanticError("a typed pointer or typed copy of the object is not admitted on the overwritten-store "
+                            "composition route")
     admitted = {**whole_object_sites(plain, symbol, fragments), **typed_admitted}
     for _, message in typed_findings + whole_object_uses(plain, symbol, admitted) + member_provenance(
             plain, {"symbol": symbol, "declaration": declaration}, admitted):
@@ -3942,7 +3974,7 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     anchors = operand_read_anchors(real_assembly, preprocessed, symbol, declaration)
     return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
                                        interfaces, unloaded_all_ones=perturbed_assembly is not None,
-                                       operand_reads=anchors)
+                                       operand_reads=anchors, typed=bool(typeofs))
             for name in sorted(real)]
 
 

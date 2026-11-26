@@ -1377,6 +1377,27 @@ def typed_pointer_sites(code, symbol, entry_declaration, fragments):
         return {}, set(), []
     admitted[tokens[bindings[0]][1]] = "the typed pointer's binding"
     findings = []
+    # the binding dominates every use: it is the initialiser, or a statement of the declaration's own
+    # block (never below it in between), before every use, with no label after the declaration in that
+    # block and no goto in the unit, so no path reaches a use without passing the binding
+    binding = bindings[0]
+    if binding != k + 8 and (depths[binding] != depths[k] or min(depths[k:binding + 1]) < depths[k]):
+        findings.append((tokens[binding][1], f"the typed pointer `{name}` must be bound in its declaration's own "
+                         "block, not in a nested or another block"))
+    end = next((j for j in range(k + 1, len(words)) if depths[j] < depths[k]), len(words))
+    for j in range(k + 1, end):
+        label = words[j] in ("case", "default") or words[j + 1:j + 2] == [":"] and \
+            re.fullmatch(r"[A-Za-z_]\w*", words[j]) and words[j - 1] in ("{", ";", "}")
+        if label:
+            findings.append((tokens[j][1], f"a label after the typed pointer `{name}`'s declaration could let a "
+                             "path skip its binding"))
+    for j, word in enumerate(words):
+        if word == "goto":
+            findings.append((tokens[j][1], f"`goto` in a unit with the typed pointer `{name}` could skip its "
+                             "binding"))
+    for n in [n for n in uses if n < binding]:
+        findings.append((tokens[n][1], f"the typed pointer `{name}` is used before its binding"))
+    uses = [n for n in uses if n > binding]
     for n in uses:
         before = n - 1
         while before >= 0 and words[before] == "(":
@@ -1446,6 +1467,7 @@ def typed_copy_sites(code, symbol, entry_declaration):
         return {}, set(), []
     k = declarations[0]
     name = words[k + 4]
+    local_findings = typed_copy_locals(words, tokens, enclosing[k], symbol)
     arrays = set(re.findall(r"([A-Za-z_]\w*)\s*\[", entry_declaration))
     members = set(re.findall(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\]\s*)?(?::\s*\w+\s*)?;", entry_declaration)) - {symbol}
     admitted, findings = {tokens[k + 2][1]: "the typed copy's type"}, []
@@ -1470,7 +1492,45 @@ def typed_copy_sites(code, symbol, entry_declaration):
                 continue
         findings.append((tokens[n][1], f"the typed copy `{name}` of allowlisted volatile {symbol} may only be "
                          f"saved from it, restored to it, or read by member"))
-    return admitted, {tokens[k][1]}, findings
+    return admitted, {tokens[k][1]}, findings + local_findings
+
+
+def typed_copy_locals(words, tokens, brace, symbol):
+    """kit#375, rule T: findings for every instance of the struct holding the typed copy that is declared
+    inside a function body (a local copy, frame or static), which the rule does not admit"""
+    depth, close = 0, brace
+    while close < len(words):
+        depth += {"{": 1, "}": -1}.get(words[close], 0)
+        if depth == 0:
+            break
+        close += 1
+    names = set()
+    if words[brace - 1:brace] == ["struct"] and words[brace - 2:brace - 1] == ["typedef"] or \
+            words[brace - 3:brace - 2] == ["typedef"] and words[brace - 2:brace - 1] == ["struct"]:
+        if close + 1 < len(words) and re.fullmatch(r"[A-Za-z_]\w*", words[close + 1]):
+            names.add((words[close + 1],))
+    if words[brace - 2:brace - 1] == ["struct"] and re.fullmatch(r"[A-Za-z_]\w*", words[brace - 1]):
+        names.add(("struct", words[brace - 1]))
+    # function bodies: a `{` after a `)` at file scope, to its `}`
+    bodies, depth = [], 0
+    for j, word in enumerate(words):
+        if word == "{":
+            if depth == 0 and j and words[j - 1] == ")":
+                bodies.append([j, None])
+            depth += 1
+        elif word == "}":
+            depth -= 1
+            if depth == 0 and bodies and bodies[-1][1] is None:
+                bodies[-1][1] = j
+    findings = []
+    for start, end in bodies:
+        for j in range(start + 1, end or len(words)):
+            for spelling in names:
+                if words[j:j + len(spelling)] == list(spelling) and \
+                        re.fullmatch(r"[A-Za-z_]\w*", words[j + len(spelling)] if j + len(spelling) < len(words) else ""):
+                    findings.append((tokens[j][1], f"a local instance of the struct holding the typed copy of "
+                                     f"{symbol} is not admitted: the copy must live outside the frame"))
+    return findings
 
 
 def user_macro(rest, names):
