@@ -497,7 +497,10 @@ class ObligationTests(Base):
         self.assertEqual(self.compare(slots)[0][-1], (4,))
         through = FRAME + ("add\tsp, sp, #-8",) + loop("add\tr1, sp, #4", "str\tr4, [r1]") + MEMBER + \
             ("add\tsp, sp, #8",) + END
-        self.refused(through, "a frame store in a loop outside the slots it stores at [sp, #imm]")
+        # a fixed slot stored through a register is marked for the cut (register_slots)
+        self.assertEqual(self.compare(through)[0][-1], (4,))
+        with mock.patch.object(induction.POLICY, "register_slots", False):
+            self.refused(through, "a frame store in a loop outside the slots it stores at [sp, #imm]")
 
     def test_a_frame_slot_holding_an_address_the_loop_rewrites(self):
         body = FRAME + ("add\tsp, sp, #-8", "add\tr0, sp, #4", "str\tr0, [sp]") + \

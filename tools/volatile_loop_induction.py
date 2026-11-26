@@ -90,7 +90,9 @@ Obligations, each refused with the message in brackets:
    other live written location holds no address, object value or poison [...
    holds an address ... at the back edge]; no frame store lies outside the
    region's slots [a frame store in a loop outside the slots it stores at
-   [sp, #imm]];
+   [sp, #imm]] - a store of an unescaped frame at a fixed address through a
+   register, outside the push area, marks that slot for the cut and the
+   comparison is run again (mark_slots; the marks only grow);
 5. at every back edge, each location sharing a symbol holds the value of its
    real counterpart again [back edge k: L differs from the real compile's ...];
 6. poison never reaches an address [a memory access through a poisoned
@@ -265,11 +267,15 @@ class LoopInduction:
     a refusal of the rules before it: escaped_loops (rule A) enters a loop with the frame
     escaped when an iteration escapes it, instead of refusing; join_cuts (rule B) merges
     paths where they join when the loop cuts alone, or an acyclic function, still meet a
-    bound.  Neither runs under the escaped-local model (escaped_local_extents)."""
+    bound.  Neither runs under the escaped-local model (escaped_local_extents).
+    register_slots, reached only from the refusal of a frame store outside a loop's
+    [sp, #imm] slots, adds the fixed frame slots a loop of an unescaped frame stores
+    through a register to its cut (mark_slots)."""
 
     name, premise = NAME, PREMISE
     escaped_loops = True
     join_cuts = True
+    register_slots = True
 
     def compare(self, bound, real_assembly, stripped_assembly, preprocessed, symbol, declaration,
                 perturbed_assembly, interfaces):
@@ -688,6 +694,7 @@ class Context:
         plain = vs.FRAME_MODELS.get() is None
         self.escaped_loops = plain and bool(getattr(policy, "escaped_loops", False))
         self.join_cuts = plain and bool(getattr(policy, "join_cuts", False))
+        self.register_slots = bool(getattr(policy, "register_slots", False))
         self.shapes, self.cuts, self.backs, self.used, self.returns = {}, {}, {}, set(), {}
         self.loops = None
         # cuts whose barrier is marked as hiding object content: (label, instruction)
@@ -697,6 +704,10 @@ class Context:
         # it: (label, instruction) of a loop or (label, "join", group) for every path of a
         # compile, and path keys (or groups) for every compile at that cut
         self.escaping, self.escaping_keys = set(), set()
+        # loop cuts whose loop stores at a fixed frame address through a register, which
+        # the [sp, #imm] slots miss: (label, instruction) -> {(offset from the cut's sp,
+        # width)}, found at back edges and havocked by the cut from then on
+        self.slotted = {}
         # rule B, on once the loop cuts alone meet a bound: the groups (decisions before the
         # join's immediate dominator, real instruction) whose join is not cut
         self.joining, self.uncut = False, set()
@@ -1171,6 +1182,31 @@ class InductionExecutor(vs.Executor):
             return entry
         return None
 
+    def mark_slots(self, pc, k, loop, slots):
+        """a loop of an unescaped frame storing at a fixed frame address through a register
+        (outside the push area): mark those slots for the cut and run the comparison again,
+        as a hidden object store marks a barrier (the marks only grow).  A store at a
+        variable frame offset, or over a pushed register, is left to refuse."""
+        if loop.escaped or not self.context.register_slots:
+            return
+        base = vs.signed32(vs.linear(loop.sp)[0])
+        found = set()
+        for entry in self.memory[loop.mark:]:
+            if entry[0] != "store" or not vs.carries(entry[2], vs.SP) or entry[5]:
+                continue
+            if not vs.is_stack(entry[2]):
+                return
+            start = vs.signed32(vs.linear(entry[2])[0])
+            if (start, entry[1]) in slots:
+                continue
+            if self.in_push_area(start, entry[1]):
+                return
+            found.add((start - base, entry[1]))
+        marks = self.context.slotted.setdefault((self.label, pc), set())
+        if found and not found <= marks:
+            marks |= found
+            raise Retaint(f"{self.label}: loop {k} stores at a fixed frame address through a register")
+
     # loops -------------------------------------------------------------------
     def cut(self, pc, text):
         k = len(self.loops) + 1
@@ -1180,6 +1216,7 @@ class InductionExecutor(vs.Executor):
             self.fail(where, "irreducible control flow (a loop entered in more than one place) at instruction "
                       f"{self.shape.irreducible[0] + 1}")
         registers, flags, slots, bad = self.shape.written(pc)
+        slots = set(slots) | self.context.slotted.get((self.label, pc), set())
         if bad is not None:
             self.fail(self.instructions[bad][2], "an instruction the loop cut does not model")
         if "flags" in self.shape.live[pc]:
@@ -1300,6 +1337,7 @@ class InductionExecutor(vs.Executor):
         slots = {(location[1], location[2]) for location in loop.slots}
         if self.stray_frame_store(self.memory[loop.mark:], slots,
                                   loop.escaped and self.context.escaped_loops) is not None:
+            self.mark_slots(pc, k, loop, slots)
             self.fail(where, "a frame store in a loop outside the slots it stores at [sp, #imm]")
         key = (tuple(self.decisions[:len(self.conditions)]), k)
         if self.role == "real":

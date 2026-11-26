@@ -7,6 +7,7 @@ from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
+import volatile_loop_induction as induction
 import volatile_semantics as semantics
 import test_volatile_loop_induction as T
 
@@ -194,6 +195,49 @@ class BiosCallMutantTests(BiosBase):
         with mock.patch.object(semantics.RomInterfaces, "bios_wrapper", loose):
             (result,) = self.compare_bios(bios_call("0800027C"))
         self.assertEqual(result[0], "func_08028C34")
+
+
+def through(*body, offset=4):
+    """r5 holds the fixed frame address sp+offset; the loop's body stores through it"""
+    return FRAME + ("add\tsp, sp, #-8", f"add\tr5, sp, #{offset}") + loop(*body, start="r6") + \
+        ("ldrb\tr0, [sp, #4]", "bl\tfunc_0802A2C0") + MEMBER + ("add\tsp, sp, #8",) + END
+
+
+class RegisterSlotTests(T.Base):
+    def test_a_fixed_frame_slot_stored_through_a_register(self):
+        body = through("strb\tr4, [r5]")
+        self.bounded(body)
+        (result,) = self.compare(body)
+        self.assertEqual(result[-1], (5,))
+
+    def test_the_compiles_still_compare_the_slot(self):
+        self.refused(through(("real", "strb\tr4, [r5]"), ("stripped", "strb\tr7, [r5]")),
+                     "back edge 1: ('slot', -24, 1) differs from the real compile's ('slot', -24, 1)")
+
+    def test_a_variable_frame_offset(self):
+        # a walk over the frame: the register holds a different address each time round
+        self.refused(through("strb\tr4, [r5]", "add\tr5, r5, #1"), "r5 does not keep its value around the loop")
+
+    def test_a_pushed_register(self):
+        # sp+12 after `sub sp, #8` is the pushed r5
+        self.refused(through("strb\tr4, [r5]", offset=12), "a frame store in a loop outside the slots")
+
+
+class RegisterSlotMutantTests(T.Base):
+    def test_with_the_switch_off(self):
+        with mock.patch.object(induction.POLICY, "register_slots", False):
+            self.refused(through("strb\tr4, [r5]"), "a frame store in a loop outside the slots")
+
+    def test_without_the_marking(self):
+        with mock.patch.object(induction.InductionExecutor, "mark_slots", lambda *args: None):
+            self.refused(through("strb\tr4, [r5]"), "a frame store in a loop outside the slots")
+
+    def test_with_the_push_area(self):
+        # defence in depth: a slot marked over a pushed register still refuses, at the
+        # partial overlap with the push (a byte) or at the return (a word)
+        with mock.patch.object(induction.InductionExecutor, "in_push_area", lambda *args: False):
+            self.refused(through("strb\tr4, [r5]", offset=12), "partially overlapping stack access")
+            self.refused(through("str\tr4, [r5]", offset=12), "r5 does not hold its entry value at the return")
 
 
 if __name__ == "__main__":

@@ -5739,8 +5739,9 @@ a load cannot move across a cut: equal lists mean equal counts per
 iteration. At every back edge each compile must restore what it kept,
 leave unwritten locations alone, hold no address in a fresh location, keep
 sp, the escape state and its frame stores inside the region's slots, and
-give each shared location its counterpart's value again. The flags must be
-dead at the cut, and the region may not push, pop or write sp.
+give each shared location its counterpart's value again. The slots are the
+region's `[sp, #imm]` stores (and those of the third rule below). The flags
+must be dead at the cut, and the region may not push, pop or write sp.
 
 That second run decides functions the bound left undecided, so it does not
 inherit the executor's call model, whose gaps (kit#215 and those found
@@ -5764,7 +5765,7 @@ never drops below it; the saved slots join each escape snapshot; and r4-r11
 must hold their entry values at every return. Untyped calls stay refused.
 The invariants the proof rests on are listed in the module's docstring.
 
-Two rules carry the run further, each behind one switch on the policy object
+Three rules carry the run further, each behind one switch on the policy object
 and each reached only where the run would refuse:
 
 * **A loop that escapes the frame** (`escaped_loops`). Where the frame
@@ -5787,6 +5788,12 @@ and each reached only where the run would refuse:
   whose obligations fail, is not cut, and its paths are enumerated as before.
   A read-modify-write load and its store on either side of a join stay
   refused (rule 3 reads its window as straight-line code).
+* **Frame slots held in a register** (`register_slots`). Where a loop of an
+  unescaped frame stores at a fixed frame address through a register (a
+  local's address kept in one), outside its `[sp, #imm]` slots, that slot is
+  added to the loop's cut and the comparison is run again, as for a marked
+  barrier. A store at a variable frame offset or over a pushed register
+  still refuses.
 
 A report that relies on it says so in the semantic record:
 `loops by relational induction at instructions [N, ...]
