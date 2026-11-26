@@ -32,9 +32,11 @@ refused, never read as a scalar; a constant word's load without a value is an un
   other store of its removes the value.
 * K2, code that is not walked.  While any word is live every call is walked: the owner's pointer
   slots are incoming stack words of every callee, a summary (copy helper, BIOS wrapper, BIOS fill)
-  refuses a call made with words, and a call the walk replaces by the dead-register rule (a callee
-  that overwrites the frame address it is given before using it) removes every word.  An SWI
-  anywhere in a walk refuses.  The rule refuses outright when the #350 callee watch records an
+  refuses a call made with words, and the dead-register rule does not replace a call made with
+  words (DeadStackRegisters.call).  An SWI anywhere in a walk refuses.  The one call that keeps
+  the words without a walk is a compiler-runtime summary whose native proof shows no memory operand
+  and SP moved only below the call's own SP and back: it returns `summary_result`, every word
+  unchanged.  The rule refuses outright when the #350 callee watch records an
   escape, a dangling frame address or a stale reach of frame words.
 * K3, loops.  A load of a word whose owner store lies on a cycle of the owner's control flow
   refuses.  Words join as every walk state does: a value survives a join only when it is the same
@@ -104,6 +106,15 @@ class Slots:
 
 def active(proof):
     return getattr(proof, "closure_slots", None) is not None
+
+
+def summary_result(proof, words):
+    """The result of a summarised call whose native proof shows no memory operand and SP moved only
+    below the call's own SP and back (a pinned compiler runtime, runtime_summary_profile): every word
+    survives unchanged, value, kind, origins and crossings.  Only a closure-slot walk has words."""
+    if not active(proof):
+        raise ValueError("closure words pass through a summary only in a closure-slot walk")
+    return WordResult({}, dict(words))
 
 
 def word_context(words, frame_base, root_frame):

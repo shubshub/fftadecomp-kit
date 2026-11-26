@@ -2572,7 +2572,13 @@ pointer-bearing slot, so it is never read as a scalar), by:
 While a word is live every call is walked: the owner's pointer slots are
 incoming stack words of every callee, so no call is left unwalked; summaries
 refuse calls made with words; the dead-register rule does not replace a call
-made with words; an SWI anywhere in a walk refuses. The retry refuses
+made with words; an SWI anywhere in a walk refuses. One exception is planned
+but not yet live: `closure_slot_profile.summary_result` passes every word
+through unchanged for a compiler-runtime summary, and nothing calls it yet. Its
+caller (the runtime summary that wires it in) must itself prove that the
+runtime has no memory operand and moves SP only below the call's own SP and
+back; until then a runtime call made with words refuses like every other
+summary. The retry refuses
 outright when the callee-saved watch records an escape, a dangling frame
 address or a stale reach of frame words, when a reloaded word's owner store
 lies on a cycle of the owner's control flow, and when it reloads no word. A
