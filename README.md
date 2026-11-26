@@ -6159,7 +6159,18 @@ symbolically along every path, and the check requires:
     registers, writes neither an address register nor sp/pc, and its flags
     reach no conditional branch. As nothing in the window reads the loaded
     value, its inputs cannot carry it, and the stored value stays the one
-    the stripped compile computes. Before
+    the stripped compile computes. A spill reload may sit in the window
+    too (kit #165; 0813F22C: `ldrh r0, [r5, #10]; movs r2, #0;
+    ldr r3, [sp, #8]; strh r3, [r5, #10]`), because agbcc's reload pass puts it
+    just before the store that uses it. Its conditions:
+    - it is an unsigned word `ldr rX, [sp, #k]`;
+    - it reloads exactly what the nearest earlier store to that slot wrote:
+      a word store to `sp + k` whose value the executor reads back;
+    - no overlapping store, no store through another frame address, and no
+      push, pop, loop cut or `sp` change lies between them;
+    - it feeds only the store's value register through copies.
+
+    The record lists such windows. Before
     a store of the member's all-ones value the window keeps only the
     narrower forms: agbcc may fold that store's own load away (081175D4
     keeps it), so a dead load before one may be planted;
