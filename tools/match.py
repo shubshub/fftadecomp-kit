@@ -5995,9 +5995,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             raise ValueError("menu list long branches require the typed function-buffer walk")
         menu_list_frame.finish(data, address, instructions, edges, local_branches, calls, buffer_proof)
     elif local_branches and owner_switch_branches:
-        # The owner switch's far default arm only: the walk above took it as a jump that loses LR
-        # (LR left the return registers, constants and aliases), so each return it reached was
-        # proved from the saved entry LR with a balanced frame, as after any external BL.
+        # The owner switch's far default arm, and any far BL to its target: the walk above took
+        # each as a jump that loses LR (LR left the return registers, constants and aliases), so
+        # each return it reached was proved from the saved entry LR with a balanced frame, as after
+        # any external BL.
         if local_branches != owner_switch_branches:
             raise ValueError("owner switch walk took a local BL other than its far default arm")
     elif local_branches:

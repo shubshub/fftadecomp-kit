@@ -2096,7 +2096,8 @@ and loses any constant or alias. Every return the walk reaches after it must
 then come from the saved entry LR with a balanced frame, exactly as after an
 external BL: `bx lr` there, or popping a re-pushed LR into PC, refuses. Any
 other same-owner BL still refuses with `owner switch excludes local BL
-control`. The record gains `far_default` (`guarded-switch-far-default-v1`,
+control`, apart from the further BLs to the same target described next. The
+record gains `far_default` (`guarded-switch-far-default-v1`,
 site and target), bound into the fingerprint, and the line one clause:
 
 ```
@@ -2107,6 +2108,26 @@ The walk proves the entry-LR return and the balanced frame on every path, but
 not that R4-R11 are restored. The owner-switch walk proves that for no owner,
 and the BL writes only LR. `owner_switch_buffer_profile.FAR_DEFAULT.enabled =
 False` restores the refusal.
+
+When the far default block is the owner's shared tail (a `return 1` after the
+last case, say), agbcc reaches it by far BL from anywhere beyond a narrow
+branch's reach too, not only from the guard: from a case, or from before the
+switch. Every same-owner BL to that target, wherever it sits in the owner
+graph, is walked the same way, each as a jump that loses LR, when every
+same-owner BL in the owner graph targets the guard arm's own target and the
+guard's BL is one of them. A far BL
+to any other block, or two BLs to one block without the far guard, still
+refuses with `owner switch excludes local BL control`. An owner with only the
+guard's BL keeps its `far_default` record and clause unchanged; one with more
+records `shared_far_default` (`guarded-switch-shared-far-default-v1`, the
+target and every site), bound into the fingerprint, and the line says:
+
+```
+; shared far default (guarded-switch-shared-far-default-v1): same-owner BLs at 0x080AC0C8, 0x080AC210 to 0x080ACC10, the guard arm's own target, each taken as a jump that loses LR; every return re-proved from the saved entry LR
+```
+
+`owner_switch_buffer_profile.SHARED_FAR_DEFAULT.enabled = False` keeps the
+guard's arm only.
 
 An owner without typed objects, the function-literal path, the switch-data
 selectors, and the preloaded and fixed five-word layouts keep their walk and
