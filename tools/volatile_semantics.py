@@ -2639,6 +2639,40 @@ def live(records, position, step):
     return False
 
 
+def spill_reload(records, position):
+    """kit#165: the store a word reload of a fixed frame slot provably reloads, or None.
+
+    The load must be an unsigned `ldr rX, [sp, #k]`, and the nearest earlier
+    record that may write the slot must be a word store to exactly sp + k
+    whose value the load's executor value equals.  Between them no store
+    overlaps the slot, no store goes through another frame address, no push,
+    pop, loop cut or sp adjustment lies, and a call counts only through the
+    executor: a frame slot a call might have written reads back as a value
+    of its own, never as the stored one.  So the reload returns the spilled
+    value exactly, as a register copy would.
+    """
+    record = records[position]
+    if record.kind != "load" or record.width != 4 or record.signed or record.reads != {"sp"} or \
+            record.address is None or not is_stack(record.address):
+        return None
+    slot = signed32(linear(record.address)[0])
+    for earlier in reversed(records[:position]):
+        if earlier.kind in ("push", "pop", "loop") or "sp" in earlier.writes:
+            return None
+        if earlier.kind != "store":
+            continue
+        if not is_stack(earlier.address):
+            if carries(earlier.address, SP):
+                return None
+            continue
+        start = signed32(linear(earlier.address)[0])
+        if start == slot and earlier.width == 4:
+            return earlier if earlier.value == record.value else None
+        if start < slot + 4 and slot < start + earlier.width:
+            return None
+    return None
+
+
 def read_modify_write_store(records, position, address, width):
     """the position of the store this dead load belongs to, or None.
 
@@ -2673,6 +2707,11 @@ def read_modify_write_store(records, position, address, width):
     inputs cannot carry the loaded value, because no step in the window may
     read it, so the stored value is the one the stripped compile computes
     before the store; the comparison still checks it.
+    A spill reload may sit there too (kit#165; 0813F22C: `ldrh r0, [r5, #10];
+    movs r2, #0; ldr r3, [sp, #8]; strh r3, [r5, #10]`): agbcc's reload pass
+    puts it just before the store that uses it.  It must reload exactly what
+    the nearest earlier store to its slot wrote (spill_reload), and feed only
+    the store's value register through copies; it never builds the address.
     Not before a store of the member's all-ones value, though: agbcc may
     fold that store's own load away (081175D4 keeps it), so a dead load
     before one may be planted, and the window keeps the narrower rules above
@@ -2733,6 +2772,8 @@ def read_modify_write_store(records, position, address, width):
                             if after.flags_written:
                                 break
                     continue
+                if step.kind == "load" and (all_ones or step.index not in value):
+                    return None                      # a spill reload feeds the stored value only
                 if step.index not in slice_:
                     # scheduled in from unrelated code (0813F934: `movs r0, #0;
                     # mov r8, r0`): a pure register operation that feeds no
@@ -2741,6 +2782,8 @@ def read_modify_write_store(records, position, address, width):
                     if all_ones or step.writes & (record.reads | {"sp", "pc"}) or \
                             not live(records, place, step):
                         return None
+                elif step.kind == "load":
+                    continue                         # a spill reload of the value (kit#165), above
                 elif not (step.kind == "literal" or step.copy or step.constant):
                     return None                      # the store's operands are built before the load
                 elif step.constant and not step.copy and step.kind != "literal":
@@ -2749,15 +2792,26 @@ def read_modify_write_store(records, position, address, width):
                 elif step.index not in operands | value_slice:
                     return None
             return later
-        # no memory access but a literal-pool load, no call or conditional
-        # branch, and the dead value is never read, even by unrelated code
-        # (dead() already ensures that; this is defence in depth)
+        # no memory access but a literal-pool load or a spill reload (kit#165),
+        # no call or conditional branch, and the dead value is never read, even
+        # by unrelated code (dead() already ensures that; this is defence in depth)
+        if record.kind == "load" and spill_reload(records, later) is not None and \
+                not record.reads & loaded:
+            loaded -= record.writes
+            between.append(record)
+            places.append(later)
+            continue
         if record.kind not in ("alu", "literal") or record.reads & loaded:
             return None
         loaded -= record.writes
         between.append(record)
         places.append(later)
     return None
+
+
+class SpillReloads(list):
+    """kit#165: the dead loads whose read-modify-write window holds a spill reload,
+    a tagged result part"""
 
 
 class WholeObjectArguments(list):
@@ -3075,6 +3129,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional, indirect = \
         (set() for _ in range(8))
     whole = set()           # kit#375, rule U: the admitted whole-object arguments
+    reloads = set()         # kit#165: dead loads whose window holds a spill reload
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3144,6 +3199,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                             "documented effect")
                     explained_stores.add(store)
                     read_modify_write.add(record.index)
+                    if any(step.kind == "load" for step in records[position + 1:store]):
+                        reloads.add(record.index)
                     classified_dead_reads.add(record.index)
                     continue
                 # A forwarded re-read is an optional counterpart (kit#378): it is explained,
@@ -3285,7 +3342,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
     # tagged like the tested-update re-reads, so record() finds it after the positional parts
-    tail = (WholeObjectArguments(sorted(whole)),) if whole else ()
+    tail = ((WholeObjectArguments(sorted(whole)),) if whole else ()) + \
+        ((SpillReloads(sorted(reloads)),) if reloads else ())
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
@@ -3545,7 +3603,8 @@ def record(symbol, results, perturbed=False):
         tested = next((part for part in extra if isinstance(part, tested_update.Rereads)), [])
         extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
         whole = next((part for part in extra if isinstance(part, WholeObjectArguments)), [])
-        extra = [part for part in extra if not isinstance(part, WholeObjectArguments)]
+        reloads = next((part for part in extra if isinstance(part, SpillReloads)), [])
+        extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads))]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -3564,6 +3623,8 @@ def record(symbol, results, perturbed=False):
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
                      (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
                      (f", whole-object arguments (kit#375): {'; '.join(whole)}" if whole else "") +
+                     (f", read-modify-write windows holding a spill reload (kit#165) at "
+                      f"{list(n + 1 for n in reloads)}" if reloads else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
                      (f", {loops.describe()}" if loops else "") +
                      (f", BIOS calls by their GBATEK interfaces: {'; '.join(bios)} ({BIOS_NAME}, premise: "
