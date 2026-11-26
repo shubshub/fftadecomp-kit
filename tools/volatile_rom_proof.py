@@ -69,6 +69,14 @@ the addressed source wherever two things hold, and refuses it otherwise.
      stay inside the listed size; a variable offset from the symbol is
      admitted only under the printed premise that it stays inside the object,
      which the proof does not check (the source may compute it on integers);
+   * a data symbol listed as reviewed-ram, mapped to the listed address, in
+     a function the entry lists: ordinary RAM a user ruling admits case by
+     case, at a constant offset inside the listed size, never through a
+     caller.  The function's bytes are pinned by SHA-256 and each reload the
+     review cites must be a load of the object the non-volatile build
+     drops, merges or moves, after an access of it at the cited address
+     (reviewed_evidence); the record prints the ruling and what the review
+     could not prove.  The default stays hardware-only;
    * the result of a scanline payload getter listed in volatile_objects.json:
      the getter's code must be `return 0800C614(*(u32 *)(08005BFC(task) +
      4))`, and both callees' bodies are read too (08005BFC is task + 0x18;
@@ -177,6 +185,8 @@ MODE_SIZE = {"QI": 1, "HI": 2, "SI": 4, "DI": 8, "SF": 4, "DF": 8}
 DMA_SOURCE = {0x040000B0 + 12 * channel: channel for channel in range(4)}
 DMA_KINDS = ("dma-source", "dma-target")
 GETTER_KIND = "scanline-payload-getter"
+# a RAM object the user admitted case by case for listed functions (reviewed_evidence)
+REVIEWED_KIND = "reviewed-ram"
 ALLOCATOR_KIND = "scanline-callback-allocator"
 # analyze.py and status.py: the main index; code above it is late, installed in RAM before it runs
 CODE_END = 0x08150000
@@ -1488,7 +1498,7 @@ class Callers:
 
 
 def object_premise(base, offset, width, stores_at_base, data_symbols, entries, rom, typed=None, calls=None,
-                   pipeline=None, tasks=None, callers=None):
+                   pipeline=None, tasks=None, callers=None, function=None):
     """(premise, offset premise or None) for one access, or ProofError.
 
     calls maps each callee symbol of the function to the ROM's BL targets at
@@ -1496,7 +1506,9 @@ def object_premise(base, offset, width, stores_at_base, data_symbols, entries, r
     argument of each of its calls (call_arguments); callers, a Callers,
     traces a register parameter.  typed, when given, is a callable that may vouch
     for a parameter or call result (window_scanline's caller-path evidence in
-    the instance test); match.py and plausible.py never pass one.
+    the instance test); match.py and plausible.py never pass one.  function is
+    the address of the function whose own access this is (token_record): a
+    reviewed-ram entry admits its object there only, never through a caller.
     """
     if typed is not None and base.kind in ("param", "ret"):
         premise = typed(base)
@@ -1542,6 +1554,21 @@ def object_premise(base, offset, width, stores_at_base, data_symbols, entries, r
             location = int(mapped, 0) if isinstance(mapped, str) else int(mapped)
         except (TypeError, ValueError):
             raise ProofError(f"{base.value} is not mapped by config/data_symbols.json") from None
+        reviewed = [entry for entry in entries if entry.get("symbol") == base.value and
+                    entry.get("kind") == REVIEWED_KIND]
+        if reviewed:
+            entry = reviewed[0]
+            if len(reviewed) != 1 or int(entry["address"], 16) != location:
+                raise ProofError(f"{base.value} is listed for another address")
+            names = [int(item, 16) for item in entry["functions"]]
+            if function is None or function not in names:
+                raise ProofError(f"{base.value} is admitted case by case only in " +
+                                 ", ".join(f"{item:08X}" for item in names))
+            if offset is None or not 0 <= offset <= int(entry["size"]) - width:
+                raise ProofError(f"{base.value}+{offset if offset is None else hex(offset)} lies outside its "
+                                 f"listed {int(entry['size'])} bytes")
+            return (f"{base.value} is ordinary RAM admitted case by case for {function:08X} by a reviewed "
+                    f"volatile_objects.json entry ({entry['ruling']}); unproved: {entry['unproved']}"), None
         listed = [entry for entry in entries if entry.get("symbol") == base.value and entry.get("kind") in DMA_KINDS]
         if listed:
             entry = listed[0]
@@ -1953,11 +1980,17 @@ def token_record(address, name, real, stripped, rom, data_symbols, entries, line
     premises, ranges = [], []
     for base, offset, width, store in resolved:
         object_text, range_text = object_premise(base, offset, width, base in stores_at, data_symbols, entries, rom,
-                                                 typed, calls, pipeline, tasks, callers)
+                                                 typed, calls, pipeline, tasks, callers, function=address)
         if object_text not in premises:
             premises.append(object_text)
         if range_text and range_text not in ranges:
             ranges.append(range_text)
+    for entry in entries:
+        if entry.get("kind") == REVIEWED_KIND and any(base.kind == "symbol" and base.value == entry.get("symbol")
+                                                      for base, _, _, _ in resolved):
+            premises.append(reviewed_evidence(rom, entry, address, real["text"][2],
+                                              [site for (base, _, _, _), site in zip(resolved, sites)
+                                               if base.kind == "symbol" and base.value == entry["symbol"]]))
     width_name = {1: "byte", 2: "halfword", 4: "word"}
     listed = "; ".join(
         (f"{at:08X} {width_name[width]} {'store' if store else 'load'} {category}" +
@@ -1968,6 +2001,50 @@ def token_record(address, name, real, stripped, rom, data_symbols, entries, line
     return (f"line {line}: {'; '.join(premises)}" + (f"; premise: {'; '.join(ranges)}" if ranges else "") +
             f"; accesses in the non-volatile build: {listed}; .text with/without `{digest[0]}`/`{digest[1]}`"), \
         claimed
+
+
+def reviewed_evidence(rom, entry, address, size, sites):
+    """the evidence a reviewed-ram entry pins for one function, re-read at every run, or ProofError.
+
+    The entry is a user's case-by-case ruling: an ordinary RAM object whose
+    volatile qualifier the ROM shows and no hardware explains.  The ruling's
+    review cites ROM reloads, and the proof checks each of them again:
+    - the entry's start and end are this function's span, whose ROM bytes
+      have the pinned SHA-256;
+    - each listed reload is an access of the object at that ROM address that
+      loads it, at its width, and that the non-volatile build drops, merges
+      or moves (rule 1's evidence);
+    - the access each reload follows is an access of the object, at that
+      ROM address, earlier in the function.
+    The review's other findings (no store or call between, the plain
+    setters elsewhere) are fixed by the pinned bytes and are not re-derived.
+    """
+    start, end = int(entry["start"], 16), int(entry["end"], 16)
+    if start != address or end != address + size:
+        raise ProofError(f"{entry['symbol']}'s reviewed evidence is pinned for {start:08X}..{end:08X}, "
+                         f"not this function's span")
+    if sha256(rom[start - BASE:end - BASE]).hexdigest() != entry["sha256"]:
+        raise ProofError(f"{entry['symbol']}'s reviewed evidence {start:08X}..{end:08X} changed")
+    width = int(entry["size"])
+    by_address = {}
+    for at, store, bytes_, category, _ in sites:
+        if at is not None:
+            by_address.setdefault(at, []).append((store, bytes_, category))
+    shown = []
+    for reload, after in entry["reloads"]:
+        reload, after = int(reload, 16), int(after, 16)
+        if not any(not store and bytes_ == width and category in EVIDENCE
+                   for store, bytes_, category in by_address.get(reload, ())):
+            raise ProofError(f"{entry['symbol']}'s reviewed reload at {reload:08X} is not a load the non-volatile "
+                             "build drops, merges or moves")
+        if not (start <= after < reload and by_address.get(after)):
+            raise ProofError(f"{entry['symbol']}'s reviewed reload at {reload:08X} does not follow an access of it "
+                             f"at {after:08X}")
+        shown.append(f"{reload:08X} after {after:08X}")
+    if not shown:
+        raise ProofError(f"{entry['symbol']}'s reviewed entry lists no reload")
+    return (f"reviewed reloads of {entry['symbol']} that the non-volatile build drops or merges: "
+            f"{', '.join(shown)} (function bytes SHA-256 `{entry['sha256']}`)")
 
 
 # ------------------------------------------------------------------ plausible.py and the report

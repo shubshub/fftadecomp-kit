@@ -795,9 +795,12 @@ class SourceTests(unittest.TestCase):
         entries = proof.load_objects()
         self.assertTrue(entries)
         keys = {"symbol", "address", "kind", "start", "end", "sha256", "reason"}
+        reviewed = {"size", "functions", "reloads", "ruling", "unproved"}
         for entry in entries:
-            self.assertIn(entry["kind"], proof.DMA_KINDS + (proof.GETTER_KIND, proof.ALLOCATOR_KIND))
-            self.assertEqual(set(entry), keys | ({"size"} if entry["kind"] in proof.DMA_KINDS else set()))
+            self.assertIn(entry["kind"], proof.DMA_KINDS + (proof.GETTER_KIND, proof.ALLOCATOR_KIND,
+                                                            proof.REVIEWED_KIND))
+            self.assertEqual(set(entry), keys | ({"size"} if entry["kind"] in proof.DMA_KINDS else
+                                                 reviewed if entry["kind"] == proof.REVIEWED_KIND else set()))
 
 
 class PlausibleHookTests(unittest.TestCase):

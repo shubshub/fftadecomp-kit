@@ -1,5 +1,5 @@
 {
-  "_policy": "Objects that hardware reads or writes on its own, so that a volatile qualifier on them is evidence, not steering, wherever tools/volatile_rom_proof.py shows the qualifier's effect on their accesses. A dma-source or dma-target entry names a RAM object (a data symbol, its mapped address and its size) and ROM code that programs a DMA channel with it: the code's bytes are pinned by SHA-256 and the transfer is read off the instructions at every run. A scanline-payload-getter entry names a function whose pinned code returns a scanline task's payload, read off its instructions and its two callees' at every run, with the scanline pipeline that hands the payload to the HBlank DMA bank. A scanline-callback-allocator entry names the function that makes its r0 a new scanline task's callback, pinned by SHA-256, with the same pipeline, whose manager calls that callback with the task's payload and the bank it submits for HBlank DMA. Listing an object admits nothing by itself. ONLY the repository maintainer may add an entry; agents park the function and cite the evidence instead.",
+  "_policy": "Objects that hardware reads or writes on its own, so that a volatile qualifier on them is evidence, not steering, wherever tools/volatile_rom_proof.py shows the qualifier's effect on their accesses. A dma-source or dma-target entry names a RAM object (a data symbol, its mapped address and its size) and ROM code that programs a DMA channel with it: the code's bytes are pinned by SHA-256 and the transfer is read off the instructions at every run. A scanline-payload-getter entry names a function whose pinned code returns a scanline task's payload, read off its instructions and its two callees' at every run, with the scanline pipeline that hands the payload to the HBlank DMA bank. A scanline-callback-allocator entry names the function that makes its r0 a new scanline task's callback, pinned by SHA-256, with the same pipeline, whose manager calls that callback with the task's payload and the bank it submits for HBlank DMA. A reviewed-ram entry is different: it names an ordinary RAM object that no hardware is shown to touch, admitted case by case under a user ruling for the functions it lists only, with the review's ROM evidence. The proof re-reads that evidence at every run: the function's bytes, pinned by SHA-256, and each listed reload, which must be a load of the object that the non-volatile build drops, merges or moves, after an earlier access of it. What the review could not prove is printed in each report as its premise. The default stays hardware-only. Listing an object admits nothing by itself. ONLY the repository maintainer may add an entry; agents park the function and cite the evidence instead.",
   "version": 1,
   "entries": [
     {
@@ -38,6 +38,35 @@
       "end": "0x0800C4B4",
       "sha256": "0de1cf88f1da097ba540acc0061d0f3ef1aa86f0e7ed9b0baa2a4aba876d579d",
       "reason": "allocates a scanline task (payload, two banks, a one-halfword HBlank channel for the register in r3) and stores r0 as its callback (task + 0); the manager 0800C4B4 calls task->callback(payload_size ? payload : 0, back bank) for each active task, copies row 0 to row 160, flips the banks and submits the filled bank with 080009AC for repeated HBlank DMA to the task's register"
+    },
+    {
+      "symbol": "data_030034D2",
+      "address": "0x030034D2",
+      "size": 2,
+      "kind": "reviewed-ram",
+      "functions": [
+        "0x08003660"
+      ],
+      "start": "0x08003660",
+      "end": "0x08003888",
+      "sha256": "0503392c291c0c665ffb48a0210988a9747b91eb83fef94b55ff9c09ccac9590",
+      "reloads": [
+        [
+          "0x080037A6",
+          "0x0800379E"
+        ],
+        [
+          "0x08003820",
+          "0x080037E4"
+        ],
+        [
+          "0x0800382C",
+          "0x08003820"
+        ]
+      ],
+      "ruling": "user ruling of 2026-11-26, case by case as for 0x0800E110; the default stays hardware-only",
+      "unproved": "no interrupt-handler or DMA writer of data_030034D2 was found, and none is assumed away: the ROM only shows that the original source read it as volatile",
+      "reason": "the scene request word. 0x08003660 (552 bytes) re-reads it with no store or call between, which only a volatile declaration explains: ldrh at 0x080037A6 after 0x0800379E (the 0xFFFF test, then the 0xFFFE test), at 0x08003820 after 0x080037E4 (the 0xFFFE test, then the 0x8000 test) and at 0x0800382C after 0x08003820 (the 0x8000 test, then `&= 0x7FFF`); the non-volatile build drops or merges all three, keeps the value in r1 and is 548 bytes. It also reloads it at 0x08003868 after its own store at 0x08003832 (`data_030034B8->scene = data_030034D2` after `&= 0x7FFF`), but that is a join the other path reaches after the call at 0x08003860, so the plain build keeps that load as well and it is not listed as evidence. Its setters are merged as plain stores (080038C8, 080038E8, 08003900, 08003918, 08003934, 080039E8), and 08003660 is the only function that reads it"
     }
   ]
 }

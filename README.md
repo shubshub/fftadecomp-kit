@@ -5856,7 +5856,27 @@ symbol listed in the
 maintainer's `tools/volatile_objects.json`, mapped to its listed address.
 Each entry pins ROM code by SHA-256 that stores the object to a DMA channel's
 source or destination register and enables the channel, and that transfer is
-read off the instructions at every run. A call result counts only from a
+read off the instructions at every run.
+
+A `reviewed-ram` entry is the one exception to hardware-only. It is a per-object
+entry under the user's case-by-case ruling (as for `0800E110`), and the
+default stays hardware-only. It names an ordinary RAM object, the functions it
+is admitted in, and the review's ROM evidence. The object is admitted only in
+those functions' own accesses, never through a caller, and only at a constant
+offset inside its listed size. At every run the proof re-reads the evidence:
+- the function's span, whose bytes have the pinned SHA-256;
+- each listed reload, which must be a load of the object at its width that
+  the non-volatile build drops, merges or moves;
+- for each reload, an earlier access of the object at the address the entry
+  gives.
+
+The record prints the ruling, the reloads and what the review could not
+prove, as the report's premise. The one entry is `data_030034D2`, the scene
+request word, for `08003660`: it is reloaded at `080037A6`, `08003820` and
+`0800382C` with no store or call in between, its setters are merged as plain
+stores, and no interrupt-handler writer of it was found.
+
+A call result counts only from a
 scanline payload getter listed there (`func_080D9B08`, the blend display's, and
 `func_080DABB4`, the window's): the pinned code must be `return
 0800C614(*(u32 *)(08005BFC(task) + 4))`, both callees' bodies are read as well,
