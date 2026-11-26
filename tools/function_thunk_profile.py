@@ -504,8 +504,13 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                             switch_callee_index=index if buffer_stack_arguments else None,
                             call_via_targets=buffer_stack_arguments is True and unit_arguments is None,
                             forward_slots=buffer_stack_arguments is True)
-                        run = lambda candidate: verify_leaf_instructions(
+                        plain = lambda candidate: verify_leaf_instructions(
                             got, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True)
+                        import function_literal_exit_scratch_profile as function_exit
+                        # The frame-buffer owner's R2/R3 exit scratch, as match.py's default retry binds it.
+                        run = lambda candidate: function_exit.walk(
+                            candidate, got, address, mapping, lambda: plain(candidate), kind=function_exit.FRAME) \
+                            if buffer_stack_arguments else plain(candidate)
                         if buffer_stack_arguments:
                             # match.py retries a refused stack-argument walk once at a variable stack
                             # index, or with closure words (closure_slot_profile).

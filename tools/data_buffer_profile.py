@@ -223,8 +223,11 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             schema = MENU_LIST_SCHEMA
             manifest["restoring_menu_frame"] = frame.evidence
     else:
-        run = lambda candidate: match.verify_leaf_instructions(
+        plain = lambda candidate: match.verify_leaf_instructions(
             data, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True, dma_fills=dma_fills)
+        # The frame-buffer owner's R2/R3 exit scratch (function_literal_exit_scratch_profile).
+        run = lambda candidate: match.function_exit.walk(candidate, data, address, mapping,
+                                                         lambda: plain(candidate), kind=match.function_exit.FRAME)
         try:
             instructions = run(proof)
         except ValueError as error:
@@ -364,7 +367,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           # closure_slot_profile.lines
           "* buffer closure slot",
           # function_literal_exit_scratch_profile.lines
-          "* buffer function-literal exit scratch",
+          "* buffer function-literal exit scratch", "* buffer frame exit scratch",
           # default_stack_index_profile.lines
           "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
           "* buffer stack index premise", "* buffer stack index frame words")

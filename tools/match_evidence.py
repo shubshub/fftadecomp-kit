@@ -543,6 +543,11 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
                 getattr(candidate, "runtime_summaries", None)) else candidate.target,
             incoming_narrow_reads=True)
         if stack_arguments:
+            import function_literal_exit_scratch_profile as function_exit
+            walk = run
+            # The frame-buffer owner's R2/R3 exit scratch, as match.py's default retry binds it.
+            run = lambda candidate: function_exit.walk(candidate, data, address, mapping, lambda: walk(candidate),
+                                                       kind=function_exit.FRAME)
             # match.py retries a refused stack-argument walk once at a variable stack index, or with
             # closure words (closure_slot_profile).
             import closure_slot_profile as closure
