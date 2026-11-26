@@ -454,15 +454,96 @@ def fills(function):
     return found
 
 
+def label_uid(x):
+    """the code_label UID a `label_ref` of any mode names (a jump table's entries print `(label_ref:SI N)`)"""
+    if len(x) != 2 or not str(x[1]).isdigit():
+        raise ProofError(f"a label reference the proof cannot read: {x}")
+    return int(x[1])
+
+
 def label_refs(x, found=None):
-    """the code_label UIDs a pattern refers to"""
+    """the code_label UIDs a pattern refers to, matched by code with the mode stripped"""
     found = [] if found is None else found
     if isinstance(x, list):
-        if x[:1] == ["label_ref"] and len(x) == 2 and str(x[1]).isdigit():
-            found.append(int(x[1]))
-        for part in x:
-            label_refs(part, found)
+        if code(x) == "label_ref":
+            found.append(label_uid(x))
+        else:
+            for part in x:
+                label_refs(part, found)
     return found
+
+
+TABLES = ("addr_vec", "addr_diff_vec")
+# the callees gcc's special_function_p marks as returning twice, after it drops a leading `_`, `__` or `__x`
+RETURNS_TWICE = {"setjmp", "setjmp_syscall", "sigsetjmp", "savectx", "qsetjmp", "vfork"}
+
+
+def returns_twice(name):
+    for prefix in ("__x", "__", "_"):
+        if name.startswith(prefix):
+            name = name[len(prefix):]
+            break
+    return name in RETURNS_TWICE
+
+
+def table_at(function, labels, uid):
+    """the jump table insn the code_label UID heads, or None"""
+    index = labels.get(uid)
+    following = function.insns[index + 1] if index is not None and index + 1 < len(function.insns) else None
+    if following is not None and following.code == "jump_insn" and code(following.pattern) in TABLES:
+        return following
+    return None
+
+
+def jump_targets(function, insn, labels):
+    """the code_label UIDs a jump_insn may pass control to besides the next insn; ProofError for a jump whose
+    targets the dump does not bound.
+
+    The jumps read: `(set (pc) (label_ref L))`; `(set (pc) (if_then_else C A B))` with each arm a label, the
+    next insn `(pc)` or a return; `(return)`; a tablejump, `(parallel [(set (pc) (reg R)) (use (label_ref T))])`
+    with T's code_label followed at once by its table; and a table, `addr_vec` or `addr_diff_vec`, whose vector
+    holds only labels.  Any other jump - a computed goto, a jump through memory, a tablejump with no table -
+    refuses.  Every label a jump refers to anywhere in its pattern is a target (an addr_diff_vec's base label
+    too), which can only add edges.
+    """
+    pattern = insn.pattern
+    head = code(pattern)
+
+    def refuse(what):
+        raise ProofError(f"jump insn UID {insn.uid} is {what}; the proof cannot bound where it goes")
+
+    if head in TABLES:
+        vector = pattern[1] if head == "addr_vec" else pattern[2] if len(pattern) > 2 else None
+        if code(vector) != proof.VECTOR or len(vector) < 2 or \
+                any(code(entry) != "label_ref" for entry in vector[1:]):
+            refuse(f"a jump table ({head}) whose vector is not a list of labels")
+    elif head == "return":
+        if len(pattern) != 1:
+            refuse("a return with operands")
+    else:
+        if head == "set":
+            items = [pattern]
+        elif head == "parallel" and len(pattern) == 2 and code(pattern[1]) == proof.VECTOR:
+            items = pattern[1][1:]
+        else:
+            refuse(f"a {head or 'malformed'} jump")
+        jumps = [item for item in items if code(item) == "set" and len(item) == 3 and code(item[1]) == "pc"]
+        others = [item for item in items if not any(item is jump for jump in jumps)]
+        if len(jumps) != 1 or any(code(item) not in ("use", "clobber") for item in others):
+            refuse("a jump that is not one set of the pc")
+        source = jumps[0][2]
+        uses = [item[1] for item in others if code(item) == "use"]
+        if code(source) == "label_ref":
+            pass
+        elif code(source) == "if_then_else" and len(source) == 4:
+            if any(code(arm) not in ("label_ref", "pc", "return") for arm in source[2:]):
+                refuse("a conditional jump with an arm that is not a label, the next insn or a return")
+        elif code(source) == "reg" and len(uses) == 1 and code(uses[0]) == "label_ref" and len(others) == 1:
+            if table_at(function, labels, label_uid(uses[0])) is None:
+                refuse("a tablejump whose label is not followed by its table")
+        else:
+            refuse("a computed jump, to a register or memory with no table")
+    return label_refs(pattern)
 
 
 def successors(function):
@@ -472,17 +553,32 @@ def successors(function):
     every label it refers to: a conditional or unconditional jump its
     target, a tablejump its table's label (whose addr_vec then refers to
     every case), and an addr_vec its cases. A barrier passes control
-    nowhere. So the graph has at least the edges the code has.
+    nowhere.  So the graph has at least the edges the code has, and where
+    the dump does not bound them it refuses: a jump jump_targets does not
+    read, a label whose address an insn other than a jump takes (a label
+    value or a nonlocal goto's handler) unless it heads a jump table, and a
+    call that may return twice (setjmp and its kin), since a missing edge
+    would make two insns look apart.
     """
     labels = {insn.uid: insn.index for insn in function.insns if insn.code == "code_label"}
     graph = {}
     for insn in function.insns:
         following = set() if insn.code == "barrier" or insn.index + 1 >= len(function.insns) else {insn.index + 1}
         if insn.code == "jump_insn":
-            targets = label_refs(insn.pattern)
+            targets = jump_targets(function, insn, labels)
             if any(uid not in labels for uid in targets):
                 raise ProofError(f"jump insn UID {insn.uid} refers to a label the dump does not hold")
             following |= {labels[uid] for uid in targets}
+        elif insn.pattern is not None:
+            for uid in label_refs(insn.pattern):
+                if table_at(function, labels, uid) is None:
+                    raise ProofError(f"insn UID {insn.uid} takes the address of label UID {uid}, which heads no "
+                                     "jump table; the proof cannot bound the jumps to it")
+            if insn.code == "call_insn":
+                names = [x.strip('"') for x in proof.flatten(insn.pattern) if isinstance(x, str) and x[:1] == '"']
+                if any(returns_twice(name) for name in names):
+                    raise ProofError(f"call insn UID {insn.uid} calls a function that may return twice; the proof "
+                                     "cannot bound the jumps to its return")
         graph[insn.index] = following
     return graph
 
