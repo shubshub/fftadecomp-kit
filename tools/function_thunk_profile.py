@@ -506,10 +506,12 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                         run = lambda candidate: verify_leaf_instructions(
                             got, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True)
                         if buffer_stack_arguments:
-                            # match.py retries a refused stack-argument walk once at a variable stack index.
+                            # match.py retries a refused stack-argument walk once at a variable stack
+                            # index, or with closure words (closure_slot_profile).
+                            import closure_slot_profile as closure
                             import default_stack_index_profile as default_index
-                            instructions, proof = default_index.walk(make_proof, run, got, address,
-                                                                     default_index.snapshot(root))
+                            instructions, proof = closure.walk(make_proof, run, got, address,
+                                                               default_index.snapshot(root))
                         else:
                             proof = make_proof() if buffer_stack_arguments is not None else None
                             instructions = run(proof)

@@ -2533,6 +2533,62 @@ needs it, and one that states it for an owner that does not is refused.
 `function_literal_exit_scratch_profile.POLICY.enabled = False` restores the
 refusal.
 
+#### Closure words on the default path
+
+A closure is a struct in the owner's frame holding the address of one of the
+owner's locals and a function pointer, handed by address to a list walker that
+calls back through both words:
+
+    closure.argument = &found;  closure.callback = func_0809AC88;
+    func_080C7CC0(list, func_0809ABE8, &closure);
+
+The default walks keep the owner's store of `&found` as a pointer-bearing slot
+and refuse the adapter's load of it (`buffer access overlaps a pointer-bearing
+argument slot`). After that refusal, and only then, the same walk runs once
+more on the same proof with the exact-word machinery of
+`protected-descriptor-word-v1` (its `word_memory`, `prune_words` and lifetime
+check, unchanged), as `closure_slot_profile` (`closure-slot-retry-v1`). An
+exact aligned word load of a live word yields what the owner stored there: a
+frame address, whose later accesses are bounds-checked as every alias's are,
+or a call-target fact through which the call-via rule above resolves the
+callback. Only the default route's exact-target proofs take the retry (the
+five constructors built with `call_via_targets=True`), composed with the
+stack-index retry: each runs only after its own trigger.
+
+A value is removed, so a later load of it refuses (a pointer word stays a
+pointer-bearing slot, so it is never read as a scalar), by:
+
+* any store overlapping the word, through an exact frame address, by the owner
+  or a walked callee; an exact word store gives it the new value, but a walked
+  callee only replaces a value with one of the same kind, and never makes a
+  new word; a block store refuses;
+* a store the walk cannot place: it refuses while a frame address is live in
+  a word, and removes every value otherwise;
+* a join where the values differ (two call-target facts of one value join to
+  the union of their origins and crossings; a fact and a plain value do not);
+* a frame change that releases the word; and no frame is allocated after one
+  is released, in the owner or any walked callee.
+
+While a word is live every call is walked: the owner's pointer slots are
+incoming stack words of every callee, so no call is left unwalked; summaries
+refuse calls made with words; the dead-register rule does not replace a call
+made with words; an SWI anywhere in a walk refuses. The retry refuses
+outright when the callee-saved watch records an escape, a dangling frame
+address or a stale reach of frame words, when a reloaded word's owner store
+lies on a cycle of the owner's control flow, and when it reloads no word. A
+call-target fact loaded from a word keeps the calls the stored fact crossed
+before the store, so the call-via rule still checks them, and gains the origin
+`slot <store site>`. R4-R11 frame addresses at a call stay the callee-saved
+watch's, as on every default walk.
+
+The report states the trigger and one line per reloaded word, bound into the
+buffer proof fingerprint and recomputed on replay:
+
+    * buffer closure slot: `closure-slot-retry-v1` after `buffer access overlaps a pointer-bearing argument slot`: <summary>
+    * buffer closure slot: 0x<owner> sp<offset> = pointer sp<offset> | constant 0x<value>, ...; stored at 0x<site>, ...; reloaded at 0x<site>, ...
+
+`closure_slot_profile.POLICY.enabled = False` restores the plain refusal.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is
