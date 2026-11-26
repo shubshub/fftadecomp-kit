@@ -54,6 +54,7 @@ import inert_spin_profile as inert_spin
 import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
+import call_via_target_profile as call_via
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
@@ -741,8 +742,12 @@ def call_bindings(image, name, address, mapping, rom_size,
                    ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                    allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
                    allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None,
-                   switch_function_literals=False, switch_thunks=None):
+                   switch_function_literals=False, switch_thunks=None, function_literal_thunks=False):
     """Bind external Thumb calls and explicitly mapped absolute data words.
+
+    function_literal_thunks (the default path only, call_via_target_profile T1) lets a caller
+    with function literals and no switch keep its canonical `_call_via_rN` calls; the proofs
+    that follow decide them.
 
     allow_self_call admits `bl <own entry>` relocations against the function's
     own complete defined symbol; the call binds to this same verified symbol,
@@ -1187,7 +1192,11 @@ def call_bindings(image, name, address, mapping, rom_size,
                     definitions[0]["section"] or definitions[0]["bind"] != 1 or \
                     definitions[0]["type"] not in (0, 2):
                 raise ValueError("division profile calls require unique undefined global functions")
-    if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets):
+    if type(function_literal_thunks) is not bool:
+        raise ValueError("function-literal thunk opt-in must be Boolean")
+    if not function_thunks and function_relocations and any(target in RUNTIME_HELPERS for target in targets) and \
+            not (function_literal_thunks and call_via.POLICY.enabled and not switch_relocations and
+                 switch_thunks is None):
         raise Refusal("function-address evidence does not support runtime call thunks")
     composed_thunks = set()
     if switch_thunks is not None:
@@ -1262,7 +1271,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                           allow_switch_constants=False, umodsi3_bindings=None, ashldi3_bindings=None, float_bindings=None,
                           allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None, multiple_switch_profile=None,
                           switch_interposed_pool=False, unsigned_thunk_profile=None,
-                          switch_function_literals=False):
+                          switch_function_literals=False, function_literal_thunks=False):
     """Validate exact placement and the linker's complete modification surface."""
     check_switch_function_opt_in(switch_function_literals, allow_switch_data, function_thunks,
                                  function_relocations, switch_relocations)
@@ -1338,7 +1347,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
                 allow_switch_data or allow_preloaded_switch or udivsi3_bindings is not None and unsigned_thunk_profile is None or \
                 modsi3_bindings is not None or divsi3_bindings is not None or double_bindings is not None:
             raise ValueError("linked function-thunk bindings are incomplete or mixed")
-    elif function_relocations and any(name in RUNTIME_HELPERS for name in targets):
+    elif function_relocations and any(name in RUNTIME_HELPERS for name in targets) and \
+            not (function_literal_thunks is True and call_via.POLICY.enabled and not switch_relocations):
         raise ValueError("linked function literals exclude call thunks without their profile")
     switch_relocations = switch_relocations or {}
     if function_thunk.is_versioned(thunk_pool_words):
@@ -1603,7 +1613,7 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                ashldi3_bindings=None, ashldi3_index=None, float_bindings=None, float_index=None,
                allow_double_data=False, signed_runtime_profile=None, unsigned_runtime_profile=None, thunk_pool_words=5, umod_r1_profile=None,
                allow_self_call=False, switch_interposed_pool=False, unsigned_thunk_profile=None,
-               switch_function_literals=False, switch_thunks=None):
+               switch_function_literals=False, switch_thunks=None, function_literal_thunks=False):
     function_thunk.check_pool_opt_in(thunk_pool_words, function_thunks)
     if umod_r1_profile is not None:
         from umod_r1_thunk_profile import check_link_context
@@ -1640,7 +1650,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                                     switch_interposed_pool=switch_interposed_pool,
                                                     unsigned_thunk_profile=unsigned_thunk_profile,
                                                     switch_function_literals=switch_function_literals,
-                                                    switch_thunks=switch_thunks)
+                                                    switch_thunks=switch_thunks,
+                                                    function_literal_thunks=function_literal_thunks)
     data_names = {binding[0] for binding in data_relocations.values()}
     linked = link_typed_targets(runner, workspace, args, name, address, targets, data_names)
     return (linked_function_bytes(original, linked, name, address, calls, targets,
@@ -1656,7 +1667,8 @@ def link_calls(runner, workspace, args, original, address, mapping, rom_size,
                                   thunk_pool_words=thunk_pool_words, umod_r1_profile=umod_r1_profile,
                                   switch_interposed_pool=switch_interposed_pool,
                                   unsigned_thunk_profile=unsigned_thunk_profile,
-                                  switch_function_literals=switch_function_literals),
+                                  switch_function_literals=switch_function_literals,
+                                  function_literal_thunks=function_literal_thunks),
             calls, data_relocations)
 
 
@@ -2100,7 +2112,11 @@ def verify_modsi3(data, address, rom, mapping, data_mapping, manifest):
 
 
 def function_address_bindings(data, address, rom, mapping, data_mapping, manifest, *,
-                              allow_empty_functions=False):
+                              allow_empty_functions=False, allow_call_thunks=False):
+    """allow_call_thunks (the function-literal buffer proofs, call_via_target_profile T1) binds a call
+    named by a canonical `_call_via_rN` to that thunk, after checking its `bx rN` bytes."""
+    if type(allow_call_thunks) is not bool:
+        raise ValueError("call-thunk binding opt-in must be Boolean")
     if type(allow_empty_functions) is not bool or mapping is None or not isinstance(manifest, dict) or \
             set(manifest) != {"calls", "data", "functions"} or \
             any(not isinstance(records, list) for records in manifest.values()) or \
@@ -2138,6 +2154,12 @@ def function_address_bindings(data, address, rom, mapping, data_mapping, manifes
             if kind == "calls":
                 if offset % 2:
                     raise ValueError("function-address call is misaligned")
+                if allow_call_thunks and call_via.POLICY.enabled and name in function_thunk.ALIASES:
+                    thunk = function_thunk.ALIASES[name]
+                    if not thunk_is_call_via(rom, thunk, (thunk - function_thunk.START) // 4):
+                        raise ValueError("call helper does not match its thunk in the ROM")
+                    calls[address + offset] = thunk
+                    continue
                 calls[address + offset] = function_address_target(
                     name, entries, address, len(data), len(rom))
                 continue
@@ -2175,7 +2197,8 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
 def verify_function_buffers(data, address, rom, mapping, manifest, premises=None):
     """``premises``: the decomp's reviewed stack-index premise file, for the default retry."""
     import default_stack_index_profile as default_index
-    calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest)
+    calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest,
+                                                allow_call_thunks=True)
     if manifest["data"] or not calls:
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
 
@@ -2189,6 +2212,11 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
     if not proof.buffer_evidence():
         raise ValueError("function-buffer evidence requires an inspected buffer call")
     verify_data_literals(instructions, address, literals)
+    if any(function_thunk.reserved(target) for target in calls.values()):
+        # A thunk caller's code-valued pool words carry their canonical function relocations, and
+        # none names the caller's own bytes, as on the plain and data-buffer paths.
+        function_thunk.verify_literal_bindings(data, address, instructions, calls, mapping, literals)
+        function_thunk.verify_own_span_literals(data, address, instructions)
     return instructions, proof
 
 
@@ -2220,6 +2248,17 @@ def check_switch_pool_opt_in(enabled, allow_switch_data, *incompatible):
     if enabled and (allow_switch_data is not True or
                     any(value is not None and value is not False for value in incompatible)):
         raise ValueError("interposed switch pool requires isolated switch-data bindings")
+
+
+def default_call_route(args, unit_context=None):
+    """True when no selector, control-flow profile or library unit chooses the proof route: the
+    default path, where call_via_target_profile's T1 lets function literals keep call-via thunks."""
+    return unit_context is None and getattr(args, "control_flow_profile", "ordinary") == "ordinary" and not any(
+        getattr(args, name, None) for name in (
+            "signed_quotient_profile", "signed_runtime_profile", "unsigned_runtime_profile",
+            "addressed_signed_runtime_profile", "software_double_profile",
+            "software_double_remainder_profile", "function_address_profile", "switch_profile",
+            "switch_data_profile", "owner_runtime_profile", "unsigned_quotient_profile"))
 
 
 def check_switch_function_opt_in(enabled, allow_switch_data, function_thunks,
@@ -4448,7 +4487,8 @@ class FunctionBufferCallProof(BufferCallProof):
     _loop_replay_opt_in = True
 
     def target(self, address):
-        if address in RUNTIME_HELPERS.values():
+        # T1 (call_via_target_profile): with its policy on, a thunk is walked as the plain proof walks it.
+        if address in RUNTIME_HELPERS.values() and not call_via.POLICY.enabled:
             raise ValueError("function-buffer evidence excludes runtime call thunks in inspected dependencies")
         return super().target(address)
 
@@ -6814,7 +6854,8 @@ def main():
                                                           allow_self_call=True,
                                                           switch_interposed_pool=pool_switch_profile,
                                                           switch_function_literals=function_switch_profile,
-                                                          switch_thunks=thunk_switch_selector)
+                                                          switch_thunks=thunk_switch_selector,
+                                                          function_literal_thunks=default_call_route(args, unit_context))
                 linked_profile = bool(calls)
                 self_sites = frozenset(site for site, target in calls.items() if target == addr)
             else:
@@ -7110,8 +7151,15 @@ def main():
                                                   index=empty_index if addr in (data_buffer.MENU_LIST_ADDRESS, 0x0801A518) else None,
                                                   premises=default_index.snapshot(ROOT))
                         else:
+                            # The buffer proof binds a call-via call by its canonical thunk name (T1);
+                            # a manifest without one is the frameless proof's, unchanged.
+                            buffer_manifest = dict(address_manifest, calls=[
+                                [site - addr, next((name for name, value in function_thunk.ALIASES.items()
+                                                    if value == target), f"func_{target:08X}")]
+                                for site, target in sorted(calls.items())])
                             verified_instructions, buffer_proof = verify_function_buffers(
-                                got, addr, rom, mapping, address_manifest, default_index.snapshot(ROOT))
+                                got, addr, rom, mapping, buffer_manifest, default_index.snapshot(ROOT))
+                            address_manifest = buffer_manifest
                     except ValueError as buffer_error:
                         raise ValueError(f"{address_error}; "
                                          f"{'function-data-buffer' if data_relocations else 'function-buffer'} "
