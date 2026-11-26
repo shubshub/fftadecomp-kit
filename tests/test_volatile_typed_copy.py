@@ -75,6 +75,41 @@ class TextRuleTests(unittest.TestCase):
         self.assertEqual(rules("State *p = state; p->control = " + SYMBOL + ";"), [])
         self.assertEqual(rules("g.control = " + SYMBOL + ";", STATE + "extern State g;\n"), [])
 
+    def test_a_local_copy_through_a_holding_type_is_refused(self):
+        def local(text):
+            return [message for _, rule, _, message in plausible.check_text(
+                text, data_symbols=allowlist.MAPPING, relpath="src/08028C34.c", volatile_allow=[allowlist.ENTRY])
+                if rule == "volatile-allowlist" and "a local instance of the struct" in message]
+
+        outer = "typedef struct { unsigned int tag; State inner; } Outer;\n"
+        read = " x = " + SYMBOL + ".display; }\n"
+        for label, text in (
+                ("a typedef alias", STATE + "typedef State Alias;\nvoid f(void) { Alias local;" + read),
+                ("an array typedef", STATE + "typedef State Pair[2];\nvoid f(void) { Pair local;" + read),
+                ("an outer struct", STATE + outer + "void f(void) { Outer local;" + read),
+                ("a tagged outer struct", STATE + "struct Box { State inner; };\nvoid f(void) { struct Box local;"
+                 + read),
+                ("an outer struct of an alias", STATE + "typedef State Alias;\ntypedef struct { Alias a; } Two;\n"
+                 "void f(void) { Two local;" + read),
+                ("a union", STATE + "typedef union { State inner; int raw; } Either;\nvoid f(void) { Either local;"
+                 + read),
+                ("a later declarator", STATE + "void f(void) { State *p = state, local;" + read),
+                ("a local typedef", STATE + "void f(void) { typedef State Mine; Mine local;" + read),
+                ("a parameter", STATE + outer + "void f(int n, Outer copy) {" + read),
+                ("a K&R parameter", STATE + "void f(copy) State copy; {" + read)):
+            with self.subTest(label):
+                self.assertTrue(local(text), label)
+        # pointers, and globals, are not local copies
+        for label, text in (
+                ("a pointer to an alias", STATE + "typedef State Alias;\nvoid f(void) { Alias *p = state;" + read),
+                ("a struct holding a pointer", STATE + "typedef struct { State *p; } Holder;\n"
+                 "void f(void) { Holder h;" + read),
+                ("a pointer parameter", STATE + outer + "void f(Outer *copy, u16 n) {" + read),
+                ("a global outer", STATE + outer + "Outer g;\nvoid f(void) {" + read),
+                ("a cast and sizeof", STATE + "void f(void) { x = sizeof(State) + ((State *)state)->tag;" + read)):
+            with self.subTest(label):
+                self.assertEqual(local(text), [], label)
+
     def test_sites(self):
         code = STATE + "void f(void) { " + SAVE + " x = state->control.unknown_3C; }\n"
         admitted, typeofs, findings = plausible.typed_copy_sites(code, SYMBOL, allowlist.ENTRY["declaration"])

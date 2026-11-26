@@ -1495,15 +1495,91 @@ def typed_copy_sites(code, symbol, entry_declaration):
     return admitted, {tokens[k][1]}, findings + local_findings
 
 
-def typed_copy_locals(words, tokens, brace, symbol):
-    """kit#375, rule T: findings for every instance of the struct holding the typed copy that is declared
-    inside a function body (a local copy, frame or static), which the rule does not admit"""
+QUALIFIERS = {"const", "volatile", "__const", "__const__", "__volatile", "__volatile__", "restrict", "__restrict",
+              "__restrict__"}
+
+
+def matching_brace(words, brace):
     depth, close = 0, brace
     while close < len(words):
         depth += {"{": 1, "}": -1}.get(words[close], 0)
         if depth == 0:
             break
         close += 1
+    return close
+
+
+def declares_by_value(words, j, spelling):
+    """does the declaration whose type spelling starts at words[j] declare an object of that type, not only
+    pointers to it?  Every declarator of `T a, *b;` counts; in a parameter list, only the parameter's own"""
+    n = len(spelling)
+    if words[j:j + n] != list(spelling):
+        return False
+    single = j > 0 and words[j - 1] in ("(", ",")
+    k = j + n
+    while k < len(words):
+        while k < len(words) and words[k] in QUALIFIERS:
+            k += 1
+        if k >= len(words):
+            return False
+        if IDENTIFIER.fullmatch(words[k]) and words[k] not in C_KEYWORDS or \
+                words[k] == "(" and words[k + 1:k + 2] != ["*"]:
+            return True
+        if words[k] not in ("*", "("):
+            return False
+        depth = 0
+        while k < len(words):
+            word = words[k]
+            if word in ("(", "[", "{"):
+                depth += 1
+            elif word in (")", "]", "}"):
+                if depth == 0:
+                    return False
+                depth -= 1
+            elif depth == 0 and word in (",", ";"):
+                break
+            k += 1
+        if k >= len(words) or words[k] == ";" or single:
+            return False
+        k += 1
+    return False
+
+
+def holding_types(words, names):
+    """names, grown to a fixed point by every type that holds one of them by value: a typedef of one
+    (`typedef T Alias;`, or an array of T), and a struct or union with a member of one"""
+    while True:
+        before = set(names)
+        for j, word in enumerate(words):
+            if word == "typedef":
+                for spelling in list(names):
+                    k = j + 1 + len(spelling)
+                    if words[j + 1:k] == list(spelling) and k + 1 < len(words) and \
+                            IDENTIFIER.fullmatch(words[k]) and words[k + 1] in (";", "[", ","):
+                        names.add((words[k],))
+            elif word == "{" and j >= 1:
+                tagged = j >= 2 and words[j - 2] in ("struct", "union") and IDENTIFIER.fullmatch(words[j - 1])
+                if not tagged and words[j - 1] not in ("struct", "union"):
+                    continue
+                close = matching_brace(words, j)
+                if not any(declares_by_value(words, m, spelling) for m in range(j + 1, close) for spelling in names):
+                    continue
+                if tagged:
+                    names.add((words[j - 2], words[j - 1]))
+                head = j - 2 if tagged else j - 1
+                if words[head - 1:head] == ["typedef"] and close + 1 < len(words) and \
+                        IDENTIFIER.fullmatch(words[close + 1]):
+                    names.add((words[close + 1],))
+        if names == before:
+            return names
+
+
+def typed_copy_locals(words, tokens, brace, symbol):
+    """kit#375, rule T: findings for every instance of the struct holding the typed copy that is declared
+    inside a function, in its body or its parameter list (a local copy, frame or static), which the rule does
+    not admit.  An instance of a type that holds that struct by value counts too: a typedef alias of it, or a
+    struct or union with a member of it (holding_types)"""
+    close = matching_brace(words, brace)
     names = set()
     if words[brace - 1:brace] == ["struct"] and words[brace - 2:brace - 1] == ["typedef"] or \
             words[brace - 3:brace - 2] == ["typedef"] and words[brace - 2:brace - 1] == ["struct"]:
@@ -1511,11 +1587,13 @@ def typed_copy_locals(words, tokens, brace, symbol):
             names.add((words[close + 1],))
     if words[brace - 2:brace - 1] == ["struct"] and re.fullmatch(r"[A-Za-z_]\w*", words[brace - 1]):
         names.add(("struct", words[brace - 1]))
-    # function bodies: a `{` after a `)` at file scope, to its `}`
+    names = holding_types(words, names)
+    # functions: a `{` at file scope after a `)` (or a K&R parameter declaration's `;`), from the `(` of its
+    # parameter list to its `}`
     bodies, depth = [], 0
     for j, word in enumerate(words):
         if word == "{":
-            if depth == 0 and j and words[j - 1] == ")":
+            if depth == 0 and j and words[j - 1] in (")", ";"):
                 bodies.append([j, None])
             depth += 1
         elif word == "}":
@@ -1524,10 +1602,18 @@ def typed_copy_locals(words, tokens, brace, symbol):
                 bodies[-1][1] = j
     findings = []
     for start, end in bodies:
-        for j in range(start + 1, end or len(words)):
+        opening = start - 1
+        while opening > 0 and words[opening] != ")":
+            opening -= 1
+        level = 0
+        while opening > 0:
+            level += {")": 1, "(": -1}.get(words[opening], 0)
+            if level == 0:
+                break
+            opening -= 1
+        for j in range(opening + 1, end or len(words)):
             for spelling in names:
-                if words[j:j + len(spelling)] == list(spelling) and \
-                        re.fullmatch(r"[A-Za-z_]\w*", words[j + len(spelling)] if j + len(spelling) < len(words) else ""):
+                if declares_by_value(words, j, spelling):
                     findings.append((tokens[j][1], f"a local instance of the struct holding the typed copy of "
                                      f"{symbol} is not admitted: the copy must live outside the frame"))
     return findings
