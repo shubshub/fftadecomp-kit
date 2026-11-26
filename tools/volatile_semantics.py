@@ -2252,6 +2252,33 @@ MAX_CALLEE_DEPTH = 8
 MAX_CALLEES = 64
 UNKNOWN_INTERFACE = (frozenset(ARGUMENT_REGISTERS), frozenset())
 
+# BIOS calls through an exact `svc #n; bx lr` wrapper.  The BIOS code is not in the
+# cartridge ROM, so its registers come from GBATEK ("BIOS Arithmetic Functions",
+# "BIOS Memory Copy", "BIOS Decompression Functions", "BIOS Rotation/Scaling
+# Functions", "BIOS Sound Functions"): n -> (name, input registers).  Only the calls the
+# ROM has such a wrapper for are listed.  No register is asserted overwritten, as in
+# bios_cpuset_fill_profile.ConditionalVolatileInterfaces, so a value a call may leave
+# alone stays live.
+BIOS_CALLS = {
+    0x06: ("Div", ("r0", "r1")),
+    0x08: ("Sqrt", ("r0",)),
+    0x0A: ("ArcTan2", ("r0", "r1")),
+    0x0B: ("CpuSet", ("r0", "r1", "r2")),
+    0x0C: ("CpuFastSet", ("r0", "r1", "r2")),
+    0x0E: ("BgAffineSet", ("r0", "r1", "r2")),
+    0x0F: ("ObjAffineSet", ("r0", "r1", "r2", "r3")),
+    0x11: ("LZ77UnCompWram", ("r0", "r1")),
+    0x12: ("LZ77UnCompVram", ("r0", "r1")),
+    0x2A: ("SoundGetJumpList", ("r0",)),
+}
+BIOS_NAME = "bios-call-inputs-v1"
+BIOS_PREMISE = "a BIOS call reads no argument register GBATEK does not list as its input"
+
+
+class BiosCalls(list):
+    """the BIOS wrappers whose GBATEK interface a passed check used, for record()"""
+    bios_calls = True
+
 
 class RomInterfaces:
     """which of r0-r3 an indexed Thumb callee reads, derived from its ROM bytes.
@@ -2276,9 +2303,32 @@ class RomInterfaces:
     Only ROM bytes and the function index are used, never source.
     """
 
-    def __init__(self, rom, functions):
+    def __init__(self, rom, functions, bios=False):
         self.rom, self.functions = rom, functions
         self.cache, self.budget, self.names, self.inexact = {}, MAX_CALLEES, {}, {}
+        # bios: answer exact BIOS wrappers from BIOS_CALLS (compare() retries with it);
+        # seen: the wrappers a run met, used: those it answered from the table
+        self.bios, self.bios_seen, self.bios_used = bios, set(), {}
+
+    def with_bios(self):
+        """a fresh instance that answers exact BIOS wrappers from BIOS_CALLS"""
+        return RomInterfaces(self.rom, self.functions, bios=True)
+
+    def bios_wrapper(self, address):
+        """the BIOS_CALLS number of an indexed Thumb `svc #n; bx lr` at address, or None"""
+        offset = address - ROM_BASE
+        if address % 2 or not 0 <= offset <= len(self.rom) - 4 or \
+                self.rom[offset + 1] != 0xDF or self.rom[offset + 2:offset + 4] != b"\x70\x47" or \
+                self.rom[offset] not in BIOS_CALLS:
+            return None
+        rows = [row for row in self.functions if isinstance(row, dict) and isinstance(row.get("rom"), str)
+                and int(row["rom"], 16) == address]
+        return self.rom[offset] if len(rows) == 1 and rows[0].get("mode") == "thumb" else None
+
+    def bios_record(self):
+        return BiosCalls(f"func_{address:08X} SWI {number:#04x} {BIOS_CALLS[number][0]} reads "
+                         "{" + ", ".join(BIOS_CALLS[number][1]) + "}" for address, number in
+                         sorted(self.bios_used.items()))
 
     def __call__(self, name):
         """(reads, writes) for a callee name, or None when nothing could be derived.
@@ -2307,6 +2357,14 @@ class RomInterfaces:
             return self.inexact[address] + (False,)
         if address in active or len(active) >= MAX_CALLEE_DEPTH or self.budget <= 0:
             return UNKNOWN_INTERFACE + (False,)
+        number = self.bios_wrapper(address)
+        if number is not None:
+            self.bios_seen.add(address)
+            if self.bios:
+                _, reads = BIOS_CALLS[number]
+                self.bios_used[address] = number
+                self.cache[address] = (frozenset(reads), frozenset())
+                return self.cache[address] + (True,)
         self.budget -= 1
         try:
             instructions, entry, returns = self.control_flow(address)
@@ -3301,6 +3359,27 @@ def compare(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
     through its name.  interfaces, if given, is a RomInterfaces: the callees'
     argument registers derived from their ROM code.
     """
+    arguments = (real_assembly, stripped_assembly, preprocessed, symbol, declaration, perturbed_assembly)
+    try:
+        return _compare_bounded(*arguments, interfaces)
+    except SemanticError as error:
+        # a refusal that met an exact BIOS wrapper is retried with the wrappers' GBATEK
+        # interfaces; a result it passes with names them and the premise (BIOS_CALLS), and
+        # a retry that refuses as well leaves the first refusal as it was
+        if not isinstance(interfaces, RomInterfaces) or not interfaces.bios_seen or interfaces.bios:
+            raise
+        widened = interfaces.with_bios()
+        try:
+            results = _compare_bounded(*arguments, widened)
+        except SemanticError:
+            raise error from None
+        if not widened.bios_used:
+            raise
+        return [result + (widened.bios_record(),) for result in results]
+
+
+def _compare_bounded(real_assembly, stripped_assembly, preprocessed, symbol, declaration, perturbed_assembly,
+                     interfaces):
     try:
         return _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, declaration,
                                 perturbed_assembly, interfaces)
@@ -3387,7 +3466,9 @@ def record(symbol, results, perturbed=False):
     import volatile_tested_update as tested_update
     for name, paths, read_modify_write, chained, *extra in results:
         loops = next((part for part in extra if getattr(part, "loop_induction", False)), None)
-        extra = [part for part in extra if not getattr(part, "loop_induction", False)]
+        bios = next((part for part in extra if getattr(part, "bios_calls", False)), None)
+        extra = [part for part in extra if not getattr(part, "loop_induction", False) and
+                 not getattr(part, "bios_calls", False)]
         tested = next((part for part in extra if isinstance(part, tested_update.Rereads)), [])
         extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
@@ -3408,7 +3489,9 @@ def record(symbol, results, perturbed=False):
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
                      (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
-                     (f", {loops.describe()}" if loops else ""))
+                     (f", {loops.describe()}" if loops else "") +
+                     (f", BIOS calls by their GBATEK interfaces: {'; '.join(bios)} ({BIOS_NAME}, premise: "
+                      f"{BIOS_PREMISE})" if bios else ""))
     return (f"* allowlisted volatile semantics: `{symbol}` stripped of volatile compiles to the same "
             f"behaviour{', and a compile with the pinned bytes moved follows every pinned access' if perturbed else ''}; " +
             "; ".join(parts))
