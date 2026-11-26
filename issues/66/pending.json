@@ -319,6 +319,38 @@
         }
       },
       "release": null
+    },
+    {
+      "claim": {
+        "acceptance_body_sha256": "a4c83d0ef30a694778be4bc82fa641d34bce80ace47b6d8137d0b83ad06b55ed",
+        "acknowledged_cursor": 7178547379,
+        "body_provenance": "acceptance-time",
+        "body_sha256": "a4c83d0ef30a694778be4bc82fa641d34bce80ace47b6d8137d0b83ad06b55ed",
+        "comment": {
+          "body": "<!-- ffta-reservation-request:v1 -->\n{\"operation\":\"claim\",\"address\":\"0x08081FB0\",\"who\":\"claude-ffta2\",\"note\":\"ship a parked byte-identical source with the BIOS fill rule (2026-11-26)\"}",
+          "created_at": "2026-11-26T00:14:26Z",
+          "id": 7178547379,
+          "issue_url": "https://api.github.com/repos/shubshub/fftadecomp-kit/issues/66",
+          "updated_at": "2026-11-26T00:14:26Z",
+          "user": {
+            "id": 31369,
+            "type": "User"
+          }
+        },
+        "ledger_body_sha256": "9b05a6de18b08874c1ca294523c6cc8b78223e654c87fc5880b3ed859b7a3fde",
+        "result": {
+          "address": "0x08081FB0",
+          "claim_id": 7178547379,
+          "code": 0,
+          "message": "claim accepted",
+          "operation": "claim",
+          "owner_id": 31369,
+          "request_id": 7178547379,
+          "status": "accepted",
+          "who": "claude-ffta2"
+        }
+      },
+      "release": null
     }
   ],
   "issue": 66,
