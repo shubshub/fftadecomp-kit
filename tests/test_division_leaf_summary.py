@@ -127,6 +127,59 @@ NO_BUFFER = HEADER + """u32 func_08000200(u32 phase, int value, int other)
 PLAIN = HEADER + "int func_08000200(int value)\n{\n    return value / 10 + value % 10;\n}\n"
 
 
+# 0x0802F560's step toward a target: a quotient by abs(distance) behind distance != 0 (D3).
+SIGN_SOURCE = SIGNED.replace("        return %(division)s;", "        %(division)s")
+SIGN_STEP = """{
+            int distance = 8 - (s16)value;
+            int step = 0;
+
+            if (%(guard)s) {
+                step = distance / 4;
+                if (step == 0)
+                    step = distance / (distance < 0 ? -distance : distance);
+            }
+            return step;
+        }"""
+
+
+def assemble(text):
+    """Thumb bytes of an assembly body at 0x08000200 (the fixed binutils); `other` is an ordinary callee."""
+    import subprocess
+    with tempfile.TemporaryDirectory() as work:
+        source, obj, elf, binary = (os.path.join(work, name) for name in ("a.s", "a.o", "a.elf", "a.bin"))
+        Path(source).write_text(".syntax unified\n.arch armv4t\n.thumb\n.text\n"
+                                f".thumb_set rt_divsi3, 0x{leaf.ENTRIES['__divsi3'] | 1:08X}\n"
+                                ".thumb_set other, 0x08000401\n"
+                                ".global f\nf:\n" + text + "\n")
+        for command in ([match.DEFAULT_AS, "-mthumb-interwork", source, "-o", obj],
+                        [match.DEFAULT_LD, f"-Ttext=0x{A:08X}", "-e", "f", obj, "-o", elf],
+                        [match.DEFAULT_OBJCOPY, "-O", "binary", "--only-section=.text", elf, binary]):
+            subprocess.run(command, check=True, capture_output=True)
+        return Path(binary).read_bytes()
+
+
+def graph(data):
+    """(instructions, edges, calls) of straight-line Thumb with branches, BLs and one return."""
+    decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+    decoder.detail = True
+    instructions = {item.address: item for item in decoder.disasm(data, A)}
+    edges, calls = {}, {}
+    for site, item in instructions.items():
+        following = site + item.size
+        if item.mnemonic == "bl":
+            calls[site] = item.operands[0].imm
+            edges[site] = [following]
+        elif item.id == match.ARM_INS_B:
+            target = item.operands[0].imm
+            edges[site] = [target] + ([] if item.cc in (match.ARM_CC_AL, match.ARM_CC_INVALID) else [following])
+        elif item.mnemonic == "bx" or item.mnemonic == "pop" and "pc" in item.op_str:
+            edges[site] = []
+        else:
+            edges[site] = [following]
+        edges[site] = [successor for successor in edges[site] if successor in instructions]
+    return instructions, edges, calls
+
+
 def division_lines(report):
     return [line for line in report.splitlines() if line.startswith(leaf.DIVISION_LINE)]
 
@@ -222,6 +275,17 @@ class DivisionLeafTests(unittest.TestCase):
             summary.records[A + 2] = [A, 2, leaf.NONZERO_DIVISOR, 265]
             self.assertNotEqual(proof.fingerprint(), recorded)
             self.assertIn("__udivsi3: divisor 265 (nonzero-u32-constant-divisor)", "\n".join(summary.lines()))
+            # A __modsi3-only owner with a sign-guarded record states it on the division lines.
+            summary.sites[A + 2] = leaf.ADDRESS
+            summary.records[A + 2] = [A, 2, leaf.SIGN_GUARDED_DIVISOR]
+            summary.prove(leaf.ADDRESS)
+            self.assertFalse(summary.remainder_only())
+            self.assertTrue(summary.lines()[0].startswith(leaf.DIVISION_LINE))
+            self.assertIn("__modsi3: divisor nonzero and not -1", summary.lines()[1])
+            summary.records[A + 2] = [A, 2, owner.POSITIVE_DIVISOR, 7]
+            self.assertTrue(summary.remainder_only())
+            self.assertTrue(summary.lines()[0].startswith(leaf.LINE))
+            summary.sites[A + 2] = leaf.ENTRIES["__udivsi3"]
             summary.records[A + 2] = [A, 2, "an-unknown-kind", 264]
             with self.assertRaisesRegex(ValueError, "unknown kind"):
                 summary.lines()
@@ -411,6 +475,91 @@ class DivisionLeafTests(unittest.TestCase):
         other = match.BufferCallProof(rom, mapping, stack_arguments=True, copy_helper_index=index)
         self.assertIsNone(other.runtime_summaries)
         self.assertFalse(other.buffer_evidence())
+
+    # D3: divisors proved nonzero and not -1 by zero-compare branches and negation.
+
+    ABS = ("cmp r0, #0\nbeq 1f\nadds r1, r0, #0\ncmp r1, #0\nbge 2f\nrsbs r1, r1, #0\n2:\nbl rt_divsi3\n1:\nbx lr")
+
+    def sign(self, text):
+        data = assemble(text)
+        instructions, edges, calls = graph(data)
+        sites = {site for site, target in calls.items() if target == leaf.ENTRIES["__divsi3"]}
+        self.assertEqual(len(sites), 1)
+        return leaf.sign_guarded_sites(instructions, edges, A, sites) == sites
+
+    def test_the_sign_idiom_is_proved_from_the_code(self):
+        self.assertTrue(self.sign(self.ABS))
+        # A divisor > 0 on the edge out of a LE branch, and one < 0 negated: both nonzero, not -1.
+        self.assertTrue(self.sign("cmp r1, #0\nble 1f\nbl rt_divsi3\n1:\nbx lr"))
+        self.assertTrue(self.sign("cmp r1, #0\nbge 1f\nrsbs r1, r1, #0\nbl rt_divsi3\n1:\nbx lr"))
+        # An unknown value negated, then > 0 on the taken edge: the facts come from the compare.
+        self.assertTrue(self.sign("rsbs r1, r0, #0\ncmp r1, #0\nbgt 2f\nb 1f\n2:\nbl rt_divsi3\n1:\nbx lr"))
+
+    def test_sign_edge_cases_refuse(self):
+        for name, text in (
+                # No nonzero guard: abs(0) = 0 reaches the call.
+                ("unguarded", self.ABS.replace("cmp r0, #0\nbeq 1f\n", "")),
+                # GT leaves zero on the fallthrough, so the negated value may be 0.
+                ("bgt", "adds r1, r0, #0\ncmp r1, #0\nbgt 2f\nrsbs r1, r1, #0\n2:\nbl rt_divsi3\nbx lr"),
+                # The negation of a positive value may be -1 (from 1).
+                ("negated positive", "cmp r0, #0\nble 1f\nrsbs r1, r0, #0\nbl rt_divsi3\n1:\nbx lr"),
+                ("minus one", "movs r1, #1\nrsbs r1, r1, #0\nbl rt_divsi3\nbx lr"),
+                # The negation of an unknown value may be 0; a later >= 0 adds only "not -1".
+                ("negated unknown", "rsbs r1, r0, #0\ncmp r1, #0\nblt 1f\nbl rt_divsi3\n1:\nbx lr"),
+                # x >= 0 negated, then >= 0: the only such value is 0.
+                ("negated non-negative", "cmp r0, #0\nblt 1f\nrsbs r1, r0, #0\ncmp r1, #0\nblt 1f\n"
+                                         "bl rt_divsi3\n1:\nbx lr"),
+                # The comparand must be a known 0: r3 is unknown.
+                ("unknown comparand", "cmp r1, r3\nble 1f\nbl rt_divsi3\n1:\nbx lr"),
+                # r0's nonzero fact dies at the call between its guard and the copy into r1.
+                ("guard across a call", self.ABS.replace("beq 1f\n", "beq 1f\nbl other\n", 1)),
+                # The taken edge of LE includes 0, so its negation may be 0.
+                ("le taken", "cmp r1, #0\nble 2f\nb 1f\n2:\nrsbs r1, r1, #0\nbl rt_divsi3\n1:\nbx lr"),
+                # Both edges of a GT branch reach the call: no edge fact.
+                ("coincident targets", "cmp r1, #0\nbgt 2f\n2:\nbl rt_divsi3\nbx lr"),
+                # MVN is not a copy: ~x of x >= 0 is nonzero only by the later test, and ~0 is -1.
+                ("inverted non-negative", "cmp r0, #0\nblt 1f\nmvns r1, r0\ncmp r1, #0\nbeq 1f\n"
+                                          "bl rt_divsi3\n1:\nbx lr"),
+                ("inverted zero", "movs r0, #0\nmvns r1, r0\ncmp r1, #0\nbeq 1f\nbl rt_divsi3\n1:\nbx lr"),
+                # A second way into the branch: its flags may come from another compare (r0 > 5).
+                ("branch entered twice", "cmp r0, #5\nbgt 2f\ncmp r1, #0\n2:\nbgt 3f\nbx lr\n"
+                                         "3:\nbl rt_divsi3\nbx lr"),
+                # Nonzero alone allows -1 (INT_MIN / -1).
+                ("nonzero only", "cmp r1, #0\nbeq 1f\nbl rt_divsi3\n1:\nbx lr"),
+                # A second way into the call with an unknown divisor.
+                ("second predecessor", "cmp r2, #0\nbeq 2f\n" + self.ABS),
+                # The divisor rewritten after the join, and a call between guard and use.
+                ("rewritten", self.ABS.replace("2:\nbl", "2:\nadds r1, r4, #0\nbl")),
+                ("clobbered", "cmp r1, #0\nble 1f\nbl rt_divsi3\nbl rt_divsi3\n1:\nbx lr")):
+            with self.subTest(case=name):
+                data = assemble(text)
+                instructions, edges, calls = graph(data)
+                sites = {site for site, target in calls.items() if target == leaf.ENTRIES["__divsi3"]}
+                self.assertNotEqual(leaf.sign_guarded_sites(instructions, edges, A, sites), sites)
+
+    def test_int_min_is_a_nonzero_divisor_other_than_minus_one(self):
+        # A value < 0 negated: -x for x < 0 is positive, or INT_MIN for x = INT_MIN (nonzero and not
+        # -1). No quotient range is derived from it; the summary's R0 stays an unknown scalar.
+        self.assertTrue(self.sign("cmp r1, #0\nbge 1f\nrsbs r1, r1, #0\nbl rt_divsi3\n1:\nbx lr"))
+        self.assertFalse(self.sign("cmp r1, #0\nblt 1f\nrsbs r1, r1, #0\nbl rt_divsi3\n1:\nbx lr"))
+
+    def test_the_sign_step_is_admitted_end_to_end(self):
+        root = self.fixture("sign_step", SIGN_SOURCE % dict(division=SIGN_STEP % dict(guard="distance != 0")))
+        code, output, report = base.run(root)
+        self.assertEqual(code, 0, output)
+        sites = [line for line in division_lines(report) if "nonzero-not-minus-one-divisor" in line]
+        self.assertEqual(len(sites), 1, report)
+        self.assertIn("__divsi3: divisor nonzero and not -1 (nonzero-not-minus-one-divisor)", sites[0])
+        self.assertTrue(self.replays(report, root))
+        with patch.object(leaf.SIGN, "enabled", False):
+            code, output = base.cli(root)
+            self.assertIn("signed remainder requires proven signed16 r0 and nonzero r1", code)
+            self.assertFalse(self.replays(report, root))
+
+    def test_the_sign_step_without_its_guard_refuses(self):
+        root = self.fixture("sign_unguarded", SIGN_SOURCE % dict(division=SIGN_STEP % dict(guard="1")))
+        self.assertRetryRefused(root, "signed quotient excludes other runtime, literal, switch and thunk profiles",
+                                "signed remainder requires proven signed16 r0 and nonzero r1")
 
     # Where the retry never runs.
 
