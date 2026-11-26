@@ -24,10 +24,14 @@ from unittest.mock import patch
 import test_addressed_signed_runtime_thunks as fixtures
 
 match, profile, evidence, status = fixtures.match, fixtures.profile, fixtures.evidence, fixtures.status
+import signed_remainder_leaf_profile as remainder_leaf
 A, B, R2, R3 = fixtures.A, fixtures.B, fixtures.R2, fixtures.R3
 SELECTOR, SCHEMA = profile.COMPILER_THUNKS_DATA_SELECTOR, profile.COMPILER_THUNKS_DATA_SCHEMA
 POLICY = profile.COMPILER_THUNKS_POLICY
 PLAIN = 'signed quotient excludes other runtime, literal, switch and thunk profiles'
+# The default path's division leaf retry (signed_remainder_leaf_profile.DIVISION) also runs on PLAIN,
+# after the route; its walk refuses the thunk owner, and the earlier refusals stay first.
+LEAF = remainder_leaf.DIVISION_RETRY + 'call is not a validated external direct Thumb BL'
 
 # fixtures.TABLE with the compiler's own `%` and `/` in place of the explicit runtime calls.
 TABLE = fixtures.TABLE.replace('s32 func_08142950(s32 numerator, s32 denominator);\n', '').replace(
@@ -196,7 +200,9 @@ class CompilerRuntimeThunkTests(unittest.TestCase):
     def test_disabled_policy_or_another_selector_keeps_the_plain_refusal(self):
         root = self.copy_root(self.table)
         with patch.object(POLICY, 'enabled', False):
-            self.assertEqual(self.main(root), (f'compile failed:\n{PLAIN}', self.main(root)[1]))
+            self.assertEqual(self.main(root), (f'compile failed:\n{PLAIN}{LEAF}', self.main(root)[1]))
+            with patch.object(remainder_leaf.DIVISION, 'enabled', False):
+                self.assertEqual(self.main(root), (f'compile failed:\n{PLAIN}', self.main(root)[1]))
         for options in (('--function-address-profile', 'canonical-thunks-v1'),
                         ('--flags', '-mthumb-interwork -O1')):          # an exploratory toolchain
             with self.subTest(options=options):
@@ -207,11 +213,14 @@ class CompilerRuntimeThunkTests(unittest.TestCase):
 
     def test_a_refused_route_reports_both_refusals(self):
         root = self.make_root('alias', ALIAS, SELECTOR)
+        route = f'compile failed:\n{PLAIN}; compiler signed runtime thunks: ' \
+                'stack aliases cannot cross calls in caller-clobbered registers'
         code, output = self.main(root)
-        self.assertEqual(code, f'compile failed:\n{PLAIN}; compiler signed runtime thunks: '
-                               'stack aliases cannot cross calls in caller-clobbered registers')
+        self.assertEqual(code, route + LEAF)
         self.assertNotIn('MATCH', output)
         self.assertFalse((root/'docs/match/08010000.md').exists())
+        with patch.object(remainder_leaf.DIVISION, 'enabled', False):
+            self.assertEqual(self.main(root)[0], route)
 
     def test_an_unexpected_error_in_the_routed_build_fails_closed(self):
         root = self.copy_root(self.table)
@@ -219,10 +228,15 @@ class CompilerRuntimeThunkTests(unittest.TestCase):
             with self.subTest(error=type(error).__name__), patch.object(profile, 'build', side_effect=error), \
                     patch.dict(os.environ, FFTA_TRACEBACK='0'):
                 code, output = self.main(root)
+            # The route fails closed; the leaf retry then runs its own complete walk, which refuses.
             self.assertEqual(code, f'compile failed:\n{PLAIN}; compiler signed runtime thunks: '
-                                   f'{type(error).__name__}: {error}')
+                                   f'{type(error).__name__}: {error}{LEAF}')
             self.assertNotIn('MATCH', output)
             self.assertFalse((root/'docs/match/08010000.md').exists())
+        with patch.object(profile, 'build', side_effect=struct.error('bad pack')), \
+                patch.dict(os.environ, FFTA_TRACEBACK='0'), patch.object(remainder_leaf.DIVISION, 'enabled', False):
+            self.assertEqual(self.main(root)[0], f'compile failed:\n{PLAIN}; compiler signed runtime thunks: '
+                                                 'error: bad pack')
         with patch.object(profile, 'build', side_effect=KeyboardInterrupt), \
                 self.assertRaises(KeyboardInterrupt):
             self.main(root)

@@ -84,8 +84,8 @@ def report_lines(schema, address, data, manifest, source_digest, mapping, object
 def call_name(target):
     from match import RUNTIME_HELPERS
     import signed_remainder_leaf_profile as remainder_leaf
-    if target == remainder_leaf.ADDRESS and remainder_leaf.active():
-        return remainder_leaf.NAME  # bound only from compiler __modsi3 relocations
+    if remainder_leaf.active() and target in remainder_leaf.entries():
+        return remainder_leaf.entries()[target]  # bound only from that runtime's compiler relocations
     names = [name for name, value in RUNTIME_HELPERS.items() if value == target]
     return names[0] if names else f"func_{target:08X}"
 
@@ -180,8 +180,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             if offset % 2 or not 0 <= offset <= len(data) - 4 or \
                     occupied & set(range(offset, offset + 4)):
                 raise ValueError("data-buffer calls must be complete instructions outside literal words")
-            if target == match.remainder_leaf.ADDRESS and match.remainder_leaf.active():
-                continue  # the pinned compiler __modsi3 the walk summarises (signed_remainder_leaf_profile)
+            if match.remainder_leaf.active() and target in match.remainder_leaf.entries():
+                continue  # a pinned compiler runtime the walk summarises (signed_remainder_leaf_profile)
             if target in match.RUNTIME_HELPERS.values():
                 if not match.thunk_is_call_via(rom, target, (target - match.RUNTIME_HELPERS["_call_via_r0"]) // 4):
                     raise ValueError("data-buffer call target does not match its runtime thunk")
@@ -352,7 +352,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
-          "* buffer owner switch", "* buffer owner switch exit scratch", "* buffer dead register", "* buffer signed remainder", "* buffer split join",
+          "* buffer owner switch", "* buffer owner switch exit scratch", "* buffer dead register", "* buffer signed remainder", "* buffer division runtime", "* buffer split join",
           "* mapping SHA-256",
           "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS non-argument register",
