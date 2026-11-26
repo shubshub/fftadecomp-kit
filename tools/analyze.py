@@ -294,6 +294,13 @@ def refinement_word_switch(data, address, position, end, engine, *,
     if not candidates and interposed_pool_switch:
         # Only where every fixed layout found no table.
         return pooled[0] if len(pooled) == 1 else None
+    if interposed_pool_switch and len(candidates) == 1 and len(pooled) == 1:
+        # agbcc's five-word pool: the fixed layout's table under the rule's pool proof
+        # (interposed_pool_switch.FIVE_WORDS); every other fixed descriptor stands.
+        from interposed_pool_switch import five_word_pool
+        placed = five_word_pool(candidates[0], pooled[0])
+        if placed is not None:
+            return placed
     return candidates[0] if len(candidates) == 1 else None
 
 

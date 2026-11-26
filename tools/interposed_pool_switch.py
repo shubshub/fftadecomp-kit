@@ -31,6 +31,17 @@ literal rules (a typed object relocation for a RAM or ROM address, a number
 otherwise).  The layout is tried only where every existing layout found no
 table, so a refinement or a link that resolves a table today is unchanged;
 `POLICY.enabled = False` restores every refusal.
+
+One exception (`FIVE_WORDS`): agbcc's five-word pool.  `match.switch_layout`
+also has a fixed layout for exactly five words behind a `bls; b` guard, which
+only the canonical-thunk switch selectors walk; the owner graph and the
+owner-switch walk have no replay for it, so an owner refinement that took it
+left the owner refused.  Where that fixed layout and this rule place the same
+table (the same guard, dispatch, pointer, table and entries), the owner
+refinement takes this rule's descriptor instead, and with it the same pool
+proof: all five words reserved as data, each read by a reached PC load and
+bound as a literal.  Refinements without the opt-in keep the fixed
+descriptor; `FIVE_WORDS.enabled = False` restores it under the opt-in too.
 """
 
 NAME = 'interposed-pool-word-switch-v1'
@@ -45,6 +56,29 @@ class Policy:
 
 
 POLICY = Policy()
+
+
+class FiveWords:
+    """agbcc's five-word pool takes this rule's proof in the owner refinement."""
+    enabled = True
+
+
+FIVE_WORDS = FiveWords()
+# The descriptor keys both layouts derive from the bytes; they must agree before the rule's replaces the fixed one.
+TABLE_KEYS = ('comparison', 'guard', 'dispatch', 'default', 'literal', 'table', 'bound', 'relocations')
+
+
+def five_word_pool(fixed, placed):
+    """This rule's descriptor for the table the fixed five-word layout found, or None.
+
+    fixed is the one fixed-layout candidate of a dispatch; placed the one
+    descriptor this rule derived for the same dispatch.
+    """
+    if not (POLICY.enabled and FIVE_WORDS.enabled) or fixed.get('interposed_words') != 5 or \
+            'pool_policy' in fixed or not marked(placed) or placed.get('interposed_words') != 5 or \
+            any(fixed.get(key) != placed.get(key) for key in TABLE_KEYS):
+        return None
+    return placed
 
 
 def pool_words(address, descriptor):

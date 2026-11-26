@@ -2478,6 +2478,26 @@ The rule carries no premise. A refinement or link that finds a table today is
 unchanged, and `interposed_pool_switch.POLICY.enabled = False` restores every
 refusal.
 
+One table found today does change, and only under the opt-in: agbcc's
+five-word pool. `match.switch_layout` has a fixed layout for exactly five
+words behind a `bls; b` guard, which only the canonical-thunk switch selectors
+walk. The owner graph and the owner switch have no replay for it, so an owner
+refinement that took it left the owner refused:
+
+```
+owner switch requires one guarded table without scalar words
+```
+
+Where that fixed layout and this rule place the same table (the same compare,
+guard, dispatch, default, pointer, table, bound and entries, with five words
+on both sides), the owner refinement takes this rule's descriptor, with the
+same per-word proof and the same report clause (`table behind its 5-word
+literal pool`). A five-word pool word that no reached load reads still
+refuses, and so does a pointer that does not name the next word. Refinements
+without the opt-in keep the fixed descriptor, so the selectors that walk it
+are unchanged. `interposed_pool_switch.FIVE_WORDS.enabled = False` restores
+the fixed descriptor under the opt-in too.
+
 ### Function literals with bounded buffer calls
 
 The separate `elf-symbol-thumb-function-buffer-calls-v1` profile composes the

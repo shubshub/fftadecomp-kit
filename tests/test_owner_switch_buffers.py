@@ -184,12 +184,18 @@ class OwnerSwitchTests(unittest.TestCase):
     # Obligation 2: exactly one guarded table, no scalar words.
 
     def test_one_table_without_scalar_words(self):
-        # agbcc's five-word interposed pool layout is refined, then refused here.
+        # agbcc's five-word interposed pool layout is refined, then refused here. Under the
+        # interposed-pool rule's five-word case (test_five_word_pool_switch) the refinement takes
+        # that rule's proof instead, and these five words, which nothing loads, fail it.
+        import interposed_pool_switch as pool_rule
         pool = self.fixture(guard='bls dispatch\nb default',
                             words=''.join(f'word{n}: .word {n + 1}\n' for n in range(5)))
         switch, = self.refinement(pool)['word_switches']
         self.assertEqual(switch.get('interposed_words'), 5)
-        with self.assertRaisesRegex(ValueError, 'owner switch requires one guarded table without scalar words'):
+        with self.assertRaisesRegex(ValueError, 'structural inventory is not closed'):
+            self.walk(pool, calls={}, linked=dict(switch['relocations']))
+        with patch.object(pool_rule.FIVE_WORDS, 'enabled', False), self.assertRaisesRegex(
+                ValueError, 'owner switch requires one guarded table without scalar words'):
             self.walk(pool, calls={}, linked=dict(switch['relocations']))
         # No table at all.
         straight = self.fixture(body='push {lr}\nsub sp, #8\nmov r0, sp\nbl callee\nadd sp, #8\npop {r1}\nbx r1')
