@@ -330,9 +330,15 @@ class Insn:
         self.index = index
         self.pattern = form[4] if self.code in ("insn", "jump_insn", "call_insn") else None
         self.deleted = self.code == "note" and "NOTE_INSN_DELETED" in form[4:]
+        # the head's flags (a code_label's `/s` is LABEL_PRESERVE_P), and a code_label's number, which the
+        # assembly prints as `.L<number>`
+        self.flags = rtl_flags(form)
+        self.number = int(form[4]) if self.code == "code_label" and len(form) > 4 and str(form[4]).isdigit() \
+            else None
         # REG_EQUAL / REG_EQUIV: the value the insn's single destination holds after it
         self.equal = None
         notes = form[7] if self.pattern is not None and len(form) > 7 else None
+        self.notes = notes
         while code(notes) in ("expr_list", "insn_list"):
             if rtl_mode(notes) in ("REG_EQUAL", "REG_EQUIV") and self.equal is None:
                 self.equal = notes[1]

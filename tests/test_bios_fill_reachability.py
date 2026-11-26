@@ -14,6 +14,7 @@ dump does not bound (a computed goto, a tablejump with no table, a label value,
 a call that may return twice) refuses rather than drop its edges.
 """
 from pathlib import Path
+import re
 import sys
 import tempfile
 import unittest
@@ -171,6 +172,32 @@ class RtlTests(unittest.TestCase):
             fill.fills(function(arms()[:2] + [setjmp] + arms()[2:]))
         self.assertTrue(all(fill.returns_twice(name) for name in ("setjmp", "__sigsetjmp", "__xqsetjmp", "vfork")))
         self.assertFalse(fill.returns_twice("longjmp"))
+        # a label value from the constant pool, whose REG_EQUAL note names the label
+        pooled = (25, 'insn (set (reg:SI 49) (mem/u:SI (symbol_ref/u:SI ("*.LC1")) 0)) -1 (nil) '
+                      "(expr_list:REG_EQUAL (label_ref:SI 50) (nil))")
+        with self.assertRaisesRegex(proof.ProofError, "takes the address of label UID 50, which heads no jump table"):
+            fill.fills(function(insns[:where] + [pooled] + insns[where:]))
+        # a label gcc preserves for a nonlocal goto
+        preserved = [(uid, rest.replace("code_label ", "code_label/s ", 1) if uid == 50 else rest)
+                     for uid, rest in insns]
+        with self.assertRaisesRegex(proof.ProofError, "label UID 50 is preserved for a nonlocal goto"):
+            fill.fills(function(preserved))
+
+    def test_labels_whose_address_the_assembly_takes(self):
+        # label(6) is the table's label, number 7; its cases are labels 9 and 50, numbers 10 and 51
+        fn = function(table())
+        for taken in (set(), {7}, {7, 10, 51}):
+            with self.subTest(taken=taken):
+                (found,) = fill.fills(fn, taken)
+                self.assertEqual(found["apart"], [30])
+        for taken, shown in (({7, 61}, ".L61 (UID 60)"), ({999}, ".L999,")):
+            with self.subTest(taken=taken), self.assertRaisesRegex(
+                    proof.ProofError, re.escape("the assembly takes the address of label " + shown)):
+                fill.fills(fn, taken)
+        with self.assertRaisesRegex(proof.ProofError, r"the assembly takes the address of label \.L51 \(UID 50\)"):
+            fill.fills(function(arms()), {51})
+        self.assertEqual(fill.label_words("\tldr\tr0, .L5\n\tb\t.L3\n.L5:\n\t.word\t.L3\n\t.word\tdata_0300\n"
+                                          "\t.word\t.L7+1\n.L9:\t.word\t.L8\n\tbl\t.L4\t@ far jump\n"), {3, 7, 8})
 
 SHAPE = """void func_08000400(u16 *dest, int phase, int index, u16 value)
 {
@@ -264,6 +291,86 @@ LOOPED_TABLE = """void func_08000400(u16 *dest, int phase, int index, u16 value)
     } while (--phase < 6);
 }
 """
+STATIC_TABLE = """void func_08000400(u16 *dest, int phase, int index, u16 value)
+{
+    static void *const where[2] = { &&first, &&second };
+    u32 heights[4];
+
+    goto *where[phase & 1];
+first:
+    {
+        volatile u16 fill = dest[8];
+        func_0814186C((const void *)&fill, dest + 0x10, 0x010000A0);
+    }
+    goto *where[1];
+second:
+    heights[0] = 3;
+    heights[3] = 5;
+    dest[0] = heights[index];
+}
+"""
+LABEL_VALUE = """extern void *data_03000100;
+
+void func_08000400(u16 *dest, int phase, int index, u16 value)
+{
+    u32 heights[4];
+
+    data_03000100 = &&second;
+    if (phase) {
+        {
+            volatile u16 fill = dest[8];
+            func_0814186C((const void *)&fill, dest + 0x10, 0x010000A0);
+        }
+        return;
+    }
+second:
+    heights[0] = 3;
+    heights[3] = 5;
+    dest[0] = heights[index];
+}
+"""
+NONLOCAL = """extern void func_08001238(void (*)(void));
+
+void func_08000400(u16 *dest, int phase, int index, u16 value)
+{
+    __label__ out;
+    u32 heights[4];
+    void inner(void) { goto out; }
+
+    if (phase) {
+        {
+            volatile u16 fill = dest[8];
+            func_0814186C((const void *)&fill, dest + 0x10, 0x010000A0);
+        }
+        func_08001238(inner);
+        return;
+    }
+    heights[0] = 3;
+out:
+    heights[3] = 5;
+    dest[0] = heights[index];
+}
+"""
+SETJMP = """extern void *data_03000100[5];
+
+void func_08000400(u16 *dest, int phase, int index, u16 value)
+{
+    u32 heights[4];
+
+    if (phase) {
+        {
+            volatile u16 fill = dest[8];
+            func_0814186C((const void *)&fill, dest + 0x10, 0x010000A0);
+        }
+        return;
+    }
+    if (__builtin_setjmp(data_03000100))
+        return;
+    heights[0] = 3;
+    heights[3] = 5;
+    dest[0] = heights[index];
+}
+"""
 COMPUTED = """void func_08000400(u16 *dest, int phase, int index, u16 value)
 {
     u32 heights[4];
@@ -333,8 +440,18 @@ class CompiledTests(unittest.TestCase):
         with self.assertRaisesRegex(proof.ProofError, "frame reference with no constant offset on a path to or "
                                                       "from the fill"):
             self.run_fill(LOOPED_TABLE)
-        with self.assertRaisesRegex(proof.ProofError, "the proof cannot bound"):
-            self.run_fill(COMPUTED)
+        for source in (COMPUTED, STATIC_TABLE):
+            with self.subTest(source=source.splitlines()[2]), \
+                    self.assertRaisesRegex(proof.ProofError, "the proof cannot bound"):
+                self.run_fill(source)
+
+    def test_labels_reached_from_outside_the_graph_refuse(self):
+        # a label value with no computed jump, a nonlocal goto's target, a __builtin_setjmp receiver
+        for source, reason in ((LABEL_VALUE, r"the assembly takes the address of label \.L\d+ \(UID \d+\)"),
+                               (NONLOCAL, "is preserved for a nonlocal goto"),
+                               (SETJMP, r"the assembly takes the address of label \.L\d+")):
+            with self.subTest(source=source.splitlines()[0]), self.assertRaisesRegex(proof.ProofError, reason):
+                self.run_fill(source)
 
 
 ARMS = """void func_08000200(u16 *dest, int phase, int index)
