@@ -82,8 +82,13 @@ class FrameHookTests(unittest.TestCase):
         proof._function_exit_kind = "other"
         self.assertEqual(function_exit.aliases(proof, data, A, RETURN, dict(held)), held)
         proof, data = frame()
-        for register in (R + 0, R + 1):
-            self.assertEqual(function_exit.aliases(proof, data, A, RETURN, {register: -20}), {register: -20})
+        self.assertEqual(function_exit.aliases(proof, data, A, RETURN, {R + 0: -20}), {R + 0: -20})
+        # R1 is the frame result r1 rule's: without the ROM's caller evidence it refuses, saying why.
+        import frame_result_r1_profile as frame_r1
+        with patch.object(frame_r1.POLICY, "enabled", False):
+            self.assertEqual(function_exit.aliases(proof, data, A, RETURN, {R + 1: -20}), {R + 1: -20})
+        with self.assertRaisesRegex(ValueError, r"escapes through a return register \(R1: "):
+            function_exit.aliases(proof, data, A, RETURN, {R + 1: -20})
 
     def test_a_split_state_return_keeps_the_refusal_only_for_the_frame_owner(self):
         held = {R + 3: -20}
