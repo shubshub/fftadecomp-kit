@@ -71,6 +71,7 @@ import counted_stack_cursor_loop as counted_cursor
 import split_join_profile as split_join
 import released_scratch_profile as released_scratch
 import iwram_image_profile as iwram_image
+import fresh_block_profile as fresh_block
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -2350,8 +2351,9 @@ def verify_function_addresses(data, address, rom, mapping, data_mapping, manifes
     return instructions, CALL_SUMMARY if calls else "closed leaf CFG"
 
 
-def verify_function_buffers(data, address, rom, mapping, manifest, premises=None):
-    """``premises``: the decomp's reviewed stack-index premise file, for the default retry."""
+def verify_function_buffers(data, address, rom, mapping, manifest, premises=None, fresh_blocks=None):
+    """``premises``: the decomp's reviewed stack-index premise file, for the default retry;
+    ``fresh_blocks``: its reviewed fresh-block premise file (fresh_block_profile)."""
     import default_stack_index_profile as default_index
     calls, literals = function_address_bindings(data, address, rom, mapping, None, manifest,
                                                 allow_call_thunks=True)
@@ -2360,7 +2362,7 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
 
     make_proof = lambda: FunctionBufferCallProof(
         rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True,
-        forward_slots=True)
+        forward_slots=True, fresh_blocks=fresh_blocks)
     if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     # The default retries: a variable stack index (default_stack_index_profile) or closure words
@@ -3797,7 +3799,8 @@ class BufferCallProof:
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
                  loop_replay=False, bios_wrappers=False, copy_helper_index=None,
-                 switch_callee_index=None, dead_registers=False, call_via_targets=False, forward_slots=False):
+                 switch_callee_index=None, dead_registers=False, call_via_targets=False, forward_slots=False,
+                 fresh_blocks=None):
         # Exact call-via targets (call_via_target_profile) on the default route only: its
         # constructors and their replays opt in; every other route keeps the thunk refusal.
         self.call_via_targets = call_via_targets is True
@@ -3861,6 +3864,17 @@ class BufferCallProof:
             self.forward_slot_records, self.forward_trusted_calls = set(), set()
             self.forward_releases = {}          # owner call site -> owner entry-SP offsets released there
             self.forward_callee_releases = set()  # (inspected callee, its ADD SP) that released a live slot
+        if fresh_blocks is not None:
+            # fresh_block_profile: the decomp's reviewed config/fresh_block_premises.json bytes, on
+            # exactly the default route's proofs that take call-via targets (it forwards their facts).
+            if stack_arguments is not True or type(self) not in (BufferCallProof, FunctionBufferCallProof) or \
+                    self.call_via_targets is not True:
+                raise ValueError("fresh block premises require the plain or function-literal stack-argument proof "
+                                 "with call-via targets")
+        self.fresh_blocks = fresh_blocks
+        self.fresh_block_entries = fresh_block.parse(fresh_blocks)
+        self.fresh_block_checked = {}
+        self.fresh_block_uses = set()
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
@@ -3944,6 +3958,11 @@ class BufferCallProof:
         return call_via.argument_constants(constants) if call_via.active(self) else {}
 
     def extra_constant(self, instruction, data, address, constants):
+        if address in self.fresh_block_entries and fresh_block.applies(self) and call_via.active(self):
+            # A reviewed entry's stored call target, forwarded to its reload (fresh_block_profile).
+            forwarded = fresh_block.extra_constant(self, instruction, address, constants)
+            if forwarded is not None:
+                return forwarded
         return call_via.extra_constant(self, instruction, data, address, constants) \
             if call_via.active(self) else None
 
@@ -4077,16 +4096,18 @@ class BufferCallProof:
                 if self.default_forwarding else None,
                 self.store_bounds.snapshot() if self.store_bounds is not None else None,
                 self.motion_summaries.snapshot() if self.motion_summaries is not None else None,
-                (set(self.released_scratch), set(self.released_kills)), set(self.iwram_image_calls))
+                (set(self.released_scratch), set(self.released_kills)), set(self.iwram_image_calls),
+                set(self.fresh_block_uses))
 
     def _restore_ledgers(self, saved):
         snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
-            forward_snapshot, bound_snapshot, motion_snapshot, released_snapshot, image_snapshot = saved
+            forward_snapshot, bound_snapshot, motion_snapshot, released_snapshot, image_snapshot, fresh_snapshot = saved
         if bound_snapshot is not None:
             self.store_bounds.restore(bound_snapshot)
         if motion_snapshot is not None:
             self.motion_summaries.restore(motion_snapshot)
         self.iwram_image_calls = set(image_snapshot)
+        self.fresh_block_uses = set(fresh_snapshot)
         if forward_snapshot is not None:
             for ledger, values in zip((self.forward_slot_records, self.forward_trusted_calls), forward_snapshot):
                 ledger.clear()
@@ -4761,6 +4782,7 @@ class BufferCallProof:
         lines.extend(function_exit.lines(self))
         lines.extend(forwarded_slots_profile.lines(self))
         lines.extend(iwram_image.lines(self))
+        lines.extend(fresh_block.lines(self))
         lines.extend(released_scratch.lines(self))
         lines.extend(far_jump.lines(self))
         return lines
@@ -4814,6 +4836,11 @@ class BufferCallProof:
             # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
             digest.update(len(scratch).to_bytes(8, "little"))
             digest.update(scratch)
+        fresh = fresh_block.fingerprint_payload(self)
+        if fresh is not None:
+            # Only a walk that forwarded a reviewed fresh-block word adds the entry it relied on.
+            digest.update(len(fresh).to_bytes(8, "little"))
+            digest.update(fresh)
         image = iwram_image.fingerprint_payload(self)
         if image is not None:
             # Only a walk that called into the boot IWRAM image adds its evidence and premise.
@@ -7637,7 +7664,8 @@ def main():
                             verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                                 data_buffer.prove(got, addr, rom, mapping, data_mapping, calls,
                                                   data_relocations, function_relocations,
-                                                  index=empty_index, premises=default_index.snapshot(ROOT))
+                                                  index=empty_index, premises=default_index.snapshot(ROOT),
+                                                  fresh_blocks=fresh_block.snapshot(ROOT))
                         else:
                             # The buffer proof binds a call-via call by its canonical thunk name (T1);
                             # a manifest without one is the frameless proof's, unchanged.
@@ -7646,7 +7674,8 @@ def main():
                                                     if value == target), f"func_{target:08X}")]
                                 for site, target in sorted(calls.items())])
                             verified_instructions, buffer_proof = verify_function_buffers(
-                                got, addr, rom, mapping, buffer_manifest, default_index.snapshot(ROOT))
+                                got, addr, rom, mapping, buffer_manifest, default_index.snapshot(ROOT),
+                                fresh_block.snapshot(ROOT))
                             address_manifest = buffer_manifest
                     except ValueError as buffer_error:
                         raise ValueError(f"{address_error}; "
@@ -7683,11 +7712,14 @@ def main():
                     fills_for = lambda proof: walk_fills.setdefault(
                         id(proof), (proof, dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT))
                                     if dma_fills is not None else None))[1]
+                    # The reviewed fresh-block entries go only where call-via targets do (fresh_block_profile).
+                    default_route = default_call_route(args, unit_context)
                     stack_buffer_proof = lambda: BufferCallProof(
                         rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
                         switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True,
-                        call_via_targets=default_call_route(args, unit_context), forward_slots=True)
+                        call_via_targets=default_route, forward_slots=True,
+                        fresh_blocks=fresh_block.snapshot(ROOT) if default_route else None)
                     # A frame-buffer owner's R2/R3 exit scratch (function_literal_exit_scratch_profile).
                     stack_buffer_walk = lambda proof: function_exit.walk(
                         proof, got, addr, mapping, lambda: verify_leaf_instructions(
@@ -7714,7 +7746,8 @@ def main():
                         data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
                                           index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills,
                                           premises=default_index.snapshot(ROOT),
-                                          store_bound_premises=store_bound.snapshot(ROOT))
+                                          store_bound_premises=store_bound.snapshot(ROOT),
+                                          fresh_blocks=fresh_block.snapshot(ROOT))
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:

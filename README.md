@@ -2010,6 +2010,41 @@ into its buffer fingerprint. A report without such a call keeps its lines and
 fingerprint. `iwram_image_profile.POLICY` gates the rule; synthetic boundaries
 are in `tests/test_iwram_image.py`.
 
+### A call target stored into a freshly allocated block
+
+`0x08005954` (task creation) takes a block from the arena allocator
+`0x08007138`, stores the task's callback into the block's word 0 and reloads
+it for a `_call_via_r3` call that passes its own frame. Eight stores between
+the store and the reload go through other registers, so the walk cannot show
+that word 0 still holds the callback, and the call refused.
+
+That none of them reaches word 0 is a game-state premise, admitted only
+through a reviewed entry in the decomp's `config/fresh_block_premises.json`
+(`fresh_block_profile`, only on the plain and function-literal
+stack-argument proofs that take call-via targets, and only where they do).
+An entry names the function and, per row, the allocator call, the register
+the result is copied into, the store and the reload (a word at the same
+offset) and every other memory write between them. The kit checks each row
+against the function's bytes and refuses the entry when anything differs:
+- the function has no far jump (a `bl` into its own span), the copy of the
+  allocator's result is reached only from the call, and neither the store
+  nor the reload lies on a loop;
+- every path to the reload passes the store, and every path to the store
+  passes the copy of the allocator's result, which only a call may write
+  before the store;
+- no call, SWI or register branch lies between the store and the reload,
+  and the base register is not written there;
+- a store through the base there misses the stored word (checked, not
+  premised);
+- the other writes there are exactly the entry's list.
+
+With a valid entry, both walks carry the exact call-target fact the stored
+register held at the store to the reloaded register (a store of a value with
+no fact leaves none); nothing else changes.
+A report that relied on it prints the row and the review text verbatim on
+one `* buffer fresh block premise:` line and binds both into its buffer
+fingerprint. Synthetic boundaries are in `tests/test_fresh_block_premises.py`.
+
 ### GBA BIOS wrappers in plain buffer walks
 
 The plain register and stack buffer proofs (`elf-symbol-thumb-frame-buffer-calls-v1`
