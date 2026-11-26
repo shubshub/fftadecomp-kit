@@ -36,7 +36,13 @@ switch_callee_profile):
    default arm: agbcc's `bls dispatch; bl default` guard, a same-owner BL the
    layout already recognizes.  The walk takes it as a jump that loses LR (no
    call ABI, no continuation), so every later return must still come from the
-   saved entry LR; the report line states the arm (FAR_DEFAULT);
+   saved entry LR; the report line states the arm (FAR_DEFAULT).  When the
+   default block is the owner's shared tail, agbcc reaches it with a far BL
+   from elsewhere in the owner too (a `return 1` beyond a narrow branch's
+   reach, from a case or from before the switch).  Every same-owner BL to that
+   target, wherever it sits, is walked the same way when every same-owner BL
+   targets the guard arm's own target and the guard's BL is one of them
+   (SHARED_FAR_DEFAULT); a far BL to any other block still refuses;
 4. the linked object's switch relocations and direct calls are exactly those the
    ROM bytes give (`owner switch differs from its linked relocations`);
 5. the walk re-derives the layout from those table words (`match.switch_layout`:
@@ -75,6 +81,19 @@ class FarDefault:
 
 
 FAR_DEFAULT = FarDefault()
+# Further same-owner BLs to the far default arm's own target (the owner's shared tail).
+SHARED_FAR_DEFAULT_NAME = 'guarded-switch-shared-far-default-v1'
+SHARED_FAR_DEFAULT_RULE = ('shared far default ({name}): same-owner BLs at {sites} to 0x{target:08X}, the guard '
+                           'arm\'s own target, each taken as a jump that loses LR; every return re-proved from '
+                           'the saved entry LR')
+
+
+class SharedFarDefault:
+    """Further same-owner BLs to the far default's target; False keeps the guard's arm only."""
+    enabled = True
+
+
+SHARED_FAR_DEFAULT = SharedFarDefault()
 # The plain switch-data manifests (one or several typed objects); every other switch
 # policy keeps its own walk and refusal.
 PLAIN_FIELDS = frozenset(('calls', 'switch', 'data', 'data_policy'))
@@ -86,16 +105,20 @@ def require(condition, message):
 
 
 def far_default(switch, address, branches):
-    """{site: target} of the switch's own far default BL, the only local BL an owner switch takes.
+    """{site: target} of the switch's own far default BL and of every other BL to that target.
 
-    branches are the owner graph's same-owner BL edges; any other local BL refuses.
+    branches are the owner graph's same-owner BL edges.  The guard's BL to the layout's
+    default must be one of them; any BL to another block refuses.  More than one edge
+    needs SHARED_FAR_DEFAULT.
     """
     if not branches:
         return {}
+    branches = dict(branches)
     site, target = address + switch['guard'] + 2, address + switch['default']
     require(FAR_DEFAULT.enabled and switch['dispatch'] - switch['comparison'] == 8 and
-            dict(branches) == {site: target}, 'owner switch excludes local BL control')
-    return {site: target}
+            branches.get(site) == target and set(branches.values()) == {target} and
+            (len(branches) == 1 or SHARED_FAR_DEFAULT.enabled), 'owner switch excludes local BL control')
+    return branches
 
 
 class OwnerSwitch:
@@ -140,10 +163,15 @@ class OwnerSwitch:
             successors=list(edges[transfer]),
             table_words_sha256=hashlib.sha256(b''.join(
                 data[offset:offset + 4] for offset in sorted(words))).hexdigest())
-        if self.branches:
+        if len(self.branches) == 1:
             # Only an owner whose switch has the far default arm carries this key.
             (site, target), = self.branches.items()
             self.record['far_default'] = dict(policy=FAR_DEFAULT_NAME, site=site, target=target)
+        elif self.branches:
+            # An owner that reaches the same target by further far BLs carries this key instead.
+            target, = set(self.branches.values())
+            self.record['shared_far_default'] = dict(policy=SHARED_FAR_DEFAULT_NAME, target=target,
+                                                     sites=sorted(self.branches))
         self.cursor = None
         from menu_local_cursor import OWNER, END, MenuCursor
         if plain and address == OWNER and address + len(data) == END:
@@ -167,6 +195,10 @@ class OwnerSwitch:
         if 'far_default' in record:
             arm = record['far_default']
             detail += '; ' + FAR_DEFAULT_RULE.format(name=arm['policy'], site=arm['site'], target=arm['target'])
+        if 'shared_far_default' in record:
+            arm = record['shared_far_default']
+            detail += '; ' + SHARED_FAR_DEFAULT_RULE.format(
+                name=arm['policy'], target=arm['target'], sites=', '.join(f'0x{site:08X}' for site in arm['sites']))
         return [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
                 f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
                 f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']

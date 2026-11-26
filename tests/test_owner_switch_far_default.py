@@ -76,9 +76,12 @@ class FarDefaultTests(pool_tests.PoolFixture):
             with self.subTest(name=name), self.assertRaisesRegex(ValueError, 'owner switch excludes local BL control'):
                 self.walk(self.fixture(**change))
 
-    def test_a_case_bl_to_the_default_is_no_arm(self):
-        # Under the far guard, a case that also reaches the default by BL: only the guard's BL is the arm.
-        with self.assertRaisesRegex(ValueError, 'owner switch excludes local BL control'):
+    def test_a_second_bl_to_the_default_needs_the_shared_rule(self):
+        # Under the far guard, a case that also reaches the default by BL: only the guard's BL is this
+        # arm.  The shared far default walks the second BL too (test_owner_switch_shared_far_default);
+        # without it the owner refuses, as on kit main.
+        with patch.object(owner_switch.SHARED_FAR_DEFAULT, 'enabled', False), \
+                self.assertRaisesRegex(ValueError, 'owner switch excludes local BL control'):
             self.walk(self.fixture(guard=FAR, case1='movs r0, #1\nbl default'))
 
     def test_a_bounded_index_leaf_takes_no_arm(self):
