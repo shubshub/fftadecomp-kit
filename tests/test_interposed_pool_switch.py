@@ -148,10 +148,12 @@ class RefinementTests(PoolFixture):
                         self.assertEqual(A + switch['comparison'], f['symbols']['dispatch'] - size)
 
     def test_a_table_found_today_is_unchanged(self):
-        # The adjacent table and agbcc's five-word pool keep their own descriptors byte for byte.
-        for name, change in (('adjacent', dict(loads='', words='')),
-                             ('five words', dict(loads='', words=''.join(f'w{n}: .word {n}\n' for n in range(5))))):
-            with self.subTest(name=name):
+        # The adjacent table keeps its descriptor byte for byte. agbcc's five-word pool keeps
+        # it without the opt-in; under it, test_five_word_pool_switch covers FIVE_WORDS.
+        five = dict(loads='', words=''.join(f'w{n}: .word {n}\n' for n in range(5)))
+        for name, change, five_words in (('adjacent', dict(loads='', words=''), True),
+                                         ('five words', five, False)):
+            with self.subTest(name=name), patch.object(pool.FIVE_WORDS, 'enabled', five_words):
                 f = self.fixture(**change)
                 self.assertEqual(self.refine(f), self.refine(f, interposed_pool_switch=True))
                 self.assertNotIn('pool_policy', self.refine(f)['word_switches'][0])
