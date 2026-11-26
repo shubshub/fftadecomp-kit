@@ -1497,6 +1497,15 @@ class Checker:
                 """A frame word written: the range its push recorded no longer holds."""
                 constants.pop(SAVED + word, None)
 
+            def unknown_words():
+                """KNOWN mode does not follow the frame addresses that code it does not walk is
+                given, so after such code any frame word may hold something else: the value a
+                push or store gave it is no longer known.  A pushed word too: hand-written code can
+                hand its address on (``push {r1}; mov r0, sp``), and a callee may write the stack
+                argument words at SP, where a push in mid-function puts it."""
+                for key in [key for key in constants if key >= SAVED - INF]:
+                    del constants[key]
+
             def indexed(kind, matters, span):
                 """The words an access at an unknown frame offset may reach, under the premise that
                 an access through a variable index into a stack array stays inside that array:
@@ -2706,6 +2715,8 @@ class Checker:
                 # saved is (that code does not write pushed words).
                 for key in [key for key in constants if key < SAVED - INF]:
                     del constants[key]
+                if mode == KNOWN:
+                    unknown_words()
                 forget_below_sp()
                 if destination is not None and not decodable(function, site + 4) and \
                         (self.isolation(destination) or (0, 0, True))[2] is False:
@@ -2912,6 +2923,8 @@ class Checker:
                 regs[12] = normal(regs[12] | EMPTY | handed)    # the BIOS restores IP
                 for key in [key for key in constants if key < SAVED - INF]:
                     del constants[key]
+                if mode == KNOWN:
+                    unknown_words()
                 forget_below_sp()
             elif mnemonic == "bx":
                 successors = transfer(regs[register(operands[0])])
