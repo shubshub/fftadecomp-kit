@@ -8,7 +8,8 @@ already proved by `GuardedSwitchBufferProof.inspect`
 and its relatives.
 
 This module makes that same proof available to the plain stack-argument
-buffer proof of the default path, and nowhere else.  It adds no rule of its
+buffer proof of the default path and to its function-literal twin
+(FunctionBufferCallProof, built by data_buffer_profile), and nowhere else.  It adds no rule of its
 own: when `analyze.refine_function` finds a word switch in an inspected
 callee, inspection is delegated to an unchanged `GuardedSwitchBufferProof`
 built on the same ROM, mapping and index, as `NamedDataBufferProof.inspect`

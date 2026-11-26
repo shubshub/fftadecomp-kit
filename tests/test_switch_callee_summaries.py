@@ -102,12 +102,19 @@ class SwitchCalleeTests(unittest.TestCase):
         self.assertEqual(proof.fingerprint(), before)
 
     def test_only_the_plain_stack_argument_proof_takes_switch_callees(self):
+        # The plain and the function-literal stack-argument proofs take them; any other
+        # subclass, or a proof without stack arguments, refuses.
         f = self.switch_fixture()
+
+        class Other(match.BufferCallProof):
+            pass
         for build in (lambda: match.BufferCallProof(f['rom'], f['mapping'], switch_callee_index=f['index']),
-                      lambda: match.FunctionBufferCallProof(f['rom'], f['mapping'], stack_arguments=True,
-                                                            switch_callee_index=f['index'])):
-            with self.assertRaisesRegex(ValueError, 'switch callees require the plain stack-argument buffer proof'):
+                      lambda: Other(f['rom'], f['mapping'], stack_arguments=True, switch_callee_index=f['index'])):
+            with self.assertRaisesRegex(ValueError, 'switch callees require the plain or function-literal '
+                                                    'stack-argument buffer proof'):
                 build()
+        self.assertIsNotNone(match.FunctionBufferCallProof(f['rom'], f['mapping'], stack_arguments=True,
+                                                           switch_callee_index=f['index']).switch_callees)
         proof = self.prove(f)
         other = match.BufferCallProof(f['rom'], f['mapping'], stack_arguments=True, switch_callee_index=f['index'])
         callee = f['rom'][B - match.ROM_BASE:B - match.ROM_BASE + 64]

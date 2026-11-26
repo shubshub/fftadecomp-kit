@@ -553,12 +553,20 @@ class WalkTests(unittest.TestCase):
                                       site=OWNER + 8, words={})
 
     def test_only_the_plain_stack_argument_proof_takes_summaries(self):
+        # The plain and the function-literal stack-argument proofs take them; any other
+        # subclass, or a proof without stack arguments, refuses.
         env = environment(owner())
+
+        class Other(match.BufferCallProof):
+            pass
         for build in (lambda: match.BufferCallProof(env['rom'], env['mapping'], copy_helper_index=env['index']),
-                      lambda: match.FunctionBufferCallProof(env['rom'], env['mapping'], stack_arguments=True,
-                                                            copy_helper_index=env['index'])):
-            with self.assertRaisesRegex(ValueError, 'copy summaries require the plain stack-argument buffer proof'):
+                      lambda: Other(env['rom'], env['mapping'], stack_arguments=True,
+                                    copy_helper_index=env['index'])):
+            with self.assertRaisesRegex(ValueError, 'copy summaries require the plain or function-literal '
+                                                    'stack-argument buffer proof'):
                 build()
+        self.assertIsNotNone(match.FunctionBufferCallProof(env['rom'], env['mapping'], stack_arguments=True,
+                                                           copy_helper_index=env['index']).copy_summaries)
 
     def test_identical_helper_elsewhere_is_walked(self):
         with self.assertRaisesRegex(ValueError, f'buffer callee 0x{FAKE:08X}: unsupported buffer pointer use or escape'):

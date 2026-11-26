@@ -7,9 +7,11 @@ routine is not in the ROM.  This module replaces that walk, for eight exact
 indexed wrappers, by a summary whose behaviour is a stated premise, as in every
 existing BIOS contract, and whose memory spans are proved from the owner's own
 code.  It is constructed by the plain path (`BufferCallProof(...,
-bios_wrappers=True)`) and by the restoring owner (`owner_runtime_profile.verify`),
-which binds its complete owner CFG first (`bind_owner`) so that each memory call
-is discharged where its frame proof makes it; no subclass uses it.
+bios_wrappers=True)`), by its function-literal twin (`FunctionBufferCallProof`,
+built by data_buffer_profile for callers with function literals) and by the
+restoring owner (`owner_runtime_profile.verify`), which binds its complete owner
+CFG first (`bind_owner`) so that each memory call is discharged where its frame
+proof makes it; no other subclass uses it.
 
 Identity: the call is an actual direct BL site; the target is one of the
 entries below; `BufferCallProof.span` gives its complete, unique,

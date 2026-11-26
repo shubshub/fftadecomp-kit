@@ -795,19 +795,25 @@ class BiosWrapperSummaryTests(unittest.TestCase):
                                                     discarded_exit_scratch={})):
             with self.subTest(options=options), self.assertRaises(ValueError):
                 match.BufferCallProof(self.rom, self.mapping, **options)
-        with self.assertRaisesRegex(ValueError, "require the plain buffer proof"):
-            match.FunctionBufferCallProof(self.rom, self.mapping, bios_wrappers=True)
+        # The function-literal twin takes them (data_buffer_profile's FUNCTION_SCHEMA path); any
+        # other subclass refuses.
+        self.assertIsNotNone(match.FunctionBufferCallProof(self.rom, self.mapping, bios_wrappers=True).bios_summaries)
+
+        class Other(match.BufferCallProof):
+            pass
+        with self.assertRaisesRegex(ValueError, "require the plain or function-literal buffer proof"):
+            Other(self.rom, self.mapping, bios_wrappers=True)
         import local_long_branch_profile as scratch
         policy = dict(schema=scratch.DISCARDED_SCRATCH_SCHEMA, registers=[2, 3])
         match.BufferCallProof(self.rom, self.mapping, discarded_exit_scratch=policy)
-        with self.assertRaisesRegex(ValueError, "require the plain buffer proof"):
+        with self.assertRaisesRegex(ValueError, "require the plain or function-literal buffer proof"):
             match.BufferCallProof(self.rom, self.mapping, discarded_exit_scratch=policy, bios_wrappers=True)
         import bios_cpuset_fill_profile as fill_profile
         # A fill proof the base constructor accepts (its owner graph is not needed here).
         fill_proof = object.__new__(fill_profile.BiosFillProof)
         fill_proof.rom, fill_proof.mapping = self.rom, self.mapping
         match.BufferCallProof(self.rom, self.mapping, bios_fill_proof=fill_proof)
-        with self.assertRaisesRegex(ValueError, "require the plain buffer proof"):
+        with self.assertRaisesRegex(ValueError, "require the plain or function-literal buffer proof"):
             match.BufferCallProof(self.rom, self.mapping, bios_fill_proof=fill_proof, bios_wrappers=True)
         proof = match.BufferCallProof(self.rom, self.mapping, bios_wrappers=True)
         stack = [(False, False, True)] * 2
@@ -925,6 +931,7 @@ class BiosWrapperSummaryTests(unittest.TestCase):
                         found.append((path.name, function.name, name, keyword.value.value))
         self.assertEqual(sorted(found), [
             ("data_buffer_profile.py", "prove", "BufferCallProof", True),
+            ("data_buffer_profile.py", "prove", "FunctionBufferCallProof", True),
             ("function_thunk_profile.py", "verify_source", "BufferCallProof", True),
             ("match.py", "main", "BufferCallProof", True), ("match.py", "main", "BufferCallProof", True),
             ("match_evidence.py", "buffer_report_matches", "BufferCallProof", True),

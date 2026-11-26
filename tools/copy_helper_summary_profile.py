@@ -8,7 +8,9 @@ that does not summarise it (`named-data-buffer-rom-table-copy-v1` and the
 stack-index selectors do, for constant ROM sources and counts up to 15).
 
 This module summarises such a call in the plain stack-argument buffer proof of
-the default path, and nowhere else.  It applies in every walk of a function's
+the default path and in its function-literal twin (FunctionBufferCallProof,
+built by data_buffer_profile for callers with function literals), and nowhere
+else.  It applies in every walk of a function's
 own frame that the proof runs (the owner's, and the frame walk of each inspected
 callee), at a direct `bl` to the helper with a tracked local alias in R0 or R1:
 
