@@ -2129,6 +2129,32 @@ target and every site), bound into the fingerprint, and the line says:
 `owner_switch_buffer_profile.SHARED_FAR_DEFAULT.enabled = False` keeps the
 guard's arm only.
 
+On a path that returns early, agbcc can leave the address of a local in R2 or
+R3 (the base it used for the local's stores). The owner switch's walk refused
+that at the return (`local stack pointer escapes through a return register`).
+At the plain owner's own normal returns it now drops such an address, one
+inside the owner's expired frame, and records it, under the premise the kit
+already states at other roots (`thumb-discarded-exit-scratch-v1`): R2/R3 carry
+no results under the agbcc Thumb ABI, so no caller reads them. That is a
+premise about the callers, not checked, and every report that uses it states
+it. R0/R1, every callee return, every other register and every address outside
+the expired frame keep the refusal, and so does a walk that kept any join
+apart (`stack-split-join-v1`), on any register: its split states can reach one
+return with different R2/R3 offsets, directly or copied from a split R12 (which
+the return check exempts), so the owner is refused rather than recorded with
+one of them. The record gains
+`exit_scratch` (schema, contract and every site), bound into the fingerprint
+only when a site exists, so no other record changes, and the report one line:
+
+```
+* buffer owner switch exit scratch: `thumb-discarded-exit-scratch-v1` premise, not checked: r2/r3 are discarded scratch at external returns; no result values are returned through them; own-frame addresses dropped at the owner's normal returns: `0x080ACC20 r2 -100`; R0/R1 and every callee return keep the escape refusal
+```
+
+Replay recomputes the line, so a report without it no longer replays for an
+owner that needs it, and one that states it for an owner that does not is
+refused. `owner_switch_buffer_profile.OWNER_EXIT_SCRATCH.enabled = False`
+restores the refusal.
+
 An owner without typed objects, the function-literal path, the switch-data
 selectors, and the preloaded and fixed five-word layouts keep their walk and
 message. An owner switch beside an untyped literal in the hardware window (the
