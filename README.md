@@ -5997,9 +5997,11 @@ again on the preprocessed text.
 
 The semantic check then needs that argument register to hold exactly the
 object's address (offset 0) at that call. Another argument register must hold the
-object's size as a constant, so the callee is handed the whole object: a copy out
-of it, a copy back into it, or a clear (#375 items 1 and 3). The record prints
-each such argument, with its byte count. What
+object's size as a constant, as a copy out of it, a copy back into it or a clear
+passes it (#375 items 1 and 3). Which argument is the count, and what the callee
+does with the object, is not checked: the callee's accesses are not this
+function's, and the call stays a memory barrier in all three compiles. The record
+prints each such argument, the argument that holds the size, and that limit. What
 the callee returns stays opaque: it may not become an address, a stored value, an
 argument or the return value, so the address cannot come back by another name.
 
