@@ -202,6 +202,9 @@ FAR_JUMP = "far-jump"
 # take about 0.25 MB each, 300 MB and 5 s in all.  More
 # decisions per path would not help: a loop whose exit is unknown is
 # refused at any bound, and each extra decision can double the paths.
+# kit#375, rule T: match.py sets the compiler's memcpy binding that the copy80 route authenticated
+# ({"helper": address, "site": address, "selector": name}); without it memcpy stays untyped
+COMPILER_COPY = contextvars.ContextVar("compiler_copy_binding", default=None)
 # kit#375, rule U: the signatures key of a callee's `void *` parameter indices
 VOID_POINTERS = "void-pointer-parameters"
 MAX_PATHS = 1024
@@ -1896,6 +1899,9 @@ class Executor:
             record.whole_object = (f"`&{self.symbol}` (+0x0, {self.size:#x} bytes in argument {counts[0] + 1}) "
                                    f"as the void-pointer argument {position + 1} of {callee} at instruction "
                                    f"{record.index + 1}")
+            if target == "memcpy" and COMPILER_COPY.get() is not None and position == 1:
+                # kit#375, rule T: the save `copy = symbol`, a typed copy at the destination
+                record.copy_destination = arguments[0]
         self.escape(arguments, text)
         if self.frame is not None:
             # an unnamed argument register the callee may read can hand it a frame address too
@@ -2824,6 +2830,10 @@ def read_modify_write_store(records, position, address, width):
     return None
 
 
+class TypedCopies(list):
+    """kit#375, rule T: the typed copies of the object and their premise, a tagged result part"""
+
+
 class StoredTestRereads(list):
     """kit#375, rule R4: the stored-value test re-reads, a tagged result part"""
 
@@ -3248,6 +3258,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     whole = set()           # kit#375, rule U: the admitted whole-object arguments
     reloads = set()         # kit#165: dead loads whose window holds a spill reload
     tests = set()           # kit#375, rule R4: stored-value test re-reads
+    copies = set()          # kit#375, rule T: the typed copies
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3259,6 +3270,13 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 indirect.add(call.indirect)
             if getattr(call, "whole_object", None):
                 whole.add(call.whole_object)
+            if getattr(call, "copy_destination", None) is not None:
+                binding = COMPILER_COPY.get()
+                copies.add(f"`{symbol}` saved to {show(call.copy_destination)} by the compiler's memcpy at "
+                           f"instruction {call.index + 1}, bound to func_{binding['helper']:08X} by "
+                           f"{binding['selector']}; premise: the copy at {show(call.copy_destination)} is read "
+                           "only by member, through this function's typed declaration (no other function, "
+                           "and no pointer this function does not derive from its base, reads it)")
         # 4. a store must not write back the value it read from the same byte
         for record in records:
             if record.kind == "store" and pinned_width(record.address) and record.self_assignment:
@@ -3464,7 +3482,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     # tagged like the tested-update re-reads, so record() finds it after the positional parts
     tail = ((WholeObjectArguments(sorted(whole)),) if whole else ()) + \
         ((SpillReloads(sorted(reloads)),) if reloads else ()) + \
-        ((StoredTestRereads(sorted(tests)),) if tests else ())
+        ((StoredTestRereads(sorted(tests)),) if tests else ()) + \
+        ((TypedCopies(sorted(copies)),) if copies else ())
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
@@ -3539,6 +3558,86 @@ def remap(expression, atom, mapping):
     return tuple(remap(part, atom, mapping) if isinstance(part, tuple) else part for part in expression)
 
 
+def copy_offset(address, copy, size):
+    """the constant offset of address inside the typed copy at copy, or None"""
+    if address is None:
+        return None
+    constant, terms = linear(address)
+    base, base_terms = linear(copy)
+    if terms != base_terms:
+        return None
+    offset = signed32(constant - base)
+    return offset if 0 <= offset < size else None
+
+
+def remap_copy(expression, copy, mapping):
+    """remap() for the typed copy at copy: `copy + pinned offset` takes its moved offset"""
+    if not isinstance(expression, tuple) or not expression:
+        return expression
+    base, base_terms = linear(copy)
+    if expression[0] == "lin" or expression == copy or (base == 0 and linear(expression)[1] == base_terms):
+        constant, terms = linear(expression)
+        if terms == base_terms and signed32(constant - base) in mapping:
+            return make_linear(base + mapping[signed32(constant - base)], terms)
+        if expression[0] != "lin":
+            return expression
+        return make_linear(constant, {remap_copy(term, copy, mapping): c for term, c in terms.items()})
+    return tuple(remap_copy(part, copy, mapping) if isinstance(part, tuple) else part for part in expression)
+
+
+def copy_accesses(records, copy, size):
+    return [(record.kind, record.width, record.address) for record in records
+            if record.kind in ("load", "store") and copy_offset(record.address, copy, size) is not None]
+
+
+def typed_copy(name, paths, symbol, size, pinned):
+    """kit#375, rule T: the one destination of the bound memcpy save of the object in
+    this function, or None; and its member rules.
+
+    Every path's saves must agree on one destination.  On every path, an access
+    inside the copy must be a load (the copy is only read) at a constant
+    offset, of exactly a pinned member at its width wherever it touches pinned
+    bytes; an address with the copy's base and another term (a variable
+    offset) is refused, and so is the copy's address in a call argument other
+    than the save, a stored value or the return value.
+    """
+    destinations = {record.copy_destination for path in paths for record in path.records
+                    if getattr(record, "copy_destination", None) is not None}
+    if not destinations:
+        return None
+    if len(destinations) != 1:
+        raise SemanticError(f"{name}: the object is copied to more than one destination")
+    copy = destinations.pop()
+    base, base_terms = linear(copy)
+    for number, path in enumerate(paths, 1):
+        for record in path.records:
+            if record.kind not in ("load", "store") or record.address is None:
+                continue
+            constant, terms = linear(record.address)
+            if terms != base_terms and all(terms.get(term) == c for term, c in base_terms.items()):
+                raise SemanticError(f"{name}: `{record.text}` reaches the typed copy at {show(copy)} at a "
+                                    f"variable offset (path {number})")
+            offset = copy_offset(record.address, copy, size)
+            if offset is None:
+                continue
+            if record.kind == "store":
+                raise SemanticError(f"{name}: `{record.text}` writes the typed copy at {show(copy)}; it is only "
+                                    f"saved from {symbol} and read by member (path {number})")
+            touched = [start for start, width in pinned.items()
+                       if start < offset + record.width and offset < start + width]
+            if touched and (touched != [offset] or pinned[offset] != record.width or record.signed):
+                raise SemanticError(f"{name}: `{record.text}` reads the typed copy at {show(copy)} other than "
+                                    f"as one pinned member at its width (path {number})")
+        for event in path.trace:
+            values = event[2] if event[0] == "call" and event[1] != "memcpy" else \
+                (event[3],) if event[0] == "store" else event[1:] if event[0] == "return" else ()
+            for value in values:
+                if isinstance(value, (int, tuple)) and copy_offset(value, copy, size) is not None:
+                    raise SemanticError(f"{name}: the typed copy's address {show(copy)} escapes in "
+                                        f"{show_event(event)} (path {number})")
+    return copy
+
+
 def object_accesses(records, atom):
     # a loop cut (volatile_loop_induction) separates the accesses of each iteration
     return [(record.kind, record.width, record.address) for record in records
@@ -3560,12 +3659,25 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
     """
     atom = ("sym", symbol)
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
+    copy = typed_copy(name, paths, symbol, size, pinned)
+
+    def moved(expression):
+        expression = remap(expression, atom, mapping)
+        return remap_copy(expression, copy, mapping) if copy is not None else expression
     for number, path in enumerate(paths, 1):
         other = replay(name, perturbed_function, signatures, "layout-perturbed", path.decisions,
                        (symbol, size, pinned), interfaces)
         mine = [(kind, width, remap(address, atom, mapping))
                 for kind, width, address in object_accesses(path.records, atom)]
         theirs = object_accesses(other.records, atom)
+        if copy is not None:
+            # kit#375, rule T: every access of the typed copy follows its member as the object's do
+            mine_copy = [(kind, width, moved(address)) for kind, width, address in copy_accesses(path.records,
+                                                                                                 copy, size)]
+            if mine_copy != copy_accesses(other.records, copy, size):
+                raise SemanticError(f"{name}: an access to the typed copy at {show(copy)} does not follow its "
+                                    f"member when the pinned members move (path {number}); the copy may only "
+                                    "be read through its own members")
         if mine != theirs:
             index = next((i for i, (a, b) in enumerate(zip(mine, theirs)) if a != b),
                          min(len(mine), len(theirs)))
@@ -3580,8 +3692,8 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
                 f"{show(real_access[2]) if real_access else 'none'}, perturbed "
                 f"{show(theirs[index][2]) if index < len(theirs) else 'none'}); a pinned member may "
                 "only be reached through its own name")
-        if [remap(c, atom, mapping) for c in path.conditions] != other.conditions or \
-                [remap(e, atom, mapping) for e in path.trace] != other.trace:
+        if [moved(c) for c in path.conditions] != other.conditions or \
+                [moved(e) for e in path.trace] != other.trace:
             raise SemanticError(f"{name}: the layout-perturbed compile behaves differently (path "
                                 f"{number}); the source depends on where the pinned members are")
     return len(paths)
@@ -3637,7 +3749,8 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
     from plausible import (declaration_fragments, member_provenance, strip_comments_and_strings,
-                           table_void_pointer_parameters, typed_pointer_sites, void_pointer_parameters,
+                           table_void_pointer_parameters, typed_copy_sites, typed_pointer_sites,
+                           void_pointer_parameters,
                            whole_object_sites, whole_object_uses)
     code = translation_unit(preprocessed)
     # the member checks read the literals blanked to spaces, not to `0`: a
@@ -3647,7 +3760,10 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     # are the only whole-object uses, read against the unit's own prototypes
     fragments = declaration_fragments(plain)
     # rule P: one typed pointer to the object, bound once to its address
-    typed_admitted, _, typed_findings = typed_pointer_sites(plain, symbol, declaration, fragments)
+    typed_admitted, typeofs, typed_findings = typed_pointer_sites(plain, symbol, declaration, fragments)
+    if not typeofs:
+        # rule T: one typed copy in a struct member (typed_copy_sites)
+        typed_admitted, _, typed_findings = typed_copy_sites(plain, symbol, declaration)
     admitted = {**whole_object_sites(plain, symbol, fragments), **typed_admitted}
     for _, message in typed_findings + whole_object_uses(plain, symbol, admitted) + member_provenance(
             plain, {"symbol": symbol, "declaration": declaration}, admitted):
@@ -3690,6 +3806,12 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
         signatures[(VOID_POINTERS, name)] = void_pointer_parameters(fragments, name)
     for key in [key for key in signatures if isinstance(key, tuple) and key[0] == "via"]:
         signatures[(VOID_POINTERS, key)] = table_void_pointer_parameters(fragments, key[1])
+    # kit#375, rule T: the compiler-emitted memcpy the copy80 route bound is
+    # `void *memcpy(void *, const void *, size_t)`, and only then
+    if COMPILER_COPY.get() is not None and "memcpy" in names and \
+            signatures.get("memcpy", (None, None))[1] is None:
+        signatures["memcpy"] = (True, 3)
+        signatures[(VOID_POINTERS, "memcpy")] = frozenset({0, 1})
     if perturbed_assembly is not None:
         _, mapping, _ = perturbed_declaration(declaration)
         perturbed, _ = parse_assembly(perturbed_assembly)
@@ -3728,8 +3850,9 @@ def record(symbol, results, perturbed=False):
         whole = next((part for part in extra if isinstance(part, WholeObjectArguments)), [])
         reloads = next((part for part in extra if isinstance(part, SpillReloads)), [])
         tests = next((part for part in extra if isinstance(part, StoredTestRereads)), [])
+        copies = next((part for part in extra if isinstance(part, TypedCopies)), [])
         extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads,
-                                                                 StoredTestRereads))]
+                                                                 StoredTestRereads, TypedCopies))]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -3753,6 +3876,7 @@ def record(symbol, results, perturbed=False):
                      (f", whole-object arguments (kit#375): {'; '.join(whole)}" if whole else "") +
                      (f", read-modify-write windows holding a spill reload (kit#165) at "
                       f"{list(n + 1 for n in reloads)}" if reloads else "") +
+                     (f", typed copies (kit#375): {'; '.join(copies)}" if copies else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
                      (f", {loops.describe()}" if loops else "") +
                      (f", BIOS calls by their GBATEK interfaces: {'; '.join(bios)} ({BIOS_NAME}, premise: "

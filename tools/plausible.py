@@ -993,6 +993,9 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
         # kit#375, rule P: one typed pointer to the object, bound once to its address
         typed_admitted, typed_typeofs, typed_findings = ({}, set(), []) if relpath is None or \
             relpath.endswith(".h") else typed_pointer_sites(joined, symbol, entry["declaration"], fragments)
+        # rule T: one typed copy in a struct member, saved from the object and read by member
+        if not typed_typeofs and relpath is not None and not relpath.endswith(".h"):
+            typed_admitted, typed_typeofs, typed_findings = typed_copy_sites(joined, symbol, entry["declaration"])
         for typeof in re.finditer(r"\b(?:typeof|__typeof|__typeof__)\b", joined):
             if typeof.start() in typed_typeofs:
                 continue
@@ -1392,6 +1395,81 @@ def typed_pointer_sites(code, symbol, entry_declaration, fragments):
                 continue
         findings.append((tokens[n][1], f"the typed pointer `{name}` to allowlisted volatile {symbol} may only "
                          f"be used as `{name}->member` or as a whole-object void-pointer argument"))
+    return admitted, {tokens[k][1]}, findings
+
+
+ASSIGNMENTS = {"=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "++", "--"}
+
+
+def typed_copy_sites(code, symbol, entry_declaration):
+    """kit#375, rule T: (admitted symbol references, admitted typeof offsets, findings) for
+    one typed copy of the object in a struct member.
+
+    Exactly one member declaration `__typeof__(symbol) name;` (any typeof
+    spelling), first in its declaration, directly inside a `struct { ... }`
+    body.  Every later `->name` or `.name` must be one of:
+    - the save `E->name = symbol;`, a whole statement (no other assignment
+      in it), which agbcc compiles to its memcpy;
+    - the restore `symbol = E->name;`;
+    - a member read `E->name.member` of a non-array member of the
+      declaration: not assigned, incremented, indexed or called, and with no
+      `&`, `++` or `--` earlier in its statement.
+    Any other use of `name` is a finding.  Without exactly that declaration
+    nothing is admitted, and the typeof and whole-object rules refuse as
+    before.  The semantic check then ties the copy to the compiler's bound
+    memcpy and follows its members through the permuted compile.
+    """
+    tokens = [(m[0], m.start()) for m in C_TOKEN.finditer(code)]
+    words = [token for token, _ in tokens]
+    openers, enclosing = [], []
+    for k, word in enumerate(words):
+        enclosing.append(openers[-1] if openers else None)
+        if word == "{":
+            openers.append(k)
+        elif word == "}" and openers:
+            openers.pop()
+    declarations = []
+    for k, word in enumerate(words):
+        if word not in TYPEOF_WORDS:
+            continue
+        brace = enclosing[k]
+        struct_body = brace is not None and (words[brace - 1:brace] == ["struct"] or
+                                             words[brace - 2:brace - 1] == ["struct"] and
+                                             re.fullmatch(r"[A-Za-z_]\w*", words[brace - 1]))
+        shape = words[k + 1:k + 6]
+        if not struct_body or shape[:3] != ["(", symbol, ")"] or len(shape) < 5 or \
+                not re.fullmatch(r"[A-Za-z_]\w*", shape[3]) or shape[3] in C_KEYWORDS | TYPEOF_WORDS or \
+                shape[4] != ";" or words[k - 1] not in ("{", ";"):
+            return {}, set(), []
+        declarations.append(k)
+    if len(declarations) != 1:
+        return {}, set(), []
+    k = declarations[0]
+    name = words[k + 4]
+    arrays = set(re.findall(r"([A-Za-z_]\w*)\s*\[", entry_declaration))
+    members = set(re.findall(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\]\s*)?(?::\s*\w+\s*)?;", entry_declaration)) - {symbol}
+    admitted, findings = {tokens[k + 2][1]: "the typed copy's type"}, []
+    for n, word in enumerate(words):
+        if word != name or n == k + 4:
+            continue
+        start = n - 1
+        while start >= 0 and words[start] not in (";", "{", "}", ":"):
+            start -= 1
+        statement = words[start + 1:n]
+        if n > k and words[n - 1] in ("->", "."):
+            if words[n + 1:n + 4] == ["=", symbol, ";"] and not set(statement) & (ASSIGNMENTS | {"return", "?", ","}):
+                admitted[tokens[n + 2][1]] = "the typed copy's save"
+                continue
+            if words[n + 1:n + 2] == [";"] and statement[:2] == [symbol, "="] and \
+                    not set(statement[2:]) & (ASSIGNMENTS | {"return", "?", ","}):
+                admitted[tokens[start + 1][1]] = "the typed copy's restore"
+                continue
+            if words[n + 1:n + 2] == ["."] and len(words) > n + 2 and words[n + 2] in members and \
+                    words[n + 2] not in arrays and words[n + 3:n + 4] not in [[op] for op in ASSIGNMENTS] + \
+                    [["["], ["("]] and not set(statement) & {"&", "++", "--"}:
+                continue
+        findings.append((tokens[n][1], f"the typed copy `{name}` of allowlisted volatile {symbol} may only be "
+                         f"saved from it, restored to it, or read by member"))
     return admitted, {tokens[k][1]}, findings
 
 
@@ -2382,12 +2460,18 @@ def volatile_census(address, linted):
             marked = (work / "marked.i").read_bytes().decode("utf-8")
     except (OSError, ValueError, RuntimeError, ImportError, subprocess.SubprocessError) as error:
         return [(source, "volatile-census", f"the volatile census could not preprocess the source: {error}")]
-    # kit#375, rule P: the typeof of the one typed pointer to an allowlisted object, as it
-    # reaches the unit
+    # kit#375, rules P and T: the typeof of the one typed pointer to, or typed copy of, an
+    # allowlisted object, as it reaches the unit.  The shape is read for each listed entry
+    # whether or not this tree maps it (an owner replay lints a copy without the data map):
+    # it only confines the typeof, and the qualifier itself is admitted elsewhere or not at all.
     typed, view = set(), strip_comments_and_strings(real)
-    for entry in active_volatile_entries(data_symbols, volatile_allow_entries()):
+    allow = volatile_allow_entries()
+    for entry in active_volatile_entries({item.get("symbol"): item.get("address") for item in allow
+                                          if isinstance(item, dict)}, allow):
         _, offsets, problems = typed_pointer_sites(view, entry["symbol"], entry["declaration"],
                                                    declaration_fragments(view))
+        if not offsets:
+            _, offsets, problems = typed_copy_sites(view, entry["symbol"], entry["declaration"])
         if not problems:
             typed |= offsets
     return [(source, "volatile-census", message) for message in

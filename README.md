@@ -6010,6 +6010,40 @@ but such a transfer are all refused. They keep the typeof and `&` refusals.
 0812C2B8 and 08125FA8 save the block this way:
 `control = &symbol; copy(saved, control, 0x50); control->display |= 0xC00;`.
 
+One typed copy of the object in a struct member is admitted as well (kit
+#375, rule T, items 1, 2, 4 and 5). The member is declared
+`__typeof__(symbol) name;` directly inside a `struct { ... }` body; a union,
+a qualified copy or a local copy is refused, and so is a second copy. Every
+later `->name` or `.name` must be one of these:
+- the save `E->name = symbol;`, a whole statement;
+- the restore `symbol = E->name;`;
+- a member read `E->name.member` of a non-array member, which is never
+  assigned, incremented, indexed or put under `&`.
+
+agbcc compiles the save to its own `memcpy`. The semantic check types that
+call `void *memcpy(void *, const void *, size_t)` only under the
+`named-data-buffer-compiler-copy80-binding-v1` route, whose prerequisite
+authenticates it as the one call of the canonical copy helper
+`func_081443FC`. The save then passes rule U: the object's exact address as
+the source, and its size as the count.
+
+The destination becomes a typed copy, and it must be the same on every
+path of the function. The copy's pinned offsets are remapped through the
+permutation, as the object's are, so every access inside it must follow its
+member in the permuted compile. An access inside it must also:
+- be a load (the copy is only read), at a constant offset;
+- read exactly one pinned member at its width wherever it touches pinned
+  bytes.
+
+An address with the copy's base and another term (a variable offset)
+refuses. So does the copy's address in a call other than the save, in a
+stored value, or as the return value. The record names the save and prints
+the premise that no check here can prove, because the copy outlives the
+function: the copy is read only by member, through this function's typed
+declaration, and no other function (and no pointer this function does not
+derive from its base) reads it. The volatile census admits that one typeof.
+08125A5C saves the block this way and restores five members from the copy.
+
 Everything else stays refused, as before:
 - `&symbol + k`, `&symbol.member`, `(&symbol)`, `p = &symbol`;
 - a typed or missing parameter;

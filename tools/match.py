@@ -406,6 +406,33 @@ def allowlisted_volatile_semantics(root, address, args=None, runner=None, *, own
     conditional_interfaces = getattr(args, "owner_runtime_profile", None) in (
         "bounded-buffer-bios-fill-source-v1", "bounded-buffer-bios-fill-local-source-semantics-v1",
         "bounded-buffer-bios-fill-overwritten-control-stores-v1")
+    # kit#375, rule T: under the copy80 route, the compiler's memcpy is the call its
+    # prerequisite authenticates (one canonical copy-helper call, count 80)
+    copy_binding = None
+    import named_data_buffer_copy_binding_profile as copy80
+    if getattr(args, "owner_runtime_profile", None) == copy80.SELECTOR:
+        from inert_spin_profile import index_snapshot
+        if rom is None or mapping is None:
+            raise ValueError("the compiler copy binding requires the current ROM and paired indexes")
+        size = function_span(address, Path(root, "symbols/functions.txt"))
+        if size is None or size <= 0:
+            raise ValueError("the compiler copy binding requires a complete indexed owner")
+        proof = copy80.prerequisite(rom[address-ROM_BASE:address-ROM_BASE+size], address, rom, mapping,
+                                    index_snapshot(root), data_snapshot(root))
+        copy_binding = {"helper": proof["helper"]["helper"], "site": proof["call_site"],
+                        "selector": copy80.SELECTOR}
+    copies = volatile_semantics.COMPILER_COPY.set(copy_binding)
+    try:
+        return _allowlisted_volatile_compiles(root, address, args, runner, used, source, interfaces, rom,
+                                              mapping, conditional_interfaces)
+    finally:
+        volatile_semantics.COMPILER_COPY.reset(copies)
+
+
+def _allowlisted_volatile_compiles(root, address, args, runner, used, source, interfaces, rom, mapping,
+                                   conditional_interfaces):
+    """allowlisted_volatile_semantics()'s compiles and checks"""
+    records = []
     with runner.workspace() as workspace:
         diagnostics = []
         # the diagnostics are not the user's to silence: drop any -w and ask
