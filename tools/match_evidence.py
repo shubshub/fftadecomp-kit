@@ -525,7 +525,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
             rom, mapping, stack_arguments=stack_arguments, loop_replay=True, bios_wrappers=True,
             copy_helper_index=index_snapshot(root) if indexed else None,
             switch_callee_index=index_snapshot(root) if indexed else None,
-            dead_registers=stack_arguments is True, call_via_targets=stack_arguments is True)
+            dead_registers=stack_arguments is True, call_via_targets=stack_arguments is True,
+            forward_slots=stack_arguments is True)
         proof = make_proof()
         if proof.span(address) != data:
             return False

@@ -1488,7 +1488,8 @@ Nested calls receive the same known incoming slots at their shifted offsets;
 there is no assumed argument count that hides higher stack slots. Buffer reads
 or writes overlapping a pointer-bearing argument word are rejected rather than
 silently changing its meaning. Spilling an incoming buffer pointer within an
-inspected callee remains unsupported.
+inspected callee is supported only on the default stack-argument proofs, as a
+forwarded slot ("Forwarded buffer pointer slots on the default path").
 
 Version 2 also permits unshifted register-indexed byte, halfword and word
 accesses, including signed loads, when every reaching path proves the index
@@ -1706,6 +1707,59 @@ Synthetic and compiled boundaries are in `tests/test_split_joins.py`; the
 joins `tests/test_stack_argument_join_lifetime.py` used to refuse for a live
 read, a callee or a later call are now walked apart, and refused with the rule
 off.
+
+### Forwarded buffer pointer slots on the default path
+
+The default plain and function-literal stack-argument proofs (the frame-buffer
+version-2 retry, the function-buffer proof, both typed-data buffer proofs and
+their report checks) let an inspected callee store a pointer into the owner's
+frame in its own frame: as the outgoing stack argument of its own callee, as
+agbcc's coordinate wrappers pass their output pointers on (`0x080DBDC8`:
+`str r2, [sp]`, then the call), or as a spill of an incoming pointer it reloads.
+They use the slot rules of `named-data-buffer-stack-index-v2`
+(`match.BufferCallProof.forwarded_slot_step`): the store must be an aligned
+word of the callee's own allocated frame in a callee whose every SP use is
+PUSH, POP, ADD/SUB SP,#imm or an immediate-offset load or store; a reload
+yields the pointer again, a partial access or a pop of the word refuses, a
+scalar store ends the slot, and a call made while it is live walks the callee
+with it as an incoming stack argument, whose own proof refuses writing that
+word. ADD SP over a live slot leaves the pointer in memory below SP: the word
+becomes a released word, tracked until it is written, and any read of it
+refuses. `tools/forwarded_slot_profile.py` carries released words to the owner:
+
+* a released word a call hands back is kept by the owner walk at its owner
+  entry-SP offset; a later owner call the walk inspects (it passes stack
+  pointers) inherits every released word, so that callee's walk checks it too;
+  a later call it does not inspect is trusted under the recorded premise below;
+  a call that passes stack pointers but is inspected by another proof, which
+  is not told the words, refuses;
+* a PUSH writes the words it covers and ends their released words; moving SP
+  down over a released word without writing it refuses (`the owner moves SP
+  down after a callee released a forwarded pointer word`); at the owner's
+  return the released words lie below SP and are dropped;
+* the copy-helper summary hands released words back unchanged and requires the
+  pinned helper to use SP only by PUSH and POP, so it reads no word below SP it
+  did not write; a summarised BIOS call beside released words hands them back
+  and is a trusted call.
+
+No value comes from a frame word across a call: a live slot survives a call
+only because that call is walked with it as an incoming argument whose write
+the walk refuses, and a released word is never a source of any value; a callee
+that overwrites one only makes the record conservative. The opt-in
+`named-data-buffer-stack-index-v2` proof keeps its own records and refusals;
+on it, and only there, the copy and BIOS summaries still exclude forwarded
+contexts.
+
+A report that uses the rule states one `* buffer forwarded slots:` line (each
+slot's callee, store site, word and owner offset, the released words per owner
+call and the trusted calls) and, whenever a word was released, the premise
+line `* buffer forwarded slot premise:`: a trusted call,
+including everything it calls, interrupt handlers and the code that runs after
+the owner returns do not read a stack word below their entry SP before writing
+it. Both are bound into the
+buffer proof fingerprint only when something was forwarded, so every other
+report keeps its fingerprint. `tests/test_default_forwarded_slots.py` covers
+each rule with assembled bodies.
 
 ### Dead stack-address registers at calls
 

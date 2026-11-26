@@ -60,6 +60,7 @@ import function_literal_exit_scratch_profile as function_exit
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
+import forwarded_slot_profile as forwarded_slots_profile
 import return_scratch_profile as return_scratch_profile
 import empty_body_profile as empty_body
 import library_units
@@ -2205,7 +2206,8 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
 
     make_proof = lambda: FunctionBufferCallProof(
-        rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True)
+        rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True,
+        forward_slots=True)
     if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     # The default retries: a variable stack index (default_stack_index_profile) or closure words
@@ -3603,6 +3605,7 @@ class BufferCallProof:
     # Opt-in per class: buffer pointers an inspected callee stores into its own frame as
     # outgoing stack arguments (see forwarded_slot_step); off keeps every such store refused.
     forwarded_stack_arguments = False
+    default_forwarding = False      # forwarded_slot_profile: set only by forward_slots=True
     forward_slot_records = forward_trusted_calls = frozenset()
     # Opt-in per class (read from the class's own __dict__, never inherited): a
     # subclass's hooks and ledgers have not been reviewed against per-state exploration.
@@ -3635,7 +3638,7 @@ class BufferCallProof:
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
                  loop_replay=False, bios_wrappers=False, copy_helper_index=None,
-                 switch_callee_index=None, dead_registers=False, call_via_targets=False):
+                 switch_callee_index=None, dead_registers=False, call_via_targets=False, forward_slots=False):
         # Exact call-via targets (call_via_target_profile) on the default route only: its
         # constructors and their replays opt in; every other route keeps the thunk refusal.
         self.call_via_targets = call_via_targets is True
@@ -3685,6 +3688,18 @@ class BufferCallProof:
                 raise ValueError("dead stack registers require the plain or function-literal stack-argument proof")
             from dead_register import DeadStackRegisters
             self.dead_registers = DeadStackRegisters(self)
+        if forward_slots is not False:
+            # The default path's forwarded buffer pointer slots (forwarded_slot_profile): inspected callees
+            # may store the owner's frame pointers in their own frames, released words are tracked to the
+            # owner (verify_leaf_instructions) and stated in the report.
+            if forward_slots is not True or stack_arguments is not True or \
+                    type(self) not in (BufferCallProof, FunctionBufferCallProof) or \
+                    discarded_exit_scratch is not None or bios_fill_proof is not None:
+                raise ValueError("forwarded buffer slots require the plain or function-literal stack-argument proof")
+            self.forwarded_stack_arguments = self.default_forwarding = True
+            self.forward_slot_records, self.forward_trusted_calls = set(), set()
+            self.forward_releases = {}          # owner call site -> owner entry-SP offsets released there
+            self.forward_inherited = set()      # owner call sites whose callee inherited released words
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
@@ -3789,12 +3804,16 @@ class BufferCallProof:
         return closure.word_memory(self, instruction, aliases, constants, stack, words, sp_offset, protected,
                                    root_frame=root_frame)
 
-    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
+    def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None,
+                   released=None):
         resolved = call_via.resolve(self, address, constants, site)
         if resolved is not None:
             address = resolved
         arguments = {register: offset for register, offset in aliases.items()
                      if register in CALLER_CLOBBERED}
+        if released:
+            # The owner's released forwarded words (forwarded_slot_profile), at callee entry-SP offsets.
+            arguments.update(released)
         slots = slots or {}
         if self.bios_fill_proof is not None and address == self.bios_fill_proof.calls.get(site) == 0x0814186C:
             if slots or words:
@@ -3868,10 +3887,21 @@ class BufferCallProof:
                 self.dead_registers.snapshot() if self.dead_registers is not None else None,
                 dict(self.split_joins),
                 ({key: dict(record) for key, record in self.call_via_records.items()},
-                 dict(self.call_via_effective)))
+                 dict(self.call_via_effective)),
+                (set(self.forward_slot_records), set(self.forward_trusted_calls),
+                 {site: set(words) for site, words in self.forward_releases.items()})
+                # Only the default forwarding proofs: the opt-in forwarding policies keep their ledgers as before.
+                if self.default_forwarding else None)
 
     def _restore_ledgers(self, saved):
-        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot = saved
+        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
+            forward_snapshot = saved
+        if forward_snapshot is not None:
+            for ledger, values in zip((self.forward_slot_records, self.forward_trusted_calls), forward_snapshot):
+                ledger.clear()
+                ledger.update(values)
+            self.forward_releases.clear()
+            self.forward_releases.update(forward_snapshot[2])
         self.split_joins.clear()
         self.split_joins.update(split_snapshot)
         self.call_via_records.clear()
@@ -4397,6 +4427,11 @@ class BufferCallProof:
         Returns True when the instruction's effect is applied here.
         """
         if replay or self.callee_frames or self.word_provenance or self.single_word_stores:
+            if getattr(self, "default_forwarding", False) and not forwarded_slots(aliases) and \
+                    not stale_words(aliases):
+                # The default proofs keep these walks as they were: nothing is forwarded in them, so a
+                # pointer store still refuses on the ordinary path.
+                return False
             raise ValueError("forwarded buffer stack arguments exclude replay and frame-content profiles")
         slots = set(forwarded_slots(aliases))
         operands = instruction.operands
@@ -4490,6 +4525,7 @@ class BufferCallProof:
         lines.extend(call_via.lines(self))
         lines.extend(closure.lines(self))
         lines.extend(function_exit.lines(self))
+        lines.extend(forwarded_slots_profile.lines(self))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4526,6 +4562,11 @@ class BufferCallProof:
             # Bound only when the closure-slot retry admitted the walk: other reports keep theirs.
             digest.update(len(slots).to_bytes(8, "little"))
             digest.update(slots)
+        forwarded = forwarded_slots_profile.fingerprint_payload(self)
+        if forwarded is not None:
+            # Bound only when a default proof forwarded a slot: other reports keep their fingerprint.
+            digest.update(len(forwarded).to_bytes(8, "little"))
+            digest.update(forwarded)
         scratch = function_exit.fingerprint_payload(self)
         if scratch is not None:
             # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
@@ -5468,6 +5509,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 stack[:0] = [(register in return_registers, True, False) for register in registers]
                 for slot in range(len(registers)):
                     pointer_slots.pop(-4 * len(stack) + 4 * slot, None)
+                if buffer_proof is not None and buffer_proof.default_forwarding:
+                    forwarded_slots_profile.push(aliases, len(stack), len(stack) - len(registers))
             else:
                 if len(registers) > len(stack):
                     raise ValueError("pop reads outside the saved stack frame")
@@ -5487,6 +5530,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             if adjustment < 0:
                 if current in literal_adjustments and 4 * (len(stack) - adjustment) > 4096:
                     raise ValueError("literal stack allocation exceeds the bounded tracked frame")
+                if buffer_proof is not None and buffer_proof.default_forwarding:
+                    forwarded_slots_profile.sp_down(aliases)
                 stack[:0] = [(False, False, True)] * -adjustment
             elif adjustment > len(stack):
                 raise ValueError("stack-pointer adjustment leaves the tracked frame")
@@ -5503,6 +5548,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         if returning:
             if stack:
                 raise ValueError("return does not balance the saved stack frame")
+            if buffer_proof is not None and buffer_proof.default_forwarding:
+                aliases = forwarded_slots_profile.at_return(aliases)
             # IP is ABI scratch, not a result register. Keep its alias tracked
             # through calls and later uses, but an unobserved value at return
             # does not return a pointer. All other escape checks still apply.
@@ -5549,6 +5596,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 if target_register in aliases or target_register in return_registers:
                     raise ValueError("indirect target carries tracked stack or return provenance")
             returned_aliases = {}
+            forward_inspected = False
             if bounded_output_proof is not None and (current in bounded_output_proof.output_calls or
                     pointer_slots or any(register in aliases for register in caller_clobbered)):
                 returned_aliases = bounded_output_proof.check_call(operands[0].imm,aliases,stack,
@@ -5560,12 +5608,27 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 elif buffer_proof is None:
                     raise ValueError("stack aliases cannot cross calls in caller-clobbered registers")
                 else:
+                    forwarding = buffer_proof.default_forwarding
+                    # Only the default forwarding proofs (plain BufferCallProof.check_call) take released words.
+                    inherited = dict(released=forwarded_slots_profile.inherited(aliases, len(stack))) \
+                        if forwarding else {}
                     returned_aliases = buffer_proof.check_call(operands[0].imm, aliases, stack,
                                                               pointer_slots, constants=constants,
-                                                              site=current, words=words)
+                                                              site=current, words=words, **inherited)
+                    if forwarding:
+                        returned_aliases = forwarded_slots_profile.import_released(
+                            buffer_proof, aliases, returned_aliases, len(stack), current, inspected=True)
+                        forward_inspected = True
                     call_alternatives = getattr(returned_aliases, 'alternatives', None)
                     if word_mode:
                         words = dict(returned_aliases.words)
+            if buffer_proof is not None and buffer_proof.default_forwarding and not forward_inspected and \
+                    forwarded_slots_profile.released(aliases):
+                if pointer_slots or words or any(register in aliases for register in caller_clobbered):
+                    # Inspected by another proof, which is not told the released words: no premise covers it.
+                    raise ValueError("a call that passes stack pointers is not told the released forwarded words")
+                # A call the walk does not inspect while released words exist: trusted (the premise).
+                forwarded_slots_profile.trust(buffer_proof, address, current, operands[0].imm)
             if buffer_proof is not None or callee_watch is not None:
                 # R4-R11 aliases are not passed to the callee walk; the callee must not use them (#350).
                 # Without a buffer proof, ``callee_watch`` (a callee_saved_watch.Context) supplies the
@@ -7308,7 +7371,7 @@ def main():
                         rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
                         switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True,
-                        call_via_targets=default_call_route(args, unit_context))
+                        call_via_targets=default_call_route(args, unit_context), forward_slots=True)
                     stack_buffer_walk = lambda proof: verify_leaf_instructions(
                         got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
                         dma_fills=walk_fills[proof.index_policy is not None])

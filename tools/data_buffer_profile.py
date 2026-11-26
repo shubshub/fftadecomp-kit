@@ -166,7 +166,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             rebuild = None
         else:
             rebuild = lambda: match.FunctionBufferCallProof(
-                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True)
+                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True,
+                forward_slots=True)
             proof = rebuild()
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
@@ -189,7 +190,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         thunk.verify_data_bindings(calls, literals, symbols, entries)
         rebuild = lambda: match.BufferCallProof(
             rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
-            copy_helper_index=index, switch_callee_index=index, dead_registers=True, call_via_targets=True)
+            copy_helper_index=index, switch_callee_index=index, dead_registers=True, call_via_targets=True,
+            forward_slots=True)
         proof = rebuild()
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
@@ -351,6 +353,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* mapping SHA-256",
           "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS call kill",
+          "* buffer forwarded slots", "* buffer forwarded slot premise",
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
