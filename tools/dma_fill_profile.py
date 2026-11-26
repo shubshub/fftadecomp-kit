@@ -185,14 +185,16 @@ def _store(instruction, base, word):
 
 
 def _inert(instruction, base):
-    """A 16-bit shift, add/sub, immediate, ALU or register move, or PC literal load, not writing the base.
+    """A 16-bit shift, add/sub, immediate, ALU or register move, PC literal load or SP-relative word
+    load, not writing the base.
 
-    None of these accesses memory or branches.  A move that writes SP or PC, or
-    reads PC, is refused by the walk itself.
+    None of these writes memory, touches a DMA register or branches; the walk itself bounds the
+    SP-relative load to the frame.  A move that writes SP or PC, or reads PC, is refused by the walk
+    itself.
     """
     code = _code(instruction)
-    return code is not None and (code < 0x4400 or code & 0xFF00 == 0x4600 or code & 0xF800 == 0x4800) and \
-        _register(base) not in instruction.regs_access()[1]
+    return code is not None and (code < 0x4400 or code & 0xFF00 == 0x4600 or code & 0xF800 in (0x4800, 0x9800)) \
+        and _register(base) not in instruction.regs_access()[1]
 
 
 def _straight(site, instructions, predecessors):
@@ -266,10 +268,13 @@ class Fills:
     `rom` is the selected ROM; only its boot code is read, for an IWRAM destination.
     """
 
-    def __init__(self, rom=None):
+    def __init__(self, rom=None, premises=None):
         self.rom = rom
+        # The decomp's config/dma_fill_premises.json bytes (dma_fill_premise.snapshot), or None.
+        self.premises = premises
         self.observations = {}
         self.records = None
+        self.address = None
 
     def admit(self, data, address, instruction, site, aliases, stack, offending, pointers):
         """Defer the escape refusal of a plain source store followed by the fill's shape in the bytes.
@@ -305,8 +310,10 @@ class Fills:
         from match import BufferCallProof
         if self.records is not None:
             raise ValueError("DMA fill record is already complete")
-        records = []
+        import dma_fill_premise as premise
+        records, premised, reasons = [], [], []
         values = exact_values(instructions, edges, address, data) if self.observations else {}
+        derived = None
         for site in sorted(self.observations):
             observed = self.observations[site]
             if len({(source, base, offset) for source, base, offset, _, _ in observed}) != 1:
@@ -320,30 +327,76 @@ class Fills:
                 cursor = _straight(cursor, instructions, predecessors)
                 return cursor, instructions.get(cursor)
             destination_store, control_store, readback = window(site, base, following)
-            control = values[control_store].get(_register(_store(instructions[control_store], base, 2)))
-            if control is None:
-                raise ValueError("DMA fill control is not an exact immediate fixed-source enable")
-            unit, count = control_unit(control, channel)
+            control_register = _register(_store(instructions[control_store], base, 2))
+            destination_register = _register(_store(instructions[destination_store], base, 1))
+            control = values[control_store].get(control_register)
+            destination = values[destination_store].get(destination_register)
+            if control is not None and destination is not None:
+                unit, count = control_unit(control, channel)
+            else:
+                # Not exact: admitted only under a reviewed destination premise (dma_fill_premise).
+                if derived is None:
+                    derived = premise.derivations(instructions, edges, address, data)
+                control_value = derived[control_store][1].get(control_register, premise.UNKNOWN)
+                destination_value = derived[destination_store][1].get(destination_register, premise.UNKNOWN)
+                unit, count = premise.high_control(control_value, channel), None
+                if control_value[0] is None:
+                    raise ValueError("DMA fill control is not an exact immediate fixed-source enable (its count "
+                                     "has no defined derivation, so no premise can be stated)")
+                if destination is not None:
+                    # an exact start no premise can repair: misaligned, or its first unit outside every region
+                    if destination % unit:
+                        raise ValueError("DMA fill destination is not an exact unit-aligned address")
+                    region(destination, unit, stack_floor(self.rom))
+                if destination_value[0] is None:
+                    raise ValueError("DMA fill destination is not an exact unit-aligned address (it has no "
+                                     "defined derivation, so no premise can be stated)")
+                reasons.append("DMA fill control is not an exact immediate fixed-source enable" if control is None
+                               else "DMA fill destination is not an exact unit-aligned address")
             for _, _, _, stack, pointers in observed:
                 BufferCallProof.access(offset, unit, stack)
                 # The transfer copies the unit out: a word that holds a stack address would escape.
                 if any(word in pointers for word in range(offset - offset % 4, offset + unit, 4)):
                     raise ValueError("DMA fill source unit is a pointer-bearing local word")
-            destination = values[destination_store].get(_register(_store(instructions[destination_store], base, 1)))
-            if destination is None or destination % unit:
+            if count is None:
+                row = dict(site=f"0x{site:08X}", channel=channel, unit=unit,
+                           destination=premise.render(destination_value[0]),
+                           control=premise.render(control_value[0]))
+                premised.append((len(records), row))
+                records.append(dict(site=site - address, channel=channel, source=offset,
+                                    frame=4 * len(observed[0][3]), unit=unit,
+                                    destination_store=destination_store - address,
+                                    control_store=control_store - address, readback=readback - address,
+                                    control=row["control"], destination=row["destination"], bytes=None,
+                                    region="premise"))
+                continue
+            if destination % unit:
                 raise ValueError("DMA fill destination is not an exact unit-aligned address")
             span = region(destination, unit * count, stack_floor(self.rom))
             records.append(dict(site=site - address, channel=channel, source=offset, frame=4 * len(observed[0][3]),
                                 unit=unit, destination_store=destination_store - address,
                                 control_store=control_store - address, readback=readback - address,
                                 control=control, destination=destination, bytes=unit * count, region=span))
+        if premised:
+            try:
+                review = premise.accept(address, [row for _, row in premised], self.premises)
+            except ValueError as error:
+                raise ValueError(f"{reasons[0]}; {error}") from error
+            for index, _ in premised:
+                records[index]["review_sha256"] = review
+        elif self.observations and self.premises is not None:
+            premise.unneeded(address, self.premises)
+        self.address = address
         self.records = records
 
     def report_lines(self):
         """The summary, one line per premise in order, and the canonical manifest; none without a record."""
         if not self.records:
             return []
-        return [SUMMARY_FIELD + SUMMARY, *(PREMISE_FIELD + premise for premise in PREMISES),
+        import dma_fill_premise
+        destination_premises = [dma_fill_premise.line(record, self.address) for record in self.records
+                                if record["region"] == "premise"]
+        return [SUMMARY_FIELD + SUMMARY, *(PREMISE_FIELD + premise for premise in PREMISES), *destination_premises,
                 MANIFEST_FIELD + "`" + json.dumps(dict(sites=self.records), sort_keys=True, separators=(",", ":")) + "`"]
 
 

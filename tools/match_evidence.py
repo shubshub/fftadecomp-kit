@@ -12,6 +12,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import dma_fill_profile as dma_fill
+import dma_fill_premise
 import empty_body_profile as empty_body
 import plain_report_fields
 import switch_constants_profile as switch_constants
@@ -1338,7 +1339,7 @@ def legacy_report_control_flow(lines, root, address, profile, parts=None):
 
         # report_matches admits DMA fill lines here only on the plain framed profiles (kit #239)
         dma_lines = dma_fill.report_fields(lines)
-        fills = dma_fill.Fills(rom) if dma_lines else None
+        fills = dma_fill.Fills(rom, dma_fill_premise.snapshot(root)) if dma_lines else None
         # and the exit-scratch premise lines likewise (kit #538): a ledger only when stated
         import return_scratch_profile
         scratch_lines = return_scratch_profile.report_fields(lines)

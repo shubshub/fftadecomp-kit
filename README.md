@@ -1338,8 +1338,9 @@ of:
    every reaching path (`DMA source store base is not exactly one DMA source
    register on every path`).
 2. The next instructions form one straight window, each reached only from the
-   one before it, of at most 16 instructions: register-only arithmetic, moves
-   and PC literal loads that do not write rB, then exactly one destination
+   one before it, of at most 16 instructions: register-only arithmetic, moves,
+   PC literal loads and 16-bit `ldr rX, [sp, #imm]` loads of the frame (bounded
+   by the walk itself) that do not write rB, then exactly one destination
    store `str rD, [rB, #4]`, more of the same, and the control store
    `str rC, [rB, #8]`. A call, branch, return, other memory access or second
    store through rB is not the shape, so the store stays an escape; a
@@ -1424,6 +1425,56 @@ including the data-buffer proof, takes a fresh one only when it exists), so
 gating it behind a selector is a one-line change. `tests/test_dma_fill.py` covers each obligation
 with assembled bodies, the replay with synthetic reports, and the path end to
 end with natural C compiled by the fixed agbcc.
+
+##### Premised destinations and counts
+
+A fill whose destination is a pointer the caller passes, or whose count comes
+from a struct, fails items 4 or 6, and nothing in the function proves its span
+off the stack. `tools/dma_fill_premise.py` admits it only under a reviewed,
+recorded runtime premise, the same kind as `config/stack_index_premises.json`.
+Items 1, 2, 3 and 5 still hold unchanged, and:
+
+* bits 16-31 of the control are known on every path (a known-bits analysis
+  over the walk's CFG: a halfword load has a zero top half, shifts and
+  and/or/eor/bic with constants keep what they fix) and they form an
+  immediate, fixed-source, incrementing-destination enable without repeat or
+  Game Pak DRQ, bits 16-20 clear (`DMA fill control is not an exact immediate
+  fixed-source enable (bits 16-31 are not known on every path)`). Bit 26 gives
+  the unit; only the count may be unknown;
+* the destination and the control each have one derivation on every path:
+  entry registers R0-R3, constants, and loads tagged with their own site,
+  combined by shifts, adds, subtracts, ands, ors, eors and bics. A load is a
+  leaf, the value that load reads at run time, and the derivation never says
+  what a frame word holds: a destination spilled and reloaded is
+  `u32[entry_SP-0x44]@0x0801AFD0`, not the register it was spilled from, so no
+  fact about a frame word crosses a call. Calls forget R0-R3, R12 and LR and
+  keep R4-R11 (the ABI premise the block already states). A join of two
+  derivations, a register-offset load and every other instruction leave no
+  derivation (`... (it has no defined derivation, so no premise can be
+  stated)`); a frame address as the destination stays an escape, and an exact
+  destination that is misaligned or whose first unit lies outside every
+  region refuses as in item 6, since no premise can repair it;
+* `config/dma_fill_premises.json` in the decomp holds one entry per function,
+  a written review and rows (site, channel, unit, destination, control) that
+  repeat the generated ones exactly. The review rules are those of the
+  stack-index file: a placeholder `<...>`, `SCRATCH` or `TODO` refuses. Without
+  an entry, or with rows that differ, the refusal keeps item 4's or 6's
+  message first and prints the entry to review. An entry for a function whose
+  fills are all exact refuses too.
+
+Every row states one fixed claim: whenever the fill starts, the destination
+with its low bits cleared to the unit, and unit x count bytes from it (the
+count is the low 14 bits of the control on DMA0-2, 0 meaning 0x4000, and the low
+16 bits on DMA3, 0 meaning 0x10000: GBATEK), lie wholly in palette RAM, VRAM,
+OAM or EWRAM, or in IWRAM below the stack floor. The review must show it from
+the callers. Such a record has `region` `premise`, `bytes` null, the rendered
+destination and control, and the SHA-256 of the review text, and the block
+gains one `* DMA fill destination premise:` line per record, after the premise
+lines and before the manifest, ending `unproved runtime premise, accepted by
+config/dma_fill_premises.json`. Replay re-reads the file, so an edited review,
+a removed entry or a changed row invalidates the report. Exact fills keep their
+records and lines unchanged. `tests/test_dma_fill_premise.py` covers each
+obligation with assembled bodies and the path end to end with natural C.
 
 Selector refusals (a `ValueError`; `refusal.Refusal` is the subclass used for
 the clean ones) are reported by `match.py` on the command line as

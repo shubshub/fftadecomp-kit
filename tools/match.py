@@ -61,6 +61,7 @@ import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
 import forwarded_slot_profile as forwarded_slots_profile
+import dma_fill_premise
 import return_scratch_profile as return_scratch_profile
 import empty_body_profile as empty_body
 import library_units
@@ -7356,7 +7357,7 @@ def main():
             else:
                 # The one policy object for immediate DMA fills (kit #239); each later walk takes a
                 # fresh one only when this one exists.
-                dma_fills = dma_fill.Fills(rom) if thumb else None
+                dma_fills = dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT)) if thumb else None
                 # Kit #538: R2/R3 frame addresses at a return, under the discarded-exit-scratch premise.
                 return_scratch = return_scratch_profile.ReturnScratch()
                 try:
@@ -7377,7 +7378,8 @@ def main():
                     return_scratch = None            # the stack-argument walks refuse R0-R3 themselves
                     import default_stack_index_profile as default_index
                     # One fresh recorder for the stack-argument walk and one for the stack-index retry.
-                    walk_fills = [dma_fill.Fills(rom), dma_fill.Fills(rom)] if dma_fills is not None else [None, None]
+                    walk_fills = [dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT)),
+                                  dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT))] if dma_fills is not None else [None, None]
                     stack_buffer_proof = lambda: BufferCallProof(
                         rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
@@ -7403,7 +7405,7 @@ def main():
                 if thumb and data_relocations and buffer_proof.buffer_evidence():
                     # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
                     import default_stack_index_profile as default_index
-                    dma_fills = dma_fill.Fills(rom) if dma_fills is not None else None
+                    dma_fills = dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT)) if dma_fills is not None else None
                     verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                         data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
                                           index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills,

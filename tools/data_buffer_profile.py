@@ -347,8 +347,8 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
-# copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, BIOS call kill, DMA fill premise
-# stack-index and call-via target lines may repeat.
+# copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, BIOS call kill, DMA fill premise,
+# DMA fill destination premise, stack-index and call-via target lines may repeat.
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
@@ -360,7 +360,7 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* data symbols SHA-256", "* data buffer calls", "* data buffer manifest",
           "* data buffer proof SHA-256", "* compiler", "* verified extent", "* relocations",
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
-          "* DMA fills", "* DMA fill premise", "* DMA fill manifest",
+          "* DMA fills", "* DMA fill premise", "* DMA fill destination premise", "* DMA fill manifest",
           "* callee-saved premise", "* callee-saved fact",
           # call_via_target_profile.lines
           "* buffer call-via target", "* buffer call-via premise",
@@ -378,6 +378,7 @@ def report_matches(report, root, address):
     from match_evidence import (CALL_SUMMARY, STACK_BUFFER_SUMMARY, STACK_SUMMARY, buffer_proof_lines, data_snapshot,
                                 mapping_fingerprint, mapping_snapshot, report_rom_path, source_fingerprint)
     import dma_fill_profile as dma_fill
+    import dma_fill_premise
     lines = report.splitlines()
 
     def key(line):
@@ -443,7 +444,7 @@ def report_matches(report, root, address):
         rom = Path(selected_rom).read_bytes()
         # DMA fill lines (kit #239) replay with the same rule and must equal the recomputed lines.
         dma_lines = dma_fill.report_fields(lines)
-        fills = dma_fill.Fills(rom) if dma_lines else None
+        fills = dma_fill.Fills(rom, dma_fill_premise.snapshot(root)) if dma_lines else None
         from callee_saved_watch import LINE_PREFIX, premise_lines
         instructions, proof, proved_schema, proved = verify_source(
             root, address, data, rom, functions, objects, source_digest, fills)
