@@ -166,7 +166,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             rebuild = None
         else:
             rebuild = lambda: match.FunctionBufferCallProof(
-                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
+                rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True)
             proof = rebuild()
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
@@ -189,7 +189,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         thunk.verify_data_bindings(calls, literals, symbols, entries)
         rebuild = lambda: match.BufferCallProof(
             rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
-            copy_helper_index=index, switch_callee_index=index, dead_registers=True)
+            copy_helper_index=index, switch_callee_index=index, dead_registers=True, call_via_targets=True)
         proof = rebuild()
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
@@ -339,7 +339,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 
 # Every unindented `* ` field a data-buffer report may carry; only the replay,
 # copy-summary, switch-callee, dead-register, signed-remainder, BIOS premise, BIOS call kill, DMA fill premise
-# and stack-index lines may repeat.
+# stack-index and call-via target lines may repeat.
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
@@ -352,6 +352,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* ROM bytes", "* compiled ", "* source plausibility", "* hand-asm allow list",
           "* DMA fills", "* DMA fill premise", "* DMA fill manifest",
           "* callee-saved premise", "* callee-saved fact",
+          # call_via_target_profile.lines
+          "* buffer call-via target", "* buffer call-via premise",
           # default_stack_index_profile.lines
           "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
           "* buffer stack index premise", "* buffer stack index frame words")
