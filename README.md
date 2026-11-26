@@ -5797,7 +5797,20 @@ the control word has no bit outside 0-20 and 24, and its count of words
 rounds up to a multiple of 8, as the BIOS writes eight words at a time.
 Outside that block nothing reads, writes or takes the address of the slot (a
 later block may give it to its own temporary), and inside it only the address
-is formed. Every frame reference needs a constant offset; a pseudo with
+is formed. Every frame reference needs a constant offset, with one exception.
+A reference whose offset the proof cannot place (0811E1F8's
+`heights[context->mode]`, in another switch arm) is admitted when it is apart
+from every fill on the expand RTL's control-flow graph:
+- no path from the first insn of a fill's block (through its store and its
+  BIOS call) reaches it;
+- no path from it reaches that insn;
+- loops count.
+
+Such a reference runs only on executions that run no fill. So it can neither
+change the temporary between its store and the call nor read it afterwards,
+and the frame does not outlive the invocation. A volatile store at such an
+offset still refuses, and so does the reference inside a fill's block or on a
+loop round a fill. The record lists the references. A pseudo with
 several definitions, such as the pointers a structure copy's block move
 advances, is read through the definition that reaches the reference in a
 straight line, with no branch target between. In the code, which is the ROM's, every path into the fill's BL
