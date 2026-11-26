@@ -45,17 +45,31 @@ holds:
    itself.  No insn outside a fill's block (its first insn to its call) reads, writes or forms an address in the
    slot; no frame reference of the function has an unknown offset.  So the slot is the block's alone: a later
    block may give it to its own temporary, but no later statement reads it.
-6. Each fill in R's code, which is the ROM's (rom_fill): in the straight line before the BL, one store of the
-   temporary's width is the only access to the slot, r0 holds the slot's address at the BL, r1 holds no stack
-   address whose filled bytes reach the slot and r3 none in it, r2, where the line sets it to a literal the ROM
-   holds or to an immediate, is the fill's control word, and the BL reaches the fill's BIOS call.  (agbcc may
-   keep the control word in a callee-saved register across calls and copy it to r2; the line does not show that
-   constant, and 5 reads it off the RTL.)  The order of the store and of the forming of the address is free: a
-   halfword has no sp-relative store, so its address is formed first, while a word may be stored at sp+K before
-   r0 is formed.  Either way the qualifier's evidence is 4, the code it changes.
+6. Each fill in R's code, which is the ROM's (rom_fill).  The fill's BL is its call's one site; a call that left no
+   site (cross-jumping replaced the end of its block by a branch into another fill's identical tail) has the BL that
+   the last insn of its block the code still holds reaches in a straight line, through unconditional branches only.
+   On every path into the BL: one store of the temporary's width is the only access to the slot, r0 holds the slot's
+   address at the BL, r1 holds no stack address whose filled bytes reach the slot and r3 none in it, r2 and the
+   stored register, where the path sets them to a literal the ROM holds or to an immediate, are the fill's control
+   word and the value its RTL store writes, and the BL reaches the fill's BIOS call.  (agbcc may keep a constant in
+   a callee-saved register across calls and copy it from there; the path does not show that constant, and 5 reads it
+   off the RTL.)  A path is the straight line before the BL, back to a branch target, a branch, a call, or a change
+   of sp.  When that line starts at a branch target and holds no access to the slot r0 points at, the paths are
+   instead each of the target's predecessors (the fall-through, which may not be a call, every B and B<cond> to it,
+   and every far jump to it: agbcc's long branch, a BL the listing marks `@ far jump` to a branch target of the
+   function; a BL to the function's entry is a recursive call, which returns), read the same way and followed by the
+   line, up to MAX_PATHS paths of MAX_WINDOW instructions.  No other way in may exist: a function with a jump
+   through a register other than a return's bx (agbcc's jump tables and indirect jumps are `mov pc, rN`), with a
+   jump to no branch target or a BL into its body that is no marked far jump, or holding the target's address in a
+   word that is no instruction or forming it with `add rN, pc, #K`, refuses.  A path that joins, or one into a BL
+   several fills share, comes from one fill's block (its insns before the BL's own line belong to that block and to
+   no other fill's) and stores with an insn that is one of those fills' stores; each fill sharing the BL has a path,
+   and all its paths fill from one slot.  The order of the store and of the forming of the address is free: a
+   halfword has no sp-relative store, so its address is formed first, while a word may be stored at sp+K before r0
+   is formed.  Either way the qualifier's evidence is 4, the code it changes.
 
-The record prints each fill's ROM site, slot and control word, the BIOS call's bytes and the digests of R's code
-and of each variant's.
+The record prints each fill's ROM site, slot, control word and any branch target its path joins at, the BIOS
+call's bytes and the digests of R's code and of each variant's.
 """
 from collections import Counter
 from hashlib import sha256
@@ -82,6 +96,7 @@ MODES = {"HI": 2, "SI": 4}
 MAX_GROUPS = 8
 ACCESS_WIDTHS = {"str": 4, "ldr": 4, "strh": 2, "ldrh": 2, "ldrsh": 2, "strb": 1, "ldrb": 1, "ldrsb": 1}
 MAX_WINDOW = 64
+MAX_PATHS = 8
 TOKEN = re.compile(r"[A-Za-z_]\w*|0[xX][0-9A-Fa-f]+[uUlL]*|[0-9]+[uUlL]*|##|->|<<|>>|&&|\|\||[-+*/%&|^!=<>]=|\S")
 DEFINE = re.compile(r"#[ \t]*define[ \t]+(?P<name>[A-Za-z_]\w*)\((?P<params>[^()]*)\)")
 
@@ -331,8 +346,8 @@ def overlaps(start, size, other, other_size):
 
 def fills(function):
     """[fill] of an expand-level function: each {call (insn), slot (frame register, offset), width, control,
-    store (insn index), start (insn index), callee (name), store_uid}; ProofError when a fill or the slots it needs
-    cannot be shown"""
+    store (insn index), start (insn index), callee (name), store_uid, block (the uids of its insns, in order),
+    value (the constant it stores, or None)}; ProofError when a fill or the slots it needs cannot be shown"""
     resolver = proof.Resolver(function)
     calls = [(insn, name) for insn in function.insns if insn.code == "call_insn"
              for name in CALLEES if f'"{name}"' in proof.flatten(insn.pattern)]
@@ -382,8 +397,14 @@ def fills(function):
             if overlaps(target[1], size, slot[1], width):
                 raise ProofError(f"the fill at insn UID {call.uid} passes r{number} an address that reaches its own "
                                  "temporary")
+        stored = [source for target, source, _ in function.sets(function.insns[mine[0][0]].pattern)
+                  if target is mine[0][5]]
+        known = resolver.resolve(stored[0], mine[0][0])[0] if len(stored) == 1 else None
         found.append(dict(call=call, slot=slot, width=width, control=value, store=mine[0][0], start=start,
-                          callee=callee, store_uid=function.insns[mine[0][0]].uid))
+                          callee=callee, store_uid=function.insns[mine[0][0]].uid,
+                          block=[function.insns[k].uid for k in range(start, call.index + 1)],
+                          value=known.value & (1 << 8 * width) - 1
+                          if known is not None and known.kind == "int" and known.value is not None else None))
     claimed = {fill["store"] for fill in found}
     for index, register, offset, width, what, mem in stores:
         if index not in claimed:
@@ -430,95 +451,284 @@ def constant(rom, at, half, known):
     return None
 
 
-def rom_fill(rom, address, compiled, fill):
-    """(BL site, slot offset from sp, the site forming its address) of one fill, read off R's code (the ROM's)"""
+def branch_target(half, at):
+    """the target of the Thumb B or B<cond> `half` at `at`, else None"""
+    if 0xD000 <= half < 0xDE00:
+        offset = half & 0xFF
+        return at + 4 + (offset - 0x100 if offset & 0x80 else offset) * 2
+    if 0xE000 <= half < 0xE800:
+        offset = half & 0x7FF
+        return at + 4 + (offset - 0x800 if offset & 0x400 else offset) * 2
+    return None
+
+
+def far_jumps(listing):
+    """the .text offsets of agbcc's far jumps in an `as -aln` listing of a -dp assembly: a `bl` to a local label
+    that agbcc marks `@ far jump` (or `@far jump`, after the inverse branch of a conditional one)"""
+    found = set()
+    for line in listing.splitlines():
+        match = re.match(r"\s*\d+\s+([0-9a-f]{4})\s+([0-9A-F]+)\s+(.*)$", line)
+        if match and re.match(r"bl\s+\.L\w+\s+@ ?far jump\b", match[3].strip()):
+            found.add(int(match[1], 16))
+    return found
+
+
+def rom_fill(rom, address, compiled, fill, found=None):
+    """(BL site, slot offset from sp, the site forming its address, the branch targets its path joins at, each
+    (target, predecessor)) of one fill, read off R's code (the ROM's); found is every fill of the function, of
+    which those sharing the fill's BL are read with it"""
     _, base, size, _ = compiled["text"]
     instructions, labels = compiled["layout"]
-    callee = fill.get("callee", CPUSET_NAME)
-    target = CALLEES[callee][0]
-    sites = [at for at, _ in compiled["uids"].get(fill["call"].uid, [])]
-    if len(sites) != 1:
-        raise ProofError(f"the fill at insn UID {fill['call'].uid} is not one BL")
-    index = instructions.index(sites[0])
-    bl = address + sites[0] - base
-    if proof.decode_bl(rom, bl) != target:
-        raise ProofError(f"the BL at {bl:08X} does not reach {target:08X}")
+    found = [fill] if found is None else found
     decoder = proof.thumb_decoder()
 
-    def decode(offset):
-        where = address + offset - base
-        insn = next(decoder.disasm(rom[where - BASE:where - BASE + 4], where, 1), None)
+    def where(k):
+        return address + instructions[k] - base
+
+    def inside(k):
+        return 0 <= k < len(instructions) and base <= instructions[k] < base + size
+
+    def decode(k):
+        at = where(k)
+        insn = next(decoder.disasm(rom[at - BASE:at - BASE + 4], at, 1), None)
         if insn is None:
-            raise ProofError(f"{where:08X} does not decode")
+            raise ProofError(f"{at:08X} does not decode")
         return insn
+
+    def half(k):
+        return struct.unpack_from("<H", rom, where(k) - BASE)[0]
 
     def written(insn):
         return {insn.reg_name(r) for r in insn.regs_access()[1]}
 
-    # the straight line before the BL: back to a branch target, a branch, a call, or a change of sp
-    first = index
-    while first > 0 and index - first < MAX_WINDOW and base <= instructions[first - 1] < base + size and \
-            instructions[first] not in labels:
-        before = decode(instructions[first - 1])
-        if before.mnemonic == "bl" or proof.BRANCH.fullmatch(before.mnemonic) or {"pc", "sp"} & written(before):
-            break
-        first -= 1
-    held, formed, accesses, known = {}, {}, [], {}
-    for k in range(first, index):
-        insn = decode(instructions[k])
-        loaded = constant(rom, insn.address, struct.unpack_from("<H", rom, insn.address - BASE)[0], known)
-        ops = [op.strip() for op in insn.op_str.replace("[", "").replace("]", "").split(",")]
-        writes = written(insn)
-        if "sp" in writes:
-            raise ProofError(f"{insn.address:08X} moves the stack pointer inside the fill")
-        value, access = None, None
-        immediate = [int(op[1:], 0) for op in ops if op.startswith("#")]
-        if insn.mnemonic == "add" and len(ops) == 3 and ops[1] == "sp" and immediate:
-            value = immediate[0]
-        elif insn.mnemonic == "mov" and ops[1:] == ["sp"]:
-            value = 0
-        elif insn.mnemonic in ("adds", "subs") and len(ops) in (2, 3) and immediate and \
-                (ops[1] if len(ops) == 3 else ops[0]) in held:
-            sign = 1 if insn.mnemonic == "adds" else -1
-            value = held[ops[1] if len(ops) == 3 else ops[0]] + sign * immediate[0]
-        elif insn.mnemonic in ("mov", "movs") and len(ops) == 2 and ops[1] in held:
-            value = held[ops[1]]
-        if insn.mnemonic in ("stm", "stmia", "ldm", "ldmia") and ops[0].rstrip("!") in held:
-            raise ProofError(f"{insn.address:08X} transfers a block through a stack address inside the fill")
-        width = ACCESS_WIDTHS.get(insn.mnemonic)
-        if width and len(ops) >= 2 and ops[1] != "pc":
-            displacement = immediate[0] if immediate else 0
-            if ops[1] == "sp":
-                access = (displacement, width, insn.mnemonic.startswith("str"), k)
-            elif ops[1] in held:
-                access = (held[ops[1]] + displacement, width, insn.mnemonic.startswith("str"), k)
-            elif len(ops) == 3 and not immediate and (ops[1] in held or ops[2] in held):
-                raise ProofError(f"{insn.address:08X} indexes the stack by a register inside the fill")
-        if access:
-            accesses.append(access)
-        for register in writes:
-            held.pop(register, None)
-            known.pop(register, None)
-        if value is not None:
-            held[ops[0]] = value
-            formed.setdefault(value, k)
-        if loaded is not None:
-            known[loaded[0]] = loaded[1]
-    if "r0" not in held:
-        raise ProofError(f"r0 holds no stack address at the BL at {bl:08X}")
-    slot = held["r0"]
-    mine = [a for a in accesses if a[0] < slot + fill["width"] and slot < a[0] + a[1]]
-    if len(mine) != 1 or mine[0][:3] != (slot, fill["width"], True):
-        raise ProofError(f"the slot sp+{slot:#x} of the fill at {bl:08X} is not stored exactly once with "
-                         f"{fill['width']} bytes before it")
-    for register, span in (("r1", filled(fill["control"], fill["width"], callee)), ("r3", 1)):
-        if register in held and overlaps(held[register], span, slot, fill["width"]):
-            raise ProofError(f"the fill at {bl:08X} passes {register} sp+{held[register]:#x}, which reaches its own "
-                             "temporary")
-    if "r2" in known and known["r2"] != fill["control"]:
-        raise ProofError(f"r2 holds {known['r2']:#010x} at the BL at {bl:08X}, not the fill's control word "
-                         f"{fill['control']:#010x}")
-    return bl, slot, address + instructions[formed[slot]] - base
+    def stops(insn):
+        return insn.mnemonic == "bl" or proof.BRANCH.fullmatch(insn.mnemonic) or {"pc", "sp"} & written(insn)
+
+    def sites(uid):
+        return [at for at, _ in compiled["uids"].get(uid, []) if at in instructions]
+
+    uids = {}
+    for uid in compiled["uids"]:
+        for at in sites(uid):
+            uids.setdefault(at, set()).add(uid)
+
+    def call_of(one):
+        """the index of the BL by which a fill reaches its BIOS call"""
+        uid = one["call"].uid
+        if len(sites(uid)) > 1:
+            raise ProofError(f"the fill at insn UID {uid} is not one BL")
+        if sites(uid):
+            return instructions.index(sites(uid)[0])
+        # cross-jumping kept another fill's identical tail and replaced this one's by a branch into it: the BL
+        # is the one the last insn of its block the code holds reaches in a straight line, through unconditional
+        # branches only
+        last = next((max(sites(other)) for other in reversed(one.get("block", [])) if sites(other)), None)
+        k = instructions.index(last) if last is not None else None
+        for _ in range(MAX_WINDOW if k is not None else 0):
+            k += 1
+            if not inside(k):
+                break
+            insn = decode(k)
+            target = jump(k)
+            if insn.mnemonic == "bl" and target is None:
+                return k
+            if target is not None and (half(k) >= 0xE000):
+                offset = target - address + base
+                if offset not in labels or offset not in instructions:
+                    break
+                k = instructions.index(offset) - 1
+            elif stops(insn):
+                break
+        raise ProofError(f"the fill at insn UID {uid} is not one BL, and its block reaches none in a straight line")
+
+    def start(k):
+        """the first index of the straight line ending with index k: back to a branch target, or to just after a
+        branch, a call or a change of sp"""
+        first = k
+        while first > 0 and k - first < MAX_WINDOW and inside(first - 1) and instructions[first] not in labels:
+            if stops(decode(first - 1)):
+                break
+            first -= 1
+        return first
+
+    far = compiled.get("far", set())
+
+    def jump(k):
+        """the target of the B, B<cond> or far jump at index k, else None.  A far jump is agbcc's long branch,
+        `bl .Ln @ far jump`: a BL the listing marks so, to a branch target of the function other than its entry
+        (a BL to the entry is a recursive call, which returns)"""
+        target = branch_target(half(k), where(k))
+        if target is None and instructions[k] in far:
+            callee = proof.decode_bl(rom, where(k))
+            if callee is None or not address < callee < address + size or callee - address + base not in labels:
+                raise ProofError(f"{where(k):08X} is marked a far jump but reaches no branch target of the function")
+            target = callee
+        return target
+
+    flow, taken = {}, set()
+
+    def predecessors(first):
+        """the indices control reaches the branch target at index first from: the insn before it unless that
+        ends the flow, and every branch or far jump to it; ProofError when the function holds a jump the ROM
+        cannot place, or the target's address is taken"""
+        if not flow:
+            covered = set()
+            for k in range(len(instructions)):
+                if not inside(k):
+                    continue
+                insn, target = decode(k), jump(k)
+                covered |= {instructions[k], instructions[k] + 2} if insn.size == 4 else {instructions[k]}
+                callee = proof.decode_bl(rom, where(k)) if insn.mnemonic == "bl" and target is None else None
+                if target is None and "pc" in written(insn) and insn.mnemonic not in ("bl", "bx", "pop") or \
+                        callee is not None and address < callee < address + size:
+                    raise ProofError(f"{where(k):08X} jumps where the ROM does not say; no path crosses a branch "
+                                     "target")
+                if target is not None:
+                    if target - address + base not in labels:
+                        raise ProofError(f"{where(k):08X} jumps to {target:08X}, which is no branch target")
+                    flow.setdefault(target, []).append(k)
+                if half(k) & 0xF800 == 0xA000:  # add rd, pc, #imm8 * 4: an address formed in the code
+                    taken.add(((where(k) + 4) & ~3) + (half(k) & 0xFF) * 4)
+            # a word of the function that is no instruction (a literal or a jump table) may hold an address
+            for at in range(address + (-address & 3), address + size - 3, 4):
+                if not {at - address + base, at - address + base + 2} & covered:
+                    word = struct.unpack_from("<I", rom, at - BASE)[0]
+                    taken.update({word, word & ~1})
+        label, previous = where(first), first - 1
+        if label in taken:
+            raise ProofError(f"the address of the branch target at {label:08X} is taken; no path crosses it")
+        before = decode(previous)
+        ends = instructions[previous] in far or before.mnemonic in ("b", "bx") or "pc" in written(before) and \
+            before.mnemonic not in ("bl", "blx") and branch_target(half(previous), where(previous)) is None
+        if not ends and instructions[previous] + before.size != instructions[first]:
+            raise ProofError(f"{where(previous):08X} does not fall through to the branch target at {label:08X}")
+        return ([] if ends else [previous]) + flow.get(label, [])
+
+    def read(path):
+        held, formed, accesses, known = {}, {}, [], {}
+        for k in path:
+            insn = decode(k)
+            if jump(k) is not None:
+                continue  # a branch or far jump on the path moves only pc (and lr)
+            loaded = constant(rom, insn.address, half(k), known)
+            ops = [op.strip() for op in insn.op_str.replace("[", "").replace("]", "").split(",")]
+            writes = written(insn)
+            if "sp" in writes:
+                raise ProofError(f"{insn.address:08X} moves the stack pointer inside the fill")
+            value, access = None, None
+            immediate = [int(op[1:], 0) for op in ops if op.startswith("#")]
+            if insn.mnemonic == "add" and len(ops) == 3 and ops[1] == "sp" and immediate:
+                value = immediate[0]
+            elif insn.mnemonic == "mov" and ops[1:] == ["sp"]:
+                value = 0
+            elif insn.mnemonic in ("adds", "subs") and len(ops) in (2, 3) and immediate and \
+                    (ops[1] if len(ops) == 3 else ops[0]) in held:
+                sign = 1 if insn.mnemonic == "adds" else -1
+                value = held[ops[1] if len(ops) == 3 else ops[0]] + sign * immediate[0]
+            elif insn.mnemonic in ("mov", "movs") and len(ops) == 2 and ops[1] in held:
+                value = held[ops[1]]
+            if insn.mnemonic in ("stm", "stmia", "ldm", "ldmia") and ops[0].rstrip("!") in held:
+                raise ProofError(f"{insn.address:08X} transfers a block through a stack address inside the fill")
+            width = ACCESS_WIDTHS.get(insn.mnemonic)
+            if width and len(ops) >= 2 and ops[1] != "pc":
+                displacement = immediate[0] if immediate else 0
+                if ops[1] == "sp":
+                    access = (displacement, width, insn.mnemonic.startswith("str"), k, known.get(ops[0]))
+                elif ops[1] in held:
+                    access = (held[ops[1]] + displacement, width, insn.mnemonic.startswith("str"), k,
+                              known.get(ops[0]))
+                elif len(ops) == 3 and not immediate and (ops[1] in held or ops[2] in held):
+                    raise ProofError(f"{insn.address:08X} indexes the stack by a register inside the fill")
+            if access:
+                accesses.append(access)
+            for register in writes:
+                held.pop(register, None)
+                known.pop(register, None)
+            if value is not None:
+                held[ops[0]] = value
+                formed.setdefault(value, k)
+            if loaded is not None:
+                known[loaded[0]] = loaded[1]
+        return held, formed, accesses, known
+
+    index = call_of(fill)
+    bl, callee = where(index), fill.get("callee", CPUSET_NAME)
+    if proof.decode_bl(rom, bl) != CALLEES[callee][0]:
+        raise ProofError(f"the BL at {bl:08X} does not reach {CALLEES[callee][0]:08X}")
+    sharing = [fill]
+    for one in found:
+        try:
+            if one is not fill and call_of(one) == index:
+                sharing.append(one)
+        except ProofError:
+            continue  # refused when it is read itself
+    width = fill["width"]
+    if any(one.get("callee", CPUSET_NAME) != callee or one["width"] != width for one in sharing):
+        raise ProofError(f"the fills sharing the BL at {bl:08X} differ in their call or temporary")
+    blocks = {uid: n for n, one in enumerate(sharing) for uid in one.get("block", [])}
+    stores = {one.get("store_uid") for one in sharing}
+
+    # every path into the BL: the straight line before it, and where that starts at a branch target and shows too
+    # little, each predecessor's straight line before it in turn
+    first = start(index)
+    own = index - first
+    pending, paths = [(first, list(range(first, index)), ())], []
+    while pending:
+        first, path, joins = pending.pop()
+        held, formed, accesses, known = read(path)
+        slot = held.get("r0")
+        mine = [a for a in accesses if slot is not None and overlaps(a[0], a[1], slot, width)]
+        if not mine and first > 0 and inside(first - 1) and instructions[first] in labels:
+            for previous in predecessors(first):
+                if previous == first - 1 and stops(decode(previous)) and \
+                        branch_target(half(previous), where(previous)) is None:
+                    raise ProofError(f"r0 holds no stack address at the BL at {bl:08X}" if slot is None else
+                                     f"the slot sp+{slot:#x} of the fill at {bl:08X} is not stored exactly once "
+                                     f"with {width} bytes before it")
+                line = list(range(start(previous), previous + 1))
+                if len(line) + len(path) > MAX_WINDOW:
+                    raise ProofError(f"a path into the BL at {bl:08X} is longer than {MAX_WINDOW} instructions")
+                pending.append((line[0], line + path, joins + ((where(first), where(previous)),)))
+            if len(pending) + len(paths) > MAX_PATHS:
+                raise ProofError(f"more than {MAX_PATHS} paths reach the BL at {bl:08X}")
+            continue
+        if slot is None:
+            raise ProofError(f"r0 holds no stack address at the BL at {bl:08X}")
+        if len(mine) != 1 or mine[0][:3] != (slot, width, True):
+            raise ProofError(f"the slot sp+{slot:#x} of the fill at {bl:08X} is not stored exactly once with "
+                             f"{width} bytes before it")
+        # a path that joins, or one of several fills sharing the BL, comes from one fill's block, which the
+        # code before the BL's own line belongs to, and its store is a fill's
+        owner = fill
+        if joins or len(sharing) > 1:
+            owners = {blocks[uid] for k in path[:len(path) - own] for uid in uids.get(instructions[k], ())
+                      if uid in blocks}
+            if len(owners) != 1:
+                raise ProofError(f"the path into the BL at {bl:08X} from {where(path[0]):08X} comes from "
+                                 f"{'no' if not owners else 'more than one'} fill's block")
+            owner = sharing[owners.pop()]
+            if not uids.get(instructions[mine[0][3]], set()) & stores:
+                raise ProofError(f"the path into the BL at {bl:08X} stores its slot sp+{slot:#x} at "
+                                 f"{where(mine[0][3]):08X}, which is no fill's store")
+        for register, span in (("r1", filled(owner["control"], width, callee)), ("r3", 1)):
+            if register in held and overlaps(held[register], span, slot, width):
+                raise ProofError(f"the fill at {bl:08X} passes {register} sp+{held[register]:#x}, which reaches its "
+                                 "own temporary")
+        if "r2" in known and known["r2"] != owner["control"]:
+            raise ProofError(f"r2 holds {known['r2']:#010x} at the BL at {bl:08X}, not the fill's control word "
+                             f"{owner['control']:#010x}")
+        value = owner.get("value")
+        if value is not None and mine[0][4] is not None and mine[0][4] & (1 << 8 * width) - 1 != value:
+            raise ProofError(f"the store at {where(mine[0][3]):08X} writes {mine[0][4] & (1 << 8 * width) - 1:#x} "
+                             f"to the slot sp+{slot:#x}, not the fill's value {value:#x}")
+        paths.append((owner, slot, where(formed[slot]), joins))
+    for one in sharing:
+        slots = {slot for owner, slot, _, _ in paths if owner is one}
+        if len(slots) != 1:
+            raise ProofError(f"the fill at insn UID {one['call'].uid} reaches the BL at {bl:08X} by "
+                             f"{'no path of its own' if not slots else 'paths with different slots'}")
+    _, slot, formed, joins = next(path for path in paths if path[0] is fill)
+    return bl, slot, formed, joins
 
 
 # ------------------------------------------------------------------ the proof
@@ -560,6 +770,7 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
     with tempfile.TemporaryDirectory(prefix="ffta_bft_", dir=build) as work:
         unit = proof.Unit(tree, relpath, raw, offsets, work, dependencies, repeated)
         real = unit.compile("real", unit.real, name)
+        real["far"] = far_jumps((Path(work) / "real" / "f.lst").read_text())
         proof.function_matches_rom(real["text"], address, rom)
         rtl = real["dumps"]["rtl"]
         for other, function in rtl.items():
@@ -567,7 +778,7 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
                 raise ProofError(f"another function of the unit, {other}, holds a volatile reference")
         found = sorted(fills(rtl[name]), key=lambda fill: fill["store"])
         wrappers(rom, {fill["callee"] for fill in found})
-        sites = [rom_fill(rom, address, real, fill) for fill in found]
+        sites = [rom_fill(rom, address, real, fill, found) for fill in found]
         keys = [store_key(touch) for touch in volatile_frame_stores(rtl[name], proof.Resolver(rtl[name]))]
         if len(keys) != len(found):
             raise ProofError("the fills do not account for every volatile frame store")
@@ -593,9 +804,10 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
     verdicts = []
     for g, removed, variant in zip(groups, owned, variants):
         where = f"macro {g['name']}, used {len(removed)} times" if g["kind"] == "macro" else "a block"
-        listed = "; ".join(f"{bl:08X} fills from sp+{slot:#x} (address formed at {formed:08X}, control "
-                           f"{found[k]['control']:#010x}, {found[k]['width']}-byte units)"
-                           for k, (bl, slot, formed) in enumerate(sites) if k in removed)
+        listed = "; ".join(f"{bl:08X} fills from sp+{slot:#x} (address formed at {formed:08X}, "
+                           + "".join(f"joining at {label:08X} from {at:08X}, " for label, at in joins)
+                           + f"control {found[k]['control']:#010x}, {found[k]['width']}-byte units)"
+                           for k, (bl, slot, formed, joins) in enumerate(sites) if k in removed)
         calls = "; ".join(f"{CALLEES[callee][0]:08X} is `{CALLEES[callee][2]}` in the ROM"
                           for callee in sorted({found[k]["callee"] for k in removed}))
         text = (f"line {g['line']}: volatile {g['type']} {g['temporary']} is the SDK's BIOS fill temporary "

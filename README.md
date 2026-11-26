@@ -5202,17 +5202,34 @@ the control word has no bit outside 0-20 and 24, and its count of words
 rounds up to a multiple of 8, as the BIOS writes eight words at a time.
 Outside that block nothing reads, writes or takes the address of the slot (a
 later block may give it to its own temporary), and inside it only the address
-is formed. In the code, which is the ROM's, the straight line before the BL
+is formed. In the code, which is the ROM's, every path into the fill's BL
 stores the slot once, with the temporary's width, and at the BL holds its
-address in `r0`, no `r1` that fills over it and no `r3` in it; where the line
-sets `r2` to a literal or an immediate, it is the fill's control word (agbcc
-may keep the constant in a callee-saved register across calls, and the RTL
-check covers that copy), and the BL reaches the fill's own BIOS call. The
-store and the address come in either order, with or without the qualifier: a
-halfword has no `sp`-relative store, so its address comes first, while a word
-may be stored at `sp+K` before `r0` is formed. What shows the qualifier is the
-code it changes. The report record lists each fill's site, slot and control
-word, and the BIOS call's bytes.
+address in `r0`, no `r1` that fills over it and no `r3` in it; where the path
+sets `r2` or the stored register to a literal or an immediate, it is the
+fill's control word or the value its RTL store writes (agbcc may keep a
+constant in a callee-saved register across calls, and the RTL check covers
+that copy), and the BL reaches the fill's own BIOS call. A path is the
+straight line before the BL, back to a branch target, a branch, a call or a
+change of `sp`. When two arms end in the same fill, agbcc's cross-jumping keeps
+one arm's tail and branches into it from the other, so a fill's call may have
+no BL of its own: it then has the BL its block's code reaches in a straight
+line through unconditional branches. Where the line before a BL starts at a
+branch target and shows no access to the slot, every predecessor of the
+target is read in turn, followed by the line: the fall-through (which may not
+be a call), every `b` and `b<cond>` to it, and every far jump to it (agbcc's
+`bl .Ln @ far jump`; a BL to the function's entry is a recursive call). A
+function with a jump through a register other than a return (agbcc's jump
+tables and indirect jumps are `mov pc, rN`), a jump to no branch target, an
+unmarked BL into its body, or the target's address in a literal word or
+formed by `add rN, pc, #K`, refuses there. Each such path, and each path into
+a BL several fills share, must come from one fill's block, store with one of
+those fills' stores and fill from one slot, and every fill sharing the BL
+needs a path of its own. The store and the address come in either order, with
+or without the qualifier: a halfword has no `sp`-relative store, so its
+address comes first, while a word may be stored at `sp+K` before `r0` is
+formed. What shows the qualifier is the code it changes. The report record
+lists each fill's site, slot, control word and any branch target its path
+joins at, and the BIOS call's bytes.
 
 **Volatile the ROM shows (`volatile-rom-proof-v1`, `tools/volatile_rom_proof.py`):**
 a `volatile` token of the addressed `src/<ADDR>.c` that no exception above
