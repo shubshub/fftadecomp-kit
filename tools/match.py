@@ -4661,8 +4661,10 @@ class BufferCallProof:
         return digest.hexdigest()
 
     def buffer_evidence(self):
-        """An inspected buffer call, or the default stack-index retry's record."""
-        return bool(self.dependencies) or self.stack_index_retry is not None
+        """An inspected buffer call, the default stack-index retry's record, or a runtime site the
+        default path's division leaf retry summarised (signed_remainder_leaf_profile.summarised_evidence)."""
+        return bool(self.dependencies) or self.stack_index_retry is not None or \
+            remainder_leaf.summarised_evidence(self)
 
     def index_copies(self):
         """Initialised local bytes for the default stack-index retry (default_stack_index_profile)."""
@@ -7465,6 +7467,10 @@ def main():
             if dma_fills is not None and dma_fills.records and not uses_stack_frame(verified_instructions):
                 # render_report writes the block after the stack-frame line; refuse here, before writing
                 raise ValueError("DMA fill records require the stack-frame line")
+            if data_buffer_evidence is None and remainder_leaf.summary_only_evidence(buffer_proof) and \
+                    not uses_stack_frame(verified_instructions):
+                # The stack-buffer schema states the stack frame (render_report, report_matches).
+                raise ValueError("summarised runtime evidence requires the stack-frame line")
             if remainder_leaf.active():
                 remainder_leaf.require_summarised(buffer_proof, calls)
             if return_scratch is not None and return_scratch.sites and (

@@ -114,6 +114,33 @@ class DivisionPolicy:
 DIVISION = DivisionPolicy()
 
 
+class EvidencePolicy:
+    """A summarised runtime site as the buffer proof's inspected call (``summarised_evidence``)."""
+
+    enabled = True
+
+
+EVIDENCE = EvidencePolicy()
+
+
+def summarised_evidence(proof):
+    """Whether, inside the retry, the proof summarised a runtime site.
+
+    The buffer proofs' "inspected buffer call" requirement says which schema a report gets and
+    turns on the gates keyed on buffer evidence (the complete mapped span, the data-buffer
+    composition, DMA fill records, the return-scratch refusal).  It is not what proves the walk:
+    the stack-argument proof walks the whole owner either way.  An owner whose only proved callee
+    is a summarised runtime therefore has buffer evidence here, and every such gate applies.
+    """
+    summary = getattr(proof, "runtime_summaries", None)
+    return EVIDENCE.enabled and active() and is_summaries(summary) and bool(summary.sites)
+
+
+def summary_only_evidence(proof):
+    """The proof's buffer evidence is a summarised runtime site and nothing else."""
+    return summarised_evidence(proof) and not proof.dependencies and proof.stack_index_retry is None
+
+
 def names():
     """The compiler runtime names the retry binds."""
     return frozenset(ENTRIES) if DIVISION.enabled else frozenset((NAME,))

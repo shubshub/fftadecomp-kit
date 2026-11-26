@@ -102,6 +102,31 @@ OTHER_PATH_CALLEE = ("push {r4, lr}\nadds r4, r1, #0\ncmp r0, #0\nbeq 1f\nadds r
                      "2:\nbl rt_udivsi3\n" + base.CALLEE_TAIL)
 
 
+# 0x0802A6A0's shape without a buffer call: a table, a frame, typed data and runtime calls only.
+NO_BUFFER = HEADER + """u32 func_08000200(u32 phase, int value, int other)
+{
+    switch (phase) {
+    case 0:
+        data_02000000[2] = value / 10;
+        return other %% 10;
+    case 1:
+        data_02000000[0] = 5;
+        return 1;
+    case 2:
+        return %(division)s;
+    case 3:
+        data_02000000[1] = value %% 7;
+        return 3;
+    case 4:
+        return value / 100;
+    }
+    return 0;
+}
+"""
+# A frameless owner with only a quotient and a remainder: no table, no data, no buffer call.
+PLAIN = HEADER + "int func_08000200(int value)\n{\n    return value / 10 + value % 10;\n}\n"
+
+
 def division_lines(report):
     return [line for line in report.splitlines() if line.startswith(leaf.DIVISION_LINE)]
 
@@ -332,6 +357,60 @@ class DivisionLeafTests(unittest.TestCase):
         self.assertNotEqual(code, 0, output)
         self.assertIsNone(report)
         self.assertIn("identity differs", output)
+
+    # D2: a summarised runtime site is the buffer proof's inspected call.
+
+    def test_a_table_owner_whose_only_calls_are_summarised_is_admitted(self):
+        root = self.fixture("no_buffer", NO_BUFFER % dict(division="other / 3"))
+        code, output, report = base.run(root)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(data_calls.verification(report), data_buffer.SCHEMA)
+        self.assertNotIn("* buffer callee", report)
+        self.assertEqual(len(division_lines(report)), 1 + 5)
+        self.assertTrue(self.replays(report, root))
+        with patch.object(leaf.EVIDENCE, "enabled", False):
+            code, output = base.cli(root)
+            self.assertIn(leaf.DIVISION_RETRY, code)
+            self.assertIn("requires an inspected buffer call", code)
+            self.assertFalse(self.replays(report, root))
+
+    def test_a_frameless_owner_whose_only_calls_are_summarised_refuses(self):
+        # The stack-buffer schema states a stack frame; a frameless owner has none to state.
+        root = self.fixture("plain", PLAIN, objects={})
+        code, output = base.cli(root)
+        self.assertIn(leaf.DIVISION_RETRY, code)
+        self.assertIn("summarised runtime evidence requires the stack-frame line", code)
+
+    def test_the_evidence_turns_on_the_buffer_gates_it_is_not_an_admission(self):
+        # The only proved callee is a summarised runtime, and the owner's index row is two bytes
+        # longer than its symbol: buffer evidence brings the complete-span gate, which refuses.
+        root = self.fixture("long_row", PLAIN, objects={})
+        mapping = json.loads((root / "config/functions.json").read_text())
+        row = next(entry for entry in mapping if int(entry["rom"], 16) == A)
+        row["end"] = f"0x{int(row['end'], 16) + 2:08X}"
+        (root / "config/functions.json").write_text(json.dumps(mapping))
+        code, output = base.cli(root)
+        self.assertIn(leaf.DIVISION_RETRY, code)
+        self.assertIn("requires an exact complete mapped span", code)
+        with patch.object(leaf.EVIDENCE, "enabled", False):
+            code, output = base.cli(root)
+        self.assertIn("stack-buffer evidence requires an inspected buffer call", code)
+
+    def test_summarised_evidence_needs_the_retry_and_a_site(self):
+        rom = (self.signed / "baserom.bin").read_bytes()
+        mapping = (self.signed / "config/functions.json").read_bytes()
+        index = (self.signed / "symbols/functions.txt").read_bytes()
+        with leaf.activated():
+            proof = match.BufferCallProof(rom, mapping, stack_arguments=True, copy_helper_index=index)
+            self.assertFalse(proof.buffer_evidence())
+            proof.runtime_summaries.sites[A + 2] = leaf.ENTRIES["__divsi3"]
+            self.assertTrue(proof.buffer_evidence())
+            with patch.object(leaf.EVIDENCE, "enabled", False):
+                self.assertFalse(proof.buffer_evidence())
+        self.assertFalse(proof.buffer_evidence())
+        other = match.BufferCallProof(rom, mapping, stack_arguments=True, copy_helper_index=index)
+        self.assertIsNone(other.runtime_summaries)
+        self.assertFalse(other.buffer_evidence())
 
     # Where the retry never runs.
 
