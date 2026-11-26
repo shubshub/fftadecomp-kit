@@ -874,15 +874,20 @@ class Checker:
         return self.limits[functions]
 
     # ---- entry points -------------------------------------------------------------------
-    def call(self, target, watched, constants=None, *, caller=None, site=None):
+    def call(self, target, watched, constants=None, *, caller=None, site=None, known=None):
         """Check a call at ``site`` in ``caller`` made while ``watched`` (registers in R4-R11)
         hold owner stack addresses, and the caller's code after it.  ``constants`` (tests
-        only) adds register values known at the call.  Returns the copies {R0-R3/R12: watched
-        register} the callee hands back."""
+        only) adds register values known at the call.  ``known``, when given, is the caller's
+        register values at the call ({number: value}) and replaces ``known_at`` for this call
+        only (call_via_target_profile passes its strict values).  Returns the copies
+        {R0-R3/R12: watched register} the callee hands back."""
         watched = frozenset(watched)
         if not watched <= CALLEE_SAVED:
             raise ValueError("only R4-R11 are watched across a call")
-        known = dict(self.known_at(caller, site)) if caller is not None and site is not None else {}
+        if known is not None:
+            known = dict(known)
+        else:
+            known = dict(self.known_at(caller, site)) if caller is not None and site is not None else {}
         known.update(constants or {})
         if not watched:
             return {}

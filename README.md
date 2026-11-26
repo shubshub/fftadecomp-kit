@@ -2431,6 +2431,77 @@ restores it on every route, with the function-buffer proof's own exclusion
 (`function-buffer evidence excludes runtime call thunks in inspected
 dependencies`).
 
+#### Exact call-via targets
+
+A buffer walk that reaches `bl _call_via_rN` with a frame address in R0-R3
+checks the call as a call to rN's function when rN's value is exactly known
+(`call-via-exact-target-v1`). It applies only in the default route's plain
+and function-literal buffer proofs: exact `BufferCallProof` and
+`FunctionBufferCallProof` instances that the default route's constructors and
+their replays build with `call_via_targets=True` (`verify_function_buffers`,
+`data_buffer_profile.prove`, the plain stack-argument walk on
+`match.default_call_route`, and that walk's two replays,
+`match_evidence.buffer_report_matches` and `function_thunk_profile.verify_source`,
+the latter never for a library unit). An exact proof
+any selector route builds keeps the thunk refusal. The types are checked
+against the proof's own `match` module (`call_via_target_profile.kit_match`):
+`match.py` writes a report as `__main__` and replays it as the imported
+`match`, and only those two entries count.
+
+* The walk carries exact call-target facts: a reached PC-relative pool word
+  that is an odd unique indexed Thumb ROM entry (not a thunk or a pinned
+  runtime, folded through the ROM wait-state mirrors), an `adds rd, rn, #0`
+  copy of one, and such a fact in R0-R3 at the call that entered a walked
+  callee (both the callee's alias walk and its core walk start with them). A
+  fact dies when its register is written, in the caller-clobbered
+  registers at every call, and at a join unless every edge brings the same
+  value.
+* At the thunk, rN's value comes from that fact or from the calling
+  function's own exact value at the site (`call_via_target_profile.strict_known`),
+  for `_call_via_r0` to `_call_via_r12`. That is a forward walk of the
+  function from its entry, joining every path: values come only from
+  PC-relative literal words, aligned ROM words loaded from a known address,
+  immediates, register copies and immediate or register arithmetic. No
+  register value crosses a call or SWI, and a frame word is never a value
+  source, so a word whose address a callee was given (directly or through a
+  register copy) cannot hand back a stale value. Control flow it cannot
+  follow exactly (a branch out of the function, an indirect jump other than
+  the `bx lr` and `pop {rN}; bx rN` returns, an undecodable instruction)
+  gives no value at any site. The call is checked as a direct call to
+  that entry when the entry lies outside the calling function, or, for a value
+  that is not such an entry, to the target a registered `call_via_resolvers`
+  entry maps it to. The thunk is `bx rN; mov r8, r8` (its bytes are checked),
+  so the callee starts in exactly the state a direct `bl` gives it.
+* A fact held in R4-R11 across calls is relied on only after the callee-saved
+  walk checks each call it crossed with the register it crossed in watched,
+  also when it is used from another register after a copy: a walked callee
+  must only save and restore it, and a call that walk cannot resolve is
+  admitted under its recorded callee-saved premise. The crossed call's
+  destination (through a thunk) and its argument values come from the same
+  strict values (`Checker.call(..., known=...)`), never from the callee-saved
+  walk's `known_at`, so a crossed call through a value reloaded from an
+  escaped frame word is premised, not walked at a stale destination.
+* Any other value (one read from memory, computed, or held in a register
+  without a fact) keeps the refusal.
+
+Each resolution is stated on its own line and bound into the buffer proof
+fingerprint; reports without one keep theirs:
+
+    * buffer call-via target: `call-via-exact-target-v1` 0x<site> in 0x<function> _call_via_rN = 0x<value> -> 0x<target> (<kinds>; origins <pool 0x<word>, ...>; crossed <0x<site>->0x<target>:r<n>, ...>)
+
+A crossed call the callee-saved walk cannot check (through an unresolved
+pointer, or a SWI) is admitted under a premise stated on this rule's own line,
+right after the resolution it serves. The crossings are checked on a checker
+of their own, so the value is described as what it is, a call target, and no
+crossing premise joins the shared `* callee-saved premise` lines:
+
+    * buffer call-via premise: `call-via-exact-target-v1` 0x<site> in 0x<function> relies on the crossed call at 0x<crossed site> (0x<crossed target>): call at 0x<site> in 0x<function> through _call_via_rN to an unknown address, with R<n> holding the call-via target 0x<value>; unproved premise: code reached through an unresolved function pointer, or outside ROM, uses the value that register holds on entry only to save and restore it
+
+Any other premise that walk would need refuses the resolution.
+
+Replay recomputes the lines and requires them to equal the report's.
+`call_via_target_profile.TARGETS.enabled = False` restores the refusal.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is

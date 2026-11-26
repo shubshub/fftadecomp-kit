@@ -2203,7 +2203,7 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
         raise ValueError("function-buffer evidence requires direct calls and excludes data bindings")
 
     make_proof = lambda: FunctionBufferCallProof(
-        rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True)
+        rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True)
     if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     instructions, proof = default_index.walk(
@@ -3367,7 +3367,8 @@ def join_walk_state(previous, outgoing, stack, constants, words, merged_aliases)
             tuple((saved[0] and incoming[0], saved[1] and incoming[1], saved[2] and incoming[2])
                   for saved, incoming in zip(previous[1], stack)),
             merged_aliases,
-            tuple((register, value) for register, value in previous[3] if constants.get(register) == value),
+            tuple((register, joined) for register, value in previous[3]
+                  if (joined := call_via.join(value, constants.get(register))) is not None),
             merge_possible_aliases(previous[4], outgoing[4]),
             tuple((slot, value) for slot, value in previous[5] if words.get(slot) == value))
 
@@ -3599,7 +3600,10 @@ class BufferCallProof:
 
     def __init__(self, rom, mapping, stack_arguments=False, *, discarded_exit_scratch=None, bios_fill_proof=None,
                  loop_replay=False, bios_wrappers=False, copy_helper_index=None,
-                 switch_callee_index=None, dead_registers=False):
+                 switch_callee_index=None, dead_registers=False, call_via_targets=False):
+        # Exact call-via targets (call_via_target_profile) on the default route only: its
+        # constructors and their replays opt in; every other route keeps the thunk refusal.
+        self.call_via_targets = call_via_targets is True
         if bios_wrappers is not False:
             if bios_wrappers is not True or type(self) is not BufferCallProof or \
                     discarded_exit_scratch is not None or bios_fill_proof is not None:
@@ -3664,6 +3668,14 @@ class BufferCallProof:
         self.split_joins = {}
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
+        # Exact call-via resolutions ((site, target) -> record) and the target each resolved call
+        # site was last checked as, consumed when the walk finishes that call (call_via_target_profile).
+        self.call_via_records = {}
+        self.call_via_effective = {}
+        # The calling functions' strict exact values, by (start, end) span (call_via_target_profile.strict_known),
+        # and each crossed call's premise records (call_via_target_profile.crossing_premises).
+        self.call_via_strict = {}
+        self.call_via_crossings = {}
         # Targets of un-inspected calls an inspected callee (transitively) relies on
         # to preserve R4-R11.
         self.callee_trusted = {}
@@ -3704,16 +3716,21 @@ class BufferCallProof:
         self.access(offset, 1, stack)
 
     def argument_constants(self, constants):
-        return {}
+        # The default path's exact call-via targets (call_via_target_profile): only the plain and
+        # function-literal proofs carry their callers' call-target facts into a walked callee.
+        return call_via.argument_constants(constants) if call_via.active(self) else {}
 
     def extra_constant(self, instruction, data, address, constants):
-        return None
+        return call_via.extra_constant(self, instruction, data, address, constants) \
+            if call_via.active(self) else None
 
     def clear_extra_call_constants(self, constants):
         pass
 
     def finish_call_constants(self, constants, result, *, site=None, target=None):
         self.clear_extra_call_constants(constants)
+        if call_via.active(self):
+            call_via.cross(constants, site, call_via.effective(self, site, target))
 
     def word_context(self, words, frame_base, root_frame, watched=()):
         return {}
@@ -3722,6 +3739,9 @@ class BufferCallProof:
         return dict(aliases)
 
     def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
+        resolved = call_via.resolve(self, address, constants, site)
+        if resolved is not None:
+            address = resolved
         arguments = {register: offset for register, offset in aliases.items()
                      if register in CALLER_CLOBBERED}
         slots = slots or {}
@@ -3749,14 +3769,16 @@ class BufferCallProof:
             return None  # summarised by verify_leaf_instructions, never inspected as a callee
         return self.target(address)
 
-    def inspect(self, address, data):
+    def inspect(self, address, data, entry_constants=None):
         if self.switch_callees is not None and \
                 (delegated := self.switch_callees.inspect(self, address, data)) is not None:
             return delegated
+        # The caller's exact call-target facts in R0-R3 (call_via_target_profile), only when there are any.
+        entry = {"entry_constants": entry_constants} if entry_constants else {}
         instructions = verify_leaf_instructions(data, address, True,
                                                 buffer_proof=self if self.stack_arguments else None,
                                                 call_resolver=self.resolve_call,
-                                                runtime_summaries=self.runtime_summaries)
+                                                runtime_summaries=self.runtime_summaries, **entry)
         return instructions, {}
 
     def loop_replay_eligible(self):
@@ -3790,12 +3812,18 @@ class BufferCallProof:
                 (dict(self.copy_summaries.contracts), dict(self.copy_summaries.observations)),
                 dict(self.switch_callees.records) if self.switch_callees is not None else None,
                 self.dead_registers.snapshot() if self.dead_registers is not None else None,
-                dict(self.split_joins))
+                dict(self.split_joins),
+                ({key: dict(record) for key, record in self.call_via_records.items()},
+                 dict(self.call_via_effective)))
 
     def _restore_ledgers(self, saved):
-        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot = saved
+        snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot = saved
         self.split_joins.clear()
         self.split_joins.update(split_snapshot)
+        self.call_via_records.clear()
+        self.call_via_records.update(via_snapshot[0])
+        self.call_via_effective.clear()
+        self.call_via_effective.update(via_snapshot[1])
         for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted),
                                   snapshot):
             ledger.clear()
@@ -3851,7 +3879,7 @@ class BufferCallProof:
             if self.callee_frames and frame_base != -4 * len(stack):
                 raise ValueError("callee frame origin differs from the exact incoming live stack")
             data = self.span(address)
-            instructions, finite_transfers = self.inspect(address, data)
+            instructions, finite_transfers = self.inspect(address, data, **call_via.entry_facts(self, constants))
             self.dependencies[address] = data
             by_address = {instruction.address: instruction for instruction in instructions}
             trusted_targets = set()
@@ -3969,13 +3997,17 @@ class BufferCallProof:
                         # Every released word is below the callee's entry SP and the callee gets
                         # no stack pointer: it is trusted, not inspected (the recorded premise).
                         self.forward_trusted_calls.add((address, current, operands[0].imm))
-                    result = self.check_arguments(operands[0].imm, passed, stack, nested, protected,
+                    callee = operands[0].imm
+                    if passed or nested:
+                        # A walked call-via call with an exact target is that target's call.
+                        callee = call_via.resolve(self, callee, constants, current) or callee
+                    result = self.check_arguments(callee, passed, stack, nested, protected,
                         constants=self.argument_constants(constants), site=current,
                         **self.word_context(words, frame_base-4*depth if frame_base is not None else None, root_frame,
                             tuple(sorted(set(watched) | {register for register in aliases if register not in CALLER_CLOBBERED}))))
                     # R4-R11 aliases are not passed to the walk; the callee must not use them (#350).
                     import callee_saved_watch
-                    callee_saved_watch.core_check(self, address, current, operands[0].imm, aliases, constants)
+                    callee_saved_watch.core_check(self, address, current, callee, aliases, constants)
                     call_alternatives = getattr(result, 'alternatives', None)
                     if self.word_provenance:
                         words = dict(result.words)
@@ -3984,14 +4016,14 @@ class BufferCallProof:
                         constants.pop(register, None)
                     if self.forwarded_stack_arguments:
                         result = self.import_stale_words(result, aliases, depth)
-                    self.finish_call_constants(constants, result, site=current, target=operands[0].imm)
+                    self.finish_call_constants(constants, result, site=current, target=callee)
                     aliases.update(result)
                     # An inspected callee's own writes to R4-R11 are not trusted
                     # to be restored; uninspected calls keep the ABI premise.
-                    nested_clobbers = self.callee_clobbers.get(operands[0].imm, ())
+                    nested_clobbers = self.callee_clobbers.get(callee, ())
                     clobbered.update(nested_clobbers)
-                    relied_on = self.callee_trusted.get(operands[0].imm, frozenset()) \
-                        if operands[0].imm in self.callee_clobbers else frozenset({operands[0].imm})
+                    relied_on = self.callee_trusted.get(callee, frozenset()) \
+                        if callee in self.callee_clobbers else frozenset({callee})
                     trusted_targets.update(relied_on)
                     if replay:
                         next_known = tuple((register, value) for register, value in next_known
@@ -4219,8 +4251,8 @@ class BufferCallProof:
                                 raise _LoopReplayRequired() from None
                             raise
                         merged = (merged_aliases, depth,
-                                  tuple((register, value) for register, value in previous[2]
-                                        if constants.get(register) == value),
+                                  tuple((register, joined) for register, value in previous[2]
+                                        if (joined := call_via.join(value, constants.get(register))) is not None),
                                   tuple((slot,value) for slot,value in previous[3] if words.get(slot)==value))
                         if self.callee_frames:
                             merged += (previous[4],)
@@ -4398,6 +4430,7 @@ class BufferCallProof:
         if remainder_leaf.is_summaries(self.runtime_summaries):
             lines.extend(self.runtime_summaries.lines())
         lines.extend(split_join.lines(self.split_joins))
+        lines.extend(call_via.lines(self))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4424,6 +4457,11 @@ class BufferCallProof:
         for address, data in sorted(self.dependencies.items()):
             digest.update(struct.pack("<II", address, len(data)))
             digest.update(data)
+        via = call_via.fingerprint_payload(self)
+        if via is not None:
+            # Bound only when a call-via call was resolved: other reports keep their fingerprint.
+            digest.update(len(via).to_bytes(8, "little"))
+            digest.update(via)
         if self.loop_replays:
             # Bind every replayed callee's exact caller-frame writes, the (call target,
             # register) pairs trusted across un-inspected calls and the pruned branch
@@ -4551,8 +4589,12 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                              switch_outgoing_stack_fixed_pool=False, switch_thunks=None,
                              incoming_narrow_reads=False, engine_track_rom=None, masked_argument_proof=None, resource_arguments=None,
                              switch_thunk_premises=None, dma_fills=None, menu_list_frame=None,
-                             callee_watch=None, return_scratch=None):
+                             callee_watch=None, return_scratch=None, entry_constants=None):
     """Verify a local CFG, optionally applying validated direct-call ABI summaries.
+
+    entry_constants holds exact call-target facts (call_via_target_profile.CallTarget) in
+    R0-R3 at entry, which BufferCallProof.inspect passes from a walked callee's caller; it is
+    accepted only with an exact-target buffer proof.
 
     self_calls is a frozenset of call-site addresses that may `bl` the exact
     entry of this very function.  Such a call is an ordinary ARM ABI call to
@@ -5124,7 +5166,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
         reserved.update(address + offset + byte for offset in switch_relocations for byte in range(4))
     end = address + len(data)
     alignment = 2 if thumb else 4
-    states = {address: (frozenset({ARM_REG_LR}), (), (), (), (), ())}
+    states = {address: (frozenset({ARM_REG_LR}), (), (), call_via.check_entry(buffer_proof, entry_constants), (), ())}
     stack_arguments = buffer_proof is not None and buffer_proof.stack_arguments
     # Variable stack indices are deferred only in the owner a selector's policy names.
     bounded_index = buffer_proof.index_policy if buffer_proof is not None and thumb and \
@@ -5458,8 +5500,10 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 # Without a buffer proof, ``callee_watch`` (a callee_saved_watch.Context) supplies the
                 # ROM and mapping, so a report replay repeats the check its issuance made.
                 import callee_saved_watch
+                # A call-via call the buffer proof checked as its exact target is that target's call.
+                checked_target = getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm)
                 callee_saved_watch.core_check(buffer_proof if buffer_proof is not None else callee_watch,
-                                              address, current, operands[0].imm, aliases, constants)
+                                              address, current, checked_target, aliases, constants)
             return_registers.difference_update(caller_clobbered)
             for register in caller_clobbered:
                 constants.pop(register, None)
@@ -7192,7 +7236,8 @@ def main():
                     stack_buffer_proof = lambda: BufferCallProof(
                         rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
-                        switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True)
+                        switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True,
+                        call_via_targets=default_call_route(args, unit_context))
                     stack_buffer_walk = lambda proof: verify_leaf_instructions(
                         got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
                         dma_fills=walk_fills[proof.index_policy is not None])
