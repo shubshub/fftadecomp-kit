@@ -7,6 +7,7 @@ import struct
 import sys
 import tempfile
 import unittest
+import unittest.mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
@@ -147,8 +148,10 @@ ENTRY = (2, "insn (set (reg/v:SI 22) (reg:SI 0 r0)) -1 (nil) (nil)")
 class RtlTests(unittest.TestCase):
     def test_a_fill_is_read_off_its_block(self):
         (found,) = fill.fills(function([ENTRY] + fill_insns(10)))
-        self.assertEqual((found["slot"], found["width"], found["control"], found["call"].uid),
-                         ((18, -2), 2, 0x01000100, 16))
+        self.assertEqual((found["slot"], found["width"], found["control"], found["call"].uid, found["value"]),
+                         ((18, -2), 2, 0x01000100, 16, 0))
+        other = [(k, i.replace("(const_int 0)", "(const_int -1)")) for k, i in fill_insns(10)]
+        self.assertEqual(fill.fills(function([ENTRY] + other))[0]["value"], 0xFFFF)
         word = fill.fills(function([ENTRY] + fill_insns(10, offset=-4, control=0x05000040, mode="SI")))
         self.assertEqual(word[0]["width"], 4)
 
@@ -294,6 +297,79 @@ def window(items, uid=7, labels=(), control=0x01000100):
 
 ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1 = 0xA90E, 0x2000, 0x8008
 LDR_R1, LDR_R2, ADD_R0_SP_38 = 0x4900, 0x4A00, 0xA80E
+MOV_R0_SP, ADDS_R0_3A, MOVS_R1_0, STRH_R1_R0, ADDS_R0_R1, ADDS_R1_R7 = 0x4668, 0x303A, 0x2100, 0x8001, 0x1C08, 0x1C39
+
+
+def assemble(items, control):
+    """(code, offsets) of items: halfwords, ("bl", target), ("b", "beq" or "far", the index of the item it reaches;
+    "far" is agbcc's far-jump BL), ("word", a data word); each LDR_R2 loads `control` from a literal pool after the
+    code"""
+    offsets, at = [], 0
+    for item in items:
+        offsets.append(at)
+        at += 4 if isinstance(item, tuple) and item[0] in ("bl", "far", "word") else 2
+    code = bytearray()
+    for item, at in zip(items, offsets):
+        if isinstance(item, tuple) and item[0] == "bl":
+            code += encode_bl(ADDRESS + at, item[1])
+        elif isinstance(item, tuple) and item[0] == "far":
+            code += encode_bl(ADDRESS + at, ADDRESS + offsets[item[1]])
+        elif isinstance(item, tuple) and item[0] == "word":
+            code += struct.pack("<I", item[1])
+        elif isinstance(item, tuple):
+            step = (offsets[item[1]] - (at + 4)) // 2
+            code += thumb(0xE000 | step & 0x7FF if item[0] == "b" else 0xD000 | step & 0xFF)
+        else:
+            code += thumb(item)
+    pool = len(code) + 3 & ~3
+    code += bytes(pool - len(code)) + struct.pack("<I", control)
+    for item, at in zip(items, offsets):
+        if item == LDR_R2:
+            code[at:at + 2] = thumb(LDR_R2 | (pool - (at + 4 & ~3)) // 4)
+    return bytes(code), offsets
+
+
+def shared(items, labels, uids, control=0x01000160):
+    """(rom, compiled) for a function at ADDRESS whose code is items (see assemble), with branch targets at the
+    items whose indices are labels and uids {insn uid: [(item index, instruction text)]}"""
+    code, offsets = assemble(items, control)
+    rom = bytearray(b"\xff" * 0x150000)
+    rom[ADDRESS - fill.BASE:ADDRESS - fill.BASE + len(code)] = code
+    instructions = [at for at, item in zip(offsets, items) if not (isinstance(item, tuple) and item[0] == "word")]
+    compiled = {"text": (code, 0, len(code), []), "layout": (instructions, {offsets[k] for k in labels}),
+                "far": {at for at, item in zip(offsets, items) if isinstance(item, tuple) and item[0] == "far"},
+                "uids": {uid: [(offsets[k], text) for k, text in sites] for uid, sites in uids.items()}}
+    return bytes(rom), compiled
+
+
+def one_fill(uid, store_uid, block, width=2, control=0x01000160, value=0):
+    return {"call": proof.Insn(["call_insn", str(uid), "0", "0", ["call"]], 0), "width": width, "control": control,
+            "store_uid": store_uid, "block": list(block), "value": value}
+
+
+def shifted(uids, at, by):
+    """uids with every item index from `at` on moved by `by`"""
+    return {uid: [(k + by if k >= at else k, text) for k, text in sites] for uid, sites in uids.items()}
+
+
+# 0804A8AE-0804A936: two arms end in the same fill from their own slots, sp+0x38 and sp+0x3a; cross-jumping kept
+# the second arm's tail (r1, r2, the BL) and ends the first arm with a branch into it.  The first arm's block is
+# insns 557-584 (the call, 584, is gone), the second's 753-778; 618, 1134 and 1245 are insns later passes made.
+ARMS = [("bl", 0x08001000), ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, ADDS_R0_R1, ("b", 11),
+        ("bl", 0x08001000), MOV_R0_SP, ADDS_R0_3A, MOVS_R1_0, STRH_R1_R0,
+        ADDS_R1_R7, LDR_R2, ("bl", 0x0814186C)]
+ARM_UIDS = {559: [(1, "add\tr1, sp, #56")], 561: [(2, "movs\tr0, #0")], 562: [(3, "strh\tr0, [r1]")],
+            578: [(4, "adds\tr0, r1, #0")], 618: [(5, "b\t.L58")], 1134: [(7, "mov\tr0, sp")],
+            754: [(8, "adds\tr0, #58")], 756: [(9, "movs\tr1, #0")], 757: [(10, "strh\tr1, [r0]")],
+            774: [(11, "adds\tr1, r7, #0")], 1245: [(12, "ldr\tr2, .L61")], 778: [(13, "bl\tfunc_0814186C")]}
+FIRST, SECOND = (584, 562, range(557, 585)), (778, 757, range(753, 779))
+# a two-arm fill as agbcc compiles it when the arms store alike: cross-jumping took the store too (movs r1, #0;
+# strh r1, [r0]), so each arm forms its slot's address and branches or falls into the one shared store
+MERGED = [("bl", 0x08001000), ADD_R0_SP_38, ("b", 6), ("bl", 0x08001000), MOV_R0_SP, ADDS_R0_3A,
+          MOVS_R1_0, STRH_R1_R0, ADDS_R1_R7, LDR_R2, ("bl", 0x0814186C)]
+MERGED_UIDS = {28: [(1, "add\tr0, sp, #56")], 50: [(2, "b\t.L4")], 107: [(4, "mov\tr0, sp")],
+               62: [(5, "adds\tr0, #58")], 64: [(6, "movs\tr1, #0")], 65: [(7, "strh\tr1, [r0]")],
+               72: [(8, "adds\tr1, r7, #0")], 76: [(10, "bl\tfunc_0814186C")]}
 
 
 @unittest.skipUnless(capstone, "capstone required")
@@ -302,7 +378,7 @@ class RomTests(unittest.TestCase):
         # 0804AB2C: the slot's address in r1, the zero stored through it, r0 formed again for the call
         rom, compiled, one = window([ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, LDR_R1, LDR_R2, ADD_R0_SP_38,
                                      ("bl", 0x0814186C)])
-        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 12, 0x38, ADDRESS))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 12, 0x38, ADDRESS, ()))
         # 0804ABE2: mov r0, sp; adds r0, #0x3a; movs r1, #0; strh r1, [r0]
         rom, compiled, one = window([0x4668, 0x303A, 0x2100, 0x8001, 0x1C29, LDR_R2, ("bl", 0x0814186C)])
         self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x3A)
@@ -312,7 +388,7 @@ class RomTests(unittest.TestCase):
         # 0804BFDC: a word is stored at sp before r0 is formed (str r0, [sp]; mov r0, sp)
         rom, compiled, one = window([0x9000, 0x4668, 0x1C29, LDR_R2, ("bl", 0x0814186C)])
         one.update(width=4)
-        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 8, 0, ADDRESS + 2))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 8, 0, ADDRESS + 2, ()))
 
     def test_r1_must_miss_the_slot(self):
         # the slot is sp+0x38; r1 = sp+0x30 with four halfwords ends at it, five reach it, sp+0x38 is it
@@ -336,7 +412,7 @@ class RomTests(unittest.TestCase):
         items = [MOVS_R0_0, 0x9000, 0x9903, LDR_R2, 0x4668, ("bl", 0x08141868)]
         rom, compiled, one = window(items, control=0x010013F8)
         one.update(fast)
-        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 10, 0, ADDRESS + 8))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 10, 0, ADDRESS + 8, ()))
         rom, compiled, one = window(items[:-1] + [("bl", 0x0814186C)], control=0x010013F8)
         one.update(fast)
         with self.assertRaisesRegex(proof.ProofError, "does not reach 08141868"):
@@ -375,6 +451,119 @@ class RomTests(unittest.TestCase):
                 one.update(control=control)
                 with self.assertRaisesRegex(proof.ProofError, reason):
                     fill.rom_fill(rom, ADDRESS, compiled, one)
+
+    def test_a_bl_two_fills_share_is_read_on_every_path(self):
+        rom, compiled = shared(ARMS, {11}, ARM_UIDS)
+        first, second = one_fill(*FIRST), one_fill(*SECOND)
+        both = [first, second]
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, first, both),
+                         (ADDRESS + 0x1E, 0x38, ADDRESS + 4, ((ADDRESS + 0x1A, ADDRESS + 0xC),)))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, second, both),
+                         (ADDRESS + 0x1E, 0x3A, ADDRESS + 0x14, ((ADDRESS + 0x1A, ADDRESS + 0x18),)))
+        # the store shared as well: each path still stores its own slot once
+        rom, compiled = shared(MERGED, {6}, MERGED_UIDS)
+        first, second = one_fill(45, 43, range(26, 46)), one_fill(76, 65, range(60, 77))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, first, [first, second]),
+                         (ADDRESS + 0x18, 0x38, ADDRESS + 4, ((ADDRESS + 0x10, ADDRESS + 6),)))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, second, [first, second]),
+                         (ADDRESS + 0x18, 0x3A, ADDRESS + 0xE, ((ADDRESS + 0x10, ADDRESS + 0xE),)))
+        # the first arm reaches the tail by agbcc's far jump, a BL into the function
+        rom, compiled = shared(ARMS[:5] + [("far", 11)] + ARMS[6:], {11}, ARM_UIDS)
+        first, second = one_fill(*FIRST), one_fill(*SECOND)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, first, [first, second]),
+                         (ADDRESS + 0x20, 0x38, ADDRESS + 4, ((ADDRESS + 0x1C, ADDRESS + 0xC),)))
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, second, [first, second])[1], 0x3A)
+        # one fill whose line starts at a branch target that only its own block falls into
+        alone = ARMS[6:]
+        sites = shifted({k: v for k, v in ARM_UIDS.items() if v[0][0] >= 6}, 0, -6)
+        rom, compiled = shared(alone, {5}, sites)
+        one = one_fill(*SECOND)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one, [one]),
+                         (ADDRESS + 0x10, 0x3A, ADDRESS + 6, ((ADDRESS + 0xC, ADDRESS + 0xA),)))
+        # a second way in that stores nothing: the path from the beq shows no fill
+        rom, compiled = shared([alone[0], ("beq", 6)] + alone[1:], {6}, shifted(sites, 1, 1))
+        with self.assertRaisesRegex(proof.ProofError, "r0 holds no stack address at the BL at 08000412"):
+            fill.rom_fill(rom, ADDRESS, compiled, one, [one])
+
+    def test_shared_bl_refusals(self):
+        first, second = one_fill(*FIRST), one_fill(*SECOND)
+        uids = {k: v for k, v in ARM_UIDS.items() if k not in (559, 561, 562, 578)}
+        conditional = ARMS[:5] + [("beq", 12), ("b", 12)] + ARMS[6:]
+        for label, items, labels, sites, fills, reason in (
+                ("a path without its own store", ARMS[:3] + [0x46C0] + ARMS[4:], {11}, ARM_UIDS, None,
+                 "sp\\+0x38 of the fill at 0800041E is not stored exactly once"),
+                ("a path whose store is no fill's", ARMS, {11}, {**uids, 563: [(3, "strh\tr0, [r1]")],
+                                                                 578: [(4, "adds\tr0, r1, #0")]}, None,
+                 "stores its slot sp\\+0x38 at 08000408, which is no fill's store"),
+                ("a path from no fill's block", ARMS, {11}, {**uids, 580: [(11, "adds\tr1, r7, #0")]}, None,
+                 "from 08000404 comes from no fill's block"),
+                ("a path from two fills' blocks", ARMS, {11}, {**ARM_UIDS, 755: [(1, "add\tr1, sp, #56")]}, None,
+                 "from 08000404 comes from more than one fill's block"),
+                ("a block the code no longer holds", ARMS, {11}, uids, None,
+                 "UID 584 is not one BL, and its block reaches none"),
+                ("a temporary of another width", ARMS, {11}, ARM_UIDS, [one_fill(*FIRST, width=4), second],
+                 "differ in their call or temporary"),
+                ("another control word", ARMS, {11}, ARM_UIDS, [one_fill(*FIRST, control=0x01000180), second],
+                 "r2 holds 0x01000160 at the BL at 0800041E, not the fill's control word 0x01000180"),
+                ("a computed jump", ARMS + [0x4687], {11}, ARM_UIDS, None, "jumps where the ROM does not say"),
+                ("a BL into the function the listing does not mark a far jump", ARMS + [("bl", ADDRESS + 0x1A)],
+                 {11}, ARM_UIDS, None, "08000422 jumps where the ROM does not say"),
+                ("a far jump to no branch target", ARMS + [("far", 9)], {11}, ARM_UIDS, None,
+                 "08000422 is marked a far jump but reaches no branch target of the function"),
+                # 0x08000400 calling itself in the arm whose tail cross-jumping kept: the call returns into the
+                # target, and the CpuSet BL then runs with r0 = its result and no store
+                ("a recursive call falling into the target", ARMS[:5] + [("b", 7), ("bl", ADDRESS)] + ARMS[11:],
+                 {7}, {**{k: v for k, v in ARM_UIDS.items() if v[0][0] < 6}, 778: [(9, "bl\tfunc_0814186C")]},
+                 [first], "r0 holds no stack address at the BL at 08000416"),
+                ("an insn before the target that does not fall into it",
+                 ARMS[:5] + [("b", 12)] + ARMS[6:11] + [("word", 0)] + ARMS[11:], {12}, shifted(ARM_UIDS, 11, 1),
+                 None, "08000418 does not fall through to the branch target at 0800041E"),
+                ("a far jump in that stores nothing", ARMS + [("far", 11)], {11}, ARM_UIDS, None,
+                 "r0 holds no stack address at the BL at 0800041E"),
+                ("a conditional branch in that stores nothing", ARMS + [("beq", 11)], {11}, ARM_UIDS, None,
+                 "r0 holds no stack address at the BL at 0800041E"),
+                ("the target's address in a literal", ARMS + [0x46C0, ("word", ADDRESS + 0x1B)], {11}, ARM_UIDS, None,
+                 "the address of the branch target at 0800041A is taken"),
+                ("the target's address formed in the code", [0xA006] + ARMS[:5] + [("b", 12)] + ARMS[6:], {12},
+                 shifted(ARM_UIDS, 0, 1), None, "the address of the branch target at 0800041C is taken"),
+                ("another value stored", ARMS, {11}, ARM_UIDS, [one_fill(*FIRST, value=1), second],
+                 "the store at 08000408 writes 0x0 to the slot sp\\+0x38, not the fill's value 0x1"),
+                ("a block that leaves by a conditional branch", conditional, {12}, shifted(ARM_UIDS, 5, 1), None,
+                 "UID 584 is not one BL, and its block reaches none in a straight line"),
+                ("a call between the store and the target",
+                 ARMS[:5] + [("b", 12)] + ARMS[6:11] + [("bl", 0x08001000)] + ARMS[11:], {12},
+                 shifted(ARM_UIDS, 11, 1), None, "r0 holds no stack address at the BL at 08000422"),
+                ("a fill sharing the BL with no path", ARMS, {11}, {**ARM_UIDS, 395: [(11, "adds\tr1, r7, #0")]},
+                 [first, second, one_fill(400, 399, range(390, 401))],
+                 "UID 400 reaches the BL at 0800041E by no path of its own"),
+                ("a fill reaching the BL from two slots", ARMS + [0xA90F, MOVS_R0_0, STRH_R0_R1, ADDS_R0_R1, ("b", 11)],
+                 {11}, {**ARM_UIDS, 570: [(14, "add\tr1, sp, #60")], 571: [(16, "strh\tr0, [r1]")],
+                        562: [(3, "strh\tr0, [r1]"), (16, "strh\tr0, [r1]")]}, None,
+                 "UID 584 reaches the BL at 0800041E by paths with different slots")):
+            with self.subTest(label=label):
+                rom, compiled = shared(items, labels, sites)
+                both = fills or [first, second]
+                with self.assertRaisesRegex(proof.ProofError, reason):
+                    for one in both:
+                        fill.rom_fill(rom, ADDRESS, compiled, one, both)
+
+    def test_far_jumps_are_read_off_the_listing(self):
+        # agbcc marks its long branch `@far jump`, or `@ far jump`; a BL to a function is a call, marked or not
+        listing = ("  18 0008 01F034F8 \t\tbl\t.L3\t@far jump\n"
+                   "  31 0010 FFF7FEFF \t\tbl\t.L9\t@ far jump\n"
+                   "  40 0014 FFF7FEFF \t\tbl\t.L9\n"
+                   "  52 0018 FFF7FEFF \t\tbl\tfunc_08000400\t@ 33\tcall_value\n"
+                   "  60 001c FFF7FEFF \t\tbl\tfunc_08000400\t@far jump\n")
+        self.assertEqual(fill.far_jumps(listing), {0x8, 0x10})
+
+    def test_paths_are_bounded(self):
+        first, second = one_fill(*FIRST), one_fill(*SECOND)
+        rom, compiled = shared(ARMS, {11}, ARM_UIDS)
+        for name, value, reason in (("MAX_PATHS", 1, "more than 1 paths reach the BL at 0800041E"),
+                                    ("MAX_WINDOW", 6, "a path into the BL at 0800041E is longer than 6")):
+            with self.subTest(name=name), unittest.mock.patch.object(fill, name, value), \
+                    self.assertRaisesRegex(proof.ProofError, reason):
+                fill.rom_fill(rom, ADDRESS, compiled, first, [first, second])
 
     def test_rom_refusals(self):
         for label, items, reason, extra in (
@@ -496,6 +685,26 @@ class CompiledTests(unittest.TestCase):
         for control, reason in (("0x00000020", "without bit 24"), ("0x05000020", "a bit outside 0-20 and 24")):
             with self.subTest(control=control), self.assertRaisesRegex(proof.ProofError, reason):
                 self.run_fill(FAST.replace("0x01000000 |", f"{control} |"), FASTSET)
+
+    def test_fills_that_share_a_bl_are_admitted(self):
+        # the arms' tails are alike from the store on, so cross-jumping leaves the first arm's slot address and a
+        # branch into the second arm's store and BL
+        arms = MACRO.split("void func_08000400")[0] + (
+            "extern void func_08001000(void);\nextern void func_08001004(void);\n"
+            "extern void func_08001008(u16 *dest);\nextern void func_0800100C(void);\n"
+            "extern void func_08001010(void);\n"
+            "void func_08000400(int c, u16 *dest)\n{\n    if (c == 1) {\n        func_08001000();\n"
+            "        CpuFill16(0, dest, 0x2C0);\n        func_08001008(dest);\n    } else if (c == 2) {\n"
+            "        func_08001004();\n        CpuFill16(0, dest, 0x2C0);\n        func_08001008(dest);\n"
+            "    } else {\n        func_0800100C();\n    }\n    func_08001010();\n}\n")
+        result = self.run_fill(arms)
+        self.assertEqual([state for _, (state, _) in result], ["admitted", "admitted"], result)
+        text = result[0][1][1]
+        self.assertIn("(macro CpuFill16, used 2 times)", text)
+        self.assertIn("08000426 fills from sp+0x0 (address formed at 0800040E, joining at 0800041E from 08000410, "
+                      "control 0x01000160", text)
+        self.assertIn("08000426 fills from sp+0x2 (address formed at 0800041C, joining at 0800041E from 0800041C, "
+                      "control 0x01000160", text)
 
     def test_a_qualifier_that_changes_nothing_refuses(self):
         # the second arm's temporary compiles alike without its qualifier: the ROM does not show it
