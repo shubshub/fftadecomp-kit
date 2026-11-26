@@ -1745,6 +1745,38 @@ bound into the buffer proof fingerprint; a proof that accepts nothing keeps its
 fingerprint and lines. An admitted walk never reaches the rule, so only
 refusals change. Synthetic boundaries are in `tests/test_dead_stack_registers.py`.
 
+When the entry proof refuses, `dead_register.through_calls` tries once more,
+for a callee that hands the value to a callee of its own before writing it, or
+whose path to the write passes a switch the value never reaches. A BL to an
+indexed Thumb function (the proof's own complete mapped span; no division
+runtime, no call thunk) is followed into that callee's entry with the same
+rules, nested at most twice; the callee must write every live register before
+reading it on every path, so the call ends the path, and a return with one live
+refuses. Both edges of every direct conditional branch are followed to a least
+fixpoint, except a branch whose flags come from the CMP, CMN or TST right
+before it (its only predecessor on the surviving paths, so nothing between
+writes the flags) and whose operands are exact constants there: only its taken
+edge, or only its fallthrough, is followed. A constant comes from immediates
+through MOVS/MOV, ADDS, SUBS, NEGS, MVNS, shifts by an immediate and logic on
+two constants, computed by a forward fixpoint over the surviving paths; a load
+(so any value from memory), any other write, and a join of two different values
+leave a register unknown. Signed and unsigned conditions are evaluated on the
+exact 32-bit flags, and a condition on C or V after TST is not decided. Every
+surviving path must write the register before any read, call or return; a
+memory read while a register is live, an indirect call, any PC write (a `mov
+pc` dispatch on a surviving edge too), an SWI and any 32-bit decode but a BL
+refuse. The record and the line (`thumb-dead-stack-register-calls-v1`) state
+every followed call (site, callee, depth, its body hash and killing writes) and
+every decided branch (site, condition, edge, flag site and operands):
+
+```
+* buffer dead register: `thumb-dead-stack-register-calls-v1` call 0x080AC372 to 0x080A7EC4 passes r2=-100; ... followed: BL 0x080A7ED8 to 0x080CA7A4 (depth 1, ff46b43099ea0296) writes r2@0x080CA7AC, BL 0x080A7FBA to 0x08141520 (depth 1, c2b406f78415f765) writes r2@0x08141524; decided: 0x080A7EE0 bhi taken to 0x080A7FB8 (flags from 0x080A7EDE on 0xFFFFFFFE, 0x00000012); ...
+```
+
+A callee the entry proof admits keeps its version-1 record and line.
+`dead_register.THROUGH_CALLS.enabled = False` keeps the entry proof alone.
+Boundaries are in `tests/test_dead_register_through_calls.py`.
+
 ### GBA BIOS wrappers in plain buffer walks
 
 The plain register and stack buffer proofs (`elf-symbol-thumb-frame-buffer-calls-v1`
