@@ -203,8 +203,12 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         import owner_switch_buffer_profile as owner_switch
         instructions = owner_switch.walk(proof, data, address, calls, switch_relocations)
     elif schema == FUNCTION_SCHEMA:
-        run = lambda candidate: match.verify_leaf_instructions(
+        walk = lambda candidate: match.verify_leaf_instructions(
             data, address, True, calls, buffer_proof=candidate, menu_list_frame=frame)
+        # The function-literal owner's R2/R3 exit scratch (function_literal_exit_scratch_profile),
+        # never with the menu list's own frame.
+        run = walk if frame is not None else (lambda candidate: match.function_exit.walk(
+            candidate, data, address, mapping, lambda: walk(candidate)))
         if frame is not None or rebuild is None:
             instructions = run(proof)
         else:
@@ -354,6 +358,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* callee-saved premise", "* callee-saved fact",
           # call_via_target_profile.lines
           "* buffer call-via target", "* buffer call-via premise",
+          # function_literal_exit_scratch_profile.lines
+          "* buffer function-literal exit scratch",
           # default_stack_index_profile.lines
           "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
           "* buffer stack index premise", "* buffer stack index frame words")

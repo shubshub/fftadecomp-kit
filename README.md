@@ -2502,6 +2502,37 @@ Any other premise that walk would need refuses the resolution.
 Replay recomputes the lines and requires them to equal the report's.
 `call_via_target_profile.TARGETS.enabled = False` restores the refusal.
 
+#### Exit scratch of a function-literal owner
+
+On a path that returns, agbcc can leave the address of one of the owner's
+locals in R2 or R3: the base it used for the local's stores, the argument it
+passed, or the value a walked callee left there. The function-literal buffer
+proofs refused that at the return (`local stack pointer escapes through a
+return register`). At the owner's own normal returns they now drop such an
+address, one inside the owner's expired frame (a negative entry-SP offset),
+and record it, under the premise the kit already states at other roots,
+`thumb-discarded-exit-scratch-v1`: R2/R3 carry no results under the agbcc
+Thumb ABI, so the owner's caller never reads them. It is a premise about the
+callers and is not checked; every report that uses it states it.
+
+The projection is `RootReturnScratchMixin`'s, unchanged, bound as the owner
+switch binds it (`function_literal_exit_scratch_profile`): only an exact
+`FunctionBufferCallProof` root walk without a stack-index retry, an owner
+switch or the menu list frame, with no local BL and no switch, whose every
+normal return ends the walk. The binding is made at the first return that
+holds an R2/R3 address, so no other walk changes. R0/R1, every other
+register, every non-negative offset, every inspected callee's return and a
+walk that kept any join apart (`stack-split-join-v1`, on any register) keep
+the refusal. The sites are bound into the buffer proof fingerprint only when
+one exists, and the report states them on one line:
+
+    * buffer function-literal exit scratch: `thumb-discarded-exit-scratch-v1` premise, not checked: <contract>; own-frame addresses dropped at the owner's normal returns: `0x<return site> r<register> <entry-SP offset>`, ...; R0/R1 and every callee return keep the escape refusal
+
+Replay recomputes it: a report without it does not replay for an owner that
+needs it, and one that states it for an owner that does not is refused.
+`function_literal_exit_scratch_profile.POLICY.enabled = False` restores the
+refusal.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is

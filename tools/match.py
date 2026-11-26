@@ -55,6 +55,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import call_via_target_profile as call_via
+import function_literal_exit_scratch_profile as function_exit
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
 import dma_fill_profile as dma_fill
@@ -2207,7 +2208,9 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
     if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
     instructions, proof = default_index.walk(
-        make_proof, lambda proof: verify_leaf_instructions(data, address, True, calls, buffer_proof=proof),
+        make_proof, lambda proof: function_exit.walk(
+            proof, data, address, mapping,
+            lambda: verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)),
         data, address, premises)
     if not proof.buffer_evidence():
         raise ValueError("function-buffer evidence requires an inspected buffer call")
@@ -4431,6 +4434,7 @@ class BufferCallProof:
             lines.extend(self.runtime_summaries.lines())
         lines.extend(split_join.lines(self.split_joins))
         lines.extend(call_via.lines(self))
+        lines.extend(function_exit.lines(self))
         return lines
 
     def record_cursor_loops(self, records):
@@ -4462,6 +4466,11 @@ class BufferCallProof:
             # Bound only when a call-via call was resolved: other reports keep their fingerprint.
             digest.update(len(via).to_bytes(8, "little"))
             digest.update(via)
+        scratch = function_exit.fingerprint_payload(self)
+        if scratch is not None:
+            # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
+            digest.update(len(scratch).to_bytes(8, "little"))
+            digest.update(scratch)
         if self.loop_replays:
             # Bind every replayed callee's exact caller-frame writes, the (call target,
             # register) pairs trusted across un-inspected calls and the pruned branch
@@ -5455,6 +5464,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 aliases = root_return_scratch_aliases(buffer_proof, data, address, current, aliases)
                 # The plain owner switch's R2/R3 exit scratch (owner_switch_buffer_profile).
                 aliases = owner_switch_buffer.exit_scratch_aliases(buffer_proof, data, address, current, aliases)
+                # A function-literal owner's R2/R3 exit scratch (function_literal_exit_scratch_profile).
+                aliases = function_exit.aliases(buffer_proof, data, address, current, aliases)
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
