@@ -331,6 +331,24 @@ class ClosureUnitTests(unittest.TestCase):
         proof.closure_retry = dict(proof.closure_retry, slots=[[-12, [2], [[3, "pointer", -16]]]])
         self.assertEqual(len({plain, first, proof.fingerprint()}), 3)
 
+    def test_summary_result_passes_every_word_through_unchanged(self):
+        proof = self.proof()
+        fact = call_via.CallTarget(0x08000701, {("pool", 0x08000230), ("slot", 0x08000210)},
+                                   {(0x08000300, 0x08000700, 4)})
+        words = {-12: ("pointer", -16), -8: ("constant", fact), -4: ("constant", 0)}
+        result = closure.summary_result(proof, words)
+        self.assertIsInstance(result, closure.WordResult)
+        self.assertEqual(dict(result), {})
+        self.assertEqual(dict(result.words), words)
+        kept = dict(result.words)[-8][1]
+        self.assertIs(type(kept), call_via.CallTarget)
+        self.assertEqual((kept.origins, kept.crossed), (fact.origins, fact.crossed))
+        words[-4] = ("constant", 1)                   # the result is a copy, not the walk's dict
+        self.assertEqual(dict(result.words)[-4], ("constant", 0))
+        plain = match.BufferCallProof(bytes(0x1000), b"[]", stack_arguments=True, call_via_targets=True)
+        with self.assertRaisesRegex(ValueError, "only in a closure-slot walk"):
+            closure.summary_result(plain, {-12: ("pointer", -16)})
+
     def test_word_join_unions_call_target_facts_of_one_value_only(self):
         first = ("constant", call_via.CallTarget(0x08000701, {("pool", 1)}))
         second = ("constant", call_via.CallTarget(0x08000701, {("pool", 1)}, {(2, 3, 8)}))
