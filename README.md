@@ -5813,8 +5813,10 @@ offset still refuses, and so does the reference inside a fill's block or on a
 loop round a fill. The record lists the references. The graph takes each
 jump's labels by RTL code, at any mode (a jump table's cases print as
 `label_ref:SI`), and refuses where it cannot bound the edges: a computed
-jump, a tablejump with no table, a label address taken outside a jump
-table, or a call that may return twice. A pseudo with
+jump, a tablejump with no table, a call that may return twice, a label
+gcc preserves for a nonlocal goto, and any label whose address the code
+takes (in the RTL, or as a `.word .L<n>` of the unit's assembly) other
+than a jump table's own label and its cases. A pseudo with
 several definitions, such as the pointers a structure copy's block move
 advances, is read through the definition that reaches the reference in a
 straight line, with no branch target between. In the code, which is the ROM's, every path into the fill's BL

@@ -366,10 +366,11 @@ def overlaps(start, size, other, other_size):
     return start < other + other_size and other < start + size
 
 
-def fills(function):
+def fills(function, taken=None):
     """[fill] of an expand-level function: each {call (insn), slot (frame register, offset), width, control,
     store (insn index), start (insn index), callee (name), store_uid, block (the uids of its insns, in order),
-    value (the constant it stores, or None)}; ProofError when a fill or the slots it needs cannot be shown"""
+    value (the constant it stores, or None)}; ProofError when a fill or the slots it needs cannot be shown.
+    taken is label_words() of the unit's assembly, which apart() reads (None: the RTL alone)"""
     resolver = proof.Resolver(function)
     calls = [(insn, name) for insn in function.insns if insn.code == "call_insn"
              for name in CALLEES if f'"{name}"' in proof.flatten(insn.pattern)]
@@ -450,7 +451,7 @@ def fills(function):
     if unplaced:
         if not found:
             raise ProofError("a frame reference of the function has no constant offset")
-        apart(function, unplaced, found)
+        apart(function, unplaced, found, taken)
     return found
 
 
@@ -546,7 +547,20 @@ def jump_targets(function, insn, labels):
     return label_refs(pattern)
 
 
-def successors(function):
+def label_words(assembly):
+    """the numbers n of every `.L<n>` a data directive of an agbcc assembly names, i.e. the labels whose
+    address the code takes: a jump table's own label (in the constant pool) and its cases, a label value,
+    a nonlocal goto's handler, a __builtin_setjmp receiver.  Thumb agbcc has no other way to form a label's
+    address (no adr); a label value reaches its register from the constant pool, which the RTL does not show"""
+    found = set()
+    for line in assembly.splitlines():
+        match = re.match(r"\s*(?:\.?\w+:\s*)?\.(?:word|long|4byte|int|short|hword|2byte|byte|quad|8byte)\s+(.*)", line)
+        if match:
+            found |= {int(number) for number in re.findall(r"\.L(\d+)\b", match[1])}
+    return found
+
+
+def successors(function, taken=None):
     """{insn index: the indices control may pass to next} on the expand RTL.
 
     Every insn but a barrier falls through to the next. A jump_insn adds
@@ -558,9 +572,30 @@ def successors(function):
     read, a label whose address an insn other than a jump takes (a label
     value or a nonlocal goto's handler) unless it heads a jump table, and a
     call that may return twice (setjmp and its kin), since a missing edge
-    would make two insns look apart.
+    would make two insns look apart.  So does a label gcc preserves for a
+    nonlocal goto (`code_label/s`), and, given the assembly's label_words(),
+    any label whose address the code takes other than a jump table's own
+    label and its cases: control reaches such a label from outside the
+    graph (a nonlocal goto, a longjmp to a __builtin_setjmp receiver).
     """
     labels = {insn.uid: insn.index for insn in function.insns if insn.code == "code_label"}
+    for insn in function.insns:
+        if insn.code == "code_label" and "s" in insn.flags:
+            raise ProofError(f"label UID {insn.uid} is preserved for a nonlocal goto; the proof cannot bound the "
+                             "jumps to it")
+    if taken is not None:
+        numbers = {insn.number: insn.uid for insn in function.insns if insn.code == "code_label"}
+        allowed = set()
+        for insn in function.insns:
+            if insn.code == "jump_insn" and code(insn.pattern) in TABLES:
+                head = function.insns[insn.index - 1] if insn.index else None
+                if head is not None and head.code == "code_label":
+                    allowed.add(head.number)
+                allowed |= {function.insns[labels[uid]].number for uid in label_refs(insn.pattern) if uid in labels}
+        for number in sorted(taken - allowed):
+            raise ProofError(f"the assembly takes the address of label .L{number}"
+                             + (f" (UID {numbers[number]})" if number in numbers else "") +
+                             ", which is no jump table's label or case; the proof cannot bound the jumps to it")
     graph = {}
     for insn in function.insns:
         following = set() if insn.code == "barrier" or insn.index + 1 >= len(function.insns) else {insn.index + 1}
@@ -570,7 +605,7 @@ def successors(function):
                 raise ProofError(f"jump insn UID {insn.uid} refers to a label the dump does not hold")
             following |= {labels[uid] for uid in targets}
         elif insn.pattern is not None:
-            for uid in label_refs(insn.pattern):
+            for uid in label_refs(insn.pattern) + label_refs(insn.notes):
                 if table_at(function, labels, uid) is None:
                     raise ProofError(f"insn UID {insn.uid} takes the address of label UID {uid}, which heads no "
                                      "jump table; the proof cannot bound the jumps to it")
@@ -594,7 +629,7 @@ def reached(graph, start):
     return seen
 
 
-def apart(function, unplaced, found):
+def apart(function, unplaced, found, taken=None):
     """F1 for the frame references at offsets the proof cannot place (0811E1F8's `heights[context->mode]`).
 
     Each must lie on no path to or from any fill: no path from the first
@@ -607,7 +642,7 @@ def apart(function, unplaced, found):
     outlive the invocation.  Each fill records the references it was
     checked against.
     """
-    graph = successors(function)
+    graph = successors(function, taken)
     for index, register, offset, width, what, mem in unplaced:
         if what == "store" and "v" in rtl_flags(mem):
             raise ProofError(f"insn UID {function.insns[index].uid} holds a volatile frame store at an offset the "
@@ -966,12 +1001,13 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
         unit = proof.Unit(tree, relpath, raw, offsets, work, dependencies, repeated)
         real = unit.compile("real", unit.real, name)
         real["far"] = far_jumps((Path(work) / "real" / "f.lst").read_text())
+        taken = label_words((Path(work) / "real" / "f.s").read_text())
         proof.function_matches_rom(real["text"], address, rom)
         rtl = real["dumps"]["rtl"]
         for other, function in rtl.items():
             if other != name and any("v" in rtl_flags(mem) for _, mem, _ in function.mems()):
                 raise ProofError(f"another function of the unit, {other}, holds a volatile reference")
-        found = sorted(fills(rtl[name]), key=lambda fill: fill["store"])
+        found = sorted(fills(rtl[name], taken), key=lambda fill: fill["store"])
         wrappers(rom, {fill["callee"] for fill in found})
         sites = [rom_fill(rom, address, real, fill, found) for fill in found]
         keys = [store_key(touch) for touch in volatile_frame_stores(rtl[name], proof.Resolver(rtl[name]))]
