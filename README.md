@@ -2400,6 +2400,68 @@ and the bytes on every run. `signed_remainder_leaf_profile.POLICY.enabled =
 False` restores the plain refusal, and a report carrying the lines then fails
 replay.
 
+### Compiler quotients and unsigned remainders as leaf calls in the default buffer walk
+
+The same retry covers the other three pinned word runtimes: compiler
+`__divsi3` (0x081426B8), `__udivsi3` (0x08142AB0) and `__umodsi3`
+(0x08142B28). Their isolated profiles prove only frameless callers, so the
+default path refuses them, at link time, beside a table, a thunk, a literal or
+another runtime:
+
+```
+signed quotient excludes other runtime, literal, switch and thunk profiles
+division evidence excludes literal, switch and thunk combinations
+unsigned remainder excludes other runtime, switch, function and thunk profiles
+```
+
+On exactly one of these refusals the retry runs once more, with the gate above,
+when the original object names at least one of the four compiler runtimes and
+none of the addressed spellings `func_081426B8`, `func_08142950`,
+`func_08142AB0` or `func_08142B28`. In the retry:
+
+1. Each compiler name binds to its pinned entry with that runtime's own
+   identity check: the SHA-pinned body, the `__div0` hook and exact unique
+   Thumb spans. The preprocessed C may name none of the eight identifiers, and
+   a call into a pinned runtime span that is not its entry refuses.
+2. The plain stack-argument buffer proof applies the same native-proved leaf
+   contract to each entry, in the owner and in every inspected callee
+   (`runtime_summary_profile`). The contract has no memory operand, and R4-R11
+   and SP are restored. R0 is an unknown scalar, and R1-R3, R12, LR and the
+   flags are clobbered. A tracked local pointer in R0, R1 or LR refuses, and a
+   pointer left in R2, R3 or R12 refuses unless the runtime overwrites it on
+   every return (only `__modsi3`'s R3 qualifies).
+3. Every summarised site needs a numeric operand record from its function's own
+   walk. A `__divsi3` site needs a CFG-constant divisor in 1..0x7FFFFFFF, or a
+   signed16 dividend and a nonzero divisor, the same two records as
+   `__modsi3`. A `__udivsi3` or `__umodsi3` site needs a CFG-constant divisor in
+   1..0xFFFFFFFF. The constants come from `MOV`, `ADD`/`SUB` immediate, `LSL`
+   immediate and PC literals outside the typed address domain; a fact survives
+   a join only when every path agrees, and calls clobber R0-R3, R12 and LR. No
+   admitted site divides by zero or computes `INT_MIN / -1`.
+4. A table may sit beside the summary only as the owner switch the data-buffer
+   proof binds, as above.
+
+An owner that summarises only `__modsi3` keeps the lines above unchanged; so do
+its schema and fingerprint text. Any other owner states the components and
+every site in `* buffer division runtime` lines under the summary schema
+`thumb-compiler-division-numeric-leaf-summary-v1`, each site naming its
+runtime:
+
+```
+* buffer division runtime: `thumb-compiler-division-numeric-leaf-summary-v1` __divsi3 0x081426B8 (72 instructions, 80b13b14c17b297e), __modsi3 0x08142950 (102 instructions, e29c5cee2bafd4fc) and __div0 as native-proved leaves: R0 unknown scalar, R1-R3/R12/LR/flags clobbered, R4-R11/SP restored, no memory operand; no local pointer in R0/R1/LR; no quotient or remainder value or range
+* buffer division runtime: call 0x0802A85A (0x0802A6A0+0x1BA) __divsi3: divisor 10 (positive-signed32-constant-divisor); dead scratch discarded: none
+```
+
+The records are bound into the buffer fingerprint as before. A refused retry
+keeps the plain refusal first, with its own suffix:
+`<plain refusal>; division leaf summary: <reason>`. A `__modsi3` beside
+another runtime, which the remainder retry used to refuse, now joins this
+summary when every site has its record. Not proved: any quotient or remainder
+value, a range for it, or termination.
+`signed_remainder_leaf_profile.DIVISION.enabled = False` restores the plain
+refusals for the three exclusions, and leaves `__modsi3` alone in the remainder
+retry.
+
 ### Jump tables behind their dispatch's literal pool
 
 agbcc ends a jump-table dispatch with `mov pc, rN`, an unconditional transfer,

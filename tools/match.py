@@ -965,6 +965,10 @@ def call_bindings(image, name, address, mapping, rom_size,
             unsigned_remainder = target_symbol["name"] == "__umodsi3"
             quotient = target_symbol["name"] == "__divsi3"
             remainder = target_symbol["name"] in ("__modsi3", modsi3.ADDRESSED_NAME)
+            # The default-path leaf retry binds every compiler runtime it summarises here.
+            leaf_runtime = remainder_leaf.active() and target_symbol["name"] in remainder_leaf.names()
+            if leaf_runtime:
+                division = remainder = quotient = unsigned_remainder = False
             own_entry = allow_self_call and target_symbol["name"] == name and \
                 target_symbol["section"] == image["text_index"] and target_symbol["value"] == symbol["value"] and \
                 target_symbol["bind"] == 1 and target_symbol["type"] == 2 and \
@@ -1004,6 +1008,19 @@ def call_bindings(image, name, address, mapping, rom_size,
                     raise ValueError("software double requires one undefined global function symbol")
                 target = double_target
                 candidates = []
+            elif leaf_runtime:
+                # The default-path retry: compiler runtimes only, summarised by the buffer walk.
+                if double_bindings is not None or modsi3_bindings:
+                    raise ValueError("signed remainder leaf summary binds only compiler __modsi3 calls")
+                if target_symbol["section"] or target_symbol["bind"] != 1 or \
+                        target_symbol["type"] not in (0, 2) or target_symbol["value"] or \
+                        sum(item["name"] == target_symbol["name"] for item in image["symbols"]) != 1:
+                    raise ValueError("signed remainder requires one undefined global function symbol"
+                                     if target_symbol["name"] == remainder_leaf.NAME else
+                                     "division leaf runtime requires one undefined global function symbol")
+                remainder_leaf.verify_identity(target_symbol["name"], rom_image, mapping)
+                target = remainder_leaf.ENTRIES[target_symbol["name"]]
+                candidates = []
             elif unsigned_remainder:
                 if umodsi3_bindings is None:
                     raise ValueError("unsigned remainder requires its canonical constant-divisor profile")
@@ -1026,9 +1043,8 @@ def call_bindings(image, name, address, mapping, rom_size,
                 candidates = []
             elif remainder:
                 if remainder_leaf.active():
-                    # The default-path retry: only compiler __modsi3, summarised by the buffer walk.
-                    if target_symbol["name"] != remainder_leaf.NAME or double_bindings is not None or modsi3_bindings:
-                        raise ValueError("signed remainder leaf summary binds only compiler __modsi3 calls")
+                    # Only the addressed spelling reaches here in the retry, which binds compiler names.
+                    raise ValueError("signed remainder leaf summary binds only compiler __modsi3 calls")
                 elif modsi3_bindings is None:
                     raise ValueError("signed remainder requires its isolated binding profile")
                 if double_bindings is not None and target_symbol["name"] != "__modsi3":
@@ -1095,14 +1111,18 @@ def call_bindings(image, name, address, mapping, rom_size,
             if relocation % 2 or relocation + 4 > symbol["size"] or instruction is None or \
                     instruction.id != ARM_INS_BL or instruction.size != 4:
                 raise ValueError("call relocation does not cover a Thumb BL instruction")
-            if division or remainder or quotient or double_operation or unsigned_remainder or left_shift or float_operation:
+            if leaf_runtime:
+                if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM or \
+                        instruction.operands[0].imm != address + relocation:
+                    raise ValueError("division call relocation has a noncanonical addend")
+                leaf_remainders[address + relocation] = target_symbol["name"]
+            elif division or remainder or quotient or double_operation or unsigned_remainder or left_shift or float_operation:
                 if len(instruction.operands) != 1 or instruction.operands[0].type != ARM_OP_IMM or \
                         instruction.operands[0].imm != address + relocation:
                     raise ValueError("division call relocation has a noncanonical addend")
                 bindings = (float_bindings if float_operation else ashldi3_bindings if left_shift else umodsi3_bindings if unsigned_remainder else
                             double_bindings if double_operation else divsi3_bindings if quotient else
-                            (leaf_remainders if remainder_leaf.active() else modsi3_bindings) if remainder else
-                            udivsi3_bindings)
+                            modsi3_bindings if remainder else udivsi3_bindings)
                 bindings[address + relocation] = target_symbol["name"]
             positions = set(range(relocation, relocation + 4))
             if positions & occupied:
@@ -1220,7 +1240,7 @@ def call_bindings(image, name, address, mapping, rom_size,
         data_names = {binding[0] for binding in data_relocations.values()}
         for target_name in targets:
             if target_name not in data_names and target_name not in composed_thunks and not (
-                    target_name == remainder_leaf.NAME and leaf_remainders) and not (
+                    target_name in leaf_remainders.values()) and not (
                     function_thunks and target_name in function_thunk.ALIASES) and not (
                     target_name == "__divsi3" and divsi3_bindings and division_switches.POLICY.enabled) and not (double_bindings is not None and
                     (software_double.call_target(target_name) is not None or target_name == "__modsi3")):
@@ -1398,7 +1418,23 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         from unsigned_thunk_profile import check_link_bindings as check_unsigned_thunk_bindings
         check_unsigned_thunk_bindings(calls, targets, data_relocations, function_relocations, switch_relocations,
                                       udivsi3_bindings, umodsi3_bindings)
-    unsigned_remainder_targets = {name: target for name, target in targets.items()
+    # The default-path leaf retry's compiler runtimes are checked here, each at its pinned entry, and
+    # leave the per-runtime checks below; every call into a pinned runtime span is an exact entry.
+    runtime_targets = targets
+    if remainder_leaf.active():
+        division_targets = {name: target for name, target in targets.items()
+                            if is_udivsi3_address(target) or modsi3.reserved(target) or
+                            divsi3.reserved(target) or umodsi3.reserved(target)}
+        if division_targets and (
+                any(name not in remainder_leaf.names() or target != remainder_leaf.ENTRIES[name]
+                    for name, target in division_targets.items()) or modsi3_bindings or
+                double_bindings is not None or function_relocations or
+                any(target not in remainder_leaf.entries() for target in calls.values()
+                    if is_udivsi3_address(target) or modsi3.reserved(target) or divsi3.reserved(target) or
+                    umodsi3.reserved(target))):
+            raise ValueError("linked signed remainder leaf bindings are incomplete or mixed")
+        runtime_targets = {name: target for name, target in targets.items() if name not in division_targets}
+    unsigned_remainder_targets = {name: target for name, target in runtime_targets.items()
                                   if umodsi3.reserved(target)}
     if unsigned_remainder_targets:
         if unsigned_remainder_targets != {"__umodsi3": umodsi3.ADDRESS} or \
@@ -1436,7 +1472,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked software-double bindings are incomplete or mixed")
     elif double_bindings is not None:
         raise ValueError("software-double bindings have no linked runtime")
-    quotient_targets = {name: target for name, target in targets.items()
+    quotient_targets = {name: target for name, target in runtime_targets.items()
                         if divsi3.reserved(target) and not (double_bindings is not None and
                             software_double.shared_division_call(name, target))}
     if quotient_targets:
@@ -1451,13 +1487,8 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked signed quotient bindings are incomplete or mixed")
     elif divsi3_bindings:
         raise ValueError("signed quotient bindings have no linked runtime")
-    remainder_targets = {name: target for name, target in targets.items() if modsi3.reserved(target)}
-    if remainder_targets and remainder_leaf.active():
-        if remainder_targets != {remainder_leaf.NAME: modsi3.ADDRESS} or modsi3_bindings or \
-                double_bindings is not None or function_relocations or \
-                any(target != modsi3.ADDRESS for target in calls.values() if modsi3.reserved(target)):
-            raise ValueError("linked signed remainder leaf bindings are incomplete or mixed")
-    elif remainder_targets:
+    remainder_targets = {name: target for name, target in runtime_targets.items() if modsi3.reserved(target)}
+    if remainder_targets:
         if not isinstance(modsi3_bindings, dict) or not modsi3_bindings or \
                 set(modsi3_bindings.values()) not in ({"__modsi3"}, {modsi3.ADDRESSED_NAME}) or \
                 double_bindings is not None and set(modsi3_bindings.values()) != {"__modsi3"} or \
@@ -1471,9 +1502,9 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
             raise ValueError("linked signed remainder bindings are incomplete or mixed")
     elif modsi3_bindings:
         raise ValueError("signed remainder bindings have no linked runtime")
-    if "__udivsi3" in targets:
+    if "__udivsi3" in runtime_targets:
         if not isinstance(udivsi3_bindings, dict) or not udivsi3_bindings or \
-                targets["__udivsi3"] != UDIVSI3_ADDRESS or \
+                runtime_targets["__udivsi3"] != UDIVSI3_ADDRESS or \
                 any(alias != "__udivsi3" or calls.get(site) != UDIVSI3_ADDRESS
                     for site, alias in udivsi3_bindings.items()) or \
                 set(udivsi3_bindings) != {site for site, target in calls.items()
@@ -1484,7 +1515,7 @@ def linked_function_bytes(original, linked, name, address, calls, targets, data_
         raise ValueError("division bindings have no linked runtime")
     if any(is_udivsi3_address(target) and
            (target_name != "__udivsi3" or target != UDIVSI3_ADDRESS or not udivsi3_bindings)
-           for target_name, target in targets.items()) or \
+           for target_name, target in runtime_targets.items()) or \
             udivsi3_bindings and unsigned_thunk_profile is None and \
             any(target in RUNTIME_HELPERS.values() for target in targets.values()):
         raise ValueError("linked division aliases or thunk combinations are unsupported")

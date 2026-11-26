@@ -143,7 +143,9 @@ def build(root, source, callees=(("func_08000400", STORES),), objects=data_calls
     (work / "callees.s").write_text(
         ".syntax unified\n.arch armv4t\n.thumb\n.text\n"
         f".thumb_set rt_modsi3, 0x{modsi3.ADDRESS | 1:08X}\n"
-        f".thumb_set rt_udivsi3, 0x{match.UDIVSI3_ADDRESS | 1:08X}\n" +
+        f".thumb_set rt_udivsi3, 0x{match.UDIVSI3_ADDRESS | 1:08X}\n"
+        f".thumb_set rt_divsi3, 0x{leaf.ENTRIES['__divsi3'] | 1:08X}\n"
+        f".thumb_set rt_umodsi3, 0x{leaf.ENTRIES['__umodsi3'] | 1:08X}\n" +
         "".join(f".global {name}, {name}_end\n" for name in names) +
         "".join(f".org 0x{0x100 * index:x}\n{name}:\n{body}\n{name}_end:\n"
                 for index, (name, body) in enumerate(callees)))
@@ -188,8 +190,8 @@ def build(root, source, callees=(("func_08000400", STORES),), objects=data_calls
             name = item["name"]
             if name and not item["section"]:
                 targets[name] = (int(objects[name], 16) if name in objects else modsi3.ADDRESS
-                                 if name in ("__modsi3", modsi3.ADDRESSED_NAME) else match.UDIVSI3_ADDRESS
-                                 if name == "__udivsi3" else
+                                 if name in ("__modsi3", modsi3.ADDRESSED_NAME) else leaf.ENTRIES[name]
+                                 if name in leaf.ENTRIES else
                                  match.RUNTIME_HELPERS.get(name) or int(name[len("func_"):], 16))
         linked = match.link_typed_targets(runner, workspace, args, "func_08000200", A, targets,
                                           set(objects) & set(targets))
@@ -385,9 +387,15 @@ class SignedRemainderLeafTests(unittest.TestCase):
                             (("func_08000400", MINUS_ONE_CALLEE),))
         self.assertRetryRefused(root, "signed remainder requires proven signed16 r0 and nonzero r1")
 
-    def test_another_runtime_in_an_inspected_callee_is_not_summarised(self):
+    def test_another_runtime_in_an_inspected_callee_needs_its_own_numeric_record(self):
+        # With DIVISION the callee's __udivsi3 is summarised too, and its unknown divisor refuses;
+        # without it the callee's runtime is not summarised at all, as before.
         root = self.fixture("callee_udiv", SWITCH % dict(remainder="value % 41"), (("func_08000400", UDIV_CALLEE),))
-        self.assertRetryRefused(root, "division runtime requires its versioned nonzero-divisor proof")
+        self.assertRetryRefused(root, "unsigned division leaf requires a CFG-proven nonzero constant in r1")
+        with patch.object(leaf.DIVISION, "enabled", False):
+            code, output = cli(root)
+        self.assertIn(leaf.EXCLUSION + leaf.RETRY, code)
+        self.assertIn("division runtime requires its versioned nonzero-divisor proof", code)
 
     def test_an_observed_site_without_a_record_refuses(self):
         # The callee's inspection reaches the remainder and is refused; the dead-register rule then
@@ -424,9 +432,21 @@ class SignedRemainderLeafTests(unittest.TestCase):
         root = self.fixture("explicit", explicit % dict(remainder="__modsi3(value, 41)"))
         self.assertRetryRefused(root, "runtime identifiers cannot occur in preprocessed C")
 
-    def test_other_runtimes_stay_refused_in_the_retry(self):
+    def test_other_runtimes_join_the_retry_only_with_division(self):
+        # A constant unsigned quotient beside `%`: summarised and recorded with DIVISION, and the
+        # report then states every site in the division lines instead of these.
         root = self.fixture("udiv", SWITCH % dict(remainder="value % 41 + (u32)value / 10u"))
-        self.assertRetryRefused(root, "signed remainder leaf summary excludes other runtimes and function literals")
+        code, output, report = run(root)
+        self.assertEqual(code, 0, output)
+        self.assertEqual(leaf_lines(report), [])
+        sites = [line for line in report.splitlines() if line.startswith(leaf.DIVISION_LINE + "call ")]
+        self.assertIn("__udivsi3: divisor 10 (nonzero-u32-constant-divisor)", "\n".join(sites))
+        self.assertTrue(self.replays(report, root))
+        with patch.object(leaf.DIVISION, "enabled", False):
+            code, output = cli(root)
+            self.assertEqual(code, f"compile failed:\n{leaf.EXCLUSION}{leaf.RETRY}"
+                                   "signed remainder leaf summary excludes other runtimes and function literals")
+            self.assertFalse(self.replays(report, root))
 
     # Where the retry never runs.
 
