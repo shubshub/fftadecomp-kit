@@ -2462,6 +2462,27 @@ value, a range for it, or termination.
 refusals for the three exclusions, and leaves `__modsi3` alone in the remainder
 retry.
 
+Inside either retry, a summarised site is also the buffer proof's inspected
+call (`signed_remainder_leaf_profile.summarised_evidence`). An owner that passes
+no local buffer to any callee, a table owner dividing by constants for example,
+was refused after the walk had proved it:
+
+```
+data-buffer evidence requires an inspected buffer call
+stack-buffer evidence requires an inspected buffer call
+```
+
+Those gates decide which schema a report gets, and they switch on the checks
+keyed on buffer evidence: the exact complete mapped span, the data-buffer
+composition for typed objects, DMA fill records and the return-scratch
+refusal. They do not prove the walk; the stack-argument proof walks the whole
+owner either way. With the summarised site as evidence, every one of those
+checks applies. An owner whose only evidence is a summarised site must also
+state a stack frame on the stack-buffer schema; a frameless one refuses
+(`summarised runtime evidence requires the stack-frame line`), and keeps its
+other routes. `signed_remainder_leaf_profile.EVIDENCE.enabled = False`
+restores both refusals.
+
 ### Jump tables behind their dispatch's literal pool
 
 agbcc ends a jump-table dispatch with `mov pc, rN`, an unconditional transfer,
