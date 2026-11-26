@@ -5,6 +5,7 @@ from pathlib import Path
 import struct
 import sys
 import unittest
+from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'tools'))
@@ -330,10 +331,23 @@ class DeadEntryProofTests(unittest.TestCase):
                 'Thumb-2 str.w r3,[sp]': [0xf8cd, 0x3000, MOVS_R3_0, BX_LR],
                 'BLX pair (ARMv5)': [0xf000, 0xe800, MOVS_R3_0, BX_LR],
                 'UNPREDICTABLE low-low hi mov r3,r0': [0x4603, BX_LR],
-                'branch out of the span': [0xe400, MOVS_R3_0, BX_LR],
-                'BL to a killing callee first': [PUSH_LR, G, MOVS_R3_0, POP_R0, BX_R0]}.items():
+                'branch out of the span': [0xe400, MOVS_R3_0, BX_LR]}.items():
             with self.subTest(name), self.assertRaises(ValueError):
                 self.entry(code, extra={G: [MOVS_R3_0, BX_LR]})
+
+    def test_a_bl_to_a_killing_callee_first(self):
+        # The entry proof alone refuses it; the retry through calls (test_dead_register_through_calls)
+        # follows the BL into G, which writes R3 first, so the call ends the path.
+        import dead_register
+        code = [PUSH_LR, G, MOVS_R3_0, POP_R0, BX_R0]
+        with patch.object(dead_register.THROUGH_CALLS, 'enabled', False), self.assertRaises(ValueError):
+            self.entry(code, extra={G: [MOVS_R3_0, BX_LR]})
+        entry = self.entry(code, extra={G: [MOVS_R3_0, BX_LR]})
+        self.assertEqual(entry['schema'], dead_register.CALLS_SCHEMA)
+        self.assertEqual([(row['callee'], row['kills']) for row in entry['followed']], [(G, [[G, 3]])])
+        # A callee that reads it first still refuses.
+        with self.assertRaises(ValueError):
+            self.entry(code, extra={G: [READ_R3, MOVS_R3_0, BX_LR]})
 
     def test_span_shorter_than_the_kill_refuses(self):
         with self.assertRaisesRegex(ValueError, 'leaves its function'):
