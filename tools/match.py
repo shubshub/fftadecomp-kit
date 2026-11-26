@@ -5579,7 +5579,11 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 # The plain owner switch's R2/R3 exit scratch (owner_switch_buffer_profile).
                 aliases = owner_switch_buffer.exit_scratch_aliases(buffer_proof, data, address, current, aliases)
                 # A function-literal owner's R2/R3 exit scratch (function_literal_exit_scratch_profile).
-                aliases = function_exit.aliases(buffer_proof, data, address, current, aliases)
+                # Only the split-join walk keys states (a path-state walk binds no state_key and
+                # keeps no join apart, so its returns are merged states).
+                aliases = function_exit.aliases(buffer_proof, data, address, current, aliases,
+                                                split_state=split_joins is not None and
+                                                isinstance(state_key, split_join.Key))
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)
