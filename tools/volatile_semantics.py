@@ -2824,6 +2824,10 @@ def read_modify_write_store(records, position, address, width):
     return None
 
 
+class StoredTestRereads(list):
+    """kit#375, rule R4: the stored-value test re-reads, a tagged result part"""
+
+
 class SpillReloads(list):
     """kit#165: the dead loads whose read-modify-write window holds a spill reload,
     a tagged result part"""
@@ -2918,6 +2922,104 @@ def chained_reread(records, position, pinned_width):
     return store is not None
 
 
+
+
+COMPARISONS = ("cmp", "cmn", "tst")
+
+
+def stored_value_test_reread(records, position, pinned_width):
+    """kit#375, rule R4: is this load the re-read of `sym.m--; if (sym.m == 0)` with volatile m?
+
+    C makes the test read the member again after the update's store, and
+    without the qualifier agbcc tests the stored value instead.  The load is
+    forwarded (the executor gives it the stored value), so it is covered by
+    the forwarded re-reads' premise, and:
+    - it is an unsigned load of a pinned member at that member's width;
+    - the nearest earlier record other than a register operation or a
+      literal load is a store of the same width to the same address, and
+      nothing between changes the store's address registers (step 3
+      requires that store's own read-modify-write load);
+    - its value, through unchanged register copies, is read by exactly one
+      comparison (`cmp`, `cmn` or `tst`), with only register operations and
+      literal loads before it;
+    - that comparison's flags reach a conditional branch before any other
+      flag write, any other record or any other read of the value;
+    - after the branch the value and its copies may be read only as the
+      value register of a store (not its address) or by unchanged copies,
+      until each is overwritten, with no loop cut first and no conditional
+      branch on a copy's flags.  agbcc reuses a register a branch proved
+      equal to a constant for later stores of that constant (08057578 stores
+      the tested r2, known zero, three times after `bldy_lo == 0`); those
+      stores are compared with the stripped compile's like every store.
+    The branch condition itself is compared with the stripped compile's, as
+    every condition is, so only the extra read is left to explain.
+    """
+    load = records[position]
+    if load.kind != "load" or load.signed or not load.forwarded or load.width != pinned_width(load.address):
+        return False
+    earlier = position - 1
+    while earlier >= 0 and records[earlier].kind in ("alu", "literal"):
+        earlier -= 1
+    if earlier < 0:
+        return False
+    prior = records[earlier]
+    if prior.kind != "store" or prior.width != load.width or prior.address != load.address:
+        return False
+    address_registers = prior.reads - {prior.value_register}
+    if any(step.writes & address_registers for step in records[earlier + 1:position]):
+        return False
+    tracked, compared, branched, copied_flags = set(load.writes), False, False, False
+    for step in records[position + 1:]:
+        uses = step.reads & tracked
+        if branched:
+            # after the test: only stores of the value and unchanged copies of it
+            if step.kind == "loop" or (step.kind == "branch" and not step.unconditional and copied_flags):
+                return False
+            if step.flags_written:
+                copied_flags = False
+            if uses:
+                operand = re.search(r"\[([^\]]*)\]", step.text)
+                addressing = {register(part.strip()) for part in operand[1].split(",")} - {None} \
+                    if operand else None
+                if step.kind == "store" and uses == {step.value_register} and addressing is not None and \
+                        not addressing & tracked:
+                    pass
+                elif step.kind == "alu" and step.copy and step.reads <= tracked:
+                    tracked |= step.writes
+                    copied_flags = step.flags_written
+                    continue
+                else:
+                    return False
+            tracked -= step.writes
+            if not tracked:
+                return True
+            continue
+        if step.kind == "branch":
+            if step.unconditional or not compared:
+                return False
+            branched = True
+            tracked -= step.writes
+            if not tracked:
+                return True
+            continue
+        if step.kind not in ("alu", "literal"):
+            return False
+        comparison = step.text.split()[0] in COMPARISONS and not step.writes
+        if compared:
+            # nothing between the comparison and its branch may read the value or write flags
+            if uses or step.flags_written:
+                return False
+        elif uses and comparison:
+            compared = True
+        elif uses:
+            if not step.copy or not step.reads <= tracked:
+                return False
+            tracked |= step.writes
+            continue
+        tracked -= step.writes
+        if not tracked and not compared:
+            return False
+    return branched
 
 
 def ordinary_store_reread(records, position, pinned_width, ordinary_address):
@@ -3145,6 +3247,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         (set() for _ in range(8))
     whole = set()           # kit#375, rule U: the admitted whole-object arguments
     reloads = set()         # kit#165: dead loads whose window holds a spill reload
+    tests = set()           # kit#375, rule R4: stored-value test re-reads
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3230,6 +3333,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                         records, position, pinned_width,
                         lambda address: object_offset(address, symbol, size) is None):
                     optional[id(record)] = ordinary
+                elif forwarded and stored_value_test_reread(records, position, pinned_width):
+                    optional[id(record)] = tests
                 # not under a caller's own trace pairing (the overwritten-store composition),
                 # whose record would not print the rule's premise
                 elif _ordered_trace_check is None and \
@@ -3358,7 +3463,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
     # tagged like the tested-update re-reads, so record() finds it after the positional parts
     tail = ((WholeObjectArguments(sorted(whole)),) if whole else ()) + \
-        ((SpillReloads(sorted(reloads)),) if reloads else ())
+        ((SpillReloads(sorted(reloads)),) if reloads else ()) + \
+        ((StoredTestRereads(sorted(tests)),) if tests else ())
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
@@ -3619,7 +3725,9 @@ def record(symbol, results, perturbed=False):
         extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
         whole = next((part for part in extra if isinstance(part, WholeObjectArguments)), [])
         reloads = next((part for part in extra if isinstance(part, SpillReloads)), [])
-        extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads))]
+        tests = next((part for part in extra if isinstance(part, StoredTestRereads)), [])
+        extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads,
+                                                                 StoredTestRereads))]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -3629,9 +3737,12 @@ def record(symbol, results, perturbed=False):
                      (f", unloaded all-ones stores at {list(n + 1 for n in unloaded)}" if unloaded else "") +
                      (f", same-member constant update re-reads at {list(n + 1 for n in updates)}" if updates else "") +
                      (f", ordinary-store chained re-reads at {list(n + 1 for n in ordinary)}" if ordinary else "") +
+                     (f", stored-value test re-reads (kit#375) at {list(n + 1 for n in tests)}" if tests else "") +
                      (f", forwarded re-reads (the chained, same-member constant update and ordinary-store "
                       f"lists) under premise: {FORWARDED_REREADS.premise}"
-                      if chained or updates or ordinary else "") +
+                      if (chained or updates or ordinary) and not tests else "") +
+                     (f", forwarded re-reads (the chained, same-member constant update, ordinary-store and "
+                      f"stored-value test lists) under premise: {FORWARDED_REREADS.premise}" if tests else "") +
                      (f", tested-update re-reads at {list(n + 1 for n in tested)} "
                       f"({tested_update.NAME}, premise: {tested_update.POLICY.premise})" if tested else "") +
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
