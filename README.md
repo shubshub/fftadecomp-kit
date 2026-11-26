@@ -2483,6 +2483,43 @@ state a stack frame on the stack-buffer schema; a frameless one refuses
 other routes. `signed_remainder_leaf_profile.EVIDENCE.enabled = False`
 restores both refusals.
 
+A signed site, `__divsi3` or `__modsi3`, whose divisor is neither a constant
+nor beside a signed16 dividend may still carry a third record kind,
+`nonzero-not-minus-one-divisor` (`sign_guarded_sites`). It holds when the code
+proves the divisor nonzero and not -1 on every path. That excludes division by
+zero and `INT_MIN / -1` for every dividend, the domain the other two records
+also prove. The proof is a forward must-analysis over the closed CFG with four
+register facts: nonzero, `>= 0`, `< 0` and not -1. They come from:
+
+* immediate moves;
+* an adjacent `cmp rN, #0` whose conditional branch has it as sole predecessor.
+  EQ and NE give nonzero on the unequal edge, and GE, LT, GT and LE give the
+  signed facts on each edge. Coincident destinations give nothing;
+* `rsbs rD, rN, #0`. A nonzero value stays nonzero, and the negation of a
+  negative value is not -1: it is positive, or `INT_MIN` when rN is `INT_MIN`.
+
+`>= 0` implies not -1, and `< 0` implies nonzero. Copies keep the facts. Any
+other write, and every call's caller-clobbered registers, drop them, and a join
+keeps only the facts every path has. The negation of a value `>= 0` gets no
+such fact, since it may be -1. That covers the sign idiom
+`d / (d < 0 ? -d : d)` behind `d != 0`, as 0x0802F560 steps a cursor:
+
+```
+subs r0, r1, r0; cmp r0, #0; beq out
+adds r1, r0, #0; cmp r1, #0; bge 1f; rsbs r1, r1, #0
+1: bl __divsi3
+```
+
+The divisor there is in 1..0x7FFFFFFF or is `INT_MIN`. The record claims only
+that the division is defined. No quotient range follows from it, and nothing
+depends on one: the summary returns R0 as an unknown scalar. Nor does it cover
+the source's own `-d`, which the kit does not check for signed overflow, as
+for any other arithmetic. A site with no record of the three kinds keeps its
+refusal unchanged. A report with this record states its sites on the division
+lines (`... __divsi3: divisor nonzero and not -1
+(nonzero-not-minus-one-divisor) ...`), so the `__modsi3`-only lines keep their
+two kinds. `signed_remainder_leaf_profile.SIGN.enabled = False` drops the kind.
+
 ### Jump tables behind their dispatch's literal pool
 
 agbcc ends a jump-table dispatch with `mov pc, rN`, an unconditional transfer,
