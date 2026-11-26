@@ -1897,9 +1897,10 @@ class Executor:
             if not counts:
                 self.fail(text, f"the address of {self.symbol} is passed to a call without its size "
                           f"({self.size:#x} bytes) as another argument")
-            record.whole_object = (f"`&{self.symbol}` (+0x0, {self.size:#x} bytes in argument {counts[0] + 1}) "
-                                   f"as the void-pointer argument {position + 1} of {callee} at instruction "
-                                   f"{record.index + 1}")
+            record.whole_object = (f"`&{self.symbol}` (+0x0) as the void-pointer argument {position + 1} of "
+                                   f"{callee} at instruction {record.index + 1}, with the object's size "
+                                   f"{self.size:#x} in argument {counts[0] + 1}; what the callee does with them "
+                                   "is not checked")
             if target == "memcpy" and COMPILER_COPY.get() is not None and position == 1:
                 # kit#375, rule T: the save `copy = symbol`, a typed copy at the destination, which
                 # may not be a frame address (a local copy is not admitted on any route)

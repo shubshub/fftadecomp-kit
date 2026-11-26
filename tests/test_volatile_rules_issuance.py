@@ -263,8 +263,10 @@ class IssuanceTests(unittest.TestCase):
                     "    func_08000400(saved, &" + SYMBOL + ", sizeof " + SYMBOL + ");\n"
                     "    " + SYMBOL + ".bldcnt_lo = 0;\n}\n")
         report = issued(self, root)
-        self.assertIn("whole-object arguments (kit#375): `&" + SYMBOL + "` (+0x0, 0x50 bytes in argument 3) as the "
-                      "void-pointer argument 2 of func_08000400", report)
+        self.assertIn("whole-object arguments (kit#375): `&" + SYMBOL + "` (+0x0) as the void-pointer argument 2 of "
+                      "func_08000400 at instruction ", report)
+        self.assertIn("with the object's size 0x50 in argument 3; what the callee does with them is not checked",
+                      report)
 
     def test_r1_spill_reload(self):
         # 0813F22C's tail: the zero it stores to the scroll members is spilled across the fill and

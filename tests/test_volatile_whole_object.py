@@ -119,8 +119,9 @@ class ExecutorTests(unittest.TestCase):
         results = self.compare(copy_call())
         self.assertEqual(results[0][1], 1)
         line = semantics.record(SYMBOL, results)
-        self.assertIn("whole-object arguments (kit#375): `&" + SYMBOL + "` (+0x0, 0x3e bytes in argument 3) as the "
-                      "void-pointer argument 2 of func_081443FC at instruction 5", line)
+        self.assertIn("whole-object arguments (kit#375): `&" + SYMBOL + "` (+0x0) as the void-pointer argument 2 "
+                      "of func_081443FC at instruction 5, with the object's size 0x3e in argument 3; what the "
+                      "callee does with them is not checked", line)
         # and only where the rule is used: an ordinary report keeps its text
         plain = fixtures.compare(fixtures.assembly("bx\tlr"), fixtures.assembly("bx\tlr"))
         self.assertNotIn("whole-object", semantics.record(SYMBOL, plain))
@@ -132,14 +133,16 @@ class ExecutorTests(unittest.TestCase):
             ".L3:\n\t.word\t" + SYMBOL + "\n", ".L3:\n\t.word\t" + SYMBOL + "\n.L5:\n\t.word\tg_callbacks_0836D4B8\n")
         results = self.compare(table, body="g_callbacks_0836D4B8[0](&" + SYMBOL + ", sizeof " + SYMBOL + ");",
                                declarations=TABLE)
-        self.assertIn("(+0x0, 0x3e bytes in argument 2) as the void-pointer argument 1 of g_callbacks_0836D4B8[0]",
+        self.assertIn("(+0x0) as the void-pointer argument 1 of g_callbacks_0836D4B8[0] at instruction 6, with the "
+                      "object's size 0x3e in argument 2",
                       semantics.record(SYMBOL, results))
 
     def test_both_directions_are_admitted(self):
         # #375 item 1: a copy back into the object takes the same rule
         body = "func_081443FC(&" + SYMBOL + ", b, sizeof " + SYMBOL + ");"
         line = semantics.record(SYMBOL, self.compare(restore_call(), body=body))
-        self.assertIn("(+0x0, 0x3e bytes in argument 3) as the void-pointer argument 1 of func_081443FC", line)
+        self.assertIn("(+0x0) as the void-pointer argument 1 of func_081443FC at instruction 5, with the object's "
+                      "size 0x3e in argument 3", line)
 
     def test_the_count_must_be_the_object_s_size(self):
         # a partial or unknown count could hand the callee a part of the object only
