@@ -680,6 +680,57 @@ class CheckerTests(unittest.TestCase):
         self.assertEqual(checker.call(CALLEE, frozenset({5}), {}), {})
         self.assertEqual(checker.premises, {('call', CALLEE, CALLEE + 4, (6,), None, (5,), (), False)})
 
+    def test_a_frame_word_code_not_walked_may_write_is_not_a_known_destination(self):
+        # push {r4,lr}; sub sp,#8; ldr r0,=OTHER|1; str r0,[sp,#4]; <handover>; mov r4,sp;
+        # ldr r1,[sp,#4]; bl _call_via_r1; add sp,#8; pop {r4}; pop {r0}; bx r0.  The handover is
+        # add r0,sp,#4; bl THIRD, and THIRD stores FAR|1 into the word it is given.  At run time
+        # the thunk goes to FAR, which reads the watched R4.  OTHER, the value stored before the
+        # call, is no known destination after it: the call is premised and neither is walked.
+        far = 0x08014300
+        via_r1 = match.RUNTIME_HELPERS['_call_via_r1']
+        stores_far = function(THIRD, [('LIT', 1, 0), 0x6001, BX_LR], [far | 1])   # ldr r1,=FAR|1; str r1,[r0]
+
+        def owner(*handover):
+            return function(CALLEE, [0xB510, 0xB082, ('LIT', 0, 0), 0x9001, *handover, 0x466C, 0x9901, via_r1,
+                                     0xB002, 0xBC10, 0xBC01, 0x4700], [OTHER | 1])
+
+        def checked(code, other, site):
+            rom, entries = rom_with({CALLEE: code, THIRD: stores_far, OTHER: other, far: (0x6821, BX_LR)})
+            checker = watch.Checker(rom, entries)
+            return checker, checker.call(via_r1, frozenset({4}), caller=CALLEE, site=site)
+
+        premised = lambda site: {('call', CALLEE, site, (1,), None, (4,), (), False)}
+        site = CALLEE + 18
+        checker, copies = checked(owner(0xA801, THIRD), (BX_LR,), site)
+        self.assertNotIn(1, checker.known_at(CALLEE, site))
+        self.assertEqual((copies, checker.premises), ({}, premised(site)))
+        # A SWI given the word's address (swi 0x0B, CpuSet) may write it too.
+        site = CALLEE + 16
+        checker, copies = checked(owner(0xA801, 0xDF0B), (BX_LR,), site)
+        self.assertEqual((copies, checker.premises), ({}, premised(site)))
+        # The replay does not follow frame addresses, so a word whose address the call is not
+        # given (movs r0,#0) is forgotten as well: premised, not walked.
+        site = CALLEE + 18
+        checker, copies = checked(owner(0x2000, THIRD), (0x6821, BX_LR), site)
+        self.assertEqual((copies, checker.premises), ({}, premised(site)))
+        # A word a push wrote is forgotten too: push {lr}; ldr r1,=OTHER|1; push {r1}; mov r0,sp;
+        # bl THIRD; pop {r1}; bl _call_via_r1; pop {r0}; bx r0 hands THIRD the pushed word.
+        def pushed(*handover):
+            return function(CALLEE, [0xB500, ('LIT', 1, 0), 0xB402, *handover, THIRD, 0xBC02, via_r1, 0xBC01,
+                                     0x4700], [OTHER | 1])
+        site = CALLEE + 14
+        rom, entries = rom_with({CALLEE: pushed(0x4668), THIRD: stores_far, OTHER: (BX_LR,), far: (0x6821, BX_LR)})
+        checker = watch.Checker(rom, entries)
+        self.assertEqual((checker.call(via_r1, frozenset({4}), caller=CALLEE, site=site), checker.premises),
+                         ({}, premised(site)))
+        # With no call between the store and the reload the value is known, and the destination
+        # walked: str r0,[sp,#4]; mov r4,sp; ldr r1,[sp,#4]; bl _call_via_r1, OTHER reads R4.
+        code = function(CALLEE, [0xB510, 0xB082, ('LIT', 0, 0), 0x9001, 0x466C, 0x9901, via_r1, 0xB002, 0xBC10,
+                                 0xBC01, 0x4700], [OTHER | 1])
+        rom, entries = rom_with({CALLEE: code, OTHER: (0x6821, BX_LR)})
+        with self.assertRaisesRegex(watch.WatchRefusal, f'callee 0x{OTHER:08X}'):
+            watch.Checker(rom, entries).call(via_r1, frozenset({4}), caller=CALLEE, site=CALLEE + 12)
+
     def test_premise_lines(self):
         class Proof:
             rom, entries = rom_with({})
@@ -1590,6 +1641,54 @@ class SummaryTests(unittest.TestCase):
 
 FOURTH, NESTED = 0x08014300, 0x08014400
 G = 0x02000100
+
+
+@unittest.skipUnless(__import__('test_data_buffer_calls').tools_present(), 'fixed compiler and ARM tools required')
+class StaleFrameWordOwnerTests(unittest.TestCase):
+    """A compiled owner whose callback lives in a local it hands to a callee before calling it."""
+
+    SOURCE = """typedef unsigned short u16;
+typedef void (*Callback)(void);
+extern const Callback data_08000800[];
+extern void func_08000400(Callback *slot);
+extern void func_08000600(u16 *p);
+u16 func_08000200(void)
+{
+    u16 buffer[4];
+    u16 *p = buffer + 1;
+    Callback callback = data_08000800[0];
+
+    func_08000400(&callback);
+    func_08000600(p);
+    callback();
+    func_08000600(p);
+    return buffer[0] + buffer[3];
+}
+"""
+
+    def test_the_callback_a_callee_may_rewrite_is_premised(self):
+        import tempfile
+        from test_data_buffer_calls import build, run
+        # data_08000800 holds func_08000500|1; func_08000400 stores func_08000700|1 through the
+        # address it is given, and func_08000700 stores through R4, where the owner keeps p.
+        with tempfile.TemporaryDirectory() as work:
+            root = build(Path(work) / 'tree', self.SOURCE,
+                         [('func_08000400', 'ldr r1, 1f\nstr r1, [r0]\nbx lr\n.align 2\n1: .word 0x08000701'),
+                          ('func_08000500', 'bx lr'), ('func_08000600', 'bx lr'),
+                          ('func_08000700', 'movs r0, #0\nstr r0, [r4]\nbx lr')],
+                         objects={'data_08000800': '0x08000800'}, large=True)
+            rom = bytearray((root / 'baserom.bin').read_bytes())
+            struct.pack_into('<I', rom, 0x08000800 - BASE, 0x08000501)
+            (root / 'baserom.bin').write_bytes(bytes(rom))
+            code, output, report = run(root)
+        self.assertEqual(code, 0, output[-2000:])
+        sites = [int(line.split('call at 0x')[1][:8], 16) for line in report.splitlines()
+                 if line.startswith(watch.PREMISE_PREFIX) and ' through _call_via_r' in line]
+        decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+        thunk = [item.address for item in decoder.disasm(rom[0x200:0x240], 0x08000200)
+                 if item.mnemonic == 'bl' and int(item.op_str.lstrip('#'), 16) in match.RUNTIME_HELPERS.values()]
+        self.assertEqual(len(thunk), 1)
+        self.assertEqual(sites, thunk)
 
 
 def function(address, items, words=()):
