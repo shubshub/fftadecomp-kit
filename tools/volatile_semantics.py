@@ -3637,8 +3637,8 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
     from plausible import (declaration_fragments, member_provenance, strip_comments_and_strings,
-                           table_void_pointer_parameters, void_pointer_parameters, whole_object_sites,
-                           whole_object_uses)
+                           table_void_pointer_parameters, typed_pointer_sites, void_pointer_parameters,
+                           whole_object_sites, whole_object_uses)
     code = translation_unit(preprocessed)
     # the member checks read the literals blanked to spaces, not to `0`: a
     # character index (`unknown_48['\x02']`) must not read as `unknown_48[0]`
@@ -3646,8 +3646,10 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     # kit#375, rule U: `sizeof symbol` and `&symbol` as a complete void-pointer argument
     # are the only whole-object uses, read against the unit's own prototypes
     fragments = declaration_fragments(plain)
-    admitted = whole_object_sites(plain, symbol, fragments)
-    for _, message in whole_object_uses(plain, symbol, admitted) + member_provenance(
+    # rule P: one typed pointer to the object, bound once to its address
+    typed_admitted, _, typed_findings = typed_pointer_sites(plain, symbol, declaration, fragments)
+    admitted = {**whole_object_sites(plain, symbol, fragments), **typed_admitted}
+    for _, message in typed_findings + whole_object_uses(plain, symbol, admitted) + member_provenance(
             plain, {"symbol": symbol, "declaration": declaration}, admitted):
         raise SemanticError(f"after preprocessing: {message}")
     real, real_outside = parse_assembly(real_assembly)

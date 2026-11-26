@@ -935,7 +935,9 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
     argument or a copy.  The exceptions are kit#375's rule U
     (whole_object_sites): `sizeof symbol`, and `&symbol` as one complete
     argument at a `void *` / `const void *` parameter of a prototyped callee
-    or typed function-pointer table element.  Only a file with its own file-scope declarator whose
+    or typed function-pointer table element; and rule P (typed_pointer_sites):
+    one block-scope `__typeof__(symbol) *name` bound once to `&symbol` and used
+    only as `name->member` or as such an argument.  Only a file with its own file-scope declarator whose
     include closure (closure=(inside, outside)) provably misses the listed
     header is exempt; without a closure nothing is.
 
@@ -977,7 +979,23 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
             finding(control.start(), f"form feed, vertical tab, NUL and lone carriage return are "
                     f"refused while {symbol} is allowlisted: cpp treats them as whitespace "
                     "where the directive scans do not")
+        # kit#375: the prototypes of this file and its headers (rules U and P)
+        context = [joined]
+        for included in sorted(inside or ()):
+            if included in (relpath, header) or tree is None:
+                continue
+            try:
+                context.append(strip_comments_and_strings(join_splices(
+                    (Path(tree) / included).read_text(encoding="utf-8", errors="replace"))))
+            except OSError:
+                pass            # reported below
+        fragments = declaration_fragments("\n;\n".join(context))
+        # kit#375, rule P: one typed pointer to the object, bound once to its address
+        typed_admitted, typed_typeofs, typed_findings = ({}, set(), []) if relpath is None or \
+            relpath.endswith(".h") else typed_pointer_sites(joined, symbol, entry["declaration"], fragments)
         for typeof in re.finditer(r"\b(?:typeof|__typeof|__typeof__)\b", joined):
+            if typeof.start() in typed_typeofs:
+                continue
             finding(typeof.start(), f"typeof while {symbol} is an allowlisted volatile "
                     "object: it would copy the qualifier onto other objects")
         for directive in re.finditer(r"(?m)^[ \t]*#[ \t]*(?:line\b|[0-9]|import\b|include_next\b)",
@@ -1021,17 +1039,11 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
             if uses and not (declares_symbol(joined, symbol) and inside is not None
                              and header not in inside):
                 # kit#375, rule U: `sizeof symbol` and `&symbol` as a complete void-pointer
-                # argument, read against the prototypes of this file and its headers
-                context = [joined]
-                for included in sorted(inside or ()):
-                    if included in (relpath, header) or tree is None:
-                        continue
-                    try:
-                        context.append(strip_comments_and_strings(join_splices(
-                            (Path(tree) / included).read_text(encoding="utf-8", errors="replace"))))
-                    except OSError:
-                        pass            # reported below
-                admitted = whole_object_sites(joined, symbol, declaration_fragments("\n;\n".join(context)))
+                # argument, read against the prototypes of this file and its headers; rule P:
+                # the typed pointer's type and its binding
+                admitted = {**whole_object_sites(joined, symbol, fragments), **typed_admitted}
+                for offset, message in typed_findings:
+                    finding(offset, message)
                 for reference in references:
                     if reference.start() in admitted:
                         continue
@@ -1245,48 +1257,142 @@ def whole_object_sites(code, symbol, fragments):
             if j - len(cast) + 1 >= 0 and words[j - len(cast) + 1:j + 1] == cast:
                 j -= len(cast)
                 break
-        if j < 0 or words[j] not in ("(", ","):
+        located = void_pointer_argument(words, j, fragments)
+        if located is None:
             continue
-        # back to the call's own `(`, counting the arguments before this one
-        index, depth, p = (1 if words[j] == "," else 0), 0, j - 1 if words[j] == "," else j
-        while words[j] == "," and p >= 0:
-            if words[p] in (";", "{", "}"):
-                p = -1
-                break
-            if words[p] in (")", "]"):
-                depth += 1
-            elif words[p] in ("(", "["):
-                if depth == 0:
-                    break
-                depth -= 1
-            elif words[p] == "," and depth == 0:
-                index += 1
-            p -= 1
-        if p < 1 or words[p] != "(":
-            continue
-        # forward to its `)`: the symbol may occur only here among its arguments
-        depth, q = 0, p
-        while q < len(words):
-            depth += {"(": 1, ")": -1}.get(words[q], 0)
-            if depth == 0:
-                break
-            q += 1
+        name, index, p, q = located
         def sized(i):
             return words[i - 1] == "sizeof" or words[i - 2:i] == ["sizeof", "("] and words[i + 1:i + 2] == [")"]
-        if q >= len(words) or sum(words[i] == symbol and not sized(i) for i in range(p, q)) != 1:
+        # the symbol may occur only here among the call's arguments
+        if sum(words[i] == symbol and not sized(i) for i in range(p, q)) != 1:
             continue
-        callee = words[p - 1]
-        if callee == "]" and p >= 5 and words[p - 3] == "[" and integer_literal(words[p - 2]) is not None and \
-                re.fullmatch(r"[A-Za-z_]\w*", words[p - 4]) and words[p - 5] not in (".", "->"):
-            name, allowed = f"{words[p - 4]}[{words[p - 2]}]", table_void_pointer_parameters(fragments, words[p - 4])
-        elif re.fullmatch(r"[A-Za-z_]\w*", callee) and callee not in NOT_CALLEES and \
-                words[p - 2:p - 1] not in (["."], ["->"]):
-            name, allowed = callee, void_pointer_parameters(fragments, callee)
-        else:
-            continue
-        if index in allowed:
-            sites[offset] = f"the void-pointer argument {index + 1} of {name}"
+        sites[offset] = f"the void-pointer argument {index + 1} of {name}"
     return sites
+
+
+def void_pointer_argument(words, j, fragments):
+    """(callee, argument index, its `(`, its `)`) when the argument after words[j] (a `(` or a `,`)
+    is one at a `void *` / `const void *` parameter of a prototyped callee or of an element
+    `table[K]` of a typed function-pointer table (kit#375, rule U), else None"""
+    if j < 0 or words[j] not in ("(", ","):
+        return None
+    # back to the call's own `(`, counting the arguments before this one
+    index, depth, p = (1 if words[j] == "," else 0), 0, j - 1 if words[j] == "," else j
+    while words[j] == "," and p >= 0:
+        if words[p] in (";", "{", "}"):
+            p = -1
+            break
+        if words[p] in (")", "]"):
+            depth += 1
+        elif words[p] in ("(", "["):
+            if depth == 0:
+                break
+            depth -= 1
+        elif words[p] == "," and depth == 0:
+            index += 1
+        p -= 1
+    if p < 1 or words[p] != "(":
+        return None
+    # forward to its `)`
+    depth, q = 0, p
+    while q < len(words):
+        depth += {"(": 1, ")": -1}.get(words[q], 0)
+        if depth == 0:
+            break
+        q += 1
+    if q >= len(words):
+        return None
+    callee = words[p - 1]
+    if callee == "]" and p >= 5 and words[p - 3] == "[" and integer_literal(words[p - 2]) is not None and \
+            re.fullmatch(r"[A-Za-z_]\w*", words[p - 4]) and words[p - 5] not in (".", "->"):
+        name, allowed = f"{words[p - 4]}[{words[p - 2]}]", table_void_pointer_parameters(fragments, words[p - 4])
+    elif re.fullmatch(r"[A-Za-z_]\w*", callee) and callee not in NOT_CALLEES and \
+            words[p - 2:p - 1] not in (["."], ["->"]):
+        name, allowed = callee, void_pointer_parameters(fragments, callee)
+    else:
+        return None
+    return (name, index, p, q) if index in allowed else None
+
+
+C_KEYWORDS = {"auto", "break", "case", "char", "const", "continue", "default", "do", "double", "else", "enum",
+              "extern", "float", "for", "goto", "if", "int", "long", "register", "return", "short", "signed",
+              "sizeof", "static", "struct", "switch", "typedef", "union", "unsigned", "void", "volatile",
+              "while", "inline", "asm"}
+
+
+def typed_pointer_sites(code, symbol, entry_declaration, fragments):
+    """kit#375, rule P: (admitted symbol references, admitted typeof offsets, findings) for
+    one typed pointer to the object.
+
+    Exactly one block-scope declaration `__typeof__(symbol) *name;` (any typeof
+    spelling, first in its statement, inside a function body), bound exactly once
+    to `&symbol`: in its initialiser `= &symbol`, or by one statement
+    `name = &symbol;` after it.  Every other use of `name` must be `name->member`
+    with a non-array member of the declaration, not under `&`, or one complete
+    argument at a `void *` / `const void *` parameter of a prototyped callee or
+    typed table element, no other argument of that call naming the symbol or
+    `name`.  Any other use of `name` is a finding.  Without exactly that shape
+    nothing is admitted, and the typeof and `&` rules refuse as before.
+    """
+    tokens = [(m[0], m.start()) for m in C_TOKEN.finditer(code)]
+    words = [token for token, _ in tokens]
+    depth, depths = 0, []
+    for word in words:
+        depths.append(depth)
+        depth += {"{": 1, "}": -1}.get(word, 0)
+    declarations = []
+    for k, word in enumerate(words):
+        if word not in TYPEOF_WORDS:
+            continue
+        shape = words[k + 1:k + 6]
+        if shape[:4] != ["(", symbol, ")", "*"] or len(shape) < 5 or \
+                not re.fullmatch(r"[A-Za-z_]\w*", shape[4]) or shape[4] in C_KEYWORDS | TYPEOF_WORDS or \
+                k == 0 or words[k - 1] not in ("{", ";", "}") or depths[k] < 1:
+            return {}, set(), []
+        declarations.append(k)
+    if len(declarations) != 1:
+        return {}, set(), []
+    k = declarations[0]
+    name = words[k + 5]
+    admitted = {tokens[k + 2][1]: "the typed pointer's type"}
+    bindings = []
+    if words[k + 6:k + 10] == ["=", "&", symbol, ";"]:
+        bindings.append(k + 8)
+    elif words[k + 6:k + 7] != [";"]:
+        return {}, set(), []
+    arrays = set(re.findall(r"([A-Za-z_]\w*)\s*\[", entry_declaration))
+    members = set(re.findall(r"([A-Za-z_]\w*)\s*(?:\[[^\]]*\]\s*)?(?::\s*\w+\s*)?;", entry_declaration)) - {symbol}
+    uses = []
+    for n, word in enumerate(words):
+        if word != name or n == k + 5:
+            continue
+        if words[n + 1:n + 5] == ["=", "&", symbol, ";"] and words[n - 1] in ("{", ";", "}", ":") and n > k:
+            bindings.append(n + 3)
+            continue
+        uses.append(n)
+    if len(bindings) != 1:
+        return {}, set(), []
+    admitted[tokens[bindings[0]][1]] = "the typed pointer's binding"
+    findings = []
+    for n in uses:
+        before = n - 1
+        while before >= 0 and words[before] == "(":
+            before -= 1
+        member = words[n + 2] if words[n + 1:n + 2] == ["->"] and len(words) > n + 2 else None
+        if n > k and member in members and member not in arrays and words[n + 3:n + 4] != ["["] and \
+                not (before >= 0 and words[before] == "&"):
+            continue
+        located = void_pointer_argument(words, n - 1, fragments) if n > k and words[n + 1:n + 2] in \
+            ([","], [")"]) else None
+        if located is not None:
+            _, _, p, q = located
+            def sized(i):
+                return words[i - 1] == "sizeof" or words[i - 2:i] == ["sizeof", "("] and words[i + 1:i + 2] == [")"]
+            if sum(words[i] in (symbol, name) and not (words[i] == symbol and sized(i)) for i in range(p, q)) == 1:
+                continue
+        findings.append((tokens[n][1], f"the typed pointer `{name}` to allowlisted volatile {symbol} may only "
+                         f"be used as `{name}->member` or as a whole-object void-pointer argument"))
+    return admitted, {tokens[k][1]}, findings
 
 
 def user_macro(rest, names):
@@ -2072,13 +2178,15 @@ def census_marked(text, markers, exempt=frozenset()):
     return "".join(pieces) + text[last:]
 
 
-def census_findings(real, marked, markers):
+def census_findings(real, marked, markers, typed=frozenset()):
     """why the qualifiers of `real` are not the lint's, given cpp's output for the marked copy.
 
     Empty when the real unit holds no qualifier, or when (1) the marked unit
     holds none either, (2) no marker was pasted into a longer token, (3) the
     marked unit with each marker mapped back is the real unit, byte for byte,
-    and (4) the unit holds no typeof.
+    and (4) the unit holds no typeof, except the typed pointer kit#375's rule P
+    admits: typed holds the offsets, in the unit's code view, of the typeof
+    tokens it admits, and every typeof of the unit must be one of them.
     """
     words = CENSUS_WORD.findall(real)
     if not any(word in VOLATILE_SPELLINGS for word in words):
@@ -2102,8 +2210,12 @@ def census_findings(real, marked, markers):
         findings.append("the translation unit changes when only its linted qualifiers are renamed: "
                         "it depends on more than the text of its linted files")
     if any(word in TYPEOF_SPELLINGS for word in words):
-        findings.append("typeof in a translation unit that holds a volatile qualifier: it can copy "
-                        "the qualifier onto an object the source never qualifies")
+        spots = [m.start() for m in re.finditer(r"\b(?:typeof|__typeof__|__typeof)\b",
+                                                 strip_comments_and_strings(real))]
+        if not typed or sum(word in TYPEOF_SPELLINGS for word in words) != len(spots) or \
+                any(spot not in typed for spot in spots):
+            findings.append("typeof in a translation unit that holds a volatile qualifier: it can copy "
+                            "the qualifier onto an object the source never qualifies")
     return findings
 
 
@@ -2270,8 +2382,17 @@ def volatile_census(address, linted):
             marked = (work / "marked.i").read_bytes().decode("utf-8")
     except (OSError, ValueError, RuntimeError, ImportError, subprocess.SubprocessError) as error:
         return [(source, "volatile-census", f"the volatile census could not preprocess the source: {error}")]
+    # kit#375, rule P: the typeof of the one typed pointer to an allowlisted object, as it
+    # reaches the unit
+    typed, view = set(), strip_comments_and_strings(real)
+    for entry in active_volatile_entries(data_symbols, volatile_allow_entries()):
+        _, offsets, problems = typed_pointer_sites(view, entry["symbol"], entry["declaration"],
+                                                   declaration_fragments(view))
+        if not problems:
+            typed |= offsets
     return [(source, "volatile-census", message) for message in
-            census_findings(real, marked, markers) + census_placement(marked, markers, data_symbols)]
+            census_findings(real, marked, markers, frozenset(typed)) +
+            census_placement(marked, markers, data_symbols)]
 
 
 def asm_allow_path():

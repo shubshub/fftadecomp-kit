@@ -5990,6 +5990,26 @@ each such argument, with its byte count. What
 the callee returns stays opaque: it may not become an address, a stored value, an
 argument or the return value, so the address cannot come back by another name.
 
+One typed pointer to the object is admitted too (kit #375, rule P). It is
+declared `__typeof__(symbol) *name;` (any typeof spelling) as the first tokens
+of a statement inside a function body. It is bound exactly once to
+`&symbol`, either in its initialiser or by one statement `name = &symbol;`
+after the declaration. Every other use of `name` must be one of these:
+- `name->member`, with a non-array member of the declaration, not under `&`;
+- one complete argument at a void-pointer parameter, under the conditions
+  above, with no other argument of that call naming the symbol or `name`.
+
+The pointer is the object's base with the object's own type, so every access
+through it is a named member access. The permuted compile moves `name->m` as it
+moves `symbol.m`, and the executor sees `symbol + offset` as it does for the
+symbol. The volatile census admits exactly that typeof in the unit. Two
+pointers, a second binding, pointer arithmetic, `*name`, `name[k]`, a copy of
+the pointer, its return, `&name->m`, an array member, a file-scope or
+`static` pointer, a typeof of any other shape, and the pointer passed anywhere
+but such a transfer are all refused. They keep the typeof and `&` refusals.
+0812C2B8 and 08125FA8 save the block this way:
+`control = &symbol; copy(saved, control, 0x50); control->display |= 0xC00;`.
+
 Everything else stays refused, as before:
 - `&symbol + k`, `&symbol.member`, `(&symbol)`, `p = &symbol`;
 - a typed or missing parameter;
