@@ -43,7 +43,8 @@ holds:
    (which the BIOS does not read), when frame addresses, are in the slot's frame and miss the slot: r1 with all
    the bytes it is filled over (the control word's count of units, for CpuFastSet rounded up to 8 words), r3
    itself.  No insn outside a fill's block (its first insn to its call) reads, writes or forms an address in the
-   slot; no frame reference of the function has an unknown offset.  (A pseudo with several definitions, such as
+   slot; no frame reference of the function has an unknown offset, unless it lies on no path to or from any fill
+   on the expand RTL's control-flow graph, loops included (apart()).  (A pseudo with several definitions, such as
    the pointers a block move advances, is read through the definition that reaches the reference in a straight
    line, with no branch target between.)  So the slot is the block's alone: a later block may give it to its own
    temporary, but no later statement reads it.
@@ -373,8 +374,9 @@ def fills(function):
     calls = [(insn, name) for insn in function.insns if insn.code == "call_insn"
              for name in CALLEES if f'"{name}"' in proof.flatten(insn.pattern)]
     touches = frame_touches(function, resolver)
-    if any(offset is None for _, _, offset, _, _, _ in touches):
-        raise ProofError("a frame reference of the function has no constant offset")
+    # a frame reference at an offset the proof cannot place is admitted only apart from every fill (apart())
+    unplaced = [touch for touch in touches if touch[2] is None]
+    touches = [touch for touch in touches if touch[2] is not None]
     stores = [t for t in touches if t[4] == "store" and "v" in rtl_flags(t[5])]
     found = []
     for call, callee in calls:
@@ -445,7 +447,83 @@ def fills(function):
         if what != "address" and index != within[0]["store"]:
             raise ProofError(f"insn UID {function.insns[index].uid} uses the fill temporary's slot beside its "
                              f"store ({what})")
+    if unplaced:
+        if not found:
+            raise ProofError("a frame reference of the function has no constant offset")
+        apart(function, unplaced, found)
     return found
+
+
+def label_refs(x, found=None):
+    """the code_label UIDs a pattern refers to"""
+    found = [] if found is None else found
+    if isinstance(x, list):
+        if x[:1] == ["label_ref"] and len(x) == 2 and str(x[1]).isdigit():
+            found.append(int(x[1]))
+        for part in x:
+            label_refs(part, found)
+    return found
+
+
+def successors(function):
+    """{insn index: the indices control may pass to next} on the expand RTL.
+
+    Every insn but a barrier falls through to the next. A jump_insn adds
+    every label it refers to: a conditional or unconditional jump its
+    target, a tablejump its table's label (whose addr_vec then refers to
+    every case), and an addr_vec its cases. A barrier passes control
+    nowhere. So the graph has at least the edges the code has.
+    """
+    labels = {insn.uid: insn.index for insn in function.insns if insn.code == "code_label"}
+    graph = {}
+    for insn in function.insns:
+        following = set() if insn.code == "barrier" or insn.index + 1 >= len(function.insns) else {insn.index + 1}
+        if insn.code == "jump_insn":
+            targets = label_refs(insn.pattern)
+            if any(uid not in labels for uid in targets):
+                raise ProofError(f"jump insn UID {insn.uid} refers to a label the dump does not hold")
+            following |= {labels[uid] for uid in targets}
+        graph[insn.index] = following
+    return graph
+
+
+def reached(graph, start):
+    """the indices some path of one or more steps from start reaches"""
+    seen, pending = set(), list(graph.get(start, ()))
+    while pending:
+        index = pending.pop()
+        if index not in seen:
+            seen.add(index)
+            pending.extend(graph.get(index, ()))
+    return seen
+
+
+def apart(function, unplaced, found):
+    """F1 for the frame references at offsets the proof cannot place (0811E1F8's `heights[context->mode]`).
+
+    Each must lie on no path to or from any fill: no path from the first
+    insn of a fill's block (through its store and its BIOS call) reaches it,
+    and no path from it reaches that insn.  Loops count, since a path may go
+    round one.  Such a reference may read, write or form any frame address,
+    but never on an execution that also runs a fill.  Within one
+    invocation it therefore neither changes the temporary between its store
+    and the BIOS call nor reads it afterwards, and the frame does not
+    outlive the invocation.  Each fill records the references it was
+    checked against.
+    """
+    graph = successors(function)
+    for index, register, offset, width, what, mem in unplaced:
+        if what == "store" and "v" in rtl_flags(mem):
+            raise ProofError(f"insn UID {function.insns[index].uid} holds a volatile frame store at an offset the "
+                             "proof cannot place")
+        later = reached(graph, index)
+        for fill in found:
+            if fill["start"] <= index <= fill["call"].index or fill["start"] in later or \
+                    index in reached(graph, fill["start"]):
+                raise ProofError(f"insn UID {function.insns[index].uid} is a frame reference with no constant "
+                                 f"offset on a path to or from the fill at insn UID {fill['call'].uid}")
+    for fill in found:
+        fill["apart"] = sorted(function.insns[index].uid for index, *_ in unplaced)
 
 
 # ------------------------------------------------------------------ the ROM
@@ -831,9 +909,12 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
                            for k, (bl, slot, formed, joins) in enumerate(sites) if k in removed)
         calls = "; ".join(f"{CALLEES[callee][0]:08X} is `{CALLEES[callee][2]}` in the ROM"
                           for callee in sorted({found[k]["callee"] for k in removed}))
+        apart_uids = sorted({uid for k in removed for uid in found[k].get("apart", ())})
         text = (f"line {g['line']}: volatile {g['type']} {g['temporary']} is the SDK's BIOS fill temporary "
                 f"({where}): {listed}; {calls}; code SHA-256 as written `{digest(real)}`, without these qualifiers "
-                f"`{variant}`")
+                f"`{variant}`" +
+                (f"; frame references at offsets the proof cannot place, on no path to or from a fill: expand "
+                 f"insn UIDs {apart_uids}" if apart_uids else ""))
         verdicts += [(o, ("admitted", text)) for o in g["offsets"]]
     return verdicts
 
