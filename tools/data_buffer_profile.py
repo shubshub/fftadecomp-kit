@@ -138,7 +138,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
     retry (default_stack_index_profile) of the two plain walks below; the owner switch, the
     menu list frame and the map record loader keep their own walks.
     """
-    import default_stack_index_profile as default_index
+    import closure_slot_profile as closure
     import match
     import function_thunk_profile as thunk
     function_relocations = function_relocations or {}
@@ -215,7 +215,8 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             try:
                 instructions = run(proof)
             except ValueError as error:
-                instructions, proof = default_index.retry(error, run, rebuild, data, address, premises)
+                # The default retries: a variable stack index or closure words (closure_slot_profile).
+                instructions, proof = closure.retry(error, run, rebuild, data, address, premises)
         if frame is not None:
             schema = MENU_LIST_SCHEMA
             manifest["restoring_menu_frame"] = frame.evidence
@@ -225,10 +226,9 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         try:
             instructions = run(proof)
         except ValueError as error:
-            if dma_fills is not None and default_index.POLICY.triggered(error):
-                # The caller keeps this recorder: the retry's walk starts it afresh.
-                dma_fills.__init__(dma_fills.rom)
-            instructions, proof = default_index.retry(error, run, rebuild, data, address, premises)
+            # The caller keeps this recorder: either retry's walk starts it afresh.
+            reset = (lambda: dma_fills.__init__(dma_fills.rom)) if dma_fills is not None else None
+            instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
     if not proof.buffer_evidence():
         raise ValueError("data-buffer evidence requires an inspected buffer call")
     match.verify_data_literals(instructions, address, literals)
@@ -358,6 +358,8 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* callee-saved premise", "* callee-saved fact",
           # call_via_target_profile.lines
           "* buffer call-via target", "* buffer call-via premise",
+          # closure_slot_profile.lines
+          "* buffer closure slot",
           # function_literal_exit_scratch_profile.lines
           "* buffer function-literal exit scratch",
           # default_stack_index_profile.lines

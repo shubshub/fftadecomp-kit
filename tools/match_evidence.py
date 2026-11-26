@@ -542,8 +542,10 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
                 getattr(candidate, "runtime_summaries", None)) else candidate.target,
             incoming_narrow_reads=True)
         if stack_arguments:
-            # match.py retries a refused stack-argument walk once at a variable stack index.
-            instructions, proof = default_index.walk(make_proof, run, data, address, default_index.snapshot(root))
+            # match.py retries a refused stack-argument walk once at a variable stack index, or with
+            # closure words (closure_slot_profile).
+            import closure_slot_profile as closure
+            instructions, proof = closure.walk(make_proof, run, data, address, default_index.snapshot(root))
         else:
             instructions = run(proof)
         from callee_saved_watch import LINE_PREFIX, premise_lines

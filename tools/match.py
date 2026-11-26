@@ -55,6 +55,7 @@ import software_double_profile as software_double
 import software_float_profile as software_float
 import function_thunk_profile as function_thunk
 import call_via_target_profile as call_via
+import closure_slot_profile as closure
 import function_literal_exit_scratch_profile as function_exit
 import data_buffer_profile as data_buffer
 import owner_switch_buffer_profile as owner_switch_buffer
@@ -2207,7 +2208,9 @@ def verify_function_buffers(data, address, rom, mapping, manifest, premises=None
         rom, mapping, stack_arguments=True, loop_replay=True, dead_registers=True, call_via_targets=True)
     if make_proof().span(address) != data:
         raise ValueError("function-buffer caller requires an exact complete mapped span")
-    instructions, proof = default_index.walk(
+    # The default retries: a variable stack index (default_stack_index_profile) or closure words
+    # (closure_slot_profile), each only after its own trigger.
+    instructions, proof = closure.walk(
         make_proof, lambda proof: function_exit.walk(
             proof, data, address, mapping,
             lambda: verify_leaf_instructions(data, address, True, calls, buffer_proof=proof)),
@@ -3358,6 +3361,21 @@ def merge_possible_aliases(previous, incoming):
     return tuple(sorted(merged.items()))
 
 
+def join_word(previous, incoming):
+    """Two states' values of one frame word, or None.  Equal values keep the value, as every word join
+    always has; a call-target fact joins as register facts do (call_via.join: two facts of one value
+    give the union of their origins and crossings, a fact and a plain value give nothing).  Only a
+    closure-slot walk holds such facts in words."""
+    if previous is None or incoming is None or previous[0] != incoming[0]:
+        return None
+    if isinstance(previous[1], call_via.CallTarget) or isinstance(incoming[1], call_via.CallTarget):
+        # Never equality here: a fact equals a plain int of its value, and the plain path's value
+        # has no crossing record (call_via.join refuses the mix, as for registers).
+        joined = call_via.join(previous[1], incoming[1])
+        return None if joined is None else (previous[0], joined)
+    return previous if previous == incoming else None
+
+
 def join_walk_state(previous, outgoing, stack, constants, words, merged_aliases):
     """The core walk's join of two states around their already merged register aliases.
 
@@ -3373,7 +3391,8 @@ def join_walk_state(previous, outgoing, stack, constants, words, merged_aliases)
             tuple((register, joined) for register, value in previous[3]
                   if (joined := call_via.join(value, constants.get(register))) is not None),
             merge_possible_aliases(previous[4], outgoing[4]),
-            tuple((slot, value) for slot, value in previous[5] if words.get(slot) == value))
+            tuple((slot, joined) for slot, value in previous[5]
+                  if (joined := join_word(value, words.get(slot))) is not None))
 
 
 def stack_alias_overwritten_before_use(data, address, successor, register, decoder, *, exit_sites=frozenset(),
@@ -3582,6 +3601,9 @@ class BufferCallProof:
     index_policy = None
     # The default stack-index retry's record (default_stack_index_profile); None on every other walk.
     stack_index_retry = None
+    # The closure-slot retry's words and record (closure_slot_profile); None on every other walk.
+    closure_slots = None
+    closure_retry = None
     # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
     # entries become proved leaf calls; None keeps every runtime refused.
     runtime_summaries = None
@@ -3736,10 +3758,26 @@ class BufferCallProof:
             call_via.cross(constants, site, call_via.effective(self, site, target))
 
     def word_context(self, words, frame_base, root_frame, watched=()):
+        if closure.active(self):
+            return closure.word_context(words, frame_base, root_frame)
         return {}
 
     def word_result(self, aliases, words):
+        if closure.active(self):
+            return closure.WordResult(aliases, words)
         return dict(aliases)
+
+    # The closure-slot retry's exact-word steps (closure_slot_profile); no other plain walk has words.
+    def prune_words(self, words, stack):
+        if not closure.active(self):
+            raise ValueError("frame words require a word-provenance buffer proof")
+        return closure.prune_words(self, words, stack)
+
+    def word_memory(self, instruction, aliases, constants, stack, words, sp_offset, protected, *, root_frame=None):
+        if not closure.active(self):
+            raise ValueError("frame words require a word-provenance buffer proof")
+        return closure.word_memory(self, instruction, aliases, constants, stack, words, sp_offset, protected,
+                                   root_frame=root_frame)
 
     def check_call(self, address, aliases, stack, slots=None, *, constants=None, site=None, words=None):
         resolved = call_via.resolve(self, address, constants, site)
@@ -3782,6 +3820,9 @@ class BufferCallProof:
                                                 buffer_proof=self if self.stack_arguments else None,
                                                 call_resolver=self.resolve_call,
                                                 runtime_summaries=self.runtime_summaries, **entry)
+        if closure.active(self):
+            # K5: no walked callee allocates frame after releasing it (the selector's lifetime check).
+            closure.check_lifetime(self, data, address, instructions)
         return instructions, {}
 
     def loop_replay_eligible(self):
@@ -4171,7 +4212,9 @@ class BufferCallProof:
                         self.observe_alias_return(path_context, current, incoming_state, result_state)
                     else:
                         returned = merge_possible_aliases(returned, aliases.items())
-                        returned_words = words if returned_words is None else {slot:value for slot,value in returned_words.items() if words.get(slot)==value}
+                        returned_words = words if returned_words is None else {
+                            slot: joined for slot, value in returned_words.items()
+                            if (joined := join_word(value, words.get(slot))) is not None}
                     successors = ()
                 elif instruction.id == ARM_INS_B:
                     successors = (operands[0].imm,)
@@ -4256,7 +4299,8 @@ class BufferCallProof:
                         merged = (merged_aliases, depth,
                                   tuple((register, joined) for register, value in previous[2]
                                         if (joined := call_via.join(value, constants.get(register))) is not None),
-                                  tuple((slot,value) for slot,value in previous[3] if words.get(slot)==value))
+                                  tuple((slot, joined) for slot, value in previous[3]
+                                        if (joined := join_word(value, words.get(slot))) is not None))
                         if self.callee_frames:
                             merged += (previous[4],)
                         if merged != previous:
@@ -4434,6 +4478,7 @@ class BufferCallProof:
             lines.extend(self.runtime_summaries.lines())
         lines.extend(split_join.lines(self.split_joins))
         lines.extend(call_via.lines(self))
+        lines.extend(closure.lines(self))
         lines.extend(function_exit.lines(self))
         return lines
 
@@ -4466,6 +4511,11 @@ class BufferCallProof:
             # Bound only when a call-via call was resolved: other reports keep their fingerprint.
             digest.update(len(via).to_bytes(8, "little"))
             digest.update(via)
+        slots = closure.fingerprint_payload(self)
+        if slots is not None:
+            # Bound only when the closure-slot retry admitted the walk: other reports keep theirs.
+            digest.update(len(slots).to_bytes(8, "little"))
+            digest.update(slots)
         scratch = function_exit.fingerprint_payload(self)
         if scratch is not None:
             # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
@@ -7253,8 +7303,11 @@ def main():
                         got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
                         dma_fills=walk_fills[proof.index_policy is not None])
                     if calls:
-                        verified_instructions, buffer_proof = default_index.walk(
-                            stack_buffer_proof, stack_buffer_walk, got, addr, default_index.snapshot(ROOT))
+                        # The default retries (default_stack_index_profile, closure_slot_profile); the
+                        # closure-slot retry walks with the first recorder again, started afresh.
+                        verified_instructions, buffer_proof = closure.walk(
+                            stack_buffer_proof, stack_buffer_walk, got, addr, default_index.snapshot(ROOT),
+                            reset=lambda: walk_fills[0] is not None and walk_fills[0].__init__(walk_fills[0].rom))
                     else:
                         # A call-free body has no buffer call to inspect: only the stack-index retry.
                         verified_instructions, buffer_proof = default_index.retry(
