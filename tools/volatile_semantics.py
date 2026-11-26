@@ -1537,6 +1537,13 @@ class Executor:
                 if local and not is_stack(stored_address):
                     placed = False
                     break
+                if event is None and not stack and global_symbol(address) is not None and \
+                        is_stack(stored_address) and isinstance(stored, tuple) and \
+                        stored[:1] == ("callee-argument",):
+                    # volatile_loop_induction's write of a callee's argument word, after the
+                    # frame escaped: a named object's address is never in the frame, so the
+                    # load passes it and stops at that call, as at any call
+                    continue
                 if event is None or internal:
                     self.fail(text, "partially overlapping stack access")
                 version = ("store", event)

@@ -5744,7 +5744,9 @@ its compile, and also its earlier value when another return site may
 leave it alone (for a callee whose return form the ROM does not show,
 every r0-r3 depends on that offset); a register the callee may leave alone keeps
 its earlier value, r2 and r3 after a runtime helper such as `__umodsi3`
-included (an SWI compares all of r0-r3); outgoing stack-argument words belong to the callee; and
+included (an SWI compares all of r0-r3); outgoing stack-argument words belong to the callee
+(after an escape a read of a named object passes them, since such an object is never in the
+frame, while any other read that partly overlaps one still refuses); and
 an access through any of those refuses. Pushes are allowed only in the
 prologue, before sp moves; frame accesses below sp, not aligned to their
 width or (before an escape) at a variable offset refuse, which also keeps
