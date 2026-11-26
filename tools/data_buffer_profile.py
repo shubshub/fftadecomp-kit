@@ -185,7 +185,8 @@ def numeric_hardware(data, address, mapping, instructions, calls, words, remaini
 
 
 def prove(data, address, rom, mapping, objects, calls, data_relocations, function_relocations=None, *,
-          index=None, switch_relocations=None, dma_fills=None, premises=None, store_bound_premises=False):
+          index=None, switch_relocations=None, dma_fills=None, premises=None, store_bound_premises=False,
+          fresh_blocks=None):
     """The composed proof for linked bytes; returns (instructions, buffer proof, schema, manifest).
 
     calls maps each BL site to its target, data_relocations each typed object word
@@ -238,7 +239,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
             rebuild = lambda: match.FunctionBufferCallProof(
                 rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                 copy_helper_index=index, switch_callee_index=index, dead_registers=True,
-                call_via_targets=True, forward_slots=True)
+                call_via_targets=True, forward_slots=True, fresh_blocks=fresh_blocks)
             proof = rebuild()
     else:
         # The plain path's call rules: direct calls and the canonical _call_via_rN
@@ -262,7 +263,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
         rebuild = lambda: match.BufferCallProof(
             rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
             copy_helper_index=index, switch_callee_index=index, dead_registers=True, call_via_targets=True,
-            forward_slots=True)
+            forward_slots=True, fresh_blocks=fresh_blocks)
         proof = rebuild()
     if proof.span(address) != data:
         raise ValueError("data-buffer caller requires an exact complete mapped span")
@@ -411,10 +412,12 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
                 raise ValueError("data-buffer fresh complete bytes differ")
             import default_stack_index_profile as default_index
             import store_bound_premise_profile as store_bound
+            import fresh_block_profile as fresh_block
             result = prove(got, address, rom, mapping, objects, calls, literals, functions, index=index,
                            switch_relocations=switches, dma_fills=dma_fills,
                            premises=default_index.snapshot(root),
-                           store_bound_premises=store_bound.snapshot(root))
+                           store_bound_premises=store_bound.snapshot(root),
+                           fresh_blocks=fresh_block.snapshot(root))
             checker = Path(__file__).with_name("plausible.py")
             checked = _run_replay_process([sys.executable, str(checker), "--quiet", "--addr",
                                            f"0x{address:08X}", "--json"] +
@@ -439,7 +442,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
           "* buffer owner switch", "* buffer owner switch exit scratch", "* buffer dead register", "* buffer signed remainder", "* buffer division runtime", "* buffer split join",
-          "* buffer released scratch", "* buffer IWRAM image",
+          "* buffer released scratch", "* buffer IWRAM image", "* buffer fresh block premise",
           "* mapping SHA-256",
           "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS non-argument register",

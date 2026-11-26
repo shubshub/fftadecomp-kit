@@ -521,6 +521,7 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
         data = bytes.fromhex(encoded[1])
         from inert_spin_profile import index_snapshot
         import default_stack_index_profile as default_index
+        import fresh_block_profile as fresh_block
         # Without a function index nothing is summarised or delegated, and the walk refuses as before.
         indexed = stack_arguments and (Path(root) / "symbols/functions.txt").is_file()
 
@@ -529,7 +530,8 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
             copy_helper_index=index_snapshot(root) if indexed else None,
             switch_callee_index=index_snapshot(root) if indexed else None,
             dead_registers=stack_arguments is True, call_via_targets=stack_arguments is True,
-            forward_slots=stack_arguments is True)
+            forward_slots=stack_arguments is True,
+            fresh_blocks=fresh_block.snapshot(root) if stack_arguments is True else None)
         proof = make_proof()
         if proof.span(address) != data:
             return False
@@ -674,8 +676,10 @@ def function_address_report_matches(lines, root, address, buffer_profile=False, 
         if buffer_profile:
             from callee_saved_watch import LINE_PREFIX, premise_lines
             import default_stack_index_profile as default_index
+            import fresh_block_profile as fresh_block
             instructions, proof = verify_function_buffers(data, address, rom, functions, manifest,
-                                                          default_index.snapshot(root))
+                                                          default_index.snapshot(root),
+                                                          fresh_block.snapshot(root))
             if single("* buffer calls: ") != STACK_BUFFER_SUMMARY or \
                     unquote("* buffer proof SHA-256: ") != proof.fingerprint() or \
                     unquote("* function buffer proof SHA-256: ") != function_buffer_fingerprint(

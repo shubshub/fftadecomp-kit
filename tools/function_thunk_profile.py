@@ -498,12 +498,16 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                     if buffer_stack_arguments is not None or any(reserved(target) for target in calls.values()):
                         # The default route's plain stack-argument walk takes exact call-via targets
                         # (call_via_target_profile), as match.py issues it: never for a library unit.
+                        # The reviewed fresh-block entries go with them (fresh_block_profile).
+                        import fresh_block_profile as fresh_block
+                        default_route = buffer_stack_arguments is True and unit_arguments is None
                         make_proof = lambda: BufferCallProof(
                             rom, mapping, stack_arguments=buffer_stack_arguments, loop_replay=True,
                             bios_wrappers=True, copy_helper_index=index if buffer_stack_arguments else None,
                             switch_callee_index=index if buffer_stack_arguments else None,
-                            call_via_targets=buffer_stack_arguments is True and unit_arguments is None,
-                            forward_slots=buffer_stack_arguments is True)
+                            call_via_targets=default_route,
+                            forward_slots=buffer_stack_arguments is True,
+                            fresh_blocks=fresh_block.snapshot(root) if default_route else None)
                         plain = lambda candidate: verify_leaf_instructions(
                             got, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True)
                         import function_literal_exit_scratch_profile as function_exit

@@ -79,6 +79,8 @@ SUCCESSOR_SITES = {
     "owner_graph_profile.py:graph": OWN_RULE,
     "volatile_rom_proof.py:pool_halfword": OWN_RULE,
     # REFUSES
+    # a `bl` into the span (a far jump) refuses the fresh-block premise
+    "fresh_block_profile.py:_graph": REFUSES,
     # the pinned boot path to the IWRAM copier refuses at any call, a far jump included
     "iwram_image_profile.py:_dominated": REFUSES,
     "compiler_orphan_constants_prerequisite.py:reachable_literals": REFUSES,
