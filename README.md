@@ -1953,6 +1953,37 @@ every decided branch (site, condition, edge, flag site and operands):
 A callee the entry proof admits keeps its version-1 record and line.
 `dead_register.THROUGH_CALLS.enabled = False` keeps the entry proof alone.
 Boundaries are in `tests/test_dead_register_through_calls.py`.
+### Calls into the boot IWRAM code image
+
+The game copies a small Thumb image (a clear, a fill and a copy routine) into
+IWRAM at boot, and callers reach those routines through `_call_via_rN` with an
+address read from a ROM table (`0x0836D4B8`). A buffer walk that met such a
+call with a stack address live could not inspect it: the target is not ROM
+code. `iwram_image_profile` lets the exact call-via target rule
+(`call_via_target_profile`) resolve it, in the default path's plain and
+function-literal buffer proofs only (exact types).
+
+The copy is derived from the ROM each time, at pinned addresses, and refuses
+when any link differs: the cartridge entry branch reaches the ARM reset code,
+which runs straight to `bx` MAIN; MAIN calls only call-free leaves before it
+calls BOOT; every path of BOOT reaches its call of the copier first; and the
+copier runs straight to its `bl` of the exact indexed CpuSet wrapper, calling
+only that wrapper before it, with a ROM source, an IWRAM destination and a
+plain 16- or 32-bit copy control evaluated from its own literal words. A
+call-via value C resolves when C is odd and C & ~1 lies inside that copy; the
+walk then reads the copied ROM bytes at their IWRAM addresses (from C & ~1 to
+the image's end), and every existing buffer and callee-saved rule applies to
+them unchanged. Even values, values outside the image, other proof types and
+an unproved copy keep the refusal.
+
+That the image still holds the copied bytes when the call is made is not
+proved: IWRAM is writable. Every report that resolves such a call states the
+premise `iwram-boot-image-unmodified-v1` on one `* buffer IWRAM image:` line,
+with the copy's addresses, length and SHA-256, the resolved calls and every
+aligned ROM word whose value lies inside the image, and binds the same record
+into its buffer fingerprint. A report without such a call keeps its lines and
+fingerprint. `iwram_image_profile.POLICY` gates the rule; synthetic boundaries
+are in `tests/test_iwram_image.py`.
 
 ### GBA BIOS wrappers in plain buffer walks
 
