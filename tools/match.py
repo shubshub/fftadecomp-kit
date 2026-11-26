@@ -7379,9 +7379,11 @@ def main():
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
                         switch_callee_index=inert_spin.index_snapshot(ROOT), dead_registers=True,
                         call_via_targets=default_call_route(args, unit_context), forward_slots=True)
-                    stack_buffer_walk = lambda proof: verify_leaf_instructions(
-                        got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
-                        dma_fills=walk_fills[proof.index_policy is not None])
+                    # A frame-buffer owner's R2/R3 exit scratch (function_literal_exit_scratch_profile).
+                    stack_buffer_walk = lambda proof: function_exit.walk(
+                        proof, got, addr, mapping, lambda: verify_leaf_instructions(
+                            got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
+                            dma_fills=walk_fills[proof.index_policy is not None]), kind=function_exit.FRAME)
                     if calls:
                         # The default retries (default_stack_index_profile, closure_slot_profile); the
                         # closure-slot retry walks with the first recorder again, started afresh.

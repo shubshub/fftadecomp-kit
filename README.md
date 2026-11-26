@@ -2651,6 +2651,27 @@ buffer proof fingerprint and recomputed on replay:
 
 `closure_slot_profile.POLICY.enabled = False` restores the plain refusal.
 
+#### Exit scratch of a frame-buffer owner
+
+The plain stack-argument owner shares that binding and projection: the
+default retry's exact `BufferCallProof` walk (`elf-symbol-thumb-frame-buffer-calls-v2`,
+and the typed-data buffer proof's plain route), including its stack-index
+retry, whose retried proof binds its own root. Each of those walks is wrapped
+(`function_exit.walk(..., kind=function_exit.FRAME)`) by match.py's default
+retry, by `data_buffer_profile.prove` and by both replays
+(`match_evidence.buffer_report_matches` and the thunk-absence replay); no
+other plain proof is wrapped, so every other walk keeps its refusal. The
+gates are the function-literal owner's (no local BL, no switch, every normal
+return ends the walk; R0/R1, other registers, non-negative offsets, callee
+returns and split walks keep the refusal). The sites are bound into the
+fingerprint under their own payload tag and stated on one line:
+
+    * buffer frame exit scratch: `thumb-discarded-exit-scratch-v1` premise, not checked: <contract>; own-frame addresses dropped at the owner's normal returns: `0x<return site> r<register> <entry-SP offset>`, ...; R0/R1 and every callee return keep the escape refusal
+
+`function_literal_exit_scratch_profile.FRAME_POLICY.enabled = False` restores
+the refusal; `tests/test_frame_exit_scratch.py` covers the gates and native
+reports on both plain routes.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is
