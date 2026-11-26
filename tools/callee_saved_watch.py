@@ -1270,7 +1270,11 @@ class Checker:
                 self._now = (sp, ((root, 0),) + tuple((level[0], level[2]) for level in ctx))
             pushed = set(state[4])          # live words a push wrote: saved registers, return addresses
             # Frame addresses stored outside the frames that a global may still hold:
-            # (function, site, target, address or None, highest frame offset).
+            # (function, site, target, address or None, highest frame offset); and, for forgetting
+            # what is known of the words they reach, ("kept", function, site, None, INF, the addresses)
+            # for each address stored to memory or handed to code that is not walked.  Whatever took
+            # one may keep it after the global is cleared, so a "kept" entry stays while its frame is
+            # live (it never dangles and no global's overwrite removes it).
             escaped = set(state[5])
             # Probing: the input words (key, offset) a full-word store has written on every path.
             definite = set(state[6])
@@ -1496,6 +1500,26 @@ class Checker:
             def touched(word):
                 """A frame word written: the range its push recorded no longer holds."""
                 constants.pop(SAVED + word, None)
+
+            def escaped_addresses():
+                """The frame addresses, in frames still live, that escaped to memory or to code that
+                is not walked: code that has one may write inside its object (``ESCAPE_PREMISE``, and
+                code not walked may keep what it is given), whether or not it is given it again."""
+                return frozenset(token for entry in escaped if entry[0] == "kept" for token in entry[5]
+                                 if not (token[0] in ("F", "FR") and max(offsets(token)) < sp))
+
+            def forget_escaped():
+                """Code that may write through an escaped frame address ran: a call this walk does
+                not enter, a summarised callee, a SWI (walked code may hand the BIOS a pointer it
+                loaded back), or a store through an address it does not know.
+                The words of those frames no longer hold the value a store gave them.  A continuation
+                walk does not see the escapes made before it starts, so there every word of the frames
+                live at its start (at or above the SP it starts with) counts as well; a frame made
+                after that escapes only where this walk sees it."""
+                reached = [extent(token, spans) for token in escaped_addresses()] + ([(0, INF)] if mode == CONT else [])
+                for key in [key for key in constants if key >= SAVED - INF and key - SAVED not in pushed and
+                            any(lo - 3 <= key - SAVED < hi for lo, hi in reached)]:
+                    del constants[key]
 
             def unknown_words():
                 """KNOWN mode does not follow the frame addresses that code it does not walk is
@@ -1775,6 +1799,11 @@ class Checker:
                     return
                 if location is None:
                     use(stored, what, STORED.get(mnemonic, FULL))
+                    if target()[1] is None:
+                        if mode in (ROOT, CONT):
+                            forget_escaped()
+                        elif mode == KNOWN:
+                            unknown_words()     # the replay follows no escape: any word may be written
                     plain(stored)
                     # Bits of a frame address that vary with it (FS, or the part of an address a
                     # narrow store writes) escape like the address: code that is not walked could
@@ -1815,6 +1844,7 @@ class Checker:
                             self.premises.add(("escape", function, site, text, addressed, tuple(sorted(
                                 off - sp for off, word in memory.items() if taints(word)))))
                             escaped.add((function, site, text, address, max(addressed, default=0) + sp))
+                            escaped.add(("kept", function, site, None, INF, tuple(sorted(frames(stored), key=repr))))
                             released(frames(stored), arguments=False)
                     elif width == 4 and mode in (ROOT, CONT):
                         address = target()[1]       # a known global overwritten with no frame address
@@ -2657,6 +2687,8 @@ class Checker:
                             memory[off] = normal(memory[off] | STALE)
                     for key in [key for key in constants if key >= SAVED - INF and key - SAVED < sp]:
                         del constants[key]
+                    if mode in (ROOT, CONT):
+                        forget_escaped()        # its stores through pointers it loads are not in a summary
                     for off, value in carried.items():           # the words the summary says it leaves
                         mask = early(value)
                         if mask:
@@ -2706,6 +2738,13 @@ class Checker:
                                        ((12,) if scratch() else ()), tuple(stacked),
                                        bool(regs[FLAGS])))
                 # What code that is not walked may hand back of the frame addresses it was given.
+                if mode != KNOWN:
+                    forget_escaped()
+                    given = frozenset().union(*(frames(regs[number]) for number in (0, 1, 2, 3, 12)),
+                                              *(frames(memory[off]) for off in memory
+                                                if sp <= off < entry_sp and off not in pushed))
+                    if given:
+                        escaped.add(("kept", function, site, None, INF, tuple(sorted(given, key=repr))))
                 handed = released() if mode != KNOWN else frozenset()
                 for number in (0, 1, 2, 3):
                     regs[number] = EMPTY | handed
@@ -2925,6 +2964,8 @@ class Checker:
                     del constants[key]
                 if mode == KNOWN:
                     unknown_words()
+                elif mode in (ROOT, CONT):
+                    forget_escaped()
                 forget_below_sp()
             elif mnemonic == "bx":
                 successors = transfer(regs[register(operands[0])])

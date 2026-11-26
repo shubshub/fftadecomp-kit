@@ -731,6 +731,148 @@ class CheckerTests(unittest.TestCase):
         with self.assertRaisesRegex(watch.WatchRefusal, f'callee 0x{OTHER:08X}'):
             watch.Checker(rom, entries).call(via_r1, frozenset({4}), caller=CALLEE, site=CALLEE + 12)
 
+    def test_a_frame_word_written_through_an_escaped_address_is_not_a_known_destination(self):
+        # The word at sp+4 holds OTHER|1 when its address escapes; it is stored again, and later
+        # code writes FAR|1 through the escaped address, which a global G holds.  The value stored
+        # last is then no known destination: the call through the word is premised and neither
+        # OTHER nor FAR is walked (OTHER reads R4 here, so walking it would refuse).
+        g, g2, far = 0x02000000, 0x02000010, 0x08014300
+        fourth = 0x08014400
+        via_r1 = match.RUNTIME_HELPERS['_call_via_r1']
+        keeps = function(THIRD, [('LIT', 1, 0), 0x6008, BX_LR], [g])                 # *G = r0
+        rewrites = function(fourth, [('LIT', 1, 0), 0x6809, ('LIT', 2, 1), 0x600A, BX_LR], [g, far | 1])  # **G = FAR|1
+        functions = {THIRD: keeps, fourth: rewrites, OTHER: (0x6821, BX_LR), far: (BX_LR,)}
+
+        def calls(premises, site):
+            return [record for record in premises if record[:3] == ('call', CALLEE, site)]
+
+        # ROOT: the escape is a walked store (bl THIRD), the write a walked callee's store through
+        # what it loads from G (bl FOURTH).  push {lr}; sub sp,#8; ldr r0,=OTHER|1; str r0,[sp,#4];
+        # add r0,sp,#4; bl THIRD; ldr r0,=OTHER|1; str r0,[sp,#4]; movs r0,#0; bl FOURTH;
+        # ldr r3,[sp,#4]; bl _call_via_r3; add sp,#8; pop {r0}; bx r0.
+        code = function(CALLEE, [0xB500, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, THIRD, ('LIT', 0, 0), 0x9001,
+                                 0x2000, fourth, 0x9B01, VIA_R3, 0xB002, 0xBC01, 0x4700], [OTHER | 1])
+        rom, entries = rom_with({**functions, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 26)), 1)
+        # The address handed to a call the walk does not enter (through _call_via_r2, to an unknown
+        # address) escapes too, and the owner's own store through what it loads from G may write
+        # the word.  ...; add r0,sp,#4; ldr r2,=G2; ldr r2,[r2]; bl _call_via_r2; ldr r0,=OTHER|1;
+        # str r0,[sp,#4]; ldr r1,=G; ldr r1,[r1]; ldr r2,=FAR|1; str r2,[r1]; ldr r3,[sp,#4];
+        # bl _call_via_r3; ...
+        code = function(CALLEE, [0xB500, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, ('LIT', 2, 1), 0x6812, VIA_R2,
+                                 ('LIT', 0, 0), 0x9001, ('LIT', 1, 2), 0x6809, ('LIT', 2, 3), 0x600A, 0x9B01, VIA_R3,
+                                 0xB002, 0xBC01, 0x4700], [OTHER | 1, g2, g, far | 1])
+        rom, entries = rom_with({**functions, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual((len(calls(checker.premises, CALLEE + 14)), len(calls(checker.premises, CALLEE + 32))),
+                         (1, 1))
+        # ... and so may a later call the walk does not enter, given nothing.  A one-word frame, and
+        # R0-R3 and IP cleared before that call (the first may have handed the address back in
+        # them), so that nothing gives it the address again: push {lr}; sub sp,#4; ldr r0,=OTHER|1;
+        # str r0,[sp]; mov r0,sp; ldr r2,=G2; ldr r2,[r2]; bl _call_via_r2; ldr r0,=OTHER|1;
+        # str r0,[sp]; movs r0,#0; movs r1,#0; movs r3,#0; mov ip,r0; ldr r2,=G2; ldr r2,[r2];
+        # bl _call_via_r2; ldr r3,[sp]; bl _call_via_r3; add sp,#4; pop {r0}; bx r0.
+        code = function(CALLEE, [0xB500, 0xB081, ('LIT', 0, 0), 0x9000, 0x4668, ('LIT', 2, 1), 0x6812, VIA_R2,
+                                 ('LIT', 0, 0), 0x9000, 0x2000, 0x2100, 0x2300, 0x4684, ('LIT', 2, 1), 0x6812, VIA_R2,
+                                 0x9B00, VIA_R3, 0xB001, 0xBC01, 0x4700], [OTHER | 1, g2])
+        rom, entries = rom_with({**functions, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 40)), 1)
+        # Taking the address out of G and clearing G (T *p = g; g = 0; *p = v) ends what G holds,
+        # not what was taken: FIFTH stores FAR|1 through the pointer it took after clearing G.
+        fifth = 0x08014500
+        takes = function(fifth, [('LIT', 1, 0), 0x680A, 0x2300, 0x600B, ('LIT', 3, 1), 0x6013, BX_LR], [g, far | 1])
+        code = function(CALLEE, [0xB500, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, THIRD, ('LIT', 0, 0), 0x9001,
+                                 0x2000, fifth, 0x9B01, VIA_R3, 0xB002, 0xBC01, 0x4700], [OTHER | 1])
+        rom, entries = rom_with({**functions, fifth: takes, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 26)), 1)
+        # ... and so does overwriting G with another address (ldr r3,=0x02001000; str r3,[r1]).
+        takes = function(fifth, [('LIT', 1, 0), 0x680A, ('LIT', 3, 2), 0x600B, ('LIT', 3, 1), 0x6013, BX_LR],
+                         [g, far | 1, 0x02001000])
+        rom, entries = rom_with({**functions, fifth: takes, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 26)), 1)
+        # A SWI the owner hands a pointer it loaded from G (CpuSet, destination *G) may write the
+        # word too.  A one-word frame: push {lr}; sub sp,#4; ldr r0,=OTHER|1; str r0,[sp]; mov r0,sp;
+        # bl THIRD; ldr r0,=OTHER|1; str r0,[sp]; ldr r1,=G; ldr r1,[r1]; ldr r0,=ROM word;
+        # ldr r2,=0x04000001; swi 0x0B; ldr r3,[sp]; bl _call_via_r3; add sp,#4; pop {r0}; bx r0.
+        code = function(CALLEE, [0xB500, 0xB081, ('LIT', 0, 0), 0x9000, 0x4668, THIRD, ('LIT', 0, 0), 0x9000,
+                                 ('LIT', 1, 1), 0x6809, ('LIT', 0, 2), ('LIT', 2, 3), 0xDF0B, 0x9B00, VIA_R3, 0xB001,
+                                 0xBC01, 0x4700], [OTHER | 1, g, 0x08020000, 0x04000001])
+        rom, entries = rom_with({**functions, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 30)), 1)
+        # An address the call is given in a stack argument word (its caller's frame at SP) escapes
+        # the same way: sp+0 holds the word's address, R0-R3 and IP hold none.  ...; add r0,sp,#4;
+        # str r0,[sp]; movs r0,#0; movs r1,#0; movs r3,#0; mov ip,r0; ldr r2,=G2; ldr r2,[r2];
+        # bl _call_via_r2; ldr r0,=OTHER|1; str r0,[sp,#4]; movs r0,#0; str r0,[sp]; movs r1,#0;
+        # movs r3,#0; mov ip,r0; ldr r2,=G2; ldr r2,[r2]; bl _call_via_r2; ldr r3,[sp,#4];
+        # bl _call_via_r3; ...
+        code = function(CALLEE, [0xB500, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, 0x9000, 0x2000, 0x2100, 0x2300,
+                                 0x4684, ('LIT', 2, 1), 0x6812, VIA_R2, ('LIT', 0, 0), 0x9001, 0x2000, 0x9000, 0x2100,
+                                 0x2300, 0x4684, ('LIT', 2, 1), 0x6812, VIA_R2, 0x9B01, VIA_R3, 0xB002, 0xBC01, 0x4700],
+                        [OTHER | 1, g2])
+        rom, entries = rom_with({**functions, CALLEE: code})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 52)), 1)
+        # A summarised callee may write through what it loads too.  With the watched value only in
+        # the pushed R4 (push {r4,lr}; movs r4,#0), FOURTH is skipped with its summary, which does
+        # not list its store through what it loads from G; OTHER is quiet, so only the premise at
+        # the call through the word shows that the destination is unknown.
+        code = function(CALLEE, [0xB510, 0x2400, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, THIRD, ('LIT', 0, 0),
+                                 0x9001, 0x2000, fourth, 0x9B01, VIA_R3, 0xB002, 0xBC10, 0xBC01, 0x4700], [OTHER | 1])
+        rom, entries = rom_with({**functions, CALLEE: code, OTHER: (BX_LR,)})
+        checker = watch.Checker(rom, entries)
+        checker.call(CALLEE, frozenset({4}))
+        self.assertEqual(len(calls(checker.premises, CALLEE + 28)), 1)
+        # KNOWN (the caller's replay at a call site): the escape is a call it does not walk, the
+        # write the caller's own store.  ...; bl THIRD; ldr r0,=OTHER|1; str r0,[sp,#4]; ldr r1,=G;
+        # ldr r1,[r1]; ldr r2,=FAR|1; str r2,[r1]; mov r4,sp; ldr r1,[sp,#4]; bl _call_via_r1; ...
+        code = function(CALLEE, [0xB510, 0xB082, ('LIT', 0, 0), 0x9001, 0xA801, THIRD, ('LIT', 0, 0), 0x9001,
+                                 ('LIT', 1, 1), 0x6809, ('LIT', 2, 2), 0x600A, 0x466C, 0x9901, via_r1, 0xB002,
+                                 0xBC10, 0xBC01, 0x4700], [OTHER | 1, g, far | 1])
+        rom, entries = rom_with({**functions, CALLEE: code, OTHER: (BX_LR,), far: (0x6821, BX_LR)})
+        checker = watch.Checker(rom, entries)
+        self.assertNotIn(1, checker.known_at(CALLEE, CALLEE + 30))
+        checker.call(via_r1, frozenset({4}), caller=CALLEE, site=CALLEE + 30)
+        self.assertEqual(checker.premises, {('call', CALLEE, CALLEE + 30, (1,), None, (4,), (), False)})
+        # CONT (the caller's code after a call that hands back a copy, in R5): the walk starts after
+        # any escape of the frames live then, so a store through an address it does not know may
+        # write any of their words.  ldr r0,=OTHER|1; str r0,[sp,#4]; ldr r1,=G; ldr r1,[r1];
+        # ldr r2,=FAR|1; str r2,[r1]; ldr r3,[sp,#4]; bl _call_via_r3; movs r5,#0; add sp,#8;
+        # pop {r0}; bx r0.
+        code = function(CALLEE, [('LIT', 0, 0), 0x9001, ('LIT', 1, 1), 0x6809, ('LIT', 2, 2), 0x600A, 0x9B01, VIA_R3,
+                                 0x2500, 0xB002, 0xBC01, 0x4700], [OTHER | 1, g, far | 1])
+        rom, entries = rom_with({**functions, CALLEE: code, OTHER: (0x6829, BX_LR)})
+        checker = watch.Checker(rom, entries)
+        checker.continuation(CALLEE, CALLEE, {5})
+        self.assertEqual(len(calls(checker.premises, CALLEE + 14)), 1)
+        # A word of a frame made after it starts (sub sp,#8 first) escapes only where the walk sees
+        # it: with no escape the value stays known, and OTHER, which reads R5, is walked ...
+        def made_here(*escape):
+            return function(CALLEE, [0xB082, ('LIT', 0, 0), 0x9001, *escape, ('LIT', 1, 1), 0x6809, ('LIT', 2, 2),
+                                     0x600A, 0x9B01, VIA_R3, 0x2500, 0xB002, 0xB002, 0xBC01, 0x4700],
+                            [OTHER | 1, g, far | 1])
+        rom, entries = rom_with({**functions, CALLEE: made_here(), OTHER: (0x6829, BX_LR)})
+        with self.assertRaisesRegex(watch.WatchRefusal, f'callee 0x{OTHER:08X}'):
+            watch.Checker(rom, entries).continuation(CALLEE, CALLEE, {5})
+        # ... and with its address handed to THIRD, which keeps it in G, the call is premised:
+        # add r0,sp,#4; bl THIRD; ldr r0,=OTHER|1; str r0,[sp,#4] before the store through G.
+        rom, entries = rom_with({**functions, CALLEE: made_here(0xA801, THIRD, ('LIT', 0, 0), 0x9001),
+                                 OTHER: (0x6829, BX_LR)})
+        checker = watch.Checker(rom, entries)
+        checker.continuation(CALLEE, CALLEE, {5})
+        self.assertEqual(len(calls(checker.premises, CALLEE + 26)), 1)
+
     def test_premise_lines(self):
         class Proof:
             rom, entries = rom_with({})
