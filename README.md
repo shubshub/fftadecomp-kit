@@ -6213,6 +6213,33 @@ symbolically along every path, and the check requires:
     value computes the same update. The overwritten-store composition, which
     pairs traces itself, admits no such load.
     `volatile_tested_update.POLICY.enabled = False` restores the refusal;
+  - a **stored-value test re-read** (kit #375) for `sym.x--; if (sym.x == 0)`:
+    the source tests the member again after the update's store, and only the
+    real compile reloads it (08057578: `strb r0, [r2]; ldrb r0, [r2];
+    adds r2, r0, #0; cmp r2, #0; beq`). Its conditions:
+    - it is an unsigned load of a pinned member at its width, forwarded from
+      the store;
+    - the nearest earlier record that is not a register operation or a
+      literal load is a store of the same width to the same member, and
+      nothing in between changes that store's address registers;
+    - through unchanged copies, the value is read by exactly one comparison
+      (`cmp`, `cmn` or `tst`), with only register operations and literal
+      loads before it;
+    - the comparison's flags reach a conditional branch before any other
+      flag write, record or read of the value.
+
+    After the branch, the value and its copies may be read only as a
+    store's value register (never its address) or by unchanged copies, until
+    each is overwritten. A loop cut first, or a conditional branch on a
+    copy's flags, refuses. agbcc stores the tested register again where the
+    branch proved it equal to a constant (08057578 stores it three times as
+    the zero it tested), and the trace compares those stores like any other.
+    The branch condition is compared with the stripped compile's as every
+    condition is. The load is an optional counterpart under the forwarded
+    re-reads' premise, which the record prints with the list
+    `stored-value test re-reads at [...]`. Another access or a call between
+    the store and the load, a second comparison, a use of the value before
+    the test, or a re-read of another member keeps the refusal;
   - a **counterpart**: matched in order to the stripped compile's loads of
     the object, with the same address, width, signedness and executor value,
     and after the same number of trace events (kit#378). The count covers
