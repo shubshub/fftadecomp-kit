@@ -42,7 +42,10 @@ each alternative with its exact offsets.  Pointer-bearing frame words are never
 split on: two states that meet on one key and disagree on one refuse there,
 while split states that never meet again each carry their own words exactly.  A
 split register in R0-R3 that still holds a frame address at a return refuses;
-R12 keeps its exemption there, as in every stack-argument walk.  A walk that
+R12 keeps its exemption there, as in every stack-argument walk.  The plain owner
+switch's R2/R3 exit scratch (owner_switch_buffer_profile.exit_scratch_aliases)
+is not projected in a walk that kept any join apart, so this refusal holds
+there too, also for an R2/R3 copied from a split R12 after the join.  A walk that
 needs more than BUDGET split keys refuses (`split join budget exhausted`).  A
 counted stack-cursor loop does not engage over a split state inside its
 region; the join keeps its refusal there.

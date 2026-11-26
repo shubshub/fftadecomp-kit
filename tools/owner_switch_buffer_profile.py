@@ -53,6 +53,21 @@ switch_callee_profile):
 6. the walk's verified instructions are exactly the owner graph's
    (`owner switch walk differs from the complete owner graph`).
 
+At the owner's own normal returns, an address inside its expired frame left in
+R2 or R3 is dropped and recorded (OWNER_EXIT_SCRATCH), under the
+`thumb-discarded-exit-scratch-v1` premise the kit already states at other
+roots: R2/R3 carry no results under the agbcc Thumb ABI, so the owner's caller
+never reads them (a premise about the callers, not checked; every record and
+line states it).  R0/R1, every callee return and every other alias keep the
+escape refusal (`local stack pointer escapes through a return register`), and
+so does a walk that kept any join apart (split_join_profile), on any register:
+its split states can reach one return with different R2/R3 offsets (directly,
+or copied from a split R12, which the return check exempts), and the record
+names one offset per return.  It binds only the plain proof's owner with its
+authenticated far default arms and table, whose returns end the walk; the
+stack-index leaf keeps its own binding.  The hook is exit_scratch_aliases,
+which match.py calls at every stack-argument return.
+
 The walk runs without incoming narrow reads.  The table pointer counts as the
 switch's word, not an untyped literal, when the dispatch's load is its only PC
 load; as in the switch profiles (#139), what the cases do with the table base or
@@ -94,6 +109,16 @@ class SharedFarDefault:
 
 
 SHARED_FAR_DEFAULT = SharedFarDefault()
+# R2/R3 own-frame addresses at the plain owner's normal returns.
+EXIT_SCRATCH_LINE = '* buffer owner switch exit scratch'
+
+
+class OwnerExitScratch:
+    """The plain owner's R2/R3 return projection; False restores the escape refusal."""
+    enabled = True
+
+
+OWNER_EXIT_SCRATCH = OwnerExitScratch()
 # The plain switch-data manifests (one or several typed objects); every other switch
 # policy keeps its own walk and refusal.
 PLAIN_FIELDS = frozenset(('calls', 'switch', 'data', 'data_policy'))
@@ -142,6 +167,8 @@ class OwnerSwitch:
         require(len(switches) == 1 and (not switches[0].get('interposed_words', 0) or pool.marked(switches[0])),
                 'owner switch requires one guarded table without scalar words')
         instructions, edges, branches, actual, words = graph.graph(data, address, refinement)
+        self.returns = frozenset(int(site, 16) for site in refinement['returns'])
+        self.returns_end = bool(self.returns) and not any(edges[site] for site in self.returns)
         require(plain or not branches, 'owner switch excludes local BL control')
         # The walk takes this arm as a jump; match.verify_leaf_instructions re-derives it.
         self.branches = far_default(switches[0], address, branches)
@@ -199,9 +226,59 @@ class OwnerSwitch:
             arm = record['shared_far_default']
             detail += '; ' + SHARED_FAR_DEFAULT_RULE.format(
                 name=arm['policy'], target=arm['target'], sites=', '.join(f'0x{site:08X}' for site in arm['sites']))
-        return [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
-                f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
-                f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']
+        lines = [f'{LINE}: `{POLICY}` 0x{record["address"]:08X}: dispatch at 0x{record["transfer"]:08X}, '
+                 f'bound {record["switch"]["bound"]}, {len(record["successors"])} successors, '
+                 f'table {record["table_words_sha256"][:16]}; {POINTER_RULE}{detail}']
+        if 'exit_scratch' in record:
+            scratch = record['exit_scratch']
+            sites = ', '.join(f'`0x{site:08X} r{register} {offset:+d}`' for site, register, offset in scratch['sites'])
+            lines.append(f"{EXIT_SCRATCH_LINE}: `{scratch['schema']}` premise, not checked: {scratch['contract']}; "
+                         f"own-frame addresses dropped at the owner's normal returns: {sites}; R0/R1 and every "
+                         f"callee return keep the escape refusal")
+        return lines
+
+    def bind_exit_scratch(self, proof, address, data):
+        """Bind the R2/R3 return projection (named_data_buffer_profile.RootReturnScratchMixin) to proof."""
+        import match
+        require(type(proof) is match.BufferCallProof and proof.owner_switch is self and
+                getattr(proof, '_return_root', None) is None and self.key[:2] == (bytes(data), address) and
+                self.returns_end, 'owner exit scratch requires the plain owner and its complete normal returns')
+        proof._return_root = (address, bytes(data), self.returns)
+        proof._return_scratch = {}
+        proof._return_scratch_joins = set()
+
+    def record_exit_scratch(self, proof):
+        """After the walk: the final projected sites, bound into the record only when there are any."""
+        from local_long_branch_profile import DISCARDED_SCRATCH_SCHEMA, DISCARDED_SCRATCH_CONTRACT
+        sites = sorted((site, register, offset)
+                       for site, pairs in proof._return_scratch.items() for register, offset in pairs)
+        require(not proof._return_scratch_joins, 'owner exit scratch projects no joins')
+        require(not (sites and _split_walk(proof, self.record['address'])),
+                'owner exit scratch refuses a walk that kept a join apart')
+        if sites:
+            self.record['exit_scratch'] = dict(schema=DISCARDED_SCRATCH_SCHEMA, registers=[2, 3],
+                                               contract=DISCARDED_SCRATCH_CONTRACT,
+                                               sites=[list(site) for site in sites])
+
+
+def _split_walk(proof, address):
+    """Whether the walk of `address` kept any join apart (on any register)."""
+    return any(key[0] == address for key in getattr(proof, 'split_joins', {}))
+
+
+def exit_scratch_aliases(proof, data, address, site, aliases):
+    """The plain owner's R2/R3 return projection, bound only by walk() (OWNER_EXIT_SCRATCH).
+
+    Any other proof, an unbound one and a walk that kept a join apart keep the aliases, so the
+    walk's escape refusal stands.  The projection itself is RootReturnScratchMixin's: only the bound
+    owner's own normal returns, never a callee walk, and only addresses inside its expired frame.
+    """
+    import match
+    if type(proof) is not match.BufferCallProof or proof.owner_switch is None or \
+            getattr(proof, '_return_root', None) is None or _split_walk(proof, address):
+        return aliases
+    from named_data_buffer_profile import RootReturnScratchMixin
+    return RootReturnScratchMixin.root_return_aliases(proof, data, address, site, aliases)
 
 
 def retries(manifest, args, calls, data_relocations, function_relocations, thumb, matches_rom):
@@ -224,15 +301,21 @@ def walk(proof, data, address, calls, linked):
     import match
     owner = OwnerSwitch(proof, data, address, calls, linked)
     proof.owner_switch = owner
+    exit_scratch = False
     if proof.index_policy is not None:
         proof.index_policy.owner_switch = owner
         from named_data_buffer_profile import RootReturnScratchMixin
         RootReturnScratchMixin.bind_return_root(proof, address, data, indexed_leaf=owner)
+    elif type(proof) is match.BufferCallProof and OWNER_EXIT_SCRATCH.enabled and owner.returns_end:
+        owner.bind_exit_scratch(proof, address, data)
+        exit_scratch = True
     _, _, calls, words = owner.key
     instructions = match.verify_leaf_instructions(data, address, True, calls, buffer_proof=proof,
                                                   switch_relocations=words)
     require({item.address for item in instructions} == owner.instructions,
             'owner switch walk differs from the complete owner graph')
+    if exit_scratch:
+        owner.record_exit_scratch(proof)
     owner.complete = True
     return instructions
 

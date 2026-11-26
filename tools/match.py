@@ -5371,6 +5371,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 aliases = nested_query_return_aliases(buffer_proof, data, address, current, aliases)
                 from named_data_buffer_profile import root_return_scratch_aliases
                 aliases = root_return_scratch_aliases(buffer_proof, data, address, current, aliases)
+                # The plain owner switch's R2/R3 exit scratch (owner_switch_buffer_profile).
+                aliases = owner_switch_buffer.exit_scratch_aliases(buffer_proof, data, address, current, aliases)
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
             returns.add(current)

@@ -342,7 +342,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 # Anything else, or any indented field, refuses.
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
-          "* buffer owner switch", "* buffer dead register", "* buffer signed remainder", "* buffer split join",
+          "* buffer owner switch", "* buffer owner switch exit scratch", "* buffer dead register", "* buffer signed remainder", "* buffer split join",
           "* mapping SHA-256",
           "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS call kill",
