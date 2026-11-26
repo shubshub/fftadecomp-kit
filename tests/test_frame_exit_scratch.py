@@ -85,6 +85,18 @@ class FrameHookTests(unittest.TestCase):
         for register in (R + 0, R + 1):
             self.assertEqual(function_exit.aliases(proof, data, A, RETURN, {register: -20}), {register: -20})
 
+    def test_a_split_state_return_keeps_the_refusal_only_for_the_frame_owner(self):
+        held = {R + 3: -20}
+        proof, data = frame()
+        self.assertEqual(function_exit.aliases(proof, data, A, RETURN, dict(held), split_state=True), held)
+        proof.split_joins[(A, RETURN - 8, R + 3, -20, -24)] = None
+        self.assertEqual(function_exit.aliases(proof, data, A, RETURN, dict(held)), {})
+        function_exit.record(proof, A)                  # a merged-state projection beside a split is kept
+        self.assertTrue(proof.function_exit_scratch)
+        proof, data = bound()
+        proof.split_joins[(A, RETURN - 8, R + 3, -20, -24)] = None
+        self.assertEqual(function_exit.aliases(proof, data, A, RETURN, dict(held)), held)
+
     def test_walk_binds_only_the_plain_stack_argument_proof(self):
         rom, mapping = bytes(0x1000), "[]"
         for proof, expected in ((match.BufferCallProof(rom, mapping, stack_arguments=True), True),
@@ -107,6 +119,26 @@ class FrameHookTests(unittest.TestCase):
                             found.add((path.name, function.name))
         self.assertEqual(found, {("match.py", "main"), ("match_evidence.py", "buffer_report_matches"),
                                  ("data_buffer_profile.py", "prove"), ("function_thunk_profile.py", "verify_source")})
+
+
+class WiringTests(unittest.TestCase):
+    def test_the_owner_walk_says_when_a_return_is_in_a_split_state(self):
+        import ast
+        calls = [node for node in ast.walk(ast.parse((ROOT / "tools/match.py").read_text()))
+                 if isinstance(node, ast.Call) and ast.unparse(node.func) == "function_exit.aliases"]
+        self.assertEqual([[ast.unparse(keyword.value) for keyword in call.keywords if keyword.arg == "split_state"]
+                          for call in calls], [["split_joins is not None and isinstance(state_key, split_join.Key)"]])
+
+    def test_a_path_state_walk_reaches_the_return_hook_as_a_merged_state(self):
+        # The exact-alias path-state walk keeps no split joins and binds no state_key: a clean
+        # return passes the hook, and a frame address in R0 still refuses there.
+        def proof():
+            proof = match.BufferCallProof(bytes(0x1000), "[]", stack_arguments=True)
+            proof.callee_frames, proof.exact_alias_state_budget = True, 16
+            return proof
+        match.verify_leaf_instructions(bytes.fromhex("81b001b07047"), A, True, buffer_proof=proof())
+        with self.assertRaisesRegex(ValueError, "local stack pointer escapes through a return register"):
+            match.verify_leaf_instructions(bytes.fromhex("81b0684601b07047"), A, True, buffer_proof=proof())
 
 
 @unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")

@@ -98,11 +98,17 @@ def _bind(proof):
     return True
 
 
-def aliases(proof, data, address, site, held):
-    """The return hook match.py calls at every stack-argument return; unbound proofs keep ``held``."""
+def aliases(proof, data, address, site, held, split_state=False):
+    """The return hook match.py calls at every stack-argument return; unbound proofs keep ``held``.
+
+    ``split_state``: the return is reached in a state the split-join rule keeps apart.  The
+    function-literal owner refuses any walk that kept a join apart; the frame-buffer owner refuses
+    only a return reached in such a state, so its projections are made from merged states alone."""
     import match
     root = getattr(proof, "_function_exit_root", None)
-    if root is None or not eligible(proof) or address != root[0] or data != root[1] or _split(proof, address):
+    frame = getattr(proof, "_function_exit_kind", FUNCTION) == FRAME
+    if root is None or not eligible(proof) or address != root[0] or data != root[1] or \
+            (split_state if frame else _split(proof, address)):
         return held
     if not any(register in (match.ARM_REG_R0 + 2, match.ARM_REG_R0 + 3) for register in held):
         return held
@@ -126,7 +132,7 @@ def record(proof, address):
                    for site, pairs in proof._return_scratch.items() for register, offset in pairs)
     if proof._return_scratch_joins:
         raise ValueError("function-literal exit scratch projects no joins")
-    if sites and _split(proof, address):
+    if sites and getattr(proof, "_function_exit_kind", FUNCTION) == FUNCTION and _split(proof, address):
         raise ValueError("function-literal exit scratch refuses a walk that kept a join apart")
     proof.function_exit_scratch = dict(schema=DISCARDED_SCRATCH_SCHEMA, registers=[2, 3],
                                        contract=DISCARDED_SCRATCH_CONTRACT, address=address,

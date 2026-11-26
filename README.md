@@ -2672,6 +2672,11 @@ fingerprint under their own payload tag and stated on one line:
 the refusal; `tests/test_frame_exit_scratch.py` covers the gates and native
 reports on both plain routes.
 
+The frame-buffer owner keeps a join apart (`stack-split-join-v1`) and still
+projects: it refuses only a return reached in a state the split keeps apart,
+so every projection is made from a merged state. The function-literal owner
+still refuses any walk that kept a join apart.
+
 ### Typed named data beside buffer calls
 
 A caller with named data relocations whose stack buffer reaches a callee is
