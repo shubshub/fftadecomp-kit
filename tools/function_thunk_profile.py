@@ -502,7 +502,8 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                             rom, mapping, stack_arguments=buffer_stack_arguments, loop_replay=True,
                             bios_wrappers=True, copy_helper_index=index if buffer_stack_arguments else None,
                             switch_callee_index=index if buffer_stack_arguments else None,
-                            call_via_targets=buffer_stack_arguments is True and unit_arguments is None)
+                            call_via_targets=buffer_stack_arguments is True and unit_arguments is None,
+                            forward_slots=buffer_stack_arguments is True)
                         run = lambda candidate: verify_leaf_instructions(
                             got, address, True, calls, buffer_proof=candidate, incoming_narrow_reads=True)
                         if buffer_stack_arguments:

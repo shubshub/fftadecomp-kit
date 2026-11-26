@@ -227,9 +227,17 @@ class BiosWrapperSummaries:
         if type(site) is not int:
             raise ValueError('BIOS wrapper summary requires an actual direct call site')
         if words or any(context.values()) or proof.word_provenance or proof.callee_frames or \
-                proof.single_word_stores or proof.forwarded_stack_arguments:
+                proof.single_word_stores or proof.forwarded_stack_arguments and not proof.default_forwarding:
             raise ValueError('BIOS wrapper summaries exclude word-provenance, callee-frame and '
                              'forwarded-slot contexts')
+        # Released forwarded words below SP (forwarded_slot_profile): the BIOS call is trusted under the
+        # recorded premise not to read them, and they are handed back unchanged.
+        released = {key: arguments[key] for key in match.stale_words(arguments).values()}
+        arguments = {key: value for key, value in arguments.items() if key not in released}
+        if released:
+            if not proof.default_forwarding:
+                raise ValueError('released forwarded words reach only the default forwarding proofs')
+            proof.forward_trusted_calls.add((0, site, address))
         name, _, wrapper = WRAPPERS[address]
         self.span = proof.span
         data = proof.span(address)
@@ -265,7 +273,7 @@ class BiosWrapperSummaries:
         # No callee-clobber record: like every uninspected call, R4-R11 survival is
         # trusted under the premise, and a loop replay that relies on it says so.
         proof.dependencies[address] = data
-        return proof.word_result({}, {})
+        return proof.word_result(released, {})
 
     def finish(self, data, address, instructions, edges):
         """Discharge the owner's memory-wrapper calls over its complete verified CFG."""

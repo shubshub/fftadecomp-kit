@@ -386,6 +386,18 @@ def contract(body, count):
                 execution_sha256=hashlib.sha256(json.dumps(cases, separators=(',', ':')).encode()).hexdigest())
 
 
+def helper_stack_plain(body):
+    """True when every instruction of the pinned helper touches SP only by PUSH or POP."""
+    import match
+    decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+    decoder.detail = True
+    for instruction in decoder.disasm(body, HELPER):
+        read, written = instruction.regs_access()
+        if (match.ARM_REG_SP in read or match.ARM_REG_SP in written) and instruction.mnemonic not in ("push", "pop"):
+            return False
+    return True
+
+
 class CopySummaries:
     """The copy summaries of one plain buffer proof: helper identity, contracts and sites."""
 
@@ -415,11 +427,21 @@ class CopySummaries:
         try:
             require(proof.copy_summaries is self and proof.stack_arguments and not words and not (
                 proof.word_provenance or proof.callee_frames or proof.single_word_stores or
-                proof.forwarded_stack_arguments or proof.exact_alias_state_budget is not None or
+                proof.forwarded_stack_arguments and not proof.default_forwarding or
+                proof.exact_alias_state_budget is not None or
                 proof.bios_fill_proof is not None or proof.discarded_exit_scratch is not None or
                 proof.runtime_summaries is not None),
                 'copy summary excludes word-provenance, callee-frame and other summary contexts')
             require(type(site) is int, 'copy summary requires an actual direct call site')
+            import match
+            # Released forwarded words below SP (forwarded_slot_profile) are handed back unchanged; the
+            # pinned helper uses SP only by PUSH and POP, so it reads no word below SP it did not write.
+            released = {key: arguments[key] for key in match.stale_words(arguments).values()}
+            arguments = {key: value for key, value in arguments.items() if key not in released}
+            if released:
+                require(proof.default_forwarding, 'released forwarded words reach only the default forwarding proofs')
+                require(helper_stack_plain(self.identity(proof)),
+                        'copy helper must use SP only by PUSH and POP beside released forwarded words')
             require(R2 not in arguments and LR not in arguments, 'copy summary refuses a local pointer in R2 or LR')
             for offset in (*arguments.values(), *incoming.values()):
                 proof.validate_pointer_value(offset, stack)
@@ -453,6 +475,7 @@ class CopySummaries:
                 result[R3] = source + count
             if R12 in arguments:
                 result[R12] = arguments[R12]
+            result.update(released)
             proof.dependencies[HELPER] = body
             dropped = sorted([register - R0, arguments[register]]
                              for register in (R3, R0 + 1) if register in arguments and register not in result)
