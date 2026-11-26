@@ -644,12 +644,17 @@ class SemanticDiffTests(unittest.TestCase):
 
     def test_whole_object_uses_are_refused_after_preprocessing(self):
         same = assembly("bx\tlr")
-        for spelling in ("x = sizeof(" + SYMBOL + ");", "x = __alignof__(" + SYMBOL + ");",
-                         "copy = " + SYMBOL + ";", "p[sizeof " + SYMBOL + " > 0x100 ? 1 : 2] = a;",
-                         "p = &(0, " + SYMBOL + ".unknown_3E);"):
+        for spelling in ("x = __alignof__(" + SYMBOL + ");", "copy = " + SYMBOL + ";",
+                         "p = &(0, " + SYMBOL + ".unknown_3E);", "p = &" + SYMBOL + ";",
+                         "x = sizeof(" + SYMBOL + ".display) + sizeof(&" + SYMBOL + ");"):
             with self.subTest(spelling=spelling):
                 self.refused_with(same, same, PREPROCESSED + DECLARATION + "\nvoid f(void) { " + spelling + " }\n",
                                   "after preprocessing")
+        # kit#375, rule U: the object's size is a constant the permuted declaration keeps
+        for spelling in ("x = sizeof(" + SYMBOL + ");", "p[sizeof " + SYMBOL + " > 0x100 ? 1 : 2] = a;"):
+            with self.subTest(spelling=spelling):
+                self.assertEqual(compare(same, same, PREPROCESSED + DECLARATION + "\nvoid f(void) { " +
+                                         spelling + " }\n")[0][1], 1)
         # the pinned declaration itself is the one allowed bare occurrence
         self.assertEqual(compare(same, same, PREPROCESSED + DECLARATION + "\n")[0][1], 1)
 

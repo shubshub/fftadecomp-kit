@@ -932,7 +932,10 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
     replacement names the symbol.  Other headers may not name the symbol, and
     every use must be immediate member access `symbol.member`, so neither its
     address nor the whole object can reach pointer arithmetic, a macro
-    argument or a copy.  Only a file with its own file-scope declarator whose
+    argument or a copy.  The exceptions are kit#375's rule U
+    (whole_object_sites): `sizeof symbol`, and `&symbol` as one complete
+    argument at a `void *` / `const void *` parameter of a prototyped callee
+    or typed function-pointer table element.  Only a file with its own file-scope declarator whose
     include closure (closure=(inside, outside)) provably misses the listed
     header is exempt; without a closure nothing is.
 
@@ -1017,12 +1020,26 @@ def allowlisted_volatile(code, relpath, data_symbols, entries, text=None, closur
             uses = (inside is not None and header in inside) or bool(references)
             if uses and not (declares_symbol(joined, symbol) and inside is not None
                              and header not in inside):
+                # kit#375, rule U: `sizeof symbol` and `&symbol` as a complete void-pointer
+                # argument, read against the prototypes of this file and its headers
+                context = [joined]
+                for included in sorted(inside or ()):
+                    if included in (relpath, header) or tree is None:
+                        continue
+                    try:
+                        context.append(strip_comments_and_strings(join_splices(
+                            (Path(tree) / included).read_text(encoding="utf-8", errors="replace"))))
+                    except OSError:
+                        pass            # reported below
+                admitted = whole_object_sites(joined, symbol, declaration_fragments("\n;\n".join(context)))
                 for reference in references:
+                    if reference.start() in admitted:
+                        continue
                     if not re.match(r"\s*\.\s*[A-Za-z_]", joined[reference.end():]):
                         finding(reference.start(), f"allowlisted volatile {symbol} may only be "
                                 "used as `symbol.member`: its address or whole object would "
                                 "carry the qualifier to other memory")
-                for offset, message in member_provenance(joined, entry):
+                for offset, message in member_provenance(joined, entry, admitted):
                     finding(offset, message)
                 for extension in re.finditer(r"\b__extension__\b", joined):
                     finding(extension.start(), f"`__extension__` may not appear in a {symbol} user: "
@@ -1107,6 +1124,171 @@ def integer_literal(token):
     return None
 
 
+# kit#375, rule U: the allowlisted object's whole-object argument.  A `void *` or
+# `const void *` parameter (any order of the qualifier, an optional name).
+VOID_POINTER_PARAMETER = re.compile(
+    r"(?:(?:const|__const|__const__)\s+)?void\s*(?:(?:const|__const|__const__)\s*)?\*"
+    r"\s*(?:[A-Za-z_]\w*)?")
+NOT_CALLEES = {"if", "while", "for", "switch", "return", "sizeof", "typeof", "__typeof", "__typeof__",
+               "__alignof__", "__alignof", "__attribute__", "__extension__", "do", "else", "case"}
+
+
+def declaration_fragments(code):
+    """the file-scope declarations of code split at `;`, with directive lines and
+    brace bodies folded to `;`, or None when the braces do not balance"""
+    text = re.sub(r"(?m)^[ \t]*#.*$", ";", code)
+    while True:
+        folded = re.sub(r"\{[^{}]*\}", ";", text)
+        if folded == text:
+            return None if "{" in text or "}" in text else text.split(";")
+        text = folded
+
+
+def parameter_list(text):
+    """the top-level comma-separated parts of a parameter list, or None"""
+    parts, depth, start = [], 0, 0
+    for index, char in enumerate(text):
+        depth += {"(": 1, ")": -1, "[": 1, "]": -1}.get(char, 0)
+        if depth < 0:
+            return None
+        if char == "," and depth == 0:
+            parts.append(text[start:index])
+            start = index + 1
+    if depth:
+        return None
+    parts.append(text[start:])
+    return [part.strip() for part in parts]
+
+
+def void_pointer_indices(parameters):
+    """the indices of the `void *` / `const void *` parameters of a list, or None"""
+    parts = parameter_list(parameters)
+    if parts is None or parts == ["void"] or "..." in parts:
+        return None
+    return frozenset(i for i, part in enumerate(parts) if VOID_POINTER_PARAMETER.fullmatch(part))
+
+
+def void_pointer_parameters(fragments, callee):
+    """the parameter indices that every file-scope prototype of the function `callee`
+    declares `void *` or `const void *`; empty unless every declaration of it is a
+    plain prototype and all agree (kit#375, rule U)"""
+    found = set()
+    for fragment in fragments or ():
+        named = re.search(r"\b" + re.escape(callee) + r"\b", fragment)
+        if not named:
+            continue
+        text = " ".join(fragment.split())
+        prototype = re.fullmatch(r"((?:[A-Za-z_]\w*\s*|\*\s*)+?)" + re.escape(callee) + r"\s*\((.*)\)", text)
+        if prototype is None or re.search(r"\btypedef\b", prototype[1]):
+            return frozenset()
+        indices = void_pointer_indices(prototype[2])
+        if indices is None:
+            return frozenset()
+        found.add(indices)
+    return found.pop() if len(found) == 1 else frozenset()
+
+
+def table_void_pointer_parameters(fragments, table):
+    """the same for a call through an element of the function-pointer table `table`:
+    `[extern] [const] T [const] table[N]` with one `typedef R (*T)(params)`, or a
+    direct `R (*table[N])(params)` declarator; empty for anything else"""
+    found = set()
+    for fragment in fragments or ():
+        if not re.search(r"\b" + re.escape(table) + r"\b", fragment):
+            continue
+        text = " ".join(fragment.split())
+        typed = re.fullmatch(r"(?:(?:extern|const|static) )*([A-Za-z_]\w*) (?:const )?" + re.escape(table) +
+                             r" ?(?:\[[^\]]*\])?", text)
+        direct = re.fullmatch(r"(?:extern |const |static )*[A-Za-z_][\w ]*?\*? ?\( ?\* ?(?:const )?" +
+                              re.escape(table) + r" ?(?:\[[^\]]*\])? ?\) ?\((.*)\)", text)
+        if direct:
+            indices = void_pointer_indices(direct[1])
+        elif typed:
+            definitions = [" ".join(f.split()) for f in fragments
+                           if re.search(r"\btypedef\b", f) and re.search(r"\(\s*\*\s*" + re.escape(typed[1]) +
+                                                                       r"\s*\)", f)]
+            matched = [re.fullmatch(r"typedef [A-Za-z_][\w ]*?\*? ?\( ?\* ?" + re.escape(typed[1]) +
+                                    r" ?\) ?\((.*)\)", d) for d in definitions]
+            if len(matched) != 1 or matched[0] is None:
+                return frozenset()
+            indices = void_pointer_indices(matched[0][1])
+        else:
+            return frozenset()
+        if indices is None:
+            return frozenset()
+        found.add(indices)
+    return found.pop() if len(found) == 1 else frozenset()
+
+
+def whole_object_sites(code, symbol, fragments):
+    """{offset of the symbol's token: what it is} for the whole-object uses kit#375's
+    rule U admits: `sizeof symbol` and `sizeof(symbol)`, and `&symbol`, cast or not to
+    `(void *)` / `(const void *)`, as one complete top-level argument of a call to a
+    prototyped function, or through an element `table[K]` of a typed function-pointer
+    table, at a parameter declared `void *` or `const void *`, no other argument of
+    that call naming the symbol.  Every other whole-object use stays refused."""
+    tokens = [(m[0], m.start()) for m in C_TOKEN.finditer(code)]
+    words = [token for token, _ in tokens]
+    sites = {}
+    for k, (token, offset) in enumerate(tokens):
+        if token != symbol:
+            continue
+        if k >= 1 and words[k - 1] == "sizeof" or \
+                k >= 2 and words[k - 2:k] == ["sizeof", "("] and words[k + 1:k + 2] == [")"]:
+            sites[offset] = "sizeof"
+            continue
+        if k < 1 or words[k - 1] != "&" or words[k + 1:k + 2] not in ([","], [")"]):
+            continue
+        j = k - 2
+        for cast in (["(", "void", "*", ")"], ["(", "const", "void", "*", ")"],
+                     ["(", "void", "const", "*", ")"]):
+            if j - len(cast) + 1 >= 0 and words[j - len(cast) + 1:j + 1] == cast:
+                j -= len(cast)
+                break
+        if j < 0 or words[j] not in ("(", ","):
+            continue
+        # back to the call's own `(`, counting the arguments before this one
+        index, depth, p = (1 if words[j] == "," else 0), 0, j - 1 if words[j] == "," else j
+        while words[j] == "," and p >= 0:
+            if words[p] in (";", "{", "}"):
+                p = -1
+                break
+            if words[p] in (")", "]"):
+                depth += 1
+            elif words[p] in ("(", "["):
+                if depth == 0:
+                    break
+                depth -= 1
+            elif words[p] == "," and depth == 0:
+                index += 1
+            p -= 1
+        if p < 1 or words[p] != "(":
+            continue
+        # forward to its `)`: the symbol may occur only here among its arguments
+        depth, q = 0, p
+        while q < len(words):
+            depth += {"(": 1, ")": -1}.get(words[q], 0)
+            if depth == 0:
+                break
+            q += 1
+        def sized(i):
+            return words[i - 1] == "sizeof" or words[i - 2:i] == ["sizeof", "("] and words[i + 1:i + 2] == [")"]
+        if q >= len(words) or sum(words[i] == symbol and not sized(i) for i in range(p, q)) != 1:
+            continue
+        callee = words[p - 1]
+        if callee == "]" and p >= 5 and words[p - 3] == "[" and integer_literal(words[p - 2]) is not None and \
+                re.fullmatch(r"[A-Za-z_]\w*", words[p - 4]) and words[p - 5] not in (".", "->"):
+            name, allowed = f"{words[p - 4]}[{words[p - 2]}]", table_void_pointer_parameters(fragments, words[p - 4])
+        elif re.fullmatch(r"[A-Za-z_]\w*", callee) and callee not in NOT_CALLEES and \
+                words[p - 2:p - 1] not in (["."], ["->"]):
+            name, allowed = callee, void_pointer_parameters(fragments, callee)
+        else:
+            continue
+        if index in allowed:
+            sites[offset] = f"the void-pointer argument {index + 1} of {name}"
+    return sites
+
+
 def user_macro(rest, names):
     """does a #define's parameters-and-replacement text expand to `&` or a pinned name?"""
     return "&" in rest or bool(set(re.findall(r"[A-Za-z_]\w*", macro_replacement(rest))) & names)
@@ -1131,7 +1313,7 @@ def forges_directive(rest):
     return not rest.startswith("(") and "#" in rest
 
 
-def whole_object_uses(code, symbol):
+def whole_object_uses(code, symbol, admitted=()):
     """[(offset, message)] for every occurrence of symbol not written `symbol . member`.
 
     The one exception is the pinned declaration's own `} symbol ;`, which a
@@ -1142,7 +1324,7 @@ def whole_object_uses(code, symbol):
     tokens = [(m[0], m.start()) for m in C_TOKEN.finditer(code)]
     findings, declarations = [], 0
     for index, (token, offset) in enumerate(tokens):
-        if token != symbol:
+        if token != symbol or offset in admitted:
             continue
         after = [t for t, _ in tokens[index + 1:index + 3]]
         if after[:1] == ["."] and len(after) == 2 and re.fullmatch(r"[A-Za-z_]\w*", after[1]):
@@ -1155,7 +1337,7 @@ def whole_object_uses(code, symbol):
     return findings
 
 
-def member_provenance(code, entry):
+def member_provenance(code, entry, admitted=()):
     """[(offset, message)] for uses that could reach a volatile member without its name.
 
     Works on C tokens, so it applies equally to a source and to its
@@ -1218,7 +1400,7 @@ def member_provenance(code, entry):
         before = index - 1
         while before >= 0 and tokens[before][0] == "(":
             before -= 1
-        if before >= 0 and tokens[before][0] == "&":
+        if before >= 0 and tokens[before][0] == "&" and offset not in admitted:
             findings.append((offset, f"no `&` may precede {symbol} (write `{symbol}.x & a`): "
                              "a member's address could reach a volatile member without its qualifier"))
         after = [t for t, _ in tokens[index + 1:index + 6]]
