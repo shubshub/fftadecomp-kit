@@ -51,7 +51,15 @@ symbolically along every path, and the check requires
    (RomInterfaces, transitively through its own calls, failing closed);
 2. every access to the object to be `symbol + constant` inside it; variable
    offsets, out-of-object offsets, multi-register transfers and the
-   object's address reaching a call argument or a stored value fail closed;
+   object's address reaching a call argument or a stored value fail closed.
+   One argument is admitted (kit#375, rule U): the object's exact address,
+   offset 0, in the one argument register of a parameter the callee's
+   prototype (or its typed function-pointer table's) declares `void *` or
+   `const void *`, no other argument carrying it, and the object's size as a
+   constant in another argument register (a whole-object copy or clear, to
+   or from the object); the record lists each, and
+   the callee's result may not become an address, a stored value, an
+   argument or the return value (Executor.call, whole_result_use);
 3. every load of the object in the real compile to be one of
    * a read-modify-write load: an unsigned load of a pinned member, at its
      offset and of its width (`ldrb` of a byte, `ldrh` of a halfword), whose
@@ -194,6 +202,8 @@ FAR_JUMP = "far-jump"
 # take about 0.25 MB each, 300 MB and 5 s in all.  More
 # decisions per path would not help: a loop whose exit is unknown is
 # refused at any bound, and each extra decision can double the paths.
+# kit#375, rule U: the signatures key of a callee's `void *` parameter indices
+VOID_POINTERS = "void-pointer-parameters"
 MAX_PATHS = 1024
 MAX_STEPS = 20000
 MAX_DECISIONS = 32
@@ -1324,6 +1334,7 @@ class Executor:
         the constant comes from immediates and literal words only (derived: an
         address register holds a value read back from memory), and an access
         that overlaps a pinned member is exactly that member"""
+        self.whole_result_use(address, text, "used as an address")
         atom = ("sym", self.symbol)
         if not contains(address, atom):
             return
@@ -1349,6 +1360,11 @@ class Executor:
                 self.fail(text, f"a {width}-byte access at {self.symbol}{offset:+#x} overlaps a pinned "
                           f"byte of the {size}-byte member at {self.symbol}{start:+#x}; only an access "
                           "of exactly that member, through its name, may touch it")
+
+    def whole_result_use(self, value, text, use):
+        """kit#375, rule U: refuse a use of what a call that received the object's address returned"""
+        if any(contains(value, result) for result in getattr(self, "whole_results", ())):
+            self.fail(text, f"the result of a call that received the address of {self.symbol} is {use}")
 
     def fail(self, record_text, message):
         where = f" at `{record_text}`" if record_text else ""
@@ -1379,6 +1395,8 @@ class Executor:
         self.regs.update(sp=SP, lr=("entry", "lr"))
         self.flags = ("entry",)
         self.memory, self.trace, self.records = [], [], []
+        # kit#375, rule U: the results of calls that received the object's address
+        self.whole_results = set()
         self.load_captures = [] if _capture_load_provenance else None
         self.escaped, self.known, self.conditions = False, {}, []
         self.frame_base = None
@@ -1701,6 +1719,7 @@ class Executor:
 
     def store(self, width, address, value, saved=False, text="", derived=False):
         value = truncate(value, width * 8)
+        self.whole_result_use(value, text, "stored to memory")
         if carries(value, ("sym", self.symbol)):
             self.fail(text, f"the address of {self.symbol} is stored to memory")
         event = None
@@ -1834,8 +1853,34 @@ class Executor:
                 self.interfaces, "conditional_premises", {}).get(target)
             record.writes = set(writes) | {"lr"}
         record.reads = named | record.guarded | (record.reads - set(ARGUMENT_REGISTERS))
-        if any(carries(argument, ("sym", self.symbol)) for argument in arguments):
-            self.fail(text, f"the address of {self.symbol} is passed to a call")
+        for argument in arguments:
+            self.whole_result_use(argument, text, "passed to a call")
+        carrying = [n for n, argument in enumerate(arguments) if carries(argument, ("sym", self.symbol))]
+        if carrying:
+            # kit#375, rule U: the object's own address, exactly (offset 0), in one argument
+            # register of a parameter the prototype declares `void *` or `const void *`
+            if isinstance(target, str):
+                callee, key = target, (VOID_POINTERS, target)
+            elif isinstance(target, tuple) and target[0] == "via":
+                table = global_symbol(target[1][2])
+                element = signed32(linear(target[1][2])[0]) // 4
+                callee, key = f"{table}[{element}]", (VOID_POINTERS, ("via", table))
+            else:
+                callee, key = None, None
+            position = carrying[0]
+            allowed = self.signatures.get(key, frozenset()) if key else frozenset()
+            if len(carrying) != 1 or position >= 4 or arguments[position] != ("sym", self.symbol) or \
+                    not isinstance(allowed, frozenset) or position not in allowed:
+                self.fail(text, f"the address of {self.symbol} is passed to a call")
+            # a whole-object transfer (kit#375 item 1): the count is the object's size, a
+            # constant in another argument register, so the callee is handed all of it
+            counts = [n for n, argument in enumerate(arguments[:4]) if n != position and argument == self.size]
+            if not counts:
+                self.fail(text, f"the address of {self.symbol} is passed to a call without its size "
+                          f"({self.size:#x} bytes) as another argument")
+            record.whole_object = (f"`&{self.symbol}` (+0x0, {self.size:#x} bytes in argument {counts[0] + 1}) "
+                                   f"as the void-pointer argument {position + 1} of {callee} at instruction "
+                                   f"{record.index + 1}")
         self.escape(arguments, text)
         if self.frame is not None:
             # an unnamed argument register the callee may read can hand it a frame address too
@@ -1853,6 +1898,10 @@ class Executor:
         # calls whose physical source addresses differ.
         opaque = ("raw-call", event, *arguments) if record.local_fill_premise else event
         self.regs["r0"] = ("ret", opaque)
+        if getattr(record, "whole_object", None):
+            # the callee may hand the object's address back: its result stays opaque, and
+            # may not become an address, a stored value, an argument or the return value
+            self.whole_results.add(self.regs["r0"])
         for name in ("r1", "r2", "r3", "r12", "lr"):
             self.regs[name] = ("clobber", opaque, name)
         if self.frame is not None:
@@ -1864,6 +1913,8 @@ class Executor:
 
     def finish(self, text, record):
         returns = self.signatures.get(self.name, (True,))[0]
+        if returns:
+            self.whole_result_use(self.regs["r0"], text, "returned")
         if self.regs["sp"] != SP:
             self.fail(text, "the stack is not balanced at return")
         self.trace.append(("return",) + ((self.regs["r0"],) if returns else ()))
@@ -2709,6 +2760,11 @@ def read_modify_write_store(records, position, address, width):
     return None
 
 
+class WholeObjectArguments(list):
+    """kit#375, rule U: the admitted whole-object arguments of a function, a tagged
+    result part (record() lists it after the positional ones)"""
+
+
 class ForwardedRereads:
     """the three forwarded re-read rules (chained_reread, forwarded_constant_update and
     ordinary_store_reread) as one policy: enabled = False leaves every forwarded re-read a
@@ -3018,6 +3074,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                     _capture_load_provenance=_capture_load_provenance)
     read_modify_write, chained, unloaded, relied, updates, ordinary, conditional, indirect = \
         (set() for _ in range(8))
+    whole = set()           # kit#375, rule U: the admitted whole-object arguments
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3027,6 +3084,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 conditional.add(call.derived + ": " + call.local_fill_premise)
             if call.indirect:
                 indirect.add(call.indirect)
+            if getattr(call, "whole_object", None):
+                whole.add(call.whole_object)
         # 4. a store must not write back the value it read from the same byte
         for record in records:
             if record.kind == "store" and pinned_width(record.address) and record.self_assignment:
@@ -3225,22 +3284,24 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
             raise SemanticError(f"{name}: the stripped compile loads {theirs[index][2]} where the real "
                                 "one does not")
     result = (len(paths), sorted(read_modify_write), sorted(chained), sorted(unloaded), sorted(relied))
+    # tagged like the tested-update re-reads, so record() finds it after the positional parts
+    tail = (WholeObjectArguments(sorted(whole)),) if whole else ()
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
         # the tested-update re-reads stay tagged after the positional parts, so record() finds them
-        return result + (tested_update.Rereads(sorted(tested)),) if tested else result
+        return result + (tested_update.Rereads(sorted(tested)),) + tail if tested else result + tail
     if tested:
         # tagged, so record() finds it after whatever optional parts precede it
         return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
-                         tested_update.Rereads(sorted(tested)))
+                         tested_update.Rereads(sorted(tested))) + tail
     if indirect:
-        return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect))
+        return result + (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect)) + tail
     if conditional:
-        return result + (sorted(updates), sorted(ordinary), sorted(conditional))
+        return result + (sorted(updates), sorted(ordinary), sorted(conditional)) + tail
     if ordinary:
-        return result + (sorted(updates), sorted(ordinary))
-    return result + (sorted(updates),) if updates else result
+        return result + (sorted(updates), sorted(ordinary)) + tail
+    return result + (sorted(updates),) + tail if updates else result + tail
 
 
 def show_event(event):
@@ -3396,13 +3457,19 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                      perturbed_assembly=None, interfaces=None, *, _ordinary_overwrite=False):
     """compare(), with the perturbation optional so tests can exercise the other rules"""
     size, pinned = pinned_members(declaration)
-    from plausible import member_provenance, strip_comments_and_strings, whole_object_uses
+    from plausible import (declaration_fragments, member_provenance, strip_comments_and_strings,
+                           table_void_pointer_parameters, void_pointer_parameters, whole_object_sites,
+                           whole_object_uses)
     code = translation_unit(preprocessed)
     # the member checks read the literals blanked to spaces, not to `0`: a
     # character index (`unknown_48['\x02']`) must not read as `unknown_48[0]`
     plain = strip_comments_and_strings(preprocessed)
-    for _, message in whole_object_uses(plain, symbol) + member_provenance(
-            plain, {"symbol": symbol, "declaration": declaration}):
+    # kit#375, rule U: `sizeof symbol` and `&symbol` as a complete void-pointer argument
+    # are the only whole-object uses, read against the unit's own prototypes
+    fragments = declaration_fragments(plain)
+    admitted = whole_object_sites(plain, symbol, fragments)
+    for _, message in whole_object_uses(plain, symbol, admitted) + member_provenance(
+            plain, {"symbol": symbol, "declaration": declaration}, admitted):
         raise SemanticError(f"after preprocessing: {message}")
     real, real_outside = parse_assembly(real_assembly)
     stripped, stripped_outside = parse_assembly(stripped_assembly)
@@ -3436,6 +3503,12 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
                         except SemanticError as error:
                             # kept as the reason, raised only if a call uses it
                             signatures[("via", pointer)] = str(error)
+    # kit#375, rule U: which parameters of each callee are `void *` / `const void *`,
+    # read from the same declarations as plausible's whole_object_sites (Executor.call)
+    for name in sorted(names):
+        signatures[(VOID_POINTERS, name)] = void_pointer_parameters(fragments, name)
+    for key in [key for key in signatures if isinstance(key, tuple) and key[0] == "via"]:
+        signatures[(VOID_POINTERS, key)] = table_void_pointer_parameters(fragments, key[1])
     if perturbed_assembly is not None:
         _, mapping, _ = perturbed_declaration(declaration)
         perturbed, _ = parse_assembly(perturbed_assembly)
@@ -3471,6 +3544,8 @@ def record(symbol, results, perturbed=False):
                  not getattr(part, "bios_calls", False)]
         tested = next((part for part in extra if isinstance(part, tested_update.Rereads)), [])
         extra = [part for part in extra if not isinstance(part, tested_update.Rereads)]
+        whole = next((part for part in extra if isinstance(part, WholeObjectArguments)), [])
+        extra = [part for part in extra if not isinstance(part, WholeObjectArguments)]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -3488,6 +3563,7 @@ def record(symbol, results, perturbed=False):
                      (f", callee interfaces from ROM: {'; '.join(relied)}" if relied else "") +
                      (f", conditional callee interfaces: {'; '.join(conditional)}" if conditional else "") +
                      (f", indirect calls typed by declaration: {'; '.join(indirect)}" if indirect else "") +
+                     (f", whole-object arguments (kit#375): {'; '.join(whole)}" if whole else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
                      (f", {loops.describe()}" if loops else "") +
                      (f", BIOS calls by their GBATEK interfaces: {'; '.join(bios)} ({BIOS_NAME}, premise: "

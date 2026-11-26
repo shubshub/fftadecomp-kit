@@ -5968,7 +5968,32 @@ replacement names the symbol; and any `#include` that resolves outside
 `include/` or to a non-header under `src/`, which the sweep would never lint.
 Other headers may not name the symbol, and every
 use must be `symbol.member`, so neither its address nor the whole object reaches pointer
-arithmetic, a macro or a copy. Pinned bytes must be reachable only
+arithmetic, a macro or a copy. There are two exceptions (kit #375). `sizeof symbol` and
+`sizeof(symbol)` are allowed, because the size is a constant that the permuted declaration
+keeps. `&symbol`, cast or not to `(void *)` or `(const void *)`, is allowed as one complete
+argument of a call, with these conditions:
+- the callee is a prototyped function, or an element `table[K]` of a typed function-pointer
+  table;
+- the argument's parameter is declared `void *` or `const void *` there;
+- no other argument of the call names the symbol.
+
+This is how a source saves, restores or clears the whole block
+(`func_081443FC(saved, &symbol, 0x50)`, `copier[0](&symbol, saved, sizeof symbol)`).
+The checker reads the prototypes from the file and its headers, and match.py reads them
+again on the preprocessed text.
+
+The semantic check then needs that argument register to hold exactly the
+object's address (offset 0) at that call. Another argument register must hold the
+object's size as a constant, so the callee is handed the whole object: a copy out
+of it, a copy back into it, or a clear (#375 items 1 and 3). The record prints
+each such argument, with its byte count. What
+the callee returns stays opaque: it may not become an address, a stored value, an
+argument or the return value, so the address cannot come back by another name.
+
+Everything else stays refused, as before:
+- `&symbol + k`, `&symbol.member`, `(&symbol)`, `p = &symbol`;
+- a typed or missing parameter;
+- a whole-object copy, `__alignof__`. Pinned bytes must be reachable only
 through their own members. An array member may only be written
 `symbol.array[literal]` with the literal inside its bounds, so decay, pointer
 arithmetic, `k[symbol.array]`, `(symbol.array)[k]`, `[2]` past the end and
@@ -6644,9 +6669,9 @@ has these gaps:
   byte and halfword bit-fields exactly as the layout computes (an agbcc test
   compares the shipped declaration's compiled offsets with the model). It
   needs at least two pinned members of each declaration form, and fails
-  closed otherwise. The object's address cannot be taken, so code that
-  passes the block's address on (the `08000718` DMA source) cannot use the
-  declaration.
+  closed otherwise. The object's address can be taken only as a whole-object
+  argument at a void-pointer parameter (kit #375), so code that passes it on
+  any other way (the `08000718` DMA source) cannot use the declaration.
 * Variable subscripts into the object (`symbol.unknown_48[i]`) are always
   refused. None of the 173 parked and matched sources that reference the
   block uses one. A rough ROM scan finds a register-offset access through a
