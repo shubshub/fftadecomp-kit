@@ -69,6 +69,7 @@ import library_units
 import rom_mirror
 import counted_stack_cursor_loop as counted_cursor
 import split_join_profile as split_join
+import iwram_image_profile as iwram_image
 import stack_pointer_compare_profile as sp_compare
 import plausible as plausibility
 import volatile_semantics
@@ -3886,11 +3887,17 @@ class BufferCallProof:
         # and each crossed call's premise records (call_via_target_profile.crossing_premises).
         self.call_via_strict = {}
         self.call_via_crossings = {}
+        # iwram_image_profile: (site, image address) of call-via calls resolved into the boot
+        # IWRAM image, the resolver T2 asks, and nothing for any other proof type.
+        self.iwram_image_calls = set()
+        self.call_via_resolvers = (iwram_image.resolver,) if iwram_image.applies(self) else ()
         # Targets of un-inspected calls an inspected callee (transitively) relies on
         # to preserve R4-R11.
         self.callee_trusted = {}
 
     def target(self, address):
+        if (image := iwram_image.target(self, address)) is not None:
+            return image      # a call-via call resolved into the boot IWRAM image
         if is_udivsi3_address(address) or modsi3.reserved(address) or divsi3.reserved(address) or umodsi3.reserved(address) or ashldi3.reserved(address) or software_double.reserved(address) or software_float.reserved(address):
             raise ValueError("division runtime is outside buffer-call proof profiles")
         candidates = [entry for entry in self.entries
@@ -3903,6 +3910,8 @@ class BufferCallProof:
         return candidates[0]
 
     def span(self, address):
+        if (image := iwram_image.span(self, address)) is not None:
+            return image
         entry = self.target(address)
         end = int(entry["end"], 16)
         if end % 2 or not address < end <= ROM_BASE + len(self.rom):
@@ -4059,15 +4068,17 @@ class BufferCallProof:
                 # Only the default forwarding proofs: the opt-in forwarding policies keep their ledgers as before.
                 if self.default_forwarding else None,
                 self.store_bounds.snapshot() if self.store_bounds is not None else None,
-                self.motion_summaries.snapshot() if self.motion_summaries is not None else None)
+                self.motion_summaries.snapshot() if self.motion_summaries is not None else None,
+                set(self.iwram_image_calls))
 
     def _restore_ledgers(self, saved):
         snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
-            forward_snapshot, bound_snapshot, motion_snapshot = saved
+            forward_snapshot, bound_snapshot, motion_snapshot, image_snapshot = saved
         if bound_snapshot is not None:
             self.store_bounds.restore(bound_snapshot)
         if motion_snapshot is not None:
             self.motion_summaries.restore(motion_snapshot)
+        self.iwram_image_calls = set(image_snapshot)
         if forward_snapshot is not None:
             for ledger, values in zip((self.forward_slot_records, self.forward_trusted_calls), forward_snapshot):
                 ledger.clear()
@@ -4736,6 +4747,7 @@ class BufferCallProof:
         lines.extend(closure.lines(self))
         lines.extend(function_exit.lines(self))
         lines.extend(forwarded_slots_profile.lines(self))
+        lines.extend(iwram_image.lines(self))
         lines.extend(far_jump.lines(self))
         return lines
 
@@ -4788,6 +4800,11 @@ class BufferCallProof:
             # Bound only when a function-literal owner dropped exit scratch: other reports keep theirs.
             digest.update(len(scratch).to_bytes(8, "little"))
             digest.update(scratch)
+        image = iwram_image.fingerprint_payload(self)
+        if image is not None:
+            # Only a walk that called into the boot IWRAM image adds its evidence and premise.
+            digest.update(len(image).to_bytes(8, "little"))
+            digest.update(image)
         if self.loop_replays:
             # Bind every replayed callee's exact caller-frame writes, the (call target,
             # register) pairs trusted across un-inspected calls and the pruned branch

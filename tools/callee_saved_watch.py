@@ -780,6 +780,9 @@ class Checker:
         self.assumed = set()       # targets whose assumed summary a recursive call used
         self.probes = {}           # (function, site) -> constants known there
         self.spans = {}
+        # iwram_image_profile: (bytes, end) for a boot IWRAM image address the buffer proof's
+        # call-via resolver answered, else None (set by checker_for).
+        self.image_span = None
         self.limits = {}
         self.leaves = {}
         self.heads = {}
@@ -816,7 +819,8 @@ class Checker:
 
     def span(self, target):
         if target not in self.spans:
-            self.spans[target] = span(self.rom, self.entries, target)
+            image = self.image_span(target) if self.image_span is not None else None
+            self.spans[target] = image if image is not None else span(self.rom, self.entries, target)
         return self.spans[target]
 
     def loop_heads(self, function):
@@ -3474,6 +3478,9 @@ def checker_for(proof):
     checker = _CHECKERS.get(proof)
     if checker is None or checker.rom is not proof.rom:
         checker = _CHECKERS[proof] = Checker(proof.rom, proof.entries)
+        import iwram_image_profile as iwram_image
+        if iwram_image.applies(proof):
+            checker.image_span = iwram_image.watch_span(proof)
     return checker
 
 

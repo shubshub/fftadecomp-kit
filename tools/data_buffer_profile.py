@@ -435,6 +435,7 @@ def verify_source(root, address, data, rom, mapping, objects, source_digest, dma
 FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* buffer calls",
           "* buffer proof SHA-256", "* buffer loop replay", "* buffer copy summary", "* buffer switch callee",
           "* buffer owner switch", "* buffer owner switch exit scratch", "* buffer dead register", "* buffer signed remainder", "* buffer division runtime", "* buffer split join",
+          "* buffer IWRAM image",
           "* mapping SHA-256",
           "* control flow",
           "* buffer BIOS summaries", "* buffer BIOS premise", "* buffer BIOS manifest", "* buffer BIOS non-argument register",
