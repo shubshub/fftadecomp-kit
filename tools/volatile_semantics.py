@@ -934,6 +934,10 @@ def is_zero_extended(value, mask):
     return value[0] == "trunc" and value[1] <= widths[mask]
 
 
+# kit#375, rule N: the byte narrowing `lsl #24; lsr #24` of an affine value
+NARROWING_SHIFT = 24
+
+
 def shift(name, value, amount):
     if not isinstance(amount, int):
         return (name, value, amount)
@@ -952,6 +956,17 @@ def shift(name, value, amount):
         return ((value >> amount) | (value << (32 - amount))) & MASK
     if name == "lsl":
         return scale(value, 1 << amount) if amount < 32 else 0
+    if name == "lsr" and amount == NARROWING_SHIFT:
+        # kit#375, rule N: if A = 2**24 * B mod 2**32 for an affine B (the constant
+        # and every coefficient divisible by 2**24), then A >> 24 = B mod 2**8,
+        # exactly: no carry or remainder is assumed away.  agbcc narrows a byte
+        # either way (`sub r0, #1` and a byte store, or `lsl #24; lsr #24`), so the
+        # two print alike.  Only this shift: any other, or a remainder, stays opaque.
+        constant, terms = linear(value)
+        divisor = 1 << amount
+        if terms and not constant % divisor and not any(c % divisor for c in terms.values()):
+            return truncate(make_linear(constant // divisor, {term: c // divisor for term, c in terms.items()}),
+                            32 - amount)
     return (name, value, amount)
 
 
