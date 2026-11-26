@@ -5470,7 +5470,15 @@ symbolically along every path, and the check requires:
   dead load relied on as `callee interfaces from ROM: func_X reads {...}
   writes {...}`. Only ROM bytes and the function index
   are read, never source. Only the libgcc division helpers have an exact
-  interface otherwise;
+  interface otherwise. A BIOS call's code is not in the cartridge, so an
+  indexed `svc #n; bx lr` reads r0-r3 like any unknown callee; but a check
+  that this refuses is run once more with each such wrapper of a listed
+  call (Div, Sqrt, ArcTan2, CpuSet, CpuFastSet, BgAffineSet, ObjAffineSet,
+  the two LZ77 calls and SoundGetJumpList) reading only the input registers
+  GBATEK gives for it and overwriting none, and a result that then passes
+  names each wrapper it used under `BIOS calls by their GBATEK interfaces`,
+  with the premise that a BIOS call reads no other argument register (a
+  retry that refuses as well leaves the first refusal as it was);
 * every access to the object to be `symbol + constant` inside it: an
   address that adds a variable term (`(&sym)[n].x`, a variable subscript),
   lies outside the object or comes from a multi-register transfer fails
