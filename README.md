@@ -5810,7 +5810,11 @@ Such a reference runs only on executions that run no fill. So it can neither
 change the temporary between its store and the call nor read it afterwards,
 and the frame does not outlive the invocation. A volatile store at such an
 offset still refuses, and so does the reference inside a fill's block or on a
-loop round a fill. The record lists the references. A pseudo with
+loop round a fill. The record lists the references. The graph takes each
+jump's labels by RTL code, at any mode (a jump table's cases print as
+`label_ref:SI`), and refuses where it cannot bound the edges: a computed
+jump, a tablejump with no table, a label address taken outside a jump
+table, or a call that may return twice. A pseudo with
 several definitions, such as the pointers a structure copy's block move
 advances, is read through the definition that reaches the reference in a
 straight line, with no branch target between. In the code, which is the ROM's, every path into the fill's BL
