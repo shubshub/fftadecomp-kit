@@ -2048,8 +2048,10 @@ against the function's bytes and refuses the entry when anything differs:
   before the store;
 - no call, SWI or register branch lies between the store and the reload,
   and the base register is not written there;
-- a store through the base there misses the stored word (checked, not
-  premised);
+- a store through the base there, or through a register that holds the
+  block's address plus a constant on every path (exact copies and immediate
+  adds of the base), misses the stored word (checked, not premised), and a
+  block store through either refuses;
 - the other writes there are exactly the entry's list.
 
 With a valid entry, both walks carry the exact call-target fact the stored
