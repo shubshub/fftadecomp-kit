@@ -6548,9 +6548,10 @@ symbolically along every path, and the check requires:
   once a store other than its push overwrites it, or once `sp` rises above
   it (a pop or an add to `sp`); a function that sets `sp` to anything but a
   fixed offset from the entry `sp` is refused. A plain load or store (any
-  width) at a fixed slot below the current `sp` is refused (`a frame access
-  below sp`): memory below `sp` is never private, and agbcc never touches
-  it; push and pop move `sp` over the words they transfer. A frame byte
+  width), or a word of an `stmia`/`ldmia`, at a fixed slot below the
+  current `sp` is refused (`a frame access below sp`): memory below `sp` is
+  never private, and agbcc never touches it; push and pop move `sp` over
+  the words they transfer. A frame byte
   that `sp` has risen above holds no defined value, even after `sp` comes
   down over it again: a call made meanwhile puts its frame there, a BIOS
   call its stack work, and an interrupt handler may write it at any time. So a read the

@@ -67,6 +67,19 @@ class ReleasedWordTests(unittest.TestCase):
         self.assertEqual(fixtures.compare(framed("str\tr0, [sp]", "ldr\tr2, .L3", "ldr\tr0, [sp]", "str\tr0, [r2]"),
                                           STRIPPED)[0][1], 1)
 
+    def test_multiple_transfers_below_sp_are_refused(self):
+        # stmia through a copy of sp below sp, then ldmia back: neither is push nor pop
+        below = ("ldr\tr2, .L3", "mov\tr1, sp", "sub\tr1, r1, #8")
+        self.refused(framed(*below, "stmia\tr1!, {r0}", "mov\tr1, sp", "sub\tr1, r1, #8", "ldmia\tr1!, {r3}",
+                            "str\tr3, [r2]"), reason=BELOW)
+        # each alone: the store, and a load of a word nothing stored
+        self.refused(framed(*below, "stmia\tr1!, {r0}", "str\tr0, [r2]"), reason=BELOW)
+        self.refused(framed(*below, "ldmia\tr1!, {r3}", "str\tr3, [r2]"), reason=BELOW)
+        # the same transfers at sp are the frame
+        at = framed("ldr\tr2, .L3", "mov\tr1, sp", "stmia\tr1!, {r0}", "mov\tr1, sp", "ldmia\tr1!, {r3}",
+                    "str\tr3, [r2]")
+        self.assertEqual(fixtures.compare(at, STRIPPED)[0][1], 1)
+
     def test_push_and_pop_are_no_plain_accesses(self):
         # push stores below the old sp and pop reads at sp before rising: both admitted
         real = fixtures.assembly("push\t{lr}", "push\t{r0}", "ldr\tr2, .L3", "pop\t{r1}", "str\tr1, [r2]",
