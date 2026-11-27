@@ -32,8 +32,13 @@ PUSH_LR, POP_R0, BX_R0, BX_LR = 0xb500, 0xbc01, 0x4700, 0x4770
 MOVS_R1_0, READ_R1 = 0x2100, 0x1c08            # movs r1, #0; adds r0, r1, #0
 
 
-def image(bodies, extra=None):
-    """A ROM with the assembled bodies, mapped, plus raw bytes at addresses that are not mapped."""
+def image(bodies, extra=None, predecessor=True):
+    """A ROM with the assembled bodies, mapped, plus raw bytes at addresses that are not mapped.
+
+    Unless a body lies below F (or ``predecessor`` is false), a closed function, ``bx lr`` at F-2, ends at
+    F's entry, so nothing falls into it."""
+    if predecessor and not any(address < F for address in bodies):
+        bodies = {F - 2: [BX_LR], **bodies}
     rom, mapping = asm.build(bodies)
     rom = bytearray(rom)
     for address, raw in (extra or {}).items():
@@ -45,8 +50,8 @@ def caller(after):
     return [PUSH_LR, F, *after, POP_R0, BX_R0]
 
 
-def proved(bodies, extra=None):
-    rom, mapping = image(bodies, extra)
+def proved(bodies, extra=None, predecessor=True):
+    rom, mapping = image(bodies, extra, predecessor)
     frame_r1._CACHE.clear()
     return frame_r1.evidence(match.BufferCallProof(rom, mapping), F, mapping)
 
@@ -61,15 +66,22 @@ class ScanTests(unittest.TestCase):
                         0x08013040: struct.pack("<I", F + 0x03000000), 0x08013046: struct.pack("<I", (F | 1) + 0x04000000)})
         words, calls, branches = frame_r1.scan(rom, F)
         # the address at every byte offset; each mirror (0x09-0x0D) at halfword offsets only; 0x0E is not ROM
-        self.assertEqual(words, [0x08013000, 0x08013006, 0x08013011, 0x08013016, 0x08013020, 0x0801303A,
-                                 0x08013040, 0x08013046])
-        self.assertEqual(calls, [CALLER + 2])
+        self.assertEqual([site for site, _ in words], [0x08013000, 0x08013006, 0x08013011, 0x08013016, 0x08013020,
+                                                       0x0801303A, 0x08013040, 0x08013046])
+        self.assertEqual(calls, [(CALLER + 2, F)])
         self.assertEqual(branches, [])
         # b F from 0x0800FFF0 (offset -0x14... forward +0xC) and a beq to it
         rom = bytearray(rom)
         struct.pack_into("<H", rom, NEIGHBOUR - match.ROM_BASE, 0xE000 | ((F - NEIGHBOUR - 4) >> 1))
         struct.pack_into("<H", rom, NEIGHBOUR + 2 - match.ROM_BASE, 0xD000 | ((F - NEIGHBOUR - 6) >> 1))
-        self.assertEqual(frame_r1.scan(bytes(rom), F)[2], [NEIGHBOUR, NEIGHBOUR + 2])
+        self.assertEqual(frame_r1.scan(bytes(rom), F)[2], [(NEIGHBOUR, F), (NEIGHBOUR + 2, F)])
+
+    def test_the_gap_before_the_entry_is_scanned(self):
+        rom, _ = image({F: [BX_LR]}, predecessor=False)
+        rom = bytearray(rom)
+        struct.pack_into("<I", rom, 0x08013000 - match.ROM_BASE, (F - 2) | 1)
+        self.assertEqual(frame_r1.scan(bytes(rom), F, F - 4)[0], [(0x08013000, F - 2)])
+        self.assertEqual(frame_r1.scan(bytes(rom), F)[0], [])
 
 
 class EvidenceTests(unittest.TestCase):
@@ -99,14 +111,47 @@ class EvidenceTests(unittest.TestCase):
             "reaches a return": ({F: [BX_LR], CALLER: caller([])}, None),
             "no direct caller": ({F: [BX_LR]}, None),
             "may fall into its entry": ({F - 4: [0x2000, 0x2000], F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
+            # an open function, an unmapped gap of 0x0000 (lsls r0, r0, #0) and then the entry
+            "0x0800FFFA, may fall into its entry": ({F - 6: [0x2000, 0x2000], F: [BX_LR],
+                                                     CALLER: caller([MOVS_R1_0])}, {F - 2: b"\x00\x00"}),
+            "BL at 0x08012002 branches into the unmapped gap": (
+                {F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0]), OTHER: [PUSH_LR, F - 2, POP_R0, BX_R0]},
+                None),
+            "word at 0x08013000 names the unmapped gap before it": (
+                {F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])},
+                {0x08013000: struct.pack("<I", (F - 2) | 1)}),
+            "branch at 0x0800FF00 reaches the unmapped gap before it": (
+                {F - 0x100: [0xE000 | (((F - 2 - (F - 0x100) - 4) >> 1) & 0x7FF), BX_LR], F - 4: [BX_LR], F: [BX_LR],
+                 CALLER: caller([MOVS_R1_0])}, None),
+            "78-byte unmapped gap before it is longer than 64 bytes": (
+                {F - 0x50: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])}, None),
         }
         for message, (bodies, extra) in cases.items():
             with self.subTest(message), self.assertRaisesRegex(ValueError, message):
                 proved(bodies, extra)
+        with self.assertRaisesRegex(ValueError, "no mapped function precedes it"):
+            proved({F: [BX_LR], CALLER: caller([MOVS_R1_0])}, predecessor=False)
+
+    def test_the_function_before_it_must_be_thumb_code_that_ends_at_or_before_the_entry(self):
+        for change, message in ((dict(mode="arm"), "0x0800FFFC, is not Thumb code"),
+                                (dict(end=f"0x{F + 2:08X}"), "0x0800FFFC, overlaps its entry")):
+            rom, mapping = image({F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
+            entries = json.loads(mapping)
+            for entry in entries:
+                if int(entry["rom"], 16) == F - 4:
+                    entry.update(change)
+            mapping = json.dumps(entries)
+            frame_r1._CACHE.clear()
+            with self.subTest(message), self.assertRaisesRegex(ValueError, message):
+                frame_r1.evidence(match.BufferCallProof(rom, mapping), F, mapping)
+
+    def test_a_closed_function_and_an_unnamed_gap_before_the_entry_are_the_evidence(self):
+        found = proved({F - 4: [BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
+        self.assertEqual((found["previous"], found["previous_end"], found["gap"]), (F - 4, F - 2, 2))
 
     def test_a_closed_neighbour_does_not_fall_through(self):
         found = proved({F - 4: [0x2000, BX_LR], F: [BX_LR], CALLER: caller([MOVS_R1_0])})
-        self.assertEqual(found["previous"], F - 4)
+        self.assertEqual((found["previous"], found["previous_end"], found["gap"]), (F - 4, F, 0))
 
     def test_the_result_is_cached_per_rom_mapping_and_function(self):
         rom, mapping = image({F: [BX_LR], CALLER: caller([MOVS_R1_0])})
@@ -131,8 +176,8 @@ def frame():
 
 
 FOUND = dict(schema=frame_r1.SCHEMA, function=A, callers=[dict(site=0x08000502, caller=0x08000500, states=2,
-             body_sha256="0" * 64, kills=[0x08000506])], words=0, branches=0, previous=None,
-             premise=frame_r1.PREMISE, premise_proved=False)
+             body_sha256="0" * 64, kills=[0x08000506])], words=0, branches=0, previous=0x080001FE,
+             previous_end=A, gap=0, premise=frame_r1.PREMISE, premise_proved=False)
 
 
 class HookTests(unittest.TestCase):
@@ -191,6 +236,24 @@ class HookTests(unittest.TestCase):
             function_exit.aliases(proof, data, A, RETURN, dict(held))
 
 
+def patch_root(root, mapped=(), unmapped=()):
+    """Write assembled halfwords into a built tree's ROM: each of ``mapped`` as a mapped Thumb function, each
+    of ``unmapped`` as raw bytes."""
+    rom = bytearray((root / "baserom.bin").read_bytes())
+    entries = json.loads((root / "config/functions.json").read_text())
+    for address, halfwords in (*mapped, *unmapped):
+        raw = struct.pack(f"<{len(halfwords)}H", *halfwords)
+        rom[address - match.ROM_BASE:address - match.ROM_BASE + len(raw)] = raw
+    for address, halfwords in mapped:
+        entries.append({"rom": f"0x{address:08X}", "end": f"0x{address + 2 * len(halfwords):08X}", "mode": "thumb"})
+    (root / "baserom.bin").write_bytes(bytes(rom))
+    (root / "config/functions.json").write_text(json.dumps(entries))
+    (root / "symbols/functions.txt").write_text("".join(
+        f"{int(entry['rom'], 16):08X} {int(entry['end'], 16):08X} "
+        f"{int(entry['end'], 16) - int(entry['rom'], 16)} 0 return\n" for entry in entries))
+    return root
+
+
 def bl_tokens(site, target):
     high, low = struct.unpack("<HH", asm.bl(site, target))
     return f".short 0x{high:04X}\n.short 0x{low:04X}\n"
@@ -233,10 +296,12 @@ class FrameResultR1NativeTests(unittest.TestCase):
     def tearDownClass(cls):
         cls.temporary.cleanup()
 
-    def fixture(self, name, after, source=OWNER):
-        # func_08000500: push {lr}; bl func_08000200; <after>; pop {r0}; bx r0
+    def fixture(self, name, after, source=OWNER, before=((A - 2, [BX_LR]),), extra=()):
+        # func_08000500: push {lr}; bl func_08000200; <after>; pop {r0}; bx r0.  ``before`` maps functions
+        # below the owner (a closed bx lr ending at its entry by default); ``extra`` writes unmapped halfwords.
         caller_body = "push {lr}\n" + bl_tokens(0x08000502, A) + after + "pop {r0}\nbx r0"
-        return build(self.base / name, source, [("func_08000400", STORES), ("func_08000500", caller_body)])
+        root = build(self.base / name, source, [("func_08000400", STORES), ("func_08000500", caller_body)])
+        return patch_root(root, before, extra)
 
     def replays(self, report, root):
         with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
@@ -264,6 +329,20 @@ class FrameResultR1NativeTests(unittest.TestCase):
         (line,) = [line for line in report.splitlines() if line.startswith(frame_r1.LINE)]
         self.assertTrue(self.replays(report, root))
         self.assertFalse(self.replays(report.replace(line + "\n", ""), root))
+
+    def test_an_open_function_before_an_unmapped_gap_refuses(self):
+        # movs r0, #0; movs r0, #0 at 0x080001F8 runs through the 0x0000 halfwords at 0x080001FC into the owner
+        root = self.fixture("gap", "movs r1, #0\n", before=((A - 8, [0x2000, 0x2000]),))
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, output)
+        self.assertIsNone(report)
+        self.assertIn("(R1: the function before it, 0x080001F8, may fall into its entry)", output)
+        root = self.fixture("gapclosed", "movs r1, #0\n", before=((A - 8, [0x2000, BX_LR]),))
+        code, output, report = run(root)
+        self.assertEqual(code, 0, output)
+        (line,) = [line for line in report.splitlines() if line.startswith(frame_r1.LINE)]
+        self.assertIn("the mapped function before it, 0x080001F8, has a closed control-flow graph and nothing "
+                      "names the 4-byte unmapped gap from 0x080001FC to the entry", line)
 
     def test_an_owner_whose_caller_reads_r1_refuses(self):
         root = self.fixture("read", "adds r0, r1, #0\n")
