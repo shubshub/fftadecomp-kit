@@ -260,7 +260,7 @@ def selected(report):
                 # The BIOS wrapper summaries a restoring owner applied, likewise recomputed.
                 fields == [f'* verification: `{OPTIONAL_SCHEMA}`'] and
                 line.startswith(('* buffer BIOS summaries: ', '* buffer BIOS premise: ', '* buffer BIOS manifest: ',
-                                 '* buffer BIOS call kill: ')))
+                                 '* buffer BIOS non-argument register: ', '* buffer BIOS call kill: ')))
             for line in report.splitlines()):
         raise ValueError('mixed or malformed complete-owner profile')
     return True

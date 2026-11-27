@@ -45,6 +45,11 @@ OUTPUTS_PREMISE = ("* buffer BIOS premise: no routine leaves an address of the c
 TRUSTED_PREMISE = ("* buffer BIOS premise: R4-R11 are preserved across each summarised call; nothing of the "
                    "routine is inspected, so this is trusted, not proved")
 PREMISE_LINES = [GBATEK_PREMISE, OUTPUTS_PREMISE, TRUSTED_PREMISE]
+# The weaker outputs premise of a report with a non-argument register that carried a local address in.
+OUTPUTS_NON_ARGUMENT_PREMISE = ("* buffer BIOS premise: no routine leaves an address of the caller frame in any "
+                                "register except, for a memory routine, a register that carried one in (R0 or R1, "
+                                "or a non-argument R3 or R12); GBATEK documents no output register of the memory "
+                                "routines, so this is trusted, not proved")
 
 
 def owner(body, frame=8, after="movs r0, #0"):
@@ -274,12 +279,15 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         self.refused(r"scalar BIOS wrapper refuses", owner("mov r12, sp\nmovs r0, #1\nbl ArcTan2", frame=8))
 
     def test_memory_wrappers_refuse_pointers_outside_r0_r1(self):
-        for register in ("r2", "r3", "r12"):
+        self.refused(r"BIOS memory wrapper refuses a local pointer outside R0, R1 and the non-argument R3 "
+                     r"and R12", fill(control="mov r2, sp"))
+        # R3 and R12 are no arguments: a local address there is admitted only when it is dead after the
+        # call, and here it is still live at the return.
+        for register in ("r3", "r12"):
             with self.subTest(register=register):
-                self.refused(r"BIOS memory wrapper refuses a local pointer outside R0 and R1",
-                             fill(before=f"mov {register}, sp" if register != "r2" else "",
-                                  control="mov r2, sp" if register == "r2" else
-                                  "movs r2, #1\nlsls r2, r2, #24\nadds r2, #16"))
+                self.refused(rf"buffer callee 0x0814186C: R{register[1:]} carried a local pointer into BIOS "
+                             rf"CpuSet and is not written before any read, call or return",
+                             fill(before=f"mov {register}, sp"))
 
     def test_memory_wrappers_are_summarised_only_at_the_owner_call(self):
         caller = owner("mov r0, sp\nbl callee", frame=8)
@@ -364,6 +372,131 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         destination = "adds r0, r4, #0\nmov r1, sp\nmovs r2, #4\nbl CpuSet\n{}"
         self.refused(r"R1 carried a local pointer", owner(destination.format("adds r6, r1, #0\nmovs r1, #0"), frame=8))
         self.refused(r"R1 carried a local pointer", owner(destination.format("bl callee\nmovs r1, #0"), frame=8))
+
+    # A local address in a register that is no argument (R3, R12) ----------------
+
+    def non_argument(self, before="mov r3, sp", after="movs r3, #0", callee="bx lr", frame=8, **options):
+        """The 080E0824 shape: external source and destination, a stale local address in R3."""
+        return self.walk(owner(f"{before}\nadds r0, r4, #0\nadds r1, r5, #0\nmovs r2, #4\nbl CpuSet\n{after}",
+                               frame=frame, after="movs r0, #0"), callee, **options)
+
+    def test_a_dead_local_in_r3_at_a_memory_wrapper_is_admitted(self):
+        proof = self.non_argument()
+        (site,) = self.memory(proof)
+        self.assertEqual((site["routine"], site["source"], site["destination"], site["killed"],
+                          site["non_argument"]), ("CpuSet", None, None, [3], [[3, -24]]))
+        self.assertNotIn("call_kills", site)
+        summary, gbatek, outputs, trusted, manifest, stated = proof.bios_summary_lines()
+        self.assertEqual([gbatek, outputs, trusted], [GBATEK_PREMISE, OUTPUTS_NON_ARGUMENT_PREMISE, TRUSTED_PREMISE])
+        self.assertEqual(proof.bios_summaries.manifest()["premises"], list(bios.PREMISES_NON_ARGUMENT))
+        self.assertEqual(stated, f"* buffer BIOS non-argument register: r3 carried local -24 into CpuSet at "
+                                 f"0x{site['site']:08X}; no memory routine takes r3 as an argument (GBATEK: R0-R2), "
+                                 f"so under the GBATEK premise it gives the routine no access, and it is written "
+                                 f"before any read, call, interrupt or return on every path from the call, so "
+                                 f"nothing the routine leaves in it is observed")
+        self.assertEqual(proof.dependencies, {0x0814186C: bytes.fromhex("0bdf7047")})
+        # Beside a local source in R0 the records of both registers are kept, R0's spans unchanged.
+        proof = self.walk(fill(before="add r3, sp, #4", after="movs r0, #0\nmovs r3, #0"))
+        (site,) = self.memory(proof)
+        self.assertEqual((site["source"], site["killed"], site["non_argument"]), ([-24, 2], [0, 3], [[3, -20]]))
+
+    def test_a_dead_local_in_r12_and_on_every_path(self):
+        (site,) = self.memory(self.non_argument("mov r12, sp", "mov r12, r4"))
+        self.assertEqual((site["killed"], site["non_argument"]), ([12], [[12, -24]]))
+        # The 080E0824 exit: both paths from the call write R3 before reading it.
+        both = "cmp r4, #0\nbeq other\nldrb r3, [r4, #9]\nb join\nother:\nmovs r3, #0\njoin:\nadds r3, #1"
+        self.assertEqual(self.memory(self.non_argument(after=both))[0]["killed"], [3])
+
+    def test_r3_may_be_killed_by_a_callee_that_writes_it_first(self):
+        proof = self.non_argument(after="bl callee", callee="movs r3, #0\nbx lr")
+        (site,) = self.memory(proof)
+        (kill,) = site["call_kills"]
+        self.assertEqual((site["killed"], kill["register"], kill["kills"]), ([3], 3, [[CALLEE, 3]]))
+        lines = proof.bios_summary_lines()
+        self.assertTrue(lines[5].startswith("* buffer BIOS non-argument register: r3 carried local -24 "))
+        self.assertIn("it is written before any read, call, interrupt or return, a call on its call-kill line "
+                      "counting as the write, on every path", lines[5])
+        self.assertTrue(lines[6].startswith(f"* buffer BIOS call kill: call 0x{kill['site']:08X} to "
+                                            f"0x{CALLEE:08X} kills r3 (left by CpuSet at "))
+        self.assertEqual(len(lines), 7)
+
+    def test_a_non_argument_local_must_be_dead_after_the_call(self):
+        message = r"R3 carried a local pointer into BIOS CpuSet and is not written before any read, call or return"
+        for after in ("adds r6, r3, #0\nmovs r3, #0", "push {r3}\npop {r3}\nmovs r3, #0", "cmp r3, #0\nmovs r3, #0",
+                      "cmp r4, #0\nbeq skip\nmovs r3, #0\nskip:"):
+            with self.subTest(after=after):
+                self.refused(message, owner(f"mov r3, sp\nadds r0, r4, #0\nadds r1, r5, #0\nmovs r2, #4\n"
+                                            f"bl CpuSet\n{after}", frame=8))
+        # A later call before the write, whose callee reads R3 first.
+        with self.assertRaisesRegex(ValueError, message):
+            self.non_argument(after="bl callee\nmovs r3, #0", callee="adds r0, r3, #0\nbx lr")
+        # R12 is never killed by a call: the callee proof covers R0-R3 only.
+        with self.assertRaisesRegex(ValueError, r"R12 carried a local pointer into BIOS CpuSet"):
+            self.non_argument("mov r12, sp", "bl callee\nmov r12, r4", callee="mov r12, r0\nbx lr")
+
+    def test_the_policy_object_restores_the_refusal(self):
+        with patch.object(bios.NON_ARGUMENT_POLICY, "enabled", False):
+            for before, after in (("mov r3, sp", "movs r3, #0"), ("mov r12, sp", "mov r12, r4")):
+                with self.subTest(register=before):
+                    with self.assertRaisesRegex(ValueError, r"buffer callee 0x0814186C: BIOS memory wrapper refuses "
+                                                            r"a local pointer outside R0 and R1$"):
+                        self.non_argument(before, after)
+            # R0 and R1 alone are unchanged.
+            self.assertEqual(self.memory(self.walk(fill()))[0]["killed"], [0])
+        self.assertTrue(bios.NON_ARGUMENT_POLICY.enabled)
+        self.assertEqual(self.memory(self.non_argument())[0]["killed"], [3])
+
+    def test_non_argument_locals_keep_the_other_refusals(self):
+        # Depth 1 and a scalar wrapper are unchanged.
+        caller = owner("mov r0, sp\nbl callee", frame=8)
+        callee = ("push {r4, lr}\nadds r3, r0, #0\nmovs r0, #0\nmovs r1, #0\nmovs r2, #4\nbl CpuSet\n"
+                  "movs r3, #0\npop {r4}\npop {r1}\nbx r1")
+        self.refused(r"buffer callee 0x08000100: buffer callee 0x0814186C: BIOS memory wrapper is summarised "
+                     r"only at the owner's own call", caller, callee)
+        self.refused(r"scalar BIOS wrapper refuses a tracked local pointer",
+                     owner("mov r3, sp\nmovs r0, #9\nbl Sqrt\nmovs r3, #0", frame=8))
+
+    def test_non_argument_records_are_bound_into_the_report(self):
+        proof = self.non_argument()
+        lines = proof.bios_summary_lines()
+        summary, gbatek, outputs, trusted, manifest, stated = lines
+        self.assertTrue(self.accepted(self.report(proof)))
+        plain_outputs = OUTPUTS_PREMISE
+        for name, edited in (("no non-argument line", [summary, gbatek, outputs, trusted, manifest]),
+                             ("line edited", [summary, gbatek, outputs, trusted, manifest,
+                                              stated.replace("local -24", "local -20")]),
+                             ("line twice", lines + [stated]),
+                             ("line first", [stated, summary, gbatek, outputs, trusted, manifest]),
+                             ("stronger outputs premise", [summary, gbatek, plain_outputs, trusted, manifest,
+                                                           stated])):
+            with self.subTest(edit=name):
+                self.assertNotEqual(edited, lines)
+                self.assertFalse(self.accepted(self.report(proof, lines=edited)))
+
+        def edited(change):
+            value = json.loads(manifest.split("`")[1])
+            change(value["memory_sites"][0])
+            return f"* buffer BIOS manifest: `{bios.canonical(value)}`"
+
+        for name, change in (("no record", lambda site: site.pop("non_argument")),
+                             ("offset", lambda site: site.update(non_argument=[[3, -20]])),
+                             ("register", lambda site: site.update(non_argument=[[12, -24]])),
+                             ("no kill", lambda site: site.update(killed=[]))):
+            with self.subTest(edit=name):
+                line = edited(change)
+                self.assertNotEqual(line, manifest)
+                self.assertFalse(self.accepted(self.report(proof, lines=[summary, gbatek, outputs, trusted, line,
+                                                                         stated])))
+        # The same lines on an owner that reads R3 after the call do not replay: its walk refuses.
+        self.build(owner("mov r3, sp\nadds r0, r4, #0\nadds r1, r5, #0\nmovs r2, #4\nbl CpuSet\n"
+                         "adds r6, r3, #0", frame=8, after="movs r0, #0"))
+        self.assertFalse(self.accepted(self.report(proof)))
+        # The fingerprint binds the record.
+        fingerprint = proof.fingerprint()
+        (key,) = proof.bios_summaries.memory
+        proof.bios_summaries.memory[key] = {k: v for k, v in proof.bios_summaries.memory[key].items()
+                                            if k != "non_argument"}
+        self.assertNotEqual(fingerprint, proof.fingerprint())
 
     # A call whose callee writes the carried register first -----------------------
 
@@ -600,7 +733,7 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         instructions = {item.address: item for item in decoder.disasm(self.body[:16], BASE)}
         edges = {address: (address + item.size,) if address + item.size in instructions else ()
                  for address, item in instructions.items()}
-        proof.bios_summaries.pending[(BASE + 4, 0x0814186C, None, None, (), ())] = None
+        proof.bios_summaries.pending[(BASE + 4, 0x0814186C, None, None, (), (), ())] = None
         with self.assertRaisesRegex(ValueError, "BIOS CpuSet site is not its direct BL in the owner CFG"):
             proof.bios_summaries.finish(self.body, BASE, instructions, edges)
         # The owner's real CpuSet BL, recorded against another wrapper.
@@ -609,7 +742,7 @@ class BiosWrapperSummaryTests(unittest.TestCase):
         decoded = {item.address: item for item in decoder.disasm(self.body, BASE)}
         site = record["site"]
         self.assertEqual(decoded[site].operands[0].imm, 0x0814186C)
-        proof.bios_summaries.pending[(site, 0x08141868, -24, None, (), ())] = None
+        proof.bios_summaries.pending[(site, 0x08141868, -24, None, (), (), ())] = None
         with self.assertRaisesRegex(ValueError, "BIOS CpuFastSet site is not its direct BL in the owner CFG"):
             proof.bios_summaries.finish(self.body, BASE, {BASE: decoded[BASE], site: decoded[site]},
                                         {BASE: (site,), site: ()})
@@ -750,15 +883,31 @@ class BiosWrapperSummaryTests(unittest.TestCase):
     def test_foreign_report_validators_refuse_the_lines(self):
         # A report check without buffer evidence refuses every line that starts with evidence.BUFFER_LINES, and
         # one with it compares every such line with the recomputed proof
-        # (test_closed_report_replay.BufferLineTests replays each check).  The three summary lines and the
-        # call-kill line are such lines.
+        # (test_closed_report_replay.BufferLineTests replays each check).  The three summary lines, the
+        # non-argument line and the call-kill line are such lines.
         tree = ast.parse((ROOT / "tools" / "bios_wrapper_summary_profile.py").read_text())
         written = [node.value for node in ast.walk(tree) if isinstance(node, ast.Constant)
                    and isinstance(node.value, str) and node.value.startswith("* ")]
-        self.assertEqual(len(written), 4)
+        self.assertEqual(len(written), 5)
         for line in written:
             with self.subTest(line=line):
                 self.assertTrue(line.startswith(evidence.BUFFER_LINES))
+
+    def test_the_data_buffer_and_restoring_owner_checks_admit_every_line(self):
+        # A summary applied inside the data-buffer proof (080E0824) or by the restoring owner writes these
+        # lines into its report; each check names the line kinds it admits.
+        import data_buffer_profile
+        tree = ast.parse((ROOT / "tools" / "bios_wrapper_summary_profile.py").read_text())
+        kinds = sorted(node.value.split(":")[0] for node in ast.walk(tree) if isinstance(node, ast.Constant)
+                       and isinstance(node.value, str) and node.value.startswith("* "))
+        self.assertEqual(kinds, ["* buffer BIOS call kill", "* buffer BIOS manifest",
+                                 "* buffer BIOS non-argument register", "* buffer BIOS premise",
+                                 "* buffer BIOS summaries"])
+        admission = (ROOT / "tools" / "owner_admission_profile.py").read_text()
+        for kind in kinds:
+            with self.subTest(kind=kind):
+                self.assertIn(kind, data_buffer_profile.FIELDS)
+                self.assertIn(f"'{kind}: '", admission)
 
     def test_only_the_plain_path_and_the_restoring_owner_opt_in(self):
         found = []

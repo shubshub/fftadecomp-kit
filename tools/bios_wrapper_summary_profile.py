@@ -21,9 +21,11 @@ frame words are validated and left as they are.  No alias is returned.
 
 Memory wrappers (CpuSet, CpuFastSet, BgAffineSet), at the owner's own call
 only (walk depth 0), with local pointers only in R0 (source) and R1
-(destination).  The call is recorded with the walk's frame at the call, and
-discharged when the owner's CFG is complete (`finish`, called by
-`verify_leaf_instructions` for the owner):
+(destination), or in R3 or R12, which no memory routine takes as an argument
+(GBATEK: R0-R2 only; a stale address left by an earlier call, as 0801DD00
+leaves one in R3 for 080E0824's CpuSet).  The call is recorded with the walk's
+frame at the call, and discharged when the owner's CFG is complete (`finish`,
+called by `verify_leaf_instructions` for the owner):
 
 * R2 is known from `bios_cpuset_fill_profile.prove_bits` over the verifier's
   own owner CFG, with its zero-extension rules (the restoring owner's CFG is its
@@ -51,7 +53,21 @@ discharged when the owner's CFG is complete (`finish`, called by
   dead stack-address call rule).  The record names each such call, the callee's
   span end, the SHA-256 of its bytes, its killing writes and the states proved,
   and the report states each on a `* buffer BIOS call kill:` line after the
-  manifest (none without such a call, so every other report is unchanged).
+  manifest (none without such a call, so every other report is unchanged);
+* a local address in R3 or R12 gives the routine no access under the GBATEK
+  premise, since no documented argument carries it, and is proved dead by the
+  same kill proof (R3 may also be killed by a call; R12 never is, as the
+  callee proof covers R0-R3 only).  Whether the routine leaves it in place is
+  not assumed either way: nothing reads the register before it is written.
+  The record names each such register and its local offset (`non_argument`),
+  the register is in `killed`, and the report states each on a
+  `* buffer BIOS non-argument register:` line after the manifest, since the
+  contract below names R0 and R1 only; the outputs premise of such a report
+  (`OUTPUTS_NON_ARGUMENT`) allows a frame address left in any register that
+  carried one in, which trusts strictly less.  None of this appears without
+  such a register, so every other report is unchanged.  The rule sits behind
+  one policy object (`NON_ARGUMENT_POLICY`): disabled, every local pointer
+  outside R0 and R1 refuses as before.
 
 After every summarised call R0-R3, R12 and the flags are unknown scalars and
 the frame keeps its facts (no span reaches a word the walk holds a fact
@@ -105,6 +121,25 @@ OUTPUTS = ('no routine leaves an address of the caller frame in any register exc
 TRUSTED = ('R4-R11 are preserved across each summarised call; nothing of the routine is inspected, so '
            'this is trusted, not proved')
 PREMISES = (PREMISE, OUTPUTS, TRUSTED)
+# The outputs premise of a manifest with a non-argument register (R3 or R12) that carried a local
+# address in: weaker than OUTPUTS, as such a register may keep the address; it is proved dead instead.
+OUTPUTS_NON_ARGUMENT = ('no routine leaves an address of the caller frame in any register except, for a memory '
+                        'routine, a register that carried one in (R0 or R1, or a non-argument R3 or R12); '
+                        'GBATEK documents no output register of the memory routines, so this is trusted, '
+                        'not proved')
+PREMISES_NON_ARGUMENT = (PREMISE, OUTPUTS_NON_ARGUMENT, TRUSTED)
+# The registers no memory routine takes as an argument (GBATEK: R0-R2) that may carry a local
+# address into a memory call when the walk proves them dead after it, as numbers 0-12.
+NON_ARGUMENT_REGISTERS = (3, 12)
+
+
+class NonArgumentPolicy:
+    """The one policy object of the non-argument rule: ``enabled = False`` restores the refusal of
+    every local pointer outside R0 and R1 at a memory wrapper."""
+    enabled = True
+
+
+NON_ARGUMENT_POLICY = NonArgumentPolicy()
 CONTRACT = (
     'conditional returning GBA BIOS SWI wrapper summaries: exact indexed wrappers reached by a '
     'direct BL (ArcTan2 0x0A, Div 0x06, Div remainder 0x06, DivArm remainder 0x07, Sqrt 0x08, '
@@ -258,10 +293,18 @@ class BiosWrapperSummaries:
         else:
             if depth:
                 raise ValueError("BIOS memory wrapper is summarised only at the owner's own call")
-            if set(arguments) - {match.ARM_REG_R0, match.ARM_REG_R0 + 1}:
+            if not NON_ARGUMENT_POLICY.enabled and set(arguments) - {match.ARM_REG_R0, match.ARM_REG_R0 + 1}:
                 raise ValueError('BIOS memory wrapper refuses a local pointer outside R0 and R1')
+            others = {register_id(number): number for number in NON_ARGUMENT_REGISTERS}
+            if set(arguments) - {match.ARM_REG_R0, match.ARM_REG_R0 + 1} - set(others):
+                raise ValueError('BIOS memory wrapper refuses a local pointer outside R0, R1 and the '
+                                 'non-argument R3 and R12')
+            # (number, offset) of each non-argument register carrying a local address in, proved dead
+            # after the call by _discharge.
+            non_argument = tuple(sorted((others[register], offset) for register, offset in arguments.items()
+                                        if register in others))
             key = (site, address, arguments.get(match.ARM_REG_R0), arguments.get(match.ARM_REG_R0 + 1),
-                   tuple(tuple(word) for word in stack), tuple(sorted(protected)))
+                   tuple(tuple(word) for word in stack), tuple(sorted(protected)), non_argument)
             if self.owner is None:
                 self.pending[key] = key
             else:
@@ -293,7 +336,7 @@ class BiosWrapperSummaries:
         import match
         decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
         decoder.detail = True
-        site, target, source, destination, stack, protected = key
+        site, target, source, destination, stack, protected, non_argument = key
         name = MEMORY[target][0]
         instruction = instructions.get(site)
         if instruction is None or instruction.id != match.ARM_INS_BL or instruction.size != 4 or \
@@ -317,11 +360,11 @@ class BiosWrapperSummaries:
                 call_kills.append(dict(entry, site=call, register=carried - match.ARM_REG_R0))
             return entry is not None
 
-        for register, offset in ((0, source), (1, destination)):
+        for register, offset in ((0, source), (1, destination), *non_argument):
             if offset is None:
                 continue
             if not match.stack_alias_overwritten_before_use(
-                    data, address, site + instruction.size, match.ARM_REG_R0 + register, decoder,
+                    data, address, site + instruction.size, register_id(register), decoder,
                     call_kill=call_kill):
                 raise ValueError(f'R{register} carried a local pointer into BIOS {name} and is not '
                                  'written before any read, call or return')
@@ -330,6 +373,9 @@ class BiosWrapperSummaries:
                       source=None if spans[0] is None else list(spans[0][:2]),
                       destination=None if spans[1] is None else list(spans[1][:2]),
                       unit=spans[2], count=spans[3], killed=killed, pointer_words=list(protected))
+        if non_argument:
+            # Only a record with such a register carries the key, so every other manifest is unchanged.
+            record['non_argument'] = [list(pair) for pair in non_argument]
         if call_kills:
             # Only a record that relies on a callee carries the key, so every other manifest is unchanged.
             record['call_kills'] = sorted(call_kills, key=lambda kill: (kill['site'], kill['register']))
@@ -364,7 +410,9 @@ class BiosWrapperSummaries:
         if self.pending:
             raise ValueError('BIOS memory-wrapper summary was not discharged over its owner CFG')
         used = sorted({record['target'] for record in (*self.scalar.values(), *self.memory.values())})
-        manifest = dict(schema=SCHEMA, contract=CONTRACT, premises=list(PREMISES),
+        weaker = any('non_argument' in record for record in self.memory.values())
+        manifest = dict(schema=SCHEMA, contract=CONTRACT,
+                        premises=list(PREMISES_NON_ARGUMENT if weaker else PREMISES),
                         wrappers=[[target, WRAPPERS[target][0], WRAPPERS[target][1],
                                    WRAPPERS[target][2].hex()] for target in used],
                         scalar_sites=[self.scalar[key] for key in sorted(self.scalar)],
@@ -391,7 +439,35 @@ def manifest_lines(manifest):
     return [f'* buffer BIOS summaries: `{SCHEMA}` {CONTRACT}',
             *(f'* buffer BIOS premise: {premise}' for premise in manifest['premises']),
             f'* buffer BIOS manifest: `{canonical(sites)}`',
+            *non_argument_lines(manifest),
             *call_kill_lines(manifest)]
+
+
+def register_id(number):
+    """The capstone id of register r<number> (0-12)."""
+    import match
+    return match.ARM_REG_R12 if number == 12 else match.ARM_REG_R0 + number
+
+
+def non_argument_lines(manifest):
+    """One line per non-argument register that carried a local address into a memory call; none without.
+
+    The contract names R0 and R1 as the only registers that carry local pointers in; where R3 or R12
+    carried one, the line states it and why it gives the routine nothing, so no report reads as if the
+    contract held as worded.
+    """
+    lines = []
+    for site in manifest.get('memory_sites', ()):
+        killers = {kill['register'] for kill in site.get('call_kills', ())}
+        for register, offset in site.get('non_argument', ()):
+            how = ('written before any read, call, interrupt or return' +
+                   (', a call on its call-kill line counting as the write,' if register in killers else ''))
+            lines.append(f"* buffer BIOS non-argument register: r{register} carried local {offset} into "
+                         f"{site['routine']} at 0x{site['site']:08X}; no memory routine takes r{register} as an "
+                         f"argument (GBATEK: R0-R2), so under the GBATEK premise it gives the routine no access, "
+                         f"and it is {how} on every path from the call, so nothing the routine leaves in it "
+                         f"is observed")
+    return lines
 
 
 def call_kill_lines(manifest):
