@@ -39,8 +39,9 @@ symbolically along every path, and the check requires
    stores that reach the escaped locals instead.  The record of such a
    verdict, or of one that reads a saved slot past a store at a variable
    offset, names its premises (FRAME_READ_PREMISES).  Memory below sp is
-   never private, so a plain load or store at a fixed slot below sp is
-   refused, and a frame byte that sp has risen above holds no defined value
+   never private, so a plain load or store, or a word of a multiple
+   transfer other than push and pop, at a fixed slot below sp is refused,
+   and a frame byte that sp has risen above holds no defined value
    until a fixed store writes it again, so a read that may reach one is
    refused (Executor.released, frame_read).  A fixed-slot load reads the
    latest store to its bytes: the same slot and width, or, for an unsigned
@@ -2261,6 +2262,11 @@ class Executor:
             derived = base in self.derived
             for n, name in enumerate(names):
                 address = add(start, 4 * n)
+                if mnemonic not in ("push", "pop") and is_stack(address) and \
+                        signed32(linear(address)[0]) < signed32(linear(regs["sp"])[0]):
+                    # as for a plain load or store (kit#591): memory below sp is never private.
+                    # push and pop move sp over the words they transfer.
+                    self.fail(text, "a frame access below sp")
                 self.check_address(address, 4, text, multiple=True)
                 if storing:
                     # Only a callee-saved register or lr makes a saved slot: an
