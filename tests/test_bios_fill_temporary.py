@@ -477,6 +477,47 @@ class RomTests(unittest.TestCase):
         rom, compiled, one = window([ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, 0x8048] + tail)
         self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one)[1], 0x38)
 
+    def test_r3_may_hold_the_slot_only_as_the_base_of_its_store_into_cpuset(self):
+        # 0810ECD8-0810ECEA: the slot's address copied to r3 (`mov r3, sl`) to store through, then into CpuSet,
+        # which reads r0-r2 only: r3 is left holding the slot's address
+        add_r3_sp_38, strh_r0_r3, str_r0_r3, adds_r3_1 = 0xAB0E, 0x8018, 0x6018, 0x3301
+        shape = [add_r3_sp_38, MOVS_R0_0, strh_r0_r3, ADDS_R1_R7, LDR_R2, ADD_R0_SP_38, ("bl", 0x0814186C)]
+        rom, compiled, one = window(shape)
+        self.assertEqual(fill.rom_fill(rom, ADDRESS, compiled, one), (ADDRESS + 12, 0x38, ADDRESS, ()))
+        # the record states the premise the admission rests on; a fill with no r3 in its slot states none
+        self.assertEqual(one["r3"], [f"r3 holds sp+0x38 at the BL as the base of the store at {ADDRESS + 4:08X}; "
+                                     "BIOS premise: CpuSet (swi 0x0B) reads only r0-r2 (GBATEK), so nothing reads r3"])
+        rom, compiled, plain = window([ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, LDR_R1, LDR_R2, ADD_R0_SP_38,
+                                       ("bl", 0x0814186C)])
+        fill.rom_fill(rom, ADDRESS, compiled, plain)
+        self.assertEqual(plain["r3"], [])
+        rom, compiled, one = window(shape)
+        # a callee that reads r3: the ROM's 0814186C is `ldrh r0, [r3]; bx lr`, no SWI
+        reads = bytearray(rom)
+        reads[0x14186C:0x141870] = thumb(0x8818, 0x4770)
+        with self.assertRaisesRegex(proof.ProofError, "passes r3 sp\\+0x38, which reaches"):
+            fill.rom_fill(bytes(reads), ADDRESS, compiled, one)
+        # CpuFastSet, which the relaxation does not cover
+        fast = [add_r3_sp_38, MOVS_R0_0, str_r0_r3, ADDS_R1_R7, LDR_R2, ADD_R0_SP_38, ("bl", 0x08141868)]
+        rom, compiled, one = window(fast, control=0x01000008)
+        one.update(width=4, callee="func_08141868")
+        with self.assertRaisesRegex(proof.ProofError, "passes r3 sp\\+0x38, which reaches"):
+            fill.rom_fill(rom[:0x141868] + fill.CPUFASTSET_BYTES + rom[0x14186C:], ADDRESS, compiled, one)
+        for label, items, reason in (
+                ("a second store", shape[:3] + [strh_r0_r3] + shape[3:], "is not stored exactly once"),
+                ("a different base", [ADD_R1_SP_38, MOVS_R0_0, STRH_R0_R1, add_r3_sp_38] + shape[3:],
+                 "passes r3 sp\\+0x38, which reaches"),
+                ("r3 moved inside the slot after the store", shape[:3] + [adds_r3_1] + shape[3:],
+                 "passes r3 sp\\+0x39, which reaches"),
+                ("r1 in the slot as well", shape[:3] + [ADD_R1_SP_38] + shape[4:],
+                 "passes r1 sp\\+0x38, which reaches"),
+                ("a register offset from r3", [add_r3_sp_38, MOVS_R0_0, 0x5258] + shape[3:],
+                 "indexes the stack by a register inside the fill")):
+            with self.subTest(label=label):
+                rom, compiled, one = window(items)
+                with self.assertRaisesRegex(proof.ProofError, reason):
+                    fill.rom_fill(rom, ADDRESS, compiled, one)
+
     def test_a_cpufastset_fill_in_the_rom(self):
         # 0801A176: movs r0, #0; str r0, [sp]; ldr r1, [sp, #0xc]; ldr r2, =0x010013F8; mov r0, sp; bl CpuFastSet
         fast = dict(width=4, callee="func_08141868")
