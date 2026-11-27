@@ -60,6 +60,7 @@ recompute them.  A proof that splits nothing keeps its fingerprint and lines.
 from capstone.arm import ARM_REG_R0
 
 SCHEMA = "stack-split-join-v1"
+FORWARD_STALE_BASE = -(1 << 24)     # match.FORWARD_STALE_BASE: a released forwarded word's alias key
 BUDGET = 512
 
 
@@ -162,11 +163,21 @@ def records(split_joins):
             for walk, join, register, kept, split in sorted(split_joins)]
 
 
+def _name(key):
+    """A split alias key: a register, or a forwarded slot or released word (forwarded_slot_profile) by its
+    entry-SP offset."""
+    if key < FORWARD_STALE_BASE // 2:
+        return f"released word entry_SP{key - FORWARD_STALE_BASE:+#x}"
+    if key < 0:
+        return f"slot entry_SP{key:+#x}"
+    return f"r{key - ARM_REG_R0}"
+
+
 def lines(records):
     """One report line per walk and join kept apart (offsets from the walk's entry SP)."""
     grouped = {}
     for walk, join, register, kept, split in sorted(records):
-        grouped.setdefault((walk, join), []).append(f"r{register - ARM_REG_R0} {kept:+d}/{split:+d}")
+        grouped.setdefault((walk, join), []).append(f"{_name(register)} {kept:+d}/{split:+d}")
     return [f"* buffer split join: `{SCHEMA}` walk 0x{walk:08X} join 0x{join:08X} keeps "
             f"{', '.join(pairs)} apart (entry-SP offsets, kept/split) until those registers are rewritten; "
             f"each alternative is walked and checked on its own"

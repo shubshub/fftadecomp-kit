@@ -3700,7 +3700,6 @@ class BufferCallProof:
             self.forward_slot_records, self.forward_trusted_calls = set(), set()
             self.forward_releases = {}          # owner call site -> owner entry-SP offsets released there
             self.forward_callee_releases = set()  # (inspected callee, its ADD SP) that released a live slot
-            self.forward_inherited = set()      # owner call sites whose callee inherited released words
         self.discarded_exit_scratch_sites = set()
         self.rom = rom
         self.entries = json.loads(mapping) if mapping is not None else []
