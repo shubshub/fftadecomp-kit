@@ -386,14 +386,14 @@ class IwramImageTests(unittest.TestCase):
                 self.assertRaisesRegex(ValueError, "receives an owner stack address in R3"):
             self.prove()
 
-    def test_a_crossed_image_call_is_walked_over_the_image(self):
-        # The call-via target rule's crossing check: the callback's fact in R4 crosses an image call the
-        # buffer walks do not inspect and is then called with the owner's frame.  The crossed call is
-        # checked by a callee-saved walk of its own (call_via_target_profile.crossing_premises), which
-        # resolves the image the same way: the routine is walked, not stated as an unresolved call.
+    def crossed_image_call(self, callee="img_clear"):
+        """The call-via target rule's crossing check: the callback's fact in R4 crosses an image call
+        the buffer walks do not inspect and is then called with the owner's frame.  The crossed call
+        is checked by a callee-saved walk of its own (call_via_target_profile.crossing_premises)."""
         r3 = match.RUNTIME_HELPERS["_call_via_r3"]
-        body = (f"push {{r4, lr}}\nsub sp, #8\nldr r4, =callback + 1\nadds r3, r4, #0\nldr r0, =0x{TABLE:08X}\n"
-                f"ldr r2, [r0]\nldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmov r0, sp\nadds r3, r4, #0\n"
+        load = f"ldr r0, =0x{TABLE:08X}\nldr r2, [r0, #{4 * ENTRIES.index(callee)}]"
+        body = (f"push {{r4, lr}}\nsub sp, #8\nldr r4, =callback + 1\nadds r3, r4, #0\n{load}\n"
+                f"ldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmov r0, sp\nadds r3, r4, #0\n"
                 f"bl 0x{r3:08X}\nadd sp, #8\npop {{r4}}\npop {{r0}}\nbx r0\n.ltorg")
         text = assembly(body).replace("owner_end:\n", "owner_end:\n.balign 4\n.global callback, callback_end\n"
                                       "callback:\nmovs r1, #1\nstrh r1, [r0]\nbx lr\ncallback_end:\n", 1)
@@ -401,19 +401,47 @@ class IwramImageTests(unittest.TestCase):
         self.build_text()
         self.entries.append({"rom": f"0x{self.symbols['callback']:08X}",
                              "end": f"0x{self.symbols['callback_end']:08X}", "mode": "thumb"})
-        site = self.site()
+        return self.site()
+
+    def test_a_crossed_image_call_admitted_unresolved_keeps_its_premise(self):
+        # The crossed call passes no watched value, so the crossing check admits it unresolved
+        # under its call premise, as before: the image rule only turns a refusal into a walk, so
+        # the call is neither walked nor stated as an image call.
+        site = self.crossed_image_call()
         proof = self.prove()
-        self.assertEqual(proof.iwram_image_calls, set())
-        self.assertEqual(iwram.calls(proof), {(site, DESTINATION)})
+        self.assertEqual(iwram.calls(proof), set())
         self.assertIn(self.symbols["callback"], proof.dependencies)
         premised = [line for line in call_via.lines(proof) if line.startswith(call_via.PREMISE_LINE)]
-        self.assertFalse([line for line in premised if f"call at 0x{site:08X}" in line], premised)
-        # Without the image the crossing checker can only state the image call as an unresolved one.
-        with patch.object(iwram, "watch_target", lambda proof: None):
-            unresolved = self.prove()
-        self.assertEqual(iwram.calls(unresolved), set())
-        self.assertTrue([line for line in call_via.lines(unresolved) if line.startswith(call_via.PREMISE_LINE) and
-                         f"call at 0x{site:08X}" in line], call_via.lines(unresolved))
+        self.assertTrue([line for line in premised if f"call at 0x{site:08X}" in line], premised)
+        # A routine that clobbers the callback register is not walked either: still the premise.
+        site = self.crossed_image_call("img_r4")
+        proof = self.prove()
+        self.assertEqual(iwram.calls(proof), set())
+
+    def test_an_image_call_the_callee_saved_walk_admits_is_not_walked(self):
+        # The owner keeps its frame in R4 across func_f, which calls img_r4 (it clobbers R4) through
+        # _call_via_r2 with no owner address in R0-R3 or R12.  Unresolved, the walk admits that call
+        # under its ABI premise; walking img_r4 would refuse.  The admitted treatment is kept.
+        body = ("push {r4, lr}\nsub sp, #8\nmov r4, sp\nbl func_f\nmovs r3, #0\nstr r3, [r4]\n"
+                "add sp, #8\npop {r4}\npop {r0}\nbx r0\n.ltorg")
+        inner = (f"push {{lr}}\nldr r0, =0x{TABLE:08X}\nldr r2, [r0, #{4 * ENTRIES.index('img_r4')}]\n"
+                 f"ldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmovs r3, #0\npop {{r0}}\nbx r0\n.ltorg")
+        text = assembly(body).replace(
+            "owner_end:\n", f"owner_end:\n.balign 4\n.global func_f, func_f_end\nfunc_f:\n{inner}\nfunc_f_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_f']:08X}", "end": f"0x{self.symbols['func_f_end']:08X}",
+                             "mode": "thumb"})
+        proof = self.prove()
+        self.assertEqual(iwram.calls(proof), set())
+        # The same call with the owner's address copied into R3 is refused unresolved, so it is
+        # walked, and img_r4's write of R4 refuses.
+        (self.root / "f.s").write_text(text.replace("push {lr}\nldr r0, =0x", "push {lr}\nadds r3, r4, #0\nldr r0, =0x", 1))
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_f']:08X}", "end": f"0x{self.symbols['func_f_end']:08X}",
+                             "mode": "thumb"})
+        with self.assertRaises(ValueError):
+            self.prove()
 
     def test_a_crossing_continuation_walks_an_image_call(self):
         # The real path (0x08005954): the callback's fact in R4 crosses a call whose callee hands back a
