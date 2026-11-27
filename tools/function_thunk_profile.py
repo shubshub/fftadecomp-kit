@@ -513,11 +513,13 @@ def verify_source(root, address, data, rom, mapping, index, objects, source_dige
                             if buffer_stack_arguments else plain(candidate)
                         if buffer_stack_arguments:
                             # match.py retries a refused stack-argument walk once at a variable stack
-                            # index, or with closure words (closure_slot_profile).
-                            import closure_slot_profile as closure
+                            # index, or with closure words (closure_slot_profile), and then under the
+                            # owner's reviewed callee store bounds (store_bound_premise_profile).
                             import default_stack_index_profile as default_index
-                            instructions, proof = closure.walk(make_proof, run, got, address,
-                                                               default_index.snapshot(root))
+                            import store_bound_premise_profile as store_bound
+                            instructions, proof = store_bound.walk(make_proof, run, got, address,
+                                                                   default_index.snapshot(root),
+                                                                   store_bound.snapshot(root))
                         else:
                             proof = make_proof() if buffer_stack_arguments is not None else None
                             instructions = run(proof)

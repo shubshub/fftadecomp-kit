@@ -4053,6 +4053,66 @@ loop counter (0..2) indexes two 3-byte local arrays:
 `default_stack_index_profile.POLICY.enabled = False` restores the plain
 refusals, and a report a retry admitted then fails replay.
 
+### Reviewed store bounds in a replayed callee loop
+
+The default stack-argument walk replays a callee loop path by path when its
+joined pass cannot keep a buffer pointer exact. A loop that stores through an
+advancing pointer once per qualifying iteration explores every outcome of each
+qualifying test. It then refuses the first store that leaves the owner's
+allocated local words:
+
+```
+buffer callee 0x0812E4F4: bounded loop replay at 0x0812E540: 2-byte strh at caller sp+4: buffer access is unaligned or outside allocated local words
+```
+
+`func_0812E4F4` stores one halfword per equipment slot that holds a qualifying
+item, into its caller's `u16[2]`. A third store would overwrite a saved
+register. Whether a unit can hold a third qualifying item is a fact about the
+game, not about the code.
+
+That refusal, as the plain walk's whole message, is the only trigger. Walks
+that refuse in any other way, or do not refuse, are unchanged. After it, the
+plain path, the composed data-buffer proof and their replays run the walk
+again (`store_bound_premise_profile`) with reviewed rows from
+`config/store_bound_premises.json`. The file has one entry per owner address,
+with a non-empty `review` and its `rows`, each `{callee, site, bound}`, in
+(callee, site) order:
+
+```json
+{"0x08133E18": {"review": "...", "rows": [{"callee": "0x0812E4F4", "site": "0x0812E540", "bound": 2}]}}
+```
+
+A row says that in every call of `callee` that the owner's walk reaches, the
+store at `site` executes at most `bound` times. The retry runs in two passes:
+
+* **Measure.** In the replay of each row's callee, every path counts the
+  executions of each row site. That count is part of the replay state and
+  restarts at each walk of the callee, i.e. per call. A store at a row site
+  that would leave the allocated words ends its path. The least number of
+  earlier executions at such a store is the largest bound the frame allows.
+  Nothing is admitted by this pass.
+* **Prune.** This pass runs only when the entry lists exactly the sites the
+  measure pass needs, each with a bound no larger than the frame allows. A
+  path on which a row site would execute for the (bound+1)-th time ends there,
+  before the store. Every execution up to the bound is the ordinary replayed
+  store, with all its checks. Stores at every other site keep their checks.
+
+A missing or differing entry refuses and prints the entry to review, with the
+largest bounds the frame allows. Each bound is a STORE premise. It ships only
+with a reviewed entry whose bound is proved from the ROM and shown to the user
+with its evidence. A smaller proved bound is accepted.
+
+An admitted retry adds three kinds of buffer proof lines, which are bound into
+the fingerprint and recomputed by replay:
+* the trigger and the rule;
+* one line per row and calling site, with the number of replayed states the
+  bound ended;
+* the STORE premise line, which binds the owner's entry by the SHA-256 of its
+  canonical JSON (only that entry, so other entries do not change the report).
+
+`store_bound_premise_profile.POLICY.enabled = False` raises the trigger
+unchanged.
+
 ### Buffer owners with stale aliases a callee overwrites
 
 `--owner-runtime-profile named-data-buffer-dead-argument-aliases-v1` admits a

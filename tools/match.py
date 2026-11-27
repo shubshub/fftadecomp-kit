@@ -3685,6 +3685,10 @@ class BufferCallProof:
     # The closure-slot retry's words and record (closure_slot_profile); None on every other walk.
     closure_slots = None
     closure_retry = None
+    # Reviewed callee store bounds (store_bound_premise_profile): the pass's StoreBounds, attached only
+    # by that rule's retry, and the admitted retry's record; None on every other walk.
+    store_bounds = None
+    store_bound_retry = None
     # Opt-in RuntimeSummaries (runtime_summary_profile): exact canonical division
     # entries become proved leaf calls; None keeps every runtime refused.
     runtime_summaries = None
@@ -3960,11 +3964,14 @@ class BufferCallProof:
                  {site: set(words) for site, words in self.forward_releases.items()},
                  set(self.forward_callee_releases))
                 # Only the default forwarding proofs: the opt-in forwarding policies keep their ledgers as before.
-                if self.default_forwarding else None)
+                if self.default_forwarding else None,
+                self.store_bounds.snapshot() if self.store_bounds is not None else None)
 
     def _restore_ledgers(self, saved):
         snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
-            forward_snapshot = saved
+            forward_snapshot, bound_snapshot = saved
+        if bound_snapshot is not None:
+            self.store_bounds.restore(bound_snapshot)
         if forward_snapshot is not None:
             for ledger, values in zip((self.forward_slot_records, self.forward_trusted_calls), forward_snapshot):
                 ledger.clear()
@@ -4052,11 +4059,15 @@ class BufferCallProof:
                 raise ValueError("exact buffer alternatives require bounded callee frame states")
             path_states = {address: {states[address]}} if exact_budget is not None else None
             replay_states = replay_writes = None
+            # Reviewed store-bound rows of this callee ({site: bound}, store_bound_premise_profile):
+            # only in a replay, and only on that rule's retried proofs; each path then carries its
+            # row-site execution counts as one more state element.
+            bounded = self.store_bounds.sites(address) if replay and self.store_bounds is not None else {}
             if replay:
                 # Exact path-by-path replay: no joins, known counters and CMP flags
                 # prune infeasible branches, so a loop is unrolled to its proven
                 # trip count or the state budget refuses it.
-                states[address] += ((), None)
+                states[address] += ((), None) + (((),) if bounded else ())
                 replay_states = {address: {states[address]}}
                 replay_writes = set()
                 # Facts the replay relied on without checking them in bytes: R4-R11
@@ -4091,6 +4102,14 @@ class BufferCallProof:
                 depth = states[current][1]
                 constants = dict(states[current][2])
                 words = dict(states[current][3])
+                if bounded:
+                    next_counts = states[current][6]
+                    if current in bounded:
+                        counts = dict(next_counts)
+                        if not self.store_bounds.step(self, address, site, instruction, aliases, stack, counts,
+                                                      bounded[current]):
+                            continue        # this path ends before the store (store_bound_premise_profile)
+                        next_counts = tuple(sorted(counts.items()))
                 if self.callee_frames:
                     stack = list(states[current][4])
                 call_alternatives = None
@@ -4347,7 +4366,7 @@ class BufferCallProof:
                 if self.callee_frames:
                     outgoing += (tuple(stack),)
                 if replay:
-                    outgoing += (next_known, next_flags)
+                    outgoing += (next_known, next_flags) + ((next_counts,) if bounded else ())
                 if call_alternatives is not None:
                     if path_states is None:
                         raise ValueError("disjunctive call results require exact caller alternatives")
@@ -4594,6 +4613,9 @@ class BufferCallProof:
         if self.stack_index_retry is not None:
             import default_stack_index_profile as default_index
             lines.extend(default_index.lines(self.stack_index_retry))
+        if self.store_bound_retry is not None:
+            import store_bound_premise_profile as store_bound
+            lines.extend(store_bound.lines(self.store_bound_retry))
         if remainder_leaf.is_summaries(self.runtime_summaries):
             lines.extend(self.runtime_summaries.lines())
         lines.extend(split_join.lines(self.split_joins))
@@ -4687,6 +4709,10 @@ class BufferCallProof:
             # Only a walk the default stack-index retry admitted adds this.
             digest.update(json.dumps(self.stack_index_retry, sort_keys=True,
                                      separators=(",", ":")).encode())
+        if self.store_bound_retry is not None:
+            # Only a walk the reviewed store-bound retry admitted adds this.
+            import store_bound_premise_profile as store_bound
+            digest.update(store_bound.fingerprint_payload(self.store_bound_retry).encode())
         if remainder_leaf.is_summaries(self.runtime_summaries) and self.runtime_summaries.sites:
             # Only a summarised compiler __modsi3 call adds this.
             digest.update(self.runtime_summaries.digest_text().encode())
@@ -7450,9 +7476,14 @@ def main():
                         raise                        # a stack-buffer report binds the function map
                     return_scratch = None            # the stack-argument walks refuse R0-R3 themselves
                     import default_stack_index_profile as default_index
-                    # One fresh recorder for the stack-argument walk and one for the stack-index retry.
-                    walk_fills = [dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT)),
-                                  dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT))] if dma_fills is not None else [None, None]
+                    import store_bound_premise_profile as store_bound
+                    # One fresh recorder per walked proof: the stack-argument walk, the default retries
+                    # (stack index, closure slots) and the store-bound retry's passes (kept with their
+                    # proofs, so ids stay unique).
+                    walk_fills = {}
+                    fills_for = lambda proof: walk_fills.setdefault(
+                        id(proof), (proof, dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT))
+                                    if dma_fills is not None else None))[1]
                     stack_buffer_proof = lambda: BufferCallProof(
                         rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
                         copy_helper_index=inert_spin.index_snapshot(ROOT),
@@ -7462,27 +7493,29 @@ def main():
                     stack_buffer_walk = lambda proof: function_exit.walk(
                         proof, got, addr, mapping, lambda: verify_leaf_instructions(
                             got, addr, thumb, calls, buffer_proof=proof, incoming_narrow_reads=True,
-                            dma_fills=walk_fills[proof.index_policy is not None]), kind=function_exit.FRAME)
+                            dma_fills=fills_for(proof)), kind=function_exit.FRAME)
                     if calls:
-                        # The default retries (default_stack_index_profile, closure_slot_profile); the
-                        # closure-slot retry walks with the first recorder again, started afresh.
-                        verified_instructions, buffer_proof = closure.walk(
+                        # The default retries (default_stack_index_profile, closure_slot_profile), then
+                        # the reviewed store-bound retry (store_bound_premise_profile).
+                        verified_instructions, buffer_proof = store_bound.walk(
                             stack_buffer_proof, stack_buffer_walk, got, addr, default_index.snapshot(ROOT),
-                            reset=lambda: walk_fills[0] is not None and walk_fills[0].__init__(walk_fills[0].rom))
+                            store_bound.snapshot(ROOT))
                     else:
                         # A call-free body has no buffer call to inspect: only the stack-index retry.
                         verified_instructions, buffer_proof = default_index.retry(
                             first_error, stack_buffer_walk, stack_buffer_proof, got, addr,
                             default_index.snapshot(ROOT))
-                    dma_fills = walk_fills[buffer_proof.index_policy is not None]
+                    dma_fills = fills_for(buffer_proof)
                 if thumb and data_relocations and buffer_proof.buffer_evidence():
                     # Typed objects beside the version-2 buffer proof, rerun as one composed proof.
                     import default_stack_index_profile as default_index
                     dma_fills = dma_fill.Fills(rom, dma_fill_premise.snapshot(ROOT)) if dma_fills is not None else None
+                    import store_bound_premise_profile as store_bound
                     verified_instructions, buffer_proof, data_buffer_schema, data_buffer_evidence = \
                         data_buffer.prove(got, addr, rom, mapping, data_mapping, calls, data_relocations,
                                           index=inert_spin.index_snapshot(ROOT), dma_fills=dma_fills,
-                                          premises=default_index.snapshot(ROOT))
+                                          premises=default_index.snapshot(ROOT),
+                                          store_bound_premises=store_bound.snapshot(ROOT))
             if args.signed_quotient_profile is not None and quotient_evidence is None:
                 raise ValueError("framed signed quotient requires canonical __divsi3 ELF calls")
             if args.unsigned_quotient_profile is not None and division_evidence is None:

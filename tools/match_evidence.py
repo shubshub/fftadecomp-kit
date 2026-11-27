@@ -550,9 +550,11 @@ def buffer_report_matches(lines, root, address, mapping, stack_arguments=False, 
             run = lambda candidate: function_exit.walk(candidate, data, address, mapping, lambda: walk(candidate),
                                                        kind=function_exit.FRAME)
             # match.py retries a refused stack-argument walk once at a variable stack index, or with
-            # closure words (closure_slot_profile).
-            import closure_slot_profile as closure
-            instructions, proof = closure.walk(make_proof, run, data, address, default_index.snapshot(root))
+            # closure words (closure_slot_profile), and then (store_bound_premise_profile) under the
+            # owner's reviewed callee store bounds.
+            import store_bound_premise_profile as store_bound
+            instructions, proof = store_bound.walk(make_proof, run, data, address, default_index.snapshot(root),
+                                                   store_bound.snapshot(root))
         else:
             instructions = run(proof)
         from callee_saved_watch import LINE_PREFIX, premise_lines
