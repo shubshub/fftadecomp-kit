@@ -58,8 +58,10 @@ store at any other site keeps its checks and its refusal.
 
 Scope: rows apply only inside the bounded loop replay of an inspected callee (never to the owner's
 own instructions), only to the default stack-argument walk of match.py's plain path and of the
-composed data-buffer proof (and their replays), and only behind `POLICY` (disabled: the trigger is
-raised unchanged).
+composed data-buffer proof, and to their replays (`match_evidence.buffer_report_matches`,
+`data_buffer_profile.verify_source`, and the legacy buffer replay of
+`function_thunk_profile.verify_source`), and only behind `POLICY` (disabled: the trigger is raised
+unchanged).
 """
 import hashlib
 import json
