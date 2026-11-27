@@ -104,7 +104,7 @@ class WalkTests(unittest.TestCase):
     def test_a_callee_that_leaves_zero_in_ip_is_admitted_unchanged(self):
         x12 = X12.replace("mov r3, sp\nmov ip, r3", "movs r3, #0\nmov ip, r3")
         proof = self.walk(OWNER, func_X12=x12, func_E=E)
-        self.assertEqual((r12_exit.sites(proof), proof.exit_r12_lines()), ([], []))
+        self.assertEqual((r12_exit.sites(proof), r12_exit.lines(proof)), ([], []))
         plain = self.walk(OWNER, enabled=False, func_X12=x12, func_E=E)
         self.assertEqual(proof.fingerprint(), plain.fingerprint())
 
@@ -136,7 +136,7 @@ class WalkTests(unittest.TestCase):
         proof = self.walk(frame("add r3, sp, #4\nmov ip, r3\nmovs r3, #0\nmovs r0, #0"))
         site = self.returns()
         self.assertEqual(r12_exit.sites(proof), [(site, -12)])
-        self.assertEqual(proof.exit_r12_lines(), [
+        self.assertEqual(r12_exit.lines(proof), [
             f"* buffer exit scratch r12: `thumb-discarded-exit-scratch-r12-v1` {r12_exit.CONTRACT}; "
             f"`0x{site:08X} r12 -12`"])
         bound = proof.fingerprint()
@@ -144,7 +144,7 @@ class WalkTests(unittest.TestCase):
         self.assertNotEqual(proof.fingerprint(), bound)
         proof.r12_exit_scratch = set()
         self.assertNotEqual(proof.fingerprint(), bound)
-        self.assertEqual(proof.exit_r12_lines(), [])
+        self.assertEqual(r12_exit.lines(proof), [])
 
     def test_a_root_whose_report_does_not_state_it_refuses(self):
         with self.assertRaisesRegex(ValueError, f"{ESCAPE}: r12 at a root return whose report does not state"):
