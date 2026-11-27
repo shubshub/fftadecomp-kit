@@ -783,6 +783,9 @@ class Checker:
         # iwram_image_profile: (bytes, end) for a boot IWRAM image address the buffer proof's
         # call-via resolver answered, else None (set by checker_for).
         self.image_span = None
+        # iwram_image_profile: an exact odd value in the boot IWRAM image as a call-via destination,
+        # (value, site) -> the routine's address or None (set by attach_image).
+        self.image_target = None
         self.limits = {}
         self.leaves = {}
         self.heads = {}
@@ -895,7 +898,7 @@ class Checker:
         known.update(constants or {})
         if not watched:
             return {}
-        destination = self.resolve(target, known, watched)
+        destination = self.resolve(target, known, watched, site=site)
         if destination is None:
             if caller is None or site is None:
                 refuse(target, "an indirect call through a call-via thunk while watched values are live")
@@ -1047,11 +1050,12 @@ class Checker:
         links = self.chain(thunk, constants)
         return constants.get(link_register(links[-1])) if links else None
 
-    def resolve(self, target, constants, watched):
+    def resolve(self, target, constants, watched, *, site=None):
         """The callee proper: the target itself or a call-via thunk's known ROM destination
-        (followed through further thunks), else None: rN unknown, or code outside ROM (an
-        IWRAM routine installed at run time).  ``watched`` holds the registers whose values
-        must not become a branch target."""
+        (followed through further thunks), or a routine of the boot IWRAM image the destination
+        lies in (``image_target``, for a call at ``site``), else None: rN unknown, or other code
+        outside ROM.  ``watched`` holds the registers whose values must not become a branch
+        target."""
         seen = set()
         while target not in seen:
             if target in match.RUNTIME_HELPERS.values():
@@ -1069,6 +1073,8 @@ class Checker:
             if destination is not None:
                 destination = rom_mirror.canonical(destination)   # a wait-state mirror is ROM code (#377)
             if destination is None or not match.ROM_BASE <= destination < match.ROM_BASE + len(self.rom):
+                if destination is not None and site is not None and self.image_target is not None:
+                    return self.image_target(destination, site)      # walked over the image bytes
                 return None
             if not destination & 1:
                 refuse(target, f"the call-via thunk branches to 0x{destination:08X}, which is not Thumb code")
@@ -2202,7 +2208,8 @@ class Checker:
                 # A thunk may not branch to a dependent value or a frame address; a probed
                 # callee's input is checked where its summary is used.
                 destination = self.resolve(target, constants, frozenset(
-                    n for n in range(13) if taints(regs[n]) or fragment(regs[n]))) if mode != KNOWN else None
+                    n for n in range(13) if taints(regs[n]) or fragment(regs[n])), site=site) \
+                    if mode != KNOWN else None
                 stacked = sorted(off - sp for off, word in memory.items() if taints(word))
                 # A frame address in the caller's frame may be a stack argument.
                 framed = [off for off, word in memory.items() if sp <= off < entry_sp and off not in pushed
@@ -3478,9 +3485,18 @@ def checker_for(proof):
     checker = _CHECKERS.get(proof)
     if checker is None or checker.rom is not proof.rom:
         checker = _CHECKERS[proof] = Checker(proof.rom, proof.entries)
-        import iwram_image_profile as iwram_image
-        if iwram_image.applies(proof):
-            checker.image_span = iwram_image.watch_span(proof)
+        attach_image(checker, proof)
+    return checker
+
+
+def attach_image(checker, proof):
+    """Give ``checker`` the boot IWRAM image of ``proof`` (iwram_image_profile), when the rule applies to
+    it: every checker a buffer proof walks with, its own (checker_for) and the call-via target rule's
+    crossing checkers, resolves and reads the image the same way."""
+    import iwram_image_profile as iwram_image
+    if iwram_image.applies(proof):
+        checker.image_span = iwram_image.watch_span(proof)
+        checker.image_target = iwram_image.watch_target(proof)
     return checker
 
 

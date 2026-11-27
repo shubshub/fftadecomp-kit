@@ -369,20 +369,46 @@ def span(proof, address):
     return proof.iwram_image.bytes_from(proof.rom, address)
 
 
-def watch_span(proof):
-    """The callee-saved walk's span hook: (bytes, end) for an answered image address, else None."""
-    def lookup(address):
-        if not resolved(proof, address):
+def watch_target(proof):
+    """The callee-saved walks' resolver hook (callee_saved_watch.Checker.resolve): an exact odd value
+    inside the derived image, as a call-via destination at `site`, is that routine's address.  The
+    call is noted on the proof (never rolled back, as those walks' premises are not) and stated with
+    the buffer walks' own (`record`)."""
+    def lookup(value, site):
+        if not applies(proof) or not isinstance(value, int) or not value & 1 or \
+                not IWRAM[0] <= int(value) < IWRAM[1]:
             return None
-        return proof.iwram_image.bytes_from(proof.rom, address), proof.iwram_image.end
+        found = image(proof)
+        address = int(value) & ~1
+        if found is None or not found.contains(address):
+            return None
+        proof.iwram_image_watch_calls.add((site, address))
+        return address
     return lookup
 
 
+def watch_span(proof):
+    """The callee-saved walks' span hook: (bytes, end) for an image address any walk answered."""
+    def lookup(address):
+        if not resolved(proof, address) and not any(target == address for _, target in proof.iwram_image_watch_calls):
+            return None
+        found = image(proof)
+        return found.bytes_from(proof.rom, address), found.end
+    return lookup
+
+
+def calls(proof):
+    """Every (site, address) call into the image: the buffer walks' and the callee-saved walks'."""
+    return set(getattr(proof, 'iwram_image_calls', ())) | set(getattr(proof, 'iwram_image_watch_calls', ()))
+
+
 def record(proof):
-    if not applies(proof) or not getattr(proof, 'iwram_image_calls', None):
+    if not applies(proof):
         return None
-    return dict(proof.iwram_image.evidence, premise=PREMISE,
-                calls=[list(call) for call in sorted(proof.iwram_image_calls)])
+    found = calls(proof)
+    if not found:
+        return None
+    return dict(image(proof).evidence, premise=PREMISE, calls=[list(call) for call in sorted(found)])
 
 
 def fingerprint_payload(proof):

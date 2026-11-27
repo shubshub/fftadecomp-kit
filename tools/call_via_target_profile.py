@@ -456,7 +456,7 @@ def crossing_premises(proof, function, site, target, held):
     cache = getattr(proof, "call_via_crossings", None)
     if cache is not None and key in cache:
         return cache[key]
-    checker = callee_saved_watch.Checker(proof.rom, proof.entries)
+    checker = callee_saved_watch.attach_image(callee_saved_watch.Checker(proof.rom, proof.entries), proof)
     checker.call(target, frozenset({held}), caller=function[0], site=site,
                  known=strict_known(proof, function, site))
     records = frozenset(checker.premises)

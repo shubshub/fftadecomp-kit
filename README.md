@@ -2005,8 +2005,11 @@ plain 16- or 32-bit copy control evaluated from its own literal words. A
 call-via value C resolves when C is odd and C & ~1 lies inside that copy; the
 walk then reads the copied ROM bytes at their IWRAM addresses (from C & ~1 to
 the image's end), and every existing buffer and callee-saved rule applies to
-them unchanged. Even values, values outside the image, other proof types and
-an unproved copy keep the refusal.
+them unchanged. The callee-saved walks (`callee_saved_watch`: the proof's own
+checker and the exact call-via target rule's crossing checks) resolve their
+call-via calls the same way: a call whose destination is such a value is
+walked over the image bytes and stated with the buffer walks' calls. Even values, values outside the
+image, other proof types and an unproved copy keep the refusal.
 
 That the image still holds the copied bytes when the call is made is not
 proved: IWRAM is writable. Every report that resolves such a call states the

@@ -3912,6 +3912,9 @@ class BufferCallProof:
         # iwram_image_profile: (site, image address) of call-via calls resolved into the boot
         # IWRAM image, the resolver T2 asks, and nothing for any other proof type.
         self.iwram_image_calls = set()
+        # The ones the callee-saved walks resolved (iwram_image_profile.watch_target); like those
+        # walks' premises, never rolled back.
+        self.iwram_image_watch_calls = set()
         self.call_via_resolvers = (iwram_image.resolver,) if iwram_image.applies(self) else ()
         # Targets of un-inspected calls an inspected callee (transitively) relies on
         # to preserve R4-R11.
