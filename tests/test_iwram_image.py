@@ -442,6 +442,46 @@ class IwramImageTests(unittest.TestCase):
                                                    "address in R3"):
             crossing()
 
+    def test_a_crossing_continuation_does_not_walk_a_stale_frame_word_target(self):
+        # rv-137 CX1, a composition regression: the image walk in a crossing check's continuation needs
+        # the callee-saved watch's forgetting of frame words an escaped address may write (kit main's
+        # #578/#580) underneath.  The owner hands &frame[4] to a global before the crossed call, so the
+        # continuation cannot see that escape.  After the crossed call it stores img_quiet's address to
+        # frame[4] and calls img_w (walked over the image), which rewrites frame[4] through the global
+        # with img_setfar (which clobbers R4).  The next call takes its destination from frame[4].
+        # Sound: that destination is unknown (refused or stated), never img_quiet walked as the callee.
+        code = ("img_setfar:\n    ldr r4, w_far\n    bx lr\nimg_w:\n    ldr r1, w_global\n    ldr r1, [r1]\n"
+                "    ldr r0, w_setfar\n    str r0, [r1]\n    bx lr\n")
+        data = (f"w_far:\n    .word 0x{DESTINATION:08X} + (img_far - img_start) + 1\nw_global:\n    .word 0x02000010\n"
+                f"w_setfar:\n    .word 0x{DESTINATION:08X} + (img_setfar - img_start) + 1\n")
+        image = IMAGE.replace("img_quiet:\n", code + "img_quiet:\n").replace(
+            "    .balign 4\nimg_end:", "    .balign 4\n" + data + "img_end:")
+        quiet = f"0x{DESTINATION:08X} + (img_quiet - img_start) + 1"
+        written = f"0x{DESTINATION:08X} + (img_w - img_start) + 1"
+        body = (f"push {{r4, lr}}\nsub sp, #8\nadd r0, sp, #4\nldr r1, =0x02000010\nstr r0, [r1]\n"
+                f"ldr r4, =callback + 1\ncrossed:\nbl func_cp\nldr r0, ={quiet}\nstr r0, [sp, #4]\n"
+                f"ldr r2, ={written}\nmovs r0, #0\nbl 0x{R2:08X}\nldr r2, [sp, #4]\nsite2:\nbl 0x{R2:08X}\n"
+                f"movs r3, #0\nadd sp, #8\npop {{r4, pc}}\n.ltorg")
+        with patch(f"{__name__}.IMAGE", image):
+            text = assembly(body)
+        text = text.replace(".global owner,", ".global img_quiet\n.global owner,", 1).replace(
+            "owner_end:\n", "owner_end:\n.balign 4\n.global callback, func_cp, func_cp_end, crossed, site2\n"
+            "callback:\nbx lr\nfunc_cp:\nadds r3, r4, #0\nbx lr\nfunc_cp_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_cp']:08X}", "end": f"0x{self.symbols['func_cp_end']:08X}",
+                             "mode": "thumb"})
+        proof = match.BufferCallProof(bytes(self.rom), json.dumps(self.entries).encode(), stack_arguments=True,
+                                      call_via_targets=True)
+        crossed, site2 = self.symbols["crossed"], self.symbols["site2"]
+        stale = (site2, DESTINATION + self.symbols["img_quiet"] - self.symbols["img_start"])
+        try:
+            call_via.crossing_premises(proof, call_via.function_of(proof, crossed), crossed, self.symbols["func_cp"], 4)
+        except ValueError as error:
+            self.assertIn(f"indirect call at 0x{site2:08X}", str(error))
+        self.assertNotIn(stale, proof.iwram_image_watch_calls,
+                         "the continuation walked a stale frame-word destination as the image routine")
+
     def test_a_release_by_an_image_routine_marks_its_caller(self):
         # A routine of the image that returns its own frame in R2 (released_scratch_profile): the
         # marker is keyed by the routine the call resolved to.
