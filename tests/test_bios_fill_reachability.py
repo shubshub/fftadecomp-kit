@@ -204,7 +204,7 @@ class RtlTests(unittest.TestCase):
                     proof.ProofError, "barrier UID 20 follows call insn UID 18, so the source declares the callee "
                                       "noreturn, which the ROM cannot show"):
                 fill.fills(function(ending(*tail)))
-        # after anything else but a jump or a barrier, the cut is unexplained
+        # after anything else but a jump, the cut is unexplained: an insn, a label, another barrier, nothing
         constant = (25, "insn (set (reg:SI 70) (const_int 0)) -1 (nil) (nil)")
         for tail, shown in (((constant, (26, "barrier")), "insn UID 25"),
                             ((label(25), (27, "barrier")), "code_label UID 25")):
@@ -213,14 +213,13 @@ class RtlTests(unittest.TestCase):
                 fill.fills(function(ending(*tail)))
         with self.assertRaisesRegex(proof.ProofError, "barrier UID 1 follows nothing, not a jump"):
             fill.successors(function([(1, "barrier"), ENTRY]))
-        # after a jump it stands, with notes between or a second barrier
         insns = arms()
         where = [uid for uid, _ in insns].index(21)
-        for what, insns in (("a note between", insns[:where] + [(22, 'note "" NOTE_INSN_DELETED')] + insns[where:]),
-                            ("a second barrier", insns[:where + 1] + [(22, "barrier")] + insns[where + 1:])):
-            with self.subTest(what):
-                (found,) = fill.fills(function(insns))
-                self.assertEqual(found["apart"], [30])
+        with self.assertRaisesRegex(proof.ProofError, "barrier UID 22 follows barrier UID 21, not a jump"):
+            fill.fills(function(insns[:where + 1] + [(22, "barrier")] + insns[where + 1:]))
+        # after a jump it stands, with a note between
+        (found,) = fill.fills(function(insns[:where] + [(22, 'note "" NOTE_INSN_DELETED')] + insns[where:]))
+        self.assertEqual(found["apart"], [30])
 
     def test_labels_whose_address_the_assembly_takes(self):
         # label(6) is the table's label, number 7; its cases are labels 9 and 50, numbers 10 and 51
