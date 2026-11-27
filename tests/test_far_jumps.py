@@ -256,6 +256,16 @@ class FarJumpWalkTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r"continuation in LR is read|not a validated|indirect"):
             walk(jump(tail=half(0xB500, 0xBC02, 0xBC04, 0x4710)))
 
+    def test_the_continuation_in_lr_is_never_read_on_any_later_path(self):
+        # rv-X1 M03/R33: 20e movs r0,#1; 210 mov r0, lr: the read is one instruction past the target.
+        with self.assertRaisesRegex(ValueError, r"far jump: the continuation in LR is read at 0x08000210"):
+            walk(jump(tail=half(0x2001, 0x4670, 0xBC02, 0x4708)))
+
+    def test_an_instruction_that_reads_and_writes_lr_reads_it_first(self):
+        # rv-X1 M14/R27: 20e add lr, r0 reads the continuation before it writes LR.
+        with self.assertRaisesRegex(ValueError, r"far jump: the continuation in LR is read at 0x0800020E"):
+            walk(jump(tail=half(0x4486, 0x4672, 0xBC02, 0x4708)))
+
     def test_an_lr_write_ends_the_continuation(self):
         # 20e mov lr, r2; 210 mov r0, lr; 212 pop {r1}; 214 bx r1: LR is rewritten before it is read.
         instructions = walk(jump(tail=half(0x4696, 0x4670, 0xBC02, 0x4708)))
@@ -342,6 +352,82 @@ class RecordTests(unittest.TestCase):
         evidence_ = analysis_profile.forwarding_evidence(
             analysis, {"releases": [[0x08000202, [4]]], "walked": set(), "slots": [], "trusted": []})
         self.assertEqual(evidence_["trusted_calls"], [])
+
+
+# A hand-built ROM for the buffer proofs: the root at 0x08000200 and the callees each at its address.
+def rom_with(root_code, callees):
+    import json
+    rom = bytearray(0x1000)
+    rom[START - match.ROM_BASE:START - match.ROM_BASE + len(root_code)] = root_code
+    entries = [{"rom": f"0x{START:08X}", "end": f"0x{START + len(root_code):08X}", "mode": "thumb"}]
+    for address, code in callees:
+        rom[address - match.ROM_BASE:address - match.ROM_BASE + len(code)] = code
+        entries.append({"rom": f"0x{address:08X}", "end": f"0x{address + len(code):08X}", "mode": "thumb"})
+    return bytes(rom), json.dumps(entries)
+
+
+def stack_walk(root_code, calls, callees):
+    """The root under the default stack-argument proof; returns (instructions, proof)."""
+    rom, mapping = rom_with(root_code, callees)
+    proof = match.BufferCallProof(rom, mapping, stack_arguments=True, loop_replay=True, bios_wrappers=True,
+                                  dead_registers=True, forward_slots=True)
+    instructions = match.verify_leaf_instructions(root_code, START, True, dict(calls), buffer_proof=proof,
+                                                  incoming_narrow_reads=True)
+    return instructions, proof
+
+
+# rv-X1 C09: 200 push {lr}; 202 sub sp,#8; 204 mov r1,sp; 206 bl 400 (a buffer call); 20a mov r1,sp; 20c bl 214
+# (the far jump, r1 = sp across it); 210 movs r0,#0; 212 nop; 214 bl 410 (gets r1 = sp); 218 movs r1,#0;
+# 21a add sp,#8; 21c pop {r0}; 21e bx r0
+ROOT_ALIAS_ACROSS = body(half(0xB500, 0xB082, 0x4669), bl(0x08000206, 0x08000400), half(0x4669),
+                         bl(0x0800020C, 0x08000214), half(0x2000, 0x46C0), bl(0x08000214, 0x08000410),
+                         half(0x2100, 0xB002, 0xBC01, 0x4700))
+ROOT_ALIAS_CALLS = {0x08000206: 0x08000400, 0x08000214: 0x08000410}
+STORES_RAW = half(0x8008, 0x80C8, 0x4770)            # strh r0,[r1]; strh r0,[r1,#6]; bx lr
+
+
+class AliasAcrossFarJumpTests(unittest.TestCase):
+    def test_a_frame_alias_crosses_the_jump_and_keeps_its_bounds(self):
+        # rv-X1 M17: the jump changes no register but LR, so r1 = sp reaches the call at 214 and the
+        # callee is walked with it: in bounds it is admitted and inspected ...
+        instructions, proof = stack_walk(ROOT_ALIAS_ACROSS, ROOT_ALIAS_CALLS,
+                                         [(0x08000400, STORES_RAW), (0x08000410, STORES_RAW)])
+        self.assertEqual(far_jump.record(instructions, START), [[12, 20]])
+        self.assertIn(0x08000410, proof.dependencies)
+        # ... and a store past the frame through it refuses.
+        with self.assertRaisesRegex(ValueError, "outside allocated local words|unaligned"):
+            stack_walk(ROOT_ALIAS_ACROSS, ROOT_ALIAS_CALLS,
+                       [(0x08000400, STORES_RAW), (0x08000410, half(0x8108, 0x4770))])
+
+
+class LifetimeTests(unittest.TestCase):
+    """K5 (closure_slot_profile.check_lifetime) over a walked root with a far jump (rv-X1 L01/L01b/L02)."""
+    # 200 push {lr}; 202 sub sp,#8; 204 add sp,#8 (the release); 206 cmp r0,#0; 208 beq 20e; 20a the far jump
+    # (or b 212; nop); 20e movs r0,#1; 210 b 216; 212 sub sp,#8 (an allocation after the release); 214 add sp,#8;
+    # 216 pop {r1}; 218 bx r1
+    HEAD = half(0xB500, 0xB082, 0xB002, 0x2800, 0xD001)
+    TAIL = half(0x2001, 0xE001, 0xB082, 0xB002, 0xBC02, 0x4708)
+
+    def lifetime(self, code):
+        instructions = walk(code)
+        closure.check_lifetime(None, code, START, instructions)
+        return instructions
+
+    def test_the_lifetime_check_follows_the_far_jump(self):
+        for name, code in (("far", body(self.HEAD, bl(0x0800020A, 0x08000212), self.TAIL)),
+                           ("near", body(self.HEAD, half(0xE002, 0x46C0), self.TAIL)),
+                           # no beq: the continuation 20e is never walked, the target is
+                           ("unreached", body(half(0xB500, 0xB082, 0xB002, 0x46C0, 0x46C0),
+                                              bl(0x0800020A, 0x08000212), self.TAIL))):
+            with self.subTest(name):
+                with self.assertRaisesRegex(ValueError, "descriptor word lifetime excludes allocation after deallocation"):
+                    self.lifetime(code)
+
+    def test_a_far_jump_past_no_allocation_is_admitted(self):
+        # 212 movs r3,#1 instead of the allocation.
+        tail = half(0x2001, 0xE000, 0x2301, 0xBC02, 0x4708)
+        instructions = self.lifetime(body(self.HEAD, bl(0x0800020A, 0x08000212), tail))
+        self.assertEqual(far_jump.record(instructions, START), [[10, 18]])
 
 
 class ClosureCycleTests(unittest.TestCase):
