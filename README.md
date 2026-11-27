@@ -1986,10 +1986,14 @@ that callee and register refuses. A call in the core walk of an inspected
 callee is not noted, because that callee's alias-path walk makes the same
 call after its core walk. A call-via call the walk does not resolve is keyed
 by the target it can name without resolving it (the exact call-target fact
-in the thunk's register, else its strict value, as an indexed Thumb entry);
-a target nobody can name, such as a callback loaded from memory, keeps the
-ordinary trust in an unwalked indirect call. The value is never dropped, so no premise is
-stated. The records are stated on one
+in the thunk's register, else its strict value, as an indexed Thumb entry or
+a routine of the boot IWRAM image below, each with its mirrors folded); a
+target nobody can name, such as a callback loaded from memory, keeps the
+ordinary trust in an unwalked indirect call. On the walked paths the value
+is never dropped, so the rule states no premise; a released address handed
+on by a callee the walk does not walk, or left by a target it cannot name,
+rests on that same trust, the buffer walk's standing premise for untracked
+pointers. The records are stated on one
 `* buffer released scratch:` line and bound into the buffer fingerprint only
 when there is one. Synthetic boundaries are in `tests/test_released_scratch.py`.
 
@@ -2013,7 +2017,10 @@ plain 16- or 32-bit copy control evaluated from its own literal words. A
 call-via value C resolves when C is odd and C & ~1 lies inside that copy; the
 walk then reads the copied ROM bytes at their IWRAM addresses (from C & ~1 to
 the image's end), and every existing buffer and callee-saved rule applies to
-them unchanged. The callee-saved walks (`callee_saved_watch`: the proof's own
+them unchanged. IWRAM repeats every 0x8000 through 0x03FFFFFF, so a mirror
+runs the same bytes: every address the rule keys or tests for containment
+(the resolved calls, the image's range, the listed ROM words) is folded to
+0x03000000-0x03007FFF first. The callee-saved walks (`callee_saved_watch`: the proof's own
 checker and the exact call-via target rule's crossing checks) resolve their
 call-via calls the same way: a call whose destination is such a value is
 walked over the image bytes and stated with the buffer walks' calls. Even values, values outside the
