@@ -101,6 +101,22 @@ u16 func_08000200(u16 value, void (*hook)(void))
     return buffer[0] + buffer[3];
 }
 """
+# HOOK_PLAIN plus a code-entry address written as a number, handed on as data: on the function-buffer
+# path a thunk caller's code-valued pool words must carry their function relocations.
+NUMERIC_HOOK_PLAIN = """typedef unsigned short u16;
+extern void func_08000500(void);
+extern void func_08000400(u16 value, u16 *out, void (*callback)(void));
+extern void func_08000600(void (*callback)(void));
+u16 func_08000200(u16 value, void (*hook)(void))
+{
+    u16 buffer[4];
+
+    hook();
+    func_08000400(value, buffer, func_08000500);
+    func_08000600((void (*)(void))0x08000501);
+    return buffer[0] + buffer[3];
+}
+"""
 # The literal caller without typed data: the function-buffer proof, which match.py walks in its own module.
 LITERAL_PLAIN = """typedef unsigned short u16;
 extern void func_08000500(void);
@@ -217,6 +233,16 @@ class FactTests(unittest.TestCase):
         self.assertIsNone(call_via.join(first, None))
         self.assertEqual(call_via.join(7, 7), 7)
         self.assertIsNone(call_via.join(7, 8))
+
+    def test_effective_target_is_consumed_once(self):
+        # A resolved call is checked as its target once; a later visit of the site that does not resolve
+        # it again is checked as the thunk, never as the stale target.
+        proof = match.BufferCallProof(bytes(0x1000), b"[]", stack_arguments=True, call_via_targets=True)
+        thunk, site = match.RUNTIME_HELPERS["_call_via_r2"], 0x08000416
+        proof.call_via_effective[site] = 0x08000700
+        self.assertEqual(call_via.effective(proof, site, thunk), 0x08000700)
+        self.assertEqual(call_via.effective(proof, site, thunk), thunk)
+        self.assertEqual(proof.call_via_effective, {})
 
     def test_entry_requires_an_odd_unique_indexed_thumb_entry(self):
         class Proof:
@@ -677,6 +703,13 @@ class CallViaNativeTests(unittest.TestCase):
                                   [("func_08000400", STORES), ("func_08000500", "bx lr")], large=True,
                                   function_literal_thunks=True))
         self.refused(root, "code-entry thunk literals require canonical function provenance")
+
+    def test_function_buffer_numeric_code_pointer_beside_a_thunk_refused(self):
+        root = index_thunks(build(self.base / "numeric_hook", NUMERIC_HOOK_PLAIN,
+                                  [("func_08000400", STORES), ("func_08000500", "bx lr"), ("func_08000600", "bx lr")],
+                                  large=True, function_literal_thunks=True))
+        output = self.refused(root, "code-entry thunk literals require canonical function provenance")
+        self.assertIn("function-buffer proof: code-entry thunk literals require canonical function provenance", output)
 
     def test_resolution_is_part_of_the_buffer_fingerprint(self):
         root = self.fixture("fingerprint", DIRECT)
