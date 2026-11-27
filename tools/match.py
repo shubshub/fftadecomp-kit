@@ -3895,6 +3895,8 @@ class BufferCallProof:
         # released_scratch_profile: (callee, return site, register, offset or None) released
         # frame addresses handed back in R2/R3, and (function, site, register) clearing writes.
         self.released_scratch, self.released_kills = set(), set()
+        # (callee, register) pairs a call went without a marker for (released_scratch_profile rule 6).
+        self.released_unmarked = set()
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Exact call-via resolutions ((site, target) -> record) and the target each resolved call
@@ -4096,7 +4098,8 @@ class BufferCallProof:
                 if self.default_forwarding else None,
                 self.store_bounds.snapshot() if self.store_bounds is not None else None,
                 self.motion_summaries.snapshot() if self.motion_summaries is not None else None,
-                (set(self.released_scratch), set(self.released_kills)), set(self.iwram_image_calls),
+                (set(self.released_scratch), set(self.released_kills), set(self.released_unmarked)),
+                set(self.iwram_image_calls),
                 set(self.fresh_block_uses))
 
     def _restore_ledgers(self, saved):
@@ -4122,7 +4125,8 @@ class BufferCallProof:
         self.call_via_records.update(via_snapshot[0])
         self.call_via_effective.clear()
         self.call_via_effective.update(via_snapshot[1])
-        self.released_scratch, self.released_kills = (set(values) for values in released_snapshot)
+        self.released_scratch, self.released_kills, self.released_unmarked = \
+            (set(values) for values in released_snapshot)
         for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted,
                                    self.far_jumps), snapshot):
             ledger.clear()
@@ -5959,7 +5963,7 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
             aliases.update(returned_aliases)
             if buffer_proof is not None:
                 # The callee whose walk recorded the release: a resolved call-via call's target.
-                released_scratch.after_call(buffer_proof, released_target, aliases)
+                released_scratch.after_call(buffer_proof, released_target, aliases, core=True)
             if bounded_index is not None:
                 # Frame words cannot see these aliases in their own values: they are told.
                 bounded_index.note_returned(current, returned_aliases, call_alternatives)

@@ -25,7 +25,11 @@ The caller is a known, walked function, so this rule checks the caller instead o
    release follows the call chain until a write clears it; at the owner root's return it refuses;
 5. an inspection that recorded a release and then refused keeps its refusal: the dead-register
    fallback (an alias-free call when the callee overwrites the passed address unread) would
-   discard the record, as kit #538 keeps the refusal of a callee that returns its own frame.
+   discard the record, as kit #538 keeps the refusal of a callee that returns its own frame;
+6. the markers do not depend on the walk's order: a call that marks no R2 (or R3) for its callee,
+   because no release of that callee had been recorded yet, notes (callee, register), and a release
+   recorded later for a noted pair refuses.  A call in the core walk of an inspected callee is not
+   noted: that callee's alias-path walk visits the same call after its core walk.
 
 Nothing is dropped: the value is tracked until a write overwrites it on every path, and every use
 refuses.  No premise.  Every record and clearing site is bound into the buffer fingerprint, only
@@ -80,14 +84,23 @@ def callee_return(proof, address, site, aliases, *, own_frame=True):
     for register in scratch if own_frame else ():
         offset = kept.get(register)
         if type(offset) is int and offset < 0:
-            proof.released_scratch.add((address, site, register - r0, offset))
+            _record(proof, (address, site, register - r0, offset))
             del kept[register]
     for register in held:
         if register not in scratch:
             raise ValueError(f"released callee frame address in r{register - r0} reaches a return")
-        proof.released_scratch.add((address, site, register - r0, None))
+        _record(proof, (address, site, register - r0, None))
         del kept[mark(register)]
     return kept
+
+
+def _record(proof, row):
+    """Record a release; rule 6 refuses one that an earlier call of the same callee went without.
+    The row is recorded first, so the refusal also keeps the dead-register fallback away (rule 5)."""
+    proof.released_scratch.add(row)
+    if (row[0], row[2]) in proof.released_unmarked:
+        raise ValueError(f"released callee frame address in r{row[2]}: an earlier call to 0x{row[0]:08X} "
+                         "took no marker")
 
 
 def recorded_since(proof, before):
@@ -106,9 +119,17 @@ def released(proof, callee):
     return sorted({r0 + register for function, _, register, _ in proof.released_scratch if function == callee})
 
 
-def after_call(proof, callee, aliases):
-    for register in released(proof, callee):
+def after_call(proof, callee, aliases, *, core=False):
+    """Rule 2 after a call to `callee`, and rule 6's ledger: each of R2/R3 the call does not mark is
+    noted as (callee, register) in `proof.released_unmarked`.  `core`: the call is in a core walk;
+    one inside an inspected callee (proof.active) is exempt, because that callee's alias-path walk
+    makes the same call again after it, and marks or notes it then."""
+    registers = released(proof, callee)
+    for register in registers:
         aliases[mark(register)] = RELEASED
+    if applies(proof) and not (core and proof.active):
+        r0, scratch = _registers()
+        proof.released_unmarked.update((callee, register - r0) for register in scratch if register not in registers)
 
 
 def step(proof, address, site, instruction, aliases, calling):

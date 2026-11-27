@@ -35,6 +35,21 @@ X2 = ("push {r4, lr}\nadds r4, r0, #0\nbl func_Z\nmovs r1, #2\nstrh r1, [r4]\npo
 # path the walk takes first and meets an SWI, which the walk refuses, on the other.
 X3 = ("push {lr}\nsub sp, #8\nmovs r0, #0\ncmp r1, #0\nbeq 1f\nmov r2, sp\nadd sp, #8\npop {r0}\nbx r0\n"
       "1:\nsvc #0\nadd sp, #8\npop {r0}\nbx r0")
+# Order (rule 6).  D releases r2 (its own frame, through Y) and is walked only when it is passed a
+# stack address.  E writes through r0 + 8, which for r0 = D's released frame is E's own saved LR.
+D = "push {lr}\nsub sp, #8\nmov r2, sp\nmovs r0, #0\nbl func_Y\nadd sp, #8\npop {r0}\nbx r0"
+E = "push {lr}\nstr r1, [r0, #8]\npop {r0}\nbx r0"
+# The owner calls D with nothing passed (not walked) and hands its r2 to E, then walks D.
+D_LATER = ("push {r4, lr}\nsub sp, #8\nbl func_D\nadds r0, r2, #0\nmovs r1, #0\nbl func_E\n"
+           "mov r0, sp\nbl func_D\nmovs r2, #0\nadd sp, #8\npop {r4}\npop {r1}\nbx r1")
+# The same inside a walked callee's alias-path walk: the path taken first drops the owner's buffer,
+# calls D unwalked and hands r2 to E; the other path passes the buffer to D, which is walked.
+C_BRANCH = ("push {r4, lr}\ncmp r1, #0\nbeq 1f\nmovs r0, #0\nbl func_D\nadds r0, r2, #0\nmovs r1, #0\n"
+            "bl func_E\nb 2f\n1:\nbl func_D\nmovs r2, #0\n2:\npop {r4}\npop {r0}\nbx r0")
+# A walked callee that calls D unwalked, overwrites r2, then walks D with its own frame: its core
+# walk meets the first call before D's record, its alias-path walk after it.
+C_BOTH = ("push {lr}\nsub sp, #8\nmovs r1, #1\nstrh r1, [r0]\nmovs r0, #0\nbl func_D\nmovs r2, #0\n"
+          "mov r0, sp\nbl func_D\nmovs r2, #0\nadd sp, #8\npop {r0}\nbx r0")
 
 
 def owner(after, callee="func_X", frame=8):
@@ -55,7 +70,8 @@ class ReleasedScratchTests(unittest.TestCase):
         self.root = Path(directory.name)
 
     def build(self, owner_body, **bodies):
-        functions = dict(func_X=X, func_Y=Y, func_Z=Z, func_X2=X2, func_W="bx lr", func_X3=X3)
+        functions = dict(func_X=X, func_Y=Y, func_Z=Z, func_X2=X2, func_W="bx lr", func_X3=X3, func_D=D,
+                         func_E=E, func_C_BRANCH=C_BRANCH, func_C_BOTH=C_BOTH)
         functions.update(bodies)
         labels = ["owner", "owner_end"] + [label for name in functions for label in (name, name + "_end")]
         text = (".syntax unified\n.arch armv4t\n.thumb\n.text\n.global " + ", ".join(labels) + "\n"
@@ -165,6 +181,36 @@ class ReleasedScratchTests(unittest.TestCase):
             dropped = self.walk(owner("strh r1, [r2]", callee="func_X3"), func_X3=X3)
         self.assertTrue(dropped.dead_registers.calls)
         self.assertFalse(dropped.released_scratch)
+
+    def test_a_release_recorded_after_an_unmarked_call_refuses(self):
+        # The first call of D went without a marker because D's release was not recorded yet.
+        self.refused(r"released callee frame address in r2: an earlier call to 0x[0-9A-F]{8} took no marker",
+                     D_LATER)
+        # In the other order the release is recorded first and the read of r2 refuses.
+        self.refused("released callee frame address in r2 is read",
+                     D_LATER.replace("bl func_D\nadds r0, r2, #0\nmovs r1, #0\nbl func_E\nmov r0, sp\nbl func_D\n",
+                                     "mov r0, sp\nbl func_D\nmovs r2, #0\nbl func_D\nadds r0, r2, #0\nmovs r1, #0\nbl func_E\n"))
+
+    def test_a_release_recorded_on_a_later_path_of_an_alias_walk_refuses(self):
+        self.refused(r"an earlier call to 0x[0-9A-F]{8} took no marker", owner("movs r2, #0", callee="func_C_BRANCH"))
+
+    def test_a_walked_callees_core_walk_is_checked_by_its_alias_walk(self):
+        proof = self.walk(owner("movs r2, #0", callee="func_C_BOTH"))
+        self.assertIn((self.x("func_D"), 2), {(row[0], row[2]) for row in proof.released_scratch})
+        self.assertNotIn((self.x("func_D"), 2), proof.released_unmarked)
+        # Without the exemption its core walk's first call would refuse the release it meets next;
+        # the alias-path walk marks that call (D's release is recorded by then).
+        self.refused("released callee frame address in r2 is read",
+                     owner("movs r2, #0", callee="func_C_BOTH"),
+                     func_C_BOTH=C_BOTH.replace("bl func_D\nmovs r2, #0\nmov r0, sp", "bl func_D\nadds r0, r2, #0\nmov r0, sp"))
+
+    def test_an_aborted_pass_leaves_no_unmarked_call(self):
+        self.build(owner("movs r2, #0"))
+        proof = match.BufferCallProof(self.rom, self.mapping, stack_arguments=True)
+        saved = proof._snapshot_ledgers()
+        proof.released_unmarked.add((1, 2))
+        proof._restore_ledgers(saved)
+        self.assertEqual(proof.released_unmarked, set())
 
     def test_a_subclass_proof_keeps_the_refusal(self):
         self.build(owner("movs r2, #0"))
