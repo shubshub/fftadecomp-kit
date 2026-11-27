@@ -75,7 +75,7 @@ def import_released(proof, aliases, result, depth_words, site, inspected):
         proof.forward_releases.setdefault(site, set()).add(position - 4 * depth_words)
     if not stale:
         return result
-    return type(result)({key: value for key, value in result.items() if key not in stale.values()})
+    return match.without_keys(result, stale.values())
 
 
 def trust(proof, owner, site, target):
