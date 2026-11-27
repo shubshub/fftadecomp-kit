@@ -101,6 +101,18 @@ CALLS_UNPLACED = "push {lr}\nldr r0, [r0, #8]\nbl 0x08000900\nmovs r0, #1\npop {
 UNPLACED = "movs r1, #0\nstrb r1, [r0, #2]\nbx lr"                  # a store the walk cannot place
 
 
+# CF-1 (rv-T-2): a walked callee stores a frame address into an owner word.  cf1c: the callback stores
+# &found into found, and the owner returns found.  cf1h: then the owner kills its pointer word and
+# writes 64 bytes past what it reloads from found.  cf1g: a direct callee given &found stores it there.
+SPILL_SELF = "str r1, [r1]\nmovs r0, #1\nbx lr"
+OWNER_WRITE = OWNER.replace("    return found;", """    closure.argument = 0;
+    ((u32 *)found)[16] = 0;
+    return 0;""")
+OWNER_DIRECT = (HEAD + "extern void func_08000A00(u32 *p);\n" + OWNER[len(HEAD):]).replace(
+    "    return found;", "    closure.argument = 0;\n    func_08000A00(&found);\n    return found;")
+DIRECT = "str r0, [r0]\nbx lr"
+
+
 def callees(adapter_body=ADAPTER, callback=CALLBACK, ninth="bx lr"):
     return [("func_08000400", LIST), ("func_08000500", adapter_body), ("func_08000600", GETTER),
             ("func_08000700", callback), ("func_08000800", BAD), ("func_08000900", ninth)]
@@ -194,6 +206,21 @@ class ClosureNativeTests(unittest.TestCase):
         self.refused("k5_lifetime", r"descriptor word lifetime excludes allocation after deallocation",
                      adapter_body=adapter(before_reload="sub sp, #8\nadd sp, #8\nsub sp, #8\nadd sp, #8\n"))
 
+    def test_cf1_callee_stores_of_a_frame_address_refuse(self):
+        for name, source, extra in (("cf1c", OWNER, {"callback": SPILL_SELF}),
+                                    ("cf1h", OWNER_WRITE, {"callback": SPILL_SELF})):
+            with self.subTest(name):
+                self.refused(name, r"buffer pointers cannot be stored or spilled", source, **extra)
+        # cfpp: the adapter stores &closure over closure.argument (&found), a pointer over a pointer.
+        self.refused("cfpp", r"buffer pointers cannot be stored or spilled",
+                     adapter_body=adapter(before_reload="str r4, [r4]\n"))
+        root = index_thunks(build(self.base / "cf1g", OWNER_DIRECT, callees() + [("func_08000A00", DIRECT)],
+                                  large=True, function_literal_thunks=True))
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, report)
+        self.assertIn(f"{closure.TRIGGER}; closure-slot retry: ", output)
+        self.assertRegex(output.split("closure-slot retry: ", 1)[1], r"buffer pointers cannot be stored or spilled")
+
     def test_k6_unplaced_store_with_a_live_pointer_word_refuses(self):
         self.refused("k6_unplaced", r"0x08000900: unknown store can invalidate a live pointer word",
                      callback=CALLS_UNPLACED, ninth=UNPLACED)
@@ -246,13 +273,31 @@ class ClosureUnitTests(unittest.TestCase):
                             -16, frozenset({-8}))
         self.assertEqual(words, {})                   # a constant over a pointer word: removed (a slot reload refuses)
         words = {-8: ("constant", 5)}
-        closure.word_memory(proof, store, {match.ARM_REG_R1: -8, match.ARM_REG_R0: -16}, {}, stack, words,
-                            -16, frozenset())
-        self.assertEqual(words, {})                   # an alias over a constant word: removed
+        with self.assertRaisesRegex(ValueError, "^buffer pointers cannot be stored or spilled$"):
+            closure.word_memory(proof, store, {match.ARM_REG_R1: -8, match.ARM_REG_R0: -16}, {}, stack, words,
+                                -16, frozenset())       # an alias stored by a callee: the plain refusal (CF-1)
+        words = {}
+        with self.assertRaisesRegex(ValueError, "^buffer pointers cannot be stored or spilled$"):
+            closure.word_memory(proof, store, {match.ARM_REG_R1: -8, match.ARM_REG_R0: -16}, {}, stack, words,
+                                -16, frozenset())       # into a plain local word too
         words = {-8: ("constant", 5)}
         closure.word_memory(proof, store, {match.ARM_REG_R1: -8}, {match.ARM_REG_R0: 7}, stack, words,
                             -16, frozenset())
         self.assertEqual(words, {-8: ("constant", 7)})  # same kind: the new value
+
+    def test_callee_pointer_over_pointer_refuses_and_the_owner_replaces(self):
+        # Only the owner stores a frame address (CF-1): a walked callee replacing one pointer word with
+        # another refuses; the same store at an owner site gives the word the new pointer.
+        proof, stack = self.proof(), [(False, False, True)] * 4
+        aliases = {match.ARM_REG_R1: -8, match.ARM_REG_R0: -12}
+        words = {-8: ("pointer", -16)}
+        with self.assertRaisesRegex(ValueError, "^buffer pointers cannot be stored or spilled$"):
+            closure.word_memory(proof, self.instruction(b"\x08\x60", 0x08000400), aliases, {}, stack, words,
+                                -16, frozenset({-8}))
+        words = {-8: ("pointer", -16)}
+        closure.word_memory(proof, self.instruction(b"\x08\x60", 0x08000210), aliases, {}, stack, words,
+                            -16, frozenset({-8}))
+        self.assertEqual(words, {-8: ("pointer", -12)})
 
     def test_owner_store_over_a_fact_with_its_plain_value_is_a_store(self):
         proof, stack = self.proof(), [(False, False, True)] * 4
