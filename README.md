@@ -6565,7 +6565,20 @@ symbolically along every path, and the check requires:
   relies on such a read or escape, or that reads a saved slot past a store
   at a variable offset, names its premises: no callee holds a frame address
   before the frame escapes, and a variable offset from `sp` reaches no
-  pushed callee-saved register or `lr`. Every callee needs a file-scope
+  pushed callee-saved register or `lr`. A load of a fixed frame slot reads
+  the latest store to its bytes when that store has its address and width.
+  agbcc keeps a narrow local zero-extended in a word register, so it spills
+  the whole word and reloads only the low bytes for a byte or halfword use
+  (kit #582; 080200C8: `str r0, [sp]` ... `mov r1, sp; ldrh r0, [r1]`). So an
+  unsigned `ldrb` or `ldrh` at offset 0 of an untraced word store to a fixed
+  slot, not a push, reads that word's low bytes: the backward scan that
+  reached the store has passed nothing that may write them, and the GBA is
+  little-endian. The reloaded register still counts as read from memory, and
+  the record lists each such reload per compile under `word spills reloaded
+  by their low bytes`. Any other overlap is still refused as a partially
+  overlapping stack access: another offset, a load across two stores or the
+  edge of one, a signed load, a load wider than the store, a byte of a
+  halfword store and a byte of a pushed register. Every callee needs a file-scope
   prototype with a fixed argument list. A callee with no prototype, `()` or
   `...` fails closed. An indirect call (`bl _call_via_rN`) is compared like a
   named one only when rN holds a word loaded from an element of a file-scope
@@ -6668,9 +6681,14 @@ symbolically along every path, and the check requires:
     too (kit #165; 0813F22C: `ldrh r0, [r5, #10]; movs r2, #0;
     ldr r3, [sp, #8]; strh r3, [r5, #10]`), because agbcc's reload pass puts it
     just before the store that uses it. Its conditions:
-    - it is an unsigned word `ldr rX, [sp, #k]`;
+    - it is an unsigned word `ldr rX, [sp, #k]`, or an unsigned `ldrb` or
+      `ldrh` at offset 0 of a word spill through one base register whose
+      address is that slot (kit #582; 080D3208: `ldrh r0, [r4, #14];
+      mov r1, sp; ldrh r1, [r1, #8]; strh r1, [r4, #14]`, since Thumb has no
+      `sp`-based byte or halfword load);
     - it reloads exactly what the nearest earlier store to that slot wrote:
-      a word store to `sp + k` whose value the executor reads back;
+      a word store to `sp + k` whose value (its low bytes, for a byte or
+      halfword reload) the executor reads back;
     - no overlapping store, no store through another frame address, and no
       push, pop, loop cut or `sp` change lies between them;
     - it feeds only the store's value register through copies.
