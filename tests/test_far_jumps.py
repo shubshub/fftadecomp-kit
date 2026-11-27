@@ -353,6 +353,23 @@ class RecordTests(unittest.TestCase):
             analysis, {"releases": [[0x08000202, [4]]], "walked": set(), "slots": [], "trusted": []})
         self.assertEqual(evidence_["trusted_calls"], [])
 
+    def test_the_stack_index_analysis_steps_a_core_far_jump_to_its_target(self):
+        import stack_index_precondition_profile as analysis_profile
+        # The fixture above: 206 bl 20e is the far jump; 20a/20c (its continuation) is reached by no path.
+        code = body(half(0xB500), bl(0x08000202, 0x08000400), bl(0x08000206, 0x0800020E),
+                    half(0xBC02, 0x4708, 0x2001, 0xBC02, 0x4708))
+        analysis = analysis_profile.Analysis(code, START, frozenset(), frozenset(), {})
+        with self.assertRaisesRegex(ValueError, "same-owner long branches are outside this policy"):
+            analysis.run()
+        analysis = analysis_profile.Analysis(code, START, frozenset(), frozenset(), {})
+        analysis.far_jumps = {0x08000206: 0x0800020E}
+        states = analysis.run()
+        # The value-range walk takes the jump to its target, with LR its continuation (unknown), and
+        # never steps to the continuation itself.
+        self.assertEqual(sorted(states), [0x08000200, 0x08000202, 0x08000206, 0x0800020E, 0x08000210,
+                                          0x08000212])
+        self.assertEqual(states[0x0800020E].regs[14], analysis_profile.TOP)
+
 
 # A hand-built ROM for the buffer proofs: the root at 0x08000200 and the callees each at its address.
 def rom_with(root_code, callees):
