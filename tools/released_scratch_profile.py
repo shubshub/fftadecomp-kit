@@ -29,10 +29,14 @@ The caller is a known, walked function, so this rule checks the caller instead o
    dead-register fallback (an alias-free call when the callee overwrites the passed address
    unread) would discard the pass and drop the address, as kit #538 keeps the refusal of a callee
    that returns its own frame;
-6. the markers do not depend on the walk's order: a call that marks no R2 (or R3) for its callee,
-   because no release of that callee had been recorded yet, notes (callee, register), and a release
-   recorded later for a noted pair refuses.  A call in the core walk of an inspected callee is not
-   noted: that callee's alias-path walk visits the same call after its core walk;
+6. a call that marks no R2 (or R3) for its callee, because no release of that callee had been
+   recorded yet, notes (callee, register), and a release recorded later for a noted pair refuses,
+   so the walk's order does not decide a marker for any callee the walk can name: a direct callee,
+   a resolved call-via target, or the target an unresolved call-via call names by its exact
+   call-target fact or strict value (call_key).  A call-via target nobody can name, such as a
+   callback loaded from memory, is under the ordinary trust in an unwalked indirect call.  A call
+   in the core walk of an inspected callee is not noted: that callee's alias-path walk visits the
+   same call after its core walk;
 7. a call while R0-R3 holds a marker is admitted only when dead_register's version-1 entry walk
    proves that its direct callee writes that register before any read, call, return or other
    transfer on every path (a call counts as a read; no callee is followed); the marker then ends at
@@ -143,6 +147,30 @@ def released(proof, callee):
         return ()
     r0, _ = _registers()
     return sorted({r0 + register for function, _, register, _ in proof.released_scratch if function == callee})
+
+
+def call_key(proof, callee, constants, site):
+    """The function a call's release is keyed by (rules 2 and 6): `callee`, or, for a call through a
+    call-via thunk the walk did not resolve (nothing was passed), the target it can name without
+    resolving it: the exact call-target fact in the thunk's register, else the strict value there
+    (call_via_target_profile.strict_known), when call_via_target_profile.entry accepts it as an
+    indexed Thumb entry.  Nothing is resolved or recorded (call_via_target_profile.resolve writes its
+    records), so a walk is unchanged by asking.  A target nobody can name, such as a callback loaded
+    from memory, stays the thunk: that call keeps the ordinary trust in an unwalked indirect call."""
+    import match
+    import call_via_target_profile as call_via
+    if not applies(proof):
+        return callee
+    name = next((name for name, address in match.RUNTIME_HELPERS.items() if address == callee), "")
+    if not name.startswith("_call_via_r") or not name[len("_call_via_r"):].isdigit():
+        return callee
+    number = int(name[len("_call_via_r"):])
+    value = constants.get(match.ARM_REG_R0 + number)
+    if not isinstance(value, call_via.CallTarget):
+        span = call_via.function_of(proof, site)
+        value = call_via.strict_known(proof, span, site).get(number) if span is not None else None
+    target = call_via.entry(proof, value) if value is not None else None
+    return target if target is not None else callee
 
 
 def after_call(proof, callee, aliases, *, core=False):

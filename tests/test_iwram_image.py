@@ -396,6 +396,18 @@ class IwramImageTests(unittest.TestCase):
         self.assertTrue([line for line in call_via.lines(unresolved) if line.startswith(call_via.PREMISE_LINE) and
                          f"call at 0x{site:08X}" in line], call_via.lines(unresolved))
 
+    def test_a_release_by_an_image_routine_marks_its_caller(self):
+        # A routine of the image that returns its own frame in R2 (released_scratch_profile): the
+        # marker is keyed by the routine the call resolved to, which no literal or ROM word names.
+        image = IMAGE.replace("img_quiet:\n", "img_rel:\n    push {lr}\n    sub sp, #8\n    mov r2, sp\n"
+                              "    add sp, #8\n    pop {r0}\n    bx r0\nimg_quiet:\n")
+        load = f"0x{DESTINATION:08X} + (img_rel - img_start) + 1"
+        with patch(f"{__name__}.IMAGE", image):
+            self.refused("released callee frame address in r2 is read",
+                         owner(load=load, after="adds r0, r2, #0\nmovs r3, #0\nstr r3, [sp]"))
+            proof = self.walk(owner(load=load, after="movs r2, #0\nmovs r3, #0\nstr r3, [sp]"))
+        self.assertEqual({row[2] for row in proof.released_scratch}, {2})
+
     def test_values_outside_the_image_or_even_keep_the_refusal(self):
         for value in (DESTINATION, DESTINATION - 1, DESTINATION + 0x1001, 0x03007001):
             with self.subTest(value=hex(value)):
