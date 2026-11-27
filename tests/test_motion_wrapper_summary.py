@@ -46,14 +46,14 @@ WRAPPER = """
     push {r4, r7, lr}
     mov r7, r8
     push {r7}
-    sub sp, #44
+    sub sp, #@FRAME@
     movs r4, #0
     mov r8, r4
     movs r7, #0
     str r0, [sp]
     str r1, [sp, #4]
     str r2, [sp, #8]
-    ldr r0, [sp, #60]
+    ldr r0, [sp, #@W0@]
     str r0, [sp, #12]
 @WRAPPER_EXTRA@
     add r2, sp, #16
@@ -61,10 +61,10 @@ WRAPPER = """
     str r0, [r2, #4]
     ldr r0, 1f
     movs r1, #24
-    ldr r3, [sp, #64]
+    ldr r3, [sp, #@W1@]
     bl scheduler
 @WRAPPER_AFTER@
-    add sp, #44
+    add sp, #@FRAME@
     pop {r3}
     mov r8, r3
     pop {r4, r7}
@@ -191,11 +191,13 @@ def tools_present():
 
 def stand_ins(work, owner_setup='', owner_after='', target='wrapper', r1='    add r1, sp, #8', r3='    movs r3, #0',
               wrapper_extra='', callback_extra='', phase=ZERO_PHASE, second_call='', before_allocator='',
-              after_allocator='', wrapper_after=''):
+              after_allocator='', wrapper_after='', frame=44):
     """Assemble the stand-ins; returns (rom, mapping entries, symbols, pins)."""
     owner = (OWNER_BODY.replace('@OWNER_SETUP@', owner_setup).replace('@OWNER_AFTER@', owner_after)
              .replace('@TARGET@', target).replace('@R1@', r1).replace('@R3@', r3))
-    wrapper = WRAPPER.replace('@WRAPPER_EXTRA@', wrapper_extra).replace('@WRAPPER_AFTER@', wrapper_after)
+    # The frame: the block (16 bytes) and the descriptor (28) from SP, then any spare words below the saved registers.
+    wrapper = (WRAPPER.replace('@WRAPPER_EXTRA@', wrapper_extra).replace('@WRAPPER_AFTER@', wrapper_after)
+               .replace('@FRAME@', str(frame)).replace('@W0@', str(frame + 16)).replace('@W1@', str(frame + 20)))
     callback = CALLBACK.replace('@CALLBACK_EXTRA@', callback_extra)
     body = (BODY.replace('@PHASE@', phase).replace('@SECOND_CALL@', second_call)
             .replace('@BEFORE_ALLOCATOR@', before_allocator).replace('@AFTER_ALLOCATOR@', after_allocator))
@@ -525,6 +527,12 @@ class StandInTests(unittest.TestCase):
 
     def test_a_wrapper_that_stores_r1_outside_its_block_is_refused(self):
         self.refused('R1 is stored outside the wrapper\'s parameter block', wrapper_extra='    str r1, [sp, #24]')
+
+    def test_a_wrapper_that_stores_r1_above_its_descriptor_is_refused(self):
+        # A spare frame word above the 28-byte descriptor: the scheduler never copies it, so only the block
+        # bound (below the descriptor) refuses it.
+        self.walk(frame=48)
+        self.refused('R1 is stored outside the wrapper\'s parameter block', frame=48, wrapper_extra='    str r1, [sp, #44]')
 
     def test_a_callback_that_writes_through_a_position_is_refused(self):
         self.refused('R2 is written through, kept or used as a number', callback_extra='    strh r0, [r3]')
