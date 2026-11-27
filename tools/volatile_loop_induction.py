@@ -1023,7 +1023,8 @@ class InductionExecutor(vs.Executor):
         for name in ("r12", "lr"):
             self.regs[name] = ("garbage", self.role, number, name)
         self.flags, self.flags_derived = ("garbage", self.role, number, "flags"), False
-        if self.escaped and (self.pre_escaped or self.context.joining):
+        if not self.escaped or self.pre_escaped or self.context.joining:
+            # Executor.call stored the callee's outgoing argument words before an escape;
             # kit#137: once the frame has escaped, the call is a barrier for the whole frame,
             # its outgoing argument words included, so no store stands for them
             return

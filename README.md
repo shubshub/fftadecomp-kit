@@ -6582,7 +6582,11 @@ symbolically along every path, and the check requires:
   typed by declaration: name as N arguments`. Every parameter and return
   value must be one scalar or pointer word, so `long long`, `double` and
   struct-by-value fail closed. The arguments, stack words included, are
-  compared by that count. No prototype is trusted to name every register
+  compared by that count. The callee owns its stack-argument words and may
+  overwrite them (agbcc does: `ldr r1, [sp, #4]; add r1, r0; str r1,
+  [sp, #4]`), so after the call each such word reads as an opaque value of
+  the callee's, named by the call, never as the caller's store; it cannot
+  build an object offset or decide a branch. No prototype is trusted to name every register
   the callee reads: a lying one, or a callee whose own source hides
   parameters behind a macro, would let the qualifier's dead load pass a
   hidden argument. So every call counts as reading r0-r3, and a dead load
