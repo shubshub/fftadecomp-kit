@@ -3564,6 +3564,16 @@ def stale_words(aliases):
     return {key - FORWARD_STALE_BASE: key for key in aliases if key < FORWARD_STALE_BASE // 2}
 
 
+def without_keys(result, keys):
+    """A callee result without ``keys``, of the same type and with the same attributes: a word walk's
+    WordResult keeps its words (its constructor takes them too, so it cannot be rebuilt from items)."""
+    import copy
+    kept = copy.copy(result)
+    for key in keys:
+        kept.pop(key, None)
+    return kept
+
+
 def sp_immediate_access(instruction):
     """(width, transfer register) of a Thumb `ldr/str{,h,b}, ldrs{h,b} Rd,[sp,#imm]`, else None."""
     widths = {"ldr": 4, "str": 4, "ldrh": 2, "strh": 2, "ldrb": 1, "strb": 1, "ldrsh": 2, "ldrsb": 1}
@@ -4359,7 +4369,7 @@ class BufferCallProof:
         stale = stale_words(result)
         if not stale:
             return result
-        kept = type(result)({key: value for key, value in result.items() if key not in stale.values()})
+        kept = without_keys(result, stale.values())
         for position, key in stale.items():
             local = FORWARD_STALE_BASE + position - 4 * depth
             if aliases.setdefault(local, result[key]) != result[key]:

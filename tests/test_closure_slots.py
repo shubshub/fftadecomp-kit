@@ -299,6 +299,25 @@ class ClosureUnitTests(unittest.TestCase):
                             -16, frozenset({-8}))
         self.assertEqual(words, {-8: ("pointer", -12)})
 
+    def test_imported_stale_words_keep_a_word_result_and_its_words(self):
+        # A walked callee's released (stale) words are moved into the caller's terms; the result keeps
+        # its type and the words it carries (its constructor takes two arguments).
+        import protected_descriptor_word_profile as descriptor
+        proof = match.BufferCallProof(bytes(0x1000), b"[]", stack_arguments=True)
+        stale = match.FORWARD_STALE_BASE - 8
+        for kind in (closure.WordResult, descriptor.WordResult):
+            with self.subTest(kind.__module__):
+                result = kind({match.ARM_REG_R0: -16, stale: -24}, {-8: ("pointer", -16), -4: ("constant", 5)})
+                aliases = {}
+                kept = proof.import_stale_words(result, aliases, 2)
+                self.assertIs(type(kept), kind)
+                self.assertEqual(dict(kept), {match.ARM_REG_R0: -16})
+                self.assertEqual(kept.words, result.words)
+                self.assertEqual(dict(result), {match.ARM_REG_R0: -16, stale: -24})   # the input is unchanged
+                self.assertEqual(aliases, {match.FORWARD_STALE_BASE - 16: -24})
+        plain = proof.import_stale_words({match.ARM_REG_R1: -4, stale: -24}, {}, 0)
+        self.assertEqual((type(plain), plain), (dict, {match.ARM_REG_R1: -4}))
+
     def test_owner_store_over_a_fact_with_its_plain_value_is_a_store(self):
         proof, stack = self.proof(), [(False, False, True)] * 4
         store = self.instruction(b"\x01\x90", 0x08000212)        # str r0, [sp, #4]: the owner
