@@ -3697,6 +3697,8 @@ class BufferCallProof:
     bios_summaries = None
     # Default-path CopySummaries (copy_helper_summary_profile), set per plain instance only.
     copy_summaries = None
+    # Default-path MotionSummaries (motion_wrapper_summary_profile), set with the copy summaries only.
+    motion_summaries = None
     # Default-path SwitchCallees (switch_callee_profile), set per plain instance only.
     switch_callees = None
     # Default-path OwnerSwitch (owner_switch_buffer_profile), bound per plain instance only.
@@ -3743,6 +3745,8 @@ class BufferCallProof:
             if type(self) is not BufferCallProof or stack_arguments is not True:
                 raise ValueError("copy summaries require the plain stack-argument buffer proof")
             self.copy_summaries = CopySummaries(rom, mapping, copy_helper_index)
+            from motion_wrapper_summary_profile import MotionSummaries
+            self.motion_summaries = MotionSummaries(rom, mapping)
         if switch_callee_index is not None:
             from switch_callee_profile import SwitchCallees
             # Scratch and BIOS-fill policies already refuse stack arguments above.
@@ -3901,6 +3905,9 @@ class BufferCallProof:
         if self.copy_summaries is not None and self.copy_summaries.covers(address, arguments):
             return self.copy_summaries.call(self, arguments, stack, incoming, frozenset(slots),
                                             constants=constants or {}, site=site, words=words)
+        if self.motion_summaries is not None and self.motion_summaries.covers(address, arguments):
+            return self.motion_summaries.call(self, address, arguments, stack, incoming, frozenset(slots),
+                                              aliases, site=site, words=words)
         return self.check_arguments(address, arguments, stack, incoming, frozenset(slots),
                                     constants=self.argument_constants(constants or {}), site=site,
                                     **self.word_context(words or {}, -4*len(stack), site,
@@ -3965,13 +3972,16 @@ class BufferCallProof:
                  set(self.forward_callee_releases))
                 # Only the default forwarding proofs: the opt-in forwarding policies keep their ledgers as before.
                 if self.default_forwarding else None,
-                self.store_bounds.snapshot() if self.store_bounds is not None else None)
+                self.store_bounds.snapshot() if self.store_bounds is not None else None,
+                self.motion_summaries.snapshot() if self.motion_summaries is not None else None)
 
     def _restore_ledgers(self, saved):
         snapshot, bios_snapshot, copy_snapshot, switch_snapshot, dead_snapshot, split_snapshot, via_snapshot, \
-            forward_snapshot, bound_snapshot = saved
+            forward_snapshot, bound_snapshot, motion_snapshot = saved
         if bound_snapshot is not None:
             self.store_bounds.restore(bound_snapshot)
+        if motion_snapshot is not None:
+            self.motion_summaries.restore(motion_snapshot)
         if forward_snapshot is not None:
             for ledger, values in zip((self.forward_slot_records, self.forward_trusted_calls), forward_snapshot):
                 ledger.clear()
@@ -4613,6 +4623,8 @@ class BufferCallProof:
         lines.extend(counted_cursor.report_line(record) for _, record in sorted(self.cursor_loops.items()))
         if self.copy_summaries is not None:
             lines.extend(self.copy_summaries.lines())
+        if self.motion_summaries is not None:
+            lines.extend(self.motion_summaries.lines())
         if self.switch_callees is not None:
             lines.extend(self.switch_callees.lines())
         if self.owner_switch is not None:
@@ -4701,6 +4713,10 @@ class BufferCallProof:
         if self.copy_summaries is not None and self.copy_summaries.observations:
             # Only a summarised copy adds this; every other fingerprint is unchanged.
             digest.update(json.dumps(self.copy_summaries.evidence(), sort_keys=True,
+                                     separators=(",", ":")).encode())
+        if self.motion_summaries is not None and self.motion_summaries.observations:
+            # Only a summarised motion-wrapper call adds this; every other fingerprint is unchanged.
+            digest.update(json.dumps(self.motion_summaries.evidence(), sort_keys=True,
                                      separators=(",", ":")).encode())
         if self.switch_callees is not None and self.switch_callees.records:
             # Only an inspected jump-table callee adds this; every other fingerprint is unchanged.
