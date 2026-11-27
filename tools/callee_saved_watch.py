@@ -898,7 +898,7 @@ class Checker:
         known.update(constants or {})
         if not watched:
             return {}
-        destination = self.resolve(target, known, watched, site=site)
+        destination = self.resolve(target, known, watched)
         if destination is None:
             if caller is None or site is None:
                 refuse(target, "an indirect call through a call-via thunk while watched values are live")
@@ -1052,10 +1052,11 @@ class Checker:
 
     def resolve(self, target, constants, watched, *, site=None):
         """The callee proper: the target itself or a call-via thunk's known ROM destination
-        (followed through further thunks), or a routine of the boot IWRAM image the destination
-        lies in (``image_target``, for a call at ``site``), else None: rN unknown, or other code
-        outside ROM.  ``watched`` holds the registers whose values must not become a branch
-        target."""
+        (followed through further thunks), else None: rN unknown, or code outside ROM.  With
+        ``site``, a destination in the boot IWRAM image is that routine (``image_target``, which
+        notes the call); only a call that would otherwise refuse asks for it (``call`` in the
+        walk), so an image call the walk admits unresolved keeps that treatment.  ``watched``
+        holds the registers whose values must not become a branch target."""
         seen = set()
         while target not in seen:
             if target in match.RUNTIME_HELPERS.values():
@@ -2207,9 +2208,8 @@ class Checker:
                 registers = [n for n in range(13) if live(regs[n])]
                 # A thunk may not branch to a dependent value or a frame address; a probed
                 # callee's input is checked where its summary is used.
-                destination = self.resolve(target, constants, frozenset(
-                    n for n in range(13) if taints(regs[n]) or fragment(regs[n])), site=site) \
-                    if mode != KNOWN else None
+                guarded = frozenset(n for n in range(13) if taints(regs[n]) or fragment(regs[n]))
+                destination = self.resolve(target, constants, guarded) if mode != KNOWN else None
                 stacked = sorted(off - sp for off, word in memory.items() if taints(word))
                 # A frame address in the caller's frame may be a stack argument.
                 framed = [off for off, word in memory.items() if sp <= off < entry_sp and off not in pushed
@@ -2747,7 +2747,19 @@ class Checker:
                     new = apply()
                     return inline() if new is None else skip(new)
                 elif exposed:
-                    arguments_refused("an indirect call", registers, stacked)
+                    try:
+                        arguments_refused("an indirect call", registers, stacked)
+                    except WatchRefusal:
+                        # Only a call this refuses is resolved into the boot IWRAM image
+                        # (iwram_image_profile) and walked over its bytes; one admitted unresolved
+                        # keeps that treatment, so the rule only turns a refusal into a walk.
+                        destination = self.resolve(target, constants, guarded, site=site)
+                        if destination is None:
+                            raise
+                        if regs[FLAGS] or any(taints(regs[number]) for number in range(13)):
+                            return inline()
+                        new = apply()
+                        return inline() if new is None else skip(new)
                     self.premises.add(("call", function, site, self.chain(target, constants),
                                        self.destination(target, constants),
                                        tuple(n for n in registers if n in CALLEE_SAVED) +
