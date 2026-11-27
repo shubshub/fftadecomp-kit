@@ -11,6 +11,7 @@ value.
 from pathlib import Path
 import sys
 import unittest
+from unittest import mock
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "tools"))
@@ -159,6 +160,25 @@ class ExecutorTests(unittest.TestCase):
         # a typed parameter: the text refuses first, and the executor on its own
         self.refused(copy_call(), "after preprocessing", declarations=TYPED)
         self.refused(copy_call(), "is passed to a call", declarations=TYPED, body="func_081443FC(b, s, 0x50);")
+
+    def test_a_stack_argument_carrying_the_address_is_refused_by_the_call_rule(self):
+        # an outgoing stack argument gets its value through a store, and a store of the address
+        # refuses at once ("stored to memory"); the call rule refuses a stack-passed address on its
+        # own as well, as a load wrapped to plant the address in the outgoing slot shows
+        declarations = ("extern void func_081443FC(unsigned int a, unsigned int b, unsigned int size, "
+                        "unsigned int d, void *destination);\n")
+        body = "func_081443FC(1, 2, sizeof " + SYMBOL + ", 4, &" + SYMBOL + ");"
+        real = fixtures.assembly("push\t{lr}", "add\tsp, sp, #-4", "mov\tr0, #1", "mov\tr1, #2", "mov\tr2, #62",
+                                 "mov\tr3, #4", "bl\tfunc_081443FC", "add\tsp, sp, #4", "pop\t{r0}", "bx\tr0")
+        original = semantics.Executor.load
+
+        def planted(executor, width, signed, address, text, probe=False):
+            value, forwarded = original(executor, width, signed, address, text, probe)
+            if "func_081443FC" in text and semantics.is_stack(address):
+                return ("sym", SYMBOL), forwarded
+            return value, forwarded
+        with mock.patch.object(semantics.Executor, "load", planted):
+            self.refused(real, "is passed to a call", body=body, declarations=declarations)
 
     def test_the_callees_result_may_not_reach_memory_or_escape(self):
         for after, reason in ((("ldrb\tr3, [r0]",), "used as an address"),

@@ -383,6 +383,23 @@ class CensusTests(CensusTree, unittest.TestCase):
         found = self.census()
         self.assertTrue(any("preprocessor query" in message for message in found), found)
 
+    def test_a_typed_pointer_s_typeof_passes_only_when_its_text_check_does(self):
+        # kit#375, rule P: the census admits the one typed pointer's typeof only where the pointer's
+        # own text check (typed_pointer_sites) finds no problem with it
+        import test_volatile_semantics as fixtures
+        entry = plausible.volatile_allow_entries()[0]
+        (self.tree / entry["header"]).write_text(
+            fixtures.HEADER.format(declaration=entry["declaration"].replace("; ", ";\n    ")))
+        symbol, header = entry["symbol"], Path(entry["header"]).name
+
+        def typeofs(early):
+            self.write(f'#include "{header}"\nvoid f(void)\n{{\n    __typeof__({symbol}) *control;\n' + early +
+                       f"    control = &{symbol};\n    control->display = 1;\n}}\n")
+            return [message for message in self.census() if "typeof" in message]
+        self.assertEqual(typeofs(""), [])
+        # used before its binding: the text check has a problem, so the census reports the typeof
+        self.assertTrue(typeofs("    (void)control->display;\n"))
+
     def test_typeof_in_a_qualified_unit_is_refused(self):
         # `__typeof__` written out is refused by the lint's address walk (kit#357); through a macro
         # the lint reads a call, and the census sees the typeof

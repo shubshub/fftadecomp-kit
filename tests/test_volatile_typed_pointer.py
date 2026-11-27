@@ -59,6 +59,11 @@ class TextRuleTests(unittest.TestCase):
                 (POINTER + " " + BIND + " func_081443FC(control, &" + SYMBOL + ", 0x50);", COPY),
                 (POINTER + " " + BIND + " p = &control->display;", COPY),
                 (POINTER + " " + BIND + " x = control->unknown_02[1];", COPY),
+                # a member that is no array, indexed
+                (POINTER + " " + BIND + " x = control->display[1];", COPY),
+                # a binding that is not a statement of its own: the arm of an `if`, or inside an expression
+                (POINTER + " if (c) " + BIND + " control->display = 1;", COPY),
+                (POINTER + " x = " + BIND + " control->display = 1;", COPY),
                 (POINTER + " " + BIND + " x = (control)->display;", COPY),
                 ("static " + POINTER + " " + BIND, COPY),
                 ("__typeof__(" + SYMBOL + ") copy; copy.display = 1;", COPY),

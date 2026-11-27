@@ -82,6 +82,11 @@ class OperandReadTests(unittest.TestCase):
         self.refused(SYMBOL + ".unknown_3C |= 0xFF;", variant=REAL)
         moved = fixtures.assembly(*WINDOW, "ldrb\tr2, [r1]", "mov\tr2, #254", "strb\tr2, [r1]", "bx\tlr")
         self.refused(SYMBOL + ".unknown_3C |= 0xFF;", variant=moved)
+        # the operand read taken out, and the literal pool changed: the variant must keep the pools
+        pool = ".L3:\n\t.word\t" + SYMBOL + "\n"
+        pooled = VARIANT.replace(pool, pool + ".L5:\n\t.word\t4660\n")
+        self.assertNotEqual(pooled, VARIANT)
+        self.refused(SYMBOL + ".unknown_3C |= 0xFF;", variant=pooled)
 
     def test_two_statements_may_not_claim_one_load(self):
         self.refused(SYMBOL + ".unknown_3C |= 0xFF; " + SYMBOL + ".unknown_3C |= 0xFF;")
