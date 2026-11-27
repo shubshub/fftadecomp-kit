@@ -3884,6 +3884,12 @@ class BufferCallProof:
         self.far_jumps = {}           # X1: an inspected callee's far jumps (far_jump_profile.observe)
         self.active = set()
         self.stack_arguments = stack_arguments
+        # (return site, entry-SP offset) of the root's frame address left in R12, under the stated
+        # premise (r12_exit_scratch_profile): kept by the default path's two stack-argument proofs
+        # (exact types, whose reports print and bind it) and by the routes that enable it; None
+        # (refused) in every other proof.
+        self.r12_exit_scratch = set() if type(self) in (BufferCallProof, FunctionBufferCallProof) and \
+            stack_arguments is True else None
         self.loop_replays = {}
         self.loop_replay_states = 0
         # (function, loop head) -> counted stack-cursor loop record of the owner walk (counted_stack_cursor_loop);
@@ -4920,7 +4926,16 @@ class BufferCallProof:
             # Only a walk that kept a disagreeing join apart adds this; every other fingerprint is unchanged.
             digest.update(json.dumps([split_join.SCHEMA, split_join.records(self.split_joins)],
                                      separators=(",", ":")).encode())
+        import r12_exit_scratch_profile as r12_exit
+        if (r12_payload := r12_exit.payload(self)) is not None:
+            # Only a root that left its frame address in R12 at a return adds this.
+            digest.update(r12_payload)
         return digest.hexdigest()
+
+    def exit_r12_lines(self):
+        """The R12 exit-scratch premise line (r12_exit_scratch_profile); empty unless recorded."""
+        import r12_exit_scratch_profile as r12_exit
+        return r12_exit.lines(self)
 
     def buffer_evidence(self):
         """An inspected buffer call, the default stack-index retry's record, or a runtime site the
@@ -5869,9 +5884,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 raise ValueError("return does not balance the saved stack frame")
             if buffer_proof is not None and buffer_proof.default_forwarding:
                 aliases = forwarded_slots_profile.at_return(aliases)
-            # IP is ABI scratch, not a result register. Keep its alias tracked
-            # through calls and later uses, but an unobserved value at return
-            # does not return a pointer. All other escape checks still apply.
+            # IP is ABI scratch, not a result register: its alias is tracked through calls and
+            # later uses, and at a return r12_exit_scratch_profile decides it (below, after the
+            # R0-R3 checks): refused at a walked callee's return, stated at the root's.
             if not stack_arguments:
                 # Kit #538: these walks never looked; R0/R1 refuse, R2/R3 only under the premise.
                 return_scratch_profile.check_return(aliases, ARM_REG_R0, current, return_scratch)
@@ -5901,6 +5916,8 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 aliases = released_scratch.callee_return(buffer_proof, address, current, aliases)
                 if aliases.keys() - {ARM_REG_R12}:
                     raise ValueError("local stack pointer escapes through a return register")
+            import r12_exit_scratch_profile as r12_exit
+            r12_exit.check(aliases, current, buffer_proof, stack_arguments)
             returns.add(current)
             successors = ()
         elif local_branch:
@@ -6805,7 +6822,8 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                    STACK_BUFFER_SUMMARY if buffer_proof.stack_arguments else BUFFER_SUMMARY)
         out.append(f"* buffer calls: {summary}\n")
         out.append(f"* buffer proof SHA-256: `{buffer_proof.fingerprint()}`\n")
-        for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines():
+        for line in buffer_proof.loop_replay_lines() + buffer_proof.bios_summary_lines() + \
+                buffer_proof.exit_r12_lines():
             out.append(line + "\n")
     if buffer_proof is not None or callee_watch is not None:
         # The #350 premises: issuance records them with its buffer proof, a plain replay with the

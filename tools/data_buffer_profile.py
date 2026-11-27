@@ -468,7 +468,9 @@ FIELDS = ("* source", "* verification", "* source SHA-256", "* stack frame", "* 
           "* buffer function-literal exit scratch", "* buffer frame exit scratch", "* buffer frame result r1",
           # default_stack_index_profile.lines
           "* buffer stack index", "* buffer stack index access", "* buffer stack index initialisation",
-          "* buffer stack index premise", "* buffer stack index frame words")
+          "* buffer stack index premise", "* buffer stack index frame words",
+          # r12_exit_scratch_profile.lines
+          "* buffer exit scratch r12")
 
 
 def report_matches(report, root, address):
@@ -558,7 +560,8 @@ def report_matches(report, root, address):
         if not (proved_schema == schema and proved == manifest and single("* control flow: ") == flow and
                 stack_lines == ([f"* stack frame: {STACK_SUMMARY}"] if framed else []) and
                 quoted("* buffer proof SHA-256: ") == proof.fingerprint() and
-                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() and
+                buffer_proof_lines(lines) == proof.loop_replay_lines() + proof.bios_summary_lines() +
+                proof.exit_r12_lines() and
                 [line for line in lines if line.lstrip().startswith(LINE_PREFIX)] == premise_lines(proof) and
                 quoted(PROOF_FIELD) == fingerprint(schema, address, data, manifest, source_digest,
                                                    functions, objects, proof.fingerprint()) and

@@ -29,8 +29,8 @@ registers.
   carry no results under the agbcc Thumb ABI.  It is a premise about the
   callers, which the walks do not check (after a call every walk treats
   R0-R3 as unknown scalars, not as dead), so it is always recorded;
-* R12 keeps its exemption (IP is ABI scratch, not a result register), as in
-  the stack-argument walks.
+* R12 refuses (r12_exit_scratch_profile, kit #588): these walks state no
+  premise for it.  Only the stack-argument walks' root returns state one.
 
 A callee walked by a version-1 proof carries no ledger, so it refuses a frame
 address in any of R0-R3 at its return: its consumer is a known caller.

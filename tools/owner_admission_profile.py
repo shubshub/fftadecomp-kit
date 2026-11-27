@@ -260,7 +260,9 @@ def selected(report):
                 # The BIOS wrapper summaries a restoring owner applied, likewise recomputed.
                 fields == [f'* verification: `{OPTIONAL_SCHEMA}`'] and
                 line.startswith(('* buffer BIOS summaries: ', '* buffer BIOS premise: ', '* buffer BIOS manifest: ',
-                                 '* buffer BIOS non-argument register: ', '* buffer BIOS call kill: ')))
+                                 '* buffer BIOS non-argument register: ', '* buffer BIOS call kill: ')) or
+                # The root's R12 exit scratch (#588), from the manifest; replay re-renders the report.
+                line.startswith('* buffer exit scratch r12: '))
             for line in report.splitlines()):
         raise ValueError('mixed or malformed complete-owner profile')
     return True
@@ -778,6 +780,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
                            if selector in r6_buffer.PROFILES else {"policy": r7_buffer.SELECTOR}
                            if selector == r7_buffer.SELECTOR else {"rodata": rodata, "data": data, "address": address}
                            if selector in rom_copy.SELECTORS else {}))
+        # The root's frame address left in R12 at a return is stated on this report (r12_exit_scratch_profile).
+        import r12_exit_scratch_profile as r12_exit
+        r12_exit.enable(buffers)
         if row:
             buffers.bind_row(data, address, calls, bindings)
         if selector == named_buffer.SCRATCH_SELECTOR and address == 0x08132208:
@@ -842,6 +847,9 @@ def verify(data, address, rom, mapping, index, objects, manifest=None, *, bindin
         if callee_saved_watch.premise_lines(buffers):
             # Absent unless a call was admitted under the callee-saved ABI premise (#350).
             proof['buffers']['callee_saved_premises'] = callee_saved_watch.premise_lines(buffers)
+        if r12_exit.lines(buffers):
+            # Absent unless the root left its frame address in R12 at a return (#588).
+            proof['buffers']['r12_exit_scratch'] = r12_exit.lines(buffers)
         if selector == copy_binding.SELECTOR:
             identity = copy_binding.native_manifest(data,address,rom,mapping,index,objects,
                 bindings if bindings is not None else (manifest or {}).get('bindings'))
@@ -2044,6 +2052,7 @@ def render(address,result):
         *(numeric_hardware_lines(manifest['proof']['numeric_hardware_words'])
           if manifest['profile'] == OPTIONAL_SCHEMA and 'numeric_hardware_words' in manifest['proof'] else []),
         *((manifest.get('proof') or {}).get('buffers') or {}).get('callee_saved_premises', []),
+        *((manifest.get('proof') or {}).get('buffers') or {}).get('r12_exit_scratch', []),
         f'* owner runtime evidence: `{text(evidence)}`',f'* compiled : `{data.hex()}`',
         f'* ROM bytes: `{data.hex()}` ({len(data)} bytes)','',
         f'**MATCH - byte identical** - {len(data)}/{len(data)} bytes',''])

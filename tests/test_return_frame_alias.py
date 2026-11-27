@@ -140,9 +140,12 @@ class ReturnCheckTests(unittest.TestCase):
                 self.assertEqual(ledger.report_lines(), [
                     scratch.PREMISE, f"* stack frame exit scratch: `0x{BASE + 8:08X} r{register} -4`"])
 
-    def test_ip_keeps_its_exemption_and_unaliased_returns_record_nothing(self):
+    def test_ip_refuses_and_unaliased_returns_record_nothing(self):
+        # R12 has no exemption any more (kit #588, r12_exit_scratch_profile): these walks state no
+        # premise for it, so a frame address left in IP refuses, with or without the R2/R3 ledger.
         ledger = scratch.ReturnScratch()
-        self.walk("sub sp, #8\nmov ip, sp\nmovs r0, #0\nadd sp, #8\nbx lr", ledger=ledger)
+        with self.assertRaisesRegex(ValueError, ESCAPE + ": r12"):
+            self.walk("sub sp, #8\nmov ip, sp\nmovs r0, #0\nadd sp, #8\nbx lr", ledger=ledger)
         self.walk("sub sp, #8\nmov r3, sp\nmovs r3, #0\nadd sp, #8\nbx lr", ledger=ledger)
         self.assertEqual((ledger.sites, ledger.report_lines()), (set(), []))
 
