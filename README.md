@@ -1970,10 +1970,12 @@ marker. R0 and R1, an offset at or above the entry SP and every return of the
 owner itself keep the refusal. Both walks of the caller carry the marker
 through their joins. Any instruction that reads it refuses, and so does a
 call while it is in R0-R3. A write clears it (the site is recorded), and a
-return of a walked caller hands it on the same way. An inspection that
-recorded a release and then refused keeps its refusal: the dead-register
-fallback would discard the record, as kit #538 keeps the refusal of a callee
-that returns its own frame. The markers do not depend on the walk's order:
+return of a walked caller hands it on the same way. Every refusal of the
+rule has its own type, and an inspection refused by one, or one that met the
+rule at all (recorded a release, a repeat included, or applied a marker),
+keeps its refusal: the dead-register fallback would discard the pass and
+drop the address, as kit #538 keeps the refusal of a callee that returns its
+own frame. The markers do not depend on the walk's order:
 a call that marks no R2 (or R3) for its callee, because no release of that
 callee had been recorded yet, is noted, and a release recorded later for
 that callee and register refuses. A call in the core walk of an inspected
