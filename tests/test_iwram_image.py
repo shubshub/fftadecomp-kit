@@ -256,6 +256,8 @@ class IwramImageTests(unittest.TestCase):
             "BOOT returns first": (0x2720, struct.pack("<H", 0x4770)),
             "copier calls first": (0x2780, struct.pack("<HH", 0xF000, 0xF800)),
             "CpuSet bytes": (iwram.CPUSET - BASE, struct.pack("<H", 0xDF0C)),
+            # The copier still runs straight to its copy site, which no longer calls CpuSet.
+            "copy site": (iwram.COPY_SITE - BASE, struct.pack("<HH", 0x46C0, 0x46C0)),
         }
         reset_literal = next(offset for offset in range(0xC0, 0x100, 4)
                              if struct.unpack_from("<I", self.rom, offset)[0] == 0x08000255)
