@@ -89,6 +89,9 @@ class TextRuleTests(unittest.TestCase):
                 ("an outer struct", STATE + outer + "void f(void) { Outer local;" + read),
                 ("a tagged outer struct", STATE + "struct Box { State inner; };\nvoid f(void) { struct Box local;"
                  + read),
+                # a typedef of a tag the struct defines later: one pass in text order does not see it hold State
+                ("a typedef of a struct defined after it", STATE + "typedef struct Box Late;\n"
+                 "struct Box { State inner; };\nvoid f(void) { Late local;" + read),
                 ("an outer struct of an alias", STATE + "typedef State Alias;\ntypedef struct { Alias a; } Two;\n"
                  "void f(void) { Two local;" + read),
                 ("a union", STATE + "typedef union { State inner; int raw; } Either;\nvoid f(void) { Either local;"
