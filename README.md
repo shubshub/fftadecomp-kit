@@ -4076,7 +4076,7 @@ plain path, the composed data-buffer proof and their replays run the walk
 again (`store_bound_premise_profile`) with reviewed rows from
 `config/store_bound_premises.json`. The file has one entry per owner address,
 with a non-empty `review` and its `rows`, each `{callee, site, bound}`, in
-(callee, site) order:
+(callee, site) order. A key repeated at any level of the file refuses:
 
 ```json
 {"0x08133E18": {"review": "...", "rows": [{"callee": "0x0812E4F4", "site": "0x0812E540", "bound": 2}]}}
