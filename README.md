@@ -6203,7 +6203,9 @@ than a jump table's own label and its cases. A pseudo with
 several definitions, such as the pointers a structure copy's block move
 advances, is read through the definition that reaches the reference in a
 straight line, with no branch target between. In the code, which is the ROM's, every path into the fill's BL
-stores the slot once, with the temporary's width, and at the BL holds its
+makes no access through a register offset whose base or index holds a stack
+address (`strh r0, [r1, r2]`: its address is unknown), stores the slot once,
+with the temporary's width, and at the BL holds its
 address in `r0`, no `r1` that fills over it and no `r3` in it; where the path
 sets `r2` or the stored register to a literal or an immediate, it is the
 fill's control word or the value its RTL store writes (agbcc may keep a
