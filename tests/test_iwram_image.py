@@ -24,6 +24,7 @@ import call_via_target_profile as call_via
 
 BASE = match.ROM_BASE
 R2 = match.RUNTIME_HELPERS["_call_via_r2"]
+R3 = match.RUNTIME_HELPERS["_call_via_r3"]
 DESTINATION = 0x03005E78
 OWNER = 0x08010000
 TABLE = 0x08020000
@@ -58,6 +59,22 @@ img_quiet:
 img_end:
 """
 ENTRIES = ("img_clear", "img_far", "img_r4", "img_quiet")
+# A routine that returns its own frame address in R2 (released_scratch_profile), placed before img_quiet.
+REL = "img_rel:\n    push {lr}\n    sub sp, #8\n    mov r2, sp\n    add sp, #8\n    pop {r0}\n    bx r0\n"
+# E: called with a released address in R0, it stores R1 over its own saved LR.
+E_BODY = "push {lr}\nstr r1, [r0, #8]\npop {r0}\nbx r0"
+
+
+def released_shape(site_a, after_a, rel, word=None):
+    """rv-137's E7 shape: site A (`site_a`, passing no stack address, so it is not resolved) leaves R2
+    to its caller, which hands it to func_E as E's saved LR (`after_a` runs first); site B then passes
+    the caller's frame to img_rel (canonical address `rel`) through _call_via_r3, so img_rel is walked
+    and its release recorded.  Sound: the read of R2 after site A refuses, whatever the walk's order,
+    because site A's call is keyed by the routine its value names (released_scratch_profile.call_key).
+    `rel_word`, an aligned word site A may read its target from, holds `word` (default `rel`)."""
+    return (f"push {{r4, lr}}\nsub sp, #8\nmovs r1, #0\n{site_a}\n{after_a}adds r0, r2, #0\nmovs r1, #0\n"
+            f"bl func_E\nmov r0, sp\nldr r3, ={rel}\nbl 0x{R3:08X}\nmovs r2, #0\nadd sp, #8\npop {{r4}}\n"
+            f"pop {{r0}}\nbx r0\n.ltorg\n.balign 4\nrel_word:\n.word {rel if word is None else word}\n")
 
 
 def owner(entry="img_clear", *, held="r3", after="movs r3, #0\nstr r3, [sp]", load="table"):
@@ -427,15 +444,90 @@ class IwramImageTests(unittest.TestCase):
 
     def test_a_release_by_an_image_routine_marks_its_caller(self):
         # A routine of the image that returns its own frame in R2 (released_scratch_profile): the
-        # marker is keyed by the routine the call resolved to, which no literal or ROM word names.
-        image = IMAGE.replace("img_quiet:\n", "img_rel:\n    push {lr}\n    sub sp, #8\n    mov r2, sp\n"
-                              "    add sp, #8\n    pop {r0}\n    bx r0\nimg_quiet:\n")
+        # marker is keyed by the routine the call resolved to.
+        image = IMAGE.replace("img_quiet:\n", REL + "img_quiet:\n")
         load = f"0x{DESTINATION:08X} + (img_rel - img_start) + 1"
         with patch(f"{__name__}.IMAGE", image):
             self.refused("released callee frame address in r2 is read",
                          owner(load=load, after="adds r0, r2, #0\nmovs r3, #0\nstr r3, [sp]"))
             proof = self.walk(owner(load=load, after="movs r2, #0\nmovs r3, #0\nstr r3, [sp]"))
         self.assertEqual({row[2] for row in proof.released_scratch}, {2})
+
+    # An image routine reached by a call the walk does not resolve (rv-137 E7, E8, E10, E11) -------
+
+    def released_case(self, site_a, *, after_a="", extra=(), named="img_rel"):
+        """Build released_shape as the owner (the functions in `extra` and func_E at 0x08030000) and
+        prove it.  Site B calls img_rel; REL and MIRROR in site A, in `extra` and in rel_word are the
+        canonical address of the routine `named` and an IWRAM mirror of it."""
+        rel = f"0x{DESTINATION:08X} + (img_rel - img_start) + 1"
+        target = f"0x{DESTINATION:08X} + ({named} - img_start) + 1"
+        mirror = f"0x{DESTINATION + 0x8000:08X} + ({named} - img_start) + 1"
+        functions = dict(func_E=E_BODY, **dict(extra))
+        insertion = ".global " + ", ".join(f"{name}, {name}_end" for name in functions) + "\n" + "".join(
+            f".org 0x{0x30000 + 0x100 * index:x}\n{name}:\n{body}\n.ltorg\n{name}_end:\n"
+            for index, (name, body) in enumerate(functions.items()))
+        with patch(f"{__name__}.IMAGE", IMAGE.replace("img_quiet:\n", REL + "img_quiet:\n")):
+            text = assembly(released_shape(site_a, after_a, rel, word="REL"))
+        text = text.replace(".org 0x14186C", insertion + ".org 0x14186C").replace("REL", target)
+        text = text.replace("MIRROR", mirror).replace(".global owner,", ".global img_rel\n.global owner,", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        for name in functions:
+            self.entries.append({"rom": f"0x{self.symbols[name]:08X}", "end": f"0x{self.symbols[name + '_end']:08X}",
+                                 "mode": "thumb"})
+        return self.prove()
+
+    def released_refused(self, site_a, **options):
+        """The owner root's walk notes site A's call under img_rel's canonical address, so the release
+        site B's walk records refuses (rule 6) and names that address.  The control: with site A
+        naming img_quiet, which releases nothing, the same walk is admitted and img_rel's release
+        recorded."""
+        with self.assertRaises(ValueError) as caught:
+            self.released_case(site_a, **options)
+        address = DESTINATION + self.symbols["img_rel"] - self.symbols["img_start"]
+        self.assertIn(f"released callee frame address in r2: an earlier call to 0x{address:08X} took no marker",
+                      str(caught.exception))
+        proof = self.released_case(site_a, named="img_quiet", **options)
+        self.assertEqual({(row[0], row[2]) for row in proof.released_scratch}, {(address, 2)})
+        return proof
+
+    def test_an_unresolved_call_naming_an_image_routine_is_keyed_by_it(self):
+        # E7: site A calls img_rel by its literal with nothing passed, so T2 does not resolve it.
+        self.released_refused(f"ldr r3, =REL\nbl 0x{R3:08X}")
+
+    def test_an_iwram_mirror_names_the_same_routine(self):
+        # E8: 0x03000000-0x03007FFF repeats every 0x8000; DESTINATION + 0x8000 runs the same bytes.
+        self.released_refused(f"ldr r3, =MIRROR\nbl 0x{R3:08X}")
+
+    def test_an_unresolved_image_call_in_a_walked_callee_is_keyed_by_it(self):
+        # E10: func_C is walked (it gets the owner's frame) but clears R0, so its call of img_rel is not
+        # resolved; func_C returns with img_rel's released R2.
+        func_c = f"push {{lr}}\nmovs r1, #1\nstrh r1, [r0]\nmovs r0, #0\nldr r3, =REL\nbl 0x{R3:08X}\npop {{r0}}\nbx r0"
+        self.released_refused("mov r0, sp\nbl func_C", extra=dict(func_C=func_c))
+
+    def test_a_rom_word_naming_an_image_routine_keys_the_call(self):
+        # E11: site A's target is read from an aligned ROM word holding img_rel's address.
+        self.released_refused(f"ldr r0, =rel_word\nldr r3, [r0]\nbl 0x{R3:08X}")
+
+    def test_a_call_through_an_iwram_mirror_is_walked_as_the_routine(self):
+        # A mirror (every 0x8000 up to 0x03FFFFFF) is folded to the canonical address everywhere the
+        # rule keys or tests one: the call is resolved, recorded and walked as that routine.
+        for mirror in (DESTINATION + 0x8000, DESTINATION | 0x00FF8000):
+            with self.subTest(mirror=hex(mirror)):
+                proof = self.walk(owner(load=f"0x{mirror + 1:08X}"))
+                self.assertEqual(proof.iwram_image_calls, {(self.site(), DESTINATION)})
+                self.assertEqual(iwram.name(proof, mirror + 1), DESTINATION)
+                self.assertTrue(proof.iwram_image.contains(mirror))
+                self.assertEqual(proof.target(mirror)["rom"], f"0x{DESTINATION:08X}")
+                # The literal word is listed with the ROM words whose values lie inside the image.
+                self.assertIn(mirror + 1, [value for _, value in proof.iwram_image.evidence["words"]])
+                # The mirror of a routine that writes past the owner's local is walked over its bytes.
+                self.refused("", owner(load=f"0x{mirror:08X} + (img_far - img_start) + 1"))
+        for value in (DESTINATION + 0x8000, 0x02005E79, 0x04005E79):
+            with self.subTest(value=hex(value)):
+                self.build(owner(load=f"0x{value:08X}"))
+                with self.assertRaises(ValueError):
+                    self.prove()
 
     def test_values_outside_the_image_or_even_keep_the_refusal(self):
         for value in (DESTINATION, DESTINATION - 1, DESTINATION + 0x1001, 0x03007001):
@@ -510,38 +602,52 @@ except ImportError:            # pragma: no cover - the sibling fixtures are par
     tools_present = lambda: False
 
 
+def image_tree(directory, callees, *, image_text=None, labels=()):
+    """A natural-C tree (test_data_buffer_calls.build: BUFFER_ONLY's owner at A, `callees` from
+    0x08000400) with the fixture's boot path, copier, image source (`image_text`, default IMAGE) and
+    ROM table laid in, and the image fixture's symbols (`labels` made global first)."""
+    image = IwramImageTests("test_the_boot_copy_is_derived_from_the_rom")
+    image.root = directory / "image"
+    image.root.mkdir(parents=True)
+    with patch(f"{__name__}.IMAGE", IMAGE if image_text is None else image_text):
+        text = assembly("bx lr")
+    (image.root / "f.s").write_text(text.replace(".global owner,", "".join(f".global {label}\n" for label in labels) +
+                                                 ".global owner,", 1))
+    image.build_text()
+    root = index_thunks(data_buffer_tree(directory / "tree", BUFFER_ONLY, callees, large=True))
+    rom = bytearray((root / "baserom.bin").read_bytes())
+    entries = json.loads((root / "config/functions.json").read_text())
+    owner_end = max(int(entry["end"], 16) for entry in entries if int(entry["rom"], 16) == A)
+    # The boot path, the copier and the image source, and the ROM table, from the fixture.
+    for low, high in ((0, A - BASE), (owner_end - BASE, 0x400), (0x2700, SOURCE - BASE + 0x200),
+                      (TABLE - BASE, TABLE - BASE + 0x10)):
+        rom[low:high] = image.rom[low:high]
+    (root / "baserom.bin").write_bytes(bytes(rom))
+    entries += [{"rom": f"0x{image.symbols['leaf']:08X}", "end": f"0x{image.symbols['leaf'] + 4:08X}",
+                 "mode": "thumb"},
+                {"rom": f"0x{image.symbols['boot']:08X}", "end": "0x08002768", "mode": "thumb"},
+                {"rom": "0x08002768", "end": "0x080027B0", "mode": "thumb"}]
+    (root / "config/functions.json").write_text(json.dumps(entries))
+    (root / "symbols/functions.txt").write_text("".join(
+        f"{int(e['rom'], 16):08X} {int(e['end'], 16):08X} {int(e['end'], 16) - int(e['rom'], 16)} 0 return\n"
+        for e in entries))
+    assert iwram.derive(bytes(rom), entries) is not None
+    return root, image.symbols
+
+
+def scratch_directory(prefix):
+    scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+    scratch.mkdir(parents=True, exist_ok=True)
+    return tempfile.TemporaryDirectory(prefix=prefix, dir=scratch)
+
+
 @unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
 class SubprocessTests(unittest.TestCase):
     def test_the_rule_applies_at_issuance_and_in_replay(self):
         # match.py as a subprocess issues the report as __main__ and the replay rebuilds the proof:
         # the report states the image and replays, and fails to replay without that line.
-        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
-        scratch.mkdir(parents=True, exist_ok=True)
-        with tempfile.TemporaryDirectory(prefix="iwram_image_sub_", dir=scratch) as directory:
-            directory = Path(directory)
-            image = IwramImageTests("test_the_boot_copy_is_derived_from_the_rom")
-            image.root = directory / "image"
-            image.root.mkdir()
-            image.build("bx lr")
-            root = index_thunks(data_buffer_tree(directory / "tree", BUFFER_ONLY,
-                                                 [("func_08000400", IMAGE_CALLER)], large=True))
-            rom = bytearray((root / "baserom.bin").read_bytes())
-            entries = json.loads((root / "config/functions.json").read_text())
-            owner_end = max(int(entry["end"], 16) for entry in entries if int(entry["rom"], 16) == A)
-            # The boot path, the copier and the image source, and the ROM table, from the fixture.
-            for low, high in ((0, A - BASE), (owner_end - BASE, 0x400), (0x2700, SOURCE - BASE + 0x200),
-                              (TABLE - BASE, TABLE - BASE + 0x10)):
-                rom[low:high] = image.rom[low:high]
-            (root / "baserom.bin").write_bytes(bytes(rom))
-            entries += [{"rom": f"0x{image.symbols['leaf']:08X}", "end": f"0x{image.symbols['leaf'] + 4:08X}",
-                         "mode": "thumb"},
-                        {"rom": f"0x{image.symbols['boot']:08X}", "end": "0x08002768", "mode": "thumb"},
-                        {"rom": "0x08002768", "end": "0x080027B0", "mode": "thumb"}]
-            (root / "config/functions.json").write_text(json.dumps(entries))
-            (root / "symbols/functions.txt").write_text("".join(
-                f"{int(e['rom'], 16):08X} {int(e['end'], 16):08X} {int(e['end'], 16) - int(e['rom'], 16)} 0 return\n"
-                for e in entries))
-            self.assertIsNotNone(iwram.derive(bytes(rom), entries))
+        with scratch_directory("iwram_image_sub_") as directory:
+            root, _ = image_tree(Path(directory), [("func_08000400", IMAGE_CALLER)])
             code, output, text = run_match(root)
             self.assertEqual(code, 0, output[-2000:])
             lines = [line for line in text.splitlines() if line.startswith(iwram.FIELD + ":")]
@@ -551,6 +657,74 @@ class SubprocessTests(unittest.TestCase):
                 self.assertTrue(match_evidence.report_matches(text, root, A))
                 edited = "".join(line + "\n" for line in text.splitlines() if not line.startswith(iwram.FIELD))
                 self.assertFalse(match_evidence.report_matches(edited, root, A))
+
+
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class ReleasedImageSubprocessTests(unittest.TestCase):
+    """rv-137 E7, E8, E10 and E11 through match.py (issuing as __main__): released_shape is the
+    callee func_08000400 of BUFFER_ONLY's natural-C owner, walked because the owner passes it its
+    buffer; func_E is func_08000500 and func_C func_08000600.  Each refuses with this rule's
+    refusal, and the control (R2 cleared after site A) is admitted with img_rel's release stated."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.temporary = scratch_directory("iwram_image_released_")
+        cls.base = Path(cls.temporary.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def run_case(self, name, site_a, *, after_a="", func_c=None):
+        rel = None
+        image_text = IMAGE.replace("img_quiet:\n", REL + "img_quiet:\n")
+        # img_rel's address is read off the image fixture before the callees are assembled.
+        probe = IwramImageTests("test_the_boot_copy_is_derived_from_the_rom")
+        probe.root = self.base / f"{name}-probe"
+        probe.root.mkdir()
+        with patch(f"{__name__}.IMAGE", image_text):
+            text = assembly("bx lr")
+        (probe.root / "f.s").write_text(text.replace(".global owner,", ".global img_rel\n.global owner,", 1))
+        probe.build_text()
+        rel = DESTINATION + probe.symbols["img_rel"] - probe.symbols["img_start"] + 1
+        values = dict(REL=f"0x{rel:08X}", MIRROR=f"0x{rel + 0x8000:08X}")
+
+        def fill(body):
+            for token, value in values.items():
+                body = body.replace(token, value)
+            return body.replace("func_E", "func_08000500").replace("func_C", "func_08000600")
+        callees = [("func_08000400", fill(released_shape(site_a, after_a, "REL"))), ("func_08000500", E_BODY)]
+        if func_c is not None:
+            callees.append(("func_08000600", fill(func_c)))
+        root, symbols = image_tree(self.base / name, callees, image_text=image_text, labels=("img_rel",))
+        self.assertEqual(DESTINATION + symbols["img_rel"] - symbols["img_start"] + 1, rel)
+        return run_match(root)
+
+    def refused(self, name, site_a, **options):
+        code, output, text = self.run_case(name, site_a, **options)
+        self.assertNotEqual(code, 0, output[-2000:])
+        self.assertIn("released callee frame address in r2", output, output[-2000:])
+
+    def test_the_control_is_admitted_and_states_the_release(self):
+        code, output, text = self.run_case("control", f"ldr r3, =REL\nbl 0x{R3:08X}", after_a="movs r2, #0\n")
+        self.assertEqual(code, 0, output[-2000:])
+        fields = [line.split(":")[0] for line in text.splitlines()]
+        self.assertIn(iwram.FIELD, fields)
+        self.assertIn("* buffer released scratch", fields)
+
+    def test_e7_an_unresolved_call_naming_an_image_routine(self):
+        self.refused("e7", f"ldr r3, =REL\nbl 0x{R3:08X}")
+
+    def test_e8_an_iwram_mirror_of_the_routine(self):
+        self.refused("e8", f"ldr r3, =MIRROR\nbl 0x{R3:08X}")
+
+    def test_e10_an_unresolved_image_call_in_a_walked_callee(self):
+        self.refused("e10", "mov r0, sp\nbl func_C",
+                     func_c=f"push {{lr}}\nmovs r1, #1\nstrh r1, [r0]\nmovs r0, #0\nldr r3, =REL\nbl 0x{R3:08X}\n"
+                            "pop {r0}\nbx r0\n.ltorg")
+
+    def test_e11_a_rom_word_naming_the_routine(self):
+        self.refused("e11", f"ldr r0, =rel_word\nldr r3, [r0]\nbl 0x{R3:08X}")
 
 
 class IssuingCopyTests(unittest.TestCase):

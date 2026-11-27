@@ -33,18 +33,25 @@ The caller is a known, walked function, so this rule checks the caller instead o
    recorded yet, notes (callee, register), and a release recorded later for a noted pair refuses,
    so the walk's order does not decide a marker for any callee the walk can name: a direct callee,
    a resolved call-via target, or the target an unresolved call-via call names by its exact
-   call-target fact or strict value (call_key).  A call-via target nobody can name, such as a
-   callback loaded from memory, is under the ordinary trust in an unwalked indirect call.  A call
-   in the core walk of an inspected callee is not noted: that callee's alias-path walk visits the
-   same call after its core walk;
+   call-target fact or strict value (call_key): an indexed Thumb ROM entry (a wait-state mirror
+   folded) or a routine of the boot IWRAM image (an IWRAM mirror folded,
+   iwram_image_profile.name), the only code a release can be recorded for.  Every key is folded
+   the same way (`callee_key`).  A call-via target nobody can name, such as a callback loaded
+   from memory, is under the ordinary trust in an unwalked indirect call.  A call in the core
+   walk of an inspected callee is not noted: that callee's alias-path walk visits the same call
+   after its core walk;
 7. a call while R0-R3 holds a marker is admitted only when dead_register's version-1 entry walk
    proves that its direct callee writes that register before any read, call, return or other
    transfer on every path (a call counts as a read; no callee is followed); the marker then ends at
    the call, and the proof is recorded (callee, its body's SHA-256, every killing write).
 
-Nothing is dropped: the value is tracked until a write overwrites it on every path, and every use
-refuses.  No premise.  Every record and clearing site is bound into the buffer fingerprint, only
-when there is one, and stated on one report line; replay recomputes them.
+On the walked paths nothing is dropped: a release the walk records is tracked until a write
+overwrites it on every path, and every use refuses; the rule adds no premise.  Its reach is the
+walk's: a released address forwarded by a callee the walk does not walk (a wrapper reached by an
+unresolved call, in ROM or in the image, or the image's ROM source run in place), or left by a
+target the walk cannot name, rests on the ordinary trust in unwalked calls, the buffer walk's
+standing premise for untracked pointers.  Every record and clearing site is bound into the buffer
+fingerprint, only when there is one, and stated on one report line; replay recomputes them.
 """
 import hashlib
 import json
@@ -110,9 +117,17 @@ def callee_return(proof, address, site, aliases, *, own_frame=True):
     return kept
 
 
+def callee_key(address):
+    """The address a release is keyed by: a ROM wait-state mirror or an IWRAM mirror folded (rule 6)."""
+    import rom_mirror
+    import iwram_image_profile as iwram_image
+    return rom_mirror.canonical(iwram_image.canonical(address))
+
+
 def _record(proof, row):
     """Record a release; rule 6 refuses one that an earlier call of the same callee went without.
     The row is recorded first, so the refusal also keeps the dead-register fallback away (rule 5)."""
+    row = (callee_key(row[0]),) + tuple(row[1:])
     proof.released_scratch.add(row)
     proof.released_events += 1
     if (row[0], row[2]) in proof.released_unmarked:
@@ -146,6 +161,7 @@ def released(proof, callee):
     if not applies(proof):
         return ()
     r0, _ = _registers()
+    callee = callee_key(callee)
     return sorted({r0 + register for function, _, register, _ in proof.released_scratch if function == callee})
 
 
@@ -154,11 +170,14 @@ def call_key(proof, callee, constants, site):
     call-via thunk the walk did not resolve (nothing was passed), the target it can name without
     resolving it: the exact call-target fact in the thunk's register, else the strict value there
     (call_via_target_profile.strict_known), when call_via_target_profile.entry accepts it as an
-    indexed Thumb entry.  Nothing is resolved or recorded (call_via_target_profile.resolve writes its
-    records), so a walk is unchanged by asking.  A target nobody can name, such as a callback loaded
-    from memory, stays the thunk: that call keeps the ordinary trust in an unwalked indirect call."""
+    indexed Thumb entry or iwram_image_profile.name as a routine of the boot IWRAM image (each folds
+    its mirrors).  Those are the targets call_via_target_profile.resolve can answer, from the same
+    value.  Nothing is resolved or recorded (resolve and the image resolver write their records), so
+    a walk is unchanged by asking.  A target nobody can name, such as a callback loaded from memory,
+    stays the thunk: that call keeps the ordinary trust in an unwalked indirect call."""
     import match
     import call_via_target_profile as call_via
+    import iwram_image_profile as iwram_image
     if not applies(proof):
         return callee
     name = next((name for name, address in match.RUNTIME_HELPERS.items() if address == callee), "")
@@ -170,6 +189,8 @@ def call_key(proof, callee, constants, site):
         span = call_via.function_of(proof, site)
         value = call_via.strict_known(proof, span, site).get(number) if span is not None else None
     target = call_via.entry(proof, value) if value is not None else None
+    if target is None and value is not None:
+        target = iwram_image.name(proof, value)
     return target if target is not None else callee
 
 
@@ -185,7 +206,7 @@ def after_call(proof, callee, aliases, *, core=False):
         proof.released_events += 1
     if applies(proof) and not (core and proof.active):
         r0, scratch = _registers()
-        proof.released_unmarked.update((callee, register - r0) for register in scratch if register not in registers)
+        proof.released_unmarked.update((callee_key(callee), register - r0) for register in scratch if register not in registers)
 
 
 def step(proof, address, site, instruction, aliases, calling):

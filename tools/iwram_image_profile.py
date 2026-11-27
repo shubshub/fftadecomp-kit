@@ -29,10 +29,15 @@ such a call is unchanged.
 
 The rule: call_via_target_profile (T2) resolves a `bl _call_via_rN` whose rN holds an exact value
 C and asks `proof.call_via_resolvers` when C is not an indexed ROM entry.  This module's resolver
-answers C & ~1 when C is odd and C & ~1 lies inside the derived image.  For an address it
-answered, BufferCallProof.target and span (and the callee-saved walk's span) give the image bytes
-from that address to the image's end at their IWRAM addresses, so the existing walks, summaries
-and refusals apply to them unchanged.  Only the default path's two buffer proofs (exact types)
+answers the canonical address of C & ~1 when C is odd and that address lies inside the derived
+image.  The 32 KB of IWRAM repeat every 0x8000 through 0x03000000-0x03FFFFFF, so a mirror runs the
+same bytes: every address this module keys or tests for containment (`name`, the image's
+`contains`, the call records of both walks, the ROM words listed as evidence) is folded to
+0x03000000-0x03007FFF first (`canonical`), and released_scratch_profile.call_key names a routine
+by the same function without resolving it.  For an address it answered, BufferCallProof.target
+and span (and the callee-saved walk's span) give the image bytes from that address to the image's
+end at their IWRAM addresses, so the existing walks, summaries and refusals apply to them
+unchanged.  Only the default path's two buffer proofs (exact types)
 take the resolver; one line (POLICY) gates it.
 """
 import array
@@ -67,6 +72,13 @@ class Policy:
 
 POLICY = Policy()
 _CACHE = {}
+MIRROR = 0x03007FFF                # IWRAM repeats every 0x8000 through 0x03FFFFFF
+
+
+def canonical(value):
+    """The 0x03000000-0x03007FFF address an IWRAM word names (bit 0 kept); any other value unchanged."""
+    value = int(value)
+    return value & MIRROR if value >> 24 == 0x03 else value
 
 
 class Image:
@@ -79,10 +91,10 @@ class Image:
         return self.destination + self.length
 
     def contains(self, address):
-        return self.destination <= address < self.end
+        return self.destination <= canonical(address) < self.end
 
     def bytes_from(self, rom, address):
-        start = self.source + (address - self.destination) - ROM_BASE
+        start = self.source + (canonical(address) - self.destination) - ROM_BASE
         return bytes(rom[start:self.source + self.length - ROM_BASE])
 
 
@@ -277,12 +289,14 @@ def _arguments(rom, run):
 
 
 def _words_inside(rom, start, end):
-    """[address, value] of every aligned ROM word whose value lies in [start, end)."""
+    """[address, value] of every aligned ROM word whose value, folded by `canonical`, lies in
+    [start, end), an IWRAM range: a mirror word names the same bytes."""
     words = array.array('I')
     if words.itemsize != 4:
         raise ValueError("IWRAM image evidence needs 32-bit words")
     words.frombytes(bytes(rom[:len(rom) // 4 * 4]))
-    return [[ROM_BASE + 4 * index, value] for index, value in enumerate(words) if start <= value < end]
+    return [[ROM_BASE + 4 * index, value] for index, value in enumerate(words)
+            if value >> 24 == 0x03 and start <= value & MIRROR < end]
 
 
 def derive(rom, entries):
@@ -336,30 +350,42 @@ def image(proof):
 
 # ---- the rule --------------------------------------------------------------------------------
 
-def resolver(proof, site, register, value):
-    """call_via_resolvers entry: an exact odd value inside the derived image names its address."""
-    if not applies(proof) or not isinstance(value, int) or not value & 1 or \
-            not IWRAM[0] <= int(value) < IWRAM[1]:
+def name(proof, value):
+    """The image routine an exact value names, or None: C & ~1 folded by `canonical`, when C is odd
+    and that address lies inside the derived image.  Nothing is recorded: the resolvers below record
+    the calls they answer, and released_scratch_profile.call_key only names a call's target."""
+    if not applies(proof) or not isinstance(value, int) or not value & 1:
+        return None
+    address = canonical(value) & ~1
+    if not IWRAM[0] <= address < IWRAM[1]:
         return None
     found = image(proof)
-    address = int(value) & ~1
-    if found is None or not found.contains(address):
+    return address if found is not None and found.contains(address) else None
+
+
+def resolver(proof, site, register, value):
+    """call_via_resolvers entry: an exact odd value inside the derived image (a mirror folded) names
+    its canonical address."""
+    address = name(proof, value)
+    if address is None:
         return None
-    proof.iwram_image_calls.add((site, address))
+    proof.iwram_image_calls.add((canonical(site), address))
     return address
 
 
 def resolved(proof, address):
-    """Whether `address` is an image address this proof's resolver answered."""
+    """Whether `address` (a mirror folded) is an image address this proof's resolver answered."""
+    address = canonical(address)
     return applies(proof) and getattr(proof, 'iwram_image', None) is not None and \
         any(target == address for _, target in proof.iwram_image_calls)
 
 
 def target(proof, address):
-    """BufferCallProof.target for an answered image address: a Thumb row to the image's end."""
+    """BufferCallProof.target for an answered image address: a Thumb row, at the canonical address,
+    to the image's end."""
     if not resolved(proof, address):
         return None
-    return {"rom": f"0x{address:08X}", "end": f"0x{proof.iwram_image.end:08X}", "mode": "thumb"}
+    return {"rom": f"0x{canonical(address):08X}", "end": f"0x{proof.iwram_image.end:08X}", "mode": "thumb"}
 
 
 def span(proof, address):
@@ -373,16 +399,12 @@ def watch_target(proof):
     """The callee-saved walks' resolver hook (callee_saved_watch.Checker.resolve): an exact odd value
     inside the derived image, as a call-via destination at `site`, is that routine's address.  The
     call is noted on the proof (never rolled back, as those walks' premises are not) and stated with
-    the buffer walks' own (`record`)."""
+    the buffer walks' own (`record`).  A mirror is folded, as by the resolver."""
     def lookup(value, site):
-        if not applies(proof) or not isinstance(value, int) or not value & 1 or \
-                not IWRAM[0] <= int(value) < IWRAM[1]:
+        address = name(proof, value)
+        if address is None:
             return None
-        found = image(proof)
-        address = int(value) & ~1
-        if found is None or not found.contains(address):
-            return None
-        proof.iwram_image_watch_calls.add((site, address))
+        proof.iwram_image_watch_calls.add((canonical(site), address))
         return address
     return lookup
 
@@ -390,6 +412,7 @@ def watch_target(proof):
 def watch_span(proof):
     """The callee-saved walks' span hook: (bytes, end) for an image address any walk answered."""
     def lookup(address):
+        address = canonical(address)
         if not resolved(proof, address) and not any(target == address for _, target in proof.iwram_image_watch_calls):
             return None
         found = image(proof)

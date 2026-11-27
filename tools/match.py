@@ -5965,7 +5965,9 @@ def verify_leaf_instructions(data, address, thumb, validated_calls=None,
                 callee_saved_watch.core_check(buffer_proof if buffer_proof is not None else callee_watch,
                                               address, current, checked_target, aliases, constants)
             # The callee a release is keyed by (released_scratch_profile.call_key), named before the
-            # call's clobbers drop the thunk register's value.
+            # call's clobbers drop the thunk register's value.  A resolved call is keyed by the target
+            # it was walked as: call_key would name the same one from the same value, but the marker
+            # must not depend on that.
             released_target = released_scratch.call_key(
                 buffer_proof, getattr(buffer_proof, "call_via_effective", {}).get(current, operands[0].imm),
                 constants, current) if buffer_proof is not None else operands[0].imm
