@@ -149,6 +149,14 @@ class DefaultForwardingTests(unittest.TestCase):
         proof.forward_callee_releases.clear()
         self.assertNotEqual(forwarded.fingerprint_payload(proof), payload)
 
+    def test_split_records_name_forwarded_words_by_their_offsets(self):
+        # A join may keep a released word or a live slot apart, as it does a register: the line names each.
+        import split_join_profile as split_join
+        self.assertEqual(split_join.FORWARD_STALE_BASE, match.FORWARD_STALE_BASE)
+        (line,) = split_join.lines({(OWNER, OWNER + 8, match.FORWARD_STALE_BASE - 20, -8, -12),
+                                    (OWNER, OWNER + 8, -8, -16, -20), (OWNER, OWNER + 8, R2, -4, -8)})
+        self.assertIn(" keeps released word entry_SP-0x14 -8/-12, slot entry_SP-0x8 -16/-20, r2 -4/-8 apart ", line)
+
     def test_a_later_walked_call_inherits_the_released_word(self):
         proof = walk(bodies(after=(0xa901, FWD)))
         self.assertEqual(proof.forward_releases, {FIRST_CALL: {-20}, OWNER + 12: {-20}})
