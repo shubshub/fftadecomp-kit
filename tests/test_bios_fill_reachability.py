@@ -11,7 +11,10 @@ change the temporary between its store and the BIOS call nor read it afterwards.
 The graph must hold every edge the code has.  A jump table's cases print as
 `(label_ref:SI N)`, so labels are matched by code at any mode, and a jump the
 dump does not bound (a computed goto, a tablejump with no table, a label value,
-a call that may return twice) refuses rather than drop its edges.
+a call that may return twice) refuses rather than drop its edges.  So does a
+barrier that follows anything but a jump: after a call it marks a callee the
+source declares noreturn, which can compile to the same bytes as one that
+returns, so the ROM cannot show the cut edge.
 """
 from pathlib import Path
 import re
@@ -182,6 +185,42 @@ class RtlTests(unittest.TestCase):
                      for uid, rest in insns]
         with self.assertRaisesRegex(proof.ProofError, "label UID 50 is preserved for a nonlocal goto"):
             fill.fills(function(preserved))
+
+    def test_a_barrier_must_follow_a_jump(self):
+        noreturn = (18, 'call_insn (call (mem:SI (symbol_ref:SI ("func_08001300")) 0) (const_int 0)) -1 (nil) '
+                        "(nil) (nil)")
+        note = (19, 'note "" NOTE_INSN_DELETED')
+
+        def ending(*tail):
+            """`if (c) { fill; tail } reference`: the fill's arm ends in tail instead of a jump past the reference"""
+            return [ENTRY, branch(3, 50)] + fill_insns(10) + list(tail) + [label(50), UNKNOWN, label(60)]
+
+        # a call that returns falls through to the reference
+        with self.assertRaisesRegex(proof.ProofError, "UID 30 is a frame reference with no constant offset on a path"):
+            fill.fills(function(ending(noreturn)))
+        # a noreturn call's barrier would cut that edge, and the ROM cannot show the attribute: notes or not, it refuses
+        for tail in ((noreturn, (20, "barrier")), (noreturn, note, (20, "barrier"))):
+            with self.subTest(tail=len(tail)), self.assertRaisesRegex(
+                    proof.ProofError, "barrier UID 20 follows call insn UID 18, so the source declares the callee "
+                                      "noreturn, which the ROM cannot show"):
+                fill.fills(function(ending(*tail)))
+        # after anything else but a jump or a barrier, the cut is unexplained
+        constant = (25, "insn (set (reg:SI 70) (const_int 0)) -1 (nil) (nil)")
+        for tail, shown in (((constant, (26, "barrier")), "insn UID 25"),
+                            ((label(25), (27, "barrier")), "code_label UID 25")):
+            with self.subTest(shown), self.assertRaisesRegex(
+                    proof.ProofError, f"barrier UID {tail[1][0]} follows {shown}, not a jump"):
+                fill.fills(function(ending(*tail)))
+        with self.assertRaisesRegex(proof.ProofError, "barrier UID 1 follows nothing, not a jump"):
+            fill.successors(function([(1, "barrier"), ENTRY]))
+        # after a jump it stands, with notes between or a second barrier
+        insns = arms()
+        where = [uid for uid, _ in insns].index(21)
+        for what, insns in (("a note between", insns[:where] + [(22, 'note "" NOTE_INSN_DELETED')] + insns[where:]),
+                            ("a second barrier", insns[:where + 1] + [(22, "barrier")] + insns[where + 1:])):
+            with self.subTest(what):
+                (found,) = fill.fills(function(insns))
+                self.assertEqual(found["apart"], [30])
 
     def test_labels_whose_address_the_assembly_takes(self):
         # label(6) is the table's label, number 7; its cases are labels 9 and 50, numbers 10 and 51
@@ -389,6 +428,38 @@ second:
     dest[0] = heights[index];
 }
 """
+NORETURN = """extern void func_08001234(u32);
+extern u16 data_02001000[];
+extern u8 data_02003000[];
+extern void func_08001300(u32) __attribute__((noreturn));
+void func_08000400(u32 phase, u16 x)
+{
+    if (phase == 9)
+        goto reading;
+    switch (phase) {
+    case 0:
+        {
+            volatile u16 fill = x;
+            func_0814186C((const void *)&fill, data_02001000, 0x010000A0);
+        }
+        break;
+    case 1:
+        func_08001234(1);
+        break;
+    case 2:
+        func_08001234(2);
+        break;
+    }
+    func_08001300(phase);
+reading:
+    {
+        u32 heights[4];
+        heights[0] = 1; heights[1] = 2; heights[2] = 3; heights[3] = 4;
+        func_08001234(heights[data_02003000[0]]);
+    }
+}
+"""
+RETURNING = NORETURN.replace(" __attribute__((noreturn))", "")
 
 @unittest.skipUnless(base.COMPILER and base.capstone, "fixed compiler and capstone required")
 class CompiledTests(unittest.TestCase):
@@ -444,6 +515,34 @@ class CompiledTests(unittest.TestCase):
             with self.subTest(source=source.splitlines()[2]), \
                     self.assertRaisesRegex(proof.ProofError, "the proof cannot bound"):
                 self.run_fill(source)
+
+    def test_a_noreturn_call_refuses_though_it_compiles_as_a_returning_one(self):
+        # review fixtures 0806EC60 and 0806F994: the switch's break dumps the pool, so the attribute changes no
+        # byte, yet its barrier would cut the call's fall-through into `reading`
+        self.assertNotEqual(NORETURN, RETURNING)
+        compiled = {}
+        for name, source in (("noreturn", NORETURN), ("returning", RETURNING)):
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                (root / "src").mkdir()
+                (root / "include").mkdir()
+                text = base.TYPES + base.CPUSET + source
+                (root / "src" / "08000400.c").write_text(text)
+                with tempfile.TemporaryDirectory(dir=root) as work:
+                    unit = proof.Unit(root, "src/08000400.c", text, [], work)
+                    real = unit.compile("probe", unit.real, "func_08000400")
+                    taken = fill.label_words((Path(work) / "probe" / "f.s").read_text())
+            body, start, size, _ = real["text"]
+            compiled[name] = (body[start:start + size], real["dumps"]["rtl"]["func_08000400"], taken)
+        self.assertEqual(compiled["noreturn"][0], compiled["returning"][0])
+        with self.assertRaisesRegex(proof.ProofError, r"barrier UID \d+ follows call insn UID \d+, so the source "
+                                                      "declares the callee noreturn"):
+            fill.fills(*compiled["noreturn"][1:])
+        with self.assertRaisesRegex(proof.ProofError, "frame reference with no constant offset on a path to or "
+                                                      "from the fill"):
+            fill.fills(*compiled["returning"][1:])
+        with self.assertRaisesRegex(proof.ProofError, "so the source declares the callee noreturn"):
+            self.run_fill(NORETURN)
 
     def test_labels_reached_from_outside_the_graph_refuse(self):
         # a label value with no computed jump, a nonlocal goto's target, a __builtin_setjmp receiver

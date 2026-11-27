@@ -560,6 +560,27 @@ def label_words(assembly):
     return found
 
 
+def barrier_follows_a_jump(function, barrier):
+    """ProofError unless the barrier's nearest preceding insn other than a note is a jump_insn or another barrier.
+
+    A barrier ends a fall-through.  The graph bounds that only after a jump, whose edges jump_targets() adds; a
+    barrier after a barrier adds nothing to the first.  After a call it marks a callee the source declares
+    noreturn.  The ROM cannot show that (with or without the attribute, the BL can compile to the same bytes),
+    and the insn after the barrier is not the BL's return point (agbcc may place a literal pool there), so no
+    edge stands in for the cut one.  After anything else the cut is unexplained."""
+    k = barrier.index - 1
+    while k >= 0 and function.insns[k].code == "note":
+        k -= 1
+    before = function.insns[k] if k >= 0 else None
+    if before is not None and before.code == "call_insn":
+        raise ProofError(f"barrier UID {barrier.uid} follows call insn UID {before.uid}, so the source declares the "
+                         "callee noreturn, which the ROM cannot show; the proof cannot bound where the call returns")
+    if before is None or before.code not in ("jump_insn", "barrier"):
+        raise ProofError(f"barrier UID {barrier.uid} follows "
+                         + (f"{before.code} UID {before.uid}" if before is not None else "nothing") +
+                         ", not a jump; the proof cannot bound where control goes")
+
+
 def successors(function, taken=None):
     """{insn index: the indices control may pass to next} on the expand RTL.
 
@@ -567,7 +588,9 @@ def successors(function, taken=None):
     every label it refers to: a conditional or unconditional jump its
     target, a tablejump its table's label (whose addr_vec then refers to
     every case), and an addr_vec its cases. A barrier passes control
-    nowhere.  So the graph has at least the edges the code has, and where
+    nowhere, and it refuses unless it follows a jump (barrier_follows_a_jump:
+    after a call it marks a noreturn callee, which the ROM cannot show).
+    So the graph has at least the edges the code has, and where
     the dump does not bound them it refuses: a jump jump_targets does not
     read, a label whose address an insn other than a jump takes (a label
     value or a nonlocal goto's handler) unless it heads a jump table, and a
@@ -598,6 +621,8 @@ def successors(function, taken=None):
                              ", which is no jump table's label or case; the proof cannot bound the jumps to it")
     graph = {}
     for insn in function.insns:
+        if insn.code == "barrier":
+            barrier_follows_a_jump(function, insn)
         following = set() if insn.code == "barrier" or insn.index + 1 >= len(function.insns) else {insn.index + 1}
         if insn.code == "jump_insn":
             targets = jump_targets(function, insn, labels)
