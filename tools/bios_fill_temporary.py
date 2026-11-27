@@ -561,13 +561,13 @@ def label_words(assembly):
 
 
 def barrier_follows_a_jump(function, barrier):
-    """ProofError unless the barrier's nearest preceding insn other than a note is a jump_insn or another barrier.
+    """ProofError unless the barrier's nearest preceding insn other than a note is a jump_insn.
 
-    A barrier ends a fall-through.  The graph bounds that only after a jump, whose edges jump_targets() adds; a
-    barrier after a barrier adds nothing to the first.  After a call it marks a callee the source declares
-    noreturn.  The ROM cannot show that (with or without the attribute, the BL can compile to the same bytes),
-    and the insn after the barrier is not the BL's return point (agbcc may place a literal pool there), so no
-    edge stands in for the cut one.  After anything else the cut is unexplained."""
+    A barrier ends a fall-through.  The graph bounds that only after a jump, whose edges jump_targets() adds.
+    After a call it marks a callee the source declares noreturn.  The ROM cannot show that (with or without the
+    attribute, the BL can compile to the same bytes), and the insn after the barrier is not the BL's return
+    point (agbcc may place a literal pool there), so no edge stands in for the cut one.  After anything else
+    (an insn, a label, another barrier, nothing) the cut is unexplained."""
     k = barrier.index - 1
     while k >= 0 and function.insns[k].code == "note":
         k -= 1
@@ -575,7 +575,7 @@ def barrier_follows_a_jump(function, barrier):
     if before is not None and before.code == "call_insn":
         raise ProofError(f"barrier UID {barrier.uid} follows call insn UID {before.uid}, so the source declares the "
                          "callee noreturn, which the ROM cannot show; the proof cannot bound where the call returns")
-    if before is None or before.code not in ("jump_insn", "barrier"):
+    if before is None or before.code != "jump_insn":
         raise ProofError(f"barrier UID {barrier.uid} follows "
                          + (f"{before.code} UID {before.uid}" if before is not None else "nothing") +
                          ", not a jump; the proof cannot bound where control goes")
@@ -588,8 +588,9 @@ def successors(function, taken=None):
     every label it refers to: a conditional or unconditional jump its
     target, a tablejump its table's label (whose addr_vec then refers to
     every case), and an addr_vec its cases. A barrier passes control
-    nowhere, and it refuses unless it follows a jump (barrier_follows_a_jump:
-    after a call it marks a noreturn callee, which the ROM cannot show).
+    nowhere, and it refuses unless the nearest insn before it, past notes, is
+    a jump (barrier_follows_a_jump: after a call it marks a noreturn callee,
+    which the ROM cannot show).
     So the graph has at least the edges the code has, and where
     the dump does not bound them it refuses: a jump jump_targets does not
     read, a label whose address an insn other than a jump takes (a label
