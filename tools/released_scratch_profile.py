@@ -20,7 +20,8 @@ The caller is a known, walked function, so this rule checks the caller instead o
    the register, slot and released-word key spaces, so the existing joins carry it (released on any
    incoming path is released after the join);
 3. an instruction that reads a marked register refuses, a call while R0-R3 holds a marker refuses
-   (the callee may take it as an argument), and a write clears the marker (recorded with its site);
+   (the callee may take it as an argument) unless rule 7 proves the callee overwrites it unread, and
+   a write clears the marker (recorded with its site);
 4. at a return of a walked caller a marked R2/R3 is recorded for that caller the same way, so the
    release follows the call chain until a write clears it; at the owner root's return it refuses;
 5. an inspection that refused with this rule's refusal (the Refusal type), or that met this rule
@@ -31,7 +32,11 @@ The caller is a known, walked function, so this rule checks the caller instead o
 6. the markers do not depend on the walk's order: a call that marks no R2 (or R3) for its callee,
    because no release of that callee had been recorded yet, notes (callee, register), and a release
    recorded later for a noted pair refuses.  A call in the core walk of an inspected callee is not
-   noted: that callee's alias-path walk visits the same call after its core walk.
+   noted: that callee's alias-path walk visits the same call after its core walk;
+7. a call while R0-R3 holds a marker is admitted only when dead_register's version-1 entry walk
+   proves that its direct callee writes that register before any read, call, return or other
+   transfer on every path (a call counts as a read; no callee is followed); the marker then ends at
+   the call, and the proof is recorded (callee, its body's SHA-256, every killing write).
 
 Nothing is dropped: the value is tracked until a write overwrites it on every path, and every use
 refuses.  No premise.  Every record and clearing site is bound into the buffer fingerprint, only
@@ -165,16 +170,53 @@ def step(proof, address, site, instruction, aliases, calling):
     for register in held:
         if register in read:
             raise Refusal(f"released callee frame address in r{register - match.ARM_REG_R0} is read")
-    if calling and any(register - match.ARM_REG_R0 < 4 for register in held):
-        raise Refusal("released callee frame address reaches a call in R0-R3")
+    passed = {register for register in held if register - match.ARM_REG_R0 < 4}
+    if calling and passed:
+        entry = killing_callee(proof, instruction, passed)
+        if entry is None:
+            raise Refusal("released callee frame address reaches a call in R0-R3")
+        for register in passed:                   # rule 7: the callee overwrites it unread
+            del aliases[mark(register)]
+        proof.released_calls[(address, site, entry["address"], tuple(entry["registers"]))] = entry
     for register in held & set(written):
         del aliases[mark(register)]
         proof.released_kills.add((address, site, register - match.ARM_REG_R0))
 
 
+def killing_callee(proof, instruction, registers):
+    """Rule 7: the proof that the direct callee of `instruction` writes each of `registers` before any
+    read, call, return or other transfer on every path from its entry (dead_register's version-1
+    entry walk: a call while a value is live refuses, no callee is followed), as a record; None when
+    there is none (the call is no direct BL of a mapped callee, or the walk refuses)."""
+    import dead_register
+    import match
+    operands = instruction.operands
+    if instruction.mnemonic != 'bl' or instruction.size != 4 or len(operands) != 1 or \
+            operands[0].type != match.ARM_OP_IMM or operands[0].imm in match.RUNTIME_HELPERS.values():
+        return None
+    callee = operands[0].imm
+    try:
+        data = proof.span(callee)
+        result = dead_register.prove(callee, frozenset(registers), dead_register.thumb_step(callee, data),
+                                     end='dead register reaches the end of its callee',
+                                     cycle='dead register callee has a path without its killing write',
+                                     budget='dead register callee state budget exceeded')
+    except ValueError:
+        return None
+    r0, _ = _registers()
+    return dict(address=callee, end=callee + len(data), body_sha256=dead_register.sha(data),
+                registers=sorted(register - r0 for register in registers), states=result.states,
+                kills=sorted([site, register - r0] for site, register in result.kills))
+
+
 def records(proof):
-    return dict(released=[list(row) for row in sorted(proof.released_scratch, key=_key)],
-                cleared=[list(row) for row in sorted(proof.released_kills)])
+    found = dict(released=[list(row) for row in sorted(proof.released_scratch, key=_key)],
+                 cleared=[list(row) for row in sorted(proof.released_kills)])
+    if proof.released_calls:
+        # Only a walk that relied on rule 7 adds this; every other record is unchanged.
+        found['killed_by_calls'] = [[function, site, entry] for (function, site, _, _), entry
+                                    in sorted(proof.released_calls.items())]
+    return found
 
 
 def _key(row):
@@ -195,7 +237,14 @@ def lines(proof):
         for callee, site, register, offset in sorted(proof.released_scratch, key=_key))
     cleared = ', '.join(f"0x{function:08X} at 0x{site:08X} r{register}"
                         for function, site, register in sorted(proof.released_kills)) or 'none'
-    return [f"{FIELD}: `{SCHEMA}` released {released_rows}; cleared {cleared}"]
+    calls = ''.join(
+        f"; call 0x{site:08X} in 0x{function:08X} to 0x{entry['address']:08X} passes "
+        f"{' '.join(f'r{register}' for register in entry['registers'])}, which the callee writes before any "
+        f"read, call or return on every path ({entry['states']} states; "
+        f"{' '.join(f'r{register}@0x{at:08X}' for at, register in entry['kills'])}; "
+        f"body {entry['body_sha256'][:16]})"
+        for (function, site, _, _), entry in sorted(proof.released_calls.items()))
+    return [f"{FIELD}: `{SCHEMA}` released {released_rows}; cleared {cleared}{calls}"]
 
 
 def fingerprint_part(proof):

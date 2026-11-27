@@ -3899,6 +3899,9 @@ class BufferCallProof:
         self.released_unmarked = set()
         # How often the walks met that rule (records and applied markers); never rolled back.
         self.released_events = 0
+        # (function, site, callee, registers) -> the dead-register proof of a call that received a
+        # released address in R0-R3 its callee overwrites unread (that rule's rule 7).
+        self.released_calls = {}
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Exact call-via resolutions ((site, target) -> record) and the target each resolved call
@@ -4103,7 +4106,8 @@ class BufferCallProof:
                 if self.default_forwarding else None,
                 self.store_bounds.snapshot() if self.store_bounds is not None else None,
                 self.motion_summaries.snapshot() if self.motion_summaries is not None else None,
-                (set(self.released_scratch), set(self.released_kills), set(self.released_unmarked)),
+                (set(self.released_scratch), set(self.released_kills), set(self.released_unmarked),
+                 dict(self.released_calls)),
                 set(self.iwram_image_calls),
                 set(self.fresh_block_uses))
 
@@ -4131,7 +4135,8 @@ class BufferCallProof:
         self.call_via_effective.clear()
         self.call_via_effective.update(via_snapshot[1])
         self.released_scratch, self.released_kills, self.released_unmarked = \
-            (set(values) for values in released_snapshot)
+            (set(values) for values in released_snapshot[:3])
+        self.released_calls = dict(released_snapshot[3])
         for ledger, values in zip((self.loop_replays, self.dependencies, self.callee_clobbers, self.callee_trusted,
                                    self.far_jumps), snapshot):
             ledger.clear()
