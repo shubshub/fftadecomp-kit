@@ -14,7 +14,11 @@ dropped only when the ROM shows that no caller reads it:
   a direct branch (a Thumb BL reaches 4 MiB and an ARM B or BL 32 MiB), so it can reach the function
   only through a register;
 * no Thumb B or B<cond> outside the function branches to its entry;
-* the mapped function that ends at its entry has a closed control-flow graph, so nothing falls into it;
+* nothing falls into the entry: the mapped function with the greatest start below it is Thumb code, ends
+  at or before the entry and has a closed control-flow graph, and any unmapped gap between them is at most
+  ``GAP_LIMIT`` bytes and named by nothing (no word, BL or Thumb branch targets one of its
+  halfwords), so execution never reaches the gap and runs on into the entry; with no such function it
+  refuses;
 * every Thumb BL in the ROM that targets it lies in a mapped Thumb function and decodes as that BL there,
   and from the instruction after it, on every path, that caller writes R1 before any read, call or
   return (``dead_register.prove`` with ``dead_register.thumb_step``).  A call from the function to
@@ -38,11 +42,13 @@ import struct
 SCHEMA = "frame-result-r1-dead-at-callers-v1"
 LINE = "* buffer frame result r1"
 PREMISE = ("unproved runtime premise: code runs only from the BIOS, ROM, EWRAM and IWRAM, and no code reaches "
-           "the function through an address formed at run time (by arithmetic, in decompressed data, or as a "
-           "ROM mirror address assembled from bytes at an odd offset) rather than stored in the ROM, so its "
-           "direct callers are all its callers")
+           "the function, or unmapped bytes before it, through an address formed at run time (by arithmetic, in "
+           "decompressed data, or as a ROM mirror address assembled from bytes at an odd offset) rather than "
+           "stored in the ROM, so its direct callers are all its callers")
 MIRRORS = tuple(step * 0x01000000 for step in range(1, 6))     # 0x09000000-0x0DFFFFFF over 0x08000000
 BRANCH_REACH = 4096
+GAP_LIMIT = 64                   # the longest unmapped gap before the entry whose halfwords are scanned
+_THUMB_BL = re.compile(rb"(?=[\x00-\xff][\xf0-\xf7][\x00-\xff][\xf8-\xff])", re.S)
 _CACHE = {}
 
 
@@ -76,25 +82,29 @@ def _owner(spans, starts, site):
     return None
 
 
-def scan(rom, address):
-    """(word hits, BL sites, B/B<cond> sites) naming ``address`` in the ROM image.
+def scan(rom, address, gap_start=None):
+    """References in the ROM image to ``address`` or to a halfword of the unmapped gap [gap_start, address)
+    before it: (words, BLs, Thumb B/B<cond>s), each a sorted list of (site, target).
 
-    Word hits are the function's address or Thumb address at any byte offset, and either one in a ROM
-    mirror at a halfword-aligned offset."""
+    Words are a target or its Thumb address at any byte offset, or either one in a ROM mirror at a
+    halfword-aligned offset."""
     import match
     base = match.ROM_BASE
+    first = address if gap_start is None else gap_start
+    targets = set(range(first, address + 1, 2))
     words = []
-    values = [(value, 1) for value in (address, address | 1)]
-    values += [(value + mirror, 2) for mirror in MIRRORS for value in (address, address | 1)]
-    for value, alignment in values:
-        packed = struct.pack("<I", value)
-        start = 0
-        while (found := rom.find(packed, start)) >= 0:
-            if found % alignment == 0:
-                words.append(base + found)
-            start = found + 1
+    for target in sorted(targets):
+        values = [(value, 1) for value in (target, target | 1)]
+        values += [(value + mirror, 2) for mirror in MIRRORS for value in (target, target | 1)]
+        for value, alignment in values:
+            packed = struct.pack("<I", value)
+            start = 0
+            while (found := rom.find(packed, start)) >= 0:
+                if found % alignment == 0:
+                    words.append((base + found, target))
+                start = found + 1
     calls = []
-    for found in re.finditer(rb"(?=[\x00-\xff][\xf0-\xf7][\x00-\xff][\xf8-\xff])", rom, re.S):
+    for found in _THUMB_BL.finditer(rom):
         offset = found.start()
         if offset % 2:
             continue
@@ -102,12 +112,11 @@ def scan(rom, address):
         displacement = ((high & 0x7FF) << 12) | ((low & 0x7FF) << 1)
         if displacement & 0x400000:
             displacement -= 0x800000
-        if base + offset + 4 + displacement == address:
-            calls.append(base + offset)
+        if base + offset + 4 + displacement in targets:
+            calls.append((base + offset, base + offset + 4 + displacement))
     branches = []
-    first = max(0, (address - base - BRANCH_REACH) // 2 * 2)
-    last = min(len(rom) - 2, address - base + BRANCH_REACH)
-    for offset in range(first, last + 1, 2):
+    for offset in range(max(0, (first - base - BRANCH_REACH) // 2 * 2),
+                        min(len(rom) - 2, address - base + BRANCH_REACH) + 1, 2):
         (half,) = struct.unpack_from("<H", rom, offset)
         if half & 0xF800 == 0xE000:
             displacement = (half & 0x7FF) << 1
@@ -119,9 +128,19 @@ def scan(rom, address):
                 displacement -= 0x200
         else:
             continue
-        if base + offset + 4 + displacement == address:
-            branches.append(base + offset)
-    return sorted(set(words)), calls, branches
+        if base + offset + 4 + displacement in targets:
+            branches.append((base + offset, base + offset + 4 + displacement))
+    return sorted(set(words)), sorted(calls), sorted(branches)
+
+
+def _predecessor(proof, address):
+    """(start, end, mode) of the mapped function, of any mode, with the greatest start below ``address``."""
+    best = None
+    for entry in proof.entries:
+        start = int(entry["rom"], 16)
+        if start < address and (best is None or start > best[0]):
+            best = (start, int(entry["end"], 16), entry.get("mode", "thumb"))
+    return best
 
 
 def evidence(proof, address, mapping):
@@ -141,22 +160,40 @@ def evidence(proof, address, mapping):
         own = _owner(spans, starts, address)
         if own is None or own[0] != address:
             raise ValueError("the function is not a mapped Thumb entry")
-        words, sites, branches = scan(proof.rom, address)
+        # Nothing falls into the entry: the mapped function before it never runs off its end, and nothing
+        # names an unmapped gap between them, from which execution would run on into the entry.
+        previous = _predecessor(proof, address)
+        if previous is None:
+            raise ValueError("no mapped function precedes it, so nothing shows that no code falls into its entry")
+        if previous[2] != "thumb":
+            raise ValueError(f"the function before it, 0x{previous[0]:08X}, is not Thumb code")
+        if previous[1] > address:
+            raise ValueError(f"the function before it, 0x{previous[0]:08X}, overlaps its entry")
+        gap = address - previous[1]
+        if gap > GAP_LIMIT:
+            raise ValueError(f"the {gap}-byte unmapped gap before it is longer than {GAP_LIMIT} bytes")
+        try:
+            closed = owner.refine(proof.span(previous[0]), previous[0], mapping)["cfg_closed"]
+        except ValueError:
+            closed = False
+        if not closed:
+            raise ValueError(f"the function before it, 0x{previous[0]:08X}, may fall into its entry")
+        words, sites, branches = scan(proof.rom, address, previous[1] if gap else None)
+
+        def named(target):
+            return "the function" if target == address else "the unmapped gap before it"
         if words:
-            raise ValueError(f"the ROM word at 0x{words[0]:08X} names the function")
-        outside = [site for site in branches if not own[0] <= site < own[1]]
+            raise ValueError(f"the ROM word at 0x{words[0][0]:08X} names {named(words[0][1])}")
+        outside = [(site, target) for site, target in branches if target != address or not own[0] <= site < own[1]]
         if outside:
-            raise ValueError(f"a Thumb branch at 0x{outside[0]:08X} reaches the function's entry")
-        previous = _owner(spans, starts, address - 2)
-        if previous is not None:
-            try:
-                closed = owner.refine(proof.span(previous[0]), previous[0], mapping)["cfg_closed"]
-            except ValueError:
-                closed = False
-            if not closed:
-                raise ValueError(f"the function before it, 0x{previous[0]:08X}, may fall into its entry")
+            site, target = outside[0]
+            raise ValueError(f"a Thumb branch at 0x{site:08X} reaches "
+                             + ("the function's entry" if target == address else "the unmapped gap before it"))
+        into = [site for site, target in sites if target != address]
+        if into:
+            raise ValueError(f"a BL at 0x{into[0]:08X} branches into the unmapped gap before it")
         callers = []
-        for site in sites:
+        for site in [site for site, _ in sites]:
             caller = _owner(spans, starts, site)
             if caller is None:
                 raise ValueError(f"a BL at 0x{site:08X} outside every mapped Thumb function targets it")
@@ -180,7 +217,8 @@ def evidence(proof, address, mapping):
         if not callers:
             raise ValueError("no direct caller")
         found = dict(schema=SCHEMA, function=address, callers=callers, words=0, branches=0,
-                     previous=None if previous is None else previous[0], premise=PREMISE, premise_proved=False)
+                     previous=previous[0], previous_end=previous[1], gap=gap, premise=PREMISE,
+                     premise_proved=False)
     except ValueError as error:
         _CACHE[key] = ("refused", str(error))
         raise
@@ -220,13 +258,17 @@ def lines(proof):
     if not found:
         return []
     sites = ", ".join(f"`0x{site:08X} r1 {offset:+d}`" for site, offset in found["sites"])
+    gap = (f" and nothing names the {found['gap']}-byte unmapped gap from 0x{found['previous_end']:08X} to the "
+           f"entry" if found["gap"] else "")
     callers = ", ".join(f"0x{row['site']:08X} in 0x{row['caller']:08X} (R1 written at "
                         + " ".join(f"0x{node:08X}" for node in row["kills"]) + f"; {row['states']} states)"
                         for row in found["callers"])
     return [f"{LINE}: `{found['schema']}` own-frame addresses dropped at the owner's normal returns: {sites}; "
             f"no ROM word at any byte offset equals 0x{found['function']:08X} or 0x{found['function'] | 1:08X} "
             f"and no halfword-aligned one equals either in a ROM mirror (0x09000000-0x0DFFFFFF), "
-            f"no Thumb branch outside it reaches its entry and nothing falls into it; every direct caller writes "
+            f"no Thumb branch outside it reaches its entry; nothing falls into it: "
+            f"the mapped function before it, 0x{found['previous']:08X}, has a closed control-flow graph{gap}; "
+            f"every direct caller writes "
             f"R1 before any read, call or return: {callers}; {found['premise']}"]
 
 
