@@ -350,6 +350,47 @@ class StandInTests(unittest.TestCase):
         proof = self.walk()
         self.assertIn('frame addresses passed: ', proof.motion_summaries.lines()[1])
 
+    # The review's hostile fixtures F1-F7 (each was admitted before the walked-frame requires, F7 apart).
+    GLOBAL_STORE = '    movs r3, #3\n    lsls r3, r3, #24\n    str r0, [r3]\n'
+
+    def test_review_f1_block_address_kept_in_the_allocation(self):
+        with self.assertRaisesRegex(ValueError, 'stores a walked-frame address outside the frames'):
+            self.derive(callback_extra='    str r4, [r2, #20]\n')
+        self.refused('stores a walked-frame address outside the frames', callback_extra='    str r4, [r2, #20]\n')
+
+    def test_review_f2_message_or_callback_frame_address_kept(self):
+        for code in ('    str r1, [r2, #20]\n', '    mov r0, sp\n    str r0, [r2, #20]\n'):
+            with self.subTest(code=code):
+                self.refused('stores a walked-frame address outside the frames', callback_extra=code)
+
+    def test_review_f3_block_address_returned_and_the_owner_leaks_its_local(self):
+        self.refused('R2 returns a walked-frame address', callback_extra='    adds r2, r4, #0\n',
+                     owner_after='    ldr r0, [r2, #4]\n' + self.GLOBAL_STORE)
+
+    def test_review_f3b_block_address_returned_in_r12(self):
+        self.refused('R12 returns a walked-frame address', callback_extra='    mov r12, r4\n',
+                     owner_after='    mov r2, r12\n    ldr r0, [r2, #4]\n' + self.GLOBAL_STORE)
+
+    def test_review_f4_block_address_through_an_untracked_pointer(self):
+        self.refused('stores a walked-frame address outside the frames',
+                     callback_extra='    movs r3, #3\n    lsls r3, r3, #24\n    ldr r3, [r3]\n    str r4, [r3]\n')
+
+    def test_review_f5_halfword_of_a_frame_address_used_as_a_number(self):
+        self.refused('a halfword or byte of a walked-frame address is read',
+                     callback_extra='    sub sp, #8\n    mov r3, sp\n    strh r4, [r3]\n    ldrh r0, [r3]\n'
+                                    '    add sp, #8\n    str r0, [r2, #20]\n')
+
+    def test_review_f6_owner_position_handed_to_the_allocator(self):
+        self.refused('R1 is written through, kept or used as a number',
+                     before_allocator='    ldr r3, [r5, #4]\n    ldr r3, [r3, #4]\n')
+
+    def test_review_f7_descriptor_handed_to_the_allocator_is_admitted_under_the_premise(self):
+        # As the real bodies do: a frame address in R3 at the allocator, listed and covered by the premise.
+        proof = self.walk(before_allocator='    adds r3, r5, #0\n')
+        facts = proof.motion_summaries.lines()[1]
+        self.assertIn(':r3=entry-SP-44', facts)
+        self.assertIn('keep none of their argument values', proof.motion_summaries.lines()[-1])
+
     def test_an_unrestored_callee_saved_register_refuses(self):
         with self.assertRaisesRegex(ValueError, 'R5 is not restored at the return'):
             self.derive(wrapper_extra='    movs r5, #0')
