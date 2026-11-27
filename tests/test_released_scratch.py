@@ -59,6 +59,11 @@ SECOND = {name: (f"push {{lr}}\nsub sp, #8\n{call}{use}add sp, #8\npop {{r0}}\nb
           for use in (USE,)}
 SECOND_SWI = {name: (f"push {{lr}}\nsub sp, #8\n{call}cmp r1, #0\nbeq 1f\nsvc #0\n1:\n{USE}"
                      f"add sp, #8\npop {{r0}}\nbx r0") for name, call in AGAIN.items()}
+# Rule 7: a call made while r2 is marked, to a callee K that overwrites r2 unread, or does not.
+K = {"kills": "movs r2, #0\nbx lr",
+     "reads": "adds r0, r2, #0\nmovs r2, #0\nbx lr",
+     "calls first": "push {lr}\nbl func_KZ\nmovs r2, #0\npop {r0}\nbx r0",
+     "kills on one path": "cmp r1, #0\nbeq 1f\nmovs r2, #0\n1:\nbx lr"}
 # A walked callee that calls D unwalked, overwrites r2, then walks D with its own frame: its core
 # walk meets the first call before D's record, its alias-path walk after it.
 C_BOTH = ("push {lr}\nsub sp, #8\nmovs r1, #1\nstrh r1, [r0]\nmovs r0, #0\nbl func_D\nmovs r2, #0\n"
@@ -85,13 +90,15 @@ class ReleasedScratchTests(unittest.TestCase):
     def build(self, owner_body, **bodies):
         functions = dict(func_X=X, func_Y=Y, func_Z=Z, func_X2=X2, func_W="bx lr", func_X3=X3, func_D=D,
                          func_E=E, func_C_BRANCH=C_BRANCH, func_C_BOTH=C_BOTH,
-                         func_D7=SECOND["walked"])
+                         func_D7=SECOND["walked"], func_K=K["kills"], func_KZ="movs r2, #0\nbx lr")
         functions.update(bodies)
         labels = ["owner", "owner_end"] + [label for name in functions for label in (name, name + "_end")]
         text = (".syntax unified\n.arch armv4t\n.thumb\n.text\n.global " + ", ".join(labels) + "\n"
                 f"owner:\n{owner_body}\n.align 2\n.ltorg\nowner_end:\n")
         for index, (name, body) in enumerate(functions.items()):
             text += f".org 0x{0x100 * (index + 1):x}\n{name}:\n{body}\n{name}_end:\n"
+        if self.thunk is not None:
+            text += f".org 0x{self.thunk - BASE:x}\nbx r3\nnop\n"
         (self.root / "f.s").write_text(text)
         for command in (
                 ["arm-none-eabi-as", "-mthumb-interwork", str(self.root / "f.s"), "-o", str(self.root / "f.o")],
@@ -105,13 +112,18 @@ class ReleasedScratchTests(unittest.TestCase):
         rom = (self.root / "f.bin").read_bytes()
         entries = [{"rom": f"0x{self.symbols[name]:08X}", "end": f"0x{self.symbols[name + '_end']:08X}",
                     "mode": "thumb"} for name in ("owner", *functions)]
+        if self.thunk is not None:
+            entries.append({"rom": f"0x{self.thunk:08X}", "end": f"0x{self.thunk + 2:08X}", "mode": "thumb"})
         self.rom, self.mapping = rom, json.dumps(entries).encode()
         self.body = rom[:self.symbols["owner_end"] - BASE]
+
+    thunk = None          # _call_via_r3's address, laid in and mapped when a test sets it
 
     def walk(self, owner_body, **bodies):
         self.build(owner_body, **bodies)
         proof = match.BufferCallProof(self.rom, self.mapping, stack_arguments=True, loop_replay=True,
-                                      bios_wrappers=True, dead_registers=True)
+                                      bios_wrappers=True, dead_registers=True,
+                                      call_via_targets=self.thunk is not None)
         match.verify_leaf_instructions(self.body, OWNER, True, buffer_proof=proof, call_resolver=proof.target,
                                        incoming_narrow_reads=True)
         return proof
@@ -153,7 +165,9 @@ class ReleasedScratchTests(unittest.TestCase):
     # Refused -------------------------------------------------------------------
 
     def test_a_read_of_the_released_register_refuses(self):
-        for use in ("adds r0, r2, #0", "strh r1, [r2]", "cmp r2, #0", "push {r2}\npop {r2}", "str r2, [sp]"):
+        for use in ("adds r0, r2, #0", "strh r1, [r2]", "cmp r2, #0", "push {r2}\npop {r2}", "str r2, [sp]",
+                    # read and written by one instruction: the read refuses before the write clears it
+                    "adds r2, #4", "lsls r2, r2, #1", "ldr r2, [r2]", "subs r2, r2, r1", "ldm r2!, {r1}"):
             with self.subTest(use=use):
                 self.refused("released callee frame address in r2 is read", owner(use))
 
@@ -251,6 +265,45 @@ class ReleasedScratchTests(unittest.TestCase):
         proof.released_unmarked.add((1, 2))
         proof._restore_ledgers(saved)
         self.assertEqual(proof.released_unmarked, set())
+
+    def test_a_call_via_callees_release_marks_its_caller(self):
+        # The call-via target rule resolves the owner's _call_via_r3 to X, which releases r2: the
+        # marker is keyed by X, not by the thunk.
+        self.thunk = match.RUNTIME_HELPERS["_call_via_r3"]
+        call = f"ldr r3, =func_X + 1\nbl 0x{self.thunk:08X}"
+        body = owner("adds r0, r2, #0\nmovs r2, #0", callee="func_X").replace("bl func_X", call)
+        self.refused("released callee frame address in r2 is read", body)
+        proof = self.walk(body.replace("adds r0, r2, #0\n", ""))
+        self.assertIn(self.x(), {row[0] for row in proof.released_scratch})
+
+    def test_a_call_whose_callee_overwrites_the_marked_register_unread(self):
+        proof = self.walk(owner("bl func_K\nadds r0, r2, #0"))
+        (key, entry), = proof.released_calls.items()
+        self.assertEqual((key[0], key[2], entry["registers"]), (OWNER, self.x("func_K"), [2]))
+        self.assertEqual(entry["kills"], [[self.x("func_K"), 2]])
+        line, = released.lines(proof)
+        self.assertIn(f"to 0x{self.x('func_K'):08X} passes r2, which the callee writes before any read", line)
+        bound = proof.fingerprint()
+        saved = dict(proof.released_calls)
+        proof.released_calls.clear()
+        self.assertNotEqual(proof.fingerprint(), bound)
+        proof.released_calls.update(saved)
+        self.assertEqual(proof.fingerprint(), bound)
+        for name in ("reads", "calls first", "kills on one path"):
+            with self.subTest(name):
+                self.refused("released callee frame address reaches a call in R0-R3",
+                             owner("bl func_K\nmovs r2, #0"), func_K=K[name])
+        # A marked r3 the callee does not write keeps the refusal.
+        self.refused("released callee frame address reaches a call in R0-R3", owner("bl func_K\nmovs r3, #0"),
+                     func_X=X.replace("mov r2, sp", "mov r3, sp"))
+
+    def test_an_aborted_pass_leaves_no_killing_call(self):
+        self.build(owner("movs r2, #0"))
+        proof = match.BufferCallProof(self.rom, self.mapping, stack_arguments=True)
+        saved = proof._snapshot_ledgers()
+        proof.released_calls[(1, 2, 3, (2,))] = {}
+        proof._restore_ledgers(saved)
+        self.assertEqual(proof.released_calls, {})
 
     def test_a_subclass_proof_keeps_the_refusal(self):
         self.build(owner("movs r2, #0"))

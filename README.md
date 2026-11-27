@@ -1969,7 +1969,11 @@ from that callee's entry SP is recorded and handed back to the caller as a
 marker. R0 and R1, an offset at or above the entry SP and every return of the
 owner itself keep the refusal. Both walks of the caller carry the marker
 through their joins. Any instruction that reads it refuses, and so does a
-call while it is in R0-R3. A write clears it (the site is recorded), and a
+call while it is in R0-R3, unless the dead-register entry walk (version 1: a
+call counts as a read, no callee is followed) proves that the direct callee
+writes that register before any read, call or return on every path; the
+marker then ends at the call, and the proof (callee, body SHA-256, every
+killing write) is stated and bound. A write clears it (the site is recorded), and a
 return of a walked caller hands it on the same way. Every refusal of the
 rule has its own type, and an inspection refused by one, or one that met the
 rule at all (recorded a release, a repeat included, or applied a marker),
