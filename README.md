@@ -5756,8 +5756,16 @@ closed without an overlay map). The scan covers the whole ROM: BLs that reach
 the function's start, BLs and Thumb branches that reach anywhere inside it from
 elsewhere, and words holding any address in it; it does not see an address
 formed by arithmetic (an `adr`, an add, an offset table), and the record says
-so. Each BL to the start must lie in an indexed function below `0x08150000`
-with a matched source whose BL relocation there names the function; that
+so. A halfword that reads as a branch inside but lies in a literal pool that
+no modelled reference reaches is no reference: its word is read by a
+pc-relative load, the pool follows a `b`, `bx`, `mov pc` or `pop {pc}` (not
+after `mov lr, pc` or a lone BL prefix, either of which can make the next
+halfword a return address), and no BL, branch, return or word enters the pool
+up to it. That is all it proves, so the record prints each one with the premise that
+nothing the scan does not model runs it: an address formed by arithmetic, a
+lone BL suffix (a branch relative to `lr`), a copy in RAM, or ARM code. Each
+BL to the start must lie in an indexed function below `0x08150000` with a
+matched source whose BL relocation there names the function; that
 caller is compiled, must match the ROM, every call of the function in its
 expand dump must reach its own BL in the final listing (cross-jumping can merge
 calls with different arguments into one), and the argument register set in the

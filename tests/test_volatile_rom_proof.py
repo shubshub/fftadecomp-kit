@@ -865,11 +865,111 @@ class CallerScanTests(unittest.TestCase):
         rom[0x430:0x432] = thumb(0xE000 | ((0x08000408 - 0x08000434) >> 1) & 0x7FF)   # a branch into the body
         rom[0xA01:0xA05] = struct.pack("<I", 0x0800041F)                    # a word holding a body address
         proof._BL_INDEX.clear()
-        calls, inside, words = proof.rom_references(bytes(rom), 0x08000400, 0x08000420)
+        calls, inside, words, pools = proof.rom_references(bytes(rom), 0x08000400, 0x08000420)
         self.assertEqual(calls, [0x08000100, 0x08000404, 0x08000600])
         self.assertEqual(inside, [(0x080003F0, 0x08000400), (0x08000430, 0x08000408), (0x08000803, 0x08000400),
                                   (0x08000900, 0x08000404), (0x08000A01, 0x0800041F)])
         self.assertEqual(words, [0x08000700])
+        self.assertEqual(pools, [])
+
+    POOL = 0x08000480                                   # a literal word whose low half reads as beq 08000402
+    BEQ = 0xD000 | ((0x08000402 - (POOL + 4)) >> 1) & 0xFF
+
+    def pool(self, *before, low=BEQ, high=0x0839, load=True, at=POOL, edit=None):
+        """rom_references of 08000400..08000420 with the halfwords `before` ending at the word `at` (low, high),
+        which an ldr r1, [pc, #12] 0x10 bytes before it (08000470 for POOL) reads when `load`"""
+        rom = bytearray(b"\xff" * 0x2000)
+        if load:
+            rom[at - 0x10 - proof.BASE:at - 0x0E - proof.BASE] = thumb(0x4903)
+        rom[at - proof.BASE - 2 * len(before):at - proof.BASE] = thumb(*before)
+        rom[at - proof.BASE:at - proof.BASE + 4] = thumb(low, high)
+        if edit:
+            edit(rom)
+        proof._BL_INDEX.clear()
+        calls, inside, words, pools = proof.rom_references(bytes(rom), 0x08000400, 0x08000420)
+        self.assertEqual((calls, words), ([], []))
+        return inside, pools
+
+    def test_a_literal_word_no_modelled_reference_reaches_is_no_branch(self):
+        """the shape of 080FDB08 in 080FDAB0: a pool word after a `b`, loaded by an ldr, read as bvc into 080FD6E8"""
+        for label, before, stop in (("b", (0xE7FE,), 0x0800047E), ("bx r0", (0x4700,), 0x0800047E),
+                                    ("bx lr", (0x4770,), 0x0800047E), ("mov pc, r1", (0x468F,), 0x0800047E),
+                                    ("pop {r4, pc}", (0xBD10,), 0x0800047E),
+                                    ("an alignment nop after bx lr", (0x4770, 0x46C0), 0x0800047C),
+                                    ("an alignment zero after b", (0xE7FE, 0x0000), 0x0800047C)):
+            with self.subTest(label=label):
+                self.assertEqual(self.pool(*before), ([], [(self.POOL, 0x08000402, stop + 2, stop, [0x08000470])]))
+        # the high half of the word, and a word after another word the pool's loads read
+        self.assertEqual(self.pool(0x4770, low=0x0839, high=0xD0BE),
+                         ([], [(self.POOL + 2, 0x08000402, self.POOL, self.POOL - 2, [0x08000470])]))
+
+        def first_word_loaded(rom):
+            rom[0x472:0x474] = thumb(0x4A00 | (self.POOL - 4 - 0x08000474) // 4)     # ldr r2, [pc, #imm]
+        self.assertEqual(self.pool(0x4770, 0x1234, 0x0839, edit=first_word_loaded),
+                         ([], [(self.POOL, 0x08000402, self.POOL - 4, self.POOL - 6, [0x08000470])]))
+        self.assertEqual(self.pool(0x4770, 0x1234, 0x0839)[0], [(self.POOL, 0x08000402)])
+
+    def test_a_literal_word_a_modelled_reference_can_reach_is_still_a_branch(self):
+        kept = [(self.POOL, 0x08000402)]
+        for label, before, kwargs in (
+                ("no load reads the word", (0xE7FE,), {"load": False}),
+                ("it follows code that goes on", (0x2000,), {}),
+                ("a conditional branch", (0xD1FE,), {}),
+                ("an interrupt", (0xDF0B,), {}),
+                ("a call: the word is its return address", struct.unpack("<HH", encode_bl(0x0800047C, 0x08000800)),
+                 {}),
+                ("blx r1 returns", (0x4788,), {}),
+                ("mov lr, pc before bx r1: a call", (0x46FE, 0x4708), {}),
+                ("mov lr, pc before b: a call", (0x46FE, 0xE7FE), {}),
+                # a lone BL prefix sets lr to its address + 4 (+ offset << 12): with offset 0 the word is the return
+                ("a BL prefix with offset 0 before bx r1: a call", (0xF000, 0x4708), {}),
+                ("a BL prefix before b", (0xF012, 0xE7FE), {}),
+                ("a BL prefix with a negative offset before pop {pc}", (0xF7FF, 0xBD00), {}),
+                ("bx pc goes on to ARM code", (0x4778, 0x46C0), {}),
+                ("mov pc, pc goes on", (0x46FF, 0x46C0), {}),
+                ("pop without pc", (0xBC01,), {})):
+            with self.subTest(label=label):
+                self.assertEqual(self.pool(*before, **kwargs), (kept, []))
+
+        def put(offset, *halves):
+            def edit(rom):
+                rom[offset:offset + 2 * len(halves)] = thumb(*halves)
+            return edit
+
+        def word(offset, value):
+            def edit(rom):
+                rom[offset:offset + 4] = struct.pack("<I", value)
+            return edit
+
+        def call(at, target):
+            def edit(rom):
+                rom[at - proof.BASE:at - proof.BASE + 4] = encode_bl(at, target)
+            return edit
+
+        for label, before, edit in (
+                ("a b far before", (0x4770,), put(0x200, 0xE000 | ((self.POOL - 0x08000204) >> 1) & 0x7FF)),
+                ("the farthest b after", (0x4770,), put(0xC7C, 0xE000 | ((self.POOL - 0x08000C80) >> 1) & 0x7FF)),
+                ("a b inside the function", (0x4770,), put(0x410, 0xE000 | ((self.POOL - 0x08000414) >> 1))),
+                ("a conditional branch", (0x4770,), put(0x460, 0xD100 | ((self.POOL - 0x08000464) >> 1))),
+                ("the stop branches to it", (0xE000 | ((self.POOL - 0x08000482) >> 1) & 0x7FF,), None),
+                ("a branch to the alignment halfword", (0x4770, 0x46C0),
+                 put(0x460, 0xD100 | ((self.POOL - 2 - 0x08000464) >> 1))),
+                ("a BL", (0x4770,), call(0x08001000, self.POOL)),
+                ("a BL to the alignment halfword", (0x4770, 0x46C0), call(0x08001000, self.POOL - 2)),
+                ("a Thumb address word", (0x4770,), word(0x1001, self.POOL | 1)),
+                ("an address word", (0x4770,), word(0x1100, self.POOL))):
+            with self.subTest(label=label):
+                self.assertEqual(self.pool(*before, edit=edit), (kept, []))
+
+        def to_low_half(rom):
+            rom[0x460:0x462] = thumb(0xD100 | ((self.POOL - 0x08000464) >> 1))
+        self.assertEqual(self.pool(0x4770, low=0x0839, high=0xD0BE, edit=to_low_half),
+                         ([(self.POOL + 2, 0x08000402)], []))
+        # a word 2046 bytes on, read as `b 08000402`, and the farthest b before it that reaches it
+        far, b = 0x08000BFC, 0xE000 | ((0x08000402 - 0x08000C00) >> 1) & 0x7FF
+        self.assertEqual(self.pool(0x4770, low=b, at=far), ([], [(far, 0x08000402, far, far - 2, [far - 0x10])]))
+        self.assertEqual(self.pool(0x4770, low=b, at=far, edit=put(far - 2050 - proof.BASE, 0xE3FF)),
+                         ([(far, 0x08000402)], []))
 
     def test_every_pc_relative_load_of_a_word_is_found(self):
         rom = bytearray(b"\xff" * 0x3000)
@@ -1520,6 +1620,28 @@ class CallerTests(unittest.TestCase):
                                                   "(Entry *)0x04000040, v - 1); }"),
                      0x08000800: self.CALLER}
         self.assertIn("lies in the function itself", self.trace(recursive)[0][1][1])
+
+    def test_a_literal_word_no_modelled_reference_reaches_is_no_branch_into_the_function(self):
+        sources, pool = {ADDRESS: self.CALLEE, 0x08000800: self.CALLER}, ADDRESS + 0x80
+        beq = 0xD000 | ((ADDRESS + 2 - (pool + 4)) >> 1) & 0xFF
+
+        def literal(stop):
+            def edit(root, rom):
+                rom[0x470:0x472] = struct.pack("<H", 0x4903)                   # ldr r1, [pc, #12] reads 08000480
+                rom[0x47E:0x484] = struct.pack("<HHH", stop, beq, 0x0839)       # whose low half reads as beq
+            return edit
+
+        (state, text), = [verdict for _, verdict in self.trace(sources, literal(0x4770))]
+        self.assertEqual(state, "admitted", text)
+        self.assertIn("premise: the code runs where it lies below 0x08150000", text)
+        self.assertIn("; 08000480, a branch to 08000402 if it ran, is literal data no modelled reference reaches: the "
+                      "word 08000480 is loaded by 08000470, its pool from 08000480 follows 0800047E, which never goes "
+                      "on, and no BL, branch, return or word enters 08000480..08000481; unproved, so assumed: nothing "
+                      "the scan does not model runs it (an address formed by arithmetic, a lone BL suffix, a copy in "
+                      "RAM, ARM code)", text)
+        (state, text), = [verdict for _, verdict in self.trace(sources, literal(0x2000))]
+        self.assertEqual(state, "refused", text)
+        self.assertIn("08000480 reaches or holds 08000402 inside the function", text)
 
     def test_calls_a_later_pass_merged_refuse(self):
         # jump2 cross-jumps these calls into one BL: tracing that BL would read one argument for all of them
