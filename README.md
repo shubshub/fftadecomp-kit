@@ -5451,8 +5451,18 @@ like a codegen hack (inline asm, pragma surgery, dead code, \olatile\,
 steering padding) is reported **IMPLAUSIBLE**, not a match. Exit status is 0
 only when the bytes match *and* the source is plausible.
 
+Some findings are suspects, not errors (`noinline`, `#pragma pack`, a member
+named `pad`, a ROM address used as a value): a justification clears one. A justification is a comment that begins with
+`plausible:` and goes on to say why, on the suspect's line or ending on the
+line before. It must be a comment as the rules read the code (the scanner that
+strips comments and literals for every rule), and the rest must have a letter
+or digit and no hack vocabulary. A label, a string literal, `implausible:`,
+`not plausible:`, a `plausible:` later in a comment and a bare `plausible:`
+clear nothing. Hack vocabulary in a comment is a finding on every line, a
+justification's included, and no justification clears it.
+
 The documented hardware `volatile` exception requires an adjacent actual
-`plausible:` comment and a direct access within `0x04000000..0x040003FF`,
+`plausible:` comment, read the same way, and a direct access within `0x04000000..0x040003FF`,
 or a pointer initialized to an external symbol mapped into that register
 window by `config/data_symbols.json`. Such a pointer may only be used for
 member access; retargeting, shadowing and escapes remain rejected. A comment

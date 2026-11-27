@@ -38,7 +38,8 @@ class LineNumberTests(unittest.TestCase):
 
     def test_a_justification_on_the_line_above_still_clears(self):
         for comment in ("/* plausible: a ROM table */\n",
-                        "/* a ROM table, read\n   plausible: by the boot code */\n",
+                        # a block comment over two lines, ending on the line above (the marker begins the comment)
+                        "/* plausible: a ROM table,\n   read by the boot code */\n",
                         "// plausible: a ROM table\n"):
             with self.subTest(comment=comment):
                 source = TYPES + COMMENT + comment + "u16 f(void) { return *(u16 *)0x08001234; }\n"

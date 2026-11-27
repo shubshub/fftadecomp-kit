@@ -148,6 +148,7 @@ RULES = [
      r"so the compiler will|to make (?:it|the) (?:match|compile)|codegen hack",
      "the comment admits the source exists to steer the compiler"),
 ]
+HACK_VOCABULARY = next(pattern for rid, _, pattern, _ in RULES if rid == "hack-vocabulary")
 
 
 # A backslash, optional horizontal whitespace and a newline: GCC's cpp splices
@@ -161,6 +162,41 @@ def join_splices(text):
     return re.sub(SPLICE, "", text)
 
 
+def lexical_spans(text):
+    """(kind, start, end) of each comment ("comment") and string or character literal ("literal") in text.
+
+    The one scanner the rules and the justifications share:
+    strip_comments_and_strings blanks exactly these spans, and a justification
+    is read only from a "comment" span, so a comment clears a finding only if
+    the rules read it as a comment.  A `//` comment ends before its newline; a
+    block comment runs to its `*/` or the end of the text; a literal runs to
+    its closing quote (a backslash takes the next character with it) or the
+    end of the text."""
+    i, n = 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == "/" and i + 1 < n and text[i + 1] == "/":
+            start = i
+            while i < n and text[i] != "\n":
+                i += 1
+            yield "comment", start, i
+        elif c == "/" and i + 1 < n and text[i + 1] == "*":
+            start = i
+            while i < n and not (text[i] == "*" and i + 1 < n and text[i + 1] == "/"):
+                i += 1
+            i += 2
+            yield "comment", start, min(i, n)
+        elif c in "\"'":
+            start, q = i, c
+            i += 1
+            while i < n and text[i] != q:
+                i += 2 if text[i] == "\\" else 1
+            i = min(i + 1, n)
+            yield "literal", start, i
+        else:
+            i += 1
+
+
 def strip_comments_and_strings(text):
     """replace comments and string/char literals with spaces, keeping offsets.
 
@@ -169,48 +205,70 @@ def strip_comments_and_strings(text):
     therefore numbers lines differently from the text after such a comment; a
     line number is counted in the text itself, at the same offset."""
     out = list(text)
-    i, n = 0, len(text)
-    while i < n:
-        c = text[i]
-        if c == "/" and i + 1 < n and text[i + 1] == "/":
-            while i < n and text[i] != "\n":
-                out[i] = " "
-                i += 1
-        elif c == "/" and i + 1 < n and text[i + 1] == "*":
-            while i < n and not (text[i] == "*" and i + 1 < n and text[i + 1] == "/"):
-                out[i] = " "
-                i += 1
-            for k in range(i, min(i + 2, n)):
-                out[k] = " "
-            i += 2
-        elif c in "\"'":
-            q = c
-            out[i] = " "
-            i += 1
-            while i < n and text[i] != q:
-                if text[i] == "\\":
-                    out[i] = " "
-                    if i + 1 < n:
-                        out[i + 1] = " "
-                    i += 2
-                    continue
-                out[i] = " "
-                i += 1
-            if i < n:
-                out[i] = " "
-                i += 1
-        else:
-            i += 1
+    for _, start, end in lexical_spans(text):
+        out[start:end] = " " * (end - start)
     return "".join(out)
 
 
+def comment_justification(text, start, end):
+    """the justification the comment text[start:end] carries, on one line, or None.
+
+    The comment's text must begin with `plausible:`, after the `//` or `/*` and
+    any blanks, and go on to say something (a letter or a digit) that admits
+    no steering (hack-vocabulary).  A block comment must be closed.  So
+    `implausible:`, `not plausible:`, a `plausible:` later in the comment, a
+    label or string literal spelling it, and a bare `plausible:` carry none.
+    The result is `plausible: ` and the rest of the comment, each continuation
+    line's leading `*` dropped and its blanks run together."""
+    token = text[start:end]
+    if token.startswith("//"):
+        body = token[2:]
+    elif token.startswith("/*") and len(token) >= 4 and token.endswith("*/"):
+        body = token[2:-2]
+    else:
+        return None
+    body = body.lstrip()
+    if not body.startswith(JUSTIFY):
+        return None
+    first, *rest = body[len(JUSTIFY):].split("\n")
+    words = " ".join([first] + [re.sub(r"^\s*\*", "", line) for line in rest]).split()
+    why = " ".join(words)
+    if not re.search(r"[A-Za-z0-9]", why) or re.search(HACK_VOCABULARY, why):
+        return None
+    return f"{JUSTIFY} {why}"
+
+
+@functools.lru_cache(maxsize=8)
+def comment_lines(text):
+    """(first line, last line, justification or None) of each comment in text, in order (lexical_spans)"""
+    newlines = [match.start() for match in re.finditer("\n", text)]
+    return tuple((bisect.bisect_left(newlines, start) + 1, bisect.bisect_left(newlines, max(start, end - 1)) + 1,
+                  comment_justification(text, start, end))
+                 for kind, start, end in lexical_spans(text) if kind == "comment")
+
+
+def justification(text, line_no):
+    """the justification of the first comment that carries one and lies on line_no or ends on the line before.
+
+    Only a comment as lexical_spans reads it counts: its first line to its last
+    must include line_no, or its last line must be the one before it."""
+    for first, last, why in comment_lines(text):
+        if first > line_no:
+            break
+        if why is not None and (first <= line_no <= last or last == line_no - 1):
+            return why
+    return None
+
+
 def justified(text, line_no):
-    """True if a comment containing `plausible:` covers this line"""
-    lines = text.split("\n")
-    for idx in (line_no - 1, line_no - 2):
-        if 0 <= idx < len(lines) and JUSTIFY in lines[idx]:
-            return True
-    return False
+    """True if a comment that begins `plausible:` and says why covers this line (justification).
+
+    Not the substring on the line: a label, a string literal, `implausible:`
+    or an empty marker clears nothing."""
+    if JUSTIFY not in text:
+        # every justification spells the marker
+        return False
+    return justification(text, line_no) is not None
 
 
 # The hardware-register exception (kit#357): a justified `volatile` is exempt
@@ -715,17 +773,11 @@ def hardware_volatile_offsets(text, code, data_symbols):
     if not re.search(r"\bvolatile\b", code):
         return allowed
     code = spell_digraphs(code)
-    comments = []
-    tokens = r'"(?:\\.|[^"\\])*"|\'(?:\\.|[^\'\\])*\'|//[^\n]*|/\*[\s\S]*?\*/'
-    for token in re.finditer(tokens, text):
-        if token[0].startswith(("//", "/*")) and JUSTIFY in token[0]:
-            comments.append(text.count("\n", 0, token.end()) + 1)
     view = operand_view(text)
 
     def justified_io(offset, address):
-        line = text.count("\n", 0, offset) + 1
-        return IO_START <= address < IO_END and any(
-            comment in (line, line - 1) for comment in comments)
+        # the same justification a suspect needs (justified: the shared comment scanner)
+        return IO_START <= address < IO_END and justified(text, text.count("\n", 0, offset) + 1)
 
     for match in HARDWARE_DIRECT.finditer(code):
         if direct_access_holds(code, match, view) and justified_io(match.start("v"), int(match["address"], 16)):
@@ -1695,10 +1747,9 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             findings.append((line, rid, sev, GNU_VOLATILE.format(m[0]) if rid == "volatile" and
                              m[0] != "volatile" else msg))
     findings += inert_control_flow(code, text)
-    # comments are where hackiness gets admitted, so scan them raw too
+    # comments are where hackiness gets admitted, so scan them raw too, justifications included: one
+    # that admits steering justifies nothing (comment_justification)
     for i, raw in enumerate(text.split("\n"), 1):
-        if JUSTIFY in raw:
-            continue
         for rid, sev, pat, msg in RULES:
             if rid == "hack-vocabulary" and re.search(pat, raw):
                 findings.append((i, rid, sev, msg))
