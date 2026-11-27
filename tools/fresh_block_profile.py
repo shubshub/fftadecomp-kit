@@ -29,8 +29,10 @@ The kit checks each row against the function's bytes and refuses the entry when 
   passes the copy into `base`, and no instruction between the copy and `store` writes `base`
   except a call (the callee-saved ABI premise every walk makes);
 * every instruction on a path from `store` to `reload` is not a call, a SWI, a branch through a
-  register or a write of `base`; each store through `base` has an immediate offset outside
-  `[offset, offset + 4)` (checked, not premised); and the set of every other memory write there is
+  register or a write of `base`; each store through `base`, or through a register that holds the
+  block's address plus a constant on every path there (exact copies and immediate adds of `base`,
+  `_copies`), has an immediate offset that misses `[offset, offset + 4)` (checked, not premised),
+  and a block store through either refuses; and the set of every other memory write there is
   exactly `writes`.
 
 So on every path the store and the reload run at most once each, the store first, with `base`
@@ -203,6 +205,44 @@ def _between(nodes, start, end):
     return forward & backward
 
 
+def _copies(nodes, copy, base):
+    """{address: {register: k}} at every node reached after `copy`: the registers that hold the block's
+    address plus k there on every path.  Exact register copies and immediate adds and subtracts of
+    them are followed; any other write forgets its register, and a call forgets R0-R3, R12 and LR
+    (R4-R11 survive, the ABI premise every walk makes, the base among them); joins intersect."""
+    from capstone import CS_GRP_CALL
+    from capstone.arm import ARM_OP_IMM, ARM_OP_REG, ARM_REG_R0, ARM_REG_R12, ARM_REG_LR
+    clobbered = {ARM_REG_R0 + number for number in range(4)} | {ARM_REG_R12, ARM_REG_LR}
+    states, pending = {}, [(successor, {ARM_REG_R0 + base: 0}) for successor in nodes[copy][1]]
+    while pending:
+        address, state = pending.pop()
+        if address in states:
+            joined = {register: k for register, k in states[address].items() if state.get(register) == k}
+            if joined == states[address]:
+                continue
+            state = joined
+        states[address] = state
+        instruction, successors = nodes[address]
+        operands = instruction.operands
+        kinds = [operand.type for operand in operands]
+        sign = -1 if instruction.mnemonic in ('sub', 'subs') else 1
+        value = None
+        if instruction.mnemonic in ('mov', 'movs') and kinds == [ARM_OP_REG, ARM_OP_REG]:
+            value = state.get(operands[1].reg)
+        elif instruction.mnemonic in ('add', 'adds', 'sub', 'subs') and kinds == [ARM_OP_REG, ARM_OP_REG, ARM_OP_IMM]:
+            k = state.get(operands[1].reg)
+            value = None if k is None else k + sign * operands[2].imm
+        elif instruction.mnemonic in ('add', 'adds', 'sub', 'subs') and kinds == [ARM_OP_REG, ARM_OP_IMM]:
+            k = state.get(operands[0].reg)
+            value = None if k is None else k + sign * operands[1].imm
+        written = set(instruction.regs_access()[1]) | (clobbered if CS_GRP_CALL in instruction.groups else set())
+        after = {register: k for register, k in state.items() if register not in written}
+        if value is not None:
+            after[operands[0].reg] = value
+        pending.extend((successor, after) for successor in successors)
+    return states
+
+
 def _memory_write(instruction):
     return instruction.mnemonic.startswith(('str', 'stm', 'push'))
 
@@ -261,7 +301,7 @@ def check(proof, function, row):
         instruction = nodes[address][0]
         if ARM_REG_R0 + base in instruction.regs_access()[1] and CS_GRP_CALL not in instruction.groups:
             raise ValueError(f"fresh block premise 0x{function:08X}: the base is written before the store")
-    writes = []
+    writes, copies = [], _copies(nodes, copy, base)
     for address in sorted(_between(nodes, row['store'], row['reload'])):
         instruction = nodes[address][0]
         if CS_GRP_CALL in instruction.groups or CS_GRP_INT in instruction.groups or instruction.mnemonic == 'bx':
@@ -282,6 +322,16 @@ def check(proof, function, row):
             continue                                   # checked: it misses the word
         if instruction.mnemonic.startswith('stm') and instruction.operands[0].reg == ARM_REG_R0 + base:
             raise ValueError(f"fresh block premise 0x{function:08X}: a block store through the base")
+        held = copies.get(address, {})
+        if instruction.mnemonic.startswith('str') and memory and memory[0].mem.base in held:
+            width = 4 if instruction.mnemonic == 'str' else 2 if instruction.mnemonic == 'strh' else 1
+            disp = held[memory[0].mem.base] + memory[0].mem.disp
+            if memory[0].mem.index or disp < offset + 4 and disp + width > offset:
+                raise ValueError(f"fresh block premise 0x{function:08X}: a store through a copy of the base "
+                                 "may overwrite the stored word")
+            continue                                   # checked: it misses the word
+        if instruction.mnemonic.startswith('stm') and instruction.operands[0].reg in held:
+            raise ValueError(f"fresh block premise 0x{function:08X}: a block store through a copy of the base")
         writes.append(address)
     if writes != row['writes']:
         raise ValueError(f"fresh block premise 0x{function:08X}: the writes between the store and the reload "

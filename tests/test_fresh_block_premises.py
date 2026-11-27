@@ -71,7 +71,7 @@ class FreshBlockTests(unittest.TestCase):
         functions = dict(owner=OWNER, creator=creator,
                          allocator="ldr r0, =0x02000100\nbx lr\n.ltorg", callback=callback)
         labels = [label for name in functions for label in (name, name + "_end")]
-        labels += ["alloc_call", "store", "reload", "other"]
+        labels += ["alloc_call", "store", "reload", "other"] + (["w2"] if "w2:" in between else [])
         text = ".syntax unified\n.arch armv4t\n.thumb\n.text\n.global " + ", ".join(labels) + "\n"
         for index, (name, body) in enumerate(functions.items()):
             text += f".org 0x{0x100 * index:x}\n{name}:\n{body}\n{name}_end:\n"
@@ -261,6 +261,49 @@ class FreshBlockTests(unittest.TestCase):
         fresh.extra_constant(proof, at(store), creator, constants)
         self.assertIsNone(fresh.extra_constant(proof, at(reload), creator, constants))
         self.assertEqual(proof.fresh_block_uses, set())
+
+    def test_a_register_indexed_store_through_the_base_refuses(self):
+        # The stored word at +4: an index register can reach it whatever the immediate offset is.
+        creator = CREATOR.replace("    str r4, [r7]\n", "    str r4, [r7, #4]\n").replace(
+            "    ldr r3, [r7]\n", "    ldr r3, [r7, #4]\n")
+        self.build(creator=creator)
+        self.prove(self.entry(offset=4))
+        for base in ("r7", "r1"):
+            with self.subTest(base=base):
+                self.build(between=BETWEEN + f"\nadds r1, r7, #0\nmovs r2, #4\nstr r0, [{base}, r2]", creator=creator)
+                self.refused("may overwrite the stored word", self.entry(offset=4))
+
+    def test_a_store_through_a_copy_of_the_base_is_checked(self):
+        # Exact copies of the base and immediate adds of them are followed (rv-137's S2 shape first).
+        copy = BETWEEN + "\nadds r1, r7, #0\n"
+        for between, pattern in (
+                (copy + "ldr r2, =0x08000301\nstr r2, [r1]", "through a copy of the base may overwrite"),
+                (copy + "adds r1, #4\nsubs r1, #4\nstrb r2, [r1, #2]", "through a copy of the base may overwrite"),
+                (copy + "adds r1, #8\nstmia r1!, {r2}", "block store through a copy of the base")):
+            with self.subTest(between=between):
+                self.build(between=between)
+                self.refused(pattern, self.entry())
+        # A store through a copy that misses the word is checked, so it is not one of the listed writes.
+        self.build(between=copy + "adds r1, #8\nstr r2, [r1]")
+        self.prove(self.entry())
+
+    def test_an_unrelated_register_is_a_listed_write(self):
+        # A copy on one path only, a copy across a call, and a block store elsewhere are writes the
+        # entry lists and the review covers; unlisted, the entry refuses.
+        cases = [("join", BETWEEN + "\ncmp r0, #0\nbeq 1f\nadds r1, r7, #0\n1:\nw2:\nstr r2, [r1]", None),
+                 ("call", BETWEEN + "\nw2:\nstr r2, [r1]", ("    adds r7, r0, #0\n", "    adds r7, r0, #0\n"
+                                                              "    adds r1, r7, #0\n    bl allocator\n")),
+                 ("stm", BETWEEN + "\nldr r1, =0x02002000\nw2:\nstmia r1!, {r0, r2}", None)]
+        for name, between, change in cases:
+            with self.subTest(name):
+                self.build(between=between)
+                if change is not None:
+                    text = (self.root / "f.s").read_text().replace(*change)
+                    (self.root / "f.s").write_text(text)
+                    self.build_from_text(text)
+                listed = sorted([f"0x{self.symbols['other']:08X}", f"0x{self.symbols['w2']:08X}"])
+                self.prove(self.entry(writes=listed))
+                self.refused("not the entry's", self.entry())
 
     def build_from_text(self, text):
         for command in (
