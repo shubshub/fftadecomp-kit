@@ -1931,6 +1931,29 @@ def allowlisted_volatile_uses(root, address, entries=None):
     return records
 
 
+INERT = re.compile(r"\bif\s*\((?P<cond>[^()]*)\)(?P<a>[^;{}]*?)\s*;?\s*else\s*(?P<b>[^;{}]*?)\s*;")
+
+
+def inert_matches(code):
+    """the matches of INERT in code (comments and literals blanked) whose two arms are the same statement"""
+    return [m for m in INERT.finditer(code)
+            if " ".join(m.group("a").split()) and " ".join(m.group("a").split()) == " ".join(m.group("b").split())]
+
+
+def inert_cited(text, line_no):
+    """does a justification on line_no or ending on the line before cite the ROM (ROM_CITATION)?"""
+    return any(ROM_CITATION.search(why) for why in justifications(text, line_no))
+
+
+def cited_inert_lines(text):
+    """the `if` lines of the inert-control-flow tests in text (as written) that a ROM-citing justification clears;
+    each needs the trace the collapse compile looks for (match.inert_trace_records)"""
+    if JUSTIFY not in text:
+        return []
+    return [line for line, _, severity, _ in inert_control_flow(spell_digraphs(strip_comments_and_strings(text)), text)
+            if severity == "suspect" and inert_cited(text, line)]
+
+
 def inert_control_flow(text, lines=None):
     """find `if (c) X; else X;` - identical arms, so the test means nothing.
 
@@ -1944,18 +1967,14 @@ def inert_control_flow(text, lines=None):
     numbers the lines (text may be its stripped code).
     """
     hits = []
-    pat = re.compile(
-        r"\bif\s*\((?P<cond>[^()]*)\)(?P<a>[^;{}]*?)\s*;?\s*else"
-        r"\s*(?P<b>[^;{}]*?)\s*;")
-    for m in pat.finditer(text):
+    for m in inert_matches(text):
         a = " ".join(m.group("a").split())
         b = " ".join(m.group("b").split())
-        if a and a == b:
-            line = (text if lines is None else lines).count("\n", 0, m.start()) + 1
-            hits.append((line, "inert-control-flow", "suspect",
-                         f"`if ({m.group('cond').strip()}) {a}; else {b};` - both "
-                         f"arms do the same thing, so the test exists only to "
-                         f"change the generated code"))
+        line = (text if lines is None else lines).count("\n", 0, m.start()) + 1
+        hits.append((line, "inert-control-flow", "suspect",
+                     f"`if ({m.group('cond').strip()}) {a}; else {b};` - both "
+                     f"arms do the same thing, so the test exists only to "
+                     f"change the generated code"))
     return hits
 
 
@@ -2306,7 +2325,7 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
     # which must also cite the ROM: identical arms whose test the ROM keeps are admitted with a comment
     # naming those instructions (kit#201)
     for line, rid, sev, msg in inert_control_flow(code, text):
-        if sev == "suspect" and any(ROM_CITATION.search(why) for why in justifications(text, line)):
+        if sev == "suspect" and inert_cited(text, line):
             continue
         findings.append((line, rid, sev, msg))
     # comments are where hackiness gets admitted, so scan them raw too, justifications included: one

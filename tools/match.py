@@ -111,7 +111,7 @@ from match_evidence import (BUFFER_SCHEMA, BUFFER_SUMMARY, CALL_SUMMARY, DATA_SC
                             STACK_SUMMARY, data_snapshot, mapping_fingerprint,
                             function_address_fingerprint, function_address_manifest,
                             mapping_snapshot, source_fingerprint, source_paths, report_rom_path, report_source,
-                            verify_dependencies, carry_volatile_records)
+                            verify_dependencies, carry_volatile_records, carry_trace_records)
 
 try:
     from capstone import (Cs, CS_ARCH_ARM, CS_MODE_ARM, CS_MODE_THUMB,
@@ -532,6 +532,81 @@ VOLATILE_CHECK_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeErro
                          RecursionError, RuntimeError, subprocess.SubprocessError)
 
 
+def traced_line(record):
+    """the console line for an inert test trace record"""
+    return record.removeprefix("* ")
+
+
+def inert_trace_records(root, address, args=None, runner=None):
+    """report records of the collapse compile, one per inert-control-flow test a ROM-citing justification clears.
+
+    The tests are those of plausible.cited_inert_lines in the files match.py
+    lints for the address.  The addressed translation unit is compiled as
+    written and once per test with that test collapsed to its arm
+    (inert_collapse.collapse); inert_collapse.trace then requires the original
+    to keep a load, a compare or test, or a frame that the collapsed form does
+    not.  Raises inert_collapse.TraceError (a ValueError) with the reason when a
+    test leaves no counted trace, and OSError or RuntimeError when it cannot be
+    compiled.
+    """
+    import inert_collapse
+    root = Path(root)
+    targets = []
+    for path in source_paths(root, address):
+        with open(path, encoding="utf-8", errors="replace", newline="") as handle:
+            text = handle.read().replace("\r\n", "\n").replace("\r", "\n")
+        targets += [(path.relative_to(root).as_posix(), line) for line in plausibility.cited_inert_lines(text)]
+    if not targets:
+        return []
+    if args is None:
+        args = argparse.Namespace(cc=DEFAULT_CC, cpp=DEFAULT_CPP, assembler=DEFAULT_AS,
+                                  objcopy=DEFAULT_OBJCOPY, linker=DEFAULT_LD, flags=DEFAULT_FLAGS)
+    if runner is None:
+        runner = Runner(args.cc, getattr(args, "wsl", "Ubuntu"), getattr(args, "wsl_path", DEFAULT_WSL_PATH),
+                        root=str(root), timeout=SIGNED_REPLAY_TIMEOUT)
+    sources = sorted(Path(root, "src").rglob(f"{address:08X}.c"))
+    if len(sources) != 1:
+        raise inert_collapse.TraceError("the collapse compile needs exactly one addressed source")
+    source = sources[0].relative_to(root).as_posix()
+    records = []
+    with runner.workspace() as workspace:
+        _, original, _ = compile_object(runner, workspace, args, str(root), address, source)
+        preprocessed = runner.read_binary(f"{workspace}/f.i").decode("utf-8")
+        listing = runner.read_binary(f"{workspace}/f.s").decode("utf-8")
+        # a test in a header this unit does not include has nothing to collapse here
+        present = {mark for mark in inert_collapse.source_lines(preprocessed) if mark is not None}
+        for file, line in targets:
+            if file != source and (file, line) not in present:
+                continue
+            _, collapsed, _ = compile_object(runner, workspace, args, str(root), address, source,
+                                             rewrite=lambda text: inert_collapse.collapse(text, file, line))
+            if collapsed == original:
+                raise inert_collapse.TraceError(
+                    f"the inert test at {file} line {line} leaves nothing in the ROM: "
+                    "the source with its arms collapsed compiles to the same bytes")
+            kinds, extra, missing = inert_collapse.trace(listing,
+                                                         runner.read_binary(f"{workspace}/f.s").decode("utf-8"))
+            if not kinds:
+                raise inert_collapse.TraceError(
+                    f"the inert test at {file} line {line} changes only register allocation: "
+                    f"only in the original: {'; '.join(extra) or 'none'}; only collapsed: {'; '.join(missing) or 'none'}")
+            records.append(inert_collapse.record(file, line, kinds, extra, missing, len(original), len(collapsed)))
+    return records
+
+
+def inert_trace_check(root, address, args):
+    """(records, finding) of the collapse compile for a source, before any selector runs.
+
+    `finding` is None, or the plausibility finding that makes the source
+    IMPLAUSIBLE on every path: a justified inert test that leaves no counted
+    trace, or a collapse compile that fails.
+    """
+    try:
+        return inert_trace_records(root, address, args), None
+    except VOLATILE_CHECK_ERRORS as error:
+        return [], f"inert test trace: {error}"
+
+
 def allowlisted_volatile_check(root, address, args):
     """(records, finding, source SHA-256) for a source, before any selector runs.
 
@@ -557,18 +632,20 @@ def allowlisted_volatile_check(root, address, args):
     return records, None, source
 
 
-def issue_with_volatile_records(issue, root, address, args, records, source):
-    """run a selector's own report writer and carry the volatile records into its report.
+def issue_with_volatile_records(issue, root, address, args, records, source, traces=()):
+    """run a selector's own report writer and carry the volatile and inert test trace records into its report.
 
     The selector's output is held back until its report carries `records`
-    (match_evidence.carry_volatile_records; none for a non-user) and the source
-    is unchanged since the check; if either fails, the report and any emitted
-    bytes it just wrote are removed and no MATCH verdict is printed.
+    (match_evidence.carry_volatile_records; none for a non-user) and then
+    `traces` (inert_trace_records, carry_trace_records) and the source is
+    unchanged since the check; if any of that fails, the report and any
+    emitted bytes it just wrote are removed and no MATCH verdict is printed.
     """
     root = Path(root)
     report = root / "docs" / "match" / f"{address:08X}.md"
     emitted = (root / args.emit).resolve() if args.emit else None
-    if not records:
+    traces = list(traces)
+    if not records and not traces:
         # a non-user keeps the selector's own output and return value; only a
         # source edited after the check (one that may now use the object) is refused
         status = issue(root, address, args)
@@ -587,7 +664,8 @@ def issue_with_volatile_records(issue, root, address, args, records, source):
                      "verification; re-run match.py")
         return status
     if args.label:
-        sys.exit("allowlisted volatile records need the unlabelled report")
+        sys.exit("allowlisted volatile records need the unlabelled report" if records else
+                 "inert test trace records need the unlabelled report")
     captured = io.StringIO()
     try:
         with contextlib.redirect_stdout(captured):
@@ -604,7 +682,7 @@ def issue_with_volatile_records(issue, root, address, args, records, source):
             raise ValueError("the selector printed no single MATCH verdict")
         if not args.no_write:
             text = report.read_bytes().decode("utf-8")
-            carried = carry_volatile_records(text, records)
+            carried = carry_trace_records(carry_volatile_records(text, records), traces)
             if carried != text:
                 report.write_bytes(carried.encode("utf-8"))
         if source is None or source_fingerprint(root, address) != source:
@@ -614,9 +692,13 @@ def issue_with_volatile_records(issue, root, address, args, records, source):
             report.unlink(missing_ok=True)
         if emitted is not None and status == 0:
             emitted.unlink(missing_ok=True)
-        sys.exit(f"allowlisted volatile records not carried: {error}")
+        if status != 0 and not records:
+            # a refused selector printed no MATCH and wrote nothing to carry the records into: keep its diagnostics
+            sys.stdout.write(captured.getvalue())
+        sys.exit(f"allowlisted volatile records not carried: {error}" if records else
+                 f"inert test trace records not carried: {error}")
     lines = [f"volatile{record.removeprefix('* allowlisted volatile').removeprefix(':')}"
-             for record in records]
+             for record in records] + [traced_line(record) for record in traces]
     print("\n".join(output[:verdicts[0]] + lines + output[verdicts[0]:]))
     return status
 
@@ -6535,7 +6617,7 @@ def report_listing(instructions, want, addr, span, thumb):
 
 
 def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, got_body, verdict,
-                  same_bytes, listing, label=None, plausible=True, volatile_records=(),
+                  same_bytes, listing, label=None, plausible=True, volatile_records=(), trace_records=(),
                   hand_asm_allowed=None, findings=(), flash_evidence=None, empty_profile=False,
                   mapping=None, empty_index=None, control_flow=None, framed_profile=False,
                   buffer_proof=None, callee_watch=None, mapped=False, self_sites=frozenset(), data_profile=False,
@@ -6734,6 +6816,8 @@ def render_report(*, addr, src_rel, schema, fingerprint, compiler, want, span, g
                f"{'plausible' if plausible else 'IMPLAUSIBLE'}\n")
     for record in volatile_records:
         out.append(f"{record}\n")
+    for record in trace_records:
+        out.append(f"{record}\n")
     out.append(f"* hand-asm allow list: "
                f"{'listed (' + str(hand_asm_allowed.get('reason', 'no reason recorded')) + ')' if hand_asm_allowed else 'not listed'}\n\n")
     out.append(f"**{verdict}** - {same_bytes}/{len(want)} bytes\n")
@@ -6925,12 +7009,17 @@ def main():
     # an allowlisted volatile object is checked once, here, ahead of every
     # selector: the selectors below write their own reports
     volatile_records, volatile_finding, volatile_source = allowlisted_volatile_check(ROOT, addr, args)
+    # so is the collapse compile of a justified inert test: every report prints its trace, and the source
+    # fingerprint taken above binds it (each path compares that fingerprint after its writer ran)
+    trace_records, trace_finding = inert_trace_check(ROOT, addr, args)
+    volatile_finding = volatile_finding or trace_finding
 
     def selector_issue(issue):
         if volatile_finding:
             sys.exit(f"source    IMPLAUSIBLE\nverdict NOT VERIFIED - the selector was not run\n\n"
                      f"plausibility findings:\n  {volatile_finding}")
-        result = issue_with_volatile_records(issue, ROOT, addr, args, volatile_records, volatile_source)
+        result = issue_with_volatile_records(issue, ROOT, addr, args, volatile_records, volatile_source,
+                                             trace_records)
         if consistent_source is not None and source_fingerprint(ROOT, addr) != consistent_source:
             sys.exit("source or headers changed after the library unit consistency check; re-run match.py")
         return result
@@ -7697,6 +7786,7 @@ def main():
         plausible = False
     if not plausible:
         volatile_records = []
+        trace_records = []
     if source_fingerprint(ROOT, addr) != fingerprint or \
             volatile_source is not None and volatile_source != fingerprint or \
             consistent_source is not None and consistent_source != fingerprint:
@@ -7808,6 +7898,8 @@ def main():
           + ("" if plausible or hand_asm_allowed else " (not on the allow list)"))
     for record in volatile_records:
         print(f"volatile{record.removeprefix('* allowlisted volatile').removeprefix(':')}")
+    for record in trace_records:
+        print(traced_line(record))
     print(f"verdict {verdict}\n")
     if findings:
         print("plausibility findings:")
@@ -7837,6 +7929,7 @@ def main():
             addr=addr, label=args.label, src_rel=src_rel, schema=schema, fingerprint=fingerprint,
             compiler=f"{args.cc} {args.flags}", want=want, span=span, got_body=got_body, verdict=verdict,
             same_bytes=same_bytes, listing=lines, plausible=plausible, volatile_records=volatile_records,
+            trace_records=trace_records,
             hand_asm_allowed=hand_asm_allowed, findings=findings, flash_evidence=flash_evidence,
             empty_profile=empty_profile, mapping=mapping, empty_index=empty_index, control_flow=control_flow,
             framed_profile=framed_profile, buffer_proof=buffer_proof,
