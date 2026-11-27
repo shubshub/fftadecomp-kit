@@ -2387,6 +2387,43 @@ position among the other fields. Besides the typed-data proof's own premise,
 the one limitation stated in each line (case uses of the table registers are
 not checked) is the only addition; no other premise is added.
 
+An owner switch whose walk passes no local buffer to any call used to stop at
+the typed-data proof's closing check, after the walk had proved the frame:
+
+```
+switch evidence excludes fixed frames and runtime call thunks; owner-switch data-buffer proof: data-buffer evidence requires an inspected buffer call
+```
+
+That check refuses the schema, not the code: with no buffer call, every walk
+obligation still runs (every SP-derived value tracked, fixed frame bounds and
+returns proved, each call under its ABI summary with R4-R11 under the
+callee-saved watch, every literal typed, the switch re-derived from the ROM).
+Such an owner is now admitted under its own schema,
+`elf-symbol-thumb-data-owner-switch-frame-v1`
+(`data_buffer_profile.OWNER_SWITCH_FRAME_SCHEMA`), when:
+
+* the proof is the plain stack-argument proof, bound to an `OwnerSwitch` whose
+  walk completed over the complete owner graph;
+* the owner has no `_call_via_rN` thunk call and no function literal (`owner
+  switch frame proof excludes call-via thunks and function literals`), so no
+  call-via register can carry the table pointer or a table word;
+* no call is a summarised division runtime site: that site counts as the
+  inspected call only under the division leaf's own rule, and refuses here as
+  before.
+
+Its report states that no call took a local buffer, in place of the buffer
+summary, and names its own field in place of `* data buffer calls`:
+
+```
+* buffer calls: none: the version-2 walk of the owner switch passed no local buffer to any call; frame, aliases, calls and returns proved as for a buffer call
+* data owner switch frame: typed ABS32 object literals beside the version-2 walk of the owner's authenticated guarded switch, with no buffer call, call-via thunk or function literal; every reached RAM/ROM address word typed; premise, not checked: named objects do not overlap any live stack
+```
+
+Replay recomputes the walk, so a report that states either line for an owner
+with a buffer call, or the buffer summary for one without, is refused. The
+schema adds no premise. Any other proof with no buffer call keeps the refusal,
+and `data_buffer_profile.OWNER_SWITCH_FRAME.enabled = False` restores it.
+
 ### Compiler `__modsi3` as a leaf call in the default buffer walk
 
 The default path's call binding refuses a compiler signed remainder next to a
