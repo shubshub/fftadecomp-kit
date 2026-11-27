@@ -80,18 +80,11 @@ TWICE = ("site2:\nstrh r4, [r5]\nadds r5, #2\ncmp r7, #1\nbne stay\nmov r0, sb\n
 DONE = LOOP.replace("ble loop\nmov r0, r8", "ble loop\ndone:\nmov r0, r8")
 # An unknown choice sets r2 to 1 (arm A) or 2 (arm B) before the first store; after it only arm A may
 # return, then `movs r2, #0` makes both arms' states equal, and every later pass stores.
-MERGED = """push {{r4, r5, r6, r7, lr}}
-mov r7, sb
-mov r6, r8
-push {{r6, r7}}
-mov sb, r0
-adds r6, r1, #0
-adds r5, r1, #0
-movs r0, #0
-strh r0, [r6]
-strh r0, [r6, #2]
-movs r7, #0
-movs r4, #5
+# A callee prologue and epilogue for loops written out in full (as `LOOP` templates: braces doubled).
+HEAD = ("push {{r4, r5, r6, r7, lr}}\nmov r7, sb\nmov r6, r8\npush {{r6, r7}}\nmov sb, r0\nadds r6, r1, #0\n"
+        "adds r5, r1, #0\nmovs r0, #0\nstrh r0, [r6]\nstrh r0, [r6, #2]\nmovs r7, #0\n")
+TAIL = "pop {{r3, r4}}\nmov r8, r3\nmov sb, r4\npop {{r4, r5, r6, r7}}\npop {{r1}}\nbx r1"
+MERGED = HEAD + """movs r4, #5
 adds r1, r7, #0
 mov r0, sb
 bl query
@@ -114,12 +107,33 @@ cmp r7, #4
 ble site
 done:
 mov r0, r8
-pop {{r3, r4}}
-mov r8, r3
-mov sb, r4
-pop {{r4, r5, r6, r7}}
-pop {{r1}}
-bx r1"""
+""" + TAIL
+# On pass 0 a stored halfword is rewound (subs r6, #2), so the storing path (one store counted) and the
+# skipping path (none) meet with equal registers and flags; on later passes every store advances.  The
+# storing arm is the fall-through, or (swapped) the branch target.
+COUNT_MERGE = HEAD + """loop:
+adds r1, r7, #0
+mov r0, sb
+bl query
+adds r4, r0, #0
+cmp r4, #0
+beq skip
+site:
+strh r4, [r6]
+adds r6, #2
+cmp r7, #0
+bne next
+subs r6, #2
+b next
+skip:
+next:
+adds r7, #1
+cmp r7, #4
+ble loop
+mov r0, r8
+""" + TAIL
+COUNT_MERGE_SWAPPED = COUNT_MERGE.replace("beq skip\nsite:", "bne site\nb next\nsite:").replace(
+    "subs r6, #2\nb next\nskip:\nnext:", "subs r6, #2\nnext:")
 MERGED_A = MERGED.replace("CHOICE", "beq armB\narmA:\nmovs r2, #1\nb site\narmB:\nmovs r2, #2\nb site")
 MERGED_B = MERGED.replace("CHOICE", "bne armA\narmB:\nmovs r2, #2\nb site\narmA:\nmovs r2, #1\nb site")
 # The owner with a u16[6] (twelve bytes) instead of a u16[2].
@@ -527,6 +541,20 @@ class StoreBoundTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "measures every row or bounds every row"):
             store_bound.StoreBounds(BASE, {(self.callee, site2): 0})
 
+    def test_a_conditional_store_outside_the_frame_at_its_first_execution_refuses(self):
+        # From the independent review: the store leaves the u16[2] at its first execution, but only on a result
+        # of 1, so paths that skip it return and neither per-call check fires.  The frame bound of 0 alone keeps
+        # the plain refusal, with or without an entry, and prints none.
+        extra = "cmp r4, #1\nbne skip2\nsite2:\nstrh r4, [r6, #8]\nskip2:"
+        self.build(extra)
+        site2 = self.symbols["site2"]
+        for premises in (None, self.premises([(self.callee, self.site, 2)])):
+            with self.subTest(entry=premises is not None), self.assertRaises(ValueError) as caught:
+                self.walk(premises, extra=extra)
+            self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
+            self.assertNotIn("store-bound retry", str(caught.exception))
+            self.assertEqual(store_bound.triggered(caught.exception), (self.callee, site2))
+
     def test_rows_that_end_every_path_of_a_call_refuse(self):
         # The frame allows two stores at each site; the second site runs on all five passes, so every row
         # the frame allows ends every replayed path of the call: the premise is false by the code alone.  The
@@ -589,6 +617,30 @@ class StoreBoundTests(unittest.TestCase):
                          rf"store bound: in 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\), once the store at "
                          rf"0x{site2:08X} first runs no replayed continuation returns and some end at its bound: "
                          rf"the code itself runs the store more often than its row allows$")
+
+    def test_counts_do_not_merge_at_a_join(self):
+        # From the independent review: the skipping path's third store reaches the saved register after two
+        # earlier stores, the storing path's after three, so the frame allows 2.  A replay that merged the two
+        # pass-0 paths on the higher count would measure 3 (or keep the larger count at a refusing store) and
+        # never walk the lower-count continuation, admitting 3 with an unchecked store.  The stored value must
+        # leave the frame-word facts equal on both arms (a known zero over the prologue's zero) for the two
+        # states to be otherwise identical, so each order runs with and without that zero.
+        zero = "movs r4, #0\nsite:\nstrh r4, [r6]"
+        for name, loop in (("storing arm falls through", COUNT_MERGE), ("storing arm is the target", COUNT_MERGE_SWAPPED),
+                           ("falls through, zero stored", COUNT_MERGE.replace("site:\nstrh r4, [r6]", zero)),
+                           ("target, zero stored", COUNT_MERGE_SWAPPED.replace("site:\nstrh r4, [r6]", zero))):
+            with self.subTest(order=name):
+                self.build(loop=loop)
+                with self.assertRaises(store_bound.StoreBoundRefusal) as caught:
+                    store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                                     self.premises([(self.callee, self.site, 3)]))
+                self.assertIn("(a bound lets a store leave the allocated local words)", str(caught.exception))
+                self.assertEqual(caught.exception.entry[f"0x{BASE:08X}"]["rows"][0]["bound"], 2)
+                _, proof = store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                                            self.premises([(self.callee, self.site, 2)]))
+                self.assertEqual(proof.store_bound_retry["rows"][0]["bound"], 2)
+                ((_, _, _, _, _, writes),) = proof.loop_replays[self.callee]
+                self.assertEqual(sorted(writes), [(0, 2), (2, 2)])
 
     def test_a_forced_overrun_reached_through_a_merged_state_refuses(self):
         # From the independent review: arm B's first store leads only to the state arm A's continuation also
