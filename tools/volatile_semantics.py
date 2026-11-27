@@ -42,8 +42,13 @@ symbolically along every path, and the check requires
    never private, so a plain load or store at a fixed slot below sp is
    refused, and a frame byte that sp has risen above holds no defined value
    until a fixed store writes it again, so a read that may reach one is
-   refused (Executor.released, frame_read).  Every callee
-   needs a file-scope prototype with a fixed list of one-word arguments;
+   refused (Executor.released, frame_read).  A fixed-slot load reads the
+   latest store to its bytes: the same slot and width, or, for an unsigned
+   byte or halfword load at offset 0 of a word store, that word's low bytes
+   (kit#582, narrow_spill_reload; agbcc reloads a spilled narrow local that
+   way), which the record lists per compile; any other partial overlap of
+   stack accesses is refused.  Every callee needs a file-scope prototype
+   with a fixed list of one-word arguments;
    no prototype, `()`, `...` and wider arguments fail closed.  The callee
    owns its stack-argument words, so a frame load after the call reads each
    as the callee's opaque value, never the caller's store.  A
@@ -1340,6 +1345,46 @@ def evaluate(code, flags):
     return table.get(code)
 
 
+class NarrowSpillReloads:
+    """kit#582: a byte or halfword reload of the low bytes of a word spill, as one policy.
+
+    agbcc keeps a narrow local zero-extended in a word register (thumb.h
+    PROMOTE_MODE), so reload spills the whole word; a halfword or byte use
+    reads only the low bytes back (080200C8: `str r0, [sp]` ... `mov r1, sp;
+    ldrh r0, [r1]`).  enabled = False refuses every such reload as a partial
+    overlap, as before; record() lists each reload, per compile, where a
+    verdict used one."""
+
+    enabled = True
+
+
+NARROW_SPILL_RELOADS = NarrowSpillReloads()
+
+
+def narrow_spill_reload(width, signed, address, stored_width, stored_address, stored, pushed):
+    """kit#582: the value a sub-word load reads from the word store Executor.load's scan
+    reached, or None (the load then stays a partially overlapping stack access).
+
+    The load must be an unsigned `ldrb`/`ldrh` (width 1 or 2), and the store an
+    untraced word store (the caller passes no traced one) of a fixed frame slot
+    sp + k that is not a push of a callee-saved register or lr; the load reads
+    exactly sp + k, offset 0.  The scan stops at the first entry that may
+    write a loaded byte: a store overlapping them, a call where the slot is
+    visible to callees, a store at a variable frame offset.  Reaching this
+    store therefore proves the bytes still hold its value.  The GBA is
+    little-endian (stored_bytes), so offset 0 holds the low 8 * width bits,
+    which the load zero-extends: truncate(stored), which is exact, as a
+    register copy of the stored value narrowed to the load's width would be.
+    Any other offset, a straddle, a signed load, a narrower store and the
+    push area keep refusing.
+    """
+    if not NARROW_SPILL_RELOADS.enabled or signed or width not in (1, 2) or stored_width != 4 or pushed or \
+            not is_stack(address) or not is_stack(stored_address) or \
+            linear(address)[0] != linear(stored_address)[0]:
+        return None
+    return truncate(stored, 8 * width)
+
+
 class Executor:
     """symbolic execution of one agbcc Thumb function along one path"""
 
@@ -1432,7 +1477,7 @@ class Executor:
         # but a literal word or a word reload of a clean word store (see
         # check_address and decide)
         self.derived, self.flags_derived = set(), False
-        self.load_clean = False
+        self.load_clean = self.load_narrowed = False
         self.decisions = list(decisions)
         pc, steps = 0, 0
         while True:
@@ -1554,7 +1599,7 @@ class Executor:
         local = carries(address, SP) and not self.escaped
         placed = not local or is_stack(address)
         version, forwarded = "entry", None
-        self.load_clean = False
+        self.load_clean = self.load_narrowed = False
         for entry in reversed(self.memory) if placed else ():
             if entry[0] == "call":
                 if not stack:
@@ -1569,7 +1614,7 @@ class Executor:
                         break
                     self.fail(text, "reads a frame word released by an sp increase")
                 continue
-            _, stored_width, stored_address, stored, event, _, derived = entry
+            _, stored_width, stored_address, stored, event, pushed, derived = entry
             relation = self.relation(address, width, stored_address, stored_width, saved)
             if saved and relation == "disjoint" and not probe and not is_stack(stored_address) and \
                     carries(stored_address, SP):
@@ -1594,7 +1639,14 @@ class Executor:
                     # load passes it and stops at that call, as at any call
                     continue
                 if event is None or internal:
-                    self.fail(text, "partially overlapping stack access")
+                    narrowed = None if probe or event is not None else \
+                        narrow_spill_reload(width, signed, address, stored_width, stored_address, stored, pushed)
+                    if narrowed is None:
+                        self.fail(text, "partially overlapping stack access")
+                    # kit#582: the low bytes of the word spill this scan reached (load_clean
+                    # stays False: the register is derived, as after every sub-word reload)
+                    forwarded, self.load_narrowed = narrowed, True
+                    break
                 version = ("store", event)
                 break
         if not placed:
@@ -2172,6 +2224,8 @@ class Executor:
                 record.kind, record.reads, record.writes = "load", reads, {subject}
                 record.signed = mnemonic in ("ldrsb", "ldrsh")
                 regs[subject], record.forwarded = self.load(width, record.signed, address, text)
+                if self.load_narrowed:
+                    record.narrowed_reload = True       # kit#582 (narrow_spill_reload)
                 record.value = regs[subject]
                 record.event = len(self.trace)      # the observable events before it (kit#378)
                 if derived or not self.load_clean or record.signed:
@@ -2760,10 +2814,24 @@ def spill_reload(records, position):
     executor: a frame slot a call might have written reads back as a value
     of its own, never as the stored one.  So the reload returns the spilled
     value exactly, as a register copy would.
+
+    kit#582: an unsigned `ldrb`/`ldrh` of the same word's low bytes, too.  Thumb
+    has no sp-based byte or halfword load, so agbcc reloads through a copy of sp
+    (0x080D3208: `mov r1, sp; ldrh r1, [r1, #8]`): one base register whose
+    executor address is the fixed slot sp + k.  The nearest earlier record that
+    may write any byte of the word must be the same word store, and the load's
+    executor value its low bytes, under the conditions above.  Only
+    narrow_spill_reload gives a byte or halfword load that value (with the
+    policy off the executor refuses the load), so this needs no switch of
+    its own.
     """
     record = records[position]
-    if record.kind != "load" or record.width != 4 or record.signed or record.reads != {"sp"} or \
-            record.address is None or not is_stack(record.address):
+    if record.kind != "load" or record.signed or record.address is None or not is_stack(record.address):
+        return None
+    if record.width == 4:
+        if record.reads != {"sp"}:
+            return None
+    elif record.width not in (1, 2) or len(record.reads) != 1:
         return None
     slot = signed32(linear(record.address)[0])
     for earlier in reversed(records[:position]):
@@ -2777,7 +2845,7 @@ def spill_reload(records, position):
             continue
         start = signed32(linear(earlier.address)[0])
         if start == slot and earlier.width == 4:
-            return earlier if earlier.value == record.value else None
+            return earlier if truncate(earlier.value, 8 * record.width) == record.value else None
         if start < slot + 4 and slot < start + earlier.width:
             return None
     return None
@@ -2939,6 +3007,11 @@ class SpillReloads(list):
 class WholeObjectArguments(list):
     """kit#375, rule U: the admitted whole-object arguments of a function, a tagged
     result part (record() lists it after the positional ones)"""
+
+
+class NarrowReloads(list):
+    """kit#582: (compile, instruction indices) of the word spills each compile reloads by
+    their low bytes (narrow_spill_reload), a tagged result part"""
 
 
 class ForwardedRereads:
@@ -3426,7 +3499,7 @@ def all_ones_operand_read(records, position, address, width):
 
 def compare_function(name, real_function, stripped_function, signatures, symbol, size, pinned,
                      interfaces=None, unloaded_all_ones=False, *, _ordered_trace_check=None,
-                     _capture_load_provenance=False, operand_reads=None, typed=False):
+                     _capture_load_provenance=False, operand_reads=None, typed=False, narrowed_perturbed=None):
     def pinned_width(address):
         """the width of the pinned member that starts at address, or None"""
         return pinned.get(object_offset(address, symbol, size))
@@ -3447,6 +3520,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
     tests = set()           # kit#375, rule R4: stored-value test re-reads
     copies = set()          # kit#375, rule T: the typed copies
     operands = set()        # kit#165, R2: `|= ALL_ONES` operand reads a variant compile proves
+    # kit#582: the word spills each compile reloads by their low bytes (narrow_spill_reload)
+    narrowed = {"real": set(), "stripped": set()}
     forwarded_updates = False        # a forwarded constant update was classified on some path so far
     premised = False                 # some path relied on FRAME_READ_PREMISES (either compile)
     for number, path in enumerate(paths, 1):
@@ -3458,6 +3533,8 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
                 indirect.add(call.indirect)
             if getattr(call, "whole_object", None):
                 whole.add(call.whole_object)
+            if getattr(call, "narrowed_reload", False):
+                narrowed["real"].add(call.index)
             if getattr(call, "copy_destination", None) is not None:
                 binding = COMPILER_COPY.get()
                 copies.add(f"`{symbol}` saved to {show(call.copy_destination)} by the compiler's memcpy at "
@@ -3577,6 +3654,7 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         # 1. the stripped compile behaves the same on this path
         other = replay(name, stripped_function, signatures, "stripped", path.decisions, (symbol, size, pinned),
                        interfaces, _capture_load_provenance=_capture_load_provenance)
+        narrowed["stripped"].update(r.index for r in other.records if getattr(r, "narrowed_reload", False))
         premised = premised or getattr(path, "premised", False) or getattr(other, "premised", False)
         if typed:
             # kit#375, rules P and T: a typeof carries the qualifier off the object, onto the
@@ -3695,6 +3773,10 @@ def compare_function(name, real_function, stripped_function, signatures, symbol,
         ((StoredTestRereads(sorted(tests)),) if tests else ()) + \
         ((TypedCopies(sorted(copies)),) if copies else ()) + \
         ((OperandReads(sorted(operands)),) if operands else ())
+    if narrowed_perturbed is not None:
+        narrowed["layout-perturbed"] = set(narrowed_perturbed)
+    if any(narrowed.values()):
+        tail += (NarrowReloads((label, sorted(indices)) for label, indices in narrowed.items()),)
     if premised:
         result += (sorted(updates), sorted(ordinary), sorted(conditional), sorted(indirect),
                    list(FRAME_READ_PREMISES))
@@ -3864,7 +3946,7 @@ def object_accesses(records, atom):
 
 
 def perturbation_check(name, real_function, perturbed_function, signatures, symbol, size, pinned,
-                       mapping, interfaces=None):
+                       mapping, interfaces=None, narrowed=None):
     """the layout-perturbed compile must follow every pinned access, and only those.
 
     On every path, the real compile's trace, branch conditions and object
@@ -3875,6 +3957,7 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
     P(X) != X for every pinned X, it cannot follow the move.  Accesses that
     overlap a pinned member without being exactly it are refused by the
     executor in both compiles, so remapping an access's start is enough.
+    narrowed, if given, collects the perturbed compile's kit#582 reloads.
     """
     atom = ("sym", symbol)
     paths = explore(name, real_function, signatures, "real", (symbol, size, pinned), interfaces)
@@ -3886,6 +3969,8 @@ def perturbation_check(name, real_function, perturbed_function, signatures, symb
     for number, path in enumerate(paths, 1):
         other = replay(name, perturbed_function, signatures, "layout-perturbed", path.decisions,
                        (symbol, size, pinned), interfaces)
+        if narrowed is not None:
+            narrowed.update(r.index for r in other.records if getattr(r, "narrowed_reload", False))
         mine = [(kind, width, remap(address, atom, mapping))
                 for kind, width, address in object_accesses(path.records, atom)]
         theirs = object_accesses(other.records, atom)
@@ -4036,6 +4121,7 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
             signatures.get("memcpy", (None, None))[1] is None:
         signatures["memcpy"] = (True, 3)
         signatures[(VOID_POINTERS, "memcpy")] = frozenset({0, 1})
+    narrowed = {}           # kit#582: the perturbed compile's low-byte spill reloads, per function
     if perturbed_assembly is not None:
         _, mapping, _ = perturbed_declaration(declaration)
         perturbed, _ = parse_assembly(perturbed_assembly)
@@ -4043,7 +4129,7 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
             raise SemanticError("the real and layout-perturbed compiles define different functions")
         for name in sorted(real):
             perturbation_check(name, real[name], perturbed[name], signatures, symbol, size, pinned,
-                               mapping, interfaces)
+                               mapping, interfaces, narrowed=narrowed.setdefault(name, set()))
     # A pinned store may lack its read-modify-write load only for the
     # all-ones value, and only once the permuted compile has shown it follows
     # its member; without that compile the rule stays strict.
@@ -4058,7 +4144,8 @@ def _compare_compiles(real_assembly, stripped_assembly, preprocessed, symbol, de
     anchors = operand_read_anchors(real_assembly, preprocessed, symbol, declaration)
     return [(name,) + compare_function(name, real[name], stripped[name], signatures, symbol, size, pinned,
                                        interfaces, unloaded_all_ones=perturbed_assembly is not None,
-                                       operand_reads=anchors, typed=bool(typeofs))
+                                       operand_reads=anchors, typed=bool(typeofs),
+                                       narrowed_perturbed=narrowed.get(name))
             for name in sorted(real)]
 
 
@@ -4078,8 +4165,10 @@ def record(symbol, results, perturbed=False):
         tests = next((part for part in extra if isinstance(part, StoredTestRereads)), [])
         copies = next((part for part in extra if isinstance(part, TypedCopies)), [])
         operands = next((part for part in extra if isinstance(part, OperandReads)), [])
+        narrowed = next((part for part in extra if isinstance(part, NarrowReloads)), [])
         extra = [part for part in extra if not isinstance(part, (WholeObjectArguments, SpillReloads,
-                                                                 StoredTestRereads, TypedCopies, OperandReads))]
+                                                                 StoredTestRereads, TypedCopies, OperandReads,
+                                                                 NarrowReloads))]
         unloaded, relied, updates, ordinary, conditional, indirect, premises = (extra + [[]] * 7)[:7]
         parts.append(f"`{name}` agrees on {paths} path{'s' if paths != 1 else ''}; "
                      f"read-modify-write loads at {list(n + 1 for n in read_modify_write)}, "
@@ -4103,6 +4192,9 @@ def record(symbol, results, perturbed=False):
                      (f", whole-object arguments (kit#375): {'; '.join(whole)}" if whole else "") +
                      (f", read-modify-write windows holding a spill reload (kit#165) at "
                       f"{list(n + 1 for n in reloads)}" if reloads else "") +
+                     (", word spills reloaded by their low bytes (kit#582): " +
+                      ", ".join(f"{label} compile at {list(n + 1 for n in indices)}" for label, indices in narrowed)
+                      if narrowed else "") +
                      (f", typed copies (kit#375): {'; '.join(copies)}" if copies else "") +
                      (f", all-ones `|=` operand reads (kit#165): {'; '.join(operands)}" if operands else "") +
                      (f", frame reads under premises: {'; '.join(premises)}" if premises else "") +
