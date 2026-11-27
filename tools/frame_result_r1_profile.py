@@ -16,10 +16,10 @@ dropped only when the ROM shows that no caller reads it:
 * no Thumb B or B<cond> outside the function branches to its entry, and no ADR forms its address (the
   Thumb ``add rd, pc, #imm``, and ARM ADD/SUB immediates with Rn = PC);
 * nothing falls into the entry: the mapped function with the greatest start below it is Thumb code, ends
-  at or before the entry and has a closed control-flow graph, and any unmapped gap between them is at most
-  ``GAP_LIMIT`` bytes and named by nothing (no word, BL, Thumb branch or ADR targets one of its
-  halfwords), so execution never reaches the gap and runs on into the entry; with no such function it
-  refuses;
+  at or before the entry and has a closed control-flow graph, and the bytes from the end of its last
+  reached instruction to the entry (a literal pool, dead code, padding, any unmapped gap), which its own
+  paths never run but which would run on into the entry, are at most ``GAP_LIMIT`` and named by nothing
+  (no word, BL, Thumb branch or ADR targets one of their halfwords); with no such function it refuses;
 * every Thumb BL in the ROM that targets it lies in a mapped Thumb function and decodes as that BL there,
   and from the instruction after it, on every path, that caller writes R1 before any read, call or
   return (``dead_register.prove`` with ``dead_register.thumb_step``).  A call from the function to
@@ -49,7 +49,7 @@ PREMISE = ("unproved runtime premise: code runs only from the BIOS, ROM, EWRAM a
 MIRRORS = tuple(step * 0x01000000 for step in range(1, 6))     # 0x09000000-0x0DFFFFFF over 0x08000000
 BRANCH_REACH = 4096
 THUMB_ADR_REACH = 1028           # add rd, pc, #imm8 * 4 reaches ((pc + 4) & ~3) + 1020
-GAP_LIMIT = 64                   # the longest unmapped gap before the entry whose halfwords are scanned
+GAP_LIMIT = 64                   # the most unreached bytes before the entry whose halfwords are scanned
 _ARM_ADD, _ARM_SUB = 0b0010100, 0b0010010   # bits 27-21 of an ARM ADD/SUB immediate
 _THUMB_BL = re.compile(rb"(?=[\x00-\xff][\xf0-\xf7][\x00-\xff][\xf8-\xff])", re.S)
 _ARM_ADR = re.compile(rb"(?=[\x00-\xff][\x00-\xff][\x4f\x5f\x8f\x9f][\x02\x12\x22\x32\x42\x52\x62\x72\x82\x92"
@@ -186,7 +186,8 @@ def evidence(proof, address, mapping):
         if own is None or own[0] != address:
             raise ValueError("the function is not a mapped Thumb entry")
         # Nothing falls into the entry: the mapped function before it never runs off its end, and nothing
-        # names an unmapped gap between them, from which execution would run on into the entry.
+        # names a byte after its last reached instruction (its tail, then any unmapped gap), from which
+        # execution would run on into the entry.
         previous = _predecessor(proof, address)
         if previous is None:
             raise ValueError("no mapped function precedes it, so nothing shows that no code falls into its entry")
@@ -194,31 +195,35 @@ def evidence(proof, address, mapping):
             raise ValueError(f"the function before it, 0x{previous[0]:08X}, is not Thumb code")
         if previous[1] > address:
             raise ValueError(f"the function before it, 0x{previous[0]:08X}, overlaps its entry")
-        gap = address - previous[1]
-        if gap > GAP_LIMIT:
-            raise ValueError(f"the {gap}-byte unmapped gap before it is longer than {GAP_LIMIT} bytes")
+        if address - previous[1] > GAP_LIMIT:
+            raise ValueError(f"the {address - previous[1]} unreached bytes before its entry exceed {GAP_LIMIT}")
         try:
-            closed = owner.refine(proof.span(previous[0]), previous[0], mapping)["cfg_closed"]
+            refined = owner.refine(proof.span(previous[0]), previous[0], mapping)
         except ValueError:
-            closed = False
-        if not closed:
+            refined = dict(cfg_closed=False)
+        if not refined["cfg_closed"]:
             raise ValueError(f"the function before it, 0x{previous[0]:08X}, may fall into its entry")
-        words, sites, branches, adrs = scan(proof.rom, address, previous[1] if gap else None)
+        reached = max((int(stop, 16) for _, stop in refined["code_ranges"]), default=previous[0])
+        start = min(reached, previous[1])
+        gap = address - start
+        if gap > GAP_LIMIT:
+            raise ValueError(f"the {gap} unreached bytes before its entry exceed {GAP_LIMIT}")
+        words, sites, branches, adrs = scan(proof.rom, address, start if gap else None)
 
         def named(target):
-            return "the function" if target == address else "the unmapped gap before it"
+            return "the function" if target == address else "the unreached bytes before it"
         if words:
             raise ValueError(f"the ROM word at 0x{words[0][0]:08X} names {named(words[0][1])}")
         outside = [(site, target) for site, target in branches if target != address or not own[0] <= site < own[1]]
         if outside:
             site, target = outside[0]
             raise ValueError(f"a Thumb branch at 0x{site:08X} reaches "
-                             + ("the function's entry" if target == address else "the unmapped gap before it"))
+                             + ("the function's entry" if target == address else "the unreached bytes before it"))
         if adrs:
             raise ValueError(f"the ADR at 0x{adrs[0][0]:08X} forms the address of {named(adrs[0][1])}")
         into = [site for site, target in sites if target != address]
         if into:
-            raise ValueError(f"a BL at 0x{into[0]:08X} branches into the unmapped gap before it")
+            raise ValueError(f"a BL at 0x{into[0]:08X} branches into the unreached bytes before it")
         callers = []
         for site in [site for site, _ in sites]:
             caller = _owner(spans, starts, site)
@@ -244,7 +249,7 @@ def evidence(proof, address, mapping):
         if not callers:
             raise ValueError("no direct caller")
         found = dict(schema=SCHEMA, function=address, callers=callers, words=0, branches=0, adrs=0,
-                     previous=previous[0], previous_end=previous[1], gap=gap, premise=PREMISE,
+                     previous=previous[0], previous_end=previous[1], gap_start=start, gap=gap, premise=PREMISE,
                      premise_proved=False)
     except ValueError as error:
         _CACHE[key] = ("refused", str(error))
@@ -285,8 +290,8 @@ def lines(proof):
     if not found:
         return []
     sites = ", ".join(f"`0x{site:08X} r1 {offset:+d}`" for site, offset in found["sites"])
-    gap = (f" and nothing names the {found['gap']}-byte unmapped gap from 0x{found['previous_end']:08X} to the "
-           f"entry" if found["gap"] else "")
+    gap = (f" and nothing names the {found['gap']} bytes from 0x{found['gap_start']:08X} to the entry, which "
+           f"its control-flow graph never reaches" if found["gap"] else "")
     callers = ", ".join(f"0x{row['site']:08X} in 0x{row['caller']:08X} (R1 written at "
                         + " ".join(f"0x{node:08X}" for node in row["kills"]) + f"; {row['states']} states)"
                         for row in found["callers"])
