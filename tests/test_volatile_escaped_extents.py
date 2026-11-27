@@ -455,8 +455,10 @@ class ExecutorTests(unittest.TestCase):
             with self.subTest(slot=slot):
                 real = frame("mov\tr1, #1", f"str\tr1, {slot}")
                 self.refused(real, real.replace("#1", "#2", 1), "differ in observable behaviour")
+        # below sp no plain store is admitted at all (kit#591), even an identical one
         below = lambda value: frame("mov\tr2, sp", "sub\tr2, #4", f"mov\tr1, #{value}", "str\tr1, [r2]")
-        self.refused(below(1), below(2), "differ in observable behaviour")
+        self.refused(below(1), below(2), "a frame access below sp")
+        self.refused(below(1), below(1), "a frame access below sp")
 
     def test_locals_must_fit_the_frame(self):
         real, stripped = differing()

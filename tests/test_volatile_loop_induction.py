@@ -802,8 +802,9 @@ class ShelvedCounterexampleTests(unittest.TestCase):
                     with self.assertRaises(semantics.SemanticError) as caught:
                         semantics.compare(real, stripped, code, SYMBOL, declaration, perturbed)
                     if order == "the kit's order":
-                        self.assertIn("relational loop induction (kit#137): " + case["reason"],
-                                      str(caught.exception))
+                        # a case the plain run now refuses itself never reaches the induction
+                        prefix = "" if case.get("plain") else "relational loop induction (kit#137): "
+                        self.assertIn(prefix + case["reason"], str(caught.exception))
 
 
 class RuntimeHelperAndSwiCallTests(Base):

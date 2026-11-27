@@ -577,7 +577,8 @@ class PushAreaTests(unittest.TestCase):
         self.refused(reused("fv"), reused("vf"))
         self.refused(reused("vf"), reused("fv"))
         compare(reused("fv"), reused("fv"))
-        # written only at a variable offset: sp rose above the slot (a pop or an add), so it is released
+        # written only at a variable offset: sp rose above the slot (a pop or an add), so it is released,
+        # and it holds no defined value until a fixed store writes it again (kit#591): either order refuses
         for release in ("pop\t{r4, r5}", "add\tsp, sp, #8"):
             def body(order):
                 indexed = ("lsl\tr3, r0, #2", "add\tr3, sp", "str\tr1, [r3]")
@@ -586,8 +587,8 @@ class PushAreaTests(unittest.TestCase):
                 return ("push\t{r4, r5, lr}", release, "add\tsp, sp, #-8") + middle + \
                     ("add\tsp, sp, #8", "pop\t{r1}", "bx\tr1")
             with self.subTest(release=release):
-                self.refused(body("iv"), body("vi"))
-                compare(body("iv"), body("iv"))
+                self.refused(body("iv"), body("vi"), "reads a frame word released by an sp increase")
+                self.refused(body("iv"), body("iv"), "reads a frame word released by an sp increase")
         # sp moved through a value that is no frame offset: refused outright, so no release is missed
         via_global = ("push\t{r4, r5, lr}", "mov\tr7, sp", "add\tr7, #8", "ldr\tr2, .L3", "mov\tsp, r2",
                       "mov\tsp, r7", "add\tsp, sp, #-8", "lsl\tr3, r0, #2", "add\tr3, sp", "str\tr1, [r3]",

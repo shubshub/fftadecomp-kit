@@ -38,7 +38,11 @@ symbolically along every path, and the check requires
    extents every escape after such a store carries its ordering() of the
    stores that reach the escaped locals instead.  The record of such a
    verdict, or of one that reads a saved slot past a store at a variable
-   offset, names its premises (FRAME_READ_PREMISES).  Every callee
+   offset, names its premises (FRAME_READ_PREMISES).  Memory below sp is
+   never private, so a plain load or store at a fixed slot below sp is
+   refused, and a frame byte that sp has risen above holds no defined value
+   until a fixed store writes it again, so a read that may reach one is
+   refused (Executor.released, frame_read).  Every callee
    needs a file-scope prototype with a fixed list of one-word arguments;
    no prototype, `()`, `...` and wider arguments fail closed.  The callee
    owns its stack-argument words, so a frame load after the call reads each
@@ -1558,6 +1562,12 @@ class Executor:
                     break
                 continue
             if entry[0] == "release":
+                if self.released(address, entry[1]):
+                    if probe:
+                        # the store-time probe: no recorded read equals this value
+                        version = ("released", None)
+                        break
+                    self.fail(text, "reads a frame word released by an sp increase")
                 continue
             _, stored_width, stored_address, stored, event, _, derived = entry
             relation = self.relation(address, width, stored_address, stored_width, saved)
@@ -1606,6 +1616,46 @@ class Executor:
 
     def current(self, width, address):
         return self.load(width, False, address, "", probe=True)[0]
+
+    def released(self, address, mark):
+        """may a load at address read a byte below mark, which an sp increase released?
+
+        Memory below sp holds no defined value: a call made while sp is above it puts its
+        own frame there, a BIOS call its stack work, and an interrupt handler may write it
+        between any two instructions.  A fixed slot is below the mark when it starts below
+        it (the scan meets the release before any store to it since); an offset from sp that
+        is not constant may reach any byte; after an escape a pointer not built from sp may
+        point into the frame (relation), unless it names an object."""
+        if is_stack(address):
+            return signed32(linear(address)[0]) < mark
+        if carries(address, SP):
+            return True
+        return self.escaped and global_symbol(address) is None
+
+    def released_bytes(self):
+        """(released, uncertain): the frame bytes (sp offsets) a fixed-slot store wrote that an
+        sp increase has released since, with no fixed-slot store to them after; and, for each
+        release that a store at a variable frame offset precedes, its mark with the bytes
+        fixed-slot stores have written since.  That store may have written any byte below
+        the mark, so each such byte not written again is released too."""
+        stored, released, uncertain, variable = set(), set(), [], False
+        for entry in self.memory:
+            if entry[0] == "release":
+                gone = {byte for byte in stored if byte < entry[1]}
+                stored -= gone
+                released |= gone
+                if variable:
+                    uncertain.append((entry[1], set()))
+            elif entry[0] == "store" and is_stack(entry[2]):
+                offset = signed32(linear(entry[2])[0])
+                for byte in range(offset, offset + entry[1]):
+                    stored.add(byte)
+                    released.discard(byte)
+                    for _, written in uncertain:
+                        written.add(byte)
+            elif entry[0] == "store" and carries(entry[2], SP):
+                variable = True
+        return released, uncertain
 
     def local_stores(self, window=None, base=0):
         """the stores so far to the frame, as the frame holds them: each store
@@ -1659,6 +1709,19 @@ class Executor:
         if is_stack(address):
             start = signed32(linear(address)[0])
             window = (start, start + width)
+        # A byte released by an sp increase since its store holds no defined value, so it is
+        # left out of the binding by refusing the read: a fixed slot that holds one, or may
+        # (below a release that follows a store at a variable offset, unless a fixed-slot store
+        # wrote it again), or any offset that is not constant once one exists (it may reach it).
+        released, uncertain = self.released_bytes()
+        if window is None:
+            reached = bool(released or uncertain)
+        else:
+            reached = any(window[0] <= byte < window[1] for byte in released) or \
+                any(byte < mark and byte not in written for mark, written in uncertain
+                    for byte in range(window[0], window[1]))
+        if reached:
+            self.fail(text, "reads a frame word released by an sp increase")
         stores = self.local_stores(window)
         if any(carries(part, SP) for item in stores if item[0] == "bytes" for _, part in item[1]):
             # The read could return that frame address as a plain value, and
@@ -1676,8 +1739,8 @@ class Executor:
         return address
 
     def sp_moved(self, old, new):
-        """sp rose: the slots below its new value are released (see load).
-        run() refuses an sp that is not a fixed offset, so both are."""
+        """sp rose: the slots below its new value are released (see load, released and
+        frame_read).  run() refuses an sp that is not a fixed offset, so both are."""
         if is_stack(old) and is_stack(new) and signed32(linear(new)[0]) > signed32(linear(old)[0]):
             self.memory.append(("release", signed32(linear(new)[0])))
 
@@ -2097,6 +2160,11 @@ class Executor:
                 self.records.append(record)
                 return None
             address, reads = self.memory_operand(operands[1], text)
+            if is_stack(address) and signed32(linear(address)[0]) < signed32(linear(regs["sp"])[0]):
+                # Memory below sp is never private: a call's frame, a BIOS call's stack work and
+                # an interrupt handler write it.  agbcc never reads or writes there; push and pop
+                # (below) move sp over the words they transfer.
+                self.fail(text, "a frame access below sp")
             derived = bool(reads & self.derived)
             self.check_address(address, width, text, derived=derived)
             record.address, record.width = address, width
