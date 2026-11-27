@@ -149,6 +149,8 @@ RULES = [
      "the comment admits the source exists to steer the compiler"),
 ]
 HACK_VOCABULARY = next(pattern for rid, _, pattern, _ in RULES if rid == "hack-vocabulary")
+# an address in the ROM, as an inert-control-flow justification cites the instructions the ROM keeps
+ROM_CITATION = re.compile(r"\b0x0[89][0-9A-Fa-f]{6}\b")
 
 
 # A backslash, optional horizontal whitespace and a newline: GCC's cpp splices
@@ -258,6 +260,17 @@ def justification(text, line_no):
         if why is not None and (first <= line_no <= last or last == line_no - 1):
             return why
     return None
+
+
+def justifications(text, line_no):
+    """every justification on line_no or ending on the line before, in order (justification is the first)"""
+    found = []
+    for first, last, why in comment_lines(text):
+        if first > line_no:
+            break
+        if why is not None and (first <= line_no <= last or last == line_no - 1):
+            found.append(why)
+    return found
 
 
 def justified(text, line_no):
@@ -1924,6 +1937,9 @@ def inert_control_flow(text, lines=None):
     This is the shape that appeared in a rejected match: the branches store the
     same value, so the only effect is to make the compiler keep a frame it
     would otherwise drop.  Semantically it is `X;`, and nobody writes that.
+    It is a suspect, not an error: where the ROM keeps the test's
+    instructions, a justification that cites them by ROM address
+    (ROM_CITATION) clears the hit in check_view.
     lines, when given, is the text the offsets index, comments and all, which
     numbers the lines (text may be its stripped code).
     """
@@ -2286,7 +2302,13 @@ def check_view(text, origin="", data_symbols=None, relpath=None, volatile_allow=
             # an inline-asm-looking thing inside a comment is not code
             findings.append((line, rid, sev, GNU_VOLATILE.format(m[0]) if rid == "volatile" and
                              m[0] != "volatile" else msg))
-    findings += inert_control_flow(code, text)
+    # a suspect, cleared like the rules above by a justification on its line or ending on the one before,
+    # which must also cite the ROM: identical arms whose test the ROM keeps are admitted with a comment
+    # naming those instructions (kit#201)
+    for line, rid, sev, msg in inert_control_flow(code, text):
+        if sev == "suspect" and any(ROM_CITATION.search(why) for why in justifications(text, line)):
+            continue
+        findings.append((line, rid, sev, msg))
     # comments are where hackiness gets admitted, so scan them raw too, justifications included: one
     # that admits steering justifies nothing (comment_justification)
     for i, raw in enumerate(text.split("\n"), 1):
