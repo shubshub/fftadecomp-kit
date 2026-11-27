@@ -54,6 +54,52 @@ u32 func_08000200(void)
 """
 
 
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class ForwardingInsideClosureRetryTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        cls.temporary = tempfile.TemporaryDirectory(prefix="closure_forwarded_", dir=scratch)
+        cls.base = Path(cls.temporary.name)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.temporary.cleanup()
+
+    def case(self, name, source, callee_list):
+        root = index_thunks(build(self.base / name, source, callee_list, large=True, function_literal_thunks=True))
+        return run(root)
+
+    def refused_in_retry(self, name, source, callee_list):
+        code, output, report = self.case(name, source, callee_list)
+        self.assertNotEqual(code, 0, report)
+        self.assertIn(f"{closure.TRIGGER}; closure-slot retry: ", output)
+        self.assertIn(SLOT_REFUSAL, output.split("closure-slot retry: ", 1)[1])
+
+    def test_w0_plain_forwarding_is_tracked(self):
+        code, output, report = self.case("w0", PLAIN_FWD, cs.callees() + [("func_08000A00", WRAP),
+                                                                         ("func_08000B00", LEAF_IN)])
+        self.assertEqual(code, 0, output[-3000:])
+        self.assertTrue(any(line.startswith(forwarded.SLOTS_FIELD) for line in report.splitlines()))
+
+    def test_w0b_plain_forwarding_out_of_bounds_refuses(self):
+        code, output, report = self.case("w0b", PLAIN_FWD, cs.callees() + [("func_08000A00", WRAP),
+                                                                           ("func_08000B00", LEAF_FAR)])
+        self.assertNotEqual(code, 0, report)
+
+    def test_w1_adapter_forwarding_a_closure_pointer_refuses(self):
+        for name, callback in (("w1", CB_STACK), ("w1b", CB_STACK_FAR)):
+            with self.subTest(name):
+                self.refused_in_retry(name, cs.OWNER, cs.callees(adapter_body=forwarding_adapter(), callback=callback))
+
+    def test_w2_owner_forwarding_call_while_closure_words_are_live_refuses(self):
+        for name, leaf in (("w2", LEAF_IN), ("w2b", LEAF_FAR)):
+            with self.subTest(name):
+                self.refused_in_retry(name, OWNER_FWD, cs.callees() + [("func_08000A00", WRAP),
+                                                                        ("func_08000B00", leaf)])
+
+
 class ImportReleasedTests(unittest.TestCase):
     def test_a_word_result_keeps_its_type_and_words(self):
         stale = match.FORWARD_STALE_BASE - 8
