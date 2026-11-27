@@ -396,6 +396,35 @@ class IwramImageTests(unittest.TestCase):
         self.assertTrue([line for line in call_via.lines(unresolved) if line.startswith(call_via.PREMISE_LINE) and
                          f"call at 0x{site:08X}" in line], call_via.lines(unresolved))
 
+    def test_a_crossing_continuation_walks_an_image_call(self):
+        # The real path (0x08005954): the callback's fact in R4 crosses a call whose callee hands back a
+        # copy of R4 in R3, so the crossing check's own callee-saved walk continues in the caller and
+        # meets an image call with R3 holding that copy.  With the image that call is walked; without
+        # it the copy reaches an unresolved indirect call and the crossing refuses.
+        body = (f"push {{r4, lr}}\nldr r4, =callback + 1\ncrossed:\nbl func_cp\nldr r0, =0x{TABLE:08X}\n"
+                f"ldr r2, [r0]\nldr r0, =0x02000000\nmovs r1, #8\nbl 0x{R2:08X}\nmovs r3, #0\npop {{r4, pc}}\n.ltorg")
+        text = assembly(body).replace("owner_end:\n", "owner_end:\n.balign 4\n.global callback, func_cp, func_cp_end, crossed\n"
+                                      "callback:\nbx lr\nfunc_cp:\nadds r3, r4, #0\nbx lr\nfunc_cp_end:\n", 1)
+        (self.root / "f.s").write_text(text)
+        self.build_text()
+        self.entries.append({"rom": f"0x{self.symbols['func_cp']:08X}", "end": f"0x{self.symbols['func_cp_end']:08X}",
+                             "mode": "thumb"})
+        rom, mapping = bytes(self.rom), json.dumps(self.entries).encode()
+        crossed, image_site = self.symbols["crossed"], self.site()
+
+        def crossing():
+            proof = match.BufferCallProof(rom, mapping, stack_arguments=True, call_via_targets=True)
+            records = call_via.crossing_premises(proof, call_via.function_of(proof, crossed), crossed,
+                                                 self.symbols["func_cp"], 4)
+            return proof, records
+        proof, records = crossing()
+        self.assertEqual(proof.iwram_image_watch_calls, {(image_site, DESTINATION)})
+        self.assertFalse([record for record in records if record[0] == "call" and record[2] == image_site], records)
+        with patch.object(iwram, "watch_target", lambda proof: None), \
+                self.assertRaisesRegex(ValueError, f"indirect call at 0x{image_site:08X} receives an owner stack "
+                                                   "address in R3"):
+            crossing()
+
     def test_a_release_by_an_image_routine_marks_its_caller(self):
         # A routine of the image that returns its own frame in R2 (released_scratch_profile): the
         # marker is keyed by the routine the call resolved to, which no literal or ROM word names.
