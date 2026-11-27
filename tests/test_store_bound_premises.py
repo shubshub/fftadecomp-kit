@@ -70,6 +70,14 @@ EARLY = LOOP.replace("mov r8, r0\nloop:", "mov r8, r0\nmov r0, sb\nbl query\ncmp
     .replace("ble loop\nmov r0, r8", "ble loop\ndone:\nmov r0, r8")
 # A store at every pass through a second advancing pointer.
 EVERY_PASS = "site2:\nstrh r4, [r5]\nadds r5, #2"
+# A store at every pass through a second advancing pointer, on a result of 1 only (a test the replay cannot
+# decide), so that some paths store at most twice and return.
+CONDITIONAL = "cmp r4, #1\nbne skip2\nsite2:\nstrh r4, [r5]\nadds r5, #2\nskip2:"
+# A store at every pass; after the second (pass 1) the call may return on an unknown result, else the loop
+# runs on.  The frame allows two, and the code one or two executions or more.
+TWICE = ("site2:\nstrh r4, [r5]\nadds r5, #2\ncmp r7, #1\nbne stay\nmov r0, sb\nbl query\ncmp r0, #0\n"
+         "beq done\nstay:")
+DONE = LOOP.replace("ble loop\nmov r0, r8", "ble loop\ndone:\nmov r0, r8")
 # The owner with a u16[6] (twelve bytes) instead of a u16[2].
 CALLER12 = CALLER.replace("sub sp, #4", "sub sp, #12").replace("add sp, #4", "add sp, #12")
 
@@ -192,25 +200,30 @@ class StoreBoundTests(unittest.TestCase):
         _, proof = self.walk(self.premises([(self.callee, self.site, 2)]), extra=extra)
         self.assertEqual({(callee, site) for callee, site, _, _ in proof.store_bound_retry["pruned"]},
                          {(self.callee, self.site)})
-        # A second site whose pointer advances on every pass leaves the frame at its third store whatever
-        # the first site does: the first site's row does not cover it, the entry that lacks a row for it is
-        # refused with both rows printed, and both rows together end every path of the call, so they refuse
-        # too (test_rows_that_end_every_path_of_a_call_refuse).
-        advancing = EVERY_PASS
-        self.build(advancing)
+        # A second site whose pointer advances on some passes leaves the frame at its third store whatever
+        # the first site does: the first site's row does not cover it, and the entry that lacks a row for it
+        # is refused with both rows printed.
+        self.build(CONDITIONAL)
         site2 = self.symbols["site2"]
         with self.assertRaises(store_bound.StoreBoundRefusal) as caught:
-            self.walk(self.premises([(self.callee, self.site, 2)]), extra=advancing)
+            self.walk(self.premises([(self.callee, self.site, 2)]), extra=CONDITIONAL)
         self.assertIn("the entry lists other sites than the walk needs", str(caught.exception))
         self.assertEqual(caught.exception.entry[f"0x{BASE:08X}"]["rows"],
                          [{"callee": f"0x{self.callee:08X}", "site": f"0x{site:08X}", "bound": 2}
                           for site in sorted((self.site, site2))])
-        with self.assertRaisesRegex(ValueError, rf"store bound: no replayed path of 0x{self.callee:08X} "):
-            self.walk(self.premises(sorted([(self.callee, self.site, 2), (self.callee, site2, 2)])), extra=advancing)
-        # Bounding the first site alone below what the second needs does not admit the second.
-        with self.assertRaises(store_bound.StoreBoundRefusal):
+        # Bounding the second site above what the frame allows does not admit it.
+        with self.assertRaisesRegex(store_bound.StoreBoundRefusal, r"\(a bound lets a store leave the allocated "):
             self.walk(self.premises(sorted([(self.callee, self.site, 2), (self.callee, site2, 3)])),
-                      extra=advancing)
+                      extra=CONDITIONAL)
+        # A second site that advances on every pass leaves the frame on every path: no row can admit it, so
+        # the plain refusal stands, with or without rows (test_rows_that_end_every_path_of_a_call_refuse).
+        self.build(EVERY_PASS)
+        site2 = self.symbols["site2"]
+        for rows in ([(self.callee, self.site, 2)], [(self.callee, self.site, 2), (self.callee, site2, 2)]):
+            with self.subTest(rows=len(rows)), self.assertRaises(ValueError) as caught:
+                self.walk(self.premises(rows), extra=EVERY_PASS)
+            self.assertNotIn("store-bound retry", str(caught.exception))
+            self.assertIsNotNone(store_bound.triggered(caught.exception))
 
     # Refused entries ---------------------------------------------------------------------
 
@@ -377,24 +390,24 @@ class StoreBoundTests(unittest.TestCase):
         self.assertEqual(proof.fingerprint(), fingerprint)
 
     def test_two_rows_whose_second_store_runs_every_pass_refuse(self):
-        # The first site stores on a qualifying pass, the second on every one of the five passes: a bound of
-        # 2 on the second ends every path at pass 2, so no path of the call is verified to its return.
+        # The first site stores on a qualifying pass, the second on every one of the five passes: the frame
+        # allows two of each, and any such bound ends every path at pass 2, so no path of the call would be
+        # verified to its return.  The measure pass sees that, and the plain refusal stands.
         self.build(EVERY_PASS)
         site2 = self.symbols["site2"]
         with self.assertRaises(ValueError) as caught:
             self.walk(self.premises(sorted([(self.callee, self.site, 2), (self.callee, site2, 2)])),
                       extra=EVERY_PASS)
         self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
-        self.assertRegex(str(caught.exception),
-                         rf"; default store-bound retry: buffer callee 0x{self.callee:08X}: bounded loop replay: "
-                         rf"store bound: no replayed path of 0x{self.callee:08X} "
-                         rf"\(called at 0x0800000[0-9A-F]\) returns and \d+ end at a bound: the walk would verify "
-                         rf"the premise, not the call$")
+        self.assertEqual(store_bound.triggered(caught.exception)[0], self.callee)
+        self.assertNotIn("store-bound retry", str(caught.exception))
+        self.assertRegex(str(caught.exception.__cause__), rf"store bound: no replayed path of 0x{self.callee:08X} "
+                                                          rf"\(called at 0x0800000[0-9A-F]\) returns")
 
     def test_two_rows_count_each_site_on_its_own(self):
         # The first site stores on a nonzero result, the second on a result of 1: two qualifying tests the
         # replay cannot decide, so both sites store on some passes and not on others, and some paths return.
-        conditional = "cmp r4, #1\nbne skip2\nsite2:\nstrh r4, [r5]\nadds r5, #2\nskip2:"
+        conditional = CONDITIONAL
         self.build(conditional)
         site2 = self.symbols["site2"]
         _, proof = self.walk(self.premises(sorted([(self.callee, self.site, 2), (self.callee, site2, 2)])),
@@ -424,65 +437,83 @@ class StoreBoundTests(unittest.TestCase):
 
     def test_a_store_outside_the_frame_at_its_first_execution_refuses(self):
         # An unconditional store eight bytes past the cursor leaves the u16[2] at its first execution: the
-        # largest bound the frame allows would be 0, which says the store never runs.  Refused, with no entry
-        # printed, and an entry with a bound of 0 is malformed.
+        # largest bound the frame allows would be 0, which says the store never runs.  The plain refusal
+        # stands, with no entry printed, and an entry with a bound of 0 is malformed.
         extra = "site2:\nstrh r4, [r6, #8]"
         self.build(extra)
         site2 = self.symbols["site2"]
         with self.assertRaises(ValueError) as caught:
             self.walk(None, extra=extra)
         self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
-        self.assertTrue(str(caught.exception).endswith(
-            f"; default store-bound retry: store bound: the store at 0x{site2:08X} in 0x{self.callee:08X} leaves "
-            f"the allocated local words at its first execution on a replayed path; a bound below 1 is not "
-            f"admitted"), str(caught.exception))
-        self.assertNotIn('"bound"', str(caught.exception))
+        self.assertEqual(store_bound.triggered(caught.exception), (self.callee, site2))
+        self.assertNotIn("store-bound retry", str(caught.exception))
         with self.assertRaisesRegex(ValueError, r"^store bound: a row of 0x08000000 is not \{callee, site, bound >= 1\}$"):
             self.walk(self.premises([(self.callee, site2, 0)]), extra=extra)
         with self.assertRaisesRegex(ValueError, "measures every row or bounds every row"):
             store_bound.StoreBounds(BASE, {(self.callee, site2): 0})
 
     def test_rows_that_end_every_path_of_a_call_refuse(self):
-        # The frame allows two stores at each site; the second site runs on all five passes, so the rows the
-        # measure pass prints end every replayed path of the call: the premise is false by the code alone.
+        # The frame allows two stores at each site; the second site runs on all five passes, so every row
+        # the frame allows ends every replayed path of the call: the premise is false by the code alone.  The
+        # measure pass finds no path that returns, and the plain refusal stands, with no entry printed.
         self.build(EVERY_PASS)
         site2 = self.symbols["site2"]
-        with self.assertRaises(store_bound.StoreBoundRefusal) as caught:
-            self.walk(None, extra=EVERY_PASS)
-        rows = caught.exception.entry[f"0x{BASE:08X}"]["rows"]
-        self.assertEqual(rows, [{"callee": f"0x{self.callee:08X}", "site": f"0x{site:08X}", "bound": 2}
-                                for site in (self.site, site2)])
+        for premises in (None, self.premises([(self.callee, self.site, 2), (self.callee, site2, 2)])):
+            with self.subTest(entry=premises is not None), self.assertRaises(ValueError) as caught:
+                self.walk(premises, extra=EVERY_PASS)
+            self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
+            self.assertNotIn("store-bound retry", str(caught.exception))
+            self.assertRegex(str(caught.exception.__cause__), rf"store bound: no replayed path of 0x{self.callee:08X} "
+                                                              rf"\(called at 0x0800000[0-9A-F]\) returns and \d+ end at a "
+                                                              rf"bound: the walk would verify the premise, not the call")
+        # The frame allows two at the second site; a path may return after two, so 2 is admitted.  A bound of
+        # 1 ends every path at pass 1, before the return: the reviewed entry is refused.
+        self.build(TWICE, loop=DONE)
+        site2 = self.symbols["site2"]
+        rows = [(self.callee, self.site, 2), (self.callee, site2, 2)]
+        _, proof = store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, self.premises(rows))
+        self.assertEqual({site for _, site, _, _ in proof.store_bound_retry["pruned"]}, {self.site, site2})
         with self.assertRaises(ValueError) as caught:
-            self.walk(self.premises([(self.callee, self.site, 2), (self.callee, site2, 2)]), extra=EVERY_PASS)
-        self.assertRegex(str(caught.exception), rf"store bound: no replayed path of 0x{self.callee:08X} \(called at "
-                                                rf"0x0800000[0-9A-F]\) returns and \d+ end at a bound")
+            store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                             self.premises([(self.callee, self.site, 2), (self.callee, site2, 1)]))
+        self.assertRegex(str(caught.exception),
+                         rf"; default store-bound retry: buffer callee 0x{self.callee:08X}: bounded loop replay: "
+                         rf"store bound: no replayed path of 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\) "
+                         rf"returns and \d+ end at a bound: the walk would verify the premise, not the call$")
 
     def test_a_forced_overrun_after_an_early_return_refuses(self):
         # The call may return at once on an unknown result, so some path returns; but once the second site
         # stores it stores on all five passes, through branches the replay follows both ways (the first
         # site's test), and its frame allows four.  The row would state that the loop never runs.
+        # The measure pass sees it: the plain refusal stands, with or without the row the frame would allow.
         self.build("site2:\nstrh r4, [r5, #4]\nadds r5, #2", caller=CALLER12, loop=EARLY)
         site2 = self.symbols["site2"]
-        with self.assertRaises(store_bound.StoreBoundRefusal) as caught:
-            store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, None)
-        self.assertEqual(caught.exception.entry[f"0x{BASE:08X}"]["rows"],
-                         [{"callee": f"0x{self.callee:08X}", "site": f"0x{site2:08X}", "bound": 4}])
-        for bound in (4, 1):
-            with self.subTest(bound=bound), self.assertRaises(ValueError) as caught:
-                store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
-                                 self.premises([(self.callee, site2, bound)]))
-            self.assertRegex(str(caught.exception),
-                             rf"; default store-bound retry: buffer callee 0x{self.callee:08X}: bounded loop "
-                             rf"replay: store bound: in 0x{self.callee:08X} \(called at "
-                             rf"0x0800000[0-9A-F]\), once the store at 0x{site2:08X} first runs no replayed "
-                             rf"continuation returns and some end at a bound: the code itself runs a row store more "
-                             rf"often than its row allows$")
-        # With the first site's 4-byte frame too, both rows' first executions are forced.
-        self.build(EVERY_PASS, loop=EARLY)
+        for premises in (None, self.premises([(self.callee, site2, 4)]), self.premises([(self.callee, site2, 1)])):
+            with self.subTest(entry=premises), self.assertRaises(ValueError) as caught:
+                store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, premises)
+            self.assertNotIsInstance(caught.exception, store_bound.StoreBoundRefusal)
+            self.assertEqual(store_bound.triggered(caught.exception), (self.callee, site2))
+            self.assertRegex(str(caught.exception.__cause__),
+                             rf"store bound: in 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\), once the store "
+                             rf"at 0x{site2:08X} first runs no replayed continuation returns and some end at its bound: "
+                             rf"the code itself runs the store more often than its row allows$")
+        # Behind the early return, a second site that may return after its second store: the frame allows 2,
+        # and 2 is admitted (a first store of the first site at pass 2 leads only to the second site's cut,
+        # which is the second row's count).  A reviewed bound of 1 ends every continuation of the second
+        # site's first store at its own bound at pass 1, while the early return still returns: the entry is
+        # refused, naming that store only.
+        self.build(TWICE, loop=EARLY)
         site2 = self.symbols["site2"]
-        with self.assertRaisesRegex(ValueError, rf"once the store at 0x{self.site:08X}, 0x{site2:08X} first runs"):
+        store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
+                         self.premises([(self.callee, self.site, 2), (self.callee, site2, 2)]))
+        with self.assertRaises(ValueError) as caught:
             store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None,
-                             self.premises([(self.callee, self.site, 2), (self.callee, site2, 2)]))
+                             self.premises([(self.callee, self.site, 2), (self.callee, site2, 1)]))
+        self.assertRegex(str(caught.exception),
+                         rf"; default store-bound retry: buffer callee 0x{self.callee:08X}: bounded loop replay: "
+                         rf"store bound: in 0x{self.callee:08X} \(called at 0x0800000[0-9A-F]\), once the store at "
+                         rf"0x{site2:08X} first runs no replayed continuation returns and some end at its bound: "
+                         rf"the code itself runs the store more often than its row allows$")
 
     def test_a_bound_reached_only_after_a_later_execution_is_a_count(self):
         # The second site stores on every pass, and after its first store the call may return on an unknown
@@ -629,15 +660,19 @@ class StoreBoundNativeTests(unittest.TestCase):
             "review": "fixture", "rows": [{"callee": "0x08000400", "site": f"0x{site:08X}", "bound": bound}
                                           for site, bound in rows]}}))
 
+    def plain_refusal(self, output, site):
+        """The plain walk's refusal at ``site``, unchanged: no retry and no entry printed."""
+        self.assertIn(f"bounded loop replay at 0x{site:08X}: 2-byte strh at caller sp+", output)
+        self.assertNotIn("store-bound retry", output)
+        self.assertNotIn('"bound"', output)
+
     def test_a_store_outside_the_frame_at_its_first_execution_refuses_end_to_end(self):
         # strh r4, [r6, #8] (0x8134) on every pass, outside the u16[2] at once.
         root, fixtures, (site,) = self.variant("zero", LOOP.format(extra="strh r4, [r6, #8]"), "3481")
         code, output, report = fixtures.run(root)
         self.assertNotEqual(code, 0, output)
         self.assertIsNone(report)
-        self.assertIn(f"store bound: the store at 0x{site:08X} in 0x08000400 leaves the allocated local words at its "
-                      f"first execution on a replayed path; a bound below 1 is not admitted", output)
-        self.assertNotIn('"bound"', output)
+        self.plain_refusal(output, site)
         self.rows(root, fixtures.A, [(site, 0)])
         code, output, report = fixtures.run(root)
         self.assertNotEqual(code, 0, output)
@@ -645,13 +680,26 @@ class StoreBoundNativeTests(unittest.TestCase):
         self.assertIn(f"store bound: a row of 0x{fixtures.A:08X} is not {{callee, site, bound >= 1}}", output)
 
     def test_rows_that_end_every_path_of_a_call_refuse_end_to_end(self):
-        # strh r4, [r5] (0x802C) on every one of the five passes; its frame allows two.
+        # strh r4, [r5] (0x802C) on every one of the five passes; its frame allows two, so any row ends every
+        # path: the plain refusal stands, with or without the rows.
         root, fixtures, (site, site2) = self.variant("every", LOOP.format(extra=EVERY_PASS), "3480", "2c80")
-        code, output, _ = fixtures.run(root)
-        self.assertNotEqual(code, 0, output)
-        for row in (site, site2):
-            self.assertIn(f'"site": "0x{row:08X}",\n        "bound": 2', output)
+        for rows in (None, [(site, 2), (site2, 2)]):
+            if rows:
+                self.rows(root, fixtures.A, rows)
+            code, output, report = fixtures.run(root)
+            self.assertNotEqual(code, 0, output)
+            self.assertIsNone(report)
+            self.assertNotIn("store-bound retry", output)
+        # The same store, but the call may return after its second execution: a bound of 2 is issued and
+        # replays; a bound of 1 ends every path before that return and is refused.
+        root, fixtures, (site, site2) = self.variant("twice", DONE.format(extra=TWICE), "3480", "2c80")
         self.rows(root, fixtures.A, [(site, 2), (site2, 2)])
+        code, output, report = fixtures.run(root)
+        self.assertEqual(code, 0, output)
+        with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
+            self.assertTrue(evidence.report_matches(report, root, fixtures.A))
+            self.rows(root, fixtures.A, [(site, 2), (site2, 1)])
+            self.assertFalse(evidence.report_matches(report, root, fixtures.A))
         code, output, report = fixtures.run(root)
         self.assertNotEqual(code, 0, output)
         self.assertIsNone(report)
@@ -660,15 +708,18 @@ class StoreBoundNativeTests(unittest.TestCase):
 
     def test_a_forced_overrun_after_an_early_return_refuses_end_to_end(self):
         root, fixtures, (site, site2) = self.variant("forced", EARLY.format(extra=EVERY_PASS), "3480", "2c80")
-        code, output, _ = fixtures.run(root)
-        self.assertNotEqual(code, 0, output)
         self.rows(root, fixtures.A, [(site, 2), (site2, 2)])
         code, output, report = fixtures.run(root)
         self.assertNotEqual(code, 0, output)
         self.assertIsNone(report)
-        self.assertIn(f"once the store at 0x{site:08X}, 0x{site2:08X} first runs no replayed continuation returns "
-                      f"and some end at a bound: the code itself runs a row store more often than its row allows",
-                      output)
+        self.assertNotIn("store-bound retry", output)
+        root, fixtures, (site, site2) = self.variant("forced1", EARLY.format(extra=TWICE), "3480", "2c80")
+        self.rows(root, fixtures.A, [(site, 2), (site2, 1)])
+        code, output, report = fixtures.run(root)
+        self.assertNotEqual(code, 0, output)
+        self.assertIsNone(report)
+        self.assertIn(f"once the store at 0x{site2:08X} first runs no replayed continuation returns and some end "
+                      f"at its bound: the code itself runs the store more often than its row allows", output)
 
     def test_the_composed_data_buffer_proof_issues_and_replays(self):
         import data_buffer_profile as data_buffer
