@@ -246,7 +246,7 @@ def prove(data, address, rom, mapping, objects, calls, data_relocations, functio
                                                         store_bound_premises)
             else:
                 # The caller keeps this recorder: either retry's walk starts it afresh.
-                reset = (lambda: dma_fills.__init__(dma_fills.rom)) if dma_fills is not None else None
+                reset = (lambda: dma_fills.__init__(dma_fills.rom, dma_fills.premises)) if dma_fills is not None else None
                 instructions, proof = closure.retry(error, run, rebuild, data, address, premises, reset=reset)
     if not proof.buffer_evidence():
         raise ValueError("data-buffer evidence requires an inspected buffer call")
