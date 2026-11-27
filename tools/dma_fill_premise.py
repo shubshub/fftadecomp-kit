@@ -16,8 +16,10 @@ such a fill only under a reviewed, recorded runtime premise, the same kind as
 * the destination and the control each have one derivation on every path: entry registers R0-R3,
   constants, and loads tagged with their site (a load is a leaf: the value that load reads at run
   time, with no claim about what the word holds, so no fact about a frame word crosses a call);
-  combined by shifts, adds, subtracts, ands, ors, eors and bics.  R0-R3, R12 and LR are forgotten at
-  a call; R4-R11 are kept under the ordinary ABI premise the #239 profile already states;
+  combined by shifts, adds, subtracts, ands, ors, eors and bics.  The SP depth that names a frame
+  load is exact through PUSH, POP, ADD/SUB SP #imm and the literal ADD SP, Rm pair (Rm an exact
+  constant); any other SP write refuses.  R0-R3, R12 and LR are forgotten at a call; R4-R11 are
+  kept under the ordinary ABI premise the #239 profile already states;
 * the decomp root's `config/dma_fill_premises.json` holds a reviewed entry for the function that
   repeats every generated row exactly.  The row's claim is fixed (CLAIM): whenever the fill runs,
   its destination span lies wholly in one stackless region or in IWRAM below the stack floor.
@@ -170,6 +172,18 @@ def step(instruction, state, data, address):
     if code & 0xFF00 == 0xB000:                     # add/sub sp, #imm
         amount = (code & 0x7F) * 4
         return (None if depth is None else depth + (amount if code & 0x80 else -amount)), out
+    if code & 0xFF87 == 0x4485:                     # add sp, rm: the walk's literal stack adjustment
+        displacement = _known(regs.get(_reg((code >> 3) & 15), UNKNOWN)) if (code >> 3) & 15 < 13 else None
+        if displacement is None:
+            raise ValueError("DMA fill derivations need an exact constant for a register SP adjustment")
+        displacement -= (displacement & 0x80000000) << 1
+        if displacement % 4 or abs(displacement) > 4096:
+            raise ValueError("DMA fill derivations need a bounded aligned register SP adjustment")
+        return (None if depth is None else depth - displacement), out
+    from capstone.arm_const import ARM_REG_SP
+    if ARM_REG_SP in instruction.regs_access()[1]:
+        # Every other SP write would leave the depth, and so every frame load's entry-SP offset, unknown.
+        raise ValueError("DMA fill derivations do not model this SP write")
     if code & 0xF800 == 0x2000:
         result = _reg((code >> 8) & 7), _const(code & 0xFF)
     elif code & 0xF800 == 0x4800:

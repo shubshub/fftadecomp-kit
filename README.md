@@ -1447,8 +1447,12 @@ Items 1, 2, 3 and 5 still hold unchanged, and:
   leaf, the value that load reads at run time, and the derivation never says
   what a frame word holds: a destination spilled and reloaded is
   `u32[entry_SP-0x44]@0x0801AFD0`, not the register it was spilled from, so no
-  fact about a frame word crosses a call. Calls forget R0-R3, R12 and LR and
-  keep R4-R11 (the ABI premise the block already states). A join of two
+  fact about a frame word crosses a call. The SP depth that names a frame load
+  is tracked exactly through PUSH, POP, ADD/SUB SP by an immediate and the
+  literal `ADD SP, Rm` pair (Rm an exact bounded, aligned constant); any other
+  SP write refuses (`DMA fill derivations do not model this SP write`). Calls
+  forget R0-R3, R12 and LR and keep R4-R11 (the ABI premise the block already
+  states). A join of two
   derivations, a register-offset load and every other instruction leave no
   derivation (`... (it has no defined derivation, so no premise can be
   stated)`); a frame address as the destination stays an escape, and an exact

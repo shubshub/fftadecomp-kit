@@ -200,6 +200,31 @@ class DmaFillPremiseWalkTests(unittest.TestCase):
         self.refused(source(destination="ldr r3, [r5]"), base.ESCAPE)
         self.refused(source(destination="ldr r3, [sp, #4]\nstr r3, [sp]"), base.ESCAPE)
 
+    def test_a_literal_stack_allocation_keeps_the_frame_load_offsets(self):
+        # The frame allocated by the literal pair `ldr r5, =-8; add sp, r5` (which the walk admits) instead of
+        # `sub sp, #8`: the destination is still spilled to sp+4, entry_SP-0x10, and the row must name that word.
+        literal = TEMPLATE.replace("sub sp, #8", "ldr r5, =0xFFFFFFF8\nadd sp, r5").format(**DEFAULTS)
+        (row,) = self.rows(literal)
+        self.assertRegex(row["destination"], r"^u32\[entry_SP-0x10\]@0x080000[0-9A-F]{2}$")
+        (plain,) = self.rows(source())
+        self.assertEqual(row["destination"].split("@")[0], plain["destination"].split("@")[0])
+
+    def test_every_sp_write_is_tracked_exactly_or_refuses(self):
+        decoder = base.match.Cs(base.match.CS_ARCH_ARM, base.match.CS_MODE_THUMB)
+        decoder.detail = True
+        r5 = premise._reg(5)
+
+        def step(code, value):
+            (instruction,) = decoder.disasm(code.to_bytes(2, "little"), BASE)
+            return premise.step(instruction, (12, {} if value is None else {r5: premise._const(value)}), b"", BASE)
+        self.assertEqual(step(0x44AD, 0xFFFFFFF8)[0], 20)          # add sp, r5 with r5 = -8: eight bytes lower
+        self.assertEqual(step(0x44AD, 8)[0], 4)
+        for code, value, message in ((0x44AD, None, "need an exact constant"),
+                                     (0x44AD, 6, "bounded aligned"), (0x44AD, 0x2000, "bounded aligned"),
+                                     (0x46AD, 0xFFFFFFF8, "do not model this SP write")):    # mov sp, r5
+            with self.subTest(code=hex(code), value=value), self.assertRaisesRegex(ValueError, message):
+                step(code, value)
+
 
 NATIVE = base.HEADER + base.FILL + """
 typedef struct { u16 unknown_00[3]; u16 size; } Config;
