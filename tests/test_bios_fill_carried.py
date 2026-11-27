@@ -13,6 +13,7 @@ premises the check states.
 """
 from pathlib import Path
 import json
+import re
 import os
 import struct
 import subprocess
@@ -339,7 +340,8 @@ print("replay", match_evidence.report_matches((root / "docs/match/08000200.md").
 class IssuanceTests(unittest.TestCase):
     """each shape through match.py as a subprocess (`__main__`), then replayed as status.py --verify does"""
 
-    def issue_and_replay(self, body, register):
+    def issue_and_replay(self, body, register, tampers=()):
+        """the issued report; each (old, new) of tampers, and another register for the carry, fails replay"""
         scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", Path(__file__).resolve().parents[1] / "build"))
         scratch.mkdir(parents=True, exist_ok=True)
         tools = Path(fill.__file__).parent
@@ -357,13 +359,15 @@ class IssuanceTests(unittest.TestCase):
                                     text=True, env=environment, timeout=900)
             self.assertEqual(replay.returncode, 0, (replay.stdout + replay.stderr)[-3000:])
             self.assertIn("replay True", replay.stdout, (replay.stdout + replay.stderr)[-3000:])
-            # the carry fact is recomputed: a report naming another register does not replay
+            # the record is recomputed: a report naming another register, or with another premise, does not replay
             other = "r4" if register != "r4" else "r5"
-            (root / "docs/match/08000200.md").write_text(report.replace(f"held in {register} from",
-                                                                        f"held in {other} from"))
-            tampered = subprocess.run([sys.executable, "-c", REPLAY, str(tools), str(root)], capture_output=True,
-                                      text=True, env=environment, timeout=900)
-            self.assertIn("replay False", tampered.stdout, (tampered.stdout + tampered.stderr)[-3000:])
+            for old, new in [(f"held in {register} from", f"held in {other} from")] + list(tampers):
+                self.assertIn(old, report)
+                (root / "docs/match/08000200.md").write_text(report.replace(old, new))
+                tampered = subprocess.run([sys.executable, "-c", REPLAY, str(tools), str(root)], capture_output=True,
+                                          text=True, env=environment, timeout=900)
+                self.assertIn("replay False", tampered.stdout, (tampered.stdout + tampered.stderr)[-3000:])
+            return report
 
     def test_the_loop_shape(self):
         self.issue_and_replay(LOOP, "r7")
@@ -373,6 +377,15 @@ class IssuanceTests(unittest.TestCase):
 
     def test_the_two_step_shape(self):
         self.issue_and_replay(TWO_STEP, "sl")
+
+    def test_the_r3_store_base_shape(self):
+        # 0x0810EC04's shape; match.py's frame proof admits r3 = sp+K at the CpuSet call only as a dead local
+        # address (the BIOS wrapper summaries' non-argument register), and the fill's record states its premise
+        premise = "BIOS premise: CpuSet (swi 0x0B) reads only r0-r2 (GBATEK), so nothing reads r3"
+        report = self.issue_and_replay(STORE_BASE, "sb", [(premise, premise.replace("r0-r2", "r0-r3"))])
+        self.assertRegex(report, r"r3 holds sp\+0x24 at the BL as the base of the store at [0-9A-F]{8}; "
+                         + re.escape(premise))
+        self.assertIn("* buffer BIOS non-argument register: r3 carried local", report)
 
 
 if __name__ == "__main__":
