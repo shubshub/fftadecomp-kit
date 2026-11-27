@@ -442,5 +442,65 @@ class IssuingCopyTests(unittest.TestCase):
         finally:
             sys.modules["__main__"] = main
 
+LITERAL_PLAIN = """typedef unsigned short u16;
+extern void func_08000500(u16 *out);
+extern void func_08000400(u16 value, u16 *out, void (*callback)(u16 *));
+u16 func_08000200(u16 value)
+{
+    u16 buffer[4];
+
+    func_08000400(value, buffer, func_08000500);
+    return buffer[0] + buffer[3];
+}
+"""
+INSIDE = "movs r1, #0\nstrh r1, [r0]\nstrh r1, [r0, #6]\nbx lr"
+NATIVE_CREATOR = ("push {r4, r5, r7, lr}\nadds r5, r1, #0\nadds r4, r2, #0\nldr r0, =0x02000000\nmovs r1, #16\n"
+                  "bl 0x08000600\nadds r7, r0, #0\nstr r4, [r7]\nldr r0, =0x02001000\nstr r7, [r0, #8]\n"
+                  f"ldr r3, [r7]\nadds r0, r5, #0\nbl 0x{R3:08X}\npop {{r4, r5, r7}}\npop {{r0}}\nbx r0\n"
+                  ".align 2\n.ltorg")
+
+try:
+    from test_data_buffer_calls import A, build as data_buffer_tree, run as run_match, tools_present
+    from test_call_via_targets import index_thunks
+    import match_evidence
+except ImportError:            # pragma: no cover - the sibling fixtures are part of the suite
+    tools_present = lambda: False
+
+
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class SubprocessTests(unittest.TestCase):
+    def test_the_entry_applies_at_issuance_and_in_replay(self):
+        # match.py as a subprocess issues the report as __main__ on the function-buffer route
+        # (rv-137's S1); the replay fails without the fresh-block line or with another review text.
+        from capstone import Cs, CS_ARCH_ARM, CS_MODE_THUMB
+        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="fresh_block_sub_", dir=scratch) as directory:
+            root = index_thunks(data_buffer_tree(Path(directory) / "tree", LITERAL_PLAIN,
+                                                 [("func_08000400", NATIVE_CREATOR), ("func_08000500", INSIDE),
+                                                  ("func_08000600", "ldr r0, =0x02000100\nbx lr\n.align 2\n.ltorg")],
+                                                 large=True))
+            rom = (root / "baserom.bin").read_bytes()
+            found = list(Cs(CS_ARCH_ARM, CS_MODE_THUMB).disasm(rom[0x400:0x480], 0x08000400))
+            call = next(i.address for i in found if i.mnemonic == "bl" and i.op_str == "#0x8000600")
+            store = next(i.address for i in found if i.mnemonic == "str" and i.op_str == "r4, [r7]")
+            reload = next(i.address for i in found if i.mnemonic == "ldr" and i.op_str == "r3, [r7]")
+            writes = [i.address for i in found if store < i.address < reload and i.mnemonic.startswith("str")]
+            entry = {"0x08000400": {"review": REVIEW, "rows": [{
+                "allocator": "0x08000600", "call": f"0x{call:08X}", "base": "r7", "store": f"0x{store:08X}",
+                "reload": f"0x{reload:08X}", "offset": 0, "writes": [f"0x{site:08X}" for site in writes]}]}}
+            (root / "config/fresh_block_premises.json").write_text(json.dumps(entry))
+            code, output, text = run_match(root)
+            self.assertEqual(code, 0, output[-2000:])
+            self.assertEqual(len([line for line in text.splitlines() if line.startswith(fresh.FIELD + ":")]), 1, text)
+            with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
+                self.assertTrue(match_evidence.report_matches(text, root, A))
+                edited = "".join(line + "\n" for line in text.splitlines() if not line.startswith(fresh.FIELD))
+                self.assertFalse(match_evidence.report_matches(edited, root, A))
+                entry["0x08000400"]["review"] = REVIEW + " Changed."
+                (root / "config/fresh_block_premises.json").write_text(json.dumps(entry))
+                self.assertFalse(match_evidence.report_matches(text, root, A))
+
+
 if __name__ == "__main__":
     unittest.main()
