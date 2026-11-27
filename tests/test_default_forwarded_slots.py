@@ -157,6 +157,25 @@ class DefaultForwardingTests(unittest.TestCase):
                                     (OWNER, OWNER + 8, -8, -16, -20), (OWNER, OWNER + 8, R2, -4, -8)})
         self.assertIn(" keeps released word entry_SP-0x14 -8/-12, slot entry_SP-0x8 -16/-20, r2 -4/-8 apart ", line)
 
+    def test_a_callee_that_re_covers_a_released_word_may_not_read_it_through_a_materialised_sp(self):
+        # READER: push {lr}; sub sp,#4 (re-covers the released word); mov r1,sp; ldr r2,[r1] (would read the owner
+        # pointer as a scalar); movs r0,#0; str r0,[r2]; movs r1,#0; movs r2,#0; add sp,#4; pop {r0}; bx r0.
+        reader = OTHER + 0x200
+        code = bodies(after=(0xa800, reader))
+        code[reader] = [0xb500, 0xb081, 0x4669, 0x680a, 0x2000, 0x6010, 0x2100, 0x2200, 0xb001, 0xbc01, 0x4700]
+        with self.assertRaisesRegex(ValueError, "re-covered by a callee with non-immediate SP uses"):
+            walk(code)
+
+    def test_a_nested_callee_given_no_pointer_still_inherits_a_word_at_its_sp(self):
+        # READER clears r0 and calls NEST with no pointer, but the released word lies at NEST's SP, so NEST is
+        # walked with it, not trusted, and its read of the word refuses.
+        reader, nest = OTHER + 0x200, OTHER + 0x400
+        code = bodies(after=(0xa800, reader))
+        code[reader] = [0xb500, 0xb081, 0x2000, nest, 0xb001, 0xbc01, 0x4700]
+        code[nest] = [0x9900, 0x2000, 0x6008, 0x2100, 0x4770]
+        with self.assertRaisesRegex(ValueError, "released forwarded pointer word before it is written"):
+            walk(code)
+
     def test_a_later_walked_call_inherits_the_released_word(self):
         proof = walk(bodies(after=(0xa901, FWD)))
         self.assertEqual(proof.forward_releases, {FIRST_CALL: {-20}, OWNER + 12: {-20}})
