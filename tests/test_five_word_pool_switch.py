@@ -93,6 +93,12 @@ class FiveWordRefinementTests(FiveWordFixture):
                 ('another default', fixed, dict(placed, default=placed['default'] + 2)),
                 ('another entry', fixed, dict(placed, relocations=placed['relocations'][:-1])),
                 ('four words', dict(fixed, interposed_words=4), dict(placed, interposed_words=4)),
+                # Each side's own five-word condition alone: the pool size is no table key, so
+                # only that side's check can refuse these.
+                ('fixed four', dict(fixed, interposed_words=4), placed),
+                ('fixed unsized', {k: v for k, v in fixed.items() if k != 'interposed_words'}, placed),
+                ('placed four', fixed, dict(placed, interposed_words=4)),
+                ('placed six', fixed, dict(placed, interposed_words=6)),
                 ('an unmarked placement', fixed, {k: v for k, v in placed.items() if k != 'pool_policy'}),
                 ('a marked fixed layout', dict(fixed, pool_policy=pool.NAME), placed)):
             with self.subTest(name=name):
