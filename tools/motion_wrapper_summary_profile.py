@@ -28,8 +28,8 @@ below, on every run and on every replay:
   word below the entry SP that nothing on the path wrote (or of a released word, or of a word below
   SP at an opaque call) is only copied between frame words, never used; no frame, allocation or
   return address in arithmetic with an unknown; a walked-frame address is never stored outside the
-  walked frames, returned in a caller-clobbered register or read in part (tracked or refused, never
-  dropped); the wrapper's scheduler call passes a descriptor in
+  walked frames, returned in a caller-clobbered register (LR included) or read in part (tracked or
+  refused, never dropped); LR returns no entry value but its own; the wrapper's scheduler call passes a descriptor in
   its frame whose word +4 is the parameter block below it; exactly one callback call on every path,
   entered with halfword 0 of its message equal to 0 (the scheduler copies the descriptor and zeroes
   the phase) and the block address in its word +4; the return through the entry LR with SP and
@@ -634,6 +634,11 @@ class Derivation:
             require(not opaque_content(value), 'motion wrapper: returns an uninitialised or released frame word')
             require(value[0] != 'sp', f'motion wrapper: R{number} returns a walked-frame address')
             results[number] = value
+        # LR is caller-clobbered too: it may hold the entry LR or a return address, never a frame address,
+        # a frame word's unknown content or another entry value (an owner address would leave untracked).
+        link = regs[14]
+        require(not opaque_content(link) and link[0] != 'sp' and tags(link) <= {'LR'},
+                'motion wrapper: LR returns a walked-frame address or an entry value other than the entry LR')
         require(facts.results is None or facts.results == results,
                 'motion wrapper: the caller-clobbered results differ between paths')
         facts.results = results
