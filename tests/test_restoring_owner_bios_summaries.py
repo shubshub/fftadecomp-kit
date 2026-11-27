@@ -266,10 +266,56 @@ class OwnerBiosSummaryTests(unittest.TestCase):
         self.refused("summarised only at the owner's own call", ['mov r0, sp', 'bl func_08012000', 'movs r0, #0'],
                      [], wrappers={cpuset.ADDRESS: cpuset.WRAPPER, CALLEE: callee_with_cpuset()})
 
+    def test_a_dead_local_in_r3_is_admitted_and_reported(self):
+        # The 080E0824 shape: external source and destination, a stale local address in R3, rewritten.
+        middle = ['adds r0, r4, #0', 'adds r1, r5, #0', 'mov r3, sp', 'ldr r2, .Lfill', 'bl func_0814186C',
+                  'movs r3, #0']
+        fixture, manifest, instructions = self.admitted(middle)
+        summaries = manifest['proof']['bios_summaries']
+        [site] = self.sites(manifest)
+        self.assertEqual({key: site[key] for key in ('source', 'destination', 'killed', 'non_argument')},
+                         {'source': None, 'destination': None, 'killed': [3], 'non_argument': [[3, -20]]})
+        self.assertNotIn('call_kills', site)
+        self.assertEqual(summaries['premises'], list(bios.PREMISES_NON_ARGUMENT))
+        report = fixture.report(manifest, len(instructions)).splitlines()
+        lines = [line for line in report if line.startswith('* buffer BIOS')]
+        self.assertEqual(lines, bios.manifest_lines(summaries))
+        self.assertEqual(len(lines), 6)
+        self.assertTrue(lines[-1].startswith(f'* buffer BIOS non-argument register: r3 carried local -20 into '
+                                             f'CpuSet at 0x{site["site"]:08X}; no memory routine takes r3 as an '
+                                             f'argument (GBATEK: R0-R2), '))
+        self.assertIn(f'* buffer BIOS premise: {bios.OUTPUTS_NON_ARGUMENT}', report)
+        self.assertNotIn(f'* buffer BIOS premise: {bios.OUTPUTS}', report)
+        self.assertTrue(owner.selected('\n'.join(report)))
+        result = (fixture.data, manifest, 'synthetic-source', fixture.mapping, fixture.index, fixture.objects,
+                  bytes(fixture.rom), len(instructions), fixture.original)
+        text, stated = fixture.report(manifest, len(instructions)), lines[-1]
+        with mock.patch.object(owner, 'build', lambda *args, **kwargs: result):
+            self.assertTrue(owner.report_matches(text, self.root, A))
+            for name, edited in (('dropped', text.replace(stated + '\n', '')),
+                                 ('offset edited', text.replace(stated, stated.replace('local -20', 'local -16'))),
+                                 ('repeated', text.replace(stated, stated + '\n' + stated))):
+                with self.subTest(edit=name):
+                    self.assertNotEqual(edited, text)
+                    self.assertFalse(owner.report_matches(edited, self.root, A))
+        for change in ('record', 'killed', 'premises'):
+            altered = copy.deepcopy(manifest)
+            record = altered['proof']['bios_summaries']
+            if change == 'record':
+                del record['memory_sites'][0]['non_argument']
+            elif change == 'killed':
+                record['memory_sites'][0]['killed'] = []
+            else:
+                record['premises'] = list(bios.PREMISES)
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'manifest differs'):
+                fixture.verify(manifest=altered)
+
     def test_pointer_outside_r0_r1_and_scalar_wrappers_refused(self):
-        self.refused('local pointer outside R0 and R1',
-                     ['adds r0, r4, #0', 'adds r1, r5, #0', 'mov r3, sp', 'ldr r2, .Lfill', 'bl func_0814186C',
-                      'movs r3, #0'])
+        self.refused('local pointer outside R0, R1 and the non-argument R3 and R12',
+                     ['adds r0, r4, #0', 'adds r1, r5, #0', 'mov r2, sp', 'bl func_0814186C', 'movs r2, #0'], [])
+        # A local address in R3 that is not rewritten before the owner's next call and return.
+        self.refused(NOT_DISCHARGED, ['adds r0, r4, #0', 'adds r1, r5, #0', 'mov r3, sp', 'ldr r2, .Lfill',
+                                      'bl func_0814186C'])
         self.refused('scalar BIOS wrapper refuses a tracked local pointer',
                      ['mov r0, sp', 'movs r1, #3', 'bl func_08141870', 'movs r0, #0'], [],
                      wrappers={cpuset.ADDRESS: cpuset.WRAPPER, DIV: bios.SCALAR[DIV][2]})
@@ -322,7 +368,7 @@ class OwnerBindingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             summaries.bind_owner(code, A, instructions, edges)
         unbound = bios.BiosWrapperSummaries()
-        unbound.pending[(A, cpuset.ADDRESS, -4, None, (), ())] = None
+        unbound.pending[(A, cpuset.ADDRESS, -4, None, (), (), ())] = None
         with self.assertRaises(ValueError):
             unbound.bind_owner(code, A, instructions, edges)
 
