@@ -121,12 +121,29 @@ def hexword(value, what):
     return int(value, 16)
 
 
+class DuplicateKey(ValueError):
+    pass
+
+
+def unique(pairs):
+    """``json.loads`` object hook: a repeated key at any level refuses (JSON keeps the last silently, so a
+    reader of the file could see another entry, review or bound than the walk uses)."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise DuplicateKey(f'store bound: {PREMISES_PATH} repeats the key {json.dumps(key)}')
+        result[key] = value
+    return result
+
+
 def parse_entry(premises, owner):
     """The owner's reviewed entry as (entry, {(callee, site): bound}), or (None, {})."""
     if premises is None:
         return None, {}
     try:
-        table = json.loads(premises)
+        table = json.loads(premises, object_pairs_hook=unique)
+    except DuplicateKey:
+        raise
     except ValueError as error:
         raise ValueError(f'store bound: {PREMISES_PATH} is not JSON') from error
     if type(table) is not dict:

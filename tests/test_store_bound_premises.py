@@ -295,6 +295,37 @@ class StoreBoundTests(unittest.TestCase):
                     ValueError, rf"^store bound: a row of 0x{BASE:08X} is not \{{callee, site, bound >= 1\}}$"):
                 store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, cases[name])
 
+    def test_repeated_keys_refuse(self):
+        # JSON keeps the last of a repeated key silently, so a reader could see another entry, review or bound
+        # than the walk would use: a repeat at any level refuses, whichever copy comes first.
+        self.build()
+        key = f"0x{BASE:08X}"
+        one = json.loads(self.premises([(self.callee, self.site, 1)]))[key]
+        two = json.loads(self.premises([(self.callee, self.site, 2)]))[key]
+        row = json.dumps(two["rows"][0])
+        cases = {
+            "owner": '{"%s": %s, "%s": %s}' % (key, json.dumps(one), key, json.dumps(two)),
+            "owner, other order": '{"%s": %s, "%s": %s}' % (key, json.dumps(two), key, json.dumps(one)),
+            "another owner": '{"0x08000400": %s, "%s": %s, "0x08000400": %s}' % (
+                json.dumps(one), key, json.dumps(two), json.dumps(two)),
+            "review": '{"%s": {"review": "a", "review": %s, "rows": [%s]}}' % (key, json.dumps(two["review"]), row),
+            "bound": '{"%s": {"review": %s, "rows": [%s]}}' % (key, json.dumps(two["review"]),
+                                                               row.replace('"bound": 2', '"bound": 1, "bound": 2')),
+        }
+        for name, text in cases.items():
+            with self.subTest(case=name):
+                json.loads(text)                              # valid JSON: only the repeat is wrong
+                with self.assertRaisesRegex(store_bound.DuplicateKey,
+                                            rf"^store bound: {store_bound.PREMISES_PATH} repeats the key \""):
+                    store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, text.encode())
+        # A report replay reading such a file refuses too.
+        premises = self.premises([(self.callee, self.site, 2)])
+        (self.root / store_bound.PREMISES_PATH).write_bytes(premises)
+        _, proof = store_bound.walk(self.make_proof, self.run_walk, self.body, BASE, None, premises)
+        self.assertTrue(self.accepted(self.report(proof)))
+        (self.root / store_bound.PREMISES_PATH).write_text(cases["owner, other order"])
+        self.assertFalse(self.accepted(self.report(proof)))
+
     def test_other_refusals_are_not_retried(self):
         # A callee store that leaves the frame outside any replay.
         caller = "push {r4, lr}\nsub sp, #4\nmov r0, sp\nbl query\nadd sp, #4\npop {r4}\npop {r1}\nbx r1"
