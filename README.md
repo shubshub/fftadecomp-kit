@@ -1973,7 +1973,12 @@ call while it is in R0-R3. A write clears it (the site is recorded), and a
 return of a walked caller hands it on the same way. An inspection that
 recorded a release and then refused keeps its refusal: the dead-register
 fallback would discard the record, as kit #538 keeps the refusal of a callee
-that returns its own frame. The value is never dropped, so no premise is
+that returns its own frame. The markers do not depend on the walk's order:
+a call that marks no R2 (or R3) for its callee, because no release of that
+callee had been recorded yet, is noted, and a release recorded later for
+that callee and register refuses. A call in the core walk of an inspected
+callee is not noted, because that callee's alias-path walk makes the same
+call after its core walk. The value is never dropped, so no premise is
 stated. The records are stated on one
 `* buffer released scratch:` line and bound into the buffer fingerprint only
 when there is one. Synthetic boundaries are in `tests/test_released_scratch.py`.
