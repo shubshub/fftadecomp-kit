@@ -1751,9 +1751,11 @@ on it, and only there, the copy and BIOS summaries still exclude forwarded
 contexts.
 
 A report that uses the rule states one `* buffer forwarded slots:` line (each
-slot's callee, store site, word and owner offset, the released words per owner
-call and the trusted calls) and, whenever a word was released, the premise
-line `* buffer forwarded slot premise:`: a trusted call,
+slot's callee, store site, word and owner offset, each ADD SP inside a callee
+that released a slot, the released words per owner call and the trusted calls)
+and, whenever a word was released (in the owner or inside a callee, even when
+a later PUSH there ends it) or a call was trusted, the premise line
+`* buffer forwarded slot premise:`: a trusted call,
 including everything it calls, interrupt handlers and the code that runs after
 the owner returns do not read a stack word below their entry SP before writing
 it. Both are bound into the

@@ -21,7 +21,8 @@ the owner:
 * moving SP down over released words without writing them refuses (``sp_down``);
 * at the owner's return the released words lie below SP and are dropped (``at_return``).
 
-Every report with a released word states ``PREMISE``: trusted calls, interrupt handlers and the code
+Every report whose walk released a word, in the owner or inside an inspected callee (even one a later
+PUSH there ends), or trusted a call states ``PREMISE``: trusted calls, interrupt handlers and the code
 after the owner's return are not inspected, and none of them may read the word before writing it.
 
 No value is taken from a frame word across a call: a live slot survives a call only because the
@@ -105,7 +106,8 @@ def observed(proof):
     bind their own records) that forwarded, released or trusted anything."""
     if not getattr(proof, "default_forwarding", False):
         return False
-    return bool(proof.forward_slot_records or proof.forward_releases or proof.forward_trusted_calls)
+    return bool(proof.forward_slot_records or proof.forward_releases or proof.forward_trusted_calls or
+                proof.forward_callee_releases)
 
 
 def evidence(proof):
@@ -113,7 +115,10 @@ def evidence(proof):
                 slots=sorted(list(record) for record in proof.forward_slot_records),
                 released=[[site, sorted(positions)] for site, positions in sorted(proof.forward_releases.items())],
                 trusted=sorted([owner, site, target] for owner, site, target in proof.forward_trusted_calls),
-                premise=PREMISE if proof.forward_releases else None,
+                callee_released=sorted([callee, site] for callee, site in proof.forward_callee_releases),
+                # Any release or trusted call relies on the premise, wherever the word ends.
+                premise=PREMISE if proof.forward_releases or proof.forward_trusted_calls or
+                proof.forward_callee_releases else None,
                 premise_proved=False)
 
 
@@ -133,9 +138,10 @@ def lines(proof):
     released_text = ", ".join(f"call 0x{site:08X}: " + " ".join(f"entry_SP{position:+#x}" for position in positions)
                               for site, positions in found["released"]) or "none"
     trusted = ", ".join(f"0x{site:08X} to 0x{target:08X}" for _, site, target in found["trusted"]) or "none"
+    inside = ", ".join(f"0x{site:08X} in 0x{callee:08X}" for callee, site in found["callee_released"]) or "none"
     out = [f"{SLOTS_FIELD}`{SCHEMA}` inspected callees store owner frame pointers in their own frames, tracked "
-           f"word by word: {slots}; released below the owner's SP after {released_text}; trusted calls "
-           f"while released words exist: {trusted}"]
+           f"word by word: {slots}; released inside callees at {inside}; released below the owner's SP after "
+           f"{released_text}; trusted calls while released words exist: {trusted}"]
     if found["premise"] is not None:
         out.append(PREMISE_FIELD + found["premise"])
     return out
