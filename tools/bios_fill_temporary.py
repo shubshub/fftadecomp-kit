@@ -479,6 +479,33 @@ TABLES = ("addr_vec", "addr_diff_vec")
 RETURNS_TWICE = {"setjmp", "setjmp_syscall", "sigsetjmp", "savectx", "qsetjmp", "vfork"}
 
 
+# thumb.h: a nested function's static chain arrives in r9 (STATIC_CHAIN_REGNUM; no separate incoming register)
+STATIC_CHAIN_REGNUM = 9
+
+
+def mentions_register(x, number):
+    if code(x) == "reg" and len(x) > 1 and str(x[1]) == str(number):
+        return True
+    return isinstance(x, list) and any(mentions_register(item, number) for item in x)
+
+
+def nested_functions(rtl):
+    """the functions of a unit's expand RTL that name the static chain register: every nested function (a GNU
+    extension) does, so does a call that passes one its chain, and so does __builtin_setjmp, which clobbers it
+    (expand_builtin_setjmp, expr.c).
+
+    expand_function_start (function.c) stores the incoming chain in the frame whenever the function has a
+    containing function (current_function_needs_context), unless DECL_NO_STATIC_CHAIN, whose bit is
+    DECL_REGISTER, which C cannot set on a function (`register` there is an error, c-decl.c).  The function is
+    in the dump even when it is inlined or never called.  A nested function reads the containing function's
+    frame through the chain, out of sight of the frame analysis, so a unit holding one is refused; nothing in
+    the ROM needs one.  A file-scope function names r9 only through an explicit register variable, which
+    refuses too."""
+    return sorted(name for name, function in rtl.items() if any(
+        mentions_register(x, STATIC_CHAIN_REGNUM) for insn in function.insns for x in (insn.pattern, insn.notes)
+        if x is not None))
+
+
 def returns_twice(name):
     for prefix in ("__x", "__", "_"):
         if name.startswith(prefix):
@@ -1030,6 +1057,10 @@ def prove(tree, project, relpath, raw, admitted, rom=None, dependencies=None):
         taken = label_words((Path(work) / "real" / "f.s").read_text())
         proof.function_matches_rom(real["text"], address, rom)
         rtl = real["dumps"]["rtl"]
+        nested = nested_functions(rtl)
+        if nested:
+            raise ProofError(f"the unit names the static chain register r9 ({', '.join(nested)}): a nested function "
+                             "reads the containing frame where the proof cannot see it")
         for other, function in rtl.items():
             if other != name and any("v" in rtl_flags(mem) for _, mem, _ in function.mems()):
                 raise ProofError(f"another function of the unit, {other}, holds a volatile reference")
