@@ -119,6 +119,10 @@ class EvidenceTests(unittest.TestCase):
             "reaches the function's entry": ({F: [BX_LR], CALLER: caller([MOVS_R1_0]),
                                               F + 0x100: [0xE000 | (((F - (F + 0x100) - 4) >> 1) & 0x7FF), BX_LR]},
                                              None),
+            # a conditional branch counts whatever its condition: ble (cond 0xD) at 0x08010080
+            "branch at 0x08010080 reaches the function's entry": (
+                {F: [BX_LR], CALLER: caller([MOVS_R1_0]), F + 0x80: [0xDD00 | (((F - (F + 0x80) - 4) >> 1) & 0xFF), BX_LR]},
+                None),
             "outside every mapped Thumb function": ({F: [BX_LR], CALLER: caller([MOVS_R1_0])},
                                                     {0x08013000: asm.bl(0x08013000, F)}),
             "calls itself": ({F: [PUSH_LR, F, POP_R0, BX_R0]}, None),
