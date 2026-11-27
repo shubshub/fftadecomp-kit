@@ -71,6 +71,30 @@ void func_08000200(u16 value)
     data_02000000[1] = marks[3];
 }
 """
+# A packed struct assignment: agbcc copies it with the compiler's memcpy and emits no `.rodata`
+# (0x0800620C's 16-byte records, 0x08005EF8's 12-byte ones).
+STRUCT_COPY = """typedef unsigned char u8;
+typedef unsigned short u16;
+typedef unsigned int u32;
+typedef struct __attribute__((packed)) Record {
+    u32 first;
+    u16 second;
+    u8 third;
+    u8 fourth;
+} Record;
+extern Record data_02000000[];
+extern void func_08000400(u16 value, Record *out);
+void func_08000200(u16 value)
+{
+    Record copy;
+
+    copy = data_02000000[1];
+    func_08000400(value, &copy);
+    data_02000000[0].second = copy.second;
+}
+"""
+# The struct copy's callee writes two halfwords and leaves no frame address in R1 at its return.
+STRUCT_STORES = "strh r0, [r1]\nstrh r0, [r1, #6]\nmovs r1, #0\nbx lr"
 # No typed object: the plain stack-buffer route, which carries no binding.
 PLAIN = """typedef unsigned short u16;
 extern void func_08000400(u16 value, u16 *out);
@@ -344,6 +368,27 @@ class NativeTests(unittest.TestCase):
         root = build(self.base / "helper", COPIED)
         rom = (root / "baserom.bin").read_bytes()
         patch_rom(root, {HELPER + 40: bytes([rom[HELPER - BASE + 40] ^ 1])})
+        self.refused(root, "compiler memcpy requires the canonical pinned copy helper at 0x081443FC")
+
+    def test_a_struct_copy_binds_memcpy_without_an_initialiser(self):
+        root = build(self.base / "struct", STRUCT_COPY, STRUCT_STORES)
+        runner = match.Runner(match.DEFAULT_CC, root=root, wsl_path=match.DEFAULT_WSL_PATH, timeout=120)
+        with runner.workspace() as workspace:
+            original = compiled(root, workspace, runner)
+        self.assertIsNone(rom_copy.rodata_section(original))
+        self.assertIn("memcpy", [item["name"] for item in original["symbols"] if not item["section"]])
+        code, output, report = data_calls.run(root)
+        self.assertEqual(code, 0, output)
+        self.assertIn("verdict MATCH - byte identical", output)
+        self.assertEqual(data_calls.verification(report), data_buffer.SCHEMA)
+        found = manifest(report)
+        self.assertNotIn(readonly.MANIFEST_KEY, found)
+        self.assertIn(f"func_{HELPER:08X}", [name for _, name in found["calls"]])
+        self.assertFalse(any(line.startswith(readonly.LINE) for line in report.splitlines()))
+        self.assertTrue(self.replays(report, root))
+        rom = (root / "baserom.bin").read_bytes()
+        patch_rom(root, {HELPER + 40: bytes([rom[HELPER - BASE + 40] ^ 1])})
+        self.assertFalse(self.replays(report, root))
         self.refused(root, "compiler memcpy requires the canonical pinned copy helper at 0x081443FC")
 
     def test_pointer_initialisers_and_second_sections_refuse(self):
