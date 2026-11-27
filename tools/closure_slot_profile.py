@@ -28,8 +28,10 @@ refused, never read as a scalar; a constant word's load without a value is an un
 * K1, writes.  Any store that overlaps a word, of any width, through an exact frame address, by the
   owner or by a walked callee, removes its value; a block store refuses.  An exact aligned word
   store of a frame address or a known constant gives the word that value, but only the owner makes
-  a new word (K5): a walked callee may replace a word's value with one of the same kind, and any
-  other store of its removes the value.
+  a new word and only the owner stores a frame address (K5): a walked callee's store of a frame
+  address refuses, as the plain walk refuses it ("buffer pointers cannot be stored or spilled"); its
+  store of a known constant over a constant word replaces the value, and any other store of its
+  removes the value.
 * K2, code that is not walked.  While any word is live every call is walked: the owner's pointer
   slots are incoming stack words of every callee, a summary (copy helper, BIOS wrapper, BIOS fill)
   refuses a call made with words, and the dead-register rule does not replace a call made with
@@ -163,6 +165,10 @@ def word_memory(proof, instruction, aliases, constants, stack, words, sp_offset,
     loaded, word_constant, word_load, pointer_store = descriptor.ProtectedDescriptorWordProof.word_memory(
         proof, instruction, aliases, constants, stack, words, sp_offset, protected, root_frame=root_frame)
     owner = slots.owned(instruction.address)
+    if pointer_store and not owner:
+        # K5 (rv-T-2 CF-1): a frame address a walked callee stores would sit in an owner word that is
+        # neither a word nor a pointer slot, and a later reload would read it as an unknown scalar.
+        raise ValueError("buffer pointers cannot be stored or spilled")
     for slot, fact in list(words.items()):
         if _same(before.get(slot), fact):
             continue
