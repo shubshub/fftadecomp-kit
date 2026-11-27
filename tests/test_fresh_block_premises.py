@@ -201,6 +201,15 @@ class FreshBlockTests(unittest.TestCase):
         self.build_from_text(text)
         self.refused("reaches the reload without the store", self.entry())
 
+    def test_a_path_to_the_store_around_the_allocation_refuses(self):
+        # A branch from before the allocation straight to the store: there the base is whatever the
+        # caller left in it, not the block the allocator returned.
+        self.build()
+        text = (self.root / "f.s").read_text().replace("alloc_call:\n", "cmp r1, #0\nbeq store\nalloc_call:\n")
+        (self.root / "f.s").write_text(text)
+        self.build_from_text(text)
+        self.refused("reaches the store without the allocator's result in the base", self.entry())
+
     def test_the_base_must_hold_the_allocator_result_at_the_store(self):
         # A write of the base between the copy and the store refuses; a call there is the ABI premise.
         for before, pattern in (("adds r7, #4", "base is written before the store"),
