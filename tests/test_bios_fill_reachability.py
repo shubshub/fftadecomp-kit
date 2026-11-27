@@ -515,24 +515,26 @@ class CompiledTests(unittest.TestCase):
                     self.assertRaisesRegex(proof.ProofError, "the proof cannot bound"):
                 self.run_fill(source)
 
+    def compiled(self, body):
+        """(the function's bytes, its expand RTL, the assembly's label_words()) for a unit"""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "src").mkdir()
+            (root / "include").mkdir()
+            text = base.TYPES + base.CPUSET + body
+            (root / "src" / "08000400.c").write_text(text)
+            with tempfile.TemporaryDirectory(dir=root) as work:
+                unit = proof.Unit(root, "src/08000400.c", text, [], work)
+                real = unit.compile("probe", unit.real, "func_08000400")
+                taken = fill.label_words((Path(work) / "probe" / "f.s").read_text())
+        code, start, size, _ = real["text"]
+        return code[start:start + size], real["dumps"]["rtl"]["func_08000400"], taken
+
     def test_a_noreturn_call_refuses_though_it_compiles_as_a_returning_one(self):
         # review fixtures 0806EC60 and 0806F994: the switch's break dumps the pool, so the attribute changes no
         # byte, yet its barrier would cut the call's fall-through into `reading`
         self.assertNotEqual(NORETURN, RETURNING)
-        compiled = {}
-        for name, source in (("noreturn", NORETURN), ("returning", RETURNING)):
-            with tempfile.TemporaryDirectory() as directory:
-                root = Path(directory)
-                (root / "src").mkdir()
-                (root / "include").mkdir()
-                text = base.TYPES + base.CPUSET + source
-                (root / "src" / "08000400.c").write_text(text)
-                with tempfile.TemporaryDirectory(dir=root) as work:
-                    unit = proof.Unit(root, "src/08000400.c", text, [], work)
-                    real = unit.compile("probe", unit.real, "func_08000400")
-                    taken = fill.label_words((Path(work) / "probe" / "f.s").read_text())
-            body, start, size, _ = real["text"]
-            compiled[name] = (body[start:start + size], real["dumps"]["rtl"]["func_08000400"], taken)
+        compiled = {"noreturn": self.compiled(NORETURN), "returning": self.compiled(RETURNING)}
         self.assertEqual(compiled["noreturn"][0], compiled["returning"][0])
         with self.assertRaisesRegex(proof.ProofError, r"barrier UID \d+ follows call insn UID \d+, so the source "
                                                       "declares the callee noreturn"):
@@ -545,11 +547,18 @@ class CompiledTests(unittest.TestCase):
 
     def test_labels_reached_from_outside_the_graph_refuse(self):
         # a label value with no computed jump, a nonlocal goto's target, a __builtin_setjmp receiver
-        for source, reason in ((LABEL_VALUE, r"the assembly takes the address of label \.L\d+ \(UID \d+\)"),
-                               (NONLOCAL, "is preserved for a nonlocal goto"),
-                               (SETJMP, r"the assembly takes the address of label \.L\d+")):
-            with self.subTest(source=source.splitlines()[0]), self.assertRaisesRegex(proof.ProofError, reason):
-                self.run_fill(source)
+        # (the nested function and __builtin_setjmp name the static chain r9, so prove() refuses those units
+        # before the graph; fills() shows the graph refuses them too)
+        for source, reason, unit in (
+                (LABEL_VALUE, r"the assembly takes the address of label \.L\d+ \(UID \d+\)", None),
+                (NONLOCAL, "is preserved for a nonlocal goto", "the unit names the static chain register r9"),
+                (SETJMP, r"the assembly takes the address of label \.L\d+",
+                 "the unit names the static chain register r9")):
+            with self.subTest(source=source.splitlines()[0]):
+                with self.assertRaisesRegex(proof.ProofError, reason):
+                    fill.fills(*self.compiled(source)[1:])
+                with self.assertRaisesRegex(proof.ProofError, unit or reason):
+                    self.run_fill(source)
 
 
 ARMS = """void func_08000200(u16 *dest, int phase, int index)

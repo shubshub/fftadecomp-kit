@@ -165,6 +165,16 @@ def block_move(uid, offset, label=False):
 
 
 class RtlTests(unittest.TestCase):
+    def test_a_function_naming_the_static_chain_is_nested(self):
+        chained = (3, "insn (set (reg:SI 70) (reg:SI 9 r9)) -1 (nil) (nil)")
+        noted = (3, "insn (set (reg:SI 70) (reg:SI 71)) -1 (nil) (expr_list:REG_EQUAL (reg:SI 9 r9) (nil))")
+        others = [(3, "insn (set (reg:SI 70) (reg:SI 8 r8)) -1 (nil) (nil)"),
+                  (4, "insn (set (reg:SI 79) (reg:SI 90)) -1 (nil) (nil)")]
+        rtl = {"func_08000400": function([ENTRY] + fill_insns(10)), "peek": function([ENTRY, chained], "peek"),
+               "twice": function([ENTRY, noted], "twice"), "plain": function([ENTRY] + others, "plain")}
+        self.assertEqual(fill.nested_functions(rtl), ["peek", "twice"])
+        self.assertEqual(fill.nested_functions({"func_08000400": rtl["func_08000400"]}), [])
+
     def test_a_fill_is_read_off_its_block(self):
         (found,) = fill.fills(function([ENTRY] + fill_insns(10)))
         self.assertEqual((found["slot"], found["width"], found["control"], found["call"].uid, found["value"]),
@@ -802,6 +812,29 @@ class CompiledTests(unittest.TestCase):
                     "void func_08000400(u16"))):
             with self.subTest(label=label):
                 self.assertIsNone(self.run_fill(body))
+
+    def test_a_unit_holding_a_nested_function_is_refused(self):
+        # a nested function reads the containing frame through the static chain, where the frame analysis
+        # cannot see it; inlined or never called, it is still in the unit's expand RTL
+        block = ("    {\n        volatile u16 tmp = 0;\n"
+                 "        func_0814186C((const void *)&tmp, dest, 0x01000100);\n    }\n")
+        for label, inner in (
+                ("a nested function reading the frame", "u8 later[2];\n        u8 peek(u32 i) { return later[i]; }\n"
+                 "        dest[1] = peek(mode);"),
+                ("an inline one", "u8 later[2];\n        inline u8 peek(u32 i) { return later[i]; }\n"
+                 "        dest[1] = peek(mode);"),
+                ("one never called", "u8 later[2];\n        u8 peek(u32 i) { return later[i]; }\n"
+                 "        dest[1] = mode;"),
+                ("one that reads no frame", "u32 twice(u32 i) { return i * 2; }\n        dest[1] = twice(mode);")):
+            body = ("void func_08000400(u16 *dest, u32 mode)\n{\n" + block + "    {\n        " + inner +
+                    "\n    }\n}\n")
+            with self.subTest(label), self.assertRaisesRegex(proof.ProofError,
+                                                             "the unit names the static chain register r9"):
+                self.run_fill(body)
+        # a file-scope helper is no nested function
+        helper = "static u32 twice(u32 i) { return i * 2; }\n"
+        unit = helper + BLOCK.replace("    }\n}\n", "    }\n    dest[1] = twice(dest[2]);\n}\n")
+        self.assertEqual(self.states(unit), ["admitted"])
 
 
 if __name__ == "__main__":
