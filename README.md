@@ -5660,6 +5660,31 @@ or digit and no hack vocabulary. A label, a string literal, `implausible:`,
 clear nothing. Hack vocabulary in a comment is a finding on every line, a
 justification's included, and no justification clears it.
 
+**Identical arms (kit#201).** `if (c) X; else X;` is the suspect
+`inert-control-flow`: the test exists only for the code it makes. The
+maintainer's ruling admits it where the ROM keeps the test, so its
+justification must cite a ROM address (`0x08000000`-`0x09FFFFFF`), and the
+ROM must keep a trace of it. match.py compiles the source again with that
+test collapsed to `X;`. The same bytes refuse: the test leaves nothing in the
+ROM. Otherwise both listings are counted per mnemonic, operands ignored
+(register numbers, stack offsets and label numbers move with the allocation).
+The original must have more loads (literal-pool loads `ldr rN, .Ln` and
+loads based on sp, which are spill reloads and stack arguments, not counted),
+more compares or tests (`cmp`, `cmn`, `tst`, `and`), or a frame only the
+test explains: the collapsed form pushes no lr, and the original's frame saves
+lr alone (agbcc gives a leaf whose test branch it later removes a lone
+`push {lr}`) or serves a call the collapsed form lacks. A frame that also saves
+callee-saved registers can come from the pressure of keeping the condition
+live, so it never counts on its own. A difference in register allocation alone
+refuses. Each report
+of such a source prints one `* inert test trace: ...` record per test: what
+it keeps, both sizes, and every instruction that differs. The record follows
+the `* source plausibility: plausible` line and any allowlisted volatile
+records. match.py computes the records before any selector runs, and
+`report_matches` recompiles them and refuses a saved report whose records
+differ. A condition that writes (`++`, `--`, `=` or any compound assignment,
+`<<=` and `>>=` included) cannot be collapsed and refuses.
+
 The documented hardware `volatile` exception requires an adjacent actual
 `plausible:` comment, read the same way, and a direct access within `0x04000000..0x040003FF`,
 or a pointer initialized to an external symbol mapped into that register

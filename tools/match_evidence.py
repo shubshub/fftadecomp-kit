@@ -1459,6 +1459,57 @@ def strip_volatile_records(report, records):
     return "\n".join(lines[:anchors[0] + 1] + lines[anchors[0] + 1 + len(records):])
 
 
+TRACE_RECORD_PREFIX = "* inert test trace"
+
+
+def trace_record_lines(report):
+    return [line for line in report.split("\n") if line.lstrip().startswith(TRACE_RECORD_PREFIX)]
+
+
+def carry_trace_records(report, records):
+    """the report with the inert test trace records (match.inert_trace_records) in their one place.
+
+    They follow the single `* source plausibility: plausible` line and the
+    allowlisted volatile records after it.  A report that already carries
+    trace records, or lacks that line or has it twice, cannot carry them:
+    ValueError.
+    """
+    if trace_record_lines(report):
+        raise ValueError("report already carries inert test trace records")
+    if not records:
+        return report
+    lines = report.split("\n")
+    anchors = [index for index, line in enumerate(lines) if line == VOLATILE_RECORD_ANCHOR]
+    if len(anchors) != 1:
+        raise ValueError("report has no single plausible-source line to carry inert test trace records")
+    at = anchors[0] + 1
+    while at < len(lines) and lines[at].startswith(VOLATILE_RECORD_PREFIX):
+        at += 1
+    return "\n".join(lines[:at] + list(records) + lines[at:])
+
+
+def strip_trace_records(report, records):
+    """the report without its inert test trace records, once they equal `records`.
+
+    report_matches calls this after strip_volatile_records, so the records must
+    sit, contiguous and in order, directly after the single
+    `* source plausibility: plausible` line.  A record the recomputed collapse
+    compiles do not give, a missing one or one out of place refuses
+    (ValueError), and each profile validator then sees the report as its
+    writer rendered it.
+    """
+    records = list(records)
+    if trace_record_lines(report) != records:
+        raise ValueError("inert test trace records differ from the recomputed records")
+    if not records:
+        return report
+    lines = report.split("\n")
+    anchors = [index for index, line in enumerate(lines) if line == VOLATILE_RECORD_ANCHOR]
+    if len(anchors) != 1 or lines[anchors[0] + 1:anchors[0] + 1 + len(records)] != records:
+        raise ValueError("inert test trace records do not directly follow the plausible-source line")
+    return "\n".join(lines[:anchors[0] + 1] + lines[anchors[0] + 1 + len(records):])
+
+
 def address_pins(report, root, address, records):
     """whether `report` may stand at `address`: the pins a replay keys by address.
 
@@ -1668,6 +1719,9 @@ def report_matches(report, root, address):
         if not address_pins(report, root, address, records):
             return False
         report = strip_volatile_records(report, records)
+        # what a justified inert test keeps in the ROM, recompiled (kit#201)
+        from match import inert_trace_records
+        report = strip_trace_records(report, inert_trace_records(root, address, library_units.report_arguments(report)))
     except (OSError, ValueError, KeyError, TypeError, AttributeError, OverflowError, RecursionError,
             RuntimeError, subprocess.SubprocessError):
         return False
