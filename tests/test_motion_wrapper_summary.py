@@ -63,6 +63,7 @@ WRAPPER = """
     movs r1, #24
     ldr r3, [sp, #64]
     bl scheduler
+@WRAPPER_AFTER@
     add sp, #44
     pop {r3}
     mov r8, r3
@@ -190,11 +191,11 @@ def tools_present():
 
 def stand_ins(work, owner_setup='', owner_after='', target='wrapper', r1='    add r1, sp, #8', r3='    movs r3, #0',
               wrapper_extra='', callback_extra='', phase=ZERO_PHASE, second_call='', before_allocator='',
-              after_allocator=''):
+              after_allocator='', wrapper_after=''):
     """Assemble the stand-ins; returns (rom, mapping entries, symbols, pins)."""
     owner = (OWNER_BODY.replace('@OWNER_SETUP@', owner_setup).replace('@OWNER_AFTER@', owner_after)
              .replace('@TARGET@', target).replace('@R1@', r1).replace('@R3@', r3))
-    wrapper = WRAPPER.replace('@WRAPPER_EXTRA@', wrapper_extra)
+    wrapper = WRAPPER.replace('@WRAPPER_EXTRA@', wrapper_extra).replace('@WRAPPER_AFTER@', wrapper_after)
     callback = CALLBACK.replace('@CALLBACK_EXTRA@', callback_extra)
     body = (BODY.replace('@PHASE@', phase).replace('@SECOND_CALL@', second_call)
             .replace('@BEFORE_ALLOCATOR@', before_allocator).replace('@AFTER_ALLOCATOR@', after_allocator))
@@ -310,6 +311,44 @@ class StandInTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'load through an unsupported base'):
             self.derive(callback_extra='    ldr r0, [r4, #4]\n    mov r3, sp\n    subs r3, #8\n    strh r0, [r3]\n'
                                        '    ldrh r0, [r3]\n    ldrh r0, [r0]')
+
+    # ---- a walked-frame address is tracked or refused, never dropped (review F1) ------------------
+    def test_a_callback_that_keeps_the_block_address_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'stores a walked-frame address outside the frames'):
+            self.derive(callback_extra='    str r4, [r2, #20]')
+
+    def test_a_callback_that_keeps_its_message_address_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'stores a walked-frame address outside the frames'):
+            self.derive(callback_extra='    str r1, [r2, #20]')
+
+    def test_a_halfword_of_a_frame_address_kept_in_the_allocation_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'stores a walked-frame address outside the frames'):
+            self.derive(callback_extra='    strh r4, [r2, #20]')
+
+    def test_a_halfword_of_a_frame_address_read_back_refuses(self):
+        with self.assertRaisesRegex(ValueError, 'a halfword or byte of a walked-frame address is read'):
+            self.derive(callback_extra='    mov r0, sp\n    mov r3, sp\n    subs r3, #8\n    strh r0, [r3]\n'
+                                       '    ldrh r0, [r3]')
+        # Read through a wider store it is opaque (copied only), and using it refuses.
+        with self.assertRaisesRegex(ValueError, 'uninitialised or released frame word'):
+            self.derive(callback_extra='    mov r0, sp\n    mov r3, sp\n    subs r3, #8\n    str r0, [r3]\n'
+                                       '    ldrh r0, [r3]\n    adds r0, #1')
+
+    def test_a_frame_address_returned_in_r2_or_r12_refuses(self):
+        for register, code in (('R2', '    add r2, sp, #16'), ('R12', '    add r1, sp, #16\n    mov ip, r1')):
+            with self.subTest(register=register):
+                with self.assertRaisesRegex(ValueError, f'{register} returns a walked-frame address'):
+                    self.derive(wrapper_after=code)
+                # The owner that would store through it is refused at the call.
+                self.refused(f'{register} returns a walked-frame address', wrapper_after=code,
+                             owner_after='    ldr r0, [r2, #4]')
+
+    def test_frame_addresses_passed_to_the_opaque_calls_are_listed(self):
+        # The descriptor (entry-SP-44) is still in R2 and R5 at the allocator call: the premise covers it.
+        record = motion.facts_record(0x080D6284, self.derive(), ())
+        self.assertTrue({(2, -44), (5, -44)} <= {(register, offset) for _, register, offset in record['opaque_frames']})
+        proof = self.walk()
+        self.assertIn('frame addresses passed: ', proof.motion_summaries.lines()[1])
 
     def test_an_unrestored_callee_saved_register_refuses(self):
         with self.assertRaisesRegex(ValueError, 'R5 is not restored at the return'):

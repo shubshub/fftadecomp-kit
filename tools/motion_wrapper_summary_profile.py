@@ -27,7 +27,9 @@ below, on every run and on every replay:
 * it requires: no store to the caller's frame (at or above the wrapper's entry SP); a read of a frame
   word below the entry SP that nothing on the path wrote (or of a released word, or of a word below
   SP at an opaque call) is only copied between frame words, never used; no frame, allocation or
-  return address in arithmetic with an unknown; the wrapper's scheduler call passes a descriptor in
+  return address in arithmetic with an unknown; a walked-frame address is never stored outside the
+  walked frames, returned in a caller-clobbered register or read in part (tracked or refused, never
+  dropped); the wrapper's scheduler call passes a descriptor in
   its frame whose word +4 is the parameter block below it; exactly one callback call on every path,
   entered with halfword 0 of its message equal to 0 (the scheduler copies the descriptor and zeroes
   the phase) and the block address in its word +4; the return through the entry LR with SP and
@@ -89,11 +91,14 @@ PINS = {
     CALL_VIA_R2: (2, 'dd9261f0471768edc33bf979649f6297463be423da17c3f881684f5747e163a1'),
     CALL_VIA_R3: (2, '477db9ac7ca5efc12e37f882656b8fe5a363ffeb99b2e565a953d10c3c91ab21'),
 }
-PREMISE = ('the allocator func_08007138 returns an allocation separate from every stack word, preserves SP and '
-           'R4-R11 and touches no stack word at or above its entry SP; the zero fill called through _call_via_r2 '
-           'at 0x08005984 writes only that allocation; the untracked loads and stores (through scheduler list '
-           'nodes, the manager, the parent and fixed RAM addresses) touch no stack word and not the '
-           'allocation\'s callback word; the pinned bodies terminate')
+PREMISE = ('the allocator func_08007138 and the zero fill called through _call_via_r2 at 0x08005984 (neither is '
+           'walked; the fill is IWRAM code) each preserve SP and R4-R11, keep none of their argument values '
+           '(the frame addresses listed as passed included) once they return, read and write no stack word at '
+           'or above their entry SP, and read no stack word below it that they did not write first; the '
+           'allocator returns an allocation separate from every stack word; the zero fill writes only that '
+           'allocation; the untracked loads and stores (through scheduler list nodes, the manager, the parent '
+           'and fixed RAM addresses) touch no stack word and not the allocation\'s callback word; the pinned '
+           'bodies terminate')
 SUMMARY = ('a direct call to a pinned motion-task wrapper, summarised from its pinned bytes and those of the '
            'scheduler and the callback (executed on every run); the caller\'s local addresses are only read '
            'through, inside the recorded offsets, and the words that still hold them below SP are tracked')
@@ -161,11 +166,13 @@ def opaque_content(value):
 
 
 def narrow(value, width):
-    """``value`` read back through ``width`` bytes (zero-extended)."""
+    """``value`` read back through ``width`` bytes (zero-extended).  Part of a walked-frame address is never
+    made a number: it refuses (an address is tracked or refused, never dropped)."""
     if width == 4 or opaque_content(value):
         return value
     if value[0] == 'c':
         return constant(value[1] & WIDTH_MASK[width])
+    require(value[0] != 'sp', 'motion wrapper: a halfword or byte of a walked-frame address is read')
     return ('part', frozenset(tags(value)))
 
 
@@ -191,6 +198,7 @@ class Facts:
         self.opaque = set()        # (site, kind) of the opaque calls
         self.untracked = set()     # sites of loads and stores through untracked pointers or fixed RAM addresses
         self.opaque_live = set()   # entry names in R4-R11 at an opaque call (the callee may save them below SP)
+        self.opaque_frames = set() # (site, register, entry-SP offset) of walked-frame addresses passed to one
         self.argument_words = 0    # incoming stack words read
         self.callback = set()      # (callback, copy offset) of every callback entry
         self.results = None        # {register number: value} at the wrapper's return, equal on every path
@@ -331,6 +339,7 @@ class Derivation:
         def outside_store(value):
             require(not opaque_content(value),
                     f'motion wrapper: stores an uninitialised or released frame word outside the frames at {where}')
+            require(value[0] != 'sp', f'motion wrapper: stores a walked-frame address outside the frames at {where}')
             facts.stored.update(name for name in tags(value) if not name.startswith('rel:'))
 
         def load(base, disp, width):
@@ -422,6 +431,10 @@ class Derivation:
                 facts.stored.update(name for name in tags(value) if not name.startswith('rel:'))
             for number in range(4, 12):
                 facts.opaque_live.update(name for name in tags(regs[number]) if not name.startswith('rel:'))
+            site = calls[-1] - 4 if kind.startswith('zero fill') else pc
+            for number in range(16):
+                if number != 13 and number in regs and regs[number][0] == 'sp':
+                    facts.opaque_frames.add((site, number, regs[number][1]))
             # The callee's own frame lies below SP: a word there may be overwritten, and one that held an
             # entry value may still hold it, so it is kept for the released words but can no longer be used.
             for offset in [offset for offset in stack if offset < sp]:
@@ -619,6 +632,7 @@ class Derivation:
         for number in (0, 1, 2, 3, 12):
             value = regs[number]
             require(not opaque_content(value), 'motion wrapper: returns an uninitialised or released frame word')
+            require(value[0] != 'sp', f'motion wrapper: R{number} returns a walked-frame address')
             results[number] = value
         require(facts.results is None or facts.results == results,
                 'motion wrapper: the caller-clobbered results differ between paths')
@@ -691,6 +705,7 @@ def facts_record(wrapper, facts, released_in):
         argument_words=facts.argument_words,
         opaque=sorted([site, kind] for site, kind in facts.opaque),
         untracked=sorted(facts.untracked), opaque_live=sorted(facts.opaque_live),
+        opaque_frames=sorted([site, register, offset] for site, register, offset in facts.opaque_frames),
         results=sorted([number, describe(value)] for number, value in facts.results.items()),
         released=sorted([offset, ' | '.join(sorted(describe(value) for value in values))]
                         for offset, values in facts.released.items()),
@@ -849,7 +864,8 @@ class MotionSummaries:
                 f"kept outside the frames {' '.join(facts['stored']) or 'none'}; used as numbers "
                 f"{' '.join(facts['numbers']) or 'none'}; argument words {facts['argument_words']}; "
                 f"opaque {' '.join(f'0x{site:08X}:{kind}' for site, kind in facts['opaque']) or 'none'} "
-                f"(callee-saved there: {' '.join(facts['opaque_live']) or 'none'}); "
+                f"(callee-saved there: {' '.join(facts['opaque_live']) or 'none'}; frame addresses passed: "
+                f"{' '.join(f'0x{site:08X}:r{register}=entry-SP{offset:+d}' for site, register, offset in facts['opaque_frames']) or 'none'}); "
                 f"untracked accesses at {' '.join(f'0x{site:08X}' for site in facts['untracked']) or 'none'}; "
                 f"results {' '.join(f'r{number}={value}' for number, value in facts['results'])}; "
                 f"words below SP {' '.join(f'entry-SP{offset:+d}={value}' for offset, value in facts['released']) or 'none'}"
