@@ -3897,6 +3897,8 @@ class BufferCallProof:
         self.released_scratch, self.released_kills = set(), set()
         # (callee, register) pairs a call went without a marker for (released_scratch_profile rule 6).
         self.released_unmarked = set()
+        # How often the walks met that rule (records and applied markers); never rolled back.
+        self.released_events = 0
         # R4-R11 an inspected callee (or an inspected callee of it) may write.
         self.callee_clobbers = {}
         # Exact call-via resolutions ((site, target) -> record) and the target each resolved call
@@ -4062,7 +4064,7 @@ class BufferCallProof:
         if self.dead_registers is None:
             return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
         saved = self._snapshot_ledgers()
-        released_before = set(self.released_scratch)
+        released_before = released_scratch.events(self)
         try:
             return self._replayed_arguments(address, arguments, stack, incoming, protected, **context)
         except ValueError as refused:
@@ -4070,10 +4072,10 @@ class BufferCallProof:
             # alias-free call; the records of the refused inspection are discarded.  An
             # inspection refused because the callee returns its own frame address keeps
             # its refusal (kit #538): the call would hand that address to this owner.  So
-            # does one that recorded a released callee frame address before it refused
-            # (released_scratch_profile): discarding the record would drop that address.
+            # does one refused by, or that met, the released-scratch rule (its rule 5):
+            # discarding the pass would drop a released callee frame address it has seen.
             if return_scratch_profile.ESCAPE in str(refused) or \
-                    released_scratch.recorded_since(self, released_before) or \
+                    released_scratch.keeps_refusal(self, released_before, refused) or \
                     self.dead_registers.call(address, arguments, incoming, protected, context, saved) is None:
                 raise
             return self.word_result({}, {})

@@ -46,6 +46,19 @@ D_LATER = ("push {r4, lr}\nsub sp, #8\nbl func_D\nadds r0, r2, #0\nmovs r1, #0\n
 # calls D unwalked and hands r2 to E; the other path passes the buffer to D, which is walked.
 C_BRANCH = ("push {r4, lr}\ncmp r1, #0\nbeq 1f\nmovs r0, #0\nbl func_D\nadds r0, r2, #0\nmovs r1, #0\n"
             "bl func_E\nb 2f\n1:\nbl func_D\nmovs r2, #0\n2:\npop {r4}\npop {r0}\nbx r0")
+# Rule 5 (rv-137's b7): the owner walks D, clears r2 and then passes its frame to a callee that
+# overwrites r0 unread (the dead-register shape) and meets D's release again: by walking D (the same
+# row is recorded again) or by calling it unwalked (a marker is applied).  A refusal of its pass,
+# whether this rule's (the read of r2) or another (an SWI on the path walked first), must stay.
+TWICE = ("push {r4, lr}\nsub sp, #8\nmov r0, sp\nbl func_D\nmovs r2, #0\nmov r0, sp\nbl func_D7\n"
+         "movs r2, #0\nadd sp, #8\npop {r4}\npop {r1}\nbx r1")
+USE = "adds r0, r2, #0\nmovs r1, #0\nbl func_E\n"
+AGAIN = {"walked": "mov r0, sp\nbl func_D\n", "unwalked": "movs r0, #0\nbl func_D\n"}
+SECOND = {name: (f"push {{lr}}\nsub sp, #8\n{call}{use}add sp, #8\npop {{r0}}\nbx r0")
+          for name, call in AGAIN.items()
+          for use in (USE,)}
+SECOND_SWI = {name: (f"push {{lr}}\nsub sp, #8\n{call}cmp r1, #0\nbeq 1f\nsvc #0\n1:\n{USE}"
+                     f"add sp, #8\npop {{r0}}\nbx r0") for name, call in AGAIN.items()}
 # A walked callee that calls D unwalked, overwrites r2, then walks D with its own frame: its core
 # walk meets the first call before D's record, its alias-path walk after it.
 C_BOTH = ("push {lr}\nsub sp, #8\nmovs r1, #1\nstrh r1, [r0]\nmovs r0, #0\nbl func_D\nmovs r2, #0\n"
@@ -71,7 +84,8 @@ class ReleasedScratchTests(unittest.TestCase):
 
     def build(self, owner_body, **bodies):
         functions = dict(func_X=X, func_Y=Y, func_Z=Z, func_X2=X2, func_W="bx lr", func_X3=X3, func_D=D,
-                         func_E=E, func_C_BRANCH=C_BRANCH, func_C_BOTH=C_BOTH)
+                         func_E=E, func_C_BRANCH=C_BRANCH, func_C_BOTH=C_BOTH,
+                         func_D7=SECOND["walked"])
         functions.update(bodies)
         labels = ["owner", "owner_end"] + [label for name in functions for label in (name, name + "_end")]
         text = (".syntax unified\n.arch armv4t\n.thumb\n.text\n.global " + ", ".join(labels) + "\n"
@@ -177,7 +191,7 @@ class ReleasedScratchTests(unittest.TestCase):
         for after in ("strh r1, [r2]", "movs r2, #0"):
             with self.subTest(after=after):
                 self.refused("non-leaf calls and interrupts", owner(after, callee="func_X3"), func_X3=X3)
-        with patch.object(released, "recorded_since", lambda proof, before: False):
+        with patch.object(released, "keeps_refusal", lambda proof, before, error: False):
             dropped = self.walk(owner("strh r1, [r2]", callee="func_X3"), func_X3=X3)
         self.assertTrue(dropped.dead_registers.calls)
         self.assertFalse(dropped.released_scratch)
@@ -193,6 +207,32 @@ class ReleasedScratchTests(unittest.TestCase):
 
     def test_a_release_recorded_on_a_later_path_of_an_alias_walk_refuses(self):
         self.refused(r"an earlier call to 0x[0-9A-F]{8} took no marker", owner("movs r2, #0", callee="func_C_BRANCH"))
+
+    def test_a_pass_that_met_a_release_keeps_its_refusal(self):
+        cases = [(f"{name} read", SECOND[name], "released callee frame address in r2 is read") for name in AGAIN] + \
+                [(f"{name} SWI", SECOND_SWI[name], "non-leaf calls and interrupts") for name in AGAIN]
+        for name, body, pattern in cases:
+            with self.subTest(name):
+                self.refused(pattern, TWICE, func_D7=body)
+                # The fallback would make the callee alias-free and drop the address it reads.
+                with patch.object(released, "keeps_refusal", lambda proof, before, error: False):
+                    dropped = self.walk(TWICE, func_D7=body)
+                self.assertTrue(dropped.dead_registers.calls)
+
+    def test_the_rules_refusal_is_kept_through_any_wrapping(self):
+        self.build(owner("movs r2, #0"))
+        proof = match.BufferCallProof(self.rom, self.mapping, stack_arguments=True)
+        before = released.events(proof)
+        try:
+            try:
+                raise released.Refusal("any text")
+            except ValueError as inner:
+                raise ValueError("buffer callee 0x08000100: any text") from inner
+        except ValueError as wrapped:
+            self.assertTrue(released.keeps_refusal(proof, before, wrapped))
+        self.assertFalse(released.keeps_refusal(proof, before, ValueError("released callee frame address")))
+        proof.released_events += 1
+        self.assertTrue(released.keeps_refusal(proof, before, ValueError("unrelated")))
 
     def test_a_walked_callees_core_walk_is_checked_by_its_alias_walk(self):
         proof = self.walk(owner("movs r2, #0", callee="func_C_BOTH"))

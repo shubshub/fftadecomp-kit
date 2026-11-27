@@ -23,9 +23,11 @@ The caller is a known, walked function, so this rule checks the caller instead o
    (the callee may take it as an argument), and a write clears the marker (recorded with its site);
 4. at a return of a walked caller a marked R2/R3 is recorded for that caller the same way, so the
    release follows the call chain until a write clears it; at the owner root's return it refuses;
-5. an inspection that recorded a release and then refused keeps its refusal: the dead-register
-   fallback (an alias-free call when the callee overwrites the passed address unread) would
-   discard the record, as kit #538 keeps the refusal of a callee that returns its own frame;
+5. an inspection that refused with this rule's refusal (the Refusal type), or that met this rule
+   at all (recorded a release, a repeat included, or applied a marker), keeps its refusal: the
+   dead-register fallback (an alias-free call when the callee overwrites the passed address
+   unread) would discard the pass and drop the address, as kit #538 keeps the refusal of a callee
+   that returns its own frame;
 6. the markers do not depend on the walk's order: a call that marks no R2 (or R3) for its callee,
    because no release of that callee had been recorded yet, notes (callee, register), and a release
    recorded later for a noted pair refuses.  A call in the core walk of an inspected callee is not
@@ -43,6 +45,11 @@ MARK_BASE = 1 << 25
 RELEASED = 'released'
 FIELD = '* buffer released scratch'
 ESCAPE = 'local stack pointer escapes through a return register'
+
+
+class Refusal(ValueError):
+    """Every refusal of this rule.  The dead-register fallback (BufferCallProof.check_arguments)
+    never turns one into an alias-free call, whatever its message (rule 5)."""
 
 
 def _registers():
@@ -88,7 +95,7 @@ def callee_return(proof, address, site, aliases, *, own_frame=True):
             del kept[register]
     for register in held:
         if register not in scratch:
-            raise ValueError(f"released callee frame address in r{register - r0} reaches a return")
+            raise Refusal(f"released callee frame address in r{register - r0} reaches a return")
         _record(proof, (address, site, register - r0, None))
         del kept[mark(register)]
     return kept
@@ -98,17 +105,31 @@ def _record(proof, row):
     """Record a release; rule 6 refuses one that an earlier call of the same callee went without.
     The row is recorded first, so the refusal also keeps the dead-register fallback away (rule 5)."""
     proof.released_scratch.add(row)
+    proof.released_events += 1
     if (row[0], row[2]) in proof.released_unmarked:
-        raise ValueError(f"released callee frame address in r{row[2]}: an earlier call to 0x{row[0]:08X} "
+        raise Refusal(f"released callee frame address in r{row[2]}: an earlier call to 0x{row[0]:08X} "
                          "took no marker")
 
 
-def recorded_since(proof, before):
-    """Whether the proof recorded a release that `before` (an earlier copy of its ledger) lacks.  A
-    refused inspection that did keeps its refusal: the dead-register fallback
-    (BufferCallProof.check_arguments) would discard the record and so drop an address the walk has
-    seen, as kit #538 keeps the refusal of a callee that returns its own frame address."""
-    return bool(proof.released_scratch - before)
+def events(proof):
+    """How often the proof has met this rule: each release recorded (a repeated row too) and each
+    call that applied a marker.  The count is never rolled back."""
+    return proof.released_events
+
+
+def keeps_refusal(proof, before, error):
+    """Rule 5: whether a refused inspection keeps its refusal rather than become the dead-register
+    fallback's alias-free call (BufferCallProof.check_arguments).  It does when the refusal is this
+    rule's (a Refusal anywhere in its cause chain), or when the pass met this rule at all since
+    `events` was `before`: discarding the pass would drop a released address the walk has seen, as
+    kit #538 keeps the refusal of a callee that returns its own frame."""
+    seen = set()
+    while error is not None and id(error) not in seen:
+        if isinstance(error, Refusal):
+            return True
+        seen.add(id(error))
+        error = error.__cause__ or error.__context__
+    return proof.released_events != before
 
 
 def released(proof, callee):
@@ -127,6 +148,8 @@ def after_call(proof, callee, aliases, *, core=False):
     registers = released(proof, callee)
     for register in registers:
         aliases[mark(register)] = RELEASED
+    if registers:
+        proof.released_events += 1
     if applies(proof) and not (core and proof.active):
         r0, scratch = _registers()
         proof.released_unmarked.update((callee, register - r0) for register in scratch if register not in registers)
@@ -141,9 +164,9 @@ def step(proof, address, site, instruction, aliases, calling):
     read, written = instruction.regs_access()
     for register in held:
         if register in read:
-            raise ValueError(f"released callee frame address in r{register - match.ARM_REG_R0} is read")
+            raise Refusal(f"released callee frame address in r{register - match.ARM_REG_R0} is read")
     if calling and any(register - match.ARM_REG_R0 < 4 for register in held):
-        raise ValueError("released callee frame address reaches a call in R0-R3")
+        raise Refusal("released callee frame address reaches a call in R0-R3")
     for register in held & set(written):
         del aliases[mark(register)]
         proof.released_kills.add((address, site, register - match.ARM_REG_R0))
