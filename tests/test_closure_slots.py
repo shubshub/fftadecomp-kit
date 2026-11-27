@@ -50,6 +50,13 @@ OWNER = HEAD + """u32 func_08000200(void *list)
 # dead-register rule would admit without words (R0 is written first).  Words and pointer slots keep
 # that rule out (DeadStackRegisters.call), so the refusal stands: no call drops the words unwalked.
 OWNER_AFTER = OWNER.replace("    return found;", "    func_08000900(&closure);\n    return found;")
+# K2 with constant words (rv-T-2, C18): the owner kills both closure words with constant stores (the pointer
+# slot is gone, the constant words stay live), then hands &found to a callee that writes every register it is
+# given a frame address in (R0 = &found, R2 = &closure left over from the list walk) before any use, then
+# refuses (an SWI).  Live words alone keep the dead-register rule out.
+OWNER_DEAD_WORDS = (HEAD + "extern void func_08000A00(u32 *p);\n" + OWNER[len(HEAD):]).replace(
+    "    return found;", "    closure.argument = 0;\n    closure.callback = 0;\n    func_08000A00(&found);\n    return found;")
+DEAD_WORDS = "movs r0, #0\nmovs r2, #0\nswi 0x05\nbx lr"
 # K3: the callback word is stored on a loop of the owner.
 OWNER_LOOP = HEAD + """u32 func_08000200(void *list, u32 count)
 {
@@ -187,6 +194,15 @@ class ClosureNativeTests(unittest.TestCase):
     def test_k2_dead_register_rule_does_not_replace_a_call_made_with_words(self):
         self.refused("k2_dead", r"0x08000900: non-leaf calls and interrupts require linked CFG verification",
                      source=OWNER_AFTER, ninth=DEAD)
+
+    def test_k2_dead_register_rule_does_not_replace_a_call_made_with_constant_words(self):
+        root = index_thunks(build(self.base / "k2_dead_words", OWNER_DEAD_WORDS,
+                                  callees() + [("func_08000A00", DEAD_WORDS)], large=True,
+                                  function_literal_thunks=True))
+        code, output, report = run(root)
+        self.assertNotEqual(code, 0, report)
+        self.assertIn("closure-slot retry: buffer callee 0x08000A00: non-leaf calls and interrupts require "
+                      "linked CFG verification", output)
 
     def test_k2_memory_writing_swi_in_a_walked_callee_refuses(self):
         self.refused("k2_swi", r"0x08000900: non-leaf calls and interrupts require linked CFG verification",
@@ -433,6 +449,14 @@ class ClosureUnitTests(unittest.TestCase):
         code = bytes.fromhex("0020" "00f0fef8" "0130" "0328" "fcd1" "7047")
         items = list(decoder.disasm(code, 0x08000200))
         self.assertEqual(closure._cyclic_sites(items), {0x08000206, 0x08000208, 0x0800020A})
+
+    def test_cycles_follow_a_conditional_fall_through(self):
+        decoder = match.Cs(match.CS_ARCH_ARM, match.CS_MODE_THUMB)
+        decoder.detail = True
+        # 0: movs r0,#0  2: cmp r0,#3  4: beq a  6: adds r0,#1  8: b 2  a: bx lr  (a top-tested loop, rv-T-2 C16)
+        code = bytes.fromhex("0020" "0328" "01d0" "0130" "fbe7" "7047")
+        items = list(decoder.disasm(code, 0x08000200))
+        self.assertEqual(closure._cyclic_sites(items), {0x08000202, 0x08000204, 0x08000206, 0x08000208})
 
 
 class OptInSiteTests(unittest.TestCase):
