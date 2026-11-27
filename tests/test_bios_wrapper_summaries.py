@@ -1214,5 +1214,56 @@ class BiosWrapperNativeTests(unittest.TestCase):
         self.assertFalse(self.replays(report.replace(manifest + "\n", "")))
 
 
+# ---- the non-argument route through match.py, which issues the report as __main__ ----------------
+# func_08000400 leaves the address of `source` in R3 for func_0814186C (the CpuSet wrapper), which takes
+# only R0-R2; the optional later call writes R3 before anything reads it.
+NON_ARGUMENT_C = """typedef unsigned short u16;
+typedef unsigned int u32;
+extern void func_08000400(u32 *count, u32 *x, u32 *y, const u16 **source);
+extern void func_08000500(u32 a, u32 b, u32 c, u32 d);
+extern void func_0814186C(const void *source, void *destination, u32 control);
+void func_08000200(u16 *destination)
+{
+    u32 count, x, y;
+    const u16 *source;
+
+    func_08000400(&count, &x, &y, &source);
+    func_0814186C(source, destination, count);
+%s}
+"""
+LATER_CALL = "    func_08000500(x, y, count, 7);\n"
+
+
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class NonArgumentNativeTests(unittest.TestCase):
+    setUp = BiosWrapperNativeTests.setUp
+    build = BiosWrapperNativeTests.build
+    run_match = BiosWrapperNativeTests.run_match
+    replays = BiosWrapperNativeTests.replays
+
+    def test_a_dead_r3_is_issued_and_replayed_with_its_line(self):
+        self.build(NON_ARGUMENT_C % LATER_CALL)
+        code, output, report = self.run_match()
+        self.assertEqual(code, 0, output)
+        lines = report.splitlines()
+        stated = [line for line in lines if line.startswith("* buffer BIOS non-argument register: ")]
+        self.assertEqual(len(stated), 1, output)
+        self.assertTrue(stated[0].startswith("* buffer BIOS non-argument register: r3 carried local "), stated)
+        self.assertIn(f"* buffer BIOS premise: {bios.OUTPUTS_NON_ARGUMENT}", lines)
+        self.assertNotIn(f"* buffer BIOS premise: {bios.OUTPUTS}", lines)
+        self.assertTrue(self.replays(report))
+        self.assertFalse(self.replays(report.replace(stated[0] + "\n", "")))
+        with patch.object(bios.NON_ARGUMENT_POLICY, "enabled", False):
+            self.assertFalse(self.replays(report))
+
+    def test_an_r3_live_at_the_return_refuses_at_issue(self):
+        self.build(NON_ARGUMENT_C % "")
+        code, output, report = self.run_match()
+        self.assertNotEqual(code, 0, output)
+        self.assertIsNone(report)
+        self.assertIn("R3 carried a local pointer into BIOS CpuSet and is not written before any read, call or "
+                      "return", output)
+
+
 if __name__ == "__main__":
     unittest.main()
