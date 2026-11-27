@@ -342,5 +342,50 @@ class IssuingCopyTests(unittest.TestCase):
         finally:
             sys.modules["__main__"] = main
 
+BUFFER_ONLY = """typedef unsigned short u16;
+extern void func_08000400(u16 value, u16 *out);
+u16 func_08000200(u16 value)
+{
+    u16 buffer[4];
+
+    func_08000400(value, buffer);
+    return buffer[0] + buffer[3];
+}
+"""
+# H passes the owner's buffer to RX, which releases r2; H clears r2 before using the buffer again.
+H = ("push {r4, lr}\nadds r4, r1, #0\nmovs r0, #0\nadds r1, r4, #0\nbl 0x08000500\nmovs r2, #0\n"
+     "movs r1, #2\nstrh r1, [r4]\npop {r4}\npop {r0}\nbx r0")
+RX = ("push {lr}\nsub sp, #8\nmovs r2, #1\nstrh r2, [r1]\nmov r2, sp\nmovs r0, #0\nbl 0x08000600\n"
+      "add sp, #8\npop {r0}\nbx r0")
+
+try:
+    from test_data_buffer_calls import A, build as data_buffer_tree, run as run_match, tools_present
+    from test_call_via_targets import index_thunks
+    import match_evidence
+except ImportError:            # pragma: no cover - the sibling fixtures are part of the suite
+    tools_present = lambda: False
+
+
+@unittest.skipUnless(tools_present(), "fixed compiler and ARM tools required")
+class SubprocessTests(unittest.TestCase):
+    def test_the_rule_applies_at_issuance_and_in_replay(self):
+        # match.py as a subprocess issues the report as __main__ (rv-137's S3); the replay rebuilds
+        # the proof and fails without the released-scratch line.
+        scratch = Path(os.environ.get("FFTA_TEST_SCRATCH", ROOT / "build"))
+        scratch.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix="released_scratch_sub_", dir=scratch) as directory:
+            root = index_thunks(data_buffer_tree(Path(directory) / "tree", BUFFER_ONLY,
+                                                 [("func_08000400", H), ("func_08000500", RX),
+                                                  ("func_08000600", "bx lr")], large=True))
+            code, output, text = run_match(root)
+            self.assertEqual(code, 0, output[-2000:])
+            self.assertEqual(len([line for line in text.splitlines() if line.startswith(released.FIELD + ":")]), 1,
+                             text)
+            with patch.dict(os.environ, FFTA_ROM=str(root / "baserom.bin")):
+                self.assertTrue(match_evidence.report_matches(text, root, A))
+                edited = "".join(line + "\n" for line in text.splitlines() if not line.startswith(released.FIELD))
+                self.assertFalse(match_evidence.report_matches(edited, root, A))
+
+
 if __name__ == "__main__":
     unittest.main()
